@@ -10,6 +10,9 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import Callout from '../manager/Callout.svelte';
+  import EmptyState from '../manager/EmptyState.svelte';
+  import Kicker from '../../components/Kicker.svelte';
   import Pagination from '../../components/Pagination.svelte';
   import GatheringEventRow from './GatheringEventRow.svelte';
   import ChanceBar from './ChanceBar.svelte';
@@ -71,24 +74,52 @@
 
 <div class="gathering-detail-event" data-gathering-event-section>
   <div class="gathering-detail-event-danger">
-    <span class="gathering-detail-event-caption"
-      >{localize('FABRICATE.App.Gathering.Detail.HighestDanger')}</span
-    >
+    <Kicker as="span">{localize('FABRICATE.App.Gathering.Detail.HighestDanger')}</Kicker>
     <span class={`gathering-detail-event-level is-danger ${dangerRiskClass}`}>
       <i class="fas fa-skull" aria-hidden="true"></i>
       <span>{dangerLabel || localize('FABRICATE.App.Gathering.Detail.Risk.safe')}</span>
     </span>
   </div>
 
+  <!--
+    TWO SENTENCES, TWO ANSWERS, AND THE BRANCH IS WHAT SEPARATES THEM (issue 1514).
+
+    `EventSafeHint` converts and `EventChanceHint` does NOT, and the deciding question is the
+    routing rule's own: is this a statement about the WORLD, or a caption for a CONTROL?
+    "No events can occur here" is true of this environment whether or not anything is drawn
+    beside it, which is the standing statement `Callout` owns — and its twin renders the same
+    sentence in `GatheringTasksPanel` under the same tier, so the two are converted together
+    rather than drawn two ways. "Your chance of encountering an event while gathering here" is
+    a caption for the bar on the line directly above it: it documents a control, says nothing
+    about the world, and reads as a label rather than as a strip. A caption is neither
+    primitive's, so it stays the bare 12px line it has always been and is RECORDED as the shape
+    the set does not name — in the ruled-out register the specification actually maintains,
+    which is the "ruled-out register is part of the specification" requirement in
+    `openspec/specs/design-system/spec.md` and section 15 of
+    `openspec/specs/design-system/library.html`. An earlier draft sent it to "the register
+    (issue 1519)"; that number is the geometry sweep's, a different programme, and no entry ever
+    landed anywhere. A deferral that lives only in a `why` string and a source comment is not
+    recorded at all, which is the whole point of the register having a home.
+
+    THE MEASUREMENT, so the deferral is not re-litigated: converted, this line rendered
+    432.3x44.39 against the 432.3x15 its `<p>` draws — a +29.39px growth plus a 1px
+    `--fab-info-border` edge, an r11 corner, a `--fab-info-soft` fill and a 12px inset, all of
+    it around a caption for the 6px track above. `.gathering-detail-event-hint` therefore
+    survives in this file; its twin in `GatheringTasksPanel` does not, because both of that
+    file's sentences convert.
+  -->
   {#if hasEvent}
     <ChanceBar value={eventChance} scale="event" />
     <p class="gathering-detail-event-hint">
       {localize('FABRICATE.App.Gathering.Detail.EventChanceHint')}
     </p>
   {:else}
-    <p class="gathering-detail-event-hint" data-gathering-safe-hint>
-      {localize('FABRICATE.App.Gathering.Detail.EventSafeHint')}
-    </p>
+    <Callout
+      tone="info"
+      text={localize('FABRICATE.App.Gathering.Detail.EventSafeHint')}
+      dataAttr="data-gathering-safe-hint"
+      dataValue=""
+    />
   {/if}
 </div>
 
@@ -111,9 +142,12 @@
     </header>
 
     {#if filteredEvents.length === 0}
-      <p class="gathering-detail-empty" data-gathering-no-event-matches>
-        {localize('FABRICATE.App.Gathering.Detail.NoEventMatches')}
-      </p>
+      <EmptyState
+        note
+        hint={localize('FABRICATE.App.Gathering.Detail.NoEventMatches')}
+        dataAttr="data-gathering-no-event-matches"
+        dataValue=""
+      />
     {:else}
       <div class="gathering-detail-event-list" role="list">
         {#each paginatedEvents as event (event.id)}
@@ -143,9 +177,12 @@
     {/if}
   </section>
 {:else if eventsHidden}
-  <p class="gathering-detail-empty" data-gathering-events-hidden>
-    {localize('FABRICATE.App.Gathering.Detail.EventsHiddenHint')}
-  </p>
+  <EmptyState
+    note
+    hint={localize('FABRICATE.App.Gathering.Detail.EventsHiddenHint')}
+    dataAttr="data-gathering-events-hidden"
+    dataValue=""
+  />
 {/if}
 
 <style>
@@ -167,10 +204,12 @@
     gap: var(--fab-space-2);
   }
 
-  .gathering-detail-event-caption {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+  /* The caption under the event chance bar. It survives the issue-1514 conversion because a
+     caption for a control is not a standing statement about the world — see the comment above
+     the branch that renders it. */
+  .gathering-detail-event-hint {
+    margin: 0;
+    font-size: 12px;
     color: var(--fab-text-muted);
   }
 
@@ -207,12 +246,6 @@
   .gathering-detail-event-level.is-danger.risk-deadly i,
   .gathering-detail-event-level.is-danger.risk-extreme i {
     color: var(--fab-danger);
-  }
-
-  .gathering-detail-event-hint {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
   }
 
   /*
@@ -291,12 +324,6 @@
     flex-direction: column;
     gap: var(--fab-space-2);
     min-width: 0;
-  }
-
-  .gathering-detail-empty {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
   }
 
   .gathering-detail-pagination {

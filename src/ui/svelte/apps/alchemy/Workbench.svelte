@@ -24,6 +24,8 @@
   prefers-reduced-motion.
 -->
 <script>
+  import Kicker from '../../components/Kicker.svelte';
+  import Medallion from '../../components/Medallion.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import EssenceChips from './EssenceChips.svelte';
   import Notice from '../../components/Notice.svelte';
@@ -197,6 +199,22 @@
     ondrop={handleDrop}
   >
     {#if benchEmpty}
+      <!--
+        THE BENCH'S OWN EMPTY IS DEFERRED, and this one was converted and then measured back
+        out (issue 1514; recorded on this primitive's row in `scripts/lib/designSystemPrimitives.json`).
+
+        The drop zone is ALREADY the dashed region: `.alchemy-bench` is `1.5px dashed
+        var(--fab-border-strong)` at `border-radius: 14px`, and `.is-empty` insets it a
+        further `40px 20px`. Every `EmptyState` variant that CENTRES its stack also keeps a
+        box — base, `compact` and `inline` all draw the dashed panel, and only `note`
+        releases it, at the price of `place-items: start` and a left-aligned 10px line. So the
+        base panel measured 478x203.25 at `1.5px dashed` r12 sitting inside 520x285.25 at
+        `1.5px dashed` r14: two concentric dashed rounded boxes 40px apart, and the bench
+        grew 121.25 to 203.25. That is the exact shape `EmptyState.svelte:275-282` refuses for
+        the popover — "a second bordered box drawn inside it reads as a card the GM might be
+        able to act on" — and here the outer box is a DROP AFFORDANCE whose `is-dragover` cue
+        is that same border thickening, so it cannot be given up to the panel either.
+      -->
       <div class="alchemy-bench-empty">
         <span class="alchemy-bench-empty-icon"
           ><i class="fas fa-hand-pointer" aria-hidden="true"></i></span
@@ -249,13 +267,14 @@
             >
               <i class="fas fa-xmark" aria-hidden="true"></i>
             </button>
-            <span class="alchemy-chip-icon">
-              {#if chip.img}
-                <img src={chip.img} alt="" />
-              {:else}
-                <i class="fas fa-flask" aria-hidden="true"></i>
-              {/if}
-            </span>
+            <Medallion
+              art={chip.img}
+              alt=""
+              size={40}
+              glyph={16}
+              tint="peach"
+              icon="fas fa-flask"
+            />
             <div class="alchemy-chip-name">{chip.name}</div>
             <span class="alchemy-chip-qty">×{chip.qty}</span>
             {#if chip.essences?.length}
@@ -265,35 +284,57 @@
         {/each}
       </div>
       <div class="alchemy-signature">
-        <span class="alchemy-signature-label">{localize('FABRICATE.App.Alchemy.Signature')}</span>
+        <Kicker as="span">{localize('FABRICATE.App.Alchemy.Signature')}</Kicker>
         <span class="alchemy-signature-text">{signatureText}</span>
       </div>
       {#if benchEssences.length}
         <div class="alchemy-bench-essences" data-alchemy-bench-essences>
-          <span class="alchemy-signature-label"
-            >{localize('FABRICATE.App.Alchemy.EssenceTotal')}</span
-          >
+          <Kicker as="span">{localize('FABRICATE.App.Alchemy.EssenceTotal')}</Kicker>
           <EssenceChips essences={benchEssences} size="md" />
         </div>
       {/if}
     {/if}
   </div>
 
+  <!--
+    THE LIVE STATUS STRIP IS DEFERRED, and the reason is a measurement rather than a
+    preference (issue 1514; recorded on this primitive's row in `scripts/lib/designSystemPrimitives.json`).
+
+    The plan routed it to a non-blocking `Notice`, "which is what preserves the `aria-live`
+    region". `Notice`'s tone set is `{danger, warning, info, success, accent}`
+    (`Notice.svelte:145`) and an unrecognised tone falls back to DANGER (`:157`). This strip
+    draws FIVE modes and the fifth is NEUTRAL: `.alchemy-status` alone paints
+    `--fab-surface-soft` / `--fab-border` / `--fab-text-muted`, and it is the RESTING state —
+    measured in the View Lab as the workbench's first frame, reading "Place components on the
+    bench to begin." Routing it to `Notice` would paint the empty bench's own instruction as
+    a red alert.
+
+    `Callout` has all five tones, `neutral` among them, and cannot express the other half:
+    it emits `role="note"` or nothing (`Callout.svelte:131`) and no `aria-live`, so it would
+    silence the region this strip exists to announce through as the bench fills.
+
+    Neither primitive holds both halves, and the change that closes it is a `neutral` tone on
+    `Notice` — a primitive extension, in a file outside this phase's declared paths, which
+    "building a primitive is not a conversion issue's work" puts in another issue's hands.
+  -->
   <div class="alchemy-status alchemy-status-{mode}" data-alchemy-status={mode} aria-live="polite">
     <i class="fas {statusIcon}" aria-hidden="true"></i>
     <span>{statusText}</span>
   </div>
 
-  <div class="alchemy-produces-label">{localize('FABRICATE.App.Alchemy.Produces')}</div>
+  <!--
+    THE LABEL IS THE PRIMITIVE'S, THE 28px OF SEPARATION IS THE CALLER'S (issue 1514).
+    `Kicker` hard-declares `margin: 0` and forwards no class or style, and this rule's last
+    declaration was `margin: 18px 0 10px` — measured 18/10 in the View Lab. It is the only
+    thing standing between the status strip above and the result panel below, so it moves
+    to a wrapper rather than being deleted with the rule that carried it.
+  -->
+  <div class="alchemy-produces-slot">
+    <Kicker as="p">{localize('FABRICATE.App.Alchemy.Produces')}</Kicker>
+  </div>
   {#if showResult}
     <div class="alchemy-result" class:is-ready={mode === 'ready'} data-alchemy-result>
-      <span class="alchemy-result-icon">
-        {#if result.img}
-          <img src={result.img} alt="" />
-        {:else}
-          <i class="fas fa-flask" aria-hidden="true"></i>
-        {/if}
-      </span>
+      <Medallion art={result.img} alt="" size={46} glyph={19} tint="peach" icon="fas fa-flask" />
       <div class="alchemy-result-meta">
         <div class="alchemy-result-name">{result.name}</div>
         {#if result.essences?.length}
@@ -316,6 +357,20 @@
     </div>
   {/if}
 
+  <!--
+    THE STILL-NEEDED WELL IS DEFERRED, on content model (issue 1514; recorded on this primitive's row in `scripts/lib/designSystemPrimitives.json`). The plan routed it to `Callout`, and `Callout` has no children: its props
+    are `title` and `text` as STRINGS plus one `actions` snippet, and `.manager-callout-actions`
+    is `flex: none; display: inline-flex; align-items: center` — a non-wrapping trailing
+    cluster. This well's body is `.alchemy-missing-rows`, a `flex-wrap: wrap` row of N chips
+    that today sits BENEATH its label. Through `actions` the chips would move beside the
+    sentence and stop wrapping, so a third missing component would overflow the column;
+    through `text` they would stop being chips at all. `Notice` is the same shape and refuses
+    it for the same reason.
+
+    `.alchemy-missing-label` goes with it. Its ink is `var(--fab-info)`, and `Kicker`'s tones
+    are `default` (subtle) and `accent` (`Kicker.svelte:105`), so converting the label alone
+    would leave an info-toned well with a grey label inside it.
+  -->
   {#if showMissing}
     <div class="alchemy-missing" data-alchemy-missing>
       <div class="alchemy-missing-label">{localize('FABRICATE.App.Alchemy.StillNeeded')}</div>
@@ -552,25 +607,6 @@
     outline-offset: 1px;
   }
 
-  .alchemy-chip-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    background: var(--fab-surface-soft);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--fab-tag-peach);
-    font-size: 16px;
-    overflow: hidden;
-  }
-
-  .alchemy-chip-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
   .alchemy-chip-name {
     font-size: 11.5px;
     font-weight: 600;
@@ -600,14 +636,6 @@
     display: flex;
     align-items: center;
     gap: 8px;
-  }
-
-  .alchemy-signature-label {
-    font-size: 9px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--fab-text-subtle);
-    font-weight: 700;
   }
 
   .alchemy-signature-text {
@@ -661,12 +689,9 @@
     border-color: var(--fab-danger-border);
   }
 
-  .alchemy-produces-label {
-    font-size: 9.5px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--fab-text-subtle);
-    font-weight: 700;
+  /* The ONE property the deleted `.alchemy-produces-label` rule declared that `Kicker`
+     cannot carry. See the markup comment. */
+  .alchemy-produces-slot {
     margin: 18px 0 10px;
   }
 
@@ -683,26 +708,6 @@
   .alchemy-result.is-ready {
     border-color: var(--fab-success-border);
     background: var(--fab-success-soft);
-  }
-
-  .alchemy-result-icon {
-    width: 46px;
-    height: 46px;
-    flex: 0 0 auto;
-    border-radius: 11px;
-    background: var(--fab-surface-raised);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--fab-tag-peach);
-    font-size: 19px;
-    overflow: hidden;
-  }
-
-  .alchemy-result-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
   }
 
   .alchemy-result-meta {

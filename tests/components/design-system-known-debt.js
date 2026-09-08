@@ -382,9 +382,56 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * priced 303, having counted the two Svelte rows and not the two sheet occurrences that left with
  * them.
  *
+ *
+ * 301 → 293 with issue 1514's alchemy-and-journal conversion, and every one of the eight is a
+ * snap of the same kind: a raw `<img>` thumbnail whose scoped rule carried the corner became a
+ * `<Medallion>`, whose fixed 9px IS the ladder's rung. Four rows fall by one —
+ * `alchemy/ComponentInventoryColumn.svelte | 8px` 2 → 1, `alchemy/KnownRecipesColumn.svelte |
+ * 8px` 3 → 2, `alchemy/Workbench.svelte | 10px` 4 → 3 and `journal/RunDetail.svelte | 8px`
+ * 2 → 1, because each file draws another off-ladder corner that is not a tile — and four rows at
+ * count 1 are DELETED outright, so the key count falls 134 → 130:
+ * `journal/RecentResults.svelte | 5px`, `journal/RunDetail.svelte | 5px`,
+ * `journal/StepDetails.svelte | 5px` and `journal/TimeRemainingBox.svelte | 8px`.
+ *
+ * The last of those four is the one that is NOT a tile: `TimeRemainingBox`'s whole scoped block
+ * went with the well it drew, and the `<Callout>` it became takes the specimen's r11. The two
+ * tiles at 6px — `journal/HistoryRow` and `journal/RunCard` — move nothing in either direction,
+ * because 6 is already on the ladder and neither ever had a row.
+ *
+ * 300 → 299 with the same issue's INVENTORY phase, and it is one occurrence of the same snap:
+ * `inventory/detail/InventoryComponentDetail.svelte | border-radius | 8px` falls 2 → 1 as the
+ * source-actor portrait's `.inventory-detail-portrait` rule goes and `<Avatar shape="square">`
+ * takes its place at the ladder's own 9px. The row SURVIVES rather than vanishing, because the
+ * same file draws `.inventory-detail-row` at 8px too and that is a row, not a tile. The key count
+ * does not move.
+ *
+ * Nothing else in that phase touches a corner. The three banner and empty conversions each
+ * DELETE a rule drawing 8px or 9px — `.inventory-detail-broken-banner` r8, `.salvage-misconfigured`
+ * r9 — but 9 is on the ladder and the r8 banner's rule is counted under `.inventory-detail-row`'s
+ * own row above rather than under a row of its own, which is why the total falls by one and not
+ * by three. Re-derived from the JSON at this head rather than reasoned about.
+ *
+ * 299 → 296 with the same issue's CRAFTING-AND-ROOTS phase, three occurrences across three rows
+ * and each of them a rule DELETED or SNAPPED by a conversion rather than a value edited:
+ *
+ *  - `crafting/ComponentSourcesBar.svelte | 8px` 4 → 3. The source-portrait button drew its own
+ *    r8 tile; `<Avatar shape="square">` draws the tile now at the ladder's own 9px, and the
+ *    button keeps a radius only so no sliver of it shows outside the tile's corner. The row
+ *    SURVIVES because the same file draws the remove overlay, the add button and the picker
+ *    popover at 8px, and none of those three is a tile.
+ *  - `crafting/RecipeDetailHeader.svelte | 8px` 2 → 1. The blocking well's r8 goes with its rule
+ *    as the well becomes a non-blocking `<Notice>` at the specimen's r11. The row survives
+ *    because the header's own dashed frame is r8 too, and that is a frame, not a banner.
+ *  - `apps/FabricateAppRoot.svelte | 10px` 2 → 1. The companion-fault strip's r10 goes the same
+ *    way, into `<Notice blocking>`'s r11. The root's other 10px corner is untouched.
+ *
+ * The phase's other deletions move nothing: `.crafting-source-option-portrait` drew 6px, the
+ * essence pool's track and fill drew 999px and the stamina track drew 999px — all three are
+ * published rungs and none ever had a row. Re-derived from the JSON at this head.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 301;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 289;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -600,9 +647,16 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  *
  * NO INTERACTABLES ROW IS LEFT IN THIS TABLE.
  *
+ * 243 → 242 with issue 1514's inventory phase, and the row VANISHES rather than shrinking:
+ * `apps/inventory/InventoryFilters.svelte` declared exactly one, the kind filter's five
+ * `<button aria-pressed>` pills sharing a rule, and the strip is a `SegmentedControl` now. Its
+ * segments are `<label>`s over real radios, which Foundry recognises without a `<form>` at all —
+ * so the debt is PAID rather than moved, and the slot is closed rather than left open for the
+ * next author to fill.
+ *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 243;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 242;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.
@@ -685,8 +739,94 @@ export const KNOWN_OFF_LADDER_ART_SIZES = knownDebt('offLadderArtSizes');
  * 57 off-ladder render sites across 40 `path | size` keys, out of 65 art-tile render sites in the
  * tree — 63 icon chips and 2 portraits, with 8 of the 65 on a rung. Unchanged by the portrait
  * conversion, for the reason the docblock above gives.
+ *
+ * 59 ACROSS 42 KEYS since issue 1514 moved the player gathering tab's two stateless raw thumbs
+ * onto the tile, and both new rows are the price the guidance above names by hand — a decision
+ * about one tile, stated with the rung it rejected:
+ *
+ *  - `GatheringTaskDrops.svelte | 36`. The drop row's tile renders at 36 and 38 is the nearest
+ *    rung. It was REJECTED because 38 is the only rung above it and the row is a 52px summary
+ *    whose height the tile already sets; snapping up would grow every drop row in the panel,
+ *    which is a layout move, and the conversion this row records preserves geometry by rule.
+ *  - `GatheringTaskRequirements.svelte | 40`. The tool card's tile renders at 40 — the icon
+ *    chip's own DEFAULT, and still off the published art ladder, which is the conflation
+ *    `ART_TILE_COMPONENTS` records above. 38 was rejected for the same reason and one more:
+ *    dropping 2px here would put the one tile in the tree at a rung its own primitive does not
+ *    default to, on a card whose 63.75px height it shares with a three-line copy stack.
+ *
+ * Both are pre-existing geometry becoming VISIBLE rather than new geometry: each tile was
+ * already that size as a raw `<img>`, and only the conversion puts it where this census can see
+ * it. Issue 1519's sweep owns lowering them.
+ *
+ * 71 ACROSS 53 KEYS since the same issue's third phase moved the ALCHEMY and JOURNAL tabs' twelve
+ * raw thumbs onto the tile. Eleven new keys, twelve occurrences, and they fall into three groups
+ * rather than twelve separate decisions — the price the guidance above names, paid by group
+ * because the rejected rung is the same argument each time:
+ *
+ *  - THE FIVE ALCHEMY TILES — `AlchemyDisciplineChooser | 44`, `ComponentInventoryColumn | 34`,
+ *    `KnownRecipesColumn | 36`, `Workbench | 40` and `Workbench | 46`. Every one of the five sets
+ *    the height of the row or card it leads: the chooser card's head measured 44px, the inventory
+ *    row 60px around a 34px tile, the bench chip 107.55px around a 40px one. 38 is the only rung
+ *    at or below any of them and it is BELOW all five, so snapping would shrink five different
+ *    containers at once — a layout move in a commit whose rule is that a conversion preserves the
+ *    rendered size.
+ *  - THE FOUR JOURNAL RECORD TILES — `HistoryRow | 40`, `RecentResults | 28`, `RunCard | 64` and
+ *    `RunDetail | 64`. Each sets its row's or header's measured height (58px, 28px, 86px and 64px
+ *    respectively), and the two at 64 are the run's identity image at the size the gathering tab's
+ *    own detail tiles already draw. 38 was rejected for the 64s as a 26px cut to the largest image
+ *    in the tab, and 30 for the 28 as a 2px cut that buys nothing and moves a row.
+ *  - THE THREE 24px LEAF TILES — `RunDetail | 24` and `StepDetails | 24` (2x). These are the
+ *    smallest tiles in the tree and 22 is the nearest rung, 2px below. It was rejected because all
+ *    three sit in `font-size: 13px` list rows whose 24px height the tile sets, and because the
+ *    three are the same list drawn in two files: snapping one and not the others is exactly the
+ *    "decision about one tile in isolation" this pin exists to make visible.
+ *
+ * All twelve are pre-existing geometry becoming visible, on the same reading as the two above.
+ * Issue 1519's sweep owns lowering them.
+ *
+ * 72 ACROSS THE SAME 53 KEYS since the fourth phase moved the INVENTORY inspector's source-actor
+ * portrait onto `<Avatar shape="square" size={40}>`. NO new key: the file already carried
+ * `InventoryComponentDetail.svelte | 40` at six occurrences — the six record tiles converted
+ * before it — and this is the seventh element in that same row.
+ *
+ * THE RUNG REJECTED IS 38, and this one is the case the requirement's own second clause is for.
+ * 40 is not merely near a rung: `Avatar.svelte:97-102` records that the PORTRAIT ladder published
+ * at `spec.md:427` carries 32 as its single mark and 26 stacked, and neither is 38 — 38 belongs
+ * to the ART ladder, which is `Medallion`'s. This census filters BOTH primitives against
+ * `ART_SIZE_LADDER` alone, so a portrait is measured against a ladder the canon does not publish
+ * for it, and a row is banked here whatever size the tile takes. The size itself was rejected on
+ * the ordinary ground as well: the portrait shares a 56px-min row with six `<Medallion size={40}>`
+ * record tiles in the same body, and cutting one of the seven to 38 would make the sources list
+ * the only list in the inspector whose leading tile is smaller than its neighbours'.
+ *
+ * Pre-existing geometry becoming visible, on the same reading as the twelve above. Reconciling
+ * `ART_SIZE_LADDER` with the two ladders the requirement publishes is issue 1519's, by name.
+ *
+ * 74 ACROSS 55 KEYS since the fifth phase moved the Crafting tab's two SOURCE-ACTOR portraits
+ * onto `<Avatar shape="square">`. Two new keys, both in
+ * `crafting/ComponentSourcesBar.svelte` — `| 40 | 1` for the row of portrait buttons in the top
+ * bar, and `| 32 | 1` for the picker option beneath it.
+ *
+ * THE RUNG REJECTED AT 40 IS 38, and the reason is the one the inventory portrait recorded a
+ * phase earlier read from the other side. Here 38 is not merely near: the portrait button was
+ * ALREADY rendering its image at exactly 38, because the button is a 40px border-box drawing a
+ * 1px edge of its own. Snapping the tile to 38 would have kept the image where it was and
+ * shrunk the BUTTON to 38 with it — the row's hit target, its focus ring and its remove overlay
+ * all move — or left a 2px ring of button showing around the tile. The 40 preserves the
+ * rendered button, which is what a conversion is for.
+ *
+ * THE RUNG REJECTED AT 32 IS 30, a 2px cut. 32 is the PORTRAIT ladder's single mark
+ * (`spec.md:427`, restated at `Avatar.svelte:97-102`) and this is the tile the ladder was
+ * published for — so the row exists ONLY because this census filters both primitives against
+ * `ART_SIZE_LADDER`, which knows the art ladder alone. It is the second shipped instance of the
+ * conflation the entry above names, and the third counting `IoTable.svelte | 32 | 1`, which was
+ * already banked before this change. The option row is `min-height: 44px` and the tile does not
+ * set it, so 30 would have cost 2px of mark and moved nothing else — which is a geometry
+ * decision about one tile in isolation, and issue 1519's to take.
+ *
+ * Both are pre-existing geometry becoming visible, on the same reading as the thirteen above.
  */
-export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 57;
+export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 74;
 
 export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredSharedComponents');
 
@@ -732,4 +872,18 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // than three without one — which is this register working rather than a name slipping out of it.
 // Re-measured on the tree, not subtracted: 71 clear the two-caller bar, 26 are registered, 45
 // are not, and the docblock above is re-measured with it.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 45;
+// 45 -> 46 (issue 1514): `apps/PlayerViewState.svelte` ARRIVED, at five callers, and it is banked
+// rather than adjudicated in either direction because neither table can hold it. It is not a
+// primitive — `spec.md` says "a candidate that decomposes entirely into existing members is a
+// COMPOSITION and MUST NOT enter the set", and this decomposes into `EmptyState` and `Callout`
+// plus one line of chrome. It cannot take a `notAPrimitive` row either: the row-shape assertion
+// beside that table caps a recorded non-member at ONE caller, and all twelve shipped rows have
+// zero or one, so a five-caller row reds on its first run. So this register is its answer, which
+// is the register working rather than a gap in it: the five player views drew the same centred
+// loading/error/empty fill up to a class-name prefix, that chrome is one component now, and the
+// decision that it is a composition rather than a member is recorded HERE instead of nowhere.
+// The answer is PATH-CONDITIONAL and the condition is the row itself: it holds only while the
+// file sits outside `src/ui/svelte/components/` and inside `src/ui/svelte/`, which is what
+// `unregisteredSharedComponents()` filters on. The same file under `components/` would be inside
+// the primitive directory and would demand a manifest row instead.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 46;

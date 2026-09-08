@@ -12,6 +12,7 @@ import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 // (issue 1504). Spread from the harness's own roster rather than copied, so a module added
 // there cannot go missing here.
 import {
+  PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
@@ -244,6 +245,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
+    for (const primitive of PLAYER_APP_COMPILED_MODULES) writeCompiledSvelte(primitive);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
 
     GatheringView = (await import(pathToFileURL(join(
@@ -417,6 +419,23 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(bar.getAttribute('data-gathering-event-tier'), 'amber');
     // Explanatory hint shown; the "safe" hint is not.
     assert.ok(section.textContent.includes('EventChanceHint'), 'explanatory event hint shown');
+    // AND IT IS NOT A CALLOUT (issue 1514). "Your chance of encountering an event while
+    // gathering here" is a CAPTION for the bar on the line directly above it — it documents a
+    // control rather than stating something about the world — so it stays the bare line it has
+    // always been while its `EventSafeHint` sibling converts. Converted, it measured
+    // 432.3x44.39 against 432.3x15: a strip with an edge, a fill and a 12px inset drawn around
+    // a caption for a 6px track. Recorded in the ruled-out register as a control caption —
+    // `openspec/specs/design-system/spec.md` and section 15 of `library.html` — rather than
+    // against issue 1519, which is the geometry sweep and never owned this deferral.
+    assert.ok(
+      Boolean(section.querySelector('.gathering-detail-event-hint')),
+      'the chance caption keeps its own bare line'
+    );
+    assert.ok(
+      !section.querySelector('.manager-callout'),
+      'and does NOT become a callout: a caption for a control is not a standing statement, and ' +
+        'converting it would draw a box around a bar label'
+    );
     assert.equal(section.querySelector('[data-gathering-safe-hint]'), null, 'safe hint hidden when chance > 0');
     // Targeted (non-blind) environments never show the "events hidden" redaction
     // hint — that is blind-only, even with chance > 0 and no individual events.
@@ -435,6 +454,19 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const safe = section.querySelector('[data-gathering-safe-hint]');
     assert.ok(safe, 'safe hint shown when chance is zero');
     assert.ok(safe.textContent.includes('EventSafeHint'), 'safe hint uses the localized message');
+    // THE CONVERSION ITSELF, which nothing asserted (issue 1514): reverting these sites to the
+    // bare `<p>` they were is green in every suite that reads them, because all five readers
+    // test hook presence and a bare `<p>` carrying the hook satisfies that.
+    assert.equal(
+      safe.getAttribute('data-callout-tone'),
+      'info',
+      'a standing statement about the environment is a CALLOUT, at the info tone — documentation ' +
+        'that is true before and after the player acts, which is what separates it from a notice'
+    );
+    assert.ok(
+      safe.classList.contains('manager-callout'),
+      'so it draws the shared strip rather than a bare paragraph'
+    );
   });
 
   it('hides the Events tab and shows a risk note above the tasks under the dangerLevelOnly tier', async () => {
@@ -454,6 +486,10 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const note = target.querySelector('[data-gathering-event-risk-note]');
     assert.ok(note, 'a risk note is shown above the tasks');
     assert.ok(note.textContent.includes('EventRiskNote'), 'the risk note uses the localized message');
+    // Converted for the same reason as its `EventSafeHint` twin, and asserted so the
+    // conversion cannot be silently reverted — see the clause on that twin.
+    assert.equal(note.getAttribute('data-callout-tone'), 'info', 'drawn as an info callout');
+    assert.ok(note.classList.contains('manager-callout'), 'and not as a bare paragraph');
     assert.ok(target.querySelector('[data-gathering-tasks-section]'), 'the tasks section still renders');
   });
 
@@ -484,6 +520,19 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const safe = summary.querySelector('[data-gathering-safe-hint]');
     assert.ok(safe, 'the safe hint is shown instead');
     assert.ok(safe.textContent.includes('EventSafeHint'), 'safe hint uses the localized message');
+    // THE CONVERSION ITSELF, which nothing asserted (issue 1514): reverting these sites to the
+    // bare `<p>` they were is green in every suite that reads them, because all five readers
+    // test hook presence and a bare `<p>` carrying the hook satisfies that.
+    assert.equal(
+      safe.getAttribute('data-callout-tone'),
+      'info',
+      'a standing statement about the environment is a CALLOUT, at the info tone — documentation ' +
+        'that is true before and after the player acts, which is what separates it from a notice'
+    );
+    assert.ok(
+      safe.classList.contains('manager-callout'),
+      'so it draws the shared strip rather than a bare paragraph'
+    );
   });
 
   it('shows a blocked task with a lock overlay + callout, and its conditions detail in the right inspector on select', async () => {
@@ -555,6 +604,179 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.equal(toolRows[0].getAttribute('data-tool-state'), 'present');
     assert.equal(toolRows[1].getAttribute('data-tool-state'), 'missing');
     assert.ok(toolRows[0].textContent.includes('Stone Pickaxe'));
+  });
+
+  it('draws the drop row on the shared art tile and the shared fill bar, at the size each rendered', async () => {
+    const { services } = makeServices(listing([environment()]), {
+      drops: [{ id: 'd1', name: 'Moss', img: 'icons/svg/mystery-man.svg', finalChance: 0.5, quantity: 1 }],
+      awardMode: 'allDrops', awardLimit: 1, eventPolicy: null
+    });
+    await mountView(services);
+    target.querySelector('[data-task-id="task-1"] .gathering-task-summary').click();
+    flushSync();
+    await settle();
+
+    const row = target.querySelector('[data-gathering-task-detail] [data-gathering-drop]');
+    const tile = row.querySelector('.fab-medallion');
+    assert.ok(Boolean(tile), 'the drop thumbnail is the shared art tile');
+    // The CONVERSION RULE the geometry requirement states: the rendered size is preserved and
+    // the off-ladder row is banked, rather than snapped to the nearest rung here.
+    assert.match(tile.getAttribute('style'), /width:\s*36px;\s*height:\s*36px/, 'at the 36px it already rendered');
+    assert.equal(tile.getAttribute('data-medallion'), 'image', 'and it carries the drop artwork');
+
+    const bar = row.querySelector('.fab-fill-bar');
+    assert.ok(Boolean(bar), 'the chance track is the shared fill bar');
+    assert.ok(bar.classList.contains('is-sm'), 'at the `sm` rung, which is the height the hand-rolled track drew');
+    assert.match(bar.querySelector('.fab-fill-bar-fill').getAttribute('style'), /width: 50%/, 'and the fill carries the chance');
+  });
+
+  it('draws the required-tool tile on the shared art tile at the size it rendered', async () => {
+    const { services } = makeServices(listing([environment({
+      tasks: [taskModel({ id: 'task-tool', tools: [{ id: 't1', name: 'Pick', img: 'icons/svg/mystery-man.svg', state: 'missing' }] })]
+    })]));
+    await mountView(services);
+    target.querySelector('[data-task-id="task-tool"] .gathering-task-summary').click();
+    flushSync();
+    await settle();
+
+    const tile = target.querySelector('[data-gathering-task-detail] [data-gathering-tool] .fab-medallion');
+    assert.ok(Boolean(tile), 'the tool thumbnail is the shared art tile');
+    assert.match(tile.getAttribute('style'), /width:\s*40px;\s*height:\s*40px/, 'at the 40px it already rendered');
+  });
+
+  // ─── THE THREE ERRORS THAT USED TO BE SWALLOWED (issue 1514) ────────────────────────────
+  //
+  // All three are asserted on the RENDERED DOM rather than on source text, because each defect
+  // was precisely that the component rendered its ORDINARY state after a failure: a source-text
+  // reader cannot tell "no drops" from "the drop fetch threw", which is the confusion being
+  // fixed.
+
+  it('says so when the drop-breakdown fetch fails, instead of drawing an empty find list', async () => {
+    const { services } = makeServices(listing([environment()]));
+    services.getGatheringDropBreakdown = () => Promise.reject(new Error('boom'));
+    await mountView(services);
+    target.querySelector('[data-task-id="task-1"] .gathering-task-summary').click();
+    flushSync();
+    await settle();
+
+    const section = target.querySelector('[data-gathering-task-detail] [data-gathering-drops]');
+    assert.ok(Boolean(section), 'the find section still renders');
+    assert.equal(section.getAttribute('data-gathering-drops-state'), 'error', 'and it reports the error state');
+    const notice = section.querySelector('[data-gathering-drops-error]');
+    assert.ok(Boolean(notice), 'a notice names the failure');
+    assert.ok(notice.textContent.includes('DropsError'), 'with the localized failure sentence');
+    assert.equal(notice.getAttribute('role'), 'status', 'announced politely rather than as an alert');
+    // TITLE OVER DETAIL, not one string in the title slot (issue 1514). `Notice`'s title is a
+    // 12px/600 HEADING slot with no declared leading, and the whole two-sentence string handed
+    // to it rendered as a three-line shouty heading.
+    assert.equal(
+      notice.querySelector('.fab-notice-title').textContent.trim(),
+      'FABRICATE.App.Gathering.Detail.DropsError',
+      'the title slot carries the SHORT sentence — what went wrong — and nothing else'
+    );
+    const recovery = notice.querySelector('.fab-notice-detail');
+    assert.ok(Boolean(recovery), 'and the recovery sentence renders as the detail line');
+    assert.ok(
+      recovery.textContent.includes('DropsErrorDetail'),
+      'which is what `detail` is for: the second line says what to do next'
+    );
+    // The DISTINCTION that was missing: this is not the "nothing to find" picture.
+    assert.ok(!section.querySelector('[data-gathering-drop]'), 'no drop rows are drawn');
+  });
+
+  it('draws the ordinary ready state when the drop-breakdown fetch succeeds (control)', async () => {
+    const { services } = makeServices(listing([environment()]), {
+      drops: [{ id: 'd1', name: 'Moss', img: '', finalChance: 0.5, quantity: 1 }],
+      awardMode: 'allDrops', awardLimit: 1, eventPolicy: null
+    });
+    await mountView(services);
+    target.querySelector('[data-task-id="task-1"] .gathering-task-summary').click();
+    flushSync();
+    await settle();
+
+    const section = target.querySelector('[data-gathering-task-detail] [data-gathering-drops]');
+    assert.equal(section.getAttribute('data-gathering-drops-state'), 'ready', 'the ready state is reachable');
+    assert.ok(!section.querySelector('[data-gathering-drops-error]'), 'and carries no failure notice');
+  });
+
+  it('says the linked scene could not be loaded when its uuid does not resolve', async () => {
+    const previous = globalThis.fromUuid;
+    globalThis.fromUuid = () => Promise.reject(new Error('no such document'));
+    try {
+      const { services } = makeServices(listing([environment({
+        sceneUuid: 'Scene.missing',
+        blockedReasons: [{ code: 'SCENE_TOKEN_BLOCKED', message: 'Visit the scene', data: {} }]
+      })]));
+      await mountView(services);
+      await settle();
+
+      const scene = target.querySelector('[data-gathering-scene]');
+      assert.ok(Boolean(scene), 'the linked-scene panel renders');
+      const fault = scene.querySelector('[data-gathering-scene-unresolved]');
+      assert.ok(Boolean(fault), 'the broken link is named');
+      assert.ok(fault.textContent.includes('SceneUnresolved'), 'with the localized sentence');
+      // WHERE it is named is the fix (issue 1514). It was written into
+      // `.gathering-linked-scene-name`, which is `nowrap` with an ellipsis in about 165px and
+      // carries no `title` on that branch — so a 70-character sentence rendered as "This
+      // linked scene coul…" and its actionable half was unreachable by mouse and keyboard
+      // alike. The wait slot WRAPS.
+      assert.ok(
+        fault.classList.contains('gathering-linked-scene-wait'),
+        'the fault sentence renders in the WRAPPING slot, not in the nowrap ellipsised name slot'
+      );
+      assert.ok(
+        !scene.querySelector('.gathering-linked-scene-name.is-fault'),
+        'and the name slot carries no fault sentence any more'
+      );
+      // AND IT IS THE ONLY LINE (issue 1514). `sceneUnresolved` leaves `canView` and
+      // `permissionUnknown` both false, so before the wait branch was guarded the card read
+      // "This linked scene coul… Wait until the GM activates the linked scene." — a broken
+      // link reported as a scene the GM has not activated, which sends the player to the
+      // wrong action.
+      assert.ok(
+        !scene.querySelector('[data-gathering-scene-wait]'),
+        'a broken link is NOT also reported as a scene waiting to be activated'
+      );
+      assert.ok(
+        !scene.textContent.includes('SceneWait'),
+        'and the wait sentence does not render beside the fault one'
+      );
+    } finally {
+      globalThis.fromUuid = previous;
+    }
+  });
+
+  it('keeps a failed permission CHECK distinct from being refused permission', async () => {
+    const previous = globalThis.fromUuid;
+    const scenario = async (testUserPermission) => {
+      globalThis.fromUuid = () => Promise.resolve({ name: 'Old Mine', testUserPermission });
+      const { services } = makeServices(listing([environment({
+        sceneUuid: 'Scene.mine',
+        blockedReasons: [{ code: 'SCENE_TOKEN_BLOCKED', message: 'Visit the scene', data: {} }]
+      })]));
+      await mountView(services);
+      await settle();
+      return target.querySelector('[data-gathering-scene]');
+    };
+
+    try {
+      // REFUSED: the check answered, and the answer was no. The player waits for the GM.
+      const refused = await scenario(() => false);
+      assert.ok(Boolean(refused.querySelector('[data-gathering-scene-wait]')), 'a refusal shows the wait hint');
+      assert.ok(!refused.querySelector('[data-gathering-scene-permission-unknown]'), 'and does not claim the check failed');
+
+      unmount(mounted);
+      mounted = null;
+      target.remove();
+
+      // FAILED: the check threw. Telling this player to wait for the GM sends them to the
+      // wrong person, which is the whole reason the two outcomes are separated.
+      const unknown = await scenario(() => { throw new Error('broken'); });
+      assert.ok(Boolean(unknown.querySelector('[data-gathering-scene-permission-unknown]')), 'a failed check says so');
+      assert.ok(!unknown.querySelector('[data-gathering-scene-wait]'), 'and is NOT reported as the GM not having shared it');
+    } finally {
+      globalThis.fromUuid = previous;
+    }
   });
 
   it('shows the linked-scene banner once above the task list when the environment is scene-gated', async () => {
@@ -933,7 +1155,10 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(callout, 'the depleted/exhausted callout renders');
     assert.ok(callout.textContent.includes('NodeExhaustedPermanent'), 'shows the permanent-exhaustion copy');
     assert.ok(!callout.textContent.includes('NodeDepletedRespawns'), 'does NOT show the replenishes-over-time copy');
-    assert.equal(target.querySelector('[data-gathering-node-respawn-eta]'), null, 'no respawn ETA for a permanently exhausted node');
+    // RETARGETED, not deleted (issue 1514). The ETA moved onto `Notice`'s `detail` line, whose
+    // hooks live on the banner ROOT alone, so `[data-gathering-node-respawn-eta]` no longer
+    // exists anywhere and this assertion would have gone on passing for the wrong reason.
+    assert.ok(!callout.querySelector('.fab-notice-detail'), 'no respawn ETA for a permanently exhausted node');
   });
 
   it('detail still shows the replenishes-over-time copy for a regenerating depleted node (regression)', async () => {
@@ -948,6 +1173,54 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(callout, 'the depleted callout renders');
     assert.ok(callout.textContent.includes('NodeDepletedRespawns'), 'shows the replenishes-over-time copy');
     assert.ok(!callout.textContent.includes('NodeExhaustedPermanent'), 'does NOT show the permanent copy');
+
+    // THE BANNER'S TREATMENT, WHICH NOTHING ASSERTED (issue 1514). Copy was covered and the
+    // four things the conversion actually decided were not: flipping this banner to
+    // `tone="danger"` with an alert glyph, or adding `blocking` — which swaps `role="status"`
+    // plus `aria-live` for a bare `role="alert"`, the deciding argument this component's own
+    // comment gives — left the whole suite green.
+    assert.equal(
+      callout.getAttribute('data-notice-tone'),
+      'warning',
+      'a depleted pool is a WARNING, not a failure: the node replenishes and the player has ' +
+        'lost nothing. The tone is what moves the glyph ink and the title ink with it'
+    );
+    assert.ok(
+      Boolean(callout.querySelector('i.fa-mountain-sun')),
+      'and it carries the passed glyph rather than the per-tone default alert triangle, which ' +
+        'would draw a hazard the player is walking into instead of a resource that is resting'
+    );
+    assert.equal(
+      callout.getAttribute('role'),
+      'status',
+      'NON-blocking, which is the whole reason this site went to `Notice`: `blocking` would ' +
+        'take `role="alert"` and drop the live region with it'
+    );
+    assert.equal(
+      callout.getAttribute('aria-live'),
+      'polite',
+      'so a banner that appears when the pool runs dry mid-session announces itself politely'
+    );
+  });
+
+  // The POSITIVE half of the two "no respawn ETA" assertions above (issue 1514). Without it
+  // they prove only that an element is absent, which is what they would prove if the ETA had
+  // stopped rendering everywhere — the exact failure the conversion of this banner to `Notice`
+  // could have caused, since the ETA is now the banner's `detail` line rather than a span of
+  // its own.
+  it('detail renders the respawn ETA as the depleted banner second line when one is known', async () => {
+    await renderDetail({
+      task: {
+        id: 't2b', name: 'Berries', attemptable: false,
+        blockedReasons: [{ code: 'NODE_DEPLETED' }],
+        rich: { nodes: { enabled: true, available: false, depleted: true, permanentlyExhausted: false, current: 0, max: 5, respawnEta: { secondsUntil: 3600 } } }
+      }
+    });
+    const callout = target.querySelector('[data-gathering-node-depleted]');
+    assert.ok(callout, 'the depleted callout renders');
+    const detail = callout.querySelector('.fab-notice-detail');
+    assert.ok(Boolean(detail), 'the ETA renders as the banner detail line');
+    assert.ok(detail.textContent.includes('NodeRespawnEta'), 'and it is the ETA key');
   });
 
   // issue 301 (UI simplification): a nonRegenerating pool surfaces a plain permanence
@@ -964,6 +1237,20 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     const scarce = target.querySelector('[data-gathering-node-scarce]');
     assert.ok(scarce, 'the permanence callout renders before exhaustion');
     assert.ok(scarce.textContent.includes('NodeScarcePermanent'), 'uses the permanence/scarcity key');
+    // The SECOND node banner, asserted on the same four axes as its sibling above, and the
+    // tone is the one thing that distinguishes them: this pool still has charges.
+    assert.equal(
+      scarce.getAttribute('data-notice-tone'),
+      'info',
+      'a pool that will never replenish but still HAS nodes is information, not a warning — ' +
+        'which is the palette the rule this banner replaces already painted'
+    );
+    assert.ok(
+      Boolean(scarce.querySelector('i.fa-mountain-sun')),
+      'with the same passed glyph as its depleted sibling, so the two read as one family'
+    );
+    assert.equal(scarce.getAttribute('role'), 'status', 'non-blocking, like its sibling');
+    assert.equal(scarce.getAttribute('aria-live'), 'polite', 'with the live region the role wants');
     assert.ok(!scarce.textContent.includes('"current"') && !scarce.textContent.includes('"max"'), 'does not repeat the node count');
     // It is NOT the depleted/exhausted callout (resource is not yet exhausted).
     assert.equal(target.querySelector('[data-gathering-node-depleted]'), null, 'no depleted/exhausted callout while current > 0');
@@ -982,7 +1269,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     assert.ok(callout.textContent.includes('NodeExhaustedPermanent'), 'shows the exhausted permanence copy when exhausted');
     assert.ok(!callout.textContent.includes('"current"') && !callout.textContent.includes('"max"'), 'does not repeat the node count');
     assert.ok(!callout.textContent.includes('NodeDepletedRespawns'), 'does NOT show the replenishes-over-time copy');
-    assert.equal(target.querySelector('[data-gathering-node-respawn-eta]'), null, 'no respawn ETA for a permanently exhausted node');
+    assert.ok(!callout.querySelector('.fab-notice-detail'), 'no respawn ETA for a permanently exhausted node');
     assert.equal(target.querySelector('[data-gathering-node-scarce]'), null, 'the pre-exhaustion scarcity callout is not used at current <= 0');
   });
 });

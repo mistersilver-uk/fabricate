@@ -66,6 +66,17 @@
     gap: 8px;
   }
 
+  /* HAND-ROLLED, AND REFUSED (issue 1514), where its three sibling bodies' eyebrows converted.
+     Two independent blockers, either of which alone would be enough:
+
+       - the host is an `<h4>`, and `Kicker`'s measured host set is `{p, span, h3}` with a SILENT
+         `p` fallback (`Kicker.svelte:93-99`) — so converting would drop this section heading out
+         of the document outline without a word;
+       - the element carries `id="salvage-tools-title"` and the `<section>` above names it in
+         `aria-labelledby`. `Kicker` forwards no `id` and no rest spread, only a `dataAttr` hook,
+         so the section would lose its accessible name outright.
+
+     An `h4` host and an `id` passthrough are what would close it. Both belong on the primitive. */
   .salvage-tools-title {
     display: flex;
     align-items: center;

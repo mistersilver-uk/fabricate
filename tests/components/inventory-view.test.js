@@ -6,12 +6,14 @@ import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
 import {
   MARKS_AND_NOTICES_COMPILED_MODULES,
+  PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { chipToneOf } from '../helpers/chipTone.js';
+import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
 import {
   SYS_A,
   SYS_B,
@@ -46,7 +48,11 @@ const harness = createMountedComponentHarness({
     // The store's own suite copies them instead.
   ],
   compiledModules: [
-    'src/ui/svelte/components/Medallion.svelte',
+    // The player window's own shared roster (issue 1514), spread rather than listed: this tree
+    // renders the not-yet-ready chrome, the record tile, the portrait and the kind filter's
+    // segmented track, and a manifest that named each would insert lines into a block Sonar
+    // already reads as duplicated across these suites. See `PLAYER_APP_COMPILED_MODULES`.
+    ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
     ...SELECT_COMPILED_MODULES,
@@ -504,6 +510,52 @@ describe('InventoryView (mounted)', () => {
       null,
       'essence has no produced-by'
     );
+  });
+
+  it('renders the loading state, announces it busy, and drops the claim once ready', async () => {
+    // THE LOADING BRANCH HAD NO ASSERTION HERE AT ALL before issue 1514, which is why the
+    // `aria-busy` criterion for this view was unmeetable rather than merely unmet. Asserted on
+    // the RENDERED DOM: a composition that declares the attribute and stops rendering it passes
+    // every source-text reader.
+    const { services: loadingServices, store: loadingStore } = makeServices(makeItem());
+    loadingStore.loading = true;
+    loadingStore.loadedOnce = false;
+    const loading = await harness.mount({ services: loadingServices });
+    await settle();
+
+    const loadingRoot = loading.querySelector('[data-inventory-state="loading"]');
+    assert.ok(Boolean(loadingRoot), 'renders the loading state');
+    assert.equal(loadingRoot.getAttribute('aria-busy'), 'true', 'the loading root is busy');
+    assert.ok(
+      loadingRoot.textContent.includes('FABRICATE.App.Inventory.Loading'),
+      'and a VISIBLE label states what is loading'
+    );
+
+    harness.remount();
+    const { services: readyServices } = makeServices(makeItem());
+    const ready = await harness.mount({ services: readyServices });
+    await settle();
+
+    assert.ok(
+      ready.querySelector('[data-inventory-state="populated"]'),
+      'the ready view is populated'
+    );
+    assert.ok(!ready.querySelector('[aria-busy]'), 'nothing in the ready view claims to be busy');
+  });
+
+  it('draws a failed load as a danger notice rather than as the empty panel', async () => {
+    // THE ERROR BRANCH HAD NO TREATMENT ASSERTION IN ANY OF THE FIVE VIEWS before this clause,
+    // only the state hook — so deleting the composition's error arm, and letting a failure
+    // render the neutral no-state panel, was green in all five owning suites.
+    const { services, store } = makeServices(makeItem());
+    store.error = 'boom';
+    const target = await harness.mount({ services });
+    await settle();
+
+    assertViewErrorTreatment(target.querySelector('[data-inventory-state="error"]'), {
+      view: 'inventory view',
+      message: 'FABRICATE.App.Inventory.Error'
+    });
   });
 
   it('shows the empty state when the actor owns nothing', async () => {
@@ -2355,7 +2407,6 @@ describe('InventoryDetailHeader (source contract)', () => {
     '.inventory-detail-section',
     '.inventory-detail-section-title',
     '.inventory-detail-row-name',
-    '.inventory-detail-empty-note',
   ];
 
   // A scoped rule OPENING a block — `.x {` or `.x,` — as opposed to a mere mention
@@ -2401,13 +2452,45 @@ describe('InventoryDetailHeader (source contract)', () => {
       '.inventory-detail-section',
       '.inventory-detail-section-title',
       '.inventory-detail-row-name',
-      '.inventory-detail-empty-note',
     ]) {
       assert.ok(
         shell.includes(`:global(:where(.inventory-detail) ${leaf})`),
         `${leaf} must be published globally, ancestor-guarded and :where()-zeroed`
       );
     }
+  });
+
+  // THE ELEVENTH LEAF IS GONE, AND ITS ABSENCE IS ASSERTED (issue 1514).
+  //
+  // `.inventory-detail-empty-note` was published here and written by ten markup sites across
+  // four files. All ten render `EmptyState note` now, so the rule was deleted with the last of
+  // them. Dropping it from the two lists above would leave nothing at all watching it — and a
+  // `:global(:where())` family is exactly the thing that comes back by accident: the next author
+  // writing an empty line in one of these bodies reaches for the class name the neighbouring
+  // markup used to carry, gets no styling from anywhere, and cannot tell whether the rule is
+  // missing or their markup is. So the retirement is stated as a fact about the tree.
+  it('the retired empty-note leaf is gone from the shell AND from every body that wrote it', () => {
+    const files = [
+      'src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.svelte',
+      'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
+      'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
+      'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte',
+      'src/ui/svelte/apps/inventory/bulk/InventoryBulkReport.svelte',
+    ];
+    // Comments stripped first, in both syntaxes: this shell's own docblock now RECORDS the
+    // retirement by name, and a raw text scan would read that sentence as the thing it forbids.
+    const written = (file) =>
+      readFileSync(resolve(repoRoot, file), 'utf8')
+        .replaceAll(/<!--[\s\S]*?-->/gu, '')
+        .replaceAll(/\/\*[\s\S]*?\*\//gu, '')
+        .includes('inventory-detail-empty-note');
+    const survivors = files.filter((file) => written(file));
+    assert.deepEqual(
+      survivors,
+      [],
+      'a family whose rule outlives its markup paints nothing, and markup that outlives its ' +
+        'rule loses its type silently — so the name is retired in both places at once'
+    );
   });
 });
 
@@ -2563,7 +2646,22 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
       'empty',
       'nothing is queueable, so the panel is in its empty state'
     );
-    assert.ok(target.querySelector('[data-inventory-bulk-empty]'), 'with the shared empty note');
+    const bulkEmpty = target.querySelector('[data-inventory-bulk-empty]');
+    assert.ok(Boolean(bulkEmpty), 'with the shared empty note');
+    // THE HOOK'S VALUE, NOT JUST ITS PRESENCE (issue 1514), and the value is `"true"` rather
+    // than the `""` the deleted `<p>` wrote. `EmptyState.svelte`'s `dataValue || true` coerces
+    // it, and an explicit `dataValue=""` at the call site does NOT undo that — the empty
+    // string is falsy and takes the same branch. Measured across the tree: 61 hook-bearing
+    // `EmptyState`/`Callout` sites render `="true"`, 45 passing no value and 16 passing `""`.
+    // Nothing breaks because every shipped reader is a presence selector, which is exactly
+    // why the drift is invisible; this clause pins it so the next reader does not "fix" it at
+    // a call site, where it cannot be fixed. Closing it means changing the primitive, and
+    // that moves all 61 attributes at once.
+    assert.equal(
+      bulkEmpty.getAttribute('data-inventory-bulk-empty'),
+      'true',
+      'the primitive coerces a valueless hook to `="true"`, and only the primitive can change it'
+    );
   });
 
   it('renders the RUNNING state from its props — the state the lab cannot photograph', async () => {
@@ -2886,5 +2984,406 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
     );
     assert.equal(detail.includes('/bulk/'), false, 'no bulk import of any kind');
     assert.equal(detail.includes('InventoryBulk'), false, 'nor a bulk component by name');
+  });
+});
+
+// ===========================================================================
+/**
+ * THE INVENTORY TAB'S ADOPTION OF THE SHARED PRIMITIVES, AND THE ROUTINGS IT REFUSED
+ * (issue 1514, phase 4).
+ *
+ * The refusals are asserted as well as the conversions, because a deferral recorded only in a
+ * comment is a deferral the next author reverses without reading it. Each is stated as the
+ * measurement that produced it, and each names what the primitive would need.
+ */
+describe('Inventory primitive adoption (issue 1514)', () => {
+  before(harness.setup);
+  after(harness.teardown);
+  afterEach(harness.remount);
+
+  const segments = (target) => [...target.querySelectorAll('[data-inventory-pill]')];
+
+  /**
+   * Dispatch a real bubbling event. Declared here rather than reused from the bulk suite
+   * above, which builds a `MouseEvent` for everything: a radio's `change` is not a pointer
+   * event, and a suite that dispatched one would be asserting on a gesture production never
+   * makes.
+   */
+  function dispatch(node, type) {
+    node.dispatchEvent(
+      new node.ownerDocument.defaultView.Event(type, { bubbles: true, cancelable: true })
+    );
+  }
+
+  it('draws the kind filter as a radiogroup, not five independent toggles', async () => {
+    const { services } = makeServices(makeItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    assert.ok(
+      Boolean(target.querySelector('[role="radiogroup"]')),
+      'the strip is one radiogroup rather than a `role="group"` of five buttons'
+    );
+    assert.deepEqual(
+      segments(target).map((segment) => segment.getAttribute('data-inventory-pill')),
+      ['all', 'components', 'essences', 'tools', 'recipeItems'],
+      'every option hook survives the conversion, in the same fixed order'
+    );
+    assert.equal(
+      target.querySelectorAll('[data-inventory-pill] input[type="radio"]').length,
+      5,
+      'each segment carries a REAL radio, which is what makes the choice exclusive to a reader'
+    );
+    assert.ok(
+      segments(target).every((segment) => !segment.hasAttribute('aria-pressed')),
+      'and no segment is a toggle any more: `aria-pressed` announces five independent states'
+    );
+  });
+
+  it('carries the live per-kind tally on the primitive own count slot', async () => {
+    const { services } = makeServices(makeItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    assert.deepEqual(
+      segments(target).map((segment) =>
+        segment.querySelector('[data-segment-count]')?.getAttribute('data-segment-count')
+      ),
+      ['1', '1', '0', '1', '0'],
+      'the counts the store derives reach the shared slot, with a missing key rendering 0'
+    );
+    assert.ok(
+      !target.querySelector('[data-inventory-pill-count]'),
+      'the hand-rolled count hook is DROPPED rather than preserved: the primitive renders a ' +
+        'fixed `data-segment-count`, and nothing in src/, tests/ or scripts/ read the old name'
+    );
+  });
+
+  it('routes a segment choice back to the store, and lights the current filter', async () => {
+    const { services, store } = makeServices(makeItem());
+    const chosen = [];
+    store.setFilter = (value) => chosen.push(value);
+    const target = await harness.mount({ services });
+    await settle();
+
+    assert.ok(
+      target.querySelector('[data-inventory-pill="all"]').classList.contains('is-active'),
+      'the store current filter is the lit segment'
+    );
+    dispatch(target.querySelector('[data-inventory-pill="tools"] input'), 'change');
+    await settle();
+    assert.deepEqual(chosen, ['tools'], 'choosing a segment reaches setFilter with its value');
+  });
+
+  it('draws a source portrait as the shared square Avatar, with initials as its fallback', async () => {
+    const { services } = makeServices(makeItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    const portrait = target.querySelector('.inventory-detail-row [data-avatar]');
+    assert.ok(Boolean(portrait), 'the raw <img>/<i> pair is the shared portrait now');
+    assert.ok(
+      portrait.classList.contains('is-square'),
+      '`shape` is MANDATORY here: the component defaults to `round`, which draws 999px where ' +
+        'this well has always drawn a rounded square'
+    );
+    assert.match(
+      portrait.getAttribute('style').replaceAll(' ', ''),
+      /width:40px;height:40px/u,
+      'at the box it drew'
+    );
+    assert.equal(
+      portrait.getAttribute('data-avatar'),
+      'initials',
+      'the fixture actor carries no image, and the no-artwork state is INITIALS now rather ' +
+        'than the `fa-user` glyph this markup drew: a content change, and the one the phase ' +
+        'frames record'
+    );
+    assert.equal(
+      portrait.querySelector('.fab-avatar-initials').textContent.trim(),
+      'AK',
+      'and the mark is the actor own name'
+    );
+  });
+
+  it('draws the broken-tool banner as a non-blocking Notice, keeping its status role', async () => {
+    const { services } = salvageServices(salvageItem({}, { broken: true, isTool: true }));
+    const target = await harness.mount({ services });
+    await settle();
+
+    const banner = target.querySelector('[data-inventory-broken-banner]');
+    assert.ok(banner.classList.contains('fab-notice'), 'the hand-rolled well is the shared one');
+    assert.equal(banner.getAttribute('data-notice-tone'), 'danger', 'at the tone it painted');
+    assert.equal(banner.getAttribute('role'), 'status', 'and it KEEPS `role="status"`');
+    assert.equal(
+      banner.getAttribute('aria-live'),
+      'polite',
+      'non-blocking adds the live region the strip did not have, which is what makes a banner ' +
+        'that appears when a tool breaks mid-session announce itself'
+    );
+    assert.ok(!banner.querySelector('button'), 'and it still offers nothing to press');
+    assert.equal(
+      banner.getAttribute('data-inventory-broken-banner'),
+      '',
+      'the bare hook still renders bare: `Notice` passes `dataValue` as written where ' +
+        '`EmptyState` and `Callout` coerce it to "true"'
+    );
+  });
+
+  it('draws the misconfigured salvage body as a non-blocking Notice at its own glyph', async () => {
+    const { services } = salvageServices(
+      salvageItem({ mode: 'routed', misconfigured: true, misconfiguredReason: 'routedNoFormula' })
+    );
+    const target = await harness.mount({ services });
+    await settle();
+    dispatch(target.querySelector('[data-inventory-detail-tab="salvage"]'), 'click');
+    await settle();
+
+    const body = target.querySelector('[data-inventory-salvage-body="misconfigured"]');
+    assert.ok(body.classList.contains('fab-notice'), 'the whole body is the shared banner');
+    assert.equal(body.getAttribute('data-notice-tone'), 'warning', 'at the tone it painted');
+    assert.equal(body.getAttribute('role'), 'status', 'and it keeps `role="status"`');
+    assert.ok(
+      Boolean(body.querySelector('i.fa-screwdriver-wrench')),
+      'the glyph is PASSED rather than defaulted: the default warning mark is the alert ' +
+        'triangle, and this is a configuration fault a GM fixes rather than a hazard'
+    );
+  });
+
+  it('draws every one-line inventory empty as the shared note, and none as a panel', async () => {
+    const item = makeItem();
+    item.usedBy = [];
+    item.producedBy = [];
+    item.requiredFor = [];
+    const { services } = makeServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const notes = [...target.querySelectorAll('.inventory-detail-section .manager-empty')];
+    assert.equal(notes.length, 3, 'the three empty sections each render one');
+    for (const note of notes) {
+      assert.ok(
+        note.classList.contains('is-note'),
+        '`note` and not the base panel: `note` is the ONE variant that releases the dashed box, ' +
+          'and a bordered card inside a section already sitting in the inspector column is the ' +
+          'box the frame-move rule forbids'
+      );
+      assert.ok(
+        !note.querySelector('h3'),
+        'and the sentence rides `hint`, not `title`: `title` renders an <h3>, which would put ' +
+          'a heading per empty section into the player app document outline'
+      );
+    }
+  });
+
+  it('draws the no-selection pane as the shared panel inside a caller-owned fill', async () => {
+    const { services, store } = makeServices(makeItem());
+    store.selectedItem = null;
+    const target = await harness.mount({ services });
+    await settle();
+
+    const slot = target.querySelector('[data-inventory-detail-empty]');
+    assert.ok(Boolean(slot), 'the hook stays on the wrapper, the box it has always sat on');
+    assert.equal(
+      slot.getAttribute('data-inventory-detail-empty'),
+      '',
+      'so it still renders bare rather than the `="true"` EmptyState coerces a bare hook to'
+    );
+    const panel = slot.querySelector('.manager-empty');
+    assert.ok(Boolean(panel), 'and the panel itself is the shared primitive');
+    assert.ok(
+      !panel.classList.contains('is-note'),
+      'the FULL panel here: this state stands in for the whole inspector column rather than ' +
+        'for one section rows'
+    );
+    assert.ok(Boolean(panel.querySelector('h3')), 'with the sentence as its title');
+  });
+
+  it('draws the salvage body eyebrow as the shared kicker inside the caller own row', async () => {
+    const { services } = salvageServices(salvageItem({ checkUsable: true, dc: 12 }));
+    const target = await harness.mount({ services });
+    await settle();
+    dispatch(target.querySelector('[data-inventory-detail-tab="salvage"]'), 'click');
+    await settle();
+
+    const row = target.querySelector('.salvage-body-title');
+    const kicker = row.querySelector('.fab-kicker');
+    assert.ok(Boolean(kicker), 'the eyebrow is the shared label');
+    assert.equal(kicker.tagName.toLowerCase(), 'span', 'nested INSIDE the caller own flex row');
+    assert.ok(
+      Boolean(row.querySelector('.salvage-dc')),
+      'and the row still holds the figure beside it, which is why the wrapper survives at all'
+    );
+  });
+
+  it('draws the acting-participation eyebrow as the shared kicker, hook and all', async () => {
+    const item = { ...multiSystemCardRow(), salvage: salvageItem().salvage };
+    const { services } = salvageServices(item);
+    const target = await harness.mount({ services });
+    await settle();
+    const tab = target.querySelector('[data-inventory-detail-tab="salvage"]');
+    if (tab) {
+      dispatch(tab, 'click');
+      await settle();
+    }
+
+    const eyebrow = target.querySelector('[data-inventory-salvage-acting-system]');
+    assert.ok(Boolean(eyebrow), 'the hook survives on the primitive own element');
+    assert.ok(eyebrow.classList.contains('fab-kicker'), 'and the element is the shared label');
+    assert.equal(
+      eyebrow.getAttribute('data-inventory-salvage-acting-system'),
+      '',
+      '`Kicker` passes `dataValue` as written, so a hook written bare stays bare'
+    );
+  });
+
+  // -- THE REFUSALS ------------------------------------------------------------------------
+
+  it('leaves the Info | Salvage strip a TABLIST, because a radiogroup cannot name a panel', async () => {
+    const { services } = salvageServices(salvageItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    const strip = target.querySelector('[role="tablist"]');
+    assert.ok(Boolean(strip), 'it is still a tablist');
+    assert.ok(
+      !strip.classList.contains('manager-segmented'),
+      '`SegmentedControl` emits a radiogroup with no `aria-controls` at all, so converting ' +
+        'would leave two `role="tabpanel"` regions with nothing pointing at them'
+    );
+    assert.equal(
+      target.querySelector('[data-inventory-detail-tab="info"]').getAttribute('aria-controls'),
+      'inventory-detail-panel-info',
+      'and the attribute a radiogroup has no equivalent for is the reason'
+    );
+  });
+
+  it('leaves the salvage success ribbon hand-rolled, because a Notice has no children slot', async () => {
+    const { services } = salvageServices(salvageItem({}, { totalQuantity: 0 }), {
+      salvageResult: { systemId: 'sys', componentId: 'c1', state: 'success', message: '', awarded: [] },
+    });
+    const target = await harness.mount({ services });
+    await settle();
+    dispatch(target.querySelector('[data-inventory-detail-tab="salvage"]'), 'click');
+    await settle();
+
+    const ribbon = target.querySelector('[data-inventory-salvage-ribbon]');
+    assert.ok(Boolean(ribbon), 'the ribbon still reports the result');
+    assert.equal(ribbon.getAttribute('role'), 'status', 'and still announces it');
+    assert.ok(
+      !ribbon.classList.contains('fab-notice'),
+      '`Notice tone="success"` paints exactly this, and its CONTENT MODEL refuses it: the ' +
+        'trailing slot holds an underlined inline link in one state and a plain span in the ' +
+        'other, and the primitive has one `action` button and NO children slot'
+    );
+    assert.ok(
+      Boolean(ribbon.querySelector('[data-inventory-salvage-depleted]')),
+      'and the state with nowhere to go is the depleted one, a span rather than an action'
+    );
+  });
+
+  /**
+   * Source text with COMMENTS REMOVED, in both syntaxes.
+   *
+   * Every refusal below is recorded in a comment beside the markup it refuses for, and each of
+   * those comments NAMES the primitive it declined — so a raw `includes` scan reads the record
+   * of the refusal as the thing it forbids, and the assertion reds on the very sentence that
+   * makes the deferral legible. Measured, not anticipated: three of these clauses failed that
+   * way before the comments were stripped.
+   */
+  function code(file) {
+    return readFileSync(resolve(repoRoot, file), 'utf8')
+      .replaceAll(/<!--[\s\S]*?-->/gu, '')
+      .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
+  }
+
+  /**
+   * Does `file` IMPORT the named component?
+   *
+   * The sharper form of the same clause, and the one three of these need. Stripping block
+   * comments is not enough on its own: `InventoryItemCard` names `Medallion` in four `//` line
+   * comments that are genuine prose about the tile it mirrors, and a substring scan reads every
+   * one of them. What "draws no shared tile" actually means is that nothing is imported.
+   */
+  function imports(file, component) {
+    return new RegExp(String.raw`import\s+${component}\s+from`, 'u').test(code(file));
+  }
+
+  it('leaves the grid empty line hand-rolled, because the note variant cannot centre', () => {
+    const grid = code('src/ui/svelte/apps/inventory/InventoryGrid.svelte');
+    assert.ok(
+      !imports('src/ui/svelte/apps/inventory/InventoryGrid.svelte', 'EmptyState'),
+      'it imports no panel'
+    );
+    assert.match(
+      grid,
+      /\.inventory-grid-empty \{[\s\S]*?text-align: center/u,
+      '`.manager-empty.is-note` declares `place-items: start` and `text-align: left` on ITSELF, ' +
+        'so a caller cannot restore a centred line through a wrapper: measured in the View Lab ' +
+        'as a full-width 48.25px centred sentence becoming a 146.55px line in the top-left ' +
+        'corner of a 630px column. A centred one-line form is what would close it'
+    );
+  });
+
+  it('leaves the required-tools eyebrow an h4, because a Kicker would drop it and its id', () => {
+    const toolsPath = 'src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte';
+    const tools = code(toolsPath);
+    assert.ok(!imports(toolsPath, 'Kicker'), 'it imports no label primitive');
+    assert.match(
+      tools,
+      /<h4 class="salvage-tools-title" id="salvage-tools-title">/u,
+      'the measured host set is {p, span, h3} with a SILENT `p` fallback, so converting would ' +
+        'drop this heading out of the outline; and the primitive forwards no `id`, so the ' +
+        'section naming it in `aria-labelledby` would lose its accessible name'
+    );
+    assert.match(tools, /aria-labelledby="salvage-tools-title"/u, 'which is the reader in question');
+  });
+
+  it('leaves the shell section-eyebrow family hand-rolled, one consumer laying out children', () => {
+    const shell = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/inventory/detail/InventoryDetailHeader.svelte'),
+      'utf8'
+    );
+    const section = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/inventory/bulk/InventoryBulkSection.svelte'),
+      'utf8'
+    );
+    assert.ok(
+      shell.includes(':global(:where(.inventory-detail) .inventory-detail-section-title)'),
+      'the published family survives, and converts together or not at all'
+    );
+    assert.match(
+      section,
+      /class:has-trailing=\{titleTrailing != null\}/u,
+      'the consumer that cannot convert puts a modifier CLASS on the element `Kicker` would ' +
+        'replace, and the primitive forwards no class and no style'
+    );
+    assert.match(
+      section,
+      /\.inventory-detail-section-title\.has-trailing \{/u,
+      'and the rule that modifier switches on is the flex row the count sits in'
+    );
+  });
+
+  it('leaves the bulk progress track at 4px and the card thumb fluid, both off the ladder', () => {
+    const panelPath = 'src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte';
+    const cardPath = 'src/ui/svelte/apps/inventory/InventoryItemCard.svelte';
+    const panel = code(panelPath);
+    const card = code(cardPath);
+    assert.ok(!imports(panelPath, 'FillBar'), 'the panel draws no shared bar');
+    assert.match(
+      panel,
+      /\.bulk-progress-track \{\r?\n\s*height: 4px;/u,
+      '`FillBar` publishes `sm` at 6px and `md` at 8px, and 4px is neither: converting would ' +
+        'grow the running-batch track by half again, which is a size move'
+    );
+    assert.ok(!imports(cardPath, 'Medallion'), 'the card draws no shared tile');
+    assert.match(
+      card,
+      /aspect-ratio: 1 \/ 1;/u,
+      'the thumb is FLUID and no art rung has a fluid value; it is also the positioning ' +
+        'context for four overlays, and its img carries `draggable="false"` - three ' +
+        'independent blockers, all in the register'
+    );
   });
 });

@@ -84,7 +84,14 @@
     flex-wrap: wrap;
   }
 
-  /* Quieter than the accent Info|Salvage segments: a leading, muted eyebrow. */
+  /* Quieter than the accent Info|Salvage segments: a leading, muted eyebrow.
+
+     HAND-ROLLED, AND OUT OF SCOPE (issue 1514, routed to the player-selects issue). It reads as
+     a `Kicker` candidate and is not one: the host is a `<label for>` bound to the select beside
+     it, and `Kicker` renders `{p, span, h3}` with a silent `p` fallback and forwards no `for`.
+     Converting would take the select's accessible name away. The select and its label move
+     together or not at all, which is why both belong to the change that owns the player
+     selects. */
   .inventory-system-selector-label {
     font-size: 10px;
     font-weight: 700;

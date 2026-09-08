@@ -228,9 +228,9 @@ const SHARED_PRIMITIVES = [
   // membership: measured before that change, ZERO of the eleven mounted suites that named a
   // crafting-thumb path carried a Medallion entry, so every one of them would have taken the
   // silent `# cancelled` rather than the named "mounts a tree that renders it but never compiles
-  // it" failure. Its sibling `Avatar` deliberately does NOT join at two callers, which is this
-  // list's rule read the other way; the two rulings were taken as one question and the second is
-  // recorded below rather than by silence.
+  // it" failure. Its sibling `Avatar` deliberately did NOT join at two callers, which was this
+  // list's rule read the other way; that ruling has since been overturned by the caller it named
+  // as its own condition — see the entry below.
   'src/ui/svelte/components/Medallion.svelte',
   // THE FOUR THAT ARRIVED IN `components/` AT ISSUE 1509, adjudicated together because the change
   // that moved them made no ruling either way and four unadjudicated arrivals in the directory
@@ -261,24 +261,69 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/ToggleCard.svelte',
   'src/ui/svelte/components/ItemDropZone.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
+  // THE PORTRAIT (issue 1514), joining on exactly the condition its own non-membership note set:
+  // "it joins the moment a third caller in a third tree arrives, which is what makes this a
+  // criterion rather than a preference." The player inventory inspector's source-actor portrait
+  // is that caller, and the player window is that tree — the two shipped sites are the GM
+  // Knowledge roster row and its detail header, both under the manager root. Nothing about the
+  // criterion moved; the tree did. It is also the entry with the sharpest silent failure on this
+  // list, because it was the one component here whose omission was NOT named: three suites mount
+  // an inventory tree, and each of them would have taken a `# cancelled` with no message rather
+  // than the named "mounts a tree that renders it but never compiles it" line.
+  'src/ui/svelte/components/Avatar.svelte',
+  // THE ONE NOT-YET-READY CHROME the player views draw (issue 1514), and the only entry on this
+  // list that is not a primitive. It cannot be one: `spec.md:43` says "a candidate that
+  // decomposes entirely into existing members is a COMPOSITION and MUST NOT enter the set", and
+  // this is `EmptyState` plus `Callout` plus one line of chrome. What decides membership HERE is
+  // a different question from what decides membership in the design system — this list exists so
+  // that a component a mounted tree renders and a HAND-ROLLED harness omits fails BY NAME
+  // instead of cancelling the suite — and on that question it is the sharpest arrival since
+  // `Kicker`. SIX callers across five directories render it, and `RecipeDetail` is the shape
+  // the list is for: a suite that mounts the crafting DETAIL pane pulls the composition in,
+  // and `EmptyState` and `Callout` in behind it, without naming a view state anywhere.
+  //
+  // THE ENTRY IS LOAD-BEARING AND IT WAS MEASURED BOTH WAYS, because an addition to this list
+  // that changes nothing is the shape of guard this file exists to prevent. Dropping the path
+  // from `PLAYER_APP_COMPILED_MODULES` reds the clause below by name against EIGHT suites —
+  // the alchemy view, the app root, the journal view, three gathering suites (the detail, the
+  // environments and the actor bar) and both inventory suites. Dropping it from BOTH that
+  // roster and this list leaves the file GREEN. The pair is what proves the entry is doing the
+  // work rather than describing it.
+  //
+  // WHICH SUITES THOSE ARE, RE-MEASURED, because the sentence here first said SEVEN and said
+  // they were all hand-rolled, and both halves were wrong. It is eight — `journal-view-mounted`
+  // was missing from the list — and FIVE of the eight are `createMountedComponentHarness`
+  // suites: the alchemy view, the app root, the journal view and both inventory suites. Only
+  // the three gathering suites are hand-rolled.
+  //
+  // The naming clause below exempts NOTHING. Its only filter is that a suite must mention
+  // `writeCompiledSvelte` or `compiledModules` at all, and a `createMountedComponentHarness`
+  // caller mentions the second — so those suites are inspected exactly like the hand-rolled
+  // ones. The exemption that does exist belongs to the VACUITY RATCHET further down, which
+  // skips them because their own `validateMountedComponentDependencies` throws by name in
+  // `before()`; that is a different test answering a different question, and reading its
+  // exemption onto this clause is what produced the false sentence.
+  'src/ui/svelte/apps/PlayerViewState.svelte',
 ];
 
 /**
- * The one component adjudicated AGAINST membership, and why a non-entry is worth recording.
+ * Components adjudicated AGAINST membership, and why a non-entry is worth recording.
  *
- * `components/Avatar.svelte` shipped at issue 1506 with exactly two callers — the GM Knowledge
- * surface's roster row and its detail header — and both sit under ONE mounted tree, the manager
- * root. The list above goes on at a THIRD tree, so the portrait does not qualify, and the two
- * suites that mount it name it in their own `compiledModules` instead. That is a real cost and it
- * is taken deliberately: until a third tree renders one, an omitted portrait entry is a silent
- * `# cancelled` rather than the named failure the entries above buy. It joins the moment a third
- * caller in a third tree arrives, which is what makes this a criterion rather than a preference.
+ * IT IS EMPTY, AND THAT IS A RESULT RATHER THAN AN ABSENCE (issue 1514). Its one entry was
+ * `components/Avatar.svelte`, adjudicated out at issue 1506 because both its callers — the GM
+ * Knowledge surface's roster row and its detail header — sat under ONE mounted tree, the manager
+ * root, and this list goes on at a THIRD tree. That ruling named its own expiry in terms: "it
+ * joins the moment a third caller in a third tree arrives, which is what makes this a criterion
+ * rather than a preference." The player inventory inspector's source-actor portrait is that
+ * caller, so the portrait moved UP to the list above in the commit that added it, and this
+ * record is what proves the two lists never both held it — the assertion below is written to
+ * red by name if they ever did.
  *
- * Recorded here rather than left unsaid because its sibling `Medallion` JOINED in the same
- * change, and one ruling stated beside its opposite is a decision; one stated alone is an
- * omission that reads like an oversight.
+ * The structure is kept rather than deleted with its last entry: a ruling stated beside its
+ * opposite is a decision, and the next component measured against this bar needs somewhere to be
+ * recorded when the answer is no.
  */
-const ADJUDICATED_NON_MEMBERS = Object.freeze(['src/ui/svelte/components/Avatar.svelte']);
+const ADJUDICATED_NON_MEMBERS = Object.freeze([]);
 
 test('a component adjudicated OUT of the shared set is really out of it, and really exists', () => {
   // Two ways this record rots, and both leave it looking like configuration. A path that no
@@ -558,4 +603,85 @@ test('the shared primitives are reachable from a declared application root, so t
       `${primitive} should be reachable from at least one declared application root`
     );
   }
+});
+
+// A COMMENT INSIDE A ROSTER IS INSIDE THAT ROSTER'S CAPTURED BODY (issue 1514).
+//
+// `importedArraysOf` above reads a backing array with `Object\.freeze\(\[([^\]]*)\]`, a negated
+// character class that stops at the FIRST closing bracket in the declaration. Every roster in
+// `tests/helpers/svelte-component-harness.js` carries per-entry prose explaining why each module
+// is there, and that prose sits INSIDE the body this pattern captures — so a comment that merely
+// QUOTES a bracketed call shape truncates the capture and silently deletes every entry after it
+// from this guard's view.
+//
+// That is not hypothetical. It happened in this change: a paragraph added to
+// `CRAFTING_APP_COMPILED_MODULES` quoted the region matcher's required form literally, and the
+// roster went from 41 of 41 own literals resolved to 36 of 41, dropping `EmptyState`, `Avatar`,
+// `FillBar`, `Notice` and `CraftingView` — four of them members of `SHARED_PRIMITIVES`, which is
+// the set the guard above exists to police. It was LATENT rather than red, because no suite
+// currently spreads that roster into a readable literal array; it would have armed the moment
+// one did, which is precisely the repair that roster's own docblock recommends.
+//
+// So the failure mode is a silent narrowing of another guard, discoverable only by measurement.
+// This test makes it loud. It drives the REAL `importedArraysOf`, so it also reds if that
+// reader's pattern is changed in a way that stops resolving the rosters whole.
+//
+// The declaration scan is anchored at column 0 so it reads only genuine exports: the note at
+// `svelte-component-harness.js:346` writes `export const NAME = Object.freeze([ … ])` inside a
+// comment to describe the very form this pattern matches, and the production reader does register
+// a bogus `NAME` binding from it. That one is harmless — no suite imports a binding by that name,
+// so its empty body is never consulted — and it is excluded here rather than left to fail.
+const HARNESS_ROSTER_SOURCE = 'tests/helpers/svelte-component-harness.js';
+
+test('every exported roster in the shared harness resolves whole through the guard reader', () => {
+  const source = readRepoFile(HARNESS_ROSTER_SOURCE);
+  const rosterNames = [...source.matchAll(/^export const (\w+) = Object\.freeze\(\[$/gm)].map(
+    ([, name]) => name
+  );
+  assert.ok(
+    rosterNames.length >= 8,
+    `expected the harness to export its module rosters as frozen arrays, found ${rosterNames.length}`
+  );
+
+  // Ground truth is one quoted path per line inside the declaration, which is how the file is
+  // written and how Prettier keeps it. Read to the closing `]);` rather than with the reader's
+  // own pattern, so the two disagree exactly when the reader is truncating.
+  const declaredPathsOf = (name) => {
+    const start = source.indexOf(`export const ${name} = Object.freeze([`);
+    const end = source.indexOf('\n]);', start);
+    assert.ok(end > start, `${name} is a frozen array literal closed by ']);'`);
+    return [...source.slice(start, end).matchAll(/^\s*'([\w./@-]+)',?\s*$/gm)].map(([, p]) => p);
+  };
+
+  // The real reader, driven through a synthetic suite that imports every roster by name.
+  const resolved = new Map(
+    importedArraysOf(
+      `import { ${rosterNames.join(', ')} } from '../helpers/svelte-component-harness.js';`
+    )
+  );
+
+  const truncated = [];
+  for (const name of rosterNames) {
+    const declared = declaredPathsOf(name);
+    const body = resolved.get(name);
+    if (body === undefined) {
+      truncated.push(`${name} was not resolved by importedArraysOf at all`);
+      continue;
+    }
+    const captured = [...body.matchAll(QUOTED)].map(([, value]) => value);
+    const missing = declared.filter((path) => !captured.includes(path));
+    if (missing.length) {
+      truncated.push(
+        `${name} resolves ${captured.length} of ${declared.length} declared paths; ` +
+          `a bracket character in its comments truncated the capture before ${missing.join(', ')}`
+      );
+    }
+  }
+
+  assert.deepEqual(
+    truncated,
+    [],
+    'a closing bracket inside a roster comment silently narrows the naming guard above:\n- ' +
+      truncated.join('\n- ')
+  );
 });

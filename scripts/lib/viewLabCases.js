@@ -650,9 +650,24 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // released the panel entirely for an empty inside an overlay the product has already drawn a
   // boundary around, and that treatment appears in no frame that draws a pane.
   // `world-tool-entry-on-break-repair-tag-picker-empty` is the one frame that draws it.
+  //
+  // A THIRD ENTRY as of issue 1514, and `filtered` IS A THIRD TREATMENT rather than a variant
+  // of either. The reasoning above stopped at "two treatments" and the table stopped with it,
+  // so the variant that centres its stack, keeps the dashed panel and deliberately skips the
+  // icon/title apparatus was selected by nothing. That mattered the moment this issue moved its
+  // ink: `filtered` took the largest single change in the round, 2.66:1 to 5.42:1, across nine
+  // render sites of which six are outside this issue entirely — and every frame the table
+  // selected drew one of the other two treatments, which is exactly the "publishes two frames
+  // that do not contain the change" failure this table exists to prevent.
+  // `world-tool-catalogue-filtered-empty` is the one frame that draws it: the World Tools
+  // Catalogue searched to nothing, with the `Clear filters` action the variant renders as its
+  // own `children`. `tests/design-system-primitives.test.js` asserts only that entries RESOLVE,
+  // so it could not have caught the omission; the miss is a reasoning gap and is fixed here as
+  // one.
   'src/ui/svelte/apps/manager/EmptyState.svelte': Object.freeze([
     'manager-systems-empty',
     'world-tool-entry-on-break-repair-tag-picker-empty',
+    'world-tool-catalogue-filtered-empty',
   ]),
   // BOTH parties pickers, because between them they are the primitive's two modes and
   // neither renders the other's chrome. `inlineSearchTrigger` (the actor picker) replaces
@@ -862,7 +877,11 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // ASSERTS contains one. `manager-recipe-item-overview` is the manager one, and it is where the
   // conversion moves the most: three field labels go from `0.66rem / .1em` to the ladder's
   // `8.5px / .11em`, and the nested "from linked item" note goes with them because it declares no
-  // size of its own.
+  // size of its own. THAT IS TRUE OF SIZE AND WAS NOT TRUE OF COLOUR (issue 1514): the note DID
+  // declare its own ink, so the mark's contrast correction reached the label and stopped at the
+  // tail, splitting one 8.5px line into two tones. The note's `color` was deleted rather than
+  // the correction narrowed, so it now inherits the mark's ink as it already inherited its size,
+  // and this frame is the one that shows both halves of that line agreeing.
   //
   // Still uncovered, and named rather than left to be discovered: `tone="accent"`. It is
   // specimen-mandated — `library.html` declares the rule, draws the example and states when to
@@ -959,6 +978,29 @@ const CRAFTING_MODE_FILES = Object.freeze({
   routedByCheck: ['RoutedByCheckBody', 'OutcomeTierTable'],
   progressive: ['ProgressiveBody', 'ProgressiveStageList'],
 });
+
+/**
+ * The ONE not-yet-ready chrome all five player views draw (issue 1514).
+ *
+ * It sits directly under `apps/`, so it matches NEITHER leg of `BROAD_SIGNAL_PATTERN` and no
+ * directory pattern reaches it — without a claim of its own it selects `FALLBACK_CASE_ID` alone,
+ * which `view-lab-source-coverage.test.js` reds on by name. It is claimed by ONE representative
+ * frame per player app rather than by every player case: the component is in the render path of
+ * all of them (its `{:else}` branch renders the ready content), so five frames prove the populated
+ * tree is undisturbed across all five windows without publishing sixty for a one-line change.
+ *
+ * WHAT THOSE FIVE FRAMES CANNOT SHOW, stated rather than left to be discovered: no case in this
+ * registry seeds a player view's loading, error, no-actor or empty state — every player case
+ * renders a populated window — so the chrome this component draws in its OTHER branch is
+ * photographed nowhere. The lab has no query parameter that produces one either, so closing that
+ * gap is a lab-input change (`tests/view-lab/mount.js`) rather than a registry edit, and it is
+ * recorded here as the gap it is rather than papered over with a frame that cannot contain it.
+ *
+ * Hoisted outside every case region for the reason `RECIPE_BULK_EDIT_MATCHES` records: a change
+ * inside a case literal narrows the capture selection to that one frame, and a shared pattern
+ * belongs to all five.
+ */
+const PLAYER_VIEW_STATE = /^src\/ui\/svelte\/apps\/PlayerViewState\.svelte$/;
 
 /** Everything under `crafting/` that is NOT one mode's own body. Applies to every crafting case. */
 const CRAFTING_SHARED = new RegExp(
@@ -10524,7 +10566,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'gathering' },
     steps: [],
     kinds: ['player', 'gathering'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/gathering\//, PLAYER_VIEW_STATE],
   }),
   playerCase({
     id: 'fabricate-app-shell',
@@ -10543,8 +10585,10 @@ export const VIEW_LAB_CASES = Object.freeze([
       // of which this is one. Moving it to `apps/` took it out of both legs of
       // `BROAD_SIGNAL_PATTERN`, so without this pattern a change to a 506-line screen region
       // would publish only the frame that opens its picker and never the frame that draws it
-      // closed — which is where its own 18 scoped rules are visible.
+      // closed — which is where its own 17 scoped rules are visible. (18 until issue 1514 moved
+      // the contextual stamina track onto the shared fill bar and its fill rule went with it.)
       /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
+      PLAYER_VIEW_STATE,
     ],
   }),
   // THE PRIMITIVE'S FIRST PLAYER-WINDOW FRAME (issue 1475). Every other player case draws the
@@ -10599,6 +10643,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
+      PLAYER_VIEW_STATE,
     ],
   }),
   playerCase({
@@ -11962,7 +12007,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'alchemy' },
     steps: [],
     kinds: ['player', 'alchemy'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//, PLAYER_VIEW_STATE],
   }),
   playerCase({
     id: 'player-alchemy-stacked',
@@ -11996,7 +12041,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'journal' },
     steps: [],
     kinds: ['player', 'journal'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/journal\//, /^src\/ui\/svelte\/stores\/journalStore/],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/journal\//,
+      /^src\/ui\/svelte\/stores\/journalStore/,
+      PLAYER_VIEW_STATE,
+    ],
   }),
   playerCase({
     id: 'fabricate-journal-craft-detail',

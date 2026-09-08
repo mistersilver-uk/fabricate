@@ -30,6 +30,7 @@
   import InventoryGrid from './InventoryGrid.svelte';
   import InventoryDetail from './InventoryDetail.svelte';
   import InventoryBulkPanel from './bulk/InventoryBulkPanel.svelte';
+  import PlayerViewState from '../PlayerViewState.svelte';
 
   let { services = null } = $props();
 
@@ -44,6 +45,44 @@
   const isError = $derived(Boolean(store?.error));
   const isNoActor = $derived(Boolean(store?.loadedOnce) && !hasActor);
   const isEmpty = $derived(Boolean(store?.loadedOnce) && hasActor && rows.length === 0);
+
+  // The four branches this view can reach, in priority order, handed to the shared composition
+  // as data. The hook name and each value are the ones the smoke locators and the mounted
+  // suites already read, so neither is derived from `kind`.
+  const viewStates = $derived([
+    {
+      when: isLoading,
+      kind: 'loading',
+      hook: 'data-inventory-state',
+      value: 'loading',
+      icon: 'fas fa-spinner fa-spin',
+      message: localize('FABRICATE.App.Inventory.Loading'),
+    },
+    {
+      when: isError,
+      kind: 'error',
+      hook: 'data-inventory-state',
+      value: 'error',
+      icon: 'fas fa-triangle-exclamation',
+      message: localize('FABRICATE.App.Inventory.Error'),
+    },
+    {
+      when: isNoActor,
+      kind: 'empty',
+      hook: 'data-inventory-state',
+      value: 'no-actor',
+      icon: 'fas fa-user-slash',
+      message: localize('FABRICATE.App.Inventory.NoActor'),
+    },
+    {
+      when: isEmpty,
+      kind: 'empty',
+      hook: 'data-inventory-state',
+      value: 'empty',
+      icon: 'fas fa-boxes-stacked',
+      message: localize('FABRICATE.App.Inventory.Empty'),
+    },
+  ]);
 
   const filtering = $derived(
     String(store?.search ?? '').trim() !== '' || (store?.filter ?? 'all') !== 'all'
@@ -232,27 +271,7 @@
   );
 </script>
 
-{#if isLoading}
-  <div class="inventory-view-state" data-inventory-state="loading">
-    <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Inventory.Loading')}</p>
-  </div>
-{:else if isError}
-  <div class="inventory-view-state" data-inventory-state="error">
-    <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Inventory.Error')}</p>
-  </div>
-{:else if isNoActor}
-  <div class="inventory-view-state" data-inventory-state="no-actor">
-    <i class="fas fa-user-slash" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Inventory.NoActor')}</p>
-  </div>
-{:else if isEmpty}
-  <div class="inventory-view-state" data-inventory-state="empty">
-    <i class="fas fa-boxes-stacked" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Inventory.Empty')}</p>
-  </div>
-{:else}
+<PlayerViewState branches={viewStates}>
   <div class="inventory-view-container">
     <div class="inventory-view-grid" data-inventory-state="populated">
       <div class="inventory-view-column inventory-view-column-left">
@@ -324,7 +343,7 @@
       </section>
     </div>
   </div>
-{/if}
+</PlayerViewState>
 
 <style>
   /* The grid wrapper is the size container so columns reflow against the Fabricate
@@ -379,25 +398,5 @@
     border-radius: 8px;
     background: var(--fab-surface-soft);
     overflow: hidden;
-  }
-
-  .inventory-view-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    height: 100%;
-    color: var(--fab-text-muted);
-    background: var(--fab-surface);
-  }
-
-  .inventory-view-state i {
-    font-size: 32px;
-  }
-
-  .inventory-view-state p {
-    margin: 0;
-    font-size: 14px;
   }
 </style>

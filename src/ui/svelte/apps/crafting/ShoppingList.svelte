@@ -13,6 +13,8 @@
   import { normalizeEssenceIcon } from '../../util/essenceIcons.js';
   import { localize } from '../../util/foundryBridge.js';
   import StatBox from '../../components/StatBox.svelte';
+  import Kicker from '../../components/Kicker.svelte';
+  import EmptyState from '../manager/EmptyState.svelte';
 
   let {
     aggregate = null,
@@ -230,16 +232,32 @@
   </div>
 
   {#if isEmpty}
-    <p class="crafting-shopping-empty" data-crafting-shopping-empty>
-      <i class="fas fa-cart-shopping" aria-hidden="true"></i>
-      {localize('FABRICATE.App.Crafting.Shopping.Empty')}
-    </p>
+    <!--
+      THE PANE'S FILL IS THE CALLER'S, THE PANEL IS THE PRIMITIVE'S (issue 1514). Measured at
+      288.86x574.72, this is not a one-line note: it is a glyph over a centred sentence standing
+      in for the whole planner column, which is the same rendered SHAPE as the inventory
+      inspector's no-selection pane and takes the same answer. `EmptyState` is padding-driven and
+      declares no height, and its documented fill escape is `contextClass`, "whose rules live in
+      the global sheet" (`EmptyState.svelte:53-55`) — which would put `styles/fabricate.css` on
+      this change's path. So `.crafting-shopping-empty` survives as a caller-owned WRAPPER
+      declaring the fill and the centring and nothing else.
+
+      The hook stays ON THE WRAPPER, which is the element it has always sat on, so it keeps
+      rendering `data-crafting-shopping-empty=""` rather than the `="true"` `EmptyState` coerces
+      a bare hook to (`EmptyState.svelte:84`, `dataValue || true`).
+    -->
+    <div class="crafting-shopping-empty" data-crafting-shopping-empty>
+      <EmptyState
+        icon="fas fa-cart-shopping"
+        title={localize('FABRICATE.App.Crafting.Shopping.Empty')}
+      />
+    </div>
   {:else}
     <div class="crafting-shopping-scroll">
       <div class="crafting-shopping-card">
-        <p class="crafting-shopping-card-title">
+        <Kicker as="p">
           {localize('FABRICATE.App.Crafting.Shopping.RecipesTitle')}
-        </p>
+        </Kicker>
         <ul class="crafting-shopping-queue">
           {#each queued as entry (entry.recipeId)}
             <!--
@@ -285,9 +303,9 @@
 
       {#if acquireComponents.length > 0}
         <div class="crafting-shopping-card" data-shopping-acquire-components>
-          <p class="crafting-shopping-card-title">
+          <Kicker as="p">
             {localize('FABRICATE.App.Crafting.Shopping.AcquireComponents')}
-          </p>
+          </Kicker>
           <ul class="crafting-shopping-acquire">
             {#each acquireComponents as row (row.key)}
               <li class="crafting-shopping-acquire-row">
@@ -312,9 +330,9 @@
 
       {#if acquireTools.length > 0}
         <div class="crafting-shopping-card" data-shopping-acquire-tools>
-          <p class="crafting-shopping-card-title">
+          <Kicker as="p">
             {localize('FABRICATE.App.Crafting.Shopping.AcquireTools')}
-          </p>
+          </Kicker>
           <ul class="crafting-shopping-acquire">
             {#each acquireTools as tool (tool.key)}
               <li class="crafting-shopping-acquire-row">
@@ -393,22 +411,14 @@
     gap: var(--fab-space-2);
   }
 
+  /* THE WRAPPER ONLY: the fill and the centring the planner column needs, and nothing about
+     the glyph, the type or the ink — those belong to the panel nested inside it now. */
   .crafting-shopping-empty {
     flex: 1 1 auto;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    margin: 0;
     padding: var(--fab-space-4);
-    text-align: center;
-    font-size: 13px;
-    color: var(--fab-text-muted);
-  }
-
-  .crafting-shopping-empty i {
-    font-size: 24px;
   }
 
   /* The card stack scrolls; the header + summary stay pinned above it. */
@@ -430,15 +440,6 @@
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
-  }
-
-  .crafting-shopping-card-title {
-    margin: 0;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--fab-text-muted);
   }
 
   .crafting-shopping-queue,

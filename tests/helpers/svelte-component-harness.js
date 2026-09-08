@@ -311,6 +311,65 @@ export const MARKS_AND_NOTICES_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/Callout.svelte',
 ]);
 
+// THE SHARED PRIMITIVES THE PLAYER WINDOW'S TREES RENDER, as ONE closure (issue 1514).
+//
+// It began as the GATHERING tree's roster, because three suites mount that tree —
+// `gathering-detail-mounted`, `gathering-environments-mounted` and `gathering-view-actor-bar` —
+// and all three are HAND-ROLLED rather than built on `createMountedComponentHarness`, so a
+// module the tree renders and the manifest omits is not the named "add it to compiledModules"
+// error the shared harness raises. It is `ERR_MODULE_NOT_FOUND` in `before()`, and
+// `node --test` reports the whole file as `# cancelled`, never `# fail`.
+//
+// ONE ROSTER RATHER THAN N COPIES, and the reason is measured rather than stylistic. Issue
+// 1514's first phase added the same six-line comment and its two `writeCompiledSvelte` calls to
+// each of those three suites and to `fabricate-app-root-mounted`, and SonarCloud reported
+// `new_duplicated_lines_density` at 6.8% against a 3% threshold naming exactly those four files
+// — two of them at 100% of their new lines. Sonar counts a NEW line as duplicated when it falls
+// inside a duplicated block, and these harness manifests are near-identical across suites
+// already, so every line inserted into one lands inside such a block. The fix is therefore to
+// insert FEWER lines rather than to reword them: the prose lives here once and each call site
+// is a single loop or a single spread.
+//
+// WIDENED FROM THE GATHERING TREE TO THE WINDOW at issue 1514's third phase, rather than
+// copied. That phase adopts the same primitives in the ALCHEMY and JOURNAL trees, whose five
+// suites are `createMountedComponentHarness`-based and so fail loudly — but the manifests are
+// the same near-identical block, and five more hand-listed entries across five of them is the
+// same duplicated-lines measurement in a different file set. A SECOND frozen array beside this
+// one would not have helped: SonarCloud's copy-paste detector normalises literals, so two
+// adjacent five-line arrays of component paths match each other by SHAPE whatever the strings
+// say. So there is one list, `FillBar` joins it for the Journal run card's progress track, and
+// a suite compiling a member its own tree never renders writes one inert file into a temp
+// directory — which is cheaper than the roster it would otherwise fork.
+//
+// FLAT, and one quoted literal per entry, because the static guard in
+// `mounted-harness-primitive-allowlist.test.js` resolves an imported roster by matching
+// `export const NAME = Object.freeze([ … ])` up to the FIRST `]`. A spread of another roster
+// inside this body would resolve to nothing and the guard would read these suites as compiling
+// none of it — green, and blind. That is why `Kicker`, `Notice` and `Callout` are restated here
+// rather than spread from the roster above.
+//
+// WIDENED AGAIN AT THE FOURTH PHASE, on the same rule and for the same reason. That phase gives
+// the INVENTORY tree its first `Avatar` (a source actor's portrait) and its first
+// `SegmentedControl` (the kind filter), and the three suites that mount it — `inventory-view`,
+// `inventory-view-salvage-reload` and `fabricate-app-root-mounted` — spread this roster instead
+// of naming the two paths each. Two entries in three manifests is six new lines inside blocks
+// Sonar already reads as duplicated; one spread per suite is three, and each of those three
+// REPLACES two entries the roster already carries. Neither of the newcomers is rendered by the
+// gathering, alchemy or Journal trees, and that is the same trade the paragraph above makes:
+// a suite compiling a member its own tree never renders writes one inert file into a temp
+// directory, which is cheaper than the roster it would otherwise fork.
+export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
+  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
+  'src/ui/svelte/apps/PlayerViewState.svelte',
+  'src/ui/svelte/components/Avatar.svelte',
+  'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/Medallion.svelte',
+  'src/ui/svelte/components/Notice.svelte',
+]);
+
 // The raw `.js` modules the player Crafting tab tree needs in a mounted test.
 // Hoisted (mirroring SEARCHABLE_POPOVER_RAW_MODULES) so every crafting component
 // test references one source of truth — a component referencing a `.svelte`/`.js`
@@ -541,6 +600,73 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/ShoppingList.svelte',
   'src/ui/svelte/apps/crafting/RunSummaryPanel.svelte',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
+  // The ONE not-yet-ready chrome the five player views draw (issue 1514). `CraftingView` below
+  // renders the composition, so this roster is where the crafting suites acquire it. Its error
+  // branch composes `Notice`, which this list already carries flat a few lines down; `Callout`
+  // is kept beside it because the crafting tree still reaches that strip through the recipe
+  // detail's own panels. Omitting either does not fail a crafting suite: it CANCELS it.
+  'src/ui/svelte/apps/manager/Callout.svelte',
+  'src/ui/svelte/apps/PlayerViewState.svelte',
+  // The four the Crafting tab reaches as of issue 1514's crafting phase, each written FLAT for
+  // the reason `SELECT_COMPILED_MODULES` records above — the static guard in
+  // `mounted-harness-primitive-allowlist.test.js` reads this array's own source text for quoted
+  // literals, and a nested `...NAME` is not one. `Avatar` is the component-sources bar's two
+  // actor portraits; `Notice` is the detail header's blocking well; `FillBar` is the essence
+  // pool's per-essence meter; `EmptyState` is four pane empties, the shopping planner's panel
+  // and `RecipeDetail`'s no-selection pane.
+  //
+  // WHAT AN OMISSION COSTS HERE, MEASURED RATHER THAN ASSUMED, because the obvious sentence is
+  // wrong twice over. Dropping `Avatar` from this array leaves
+  // `mounted-harness-primitive-allowlist.test.js` GREEN — so `SHARED_PRIMITIVES` membership is
+  // NOT what makes the omission loud.
+  //
+  // THE REASON IT STAYS GREEN IS NOT AN EXEMPTION, and the sentence here used to say it was.
+  // That guard's naming clause exempts nothing: it inspects every suite mentioning
+  // `writeCompiledSvelte` or `compiledModules`, which every `createMountedComponentHarness`
+  // caller does. What it cannot READ is this roster's call shape. Its region matcher requires
+  // an inline array written out in place after `compiledModules:`, an opening bracket it can
+  // scan to a closing one, and the crafting suites pass the bare identifier
+  // `compiledModules: CRAFTING_APP_COMPILED_MODULES`, so it resolves no path for them, holds
+  // over an empty set and reports clean whatever they render. That is the same silent-vacuity
+  // shape the guard's own `BARE_LOOP_COMPILE` note records for compile LOOPS, and its vacuity
+  // ratchet cannot catch this instance because that ratchet skips
+  // `createMountedComponentHarness` suites by name — an exemption that sits on the RATCHET
+  // alone, never on the naming guard above it.
+  //
+  // NO BRACKET CHARACTER MAY APPEAR ANYWHERE IN THIS ARRAY'S COMMENTS, and that is a property
+  // of where the comment SITS rather than of the prose it carries. `importedArraysOf` in that
+  // same guard captures a roster body with a negated character class that stops at the FIRST
+  // closing bracket it meets, and a comment inside this array is inside that body — so an
+  // earlier draft of this very paragraph, which quoted the matcher's required shape literally,
+  // truncated the capture and silently dropped the last five entries below. Measured across
+  // refs: 35 of 35 own literals resolved on `origin/main`, 41 of 41 at `fda0e84f6`, and 36 of
+  // 41 once that draft landed — the losses being `EmptyState`, `Avatar`, `FillBar`, `Notice`
+  // and `CraftingView`, four of them the shared primitives that guard exists to police. It is
+  // a comment read AS code by a parser, which is the inverse of the scan-whose-haystack-holds
+  // -prose defect this file records elsewhere. Latent while no suite spreads this roster into a
+  // readable array and ARMED the moment one does, which is the repair the paragraph above
+  // recommends. `mounted-harness-primitive-allowlist.test.js` now holds a test that reds when
+  // any exported roster in this file stops resolving whole through that reader.
+  //
+  // RECORDED RATHER THAN FIXED: teaching the region matcher the bare-identifier form is not one
+  // change. Measured on a scratch copy of the guard, it reds 10 suites reporting 9 missing
+  // primitives each, and NONE of those 9 are pre-existing coverage gaps — they are artifacts of
+  // two FURTHER limits in the same parser, the capture truncation above and the absence of
+  // recursive spread expansion. Repairing both moves it to 23 suites, whose remainder is still
+  // un-expanded two-level nesting. So the parser repair is three changes, not one. The sentence
+  // this replaces said it "reds 18 suites on pre-existing gaps", which asserted an unverified
+  // cause as a measurement — the same failure the SEVEN/EIGHT correction in this commit spends
+  // twenty lines undoing. What makes an omission loud is
+  // this harness's own up-front `validateMountedComponentDependencies`, which names the
+  // importer, the missing module and this list. And the shape of that failure is not `# fail`:
+  // measured, `crafting-view-mounted` reports `not ok 1 - CraftingView mounted behavior` with
+  // the named message, `# fail 0` and `# cancelled 14`, because a throw from a `describe` body
+  // escapes the failure count. That is why the acceptance bar for this change is an unanchored
+  // grep for `not ok` and a `# cancelled 0`, not the summary line.
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/components/Avatar.svelte',
+  'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/apps/crafting/CraftingView.svelte'
 ]);
 

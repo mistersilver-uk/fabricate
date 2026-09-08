@@ -11,6 +11,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import Chip from '../../components/Chip.svelte';
+  import Notice from '../../components/Notice.svelte';
   import { craftingRecipeStatus } from '../../util/craftingRecipeStatus.js';
   import { TIME_UNITS, formatTimeRequirementCompact } from '../../util/recipeDuration.js';
 
@@ -125,19 +126,31 @@
     {/if}
 
     {#if blockingReasons.length > 0}
-      <div
-        class="crafting-detail-blocking"
-        class:is-uncraftable={uncraftable}
-        data-recipe-blocking
-        role="status"
-      >
-        <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-        <ul class="crafting-detail-blocking-list">
-          {#each blockingReasons as reason, index (index)}
-            <li>{reason}</li>
-          {/each}
-        </ul>
-      </div>
+      <!-- THE SHARED `Notice`, NON-BLOCKING (issue 1514). This well already carried
+           `role="status"`, and `Notice` is the only primitive that can keep it: `Callout` emits
+           `role="note"` or nothing (`Callout.svelte:131`) and cannot express a live status
+           region. Non-blocking is what KEEPS the role — and with it the polite live region the
+           role already implied, since `role="status"` carries an implicit `aria-live="polite"`
+           and `aria-atomic="true"`. The explicit attribute the primitive writes changes nothing
+           here; it is the role, present before and after, that announces. The tone is the one
+           this well already painted — the same
+           `--fab-warning-*` and `--fab-danger-*` triples, switched on the same `uncraftable`
+           reading — so the conversion moves the frame, not the meaning.
+
+           THE `<ul>` GOES, AND THE PRODUCER IS WHY. `Notice` takes `title` and `detail` as
+           STRINGS and has no children slot, so a bulleted list of N reasons has nowhere to go.
+           `CraftingListingBuilder._blockingReasons` returns `key ? [this.localize(key)] : []` —
+           AT MOST ONE reason, for every browse status there is — so the list this markup drew
+           has always been a one-item list wearing a `list-style: disc`. The first reason is the
+           title and any further one lands in `detail` rather than being dropped, which keeps a
+           future second reason visible instead of silent. -->
+      <Notice
+        tone={uncraftable ? 'danger' : 'warning'}
+        icon="fas fa-triangle-exclamation"
+        title={blockingReasons[0]}
+        detail={blockingReasons.slice(1).join(' ')}
+        dataAttr="data-recipe-blocking"
+      />
     {/if}
   {/if}
 </header>
@@ -284,31 +297,5 @@
     font-size: 13px;
     font-style: italic;
     color: var(--fab-text-muted);
-  }
-
-  .crafting-detail-blocking {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-warning-border);
-    border-radius: 8px;
-    background: var(--fab-warning-soft);
-    color: var(--fab-warning-text);
-  }
-
-  /* Missing materials is an error, not a warning: align the callout with the row
-     tint + thumbnail pip. Other blockers (locked/unknown/exhausted) keep the amber
-     warning treatment. */
-  .crafting-detail-blocking.is-uncraftable {
-    border-color: var(--fab-danger-border);
-    background: var(--fab-danger-soft);
-    color: var(--fab-danger-text);
-  }
-
-  .crafting-detail-blocking-list {
-    margin: 0;
-    padding-left: 16px;
-    font-size: 13px;
   }
 </style>

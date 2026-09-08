@@ -10,14 +10,27 @@
   Data comes from `services.getGatheringDropBreakdown` (resolved lazily by the
   parent for the selected task); `breakdown` is
   `{ drops, awardMode, awardLimit, eventPolicy }`. The section renders nothing
-  when there are no drops and not loading.
+  when there are no drops, not loading and not in error.
+
+  THE FOURTH STATE IS THE FETCH FAILING (issue 1514). The parent's `.catch` used to
+  clear the breakdown and lower the loading flag, which renders exactly what "this
+  task has no drops" renders — so a broken services call and an empty drop table were
+  the same picture, and a player had no way to tell that anything had gone wrong. The
+  parent now passes `error` and this section says so, at `data-gathering-drops-state="error"`.
 -->
 <script>
+  import FillBar from '../../components/FillBar.svelte';
+  import Kicker from '../../components/Kicker.svelte';
+  import Medallion from '../../components/Medallion.svelte';
+  import Notice from '../../components/Notice.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { toPercent as pct } from '../../util/gatheringFormat.js';
   import GatheringDropModifiers from './GatheringDropModifiers.svelte';
 
-  let { breakdown = null, loading = false } = $props();
+  let { breakdown = null, loading = false, error = false } = $props();
+
+  /** The drop tile's stand-in when a drop record carries no artwork of its own. */
+  const DEFAULT_DROP_IMG = 'icons/svg/item-bag.svg';
 
   const drops = $derived(Array.isArray(breakdown?.drops) ? breakdown.drops : []);
   const hasDrops = $derived(drops.length > 0);
@@ -64,19 +77,32 @@
 
 {#if loading}
   <div class="gathering-task-drops" data-gathering-drops data-gathering-drops-state="loading">
-    <p class="gathering-task-drops-heading">
-      {localize('FABRICATE.App.Gathering.Detail.WhatYouMightFind')}
-    </p>
+    <Kicker as="p">{localize('FABRICATE.App.Gathering.Detail.WhatYouMightFind')}</Kicker>
     <p class="gathering-task-drops-loading">
       <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
       {localize('FABRICATE.App.Gathering.Detail.DropsLoading')}
     </p>
   </div>
+{:else if error}
+  <div class="gathering-task-drops" data-gathering-drops data-gathering-drops-state="error">
+    <Kicker as="p">{localize('FABRICATE.App.Gathering.Detail.WhatYouMightFind')}</Kicker>
+    <!-- TITLE AND DETAIL, not one string in `title` (issue 1514). `Notice`'s title is
+         12px/600 in the tone's ink with no declared `line-height`, which is a HEADING slot;
+         the whole 120-character two-sentence string handed to it rendered as a three-line
+         shouty heading. The sentences already split at the seam the primitive draws — what
+         went wrong, then what to do next — which is exactly `detail`'s stated job, and
+         `FabricateAppRoot`'s companion fault strip splits its own copy the same way. -->
+    <Notice
+      tone="danger"
+      title={localize('FABRICATE.App.Gathering.Detail.DropsError')}
+      detail={localize('FABRICATE.App.Gathering.Detail.DropsErrorDetail')}
+      dataAttr="data-gathering-drops-error"
+      dataValue=""
+    />
+  </div>
 {:else if hasDrops}
   <div class="gathering-task-drops" data-gathering-drops data-gathering-drops-state="ready">
-    <p class="gathering-task-drops-heading">
-      {localize('FABRICATE.App.Gathering.Detail.WhatYouMightFind')}
-    </p>
+    <Kicker as="p">{localize('FABRICATE.App.Gathering.Detail.WhatYouMightFind')}</Kicker>
 
     {#if awardHint !== '' || eventHint !== ''}
       <ul class="gathering-task-drops-hints" data-gathering-drops-hints>
@@ -101,11 +127,7 @@
             onclick={() => toggle(drop.id ?? index)}
             onkeydown={(event) => onRowKey(event, drop.id ?? index)}
           >
-            <img
-              class="gathering-task-drop-thumb"
-              src={drop.img || 'icons/svg/item-bag.svg'}
-              alt=""
-            />
+            <Medallion art={drop.img || DEFAULT_DROP_IMG} alt="" size={36} />
             <span class="gathering-task-drop-copy">
               <span class="gathering-task-drop-name" title={drop.name}>
                 {drop.name}
@@ -128,10 +150,7 @@
                 })}
                 data-gathering-drop-value={pct(drop.finalChance)}
               >
-                <span class="gathering-task-drop-track">
-                  <span class="gathering-task-drop-fill" style={`width: ${pct(drop.finalChance)}%`}
-                  ></span>
-                </span>
+                <FillBar value={pct(drop.finalChance)} size="sm" />
                 <span class="gathering-task-drop-percent">{pct(drop.finalChance)}%</span>
               </span>
             </span>
@@ -158,15 +177,6 @@
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface);
-  }
-
-  .gathering-task-drops-heading {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--fab-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
   }
 
   .gathering-task-drops-loading {
@@ -228,15 +238,6 @@
     outline-offset: -2px;
   }
 
-  .gathering-task-drop-thumb {
-    flex: 0 0 auto;
-    width: 36px;
-    height: 36px;
-    border-radius: 6px;
-    object-fit: cover;
-    background: var(--fab-surface-raised);
-  }
-
   .gathering-task-drop-copy {
     flex: 1 1 auto;
     min-width: 0;
@@ -263,24 +264,6 @@
     display: flex;
     align-items: center;
     gap: 8px;
-  }
-
-  .gathering-task-drop-track {
-    position: relative;
-    flex: 1 1 auto;
-    height: 6px;
-    border-radius: 999px;
-    background: var(--fab-surface-raised);
-    border: 1px solid var(--fab-border);
-    overflow: hidden;
-  }
-
-  .gathering-task-drop-fill {
-    position: absolute;
-    inset: 0 auto 0 0;
-    height: 100%;
-    border-radius: 999px;
-    background: var(--fab-success);
   }
 
   .gathering-task-drop-percent {

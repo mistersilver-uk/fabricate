@@ -217,6 +217,20 @@ A primitive rendered by another primitive that a second application renders is e
 `Pagination` is exercised DIRECTLY — six of its 25 importers are player-app components — and `IconButton` is exercised TRANSITIVELY, because `Pagination` renders two of them as its page arrows and those six player components render that pager.
 A capability that nothing exercises is still worth having, and is not debt: it is the state a primitive is in between being made portable and being carried somewhere, and the requirement is what keeps the two from being confused.
 
+The player window is the second application for `EmptyState`, `Avatar` and `SegmentedControl`, and it deepens the `Medallion`, `Kicker`, `FillBar`, `Callout` and `Notice` adoptions that preceded it.
+That makes a COROLLARY of the paragraph above explicit, because the census made it visible: a component wearing an application's class names may be exercised in a SECOND application when it SELF-PAINTS from its own scoped block, since the class names are a naming convention and the area binding is what the rules root at.
+A docblock refusing such a caller is therefore a claim about the tree at the time it was written, and the change that adds the caller RESTATES it, in the commit that falsifies it, rather than leaving a refusal the tree has overturned.
+`EmptyState` is the shipped instance, in both of the docblocks that refused the player app.
+The same rule reaches a REASON as well as a refusal: a refusal standing on three grounds whose first two the tree has since falsified is restated to record which one survived, which is what `FabricateAppRoot`'s companion-fault strip did when it moved to a notice on the announcement ground alone.
+
+What the adoption does NOT reach is stated with it, because a conversion issue that only reports its successes cannot be audited.
+`SegmentedControl` and `Stepper` each end at ONE player caller, below the two-caller membership bar: the only further candidates were refused on ARIA semantics and on content model respectively, and a bar that a change declines to clear on the merits is a measurement rather than a shortfall.
+
+A COMPOSITION of existing members with many callers is the third outcome, and it is neither of the two the register already had.
+It is not a primitive, because a candidate that decomposes entirely into existing members MUST NOT enter the set; and it is not a recordable non-member either, because that record caps a component at one caller.
+Such a composition is BANKED as an unregistered shared component, which is the register's answer for a screen-region composition rather than a gap in it.
+That answer is PATH-CONDITIONAL and the condition is stated with it: it holds only while the file lives outside the primitive directory, so the same file moved inside it would demand a manifest row and a library specimen instead.
+
 The corollary is that a component OUTSIDE the shared directory may keep an area-scoped family, and doing so is correct rather than debt.
 Its markup cannot appear outside that area, so the ancestor is free, and unscoping it would spend specificity and widen the rule's blast radius for no reachable benefit.
 `RecipeDurationEditor`, `EnvironmentsBrowserView` and the manager modal keep `.fabricate-manager`-rooted overlay rules on exactly that basis.
@@ -531,6 +545,13 @@ Two contradictions between that ladder and the radius rules below are settled he
 "A fully rounded radius is for a shape whose contents are text alone" would, read literally, forbid the ROUND portrait the library mandates for a person; the round portrait is a stated CARVE-OUT from that sentence, because the corner is what says the mark is a person.
 And the radius rule puts 26 to 32px at radius 7 while the specimen's 32px square portrait is radius 9: for art and portraits the ladder in this paragraph GOVERNS, and the control radius rule does not reach them.
 The shipped population is off the art size ladder at more distinct values than it is on — measured on the tree rather than asserted, and RE-MEASURED after any change that moves a tile — and `tests/components/design-system-known-debt.json`'s `offLadderArtSizes` pins every art-tile render site, with a non-literal `size` recorded as an explicit `dynamic` key, so the geometry sweep lowers a number rather than re-deriving a census.
+
+A CONVERSION PRESERVES THE RENDERED SIZE AND BANKS THE ROW; THE SWEEP SNAPS IT.
+Moving a hand-rolled tile onto the art or portrait primitive MUST preserve the rendered pixel size even when that size is off the published ladder for its kind — the art ladder for a record's tile, the portrait ladder for an actor's — and MUST bank the resulting `offLadderArtSizes` row, stating per tile the rung it rejected and why, or recording that the tile already sits at its kind's published rung and the row exists only because the census filters portraits against the art ladder.
+The row is pre-existing debt becoming VISIBLE: the tile was already that size and only the conversion puts it where the census can see it.
+Resizing to the nearest rung in the same change would smuggle a layout move into a conversion, and the two must be separable so that a reviewer can approve one without the other.
+The scenario below therefore binds a NEW or RESIZED geometry and not a conversion that preserves one.
+Discharging the accumulated rows is the geometry sweep's, which is issue 1519; that sweep also owns reconciling `design-system-debt-ratchets.test.js`'s single `ART_SIZE_LADDER` constant with the TWO ladders this requirement publishes, because filtering both primitives against the art ladder alone makes a portrait at the canon's own 32px rung bank a row while a 38px portrait banks none.
 The icon chip's own flat 9px radius and flat 0.9rem glyph are off the radius and glyph ladders above, are not corrected here, and are not recordable on a `file | size` ratchet.
 Radius tracks the size of the thing: 6 for chips at or below 24px, 7 for controls of 26 to 32px, 9 for controls of 34 to 38px and for rows and wells, 11 for a 44px control and for cards and panels, and 999 for pills and tracks.
 A fully rounded radius is for a shape whose contents are text alone.
@@ -554,9 +575,16 @@ It joins a rule to a same-selector twin elsewhere in the same file, because the 
 
 #### Scenario: A geometry falls between two rungs
 
-- **WHEN** a proposed control height, radius or spacing value is not on a published ladder
+- **WHEN** a NEW or RESIZED control height, radius or spacing value is not on a published ladder
 - **THEN** it snaps to the nearest rung
 - **AND** a value that genuinely cannot snap mints a scale member rather than shipping a literal
+
+#### Scenario: A hand-rolled tile becomes a primitive
+
+- **WHEN** an existing tile at an off-ladder size is converted to a shared art or portrait primitive
+- **THEN** the rendered size is preserved and its `offLadderArtSizes` row is banked
+- **AND** the banking entry states the rung that was rejected and why, or records that the tile already sits at its kind's published rung
+- **AND** the resize is left to the geometry sweep that owns the ladder
 
 ### Requirement: Every interactive primitive declares its full state set
 
@@ -1239,6 +1267,17 @@ The notice is the unit that carries that distinction: a blocking notice takes th
 
 Grouped, navigable validation output is NOT a notice: it is the validation surface, which carries passing, warning and blocking counts simultaneously and drives the count on its own tab.
 
+UNTIL THE SHARED REGION SHIPS, A NOTICE RENDERS STANDALONE AT ITS OWN SITE, and stating that interim is what keeps this requirement honest about the tree it governs.
+A standalone notice satisfies the ANNOUNCEMENT clause through its OWN role — `role="alert"` when blocking, `role="status"` with `aria-live="polite"` otherwise — because a live-region role is recognised on insertion and a notice inserted together with its text has no later update to announce.
+It does NOT satisfy the ARBITRATION clause, so a screen rendering standalone notices MUST NOT put two blocking notices on the page at once, and the arbitration stays the region's to enforce when it lands.
+
+A BANNER'S CURRENT ROLE DECIDES ITS PRIMITIVE, which is the routing rule a conversion needs and the one thing the pair of components did not state.
+A banner already carrying `role="status"` routes to a NON-BLOCKING notice and never to a callout, because a callout emits `role="note"` or nothing and cannot express a live status region; a banner carrying `role="alert"` routes to a BLOCKING notice, which is the only form that keeps the role.
+A ROLELESS strip is decided by its MEANING first and its role second, because rolelessness is the one reading that carries no information about which primitive the strip wants.
+A roleless STANDING statement — true of the surface before and after the reader acts — routes to a callout, and gains `role="note"` only when it passes a title or actions, an addition the converting change records rather than absorbing.
+A roleless strip reporting STATE — something that has just happened, such as a view that failed to load — routes to a NOTICE and GAINS the live-region role it lacked, because a strip that reports state and announces nothing is a defect the conversion repairs rather than a property it must preserve.
+A row that would have to LOSE its role does not convert.
+
 #### Scenario: Two independent problems are true at once
 
 - **WHEN** a page has both a blocking validation failure and a non-blocking unsaved-changes state
@@ -1303,6 +1342,39 @@ The exception covers deletions proved redundant, never re-skins, and never a VAR
 - **THEN** the change may invoke the exception by naming the window and publishing the element-and-rank argument
 - **AND** a rule declaring a DIFFERENT treatment is a variant rather than a copy and is not covered
 
+### Requirement: A view's loading, error and empty states are one composition, and a loading view says so
+
+A screen-level view MUST render its not-yet-ready states through one shared composition rather than a per-view copy, and MUST set `aria-busy` on the view root while loading together with a VISIBLE label, because a spinner with no accessible name and no busy state is invisible to a screen reader and indistinguishable from an empty screen to everyone else.
+The branch SET is the view's own — a view with no actor has a no-actor branch and a view that cannot have one does not — so the composition takes the set as data; a composition that hard-codes a branch count forces every view onto the widest one's vocabulary.
+The composition MUST forward each branch's existing test and screenshot hook by NAME and VALUE verbatim, because the name differs per view and at least one view spells a no-actor branch `empty`; normalising either is a silent break of readers that HANG rather than fail.
+It MUST declare its own fill in its own scoped block rather than through a global-sheet context class, so that adopting it does not put the module stylesheet on the change's path.
+
+THE ERROR BRANCH IS NOT DRAWN AS THE EMPTY ONE, and the composition owns the difference rather than leaving it to each view.
+A failed load is STATE, so the error branch MUST render a danger-toned notice carrying a live-region role, while the empty and no-actor branches render the no-state panel; a view whose failure reads quieter than its "select a character" prompt has told the reader the wrong thing about which of the two they can act on.
+
+The composition's FILL is banked with it and is not universal, because the composition is a view ROOT's chrome.
+A caller that is a PANE inside a tinted or bordered container MUST keep its own wrapper and nest the no-state panel directly rather than adopt the composition, since the composition carries the opaque view-root background and a pane that adopts it fills its container edge to edge in a colour that container did not choose.
+Widening the composition with a background prop for one such caller is not the answer; the caller-owned wrapper already is.
+
+#### Scenario: A view fails to load
+
+- **WHEN** a view root is in its error state
+- **THEN** the failure renders as a danger-toned notice with a live-region role
+- **AND** it is not drawn with the same treatment as the view's empty or no-actor state
+
+#### Scenario: Five views draw the same three rules
+
+- **WHEN** two or more views render the same loading, error or empty chrome up to a class-name prefix
+- **THEN** that chrome is one composition with the branch set as a prop
+- **AND** each view names only the branches it can reach
+- **AND** each branch's hook name and value are unchanged
+
+#### Scenario: A view is loading
+
+- **WHEN** a view root is in its loading state
+- **THEN** it carries `aria-busy`
+- **AND** a visible label states what is loading
+
 ### Requirement: The set is extended by an explicit, recorded decision
 
 A new shared primitive enters the set only through a change that records its ENTRY, and an entry is two artifacts rather than one: a SPECIMEN in `openspec/specs/design-system/library.html` and, once the primitive ships, a ROW in `scripts/lib/designSystemPrimitives.json`.
@@ -1333,6 +1405,11 @@ The following are recorded as compositions and MUST NOT be reintroduced as compo
 
 A premium panel is recorded as out of scope rather than as a composition: its only original content is marketing copy, which is a product decision, and binding copy to a component makes the offer untranslatable against a codebase where every primitive takes pre-localized strings.
 A toast and a bespoke destructive-confirmation panel are recorded as surfaces Foundry already owns.
+
+A control caption — a one-line sentence documenting the control directly above it — is recorded as a shape the set does not name, and is neither the standing-statement callout nor a mark.
+The deciding question is whether the sentence states something about the WORLD or captions a CONTROL: a callout owns the standing statement, which is true whether or not anything is drawn beside it, while a caption documents a control and says nothing about the world.
+Measured at the gathering tab's event-chance hint: routed through the callout the line rendered 432.3x44.39 against the 432.3x15 its bare paragraph draws, wrapping a border, a soft fill and a 12px inset around a caption for the 6px track above it.
+It stays a bare line until a second independent caller justifies naming the shape.
 
 #### Scenario: A ruled-out candidate is re-proposed
 

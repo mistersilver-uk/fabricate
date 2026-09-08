@@ -114,19 +114,27 @@ const contract = defineClosedTokenContract({
  */
 const TAGS = contract.callSiteTags.map(([file, tag]) => ({ file, tag }));
 
-test('the avatar census is the two shipped call sites, so no clause below is vacuous', () => {
+test('the avatar census is the five shipped call sites, so no clause below is vacuous', () => {
   contract.assertCallSitesAlive();
   assert.equal(
     TAGS.length,
-    2,
-    'the avatar render-site census moved. That is not itself wrong — a third caller is exactly ' +
-      'what would put this component on the mount harnesses` SHARED_PRIMITIVES list — but the ' +
-      'count is what keeps the negative clause below honest, so it is re-measured deliberately.'
+    5,
+    'the avatar render-site census moved. That is not itself wrong — the third caller is what ' +
+      'put this component on the mount harnesses` SHARED_PRIMITIVES list (issue 1514), and the ' +
+      'crafting source bar added the fourth and fifth in the phase after it: the row of source ' +
+      'portraits in the Crafting tab`s top bar and the picker option beneath it — but the count ' +
+      'is what keeps the clauses below honest, so it is re-measured deliberately.'
   );
   assert.equal(
     TAGS.filter(({ tag }) => names(tag, 'art')).length,
-    2,
-    'both shipped sites pass an actor image; the initials fallback is the state neither reaches'
+    5,
+    'every site passes an actor image, and the INITIALS FALLBACK IS NOW REACHABLE at three of ' +
+      'them. This message used to read "the initials fallback is the state neither reaches", ' +
+      'and issue 1514 falsified it: the two GM Knowledge sites pass an image the projection ' +
+      'always resolves, while the player inventory inspector and both crafting source sites ' +
+      'pass the empty string for an actor with no portrait, which is the state that draws the ' +
+      'mark — and it is the state the three of them drew an `fa-user` glyph for before. Naming ' +
+      '`art` and PASSING artwork are different facts, and this clause measures the first'
   );
 });
 

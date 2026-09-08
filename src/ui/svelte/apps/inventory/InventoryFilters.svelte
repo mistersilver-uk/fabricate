@@ -1,14 +1,21 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  InventoryFilters is the left-column header: a search box, a row of filter chips
+  InventoryFilters is the left-column header: a search box, the kind filter
   (All / Components / Essences / Tools / Books & Scrolls — this fixed order, each
   with an icon and a live count), and a sort select (Name / Quantity / Type).
   Prop-driven so it stays presentational; callbacks route back to the inventory
-  store. The search + chip markup mirrors the Crafting browser so the two tabs
-  feel identical.
+  store.
+
+  THE KIND FILTER IS THE SHARED `SegmentedControl` (issue 1514), drawn as a pill run
+  in the soft-accent family. It was five `aria-pressed` buttons in a `role="group"`
+  and is now one radiogroup, which is the semantics a one-of-N choice has; see the
+  markup below for the two props that reproduce its construction and its paint. The
+  search field and the sort select are NOT converted here: they belong to the controls issue
+  and the player-selects issue respectively.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import SegmentedControl from '../manager/SegmentedControl.svelte';
 
   let {
     search = '',
@@ -20,16 +27,31 @@
     onSort = null,
   } = $props();
 
+  // The fixed kind order, as `SegmentedControl` takes it: `value` rather than `id`, and a
+  // WHOLE Font Awesome class rather than the bare glyph name, because the primitive renders
+  // `class={option.icon}` verbatim where the hand-rolled markup composed `fas ${pill.icon}`.
   const PILLS = [
-    { id: 'all', labelKey: 'FABRICATE.App.Inventory.Filters.All', icon: 'fa-layer-group' },
-    { id: 'components', labelKey: 'FABRICATE.App.Inventory.Filters.Components', icon: 'fa-cube' },
-    { id: 'essences', labelKey: 'FABRICATE.App.Inventory.Filters.Essences', icon: 'fa-droplet' },
+    { value: 'all', labelKey: 'FABRICATE.App.Inventory.Filters.All', icon: 'fas fa-layer-group' },
     {
-      id: 'tools',
-      labelKey: 'FABRICATE.App.Inventory.Filters.Tools',
-      icon: 'fa-screwdriver-wrench',
+      value: 'components',
+      labelKey: 'FABRICATE.App.Inventory.Filters.Components',
+      icon: 'fas fa-cube',
     },
-    { id: 'recipeItems', labelKey: 'FABRICATE.App.Inventory.Filters.RecipeItems', icon: 'fa-book' },
+    {
+      value: 'essences',
+      labelKey: 'FABRICATE.App.Inventory.Filters.Essences',
+      icon: 'fas fa-droplet',
+    },
+    {
+      value: 'tools',
+      labelKey: 'FABRICATE.App.Inventory.Filters.Tools',
+      icon: 'fas fa-screwdriver-wrench',
+    },
+    {
+      value: 'recipeItems',
+      labelKey: 'FABRICATE.App.Inventory.Filters.RecipeItems',
+      icon: 'fas fa-book',
+    },
   ];
 
   const SORTS = [
@@ -37,6 +59,13 @@
     { id: 'quantity', labelKey: 'FABRICATE.App.Inventory.Filters.SortQuantity' },
     { id: 'type', labelKey: 'FABRICATE.App.Inventory.Filters.SortType' },
   ];
+
+  // The live per-kind tally rides the primitive's own `count` slot. It is coerced here rather
+  // than in the markup because `SegmentedControl` renders the slot only for a FINITE number, so
+  // a missing key has to arrive as 0 rather than as `undefined`.
+  const pillOptions = $derived(
+    PILLS.map((pill) => ({ ...pill, count: Number(counts?.[pill.value] ?? 0) }))
+  );
 
   function onInput(event) {
     onSearch?.(event.currentTarget.value);
@@ -59,28 +88,29 @@
   </div>
 
   <div class="inventory-filters-row">
-    <div
-      class="inventory-pills"
-      role="group"
-      aria-label={localize('FABRICATE.App.Inventory.Filters.SearchLabel')}
-    >
-      {#each PILLS as pill (pill.id)}
-        <button
-          type="button"
-          class="inventory-pill"
-          class:is-active={filter === pill.id}
-          data-inventory-pill={pill.id}
-          aria-pressed={filter === pill.id}
-          onclick={() => onFilter?.(pill.id)}
-        >
-          <i class={`fas ${pill.icon}`} aria-hidden="true"></i>
-          <span>{localize(pill.labelKey)}</span>
-          <span class="inventory-pill-count" data-inventory-pill-count
-            >{Number(counts?.[pill.id] ?? 0)}</span
-          >
-        </button>
-      {/each}
-    </div>
+    <!-- THE KIND FILTER IS A RADIOGROUP, not five toggles (issue 1514). Choosing a kind is a
+         genuinely one-of-N choice and the hand-rolled strip spelled it as five independent
+         `aria-pressed` buttons in a `role="group"`, which announces each one's state on its
+         own and never says the set is exclusive. `shape="pill"` is the construction the strip
+         already had — a run of separate pills, no track fill, no track edge, radius 999 — and
+         `tone="accent-soft"` is the paint it already had, an unfilled resting tile behind a
+         `--fab-border` hairline against a chosen one on `--fab-accent-soft` inside
+         `--fab-accent-border` in `--fab-accent` ink. Both are the shipped values rather than a
+         near miss, which is why this converts as a frame move rather than a restyle.
+
+         `aria-label` is the SearchLabel string the `role="group"` carried, forwarded verbatim
+         rather than corrected: the label a screen reader announces here is not this change's
+         to move. -->
+    <SegmentedControl
+      options={pillOptions}
+      value={filter}
+      onChange={(next) => onFilter?.(next)}
+      groupName="inventory-filter-kind"
+      ariaLabel={localize('FABRICATE.App.Inventory.Filters.SearchLabel')}
+      optionDataAttr="data-inventory-pill"
+      shape="pill"
+      tone="accent-soft"
+    />
 
     <label class="inventory-sort">
       <span class="inventory-sort-label"
@@ -138,66 +168,6 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-  }
-
-  .inventory-pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    min-width: 0;
-  }
-
-  .inventory-pill {
-    box-sizing: border-box;
-    /* Foundry's global `.app button` height/centering reset (EnvironmentCard pattern):
-       a chip that sets only min-height gets cropped. */
-    appearance: none;
-    -webkit-appearance: none;
-    height: auto;
-    margin: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 28px;
-    padding: 3px 10px;
-    border: 1px solid var(--fab-border);
-    border-radius: 999px;
-    background: var(--fab-surface-soft);
-    color: var(--fab-text-muted);
-    font: inherit;
-    font-size: 11px;
-    font-weight: 500;
-    line-height: 1;
-    cursor: pointer;
-  }
-
-  .inventory-pill:hover {
-    background: var(--fab-surface-raised);
-    color: var(--fab-text);
-  }
-
-  .inventory-pill:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
-
-  .inventory-pill.is-active {
-    border-color: var(--fab-accent-border);
-    background: var(--fab-accent-soft);
-    color: var(--fab-accent);
-    font-weight: 600;
-  }
-
-  .inventory-pill i {
-    font-size: 11px;
-  }
-
-  /* NOT mono. The brief scopes mono to quantities, roll totals and DC values; a chip's
-     population count is part of the chip's own label, and the chip is pinned to the sans
-     face. So it inherits the chip's family, weight AND colour (which is what makes the
-     active state track automatically) and only drops back in emphasis. */
-  .inventory-pill-count {
-    opacity: 0.7;
   }
 
   .inventory-sort {

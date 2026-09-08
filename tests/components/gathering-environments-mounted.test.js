@@ -9,10 +9,12 @@ import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/i
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 import { chooseSelectOption, selectOptionValues } from '../helpers/select-control.js';
+import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
 // The raw `.js` closure of `SearchablePopover`, which the shared `<Select>` composes
 // (issue 1504). Spread from the harness's own roster rather than copied, so a module added
 // there cannot go missing here.
 import {
+  PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
@@ -192,6 +194,7 @@ describe('GatheringView mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
+    for (const primitive of PLAYER_APP_COMPILED_MODULES) writeCompiledSvelte(primitive);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
 
     GatheringView = (await import(pathToFileURL(join(
@@ -225,6 +228,32 @@ describe('GatheringView mounted behavior', () => {
     assert.equal(target.querySelectorAll('[data-environment-id]').length, 1, 'one environment card');
   });
 
+  it('announces the loading root as busy, and does not once the view is ready', async () => {
+    // Asserted on the RENDERED DOM (issue 1514): a composition that declares `aria-busy` and
+    // stops rendering it passes every source-text reader. The loading branch is reached with a
+    // listing promise that never settles, which is the only state in which this view is busy.
+    await mountView({ listGatheringForActor: () => new Promise(() => {}) });
+
+    const loadingRoot = target.querySelector('[data-gathering-state="loading"]');
+    assert.ok(Boolean(loadingRoot), 'loading state shown while the listing is in flight');
+    assert.equal(loadingRoot.getAttribute('aria-busy'), 'true', 'the loading root is busy');
+    assert.ok(
+      loadingRoot.textContent.includes('FABRICATE.App.Gathering.Loading'),
+      'and a VISIBLE label states what is loading'
+    );
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+    await mountView(makeServices(listing([environment()])));
+
+    assert.ok(
+      target.querySelector('[data-gathering-state="populated"]'),
+      'the ready view is populated'
+    );
+    assert.ok(!target.querySelector('[aria-busy]'), 'nothing in the ready view claims to be busy');
+  });
+
   it('shows the empty state when no actor is selected', async () => {
     await mountView(makeServices({ visible: true, selectedActorId: null, environments: [] }));
 
@@ -236,6 +265,10 @@ describe('GatheringView mounted behavior', () => {
     await mountView(makeServices(null, { reject: true }));
 
     assert.ok(target.querySelector('[data-gathering-state="error"]'), 'rejection renders error state');
+    assertViewErrorTreatment(target.querySelector('[data-gathering-state="error"]'), {
+      view: 'gathering view',
+      message: 'FABRICATE.App.Gathering.Error'
+    });
   });
 
   it('selects an available card on click and marks it selected', async () => {

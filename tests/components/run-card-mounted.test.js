@@ -9,6 +9,7 @@ import { resolve } from 'node:path';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
+  PLAYER_APP_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness
 } from '../helpers/svelte-component-harness.js';
@@ -37,6 +38,10 @@ const harness = createMountedComponentHarness({
     // Issue 1506: the journal's status pill retired into the shared chip, which this list
     // reaches through the `<Select>` closure rather than by a fourth hand-written literal.
     ...SELECT_COMPILED_MODULES,
+    // The shared primitives this tree draws, as ONE spread (issue 1514). See
+    // `PLAYER_APP_COMPILED_MODULES` in the harness for why it is one roster and not a
+    // list per suite.
+    ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/apps/journal/RunCard.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/journal/RunCard.svelte'

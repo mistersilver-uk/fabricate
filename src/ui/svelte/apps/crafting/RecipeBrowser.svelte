@@ -162,6 +162,19 @@
       />
     </div>
   {:else}
+    <!-- HAND-ROLLED, AND DEFERRED RATHER THAN CONVERTED (issue 1514). Four of this tab's
+         one-line empties are `EmptyState note` now. This one is not, and the reason is a
+         property of that variant rather than of this site: `note` declares
+         `place-items: start` and `text-align: left` on ITSELF, so a caller cannot restore a
+         centred line through a wrapper. ATTEMPTED AND MEASURED, not predicted: in the View Lab
+         at the default window this sentence is a full-width centred 13px line 48.25px tall
+         standing in for the whole 322.84px recipe column, and routed through `note` it became a
+         125.27px left-aligned 10px line 26px tall in the top-left corner of it. `filtered`
+         centres but keeps the dashed panel, which is the box the frame-move rule forbids. So it
+         goes to the geometry-and-gaps register with the measurement, and a centred one-line
+         form is what would close it. It is the same refusal `InventoryGrid` took one phase
+         earlier at the same rendered shape, and it carries its filtered/zero distinction the
+         same way — in the TEXT, through the ternary below, not in a variant on the box. -->
     <p class="crafting-browser-empty" data-crafting-browser-empty>
       {isFiltering
         ? localize('FABRICATE.App.Crafting.Browser.NoMatches')

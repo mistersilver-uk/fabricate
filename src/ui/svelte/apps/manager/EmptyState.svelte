@@ -36,10 +36,10 @@
      with a leading mark rather than as a centred hero block. It is NOT a smaller
      `compact`: `compact` keeps the tile (at 32px) and keeps the column, and a "nothing
      goes wrong with this component yet" line sitting directly above an Add button cannot
-     afford either. The Component Studio's complications section is its first consumer;
-     the PLAYER app's own empties (`salvage-empty`, `alchemy-*-empty`,
-     `inventory-detail-empty-note`) are still a different area shell and are NOT this
-     variant's remit, as the note at the foot of this block says of the primitive at large.
+     afford either. The Component Studio's complications section is its first consumer.
+     (This clause used to go on to refuse the PLAYER app's own empties as "a different area
+     shell". That refusal is retired with the one at the foot of this block, and for the same
+     reason — see there.)
    - note: the POPOVER form (issue 1373) — the panel itself is released. No dashed edge, no
      corner, no fill and no tile: one quiet line at the popover's own type scale, reading from
      the left. It is NOT a smaller `inline`; `inline` puts the sentence on one line and KEEPS
@@ -60,9 +60,39 @@
      panel rather than beside it.
 
   A component wearing `.manager-*` classes belongs under `apps/manager/` (not the
-  import-free `components/` leaf directory), which is why it lives here. The player app's
-  own empties (`salvage-empty`, `alchemy-*-empty`, `inventory-detail-empty-note`) are a
-  different area shell with their own scoped styles and are NOT this primitive's remit.
+  import-free `components/` leaf directory), which is why it lives here.
+
+  THIS BLOCK USED TO REFUSE THE PLAYER APP, TWICE, AND BOTH REFUSALS ARE RETIRED (issue 1514).
+  It said the player window's own empties were "a different area shell with their own scoped
+  styles" and so "NOT this primitive's remit". The player window renders this component now:
+  `apps/PlayerViewState.svelte` composes it for the no-actor and empty branches of all five
+  player views, which is the second application to draw it.
+
+  The claim was never about a directory, and that is why it could be overturned by a caller
+  rather than by a move. Everything this component looks like lives in the scoped `<style>`
+  below, and every token it reads is declared on `:root` — so it SELF-PAINTS, and a surface
+  outside `.fabricate-manager` gets the same panel the manager gets. The `.manager-*` class
+  names are a naming convention retained for the locators above, not an area binding. What a
+  docblock refusing a caller states is a fact about the tree at the time it was written; the
+  change that adds the caller restates it, in the commit that falsifies it.
+
+  One thing the refusal was right about survives, and is stated as the rule it actually is: a
+  caller that needs this panel to FILL a region owns that fill itself. `contextClass` puts the
+  rule in the global sheet, which is the wrong answer for a player screen — `PlayerViewState`
+  declares the `height: 100%` centred fill in its own scoped block and nests this panel inside
+  it, and the empties still hand-rolled in `salvage-empty`, `alchemy-*-empty` and
+  `inventory-detail-empty-note` convert on the same terms as they are reached — all three of
+  those families are gone as of the inventory phase, each caller keeping only the fill or the
+  centring its own container needed.
+
+  ONE MEASURED LIMIT OF `note`, recorded because a caller was refused on it. The variant
+  declares `place-items: start` and `text-align: left` on ITSELF, so a caller cannot restore a
+  centred line through a wrapper: an inherited `text-align` loses to the variant's own
+  declaration. `InventoryGrid`'s "No items match the current filters." is the shipped instance
+  — a full-width centred 13px sentence standing in for the whole card grid — and it stays
+  hand-rolled for that reason rather than becoming a 10px line in the top-left corner of a
+  630px-tall empty column. A centred one-line form would close it; `filtered` centres but keeps
+  the dashed panel, which is the box the frame-move rule forbids.
 -->
 <script>
   let {
@@ -81,6 +111,17 @@
 
   // Spread so the hook is genuinely absent when unset, rather than an empty attribute a
   // selector would still match.
+  //
+  // `dataValue || true` COERCES A BARE HOOK TO `="true"`, and an explicit `dataValue=""` at a
+  // call site does not change that — the empty string is falsy, so it takes the same branch as
+  // no value at all. Measured at issue 1514: 61 hook-bearing call sites of this component and
+  // `Callout` render `="true"`, 45 of them passing no `dataValue` and 16 passing `""`, and the
+  // markup every one of them replaced wrote the attribute BARE, as `=""`. Nothing breaks,
+  // because every shipped reader is a presence selector — which is precisely why the drift is
+  // invisible and why it is written down here rather than left to be re-discovered at a call
+  // site. `components/Kicker.svelte` and `components/Notice.svelte` are the two primitives that
+  // pass `dataValue` through as written, and closing this would mean changing THIS line rather
+  // than any caller, which moves 61 rendered attributes across the manager in one edit.
   const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
 </script>
 
@@ -293,11 +334,29 @@
   }
 
   /* The line itself, at the popover's scale rather than the panel family's. `proto:2262` is
-     `500 10px var(--sans)` in the subtle tone: a sentence in the list's own voice, quieter
-     than the rows it stands in for. The serif face the hero title carries is deliberately
-     dropped — a serif heading is the loudest thing in a 228px panel. */
+     `500 10px var(--sans)`: a sentence in the list's own voice, quieter than the rows it
+     stands in for. The serif face the hero title carries is deliberately dropped — a serif
+     heading is the loudest thing in a 228px panel.
+
+     ── THE INK IS THE MUTED TONE, NOT THE SUBTLE ONE THE REFERENCE STATES (issue 1514) ──────
+     `proto:2262` says `var(--subtle)` and this variant shipped it. At 10px that is SMALL TEXT,
+     and the default `fabricate` theme composites the subtle token — an alpha over the surface,
+     not an opaque value — to 3.69:1 on `--fab-surface` and 3.50:1 on `--fab-surface-soft`,
+     under the 4.5:1 small-text floor `openspec/specs/design-system/spec.md` states for a mark
+     this size. The muted tone measures 5.42:1 and 5.00:1 at the same two grounds, and clears
+     the floor in all seven palettes (the worst is `ironblood-forge` at 5.19:1 and 4.77:1).
+
+     It is corrected on the VARIANT rather than at a call site because the reference's figure is
+     wrong for every caller of it, not for one: the alpha tokens are what make it wrong, and
+     SIX of the seven palettes state `muted` and `subtle` as alphas over the surface. ONE
+     palette hid it, not four — `mythwright` alone states those two tones as opaque hues, and
+     it is the only palette of the seven in which the subtle tone clears the floor at all,
+     reading 5.28:1 from the SAME declaration. A single passing outlier is what the specimen's
+     figure was set from. Every palette, that one included, states `disabled` as an alpha,
+     which is why `is-filtered` below fails the floor in all seven; it is corrected on the same
+     measurement and the same reasoning. */
   .manager-empty.is-note h3 {
-    color: var(--fab-text-subtle);
+    color: var(--fab-text-muted);
     font-family: var(--font-primary);
     font-size: 10px;
     font-weight: 500;
@@ -305,9 +364,12 @@
   }
 
   /* The optional second line — the travel-actor picker names a module setting here — kept at
-     the same quiet scale so a two-line note is one voice rather than a heading over a body. */
+     the same quiet scale so a two-line note is one voice rather than a heading over a body.
+     The ink is declared here rather than inherited: `.manager-empty p` above paints the subtle
+     tone for the HERO panel, whose 11px sentence is not this one. */
   .manager-empty.is-note p {
     max-width: none;
+    color: var(--fab-text-muted);
     font-size: 10px;
     font-weight: 400;
     line-height: 1.4;
@@ -335,6 +397,17 @@
     shared variant.
 
     26px has no step on the 4px spacing scale and takes the nearest, 24.
+
+    ── THE ONE FIGURE OF THE REFERENCE'S THIS VARIANT DOES NOT TAKE (issue 1514) ──────────
+    `proto:2545` inks this sentence `var(--disabled)`. Measured on the default `fabricate`
+    theme, whose three text tones are ALPHAS rather than opaque values, that composites to
+    2.66:1 on `--fab-surface` and 2.58:1 on `--fab-surface-soft` at 11.5px — small text, and
+    a long way under the 4.5:1 floor. It is the worst reading in the family and it is the
+    reference's own value, so the deviation is stated here rather than route-scoped: the ink
+    moves to `--fab-text-muted`, which reads 5.42:1 and 5.00:1 at the same two grounds and
+    clears the floor in all seven palettes. Everything else of `proto:2545` — the 24px inset,
+    the 1px edge, the 10px corner and the 11.5px sentence — is unchanged, and `is-note` above
+    carries the same correction on the same measurement.
   */
   .manager-empty.is-filtered {
     align-content: center;
@@ -342,7 +415,7 @@
     border-width: 1px;
     border-color: var(--fab-border);
     border-radius: 10px;
-    color: var(--fab-text-disabled);
+    color: var(--fab-text-muted);
   }
 
   .manager-empty.is-filtered > div {
@@ -350,7 +423,7 @@
   }
 
   .manager-empty.is-filtered p {
-    color: var(--fab-text-disabled);
+    color: var(--fab-text-muted);
     font-size: 11.5px;
     font-weight: 400;
   }

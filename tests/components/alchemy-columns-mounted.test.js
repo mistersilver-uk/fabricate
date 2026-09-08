@@ -4,7 +4,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  createMountedComponentHarness,
+  PLAYER_APP_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -36,6 +39,10 @@ describe('ComponentInventoryColumn (mounted)', () => {
     tmpPrefix: 'fabricate-alchemy-inventory-',
     rawModules: ['src/ui/svelte/util/foundryBridge.js'],
     compiledModules: [
+      // The shared primitives this tree draws, as ONE spread (issue 1514). See
+      // `PLAYER_APP_COMPILED_MODULES` in the harness for why it is one roster and not a
+      // list per suite.
+      ...PLAYER_APP_COMPILED_MODULES,
       'src/ui/svelte/apps/alchemy/EssenceChips.svelte',
       'src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte'
     ],
@@ -110,7 +117,10 @@ describe('KnownRecipesColumn (mounted)', () => {
     repoRoot,
     tmpPrefix: 'fabricate-alchemy-known-',
     rawModules: ['src/ui/svelte/util/foundryBridge.js'],
-    compiledModules: ['src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte'],
+    compiledModules: [
+      ...PLAYER_APP_COMPILED_MODULES,
+      'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte'
+    ],
     componentPath: 'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte'
   });
 
@@ -253,5 +263,132 @@ describe('Alchemy list clip-fix (source guard)', () => {
         `${name} must reset line-height to normal`
       );
     }
+  });
+});
+
+/**
+ * The Alchemy columns' adoption of the shared tile, no-state panel and standing statement
+ * (issue 1514, phase 3).
+ *
+ * The tile assertions are on the GLYPH branch on purpose. Both column fixtures above carry
+ * `img: null`, and the glyph fallback is the half of the conversion a caller can silently
+ * lose: `Medallion` defaults to `fas fa-scroll` at `0.9rem` in the accent, where these rules
+ * drew `fa-flask` at the row's own 14px in `--fab-tag-peach`. A tile that renders the right
+ * BOX with the wrong face, size and ink passes every source grep for `<Medallion`.
+ */
+describe('Alchemy column primitive adoption (issue 1514)', () => {
+  /** The custom properties and size a medallion composes into its `style` attribute. */
+  function tileStyle(tile) {
+    return tile?.getAttribute('style') ?? '';
+  }
+
+  describe('ComponentInventoryColumn', () => {
+    const harness = createMountedComponentHarness({
+      repoRoot,
+      tmpPrefix: 'fabricate-alchemy-inventory-primitives-',
+      rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+      compiledModules: [
+        ...PLAYER_APP_COMPILED_MODULES,
+        'src/ui/svelte/apps/alchemy/EssenceChips.svelte',
+        'src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte'
+      ],
+      componentPath: 'src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte'
+    });
+
+    before(() => harness.setup());
+    after(() => harness.teardown());
+    beforeEach(() => harness.remount());
+
+    it('draws the component tile at 34 with the flask glyph, its 14px size and the peach ink', async () => {
+      const target = await harness.mount({
+        components: [inventoryRow('emberroot', 'Emberroot')],
+        hasComponents: true
+      });
+      const tile = target.querySelector('[data-alchemy-inventory-row="emberroot"] .fab-medallion');
+      assert.ok(Boolean(tile), 'the row leads with the shared tile');
+      assert.equal(tile.getAttribute('data-medallion'), 'glyph', 'this fixture carries no artwork');
+      assert.equal(tile.getAttribute('data-medallion-tint'), 'peach', 'the rule painted --fab-tag-peach');
+      assert.match(tileStyle(tile), /width:\s*34px/, 'at the 34px box the rule drew');
+      assert.match(
+        tileStyle(tile),
+        /--fab-medallion-glyph:\s*14px/,
+        "the glyph keeps the row's own inherited 14px rather than the tile's 0.9rem default"
+      );
+      assert.ok(
+        Boolean(tile.querySelector('i.fa-flask')),
+        "the flask face the markup's `{:else}` branch drew, not the tile's `fa-scroll` default"
+      );
+    });
+
+    it('draws both empty branches as the shared panel, filtered only where a search hid the rows', async () => {
+      const filtered = await harness.mount({ components: [], hasComponents: true, search: 'zzz' });
+      const noMatches = filtered.querySelector('[data-alchemy-inventory-no-matches]');
+      assert.ok(noMatches.classList.contains('manager-empty'), 'the filtered empty is the shared panel');
+      assert.ok(
+        noMatches.classList.contains('is-filtered'),
+        'and takes the filtered treatment, which is what distinguishes it from an absence'
+      );
+
+      const onboarding = await harness.mount({ components: [], hasComponents: false });
+      const empty = onboarding.querySelector('[data-alchemy-empty-inventory]');
+      assert.ok(empty.classList.contains('manager-empty'), 'the onboarding empty is the shared panel');
+      assert.ok(
+        !empty.classList.contains('is-filtered'),
+        'an actor who owns nothing is an ABSENCE, not a filtered-to-nothing list'
+      );
+      assert.ok(
+        Boolean(empty.querySelector('h3')),
+        'the onboarding branch keeps its title, which the filtered variant deliberately drops'
+      );
+    });
+  });
+
+  describe('KnownRecipesColumn', () => {
+    const harness = createMountedComponentHarness({
+      repoRoot,
+      tmpPrefix: 'fabricate-alchemy-known-primitives-',
+      rawModules: ['src/ui/svelte/util/foundryBridge.js'],
+      compiledModules: [
+        ...PLAYER_APP_COMPILED_MODULES,
+        'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte'
+      ],
+      componentPath: 'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte'
+    });
+
+    before(() => harness.setup());
+    after(() => harness.teardown());
+    beforeEach(() => harness.remount());
+
+    it('draws the recipe tile at 36 with the flask glyph and the peach ink', async () => {
+      const target = await harness.mount({ recipes: [knownRecipe('venom', 'Blade Venom')], knownCount: 1 });
+      const tile = target.querySelector('[data-alchemy-recipe="venom"] .fab-medallion');
+      assert.ok(Boolean(tile), 'the recipe card leads with the shared tile');
+      assert.equal(tile.getAttribute('data-medallion-tint'), 'peach');
+      assert.match(tileStyle(tile), /width:\s*36px/, 'at the 36px box the rule drew');
+      assert.match(tileStyle(tile), /--fab-medallion-glyph:\s*14px/);
+      assert.ok(Boolean(tile.querySelector('i.fa-flask')));
+    });
+
+    it('draws the not-yet-revealed footer as the shared callout, with its count above its guidance', async () => {
+      const target = await harness.mount({ recipes: [knownRecipe('venom', 'V')], knownCount: 1, undiscoveredCount: 5 });
+      const well = target.querySelector('[data-alchemy-undiscovered]');
+      assert.ok(Boolean(well), 'the footer states how many are still hidden');
+      assert.ok(well.classList.contains('manager-callout'), 'it is the shared callout');
+      assert.equal(well.getAttribute('data-callout-tone'), 'neutral', 'at the quiet tone the dashed well drew');
+      const title = well.querySelector('.manager-callout-title');
+      const body = well.querySelector('.manager-callout-text');
+      assert.match(title.textContent, /Undiscovered\b/, 'the count is the callout title');
+      assert.match(body.textContent, /UndiscoveredHint/, 'the guidance is the callout body');
+    });
+
+    it('keeps the footer placement on a caller-owned wrapper, because the callout declares margin 0', async () => {
+      const target = await harness.mount({ recipes: [knownRecipe('venom', 'V')], knownCount: 1, undiscoveredCount: 5 });
+      const slot = target.querySelector('.alchemy-known-footer-slot');
+      assert.ok(Boolean(slot), 'the wrapper survives the conversion');
+      assert.ok(
+        Boolean(slot.querySelector('[data-alchemy-undiscovered]')),
+        'and it is the callout it wraps, not a sibling left behind'
+      );
+    });
   });
 });

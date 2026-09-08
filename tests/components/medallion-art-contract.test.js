@@ -71,11 +71,31 @@ const ART_RESOLVER = 'resolveCraftingArt(';
  * two. Their contract did not lapse with the move — `avatar-source-contract.test.js` states the
  * same clause over the same two sites — and this file's domain is now the RECORD tile alone,
  * which is what its clauses were always about.
+ *
+ * 63 -> 65 (issue 1514, phase 2): the player gathering tab's drop row and required-tool card each
+ * moved a raw `<img>` onto this tile. BOTH are art-bearing and both pass `alt=""`, because each
+ * renders the record's name as adjacent text, so the second count moves by the same two. Both are
+ * the first render sites this component has in `apps/gathering/`, and the five gathering tiles
+ * that did NOT convert are the ones whose `.is-fallback` rule re-fits a default IMAGE with
+ * `object-fit: contain` and a padding — a state this tile's fixed `cover` cannot draw.
+ *
+ * 65 -> 77 (issue 1514, phase 3): the ALCHEMY and JOURNAL tabs' twelve raw `<img>` thumbs, and
+ * ALL TWELVE convert — the `.is-fallback` obstruction that deferred five of the seven gathering
+ * tiles has no instance in either tab. The predicate was run over both directories: eleven
+ * `object-fit: cover` rules cover the twelve sites, `StepDetails`' two thumbs share one, and not
+ * one of the eleven declares an `.is-fallback` variant or a `filter`.
+ *
+ * Every one of the twelve is art-bearing and passes `alt=""`, so the second count moves by the
+ * same twelve. Five of them ALSO pass `glyph`, `tint` and `icon`: the alchemy tiles are the first
+ * sites in the tree whose replaced markup had a real `{#if img}` / `{:else}` glyph branch, so the
+ * fallback's face, its size and its ink are all carried across explicitly rather than left to the
+ * component's `fa-scroll` default at `0.9rem` in the accent. The seven journal tiles pass none of
+ * the three, because every one of them resolves an image unconditionally.
  */
-const MEDALLION_SITES = 63;
+const MEDALLION_SITES = 77;
 
 /** How many of them bind artwork at all. The rest are glyph-only and `alt` is moot for them. */
-const ART_BEARING_SITES = 50;
+const ART_BEARING_SITES = 64;
 
 /** `<Medallion …>` opening tags in `src/`, as `{ path, tag }`. */
 const TAGS = Object.entries(SOURCES).flatMap(([path, source]) =>

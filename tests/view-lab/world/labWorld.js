@@ -389,7 +389,17 @@ export async function buildLabWorld({
   // `game.scenes` exposes and captures `current` / `active` off it. The seeder also replaces the
   // scene's plain `regions` array with a collection, which is what the two canvas windows'
   // `_resolveBehavior` walks (`scene.regions.get(id).behaviors.get(id)`).
-  if (!noInteractables) seedLabInteractables(world);
+  //
+  // A world DELIBERATELY STRIPPED of its sources seeds no interactables, and that is a caller
+  // decision rather than a softening of the seeder. `seedLabInteractables` throws when it cannot
+  // name a gathering task and a Tool, and that throw is correct: it exists to stop a plausible
+  // row publishing while resolving no source at all. But it is only meaningful where a source
+  // COULD have been resolved. `clearSystem` empties `content.systems` and `noTools` strips every
+  // Tool, so under either flag there is nothing for an interactable to name and asking is the
+  // error. Without this, `manager-systems-empty` — which is `clearSystem` — aborts the whole
+  // capture, and one failed case publishes NO frames at all.
+  const worldHasInteractableSources = !clearSystem && !noTools;
+  if (!noInteractables && worldHasInteractableSources) seedLabInteractables(world);
 
   const shim = installFoundryShim(world);
   world.shim = shim;

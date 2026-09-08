@@ -12,11 +12,29 @@
   saying so in terms ("Svelte scopes CSS per component, so the rule is redefined
   rather than shared"). A convention cannot be corrected in one edit; a component can.
 
-  ── THE FIGURES, AND THE ONE CORRECTION ───────────────────────────────────────────
-  Geometry from `library.html:120` — 700 / 8.5px / uppercase / `--fab-text-subtle` —
-  with ONE correction, which is made in the specimen in this same change: the tracking
-  is `0.11em`, not the `.14em` that line carried. Two independent issue-1373
-  measurements agree. `styles/fabricate.css` records the reference's own eyebrow at
+  ── THE FIGURES, AND THE TWO CORRECTIONS ──────────────────────────────────────────
+  Geometry from `library.html:120` — 700 / 8.5px / uppercase — with TWO corrections,
+  both made in the specimen in this same programme. The first is the tracking: it is
+  `0.11em`, not the `.14em` that line carried. Two independent issue-1373
+  measurements agree.
+
+  THE SECOND IS THE INK, and it is a contrast reading rather than a preference
+  (issue 1514). `library.html:120` states `--fab-text-subtle`. At 8.5px this is the
+  smallest text the product draws, and the default `fabricate` theme declares its three
+  text tones as ALPHAS over the surface rather than as opaque values — so the subtle
+  tone composites to 3.69:1 on `--fab-surface` and 3.50:1 on `--fab-surface-soft`,
+  under the 4.5:1 small-text floor `openspec/specs/design-system/spec.md` states. The
+  muted tone reads 5.42:1 and 5.00:1 at those two grounds and clears the floor in all
+  seven palettes, the worst being `ironblood-forge` at 5.19:1 and 4.77:1.
+
+  ONE palette in seven hid it, which is why it survived the specimen: `mythwright` alone
+  states `muted` and `subtle` as opaque hues rather than as alphas over the surface, and it is
+  the only palette of the seven in which the subtle tone clears the floor at all — 5.28:1 from
+  the SAME declaration. Six fail and one passes, so the specimen's figure was set from the
+  single outlier rather than from the set. It is corrected on the
+  component rather than at a call site because the figure is wrong for every caller,
+  and it moves the two sites this programme did not convert — the manager's recipe-item
+  Overview tab and `StatBox`'s composed label — as well as the ones it did. `styles/fabricate.css` records the reference's own eyebrow at
   `700 8.5px var(--sans); letter-spacing: .11em; color: var(--subtle)` in 64 of its 71
   eyebrows over sixteen cited prototype anchors, and the converged shipped
   `.manager-kicker` beside it states exactly that; a second measurement pass on a
@@ -122,7 +140,10 @@
     /* Declared, not inherited: nine of the seventeen converted sites render as a `<p>` and each
        zeroes the user-agent block margin itself today. */
     margin: 0;
-    color: var(--fab-text-subtle);
+    /* The muted tone, not the specimen's subtle one — see the second correction in the
+       header. At 8.5px the subtle tone is under the small-text contrast floor on five of
+       the seven palettes. */
+    color: var(--fab-text-muted);
     font-size: 8.5px;
     font-weight: 700;
     letter-spacing: 0.11em;

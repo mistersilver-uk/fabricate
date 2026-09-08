@@ -21,6 +21,7 @@ import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 
 import {
   MARKS_AND_NOTICES_COMPILED_MODULES,
+  PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
@@ -57,7 +58,11 @@ const harness = createMountedComponentHarness({
   ],
   runeModules: ['src/ui/svelte/stores/inventoryStore.svelte.js'],
   compiledModules: [
-    'src/ui/svelte/components/Medallion.svelte',
+    // The player window's own shared roster (issue 1514), spread rather than listed: this tree
+    // renders the not-yet-ready chrome, the record tile, the portrait and the kind filter's
+    // segmented track, and a manifest that named each would insert lines into a block Sonar
+    // already reads as duplicated across these suites. See `PLAYER_APP_COMPILED_MODULES`.
+    ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
     ...SELECT_COMPILED_MODULES,

@@ -13,6 +13,7 @@
   import Workbench from './Workbench.svelte';
   import ComponentInventoryColumn from './ComponentInventoryColumn.svelte';
   import AlchemyDisciplineChooser from './AlchemyDisciplineChooser.svelte';
+  import PlayerViewState from '../PlayerViewState.svelte';
 
   let { services = null } = $props();
 
@@ -27,6 +28,37 @@
   );
 
   const needsChooser = $derived(Boolean(store?.needsChooser));
+
+  // The branches this view can reach, in priority order, handed to the shared composition as
+  // data. Alchemy has no empty branch: a discipline with no known recipes still renders the
+  // workbench. The hook name and each value are the ones the smoke locators and the mounted
+  // suites already read.
+  const viewStates = $derived([
+    {
+      when: isLoading,
+      kind: 'loading',
+      hook: 'data-alchemy-state',
+      value: 'loading',
+      icon: 'fas fa-spinner fa-spin',
+      message: localize('FABRICATE.App.Alchemy.Loading'),
+    },
+    {
+      when: isError,
+      kind: 'error',
+      hook: 'data-alchemy-state',
+      value: 'error',
+      icon: 'fas fa-triangle-exclamation',
+      message: localize('FABRICATE.App.Alchemy.Error'),
+    },
+    {
+      when: isNoActor,
+      kind: 'empty',
+      hook: 'data-alchemy-state',
+      value: 'no-actor',
+      icon: 'fas fa-user-slash',
+      message: localize('FABRICATE.App.Alchemy.NoActor'),
+    },
+  ]);
 
   const matchedRecipeId = $derived(store?.mode === 'ready' ? (store?.target?.id ?? null) : null);
 
@@ -52,80 +84,67 @@
   }
 </script>
 
-{#if isLoading}
-  <div class="alchemy-view-state" data-alchemy-state="loading">
-    <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Alchemy.Loading')}</p>
-  </div>
-{:else if isError}
-  <div class="alchemy-view-state" data-alchemy-state="error">
-    <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Alchemy.Error')}</p>
-  </div>
-{:else if isNoActor}
-  <div class="alchemy-view-state" data-alchemy-state="no-actor">
-    <i class="fas fa-user-slash" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Alchemy.NoActor')}</p>
-  </div>
-{:else if needsChooser}
-  <AlchemyDisciplineChooser
-    systems={store?.systems ?? []}
-    onChoose={(id) => store?.chooseSystem(id)}
-  />
-{:else}
-  <div class="alchemy-view-container">
-    <div class="alchemy-view-grid" data-alchemy-state="workbench">
-      <div class="alchemy-view-column alchemy-view-known">
-        <KnownRecipesColumn
-          recipes={store?.knownRecipes ?? []}
-          knownCount={store?.knownCount ?? 0}
-          undiscoveredCount={store?.undiscoveredCount ?? 0}
-          search={store?.search ?? ''}
-          selectedRecipeId={store?.selectedRecipeId ?? null}
-          {matchedRecipeId}
-          activeSystemName={store?.listing?.activeSystemName ?? ''}
-          canSwitch={store?.canSwitch ?? false}
-          onSearch={(value) => store?.setSearch(value)}
-          onSelect={(id) => store?.selectRecipe(id)}
-          onSwitch={() => store?.switchDiscipline()}
-        />
+<PlayerViewState branches={viewStates}>
+  {#if needsChooser}
+    <AlchemyDisciplineChooser
+      systems={store?.systems ?? []}
+      onChoose={(id) => store?.chooseSystem(id)}
+    />
+  {:else}
+    <div class="alchemy-view-container">
+      <div class="alchemy-view-grid" data-alchemy-state="workbench">
+        <div class="alchemy-view-column alchemy-view-known">
+          <KnownRecipesColumn
+            recipes={store?.knownRecipes ?? []}
+            knownCount={store?.knownCount ?? 0}
+            undiscoveredCount={store?.undiscoveredCount ?? 0}
+            search={store?.search ?? ''}
+            selectedRecipeId={store?.selectedRecipeId ?? null}
+            {matchedRecipeId}
+            activeSystemName={store?.listing?.activeSystemName ?? ''}
+            canSwitch={store?.canSwitch ?? false}
+            onSearch={(value) => store?.setSearch(value)}
+            onSelect={(id) => store?.selectRecipe(id)}
+            onSwitch={() => store?.switchDiscipline()}
+          />
+        </div>
+
+        <section class="alchemy-view-column alchemy-view-bench">
+          <Workbench
+            benchChips={store?.benchChips ?? []}
+            benchEmpty={store?.benchEmpty ?? true}
+            benchEssences={store?.benchEssences ?? []}
+            {signatureText}
+            mode={store?.mode ?? 'empty'}
+            targetName={store?.target?.name ?? ''}
+            result={store?.target?.result ?? null}
+            missing={store?.missing ?? []}
+            brewEnabled={store?.brewEnabled ?? false}
+            brewInFlight={store?.brewInFlight ?? false}
+            lastBrew={store?.lastBrew ?? null}
+            onClear={() => store?.clear()}
+            onAdd={(id) => store?.add(id)}
+            onRemoveOne={(id) => store?.removeOne(id)}
+            onRemoveAll={(id) => store?.removeAll(id)}
+            onBrew={() => store?.brew()}
+            onDrop={(id) => store?.add(id)}
+          />
+        </section>
+
+        <section class="alchemy-view-column alchemy-view-inventory">
+          <ComponentInventoryColumn
+            components={store?.components ?? []}
+            search={store?.componentSearch ?? ''}
+            hasComponents={store?.hasOwnedComponents ?? false}
+            onAdd={(id) => store?.add(id)}
+            onSearch={(value) => store?.setComponentSearch(value)}
+            {onDragStart}
+          />
+        </section>
       </div>
-
-      <section class="alchemy-view-column alchemy-view-bench">
-        <Workbench
-          benchChips={store?.benchChips ?? []}
-          benchEmpty={store?.benchEmpty ?? true}
-          benchEssences={store?.benchEssences ?? []}
-          {signatureText}
-          mode={store?.mode ?? 'empty'}
-          targetName={store?.target?.name ?? ''}
-          result={store?.target?.result ?? null}
-          missing={store?.missing ?? []}
-          brewEnabled={store?.brewEnabled ?? false}
-          brewInFlight={store?.brewInFlight ?? false}
-          lastBrew={store?.lastBrew ?? null}
-          onClear={() => store?.clear()}
-          onAdd={(id) => store?.add(id)}
-          onRemoveOne={(id) => store?.removeOne(id)}
-          onRemoveAll={(id) => store?.removeAll(id)}
-          onBrew={() => store?.brew()}
-          onDrop={(id) => store?.add(id)}
-        />
-      </section>
-
-      <section class="alchemy-view-column alchemy-view-inventory">
-        <ComponentInventoryColumn
-          components={store?.components ?? []}
-          search={store?.componentSearch ?? ''}
-          hasComponents={store?.hasOwnedComponents ?? false}
-          onAdd={(id) => store?.add(id)}
-          onSearch={(value) => store?.setComponentSearch(value)}
-          {onDragStart}
-        />
-      </section>
     </div>
-  </div>
-{/if}
+  {/if}
+</PlayerViewState>
 
 <style>
   .alchemy-view-container {
@@ -181,25 +200,5 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-  }
-
-  .alchemy-view-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    height: 100%;
-    color: var(--fab-text-muted);
-    background: var(--fab-surface);
-  }
-
-  .alchemy-view-state i {
-    font-size: 32px;
-  }
-
-  .alchemy-view-state p {
-    margin: 0;
-    font-size: 14px;
   }
 </style>

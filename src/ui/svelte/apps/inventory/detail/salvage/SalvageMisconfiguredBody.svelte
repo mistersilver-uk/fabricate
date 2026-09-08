@@ -14,9 +14,18 @@
   Rendering the authored tiers or stages here would put a plausible contract under a
   footer that always fails — so this body says what is wrong instead, and the footer is
   disabled rather than inviting a doomed press.
+
+  THE WHOLE BODY IS THE SHARED `Notice`, NON-BLOCKING (issue 1514). It was already exactly
+  that shape — a warning-toned well holding a glyphed title over an explanatory line, with
+  `role="status"` on the box — and a non-blocking notice is the only one of the two banner
+  primitives that can keep the role, since `Callout` emits `role="note"` or nothing. The
+  `screwdriver-wrench` glyph is passed rather than defaulted: the default warning mark is the
+  alert triangle, and this state is a CONFIGURATION fault a GM fixes in the editor rather than
+  a hazard the player is walking into.
 -->
 <script>
   import { localize } from '../../../../util/foundryBridge.js';
+  import Notice from '../../../../components/Notice.svelte';
 
   // `reason` is the builder's discriminator; `mode` is retained as the back-compat
   // fallback for the routed/progressive no-formula cases.
@@ -35,41 +44,11 @@
   );
 </script>
 
-<div class="salvage-misconfigured" data-inventory-salvage-body="misconfigured" role="status">
-  <p class="salvage-misconfigured-title">
-    <i class="fas fa-screwdriver-wrench" aria-hidden="true"></i>
-    <span>{localize('FABRICATE.App.Inventory.Salvage.MisconfiguredTitle')}</span>
-  </p>
-  <p class="salvage-misconfigured-rule">
-    {localize(ruleKey)}
-  </p>
-</div>
-
-<style>
-  .salvage-misconfigured {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 10px;
-    border: 1px solid var(--fab-warning-border);
-    border-radius: 9px;
-    background: var(--fab-warning-soft);
-  }
-
-  .salvage-misconfigured-title {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0;
-    font-size: 11.5px;
-    font-weight: 700;
-    color: var(--fab-warning-text);
-  }
-
-  .salvage-misconfigured-rule {
-    margin: 0;
-    font-size: 11px;
-    line-height: 1.5;
-    color: var(--fab-text-muted);
-  }
-</style>
+<Notice
+  tone="warning"
+  icon="fas fa-screwdriver-wrench"
+  title={localize('FABRICATE.App.Inventory.Salvage.MisconfiguredTitle')}
+  detail={localize(ruleKey)}
+  dataAttr="data-inventory-salvage-body"
+  dataValue="misconfigured"
+/>

@@ -49,6 +49,11 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/Medallion.svelte',
+    // The actor portrait (issue 1514), reached through the EMBEDDED player inventory detail
+    // below: the component branch draws a source actor's portrait through it. The preview only
+    // ever renders the BOOK branch, but module resolution is not rendering — the compiled
+    // router imports every child statically.
+    'src/ui/svelte/components/Avatar.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
     // ONE chip (issue 883) and the shared no-state primitive (issue 785).

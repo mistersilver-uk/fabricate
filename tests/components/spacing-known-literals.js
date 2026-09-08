@@ -226,7 +226,62 @@ export function isExemptSpacingPixels(pixels) {
 // insetted a house-fallback image by. That treatment is dropped rather than restated, so the
 // slot is not left open anywhere; `CraftingEssenceThumb` went in the same commit and had no
 // spacing row at all. Measured on the tree, not subtracted.
-export const KNOWN_RAW_SPACING_TOTAL = 889;
+// 889 -> 884 (issue 1514): the five player views drew the same centred loading/error/empty fill
+// up to a class-name prefix, and each of those five blocks declared `gap: 12px` — the ONE raw
+// spacing literal in each of the five files. The blocks are one shared composition now, and the
+// composition writes `var(--fab-space-3)`, which is 12px, so nothing on screen moves and no slot
+// is left open under a new path. Five rows are DELETED rather than re-banked as one:
+// `assertRatchet` fails on a paid-down row as loudly as on a new one, so the rows and this total
+// move in the commit that deletes the blocks. Measured on the tree, not subtracted.
+// 884 -> 877 (issue 1514, phase 2): `GatheringTaskDetail`'s two node banners moved onto `Notice`,
+// which owns its own geometry, so the four rules those banners declared went with them. Three
+// rows VANISH — `gap 2` (the depleted banner's two-line copy stack), `gap 8` and `padding 8` (one
+// occupancy each per banner) — and `padding 10` SHRINKS 3 -> 1, because two of its three were the
+// same banners' `8px 10px`. Deleted rather than re-banked under `Notice`'s path: the primitive
+// declares `var(--fab-space-3)` throughout and owns no raw literal, so the seven occupancies are
+// paid rather than moved. Measured on the tree, not subtracted.
+// 877 -> 863 (issue 1514, phase 3): the alchemy and journal tabs' twelve raw thumbnails, seven
+// pane empties and two wells moved onto primitives that own their own geometry, and the rules
+// those markup blocks declared went with them. Six rows SHRINK by one occupancy each - the
+// `gap`s and `padding`s of `.alchemy-inventory-empty`, `.alchemy-known-empty` and
+// `.alchemy-known-footer` - and eight rows at one occupancy VANISH, five of them the whole of
+// `TimeRemainingBox` and `JournalListShell`'s and `RunDetail`'s deleted empty-state stacks. The
+// two caller-owned WRAPPERS this phase keeps bring nothing back: `.alchemy-known-footer-slot`
+// declares `margin-top: 12px` and `.alchemy-produces-slot` declares `margin: 18px 0 10px`, and
+// all three of those values were already banked rows on the rules they came from - 12 and 18 and
+// 10 are literals either way, so a wrapper carrying a margin verbatim moves no occupancy. What
+// the primitives absorb is `var(--fab-space-*)` throughout, so the fourteen occupancies are paid
+// rather than relocated. Measured on the tree, not subtracted.
+// 863 -> 853 (issue 1514, phase 4): the inventory tab's kind filter, its actor portrait, its two
+// remaining banners and its fourteen pane empties moved onto primitives that own their own
+// geometry. Eight rows at one occupancy VANISH and one SHRINKS by two. The whole of
+// `SalvageMisconfiguredBody`'s scoped block goes with the body it drew (`gap 4`, `gap 6`,
+// `padding 10`), as does `.inventory-detail-broken-banner`'s `padding 8`, the portrait well's
+// `padding 10`, `InventoryDetail`'s centred stack `gap 12`, and the kind pill's `padding 3` and
+// `padding 10`; `InventoryFilters | gap 6` falls 3 -> 1 because two of its three were the pill
+// strip's own gap and the gap between a pill's glyph, label and count, both of which
+// `SegmentedControl` declares in tokens. The one caller-owned WRAPPER this phase keeps brings
+// nothing back — `.inventory-detail-broken-slot` declares `flex-shrink` alone, which is not
+// spacing — and the `.inventory-detail-empty` fill wrapper keeps the `var(--fab-space-4)` it
+// already had. What the primitives absorb is `var(--fab-space-*)` throughout, so the ten
+// occupancies are paid rather than relocated. Measured on the tree, not subtracted.
+// 853 -> 844 (issue 1514, phase 5): the crafting tab's two actor portraits, its blocking well, its
+// essence-pool track, its five pane empties and the roots' companion-fault strip moved onto
+// primitives that own their own geometry, and the rules those markup blocks declared went with
+// them. Two rows SHRINK by one occupancy each and seven rows at one occupancy VANISH. The two that
+// shrink are `ComponentSourcesBar | padding 8`, whose second occupancy was the picker's own empty
+// line, and `RecipeDetailHeader | gap 8`, whose third was the blocking well's. The seven that
+// vanish are the whole of `FabricateAppRoot`'s deleted fault strip (`gap 12`, `padding 14`,
+// `padding 16`, and the description's `margin 4`), `RecipeDetail`'s deleted centred stack
+// (`gap 12`), the blocking list's `padding-left 16` and the shopping planner's `gap 10`.
+// THREE CALLER-OWNED WRAPPERS THIS PHASE KEEPS BRING NOTHING BACK, and each is a different reason:
+// `.fabricate-app-extension-fault` keeps `max-width` and `margin: 20px`, and its 20 was already a
+// banked row on that same rule, so a wrapper carrying a margin verbatim moves no occupancy;
+// `.crafting-shopping-empty` keeps the `var(--fab-space-4)` it already had; and
+// `.actor-bar-stamina-track` and `.essence-pool-bar` keep a width and a display and no spacing at
+// all. What the primitives absorb is `var(--fab-space-*)` throughout, so the nine occupancies are
+// paid rather than relocated. Measured on the tree, not subtracted.
+export const KNOWN_RAW_SPACING_TOTAL = 844;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that
