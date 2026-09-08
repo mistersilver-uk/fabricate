@@ -36,6 +36,23 @@
 
   let { services = null } = $props();
 
+  /**
+   * The widest an option panel in this window may open, in px.
+   *
+   * AN OPTION LIST IS NEVER NARROWER THAN THE CONTROL IT DROPS FROM (issue 1520 review). The
+   * shared select's `form` rung caps its panel at 340px — the primitive's own untouched band —
+   * and the rule below gives these three triggers the promote card's full column, so without
+   * this the panel would hang short under every one of them. A native `<select>`'s popup never
+   * is narrower than its control, and these replaced native `<select>`s.
+   *
+   * The number is this window's DECLARED WIDTH rather than the trigger's measured one, which
+   * says the thing the cap is for: in this window the cap never binds, and the trigger's own box
+   * decides. `iconPickerPopover` computes `clamp(max(triggerWidth, minWidth), minWidth,
+   * maxWidth)` and floors `maxWidth` at the available viewport width, so raising it cannot push
+   * a panel off screen. The config panel states the same constant for the same reason.
+   */
+  const OPTION_PANEL_MAX_WIDTH = 560;
+
   // A render tick lets list-mutating actions (promote / delete) re-pull the rows
   // after the shell re-renders the app (which re-runs _prepareSvelteProps).
   let tick = $state(0);
@@ -316,6 +333,7 @@
         value={selectedRegionId}
         options={regionSelectOptions}
         onChange={(next) => (selectedRegionId = next)}
+        maxWidth={OPTION_PANEL_MAX_WIDTH}
         triggerData={{ 'data-interactable-manager-region': '' }}
       />
 
@@ -324,6 +342,7 @@
         value={selectedSystemId}
         options={systemSelectOptions}
         onChange={(next) => (selectedSystemId = next)}
+        maxWidth={OPTION_PANEL_MAX_WIDTH}
         triggerData={{ 'data-interactable-manager-system': '' }}
       />
 
@@ -361,6 +380,7 @@
         value={selectedReferenceId}
         options={sourceSelectOptions}
         onChange={(next) => (selectedReferenceId = next)}
+        maxWidth={OPTION_PANEL_MAX_WIDTH}
         triggerData={{ 'data-interactable-manager-source': '' }}
       />
 
@@ -549,6 +569,24 @@
      writes, so the hash lands there. */
   .fab-im-toolbar :global(.fabricate-button[aria-expanded='true']) {
     border-color: var(--fab-accent);
+  }
+
+  /* THE PICKER TRIGGERS FILL THE COLUMN THEY SIT IN (issue 1520 review). The shared select
+     declares no `width` and no `min-width` — `Select.svelte` records that "the trigger's box is
+     the one thing this API does not address" — and a `<button>` hugs its content, so the three
+     pickers in this card opened at 291px, 144px and 137px interleaved with four full-width 508px
+     controls, one column reading as seven different control widths. The native `<select>`s they
+     replaced filled the column, because core gives an `<input>`-family control `width: 100%`.
+
+     `:global(...)` because the element is `Select`'s, anchored on the root `<div>` this file
+     writes rather than on `.fab-im-promote` — that name is a `class` PROP handed to
+     `InspectorCard`, so Svelte stamps no hash on it and a rule rooted there would match nothing.
+     `.fabricate-select-field` is the class the labelled form's own `<Field>` emits, so this
+     reaches the primitive's element without minting a class for it. The promote card holds every
+     select in this window, so anchoring at the root reaches the same three controls. Both the
+     browser and the config panel state the same rule for the same reason. */
+  .fabricate-interactables-manager-body :global(.fabricate-select-field .fabricate-select-trigger) {
+    width: 100%;
   }
 
   /* The promote card's contents are a column of labelled controls, which is the shell's own

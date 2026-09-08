@@ -1338,6 +1338,7 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
  * commit, while its `select` ring paints an INSET `box-shadow` against the module's OUTSET
  * `outline` and is a VARIANT the module cannot cover. Membership here is not a licence to
  * delete — the population is keyed on ELEMENTS, and elements are the part a variant shares.
+ *
  * `Field`'s is TWO comma-separated legs — `.fabricate-field
  * input:focus-visible, .fabricate-field textarea:focus-visible` — rather than one
  * `:is(input, textarea)` member, and that is a requirement of this population rather than a

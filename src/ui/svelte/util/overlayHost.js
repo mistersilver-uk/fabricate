@@ -79,13 +79,15 @@
  * hard-codes a root of its own, and that every class named here is genuinely positioned.
  *
  * WHICH WINDOWS REACH AN OVERLAY COMPONENT IS A SEPARATE, NARROWER QUESTION, and the answer is
- * still "the manager and the player app" — measured by walking the import graph from each app
- * root. The three canvas windows adopted the class BEFORE reaching an overlay, on purpose: a
- * later phase of issue 1520 converts their native `<select>` elements to the shared `Select`,
- * which is a thin composition over `SearchablePopover`, and without the frame class each
- * converted dropdown would portal to `<body>`, lose window stacking, and emit the console error
- * below on every scroll tick — the exact defect this module exists to prevent, arriving through
- * the conversion meant to modernise the control.
+ * ALL FIVE — measured by walking the import graph from each app root. It was "the manager and the
+ * player app" for one phase of issue 1520 and is no longer: the three canvas windows adopted the
+ * class BEFORE reaching an overlay, on purpose, and the later phase that spent the prerequisite
+ * landed in the same change. Twelve native `<select>` elements across those three windows are the
+ * shared `Select` now, which is a thin composition over `SearchablePopover`, so each one opens a
+ * panel appended to its own window's frame. Without the frame class each of those panels would
+ * portal to `<body>`, lose window stacking, and emit the console error below on every scroll tick
+ * — the exact defect this module exists to prevent, arriving through the conversion meant to
+ * modernise the control.
  *
  * ── WHY THE FALLBACK IS LOUD RATHER THAN SILENT ─────────────────────────────────────────────
  * `resolveOverlayHost` never returns null while a document exists. Landing on `document.body`

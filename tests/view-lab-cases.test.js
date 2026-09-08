@@ -426,6 +426,23 @@ function stripNegations(selector) {
  * SHAPE has finished with it.
  */
 function collectSelectorHookFailures(viewCase, selector, sources, haystack, missing) {
+  // A LITERAL ID IS ANSWERED BY THE ID ITSELF (issue 1520 review). The branch below exists
+  // because an editor tab strip INTERPOLATES its ids, so neither half of `#tool-tab-validation`
+  // appears in any source and the guard has to go looking for the file that builds the stem. A
+  // hand-rolled tablist writes its ids out - `id="fab-ib-tab-tasks"` in the interactable
+  // browser - and for those the heuristic is not merely unnecessary, it is WRONG: the family
+  // `fab-ib` builds no `${...}` ids and declares no `idStem`, so the branch reported a selector
+  // that resolves perfectly as naming UI that does not exist.
+  //
+  // The literal form is STRICTER than the branch it short-circuits, not looser: it demands the
+  // whole id on an `id` attribute somewhere in the corpus, where the branch demands only that
+  // some file interpolates the family and mentions the tab id in quotes. So an id renamed on the
+  // element still fails - through this branch when nothing writes it, and through the one below
+  // when nothing builds it either.
+  const literalId = /^#([\w-]+)$/.exec(selector);
+  if (literalId && [...sources].some(([, text]) => text.includes(`id="${literalId[1]}"`))) {
+    return;
+  }
   const editorTab = /^#([a-z-]+)-tab-([a-z-]+)$/.exec(selector);
   if (editorTab) {
     const [, family, tabId] = editorTab;

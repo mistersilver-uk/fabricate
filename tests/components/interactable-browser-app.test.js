@@ -16,6 +16,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  SMOKE_SOURCE,
+  assertLocatorsEmitted,
+  emittingHalfOf,
+  prefixedTokensIn,
+} from '../helpers/interactablesSmokeLocators.js';
+import {
   BROWSER_WINDOW_CONTRACT,
   assertWindowContract,
 } from '../helpers/interactablesWindowContract.js';
@@ -47,6 +53,11 @@ const searchFieldSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/components/ManagerSearchField.svelte'),
   'utf8'
 );
+const selectSource = readFileSync(
+  resolve(__dirname, '../../src/ui/svelte/components/Select.svelte'),
+  'utf8'
+);
+const sheetSource = readFileSync(resolve(__dirname, '../../styles/fabricate.css'), 'utf8');
 
 describe('InteractableBrowserApp singleton window', () => {
   it('is an ApplicationV2 + SvelteApplicationMixin app keyed by a stable id', () => {
@@ -306,15 +317,21 @@ describe('InteractableBrowserRoot body', () => {
     assertWindowContract({ rootSource, contract: BROWSER_WINDOW_CONTRACT });
   });
 
-  // THE TWO SCROLL CONTAINERS DECLARE THEIR KEYBOARD FOCUS (issue 1520).
+  // THE TWO TAB PANELS DECLARE THEIR KEYBOARD FOCUS (issue 1520; the reason restated at review).
   //
   // Both panels carry a STATIC `tabindex="0"`, which is what puts them - and only them - in
   // `design-system-keyboard-focus.test.js`'s `roleZero` population; the tab buttons above them
   // carry a roving `tabindex` EXPRESSION and land in the disjoint `roving` population instead.
-  // Without the declaration, `KeyboardManager#hasFocus` returns false for the focused panel and
-  // Foundry keeps its own bindings live over a scroll container a GM has just tabbed into: the
-  // arrows pan the canvas underneath and Space pauses the game.
-  it('declares keyboard focus on both tabpanel scroll containers', () => {
+  // The `tabindex` is the ARIA tabs pattern's own requirement: from the active tab button, one
+  // Tab press lands on the panel, and that is how a keyboard user reaches the list.
+  //
+  // NEITHER PANEL IS A SCROLL CONTAINER, and this clause used to say both were. `.fab-ib-section`
+  // declares no `overflow` and no height; the window's scroll box is the root. Nothing in the
+  // component moves focus into a panel either - `focusActiveTab` focuses the TAB. What the
+  // declaration buys is unchanged: without it `KeyboardManager#hasFocus` returns false for the
+  // focused panel and Foundry keeps its own bindings live, so the arrows pan the canvas
+  // underneath, Space pauses the game and Tab is swallowed before it reaches the row actions.
+  it('declares keyboard focus on both tabpanel containers', () => {
     const panels = rootSource.split('role="tabpanel"').slice(1);
     assert.ok(panels.length === 2, 'exactly two tabpanels');
     for (const panel of panels) {
@@ -421,5 +438,100 @@ describe('InteractableBrowserRoot body', () => {
       'the shared field renders a search input'
     );
     assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.DropModifierHint'), 'Alt-override hint shown in the browser');
+  });
+
+  // THE FILTER BAR IS ONE CONTROL RUNG AND ONE CONTROL WIDTH (issue 1520 review).
+  //
+  // Two defects the published frame showed, both of them a shared primitive doing exactly what
+  // it documents while the caller supplied neither of the two things it leaves to a caller.
+  //
+  // THE RUNG. The shared search field ships at 34px with a 6px corner; the shared select's form
+  // rung is 38px at 9px. A bar holding one of each therefore renders two heights and two radii
+  // unless the caller opts in, which is precisely what the field's `size` rung exists for - the
+  // sheet's own note calls it the opt-in a caller uses so a toolbar's search and filter share a
+  // rung. Both ends are read: the prop this window passes, and the rule that turns it into the
+  // select's own numbers, so a rung renamed on either side reds here.
+  //
+  // THE WIDTH. `Select` declares no `width` and no `min-width` by design, so a converted
+  // full-width control owes its own; the flex rule this window already had grows the FIELD and
+  // leaves the `<button>` inside it hugging its content, which is how a 144px trigger came to
+  // sit directly above a 394px search pill - the toolbar wraps at 420px, so the two are stacked
+  // and share a left edge, which is what makes the width difference impossible to miss.
+  //
+  // THE RUNG IS READ OFF THE TAG, over the EMITTING half of the file (issue 1520 review). A
+  // first draft of this clause asked whether the file contained `size={38}` anywhere, and this
+  // window's markup carries a paragraph explaining why the prop is passed - so changing the prop
+  // to `size={34}` left the clause green on its own justification. That is Q1's defect, made
+  // twice in one change, which is the argument for the shared stripper rather than for
+  // remembering.
+  it('puts its filter controls on one rung and gives the picker trigger the field width', () => {
+    const searchTag = /<ManagerSearchField\b[\s\S]*?\/>/.exec(emittingHalfOf(rootSource));
+    assert.ok(searchTag, 'the filter bar still renders the shared search field');
+    assert.ok(
+      searchTag[0].includes('size={38}'),
+      `the search field is asked for the 38px rung:\n${searchTag?.[0]}`
+    );
+    assert.ok(
+      /\.fabricate-search\.manager-search\.is-size-38 input\s*\{[^}]*height:\s*38px/.test(sheetSource),
+      'and that rung is 38px in the sheet'
+    );
+    assert.ok(
+      /\.fabricate-select \.fabricate-select-trigger-form\s*\{[^}]*min-height:\s*38px/.test(sheetSource),
+      'which is the select form rung this bar pairs it with'
+    );
+    assert.ok(
+      /\.fab-ib-controls \.fabricate-select-field \.fabricate-select-trigger\)\s*\{\s*width:\s*100%/.test(rootSource),
+      'the picker trigger fills the field, not just the field the bar'
+    );
+
+    // AND THE PANEL FOLLOWS THE TRIGGER, which only becomes necessary once the trigger is full
+    // width: the primitive's `form` rung caps its panel at 340px, so the widened trigger would
+    // otherwise hang a short panel under itself in the one browser frame that opens this picker.
+    // The same statement the config panel and the Manage panel make, for the same reason.
+    const selectTag = /<Select\b[\s\S]*?\/>/.exec(emittingHalfOf(rootSource));
+    assert.ok(selectTag, 'the filter bar still renders the shared select');
+    assert.ok(
+      selectTag[0].includes('maxWidth={OPTION_PANEL_MAX_WIDTH}'),
+      `the picker opens at the primitive's 340px band under a full-width trigger:\n${selectTag?.[0]}`
+    );
+    assert.ok(
+      rootSource.includes('const OPTION_PANEL_MAX_WIDTH = 420'),
+      "the cap is this window's declared width, so it never binds and the trigger decides"
+    );
+    assert.ok(
+      selectSource.includes('maxWidth={maxWidth || band.maxWidth}'),
+      'a caller-supplied cap wins over the rung band'
+    );
+  });
+
+  // EVERY LOCATOR THE FOUNDRY SMOKE WOULD DRIVE AGAINST THIS WINDOW (issue 1520 review).
+  //
+  // The config panel's copy of this clause scopes its scan with
+  // `data-interactable-(?!manager-|browser-)`, and the manage panel's takes the `manager-` half.
+  // Nothing took the `browser-` half, so that lookahead handed a hook family to a scan that did
+  // not exist - harmless while the answer is zero, and silently harmless in the wrong direction
+  // the day it stops being zero.
+  //
+  // THE FLOOR IS ZERO HERE, WHICH IS VACUOUS ON ITS OWN AND IS THE WHOLE REASON FOR THE SECOND
+  // ASSERTION. The smoke never opens this window - it is the one window of the three it does not
+  // drive - so the loop above runs over nothing today. The equality is a TRIPWIRE rather than a
+  // property worth having: the day a smoke step addresses a browser hook, this reds and whoever
+  // wrote that step raises the floor to a real number and gets a real guard, instead of adding a
+  // locator to a scan that would have passed either way.
+  it('has no smoke locators of its own, and reds here the day it gains one', () => {
+    const locators = prefixedTokensIn(SMOKE_SOURCE, 'data-interactable-browser-');
+    assertLocatorsEmitted({
+      locators,
+      rootSource,
+      floor: 0,
+      what: 'browser hooks',
+      root: 'the interactable browser root',
+    });
+    assert.deepEqual(
+      locators,
+      [],
+      'the Foundry smoke now drives this window; raise the floor above to the number of hooks ' +
+        'it addresses so the loop stops being vacuous'
+    );
   });
 });

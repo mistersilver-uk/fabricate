@@ -56,6 +56,14 @@ const statusToggleSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/components/StatusToggle.svelte'),
   'utf8'
 );
+const selectSource = readFileSync(
+  resolve(__dirname, '../../src/ui/svelte/components/Select.svelte'),
+  'utf8'
+);
+const popoverLayoutSource = readFileSync(
+  resolve(__dirname, '../../src/ui/svelte/util/iconPickerPopover.js'),
+  'utf8'
+);
 const sheetSource = readFileSync(resolve(__dirname, '../../styles/fabricate.css'), 'utf8');
 
 describe('InteractableConfigApp shell', () => {
@@ -312,6 +320,59 @@ describe('InteractableConfigRoot body', () => {
     assert.ok(rootSource.includes('class="fabricate-interactable-config"'), 'and the root container is still emitted');
   });
 
+  // AN OPTION PANEL IS NEVER NARROWER THAN THE TRIGGER IT DROPS FROM (issue 1520 review).
+  //
+  // The published `interactables-config-source-open` frame - the one the design-system spec now
+  // REQUIRES this change to carry, because it is the only assertion that distinguishes a panel
+  // portalled onto the window frame from one that fell back to `<body>` - shipped a 340px option
+  // panel hanging under a 450px trigger. The two halves are separately correct and wrong
+  // together: this window states `width: 100%` on the trigger, as `Select` documents a
+  // converting full-width site must, and `Select`'s `form` rung caps its PANEL at 340px, which
+  // was the primitive's own untouched band from before any full-width caller existed. A native
+  // `<select>`'s popup is never narrower than its control, and these replaced native `<select>`s.
+  //
+  // Every link is read, because the cap is spent through three files: the constant this window
+  // passes, the prop the primitive honours in preference to its band, and the clamp that turns
+  // the pair into a width. The count is EXACT so a ninth select added without the cap reds here
+  // rather than shipping one narrow panel among eight correct ones.
+  it('caps its option panels wide enough for a full-width trigger', () => {
+    assert.ok(
+      rootSource.includes('const OPTION_PANEL_MAX_WIDTH = 480'),
+      "the cap is this window's declared width, so it never binds and the trigger decides"
+    );
+    const selects = rootSource.match(/<Select\b[\s\S]*?\/>/g) ?? [];
+    assert.equal(selects.length, 8, 'the panel renders eight shared selects');
+    for (const tag of selects) {
+      assert.ok(
+        tag.includes('maxWidth={OPTION_PANEL_MAX_WIDTH}'),
+        `a select opens at the primitive's 340px band under a full-width trigger:\n${tag}`
+      );
+    }
+    assert.ok(
+      /\.fabricate-select-field \.fabricate-select-trigger\)\s*\{\s*width:\s*100%/.test(rootSource),
+      'the trigger is full width, which is what makes the band too narrow'
+    );
+
+    // The primitive's half, both ends: the band the cap replaces, and the precedence that lets a
+    // caller replace it. A `maxWidth` prop that stopped winning over the band would leave every
+    // assertion above green and every panel narrow again.
+    assert.ok(
+      selectSource.includes('form: Object.freeze({ minWidth: 240, maxWidth: 340 })'),
+      "the form rung's own band is the 340px one this window overrides"
+    );
+    assert.ok(
+      selectSource.includes('maxWidth={maxWidth || band.maxWidth}'),
+      'a caller-supplied cap wins over the rung band'
+    );
+
+    // And the clamp, which is why raising the cap widens the panel instead of fixing it at 480:
+    // the panel takes the trigger's width, floored at `minWidth` and ceilinged at `maxWidth`.
+    assert.ok(
+      popoverLayoutSource.includes('clamp(Math.max(triggerWidth, minWidth), minWidth, maxWidth)'),
+      'the panel width tracks the trigger between the two bounds'
+    );
+  });
+
   // THE PANEL'S STYLING CONTRACT, STATED FORWARD (issue 1520).
   //
   // This clause used to assert `rootSource.includes('.fab-ic-')` under the message "component
@@ -330,18 +391,21 @@ describe('InteractableConfigRoot body', () => {
     assertWindowContract({ rootSource, contract: CONFIG_PANEL_CONTRACT });
   });
 
-  // THE LIVE STATE IS A SWITCH NOW, AND THE CHAIN IS ASSERTED END TO END (issue 1520).
+  // THE LIVE STATE IS A SWITCH WHERE THE LABEL IS A STATE, AND A PRESSED BUTTON WHERE IT IS NOT
+  // (issue 1520, and the maintainer ruling at review).
   //
-  // The three `aria-pressed` buttons this panel hand-rolled - the task-node link, Disable
-  // and Lock - are `<StatusToggle>`s. This root no longer writes `aria-pressed` or
-  // `is-active` itself, so pinning either string here would pin nothing; what it writes is
-  // `on`, and what makes `on` mean "pressed and accented" is the primitive plus one
-  // sheet rule. All three links are read, because any one of them alone would go green while
-  // the pair beside it was broken.
-  it('shows the live disabled/locked/linked state on the shared switch (on -> aria-pressed + is-on)', () => {
-    assert.ok(rootSource.includes('on={view.state.enabled === false}'), 'the Disable switch is on when the interactable is disabled');
-    assert.ok(rootSource.includes('on={view.state.locked === true}'), 'the Lock switch is on when the interactable is locked');
+  // Two of this panel's four `aria-pressed` controls are `<StatusToggle>`s - the task-node link,
+  // whose two labels read "Linked to gathering task" / "Independent…", and "Hidden from players".
+  // The other two are NOT, and that is the ruling rather than an omission: "Disable" and "Lock"
+  // flip to "Enable" and "Unlock", which are action verbs, so a knob drawn ON beside the word
+  // "Enable" states the opposite of the state it reports. Issue 1625 supplies the state readings
+  // and converts them; until then they are `ManagerButton`s carrying `aria-pressed`.
+  //
+  // Every link in each chain is read, because any one of them alone would go green while the
+  // pair beside it was broken.
+  it('shows the live linked/hidden state on the shared switch (on -> aria-pressed + is-on)', () => {
     assert.ok(rootSource.includes('on={!isUnlinked}'), 'the task-node switch is on when the node is linked');
+    assert.ok(rootSource.includes('on={view.presentation.hidden}'), 'the hidden switch is on when the interactable is hidden from players');
 
     // The primitive's half: `on` becomes the announcement AND the drawn position. The Foundry
     // smoke asserts `aria-pressed` on the node-link toggle and the View Lab's configured case
@@ -355,6 +419,52 @@ describe('InteractableConfigRoot body', () => {
     assert.ok(
       /\.fabricate-toggle\.manager-status-toggle\.is-on\s*\{[^}]*var\(--fab-accent\)/.test(sheetSource),
       'the on position is painted with the themed accent token'
+    );
+  });
+
+  // AND EACH SWITCH REACHES THE `aria-pressed` BRANCH, which the clause above does NOT establish
+  // (issue 1520 review). `StatusToggle` renders one of three hosts off its `as` prop, and only
+  // the default `button` host writes `aria-pressed`: `as="checkbox"` renders a `<label>` around
+  // a real `<input type="checkbox">` and `as="indicator"` renders a `<span role="img">`, neither
+  // of which announces a pressed state at all. So "the root passes `on`" plus "the primitive CAN
+  // emit `aria-pressed` from `on`" leaves the one step between them unasserted - and the step is
+  // load-bearing: the Foundry smoke reads `aria-pressed` off the node-link control and
+  // `interactables-config-configured` selects on it, so a host change here would fail a capture
+  // WHOLE rather than fail a test.
+  //
+  // Asserted as the ABSENCE of a host declaration on every tag, not as the presence of an
+  // expected one, because the default is what these sites want and writing `as="button"` on each
+  // would be the same statement made twice. The rest spread is refused for the same reason it
+  // would defeat the check: `{...someBag}` could carry an `as` this scan cannot see.
+  it('leaves every one of its switches on the default pressable host', () => {
+    const tags = rootSource.match(/<StatusToggle\b[\s\S]*?\/>/g) ?? [];
+    assert.equal(tags.length, 2, 'the panel renders exactly the node-link and hidden switches');
+    for (const tag of tags) {
+      assert.ok(!/\bas=/.test(tag), `a switch declares a host, so it may not announce aria-pressed:\n${tag}`);
+      assert.ok(!/\{\.\.\./.test(tag), `a switch spreads props, which could carry a host:\n${tag}`);
+    }
+    // The primitive's half of the same statement, so a default flipped there reds here too.
+    assert.ok(statusToggleSource.includes("as = 'button'"), 'the unspecified host is the pressable button');
+  });
+
+  // THE TWO CONTROLS THAT DECLINED THE CONVERSION, PINNED AS BUTTONS (issue 1520, maintainer
+  // ruling). Without this clause the ruling lives only in a source comment, and the next reader
+  // "finishes the job" - which is exactly the outcome the ruling rejects. The polarity is pinned
+  // with it: `aria-pressed` reads DISABLED and LOCKED, which is what the shipped button announced
+  // before the conversion and what issue 1625 must preserve when it supplies the state readings.
+  it('keeps Disable and Lock as pressed buttons, with the state on aria-pressed', () => {
+    assert.ok(rootSource.includes('aria-pressed={view.state.enabled === false}'), 'Disable announces pressed while the interactable is disabled');
+    assert.ok(rootSource.includes('aria-pressed={view.state.locked === true}'), 'Lock announces pressed while the interactable is locked');
+    assert.ok(!rootSource.includes('on={view.state.enabled === false}'), 'Disable is not a switch');
+    assert.ok(!rootSource.includes('on={view.state.locked === true}'), 'Lock is not a switch');
+
+    // The pressed state has a VISUAL expression, which is the half the sheet records as missing
+    // for the component browser's grouping switch - a `.manager-button` under a class with no CSS
+    // anywhere, so its `aria-pressed` state was announced and never drawn. Keyed on the attribute
+    // rather than on a companion class, so the drawn and announced states cannot drift.
+    assert.ok(
+      /\.fab-ic-actions :global\(\.fabricate-button\[aria-pressed='true'\]\)\s*\{[^}]*var\(--fab-accent\)/.test(rootSource),
+      'the pressed state is drawn from the themed accent token, keyed on aria-pressed'
     );
   });
 
