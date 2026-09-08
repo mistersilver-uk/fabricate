@@ -280,6 +280,7 @@
         "Title": "Interactable browser",
         "Hint": "Drag an entry onto the canvas, or use Place on current scene.",
         "SystemLabel": "Crafting system",
+        "FiltersLabel": "Interactable browser filters",
         "SearchLabel": "Search",
         "SearchPlaceholder": "Search entries…",
         "ToolsHeading": "Tools",

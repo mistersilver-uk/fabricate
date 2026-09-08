@@ -47,11 +47,24 @@
 
   ── WHAT THIS COMPONENT DOES NOT OWN ──────────────────────────────────────────────
   It has no scoped `<style>`, for `ManagerButton.svelte`'s reason: the switch is painted
-  by `styles/fabricate.css` under `.fabricate-manager`, and a scoped block here would be
-  a second source of truth for the same control and would begin to disagree with the
-  sheet. The consequence is the same one the button carries — this is a MANAGER
-  primitive, not an app-agnostic one, and dropped into `.fabricate-app` it renders as an
-  unstyled row.
+  by `styles/fabricate.css`, and a scoped block here would be a second source of truth
+  for the same control and would begin to disagree with the sheet.
+
+  THE "IT RENDERS UNSTYLED OUTSIDE THE MANAGER" CLAUSE THAT STOOD HERE WAS FALSE, and it
+  contradicted the family-root paragraph immediately below it (corrected in issue 1520).
+  Every rule that paints this switch is rooted at `fabricate-toggle`, the class this
+  component emits — the font floor at `styles/fabricate.css`'s `.fabricate-toggle` and the
+  whole `.fabricate-toggle.manager-status-toggle` block under it — so the switch paints
+  wherever it renders and NOT ONE of them needs a `.fabricate-manager` ancestor. That is
+  the whole of what the re-root bought, and the clause said it had not been bought.
+
+  It is also no longer hypothetical which way round it matters: the interactable config
+  panel renders three of these inside `.fabricate-app`, and its frames show a painted
+  switch. Measured over the whole sheet at issue 1520, this family has NO residue at all —
+  no rule of it is written under a `.fabricate-manager` descendant chain and none sits
+  inside the `@container fabricate-manager` block, which is what distinguishes it from
+  `ManagerSearchField`'s two responsive rules and is the reason those are named there and
+  nothing is named here.
 
   It is also an IMPORT-FREE LEAF, exactly like `Stepper.svelte`: props only, no
   `foundryBridge`, no util imports. Callers pass ALREADY-LOCALIZED strings. One util

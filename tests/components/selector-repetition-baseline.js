@@ -29,7 +29,7 @@
  * rather than these 119, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,086 `(at-context, selector)` keys, of which 2,967 appear exactly
+ * Unfiltered, the sheet holds 3,057 `(at-context, selector)` keys, of which 2,938 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -41,7 +41,7 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,603 rules at that head, 119 repeated keys and 243 appearances
+ * printed from. The sheet holds 2,575 rules at that head, 119 repeated keys and 243 appearances
  * between them; five keys appear three times and none appears four or more.
  *
  * ISSUE 1520 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting eight
@@ -57,6 +57,20 @@
  * across 119 rows. The dialog's `select:focus-visible` ring SURVIVES the sweep, and is not a
  * repeated key either: it paints an inset `box-shadow` where the module ring paints an outset
  * `outline`, which is a variant rather than a copy.
+ *
+ * ISSUE 1520 PHASE 5 MOVED THE THREE CONTEXTUAL FIGURES AGAIN AND STILL NONE OF THE REPEATED
+ * ONES, and this time by the largest single deletion of the change. The Manage Interactables
+ * panel's whole `fab-im-*` element family — 28 rules, 29 selectors — left `styles/fabricate.css`
+ * for the root's own scoped block, because those rules were the only thing keeping the window's
+ * appearance rooted at an application class. Every one is a singleton in both keyings, measured:
+ * each names a `.fabricate-interactables-manager` descendant no other rule shares a list with. So
+ * the rule count falls by twenty-eight, the key and singleton counts each fall by twenty-nine, and
+ * `pinnedTotal` STAYS 243 across 119 rows.
+ *
+ * That last figure is the one worth stating rather than assuming: deleting twenty-nine selector
+ * lines from this gate's only corpus is exactly the shape that could have moved the repeated
+ * table, and it did not, because a private per-window family is by construction not shared with
+ * anything. It is re-derived by running the census, not predicted.
  *
  * ISSUE 1508 RE-KEYED THREE ROWS AND MOVED THE THREE CONTEXTUAL FIGURES, and it did the two
  * things separately. RE-KEYED: rooting `Field` at the class it emits rewrites the leading compound

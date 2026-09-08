@@ -63,13 +63,22 @@
   and `ui-integration/spec.md`.
 
   It deliberately has no scoped `<style>`, for `ManagerButton.svelte`'s and
-  `IconButton.svelte`'s reason: the shell is painted by `styles/fabricate.css` under
-  `.fabricate-manager`, and a scoped block here would be a second source of truth for
-  the same box and would begin to disagree with the sheet. The consequence is the one
-  those two carry as well — this is a MANAGER primitive, not an app-agnostic one, and
-  dropped into `.fabricate-app` it renders as an unstyled `<section>`. Unlike the icon
-  button, that consequence is NOT reached in the product today: no player-app
-  component renders this shell, directly or through a shared child.
+  `IconButton.svelte`'s reason: the shell is painted by `styles/fabricate.css`, and a
+  scoped block here would be a second source of truth for the same box and would begin
+  to disagree with the sheet.
+
+  THE "IT RENDERS UNSTYLED OUTSIDE THE MANAGER" CLAUSE THAT STOOD HERE WAS FALSE, and it
+  was already false when it was written (corrected in issue 1520). Issue 1508's second
+  phase re-rooted this family at `fabricate-card`, the class `classes` below emits, so
+  both rules that paint the shell — the flex column it shares with the rail blocks and its
+  own padded, edged, filled box — are written `.fabricate-card.manager-inspector-card` and
+  reach it wherever it renders. Measured over the whole sheet at issue 1520, not one rule
+  of this family is written under a `.fabricate-manager` descendant chain and none sits
+  inside the `@container fabricate-manager` block, so it has no residue either.
+
+  The clause's second half is retired with it rather than merely re-dated: the Manage
+  Interactables panel renders this shell as its promote card, inside a `.fabricate-app`
+  frame, so the consequence is not "not reached today" — it is not a consequence.
 
   It is an IMPORT-FREE LEAF, exactly like `Stepper.svelte` and `IconButton.svelte`:
   props only, no `foundryBridge`, no util imports. Callers pass ALREADY-LOCALIZED

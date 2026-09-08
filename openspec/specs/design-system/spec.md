@@ -172,14 +172,17 @@ So an adoption whose primitive still lives in `apps/manager/` is deferred on SCO
 The library's routing rule decides WHICH primitive an adoption wants; the deferral decides only WHEN the move happens, and the two answers are recorded separately.
 `Pagination.svelte:262-270` renders `<Select size="inline">` with no `label`, `hint` or `error`, so `Select.svelte:220` computes `labelled` false and the `<Field as="label">` at `Select.svelte:442-451` never renders.
 That CHAIN, rather than the importer list alone, is what makes the new `.fabricate-field` floor and chrome unreachable in the player application today.
-Issue 1518 and issue 1520 are the changes that turn all six from claims into facts, and issue 1520 has now turned two of them.
+Issue 1518 and issue 1520 are the changes that turn all six from claims into facts, and issue 1520 has now turned five of them.
 `src/ui/svelte/apps/InteractableConfigRoot.svelte` imports `Field` and `StatusToggle` from `src/ui/svelte/components/` and renders four fields and three switches, and that importer path lies outside both `apps/manager/` and `components/` — which is the whole of what the claim asked for.
 The same file discharges the CHAIN half as well, and the chain is what the two sentences above record as the reason the field family was unreachable rather than merely un-imported.
 It renders eight `<Select>`s that each pass a `label`, so `labelled` computes TRUE and `Select`'s own `<Field as="label">` renders — putting the `.fabricate-field` box, its element-typed chrome and its focus pair on a screen through a component that never writes `Field` at its call site.
 A family reached only through another primitive is reached, so the `Pagination` chain above describes ONE caller's shape rather than a property of the capability, and eight labelled selects in one window are the counter-case.
 The sentence it qualifies still stands as written, because it is scoped to the PLAYER application, whose only `<Select>` is still the pager's unlabelled inline one; what the interactables config window changes is the corpus that statement is true of, not the statement.
-Four remain claims, and each is recorded with the change that owns it rather than left to a reader to infer.
-`ManagerSearchField`, `ManagerToolbar` and `InspectorCard` are issue 1520's own fifth phase, in `src/ui/svelte/apps/InteractableBrowserRoot.svelte`.
+The fifth phase discharged three more, and their importer paths are recorded because the claim is about where an importer lives rather than about how many there are.
+`src/ui/svelte/apps/InteractableBrowserRoot.svelte` imports `ManagerSearchField` and `ManagerToolbar` from `src/ui/svelte/components/` and renders the browser's search pill inside its filter bar; `src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte` imports `InspectorCard` from the same directory and renders the promote panel as one.
+Both paths lie outside `apps/manager/` and `components/`, which is the whole of what the claim asked for.
+`InspectorCard` moved to the second file rather than to the browser because the browser has no card-shaped surface: its rows are horizontal `<li>` children of a `<ul>`, and the primitive renders a `<section>` with no host prop, so converting them would have produced invalid list markup and lost the list semantics a screen reader announces.
+One remains a claim.
 `ChanceSlider` has no site in any of the three interactables windows, so it is not this change's to discharge and stays issue 1518's.
 `tests/components/searchable-popover-area-scope.test.js` derives each class set from the components' own markup and fails when a rule a primitive owns is rooted at an application, is rooted at nothing, or names a root the component has stopped writing.
 It reads a composed class list as well as a written one, because a primitive that builds its classes in `<script>` writes no `class="…"` attribute at all and a markup-only extractor would report such a family clean while measuring nothing.
@@ -591,6 +594,9 @@ The list is TWO and stays two.
 Ruled by the maintainer on 2026-09-03 for issue 1520: the three interactables windows adopt `.fabricate-app` and the component editor adopts `.fabricate-manager`; there is no third root, and the windows joining the contract do not extend the eligible list.
 The component-editor half of that ruling is RETIRED rather than outstanding: the standalone component-editor window was orphaned — its only constructor call was a manager service nothing consumed, and three ratchets forbid restoring the call — so issue 1520 deleted the application instead of re-skinning it, and a deleted window adopts nothing.
 The interactables half LANDED: `InteractableBrowserApp`, `InteractableConfigApp` and `InteractablesManagerApp` each declare `fabricate-app` in `DEFAULT_OPTIONS.classes`, so the eligible list is still two CLASSES while the windows those two classes cover went from two to four — which is what makes the adoption a prerequisite for converting any control that portals, rather than a skin change that could follow one.
+The prerequisite was then SPENT rather than left standing: the same change converted twelve native `<select>` elements across those three windows onto the shared select, which is a thin composition over the portalled popover, so each one now opens a panel appended to its own window's frame.
+Because a portal that falls back to `document.body` still draws the panel where its trigger is, and loses only the window's stacking and its clip, the failure is invisible in a resting frame and nearly invisible in an open one — so a REGISTERED CAPTURE CASE opens one of those panels and asserts the panel is a DIRECT CHILD of the frame element.
+That direct-child assertion is what distinguishes the two outcomes, and a change that adds a portalled control to a window carries one.
 Two facts the ruling did not state are recorded with it, because both are ways of honouring its letter while breaking what it is for.
 
 First, THE LEVEL.

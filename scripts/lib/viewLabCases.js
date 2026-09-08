@@ -12817,10 +12817,17 @@ export const VIEW_LAB_CASES = Object.freeze([
       // The system is CHOSEN rather than inherited. `pickDefaultSystemId` picks the first system
       // carrying sources, so leaving it implicit would tie this frame to the fixture's ordering,
       // and a re-ordering would silently move the frame to another system's library.
-      { selector: '.fab-ib-controls select', select: 'lab-smithing' },
+      //
+      // TWO STEPS, because the picker is `components/Select.svelte` now (issue 1520) and there
+      // is no `<select>` left to issue `selectOption` against — the trigger is clicked by the
+      // stable hook it carries on `Select`'s `triggerData`, and the row by its own
+      // `data-popover-option` identity handle inside the portalled panel.
+      ...chooseSelectOption('[data-interactable-browser-system]', 'lab-smithing'),
       // "Forge" matches exactly one smithing Tool — `sm-tool-tongs`, "Forge Tongs" — so the
-      // filtered list is ONE row rather than a shorter version of the same list.
-      { selector: '.fab-ib-controls input[type="search"]', fill: 'Forge' },
+      // filtered list is ONE row rather than a shorter version of the same list. The field is
+      // `ManagerSearchField` now; the hook rides its `inputAttrs`, because the rest spread
+      // belongs to the `<label>` and cannot reach the input.
+      { selector: '[data-interactable-browser-search]', fill: 'Forge' },
     ],
     expectSelector: '.fabricate-interactable-browser .fab-ib-list .fab-ib-row',
     kinds: ['canvas', 'interactables'],
@@ -12877,6 +12884,37 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
     ],
   }),
+  configCase({
+    id: 'interactables-config-source-open',
+    label: 'Interactable config — source picker open, portalled onto the window frame',
+    // `beyond`: the smoke never opens one of these panels, so there is no counterpart frame for
+    // this to fall short of and no label it could claim.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { interactable: 'configured' },
+    steps: [
+      // Expand the collapsed identity section, then open the crafting-system picker inside it.
+      { selector: '[data-interactable-identity-toggle]' },
+      { selector: '[data-interactable-identity-system]' },
+    ],
+    // THE ONE FRAME THAT PROVES THE PORTAL RESOLVES (issue 1520), and the `>` is the whole
+    // assertion. `resolveOverlayHost` walks `closest` for `.fabricate-manager` / `.fabricate-app`
+    // and `portal` does a bare `appendChild`, so a panel that found its window is a DIRECT CHILD
+    // of the frame element and a panel that did not is a direct child of `<body>`. The two are
+    // indistinguishable in a resting frame — the panel is not open — and nearly
+    // indistinguishable in an open one, because the fallback still draws the panel where its
+    // trigger is; what it loses is the window's stacking and its clip, plus a `console.error` per
+    // scroll tick. That is the exact defect adopting `.fabricate-app` at the frame exists to
+    // prevent, arriving through the conversion meant to modernise the control, and no other case
+    // in this registry opens a portalled surface in one of these three windows.
+    expectSelector:
+      '.fabricate-interactable-config-app > .fabricate-select-popover [data-popover-option]',
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/InteractableConfigRoot\.svelte$/,
+      /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
+    ],
+  }),
   interactablesManagerCase({
     id: 'interactables-manager-list',
     label: 'Manage Interactables — populated scene list',
@@ -12890,7 +12928,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     // here rather than publishing as a healthy list.
     expectSelector:
       '.fabricate-interactables-manager-body .fab-im-list .fab-im-row ' +
-      '.fab-im-row-actions .fab-im-action-delete',
+      '.fab-im-row-actions [data-interactable-manager-delete]',
     kinds: ['canvas', 'interactables'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/interactables\//,
@@ -12903,16 +12941,24 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'window',
     smokeLabels: ['interactables-manager-promote'],
     steps: [
-      { selector: '.fab-im-promote-toggle' },
+      { selector: '[data-interactable-manager-promote-toggle]' },
       // The one selection the panel cannot make for itself: the system and the source both
       // auto-pick through their own effects, and the region does not. Without it the panel
       // photographs with its confirm button disabled, which is the panel before it is usable
       // rather than the panel.
-      { selector: '.fab-im-promote label.fab-im-field:first-of-type select', select: 'deep-gate' },
+      //
+      // TWO STEPS for the reason the browser's system picker takes two (issue 1520): the region
+      // picker is `components/Select.svelte`, so there is no `<select>` to issue `selectOption`
+      // against. The old form addressed it POSITIONALLY — `label.fab-im-field:first-of-type
+      // select` — which would have silently moved to another picker had the panel's field order
+      // changed; the hook names the control instead.
+      ...chooseSelectOption('[data-interactable-manager-region]', 'deep-gate'),
     ],
     // `:not([disabled])` is the whole point of the step above: it asserts `canPromote`, which is
     // region AND system AND source, so an auto-pick that silently stopped working fails here.
-    expectSelector: '.fab-im-promote .fab-im-promote-confirm:not([disabled])',
+    expectSelector:
+      '[data-interactable-manager-promote] ' +
+      '[data-interactable-manager-promote-confirm]:not([disabled])',
     kinds: ['canvas', 'interactables'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/interactables\//,

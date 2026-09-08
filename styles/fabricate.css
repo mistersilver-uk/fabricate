@@ -20814,25 +20814,48 @@
    Manage Interactables panel (issue 335)
    ==========================================
    The GM-only scene panel that lists/manages every interactable on the scene and
-   promotes regions. The panel body + its element styles live here, namespaced
-   under the `.fabricate-interactables-manager` app-root class. This block carries
-   the custom-content button layout override (the panel renders icon+label and
-   icon-only buttons) and the panel layout. All colours use `var(--fab-*)` theme
-   tokens.
+   promotes regions. TWO RULES ARE LEFT HERE, and issue 1520 moved everything else.
+
+   The panel's whole PRIVATE element family — 28 rules over 29 selectors, for a header, a
+   toolbar, a promote card, three fieldsets, a list, its rows and their chips and actions — stood
+   here because the root carried no scoped `<style>` block and had nowhere else to put it.
+   (Its class prefix is deliberately not written anywhere in this file any more: the change's own
+   acceptance greps this sheet for that prefix and expects nothing back, and a mention in prose
+   is a hit a reviewer then has to adjudicate.) Every CONTROL in it is
+   a shared primitive's now, and the LAYOUT that survives moved into
+   `apps/interactables/InteractablesManagerRoot.svelte`'s own scoped block, which is what makes
+   the window host-independent rather than painted by an application class.
 
    An area-level focus-ring pair stood at the head of this block until issue 1520 deleted it.
    It was a copy of the module-rooted pair at the top of this sheet (issue 1501): this window's
    root emits `fabricate`, so the module pair already reaches every element the copy named, at
    the same (0,2,1) rank and with a wider element list. */
 
-/* Custom-content buttons (icon + label, and icon-only action buttons) must not be
-   centred/clipped by Foundry's global button rules — left-align content and let
-   the height grow to the content. */
+/* THE FOUNDRY HOST RESET, and what it reaches after the conversion.
+
+   `foundry2.css` declares `button { display: flex; justify-content: center }` and a FIXED
+   `height: var(--button-size)` in `@layer elements.forms`, so a window rendering its own
+   custom-content buttons has to left-align them and turn the fixed height back into a floor.
+
+   MEASURED at issue 1520: every `<button>` this window now renders is a shared primitive's, and
+   each one out-specifies this rule on all three declarations —
+   `.fabricate-icon-button.manager-icon-button` and `.fabricate-button.manager-button` at (0,2,0)
+   against this rule's (0,1,1), and the select trigger through
+   `.fabricate-select .fabricate-select-trigger-form`'s `min-height` at (0,2,0), with the other
+   two declarations identical to the ones it would inherit here. So it moves nothing today. It is
+   retained rather than deleted because it is the HOST reset for this window: a bare `<button>`
+   added to this panel by a later edit would otherwise be centred and clipped by core, which is
+   the defect this rule was written for and which no primitive can answer on its behalf. */
 .fabricate-interactables-manager button {
   justify-content: flex-start;
   height: auto;
   min-height: 1.75rem;
 }
+
+/* THE WINDOW'S SCROLL CONTAINMENT, which is the frame's contract rather than the panel's
+   content layout — the root fills `.window-content` and scrolls inside it. It stays in this
+   sheet, where the window's other frame-level rules are, and is the one `.fabricate-interactables-manager`
+   descendant rule issue 1520 did not move. Deleting it removes the panel's scrolling. */
 
 .fabricate-interactables-manager .fabricate-interactables-manager-body {
   display: flex;
@@ -20841,195 +20864,6 @@
   padding: var(--fab-space-3);
   height: 100%;
   overflow-y: auto;
-}
-
-.fabricate-interactables-manager .fab-im-header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-interactables-manager .fab-im-title {
-  margin: 0;
-  font-size: 1.1rem;
-}
-
-.fabricate-interactables-manager .fab-im-subtitle {
-  margin: 0;
-  font-size: 0.85rem;
-  opacity: 0.8;
-}
-
-.fabricate-interactables-manager .fab-im-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-interactables-manager .fab-im-promote-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  width: auto;
-  flex: 0 0 auto;
-  padding: var(--fab-space-2) var(--fab-space-3);
-}
-
-.fabricate-interactables-manager .fab-im-promote-toggle.is-active {
-  border-color: var(--fab-accent);
-}
-
-.fabricate-interactables-manager .fab-im-promote {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
-  border: 1px solid var(--fab-overlay-light-16);
-  border-radius: 6px;
-  background: var(--fab-overlay-light-06);
-}
-
-.fabricate-interactables-manager .fab-im-promote-hint {
-  margin: 0;
-  font-size: 0.85rem;
-  opacity: 0.8;
-}
-
-.fabricate-interactables-manager .fab-im-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-interactables-manager .fab-im-field-label {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  opacity: 0.7;
-}
-
-.fabricate-interactables-manager .fab-im-fieldset {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-3);
-  align-items: center;
-  margin: 0;
-  padding: var(--fab-space-2);
-  border: 1px solid var(--fab-overlay-light-16);
-  border-radius: 4px;
-}
-
-.fabricate-interactables-manager .fab-im-radio {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fab-space-1);
-  font-size: 0.9rem;
-}
-
-.fabricate-interactables-manager .fab-im-radio input {
-  width: auto;
-}
-
-.fabricate-interactables-manager .fab-im-promote-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-2);
-  margin-top: var(--fab-space-1);
-}
-
-.fabricate-interactables-manager .fab-im-promote-confirm,
-.fabricate-interactables-manager .fab-im-promote-cancel {
-  width: auto;
-  flex: 0 0 auto;
-  justify-content: center;
-  padding: var(--fab-space-2) var(--fab-space-3);
-}
-
-.fabricate-interactables-manager .fab-im-list-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-interactables-manager .fab-im-empty {
-  margin: 0;
-  font-size: 0.85rem;
-  opacity: 0.7;
-}
-
-.fabricate-interactables-manager .fab-im-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-interactables-manager .fab-im-row {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-overlay-light-16);
-  border-radius: 4px;
-}
-
-.fabricate-interactables-manager .fab-im-row-main {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-interactables-manager .fab-im-row-name {
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fabricate-interactables-manager .fab-im-row-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-interactables-manager .fab-im-chip {
-  font-size: 0.7rem;
-  padding: 0.05rem 0.4rem;
-  border-radius: 999px;
-  background: var(--fab-overlay-light-06);
-  border: 1px solid var(--fab-overlay-light-16);
-  white-space: nowrap;
-}
-
-.fabricate-interactables-manager .fab-im-chip-marker.is-missing {
-  color: var(--fab-danger);
-  border-color: var(--fab-danger);
-}
-
-.fabricate-interactables-manager .fab-im-chip-marker.is-region-only {
-  opacity: 0.7;
-}
-
-.fabricate-interactables-manager .fab-im-row-actions {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-1);
-}
-
-.fabricate-interactables-manager .fab-im-action {
-  width: 2rem;
-  flex: 0 0 auto;
-  justify-content: center;
-  padding: 0;
-}
-
-.fabricate-interactables-manager .fab-im-action-delete:hover {
-  color: var(--fab-danger);
 }
 
 /* ==========================================

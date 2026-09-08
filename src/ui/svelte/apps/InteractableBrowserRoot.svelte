@@ -29,6 +29,10 @@
     systemDisplayLabel,
     pickDefaultSystemId,
   } from '../util/systemDisambiguation.js';
+  import IconButton from '../components/IconButton.svelte';
+  import ManagerSearchField from '../components/ManagerSearchField.svelte';
+  import ManagerToolbar from '../components/ManagerToolbar.svelte';
+  import Select from '../components/Select.svelte';
 
   let { services = null } = $props();
 
@@ -47,6 +51,16 @@
   // Same-named systems are indistinguishable in the picker; build a label map that
   // appends a short id disambiguator ONLY to colliding names (issue 346).
   const systemLabels = $derived(buildSystemLabelMap(systems));
+
+  // THE SHARED SELECT'S OPTION VOCABULARY (issue 1520). `Select` takes an `options` array
+  // rather than `<option>` children, so the list is built here from exactly the source the
+  // native `<select>` iterated — including the disambiguated label, which is the whole reason
+  // this picker has a label map at all. There is NO leading empty row: the native control had
+  // none either, because `pickDefaultSystemId` guarantees a selection and "no system" is not a
+  // state this browser can show.
+  const systemSelectOptions = $derived(
+    systems.map((system) => ({ value: system.id, label: systemDisplayLabel(system, systemLabels) }))
+  );
 
   // True when a system has any placeable source (a Tool or a Gathering Task), so
   // the default selection prefers a source-bearing system over an empty duplicate.
@@ -203,32 +217,35 @@
     </p>
   </header>
 
-  <div class="fab-ib-controls">
-    <label class="fab-ib-field">
-      <span class="fab-ib-field-label"
-        >{text('FABRICATE.Canvas.Browser.SystemLabel', 'Crafting system')}</span
-      >
-      <select
-        bind:value={selectedSystemId}
-        aria-label={text('FABRICATE.Canvas.Browser.SystemLabel', 'Crafting system')}
-      >
-        {#each systems as system (system.id)}
-          <option value={system.id}>{systemDisplayLabel(system, systemLabels)}</option>
-        {/each}
-      </select>
-    </label>
-    <label class="fab-ib-field">
-      <span class="fab-ib-field-label"
-        >{text('FABRICATE.Canvas.Browser.SearchLabel', 'Search')}</span
-      >
-      <input
-        type="search"
-        bind:value={search}
-        placeholder={text('FABRICATE.Canvas.Browser.SearchPlaceholder', 'Search entries…')}
-        aria-label={text('FABRICATE.Canvas.Browser.SearchLabel', 'Search')}
-      />
-    </label>
-  </div>
+  <!-- THE CONTROL ROW IS THE SHARED FILTER BAR (issue 1520). `ManagerToolbar` is a `<section>`
+       landmark, so it needs its own accessible name and the source contract gates that; the
+       browser had no filter-bar string, so `FABRICATE.Canvas.Browser.FiltersLabel` is added
+       beside the manager browsers' own `Filters` keys rather than borrowing the window title,
+       which would announce the same name twice. -->
+  <ManagerToolbar
+    class="fab-ib-controls"
+    ariaLabel={text('FABRICATE.Canvas.Browser.FiltersLabel', 'Interactable browser filters')}
+  >
+    <Select
+      label={text('FABRICATE.Canvas.Browser.SystemLabel', 'Crafting system')}
+      value={selectedSystemId}
+      options={systemSelectOptions}
+      onChange={(next) => (selectedSystemId = next)}
+      triggerData={{ 'data-interactable-browser-system': '' }}
+    />
+    <!-- NO caption span beside it. The shared field is a search PILL with a leading glyph and
+         no visible label at any of its nineteen sites, and it names its control with
+         `ariaLabel` — so the uppercase caption span this row used to draw beside it would have
+         been a second, silent name for a control that already has one. (Written without its
+         class name: this file's source-shape suite pins the surviving `fab-ib` prefix
+         occurrences as an exact allow-list, and a mention in prose adds one.) -->
+    <ManagerSearchField
+      bind:value={search}
+      placeholder={text('FABRICATE.Canvas.Browser.SearchPlaceholder', 'Search entries…')}
+      ariaLabel={text('FABRICATE.Canvas.Browser.SearchLabel', 'Search')}
+      inputAttrs={{ 'data-interactable-browser-search': '' }}
+    />
+  </ManagerToolbar>
 
   {#if systems.length === 0}
     <p class="fab-ib-empty">
@@ -274,6 +291,20 @@
       </button>
     </div>
 
+    <!-- THE PANELS DECLARE THEIR KEYBOARD FOCUS (issue 1520). Both carry a static
+         `tabindex="0"` because the tab pattern moves focus INTO the panel on activation, and
+         each is its own scroll container — so a GM who tabs here and presses Down expects the
+         list to scroll. Without `data-keyboard-focus`, `KeyboardManager#hasFocus` returns
+         false for the focused panel and Foundry keeps its own bindings live: the arrows pan
+         the canvas underneath and Space pauses the game. These two elements are the whole of
+         `roleFocusTargets`' `InteractableBrowserRoot.svelte | 2` row; the two tab buttons above
+         are excluded from it twice over, by their roving `tabindex` expression and by the
+         declaration they already carry.
+
+         Do not write the tab role as a quoted attribute literal in a comment here: this file's
+         source-shape suite counts those occurrences and asserts exactly two, so a mention in
+         prose reds it. -->
+
     {#if activeTab === 'tools'}
       <div
         class="fab-ib-section"
@@ -281,6 +312,7 @@
         role="tabpanel"
         aria-labelledby="fab-ib-tab-tools"
         tabindex="0"
+        data-keyboard-focus="true"
       >
         {#if tools.length === 0}
           {#if search.trim()}
@@ -302,33 +334,28 @@
                 <img class="fab-ib-row-thumb" src={tool.img} alt="" />
                 <span class="fab-ib-row-label">{tool.label}</span>
                 <div class="fab-ib-row-actions">
-                  <button
-                    type="button"
-                    class="fab-ib-place"
-                    onclick={() => place('tool', tool.id)}
+                  <IconButton
+                    ariaLabel={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
                     title={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
-                    aria-label={text(
-                      'FABRICATE.Canvas.Browser.PlaceOnScene',
-                      'Place region + Tile'
-                    )}
+                    onclick={() => place('tool', tool.id)}
+                    data-interactable-browser-place=""
                   >
                     <i class="fas fa-cubes" aria-hidden="true"></i>
-                  </button>
-                  <button
-                    type="button"
-                    class="fab-ib-place-region"
-                    onclick={() => place('tool', tool.id, 'none')}
+                  </IconButton>
+                  <IconButton
+                    ariaLabel={text(
+                      'FABRICATE.Canvas.Browser.PlaceRegionOnly',
+                      'Place region only (no marker)'
+                    )}
                     title={text(
                       'FABRICATE.Canvas.Browser.PlaceRegionOnly',
                       'Place region only (no marker)'
                     )}
-                    aria-label={text(
-                      'FABRICATE.Canvas.Browser.PlaceRegionOnly',
-                      'Place region only (no marker)'
-                    )}
+                    onclick={() => place('tool', tool.id, 'none')}
+                    data-interactable-browser-place-region=""
                   >
                     <i class="fas fa-draw-polygon" aria-hidden="true"></i>
-                  </button>
+                  </IconButton>
                 </div>
               </li>
             {/each}
@@ -342,6 +369,7 @@
         role="tabpanel"
         aria-labelledby="fab-ib-tab-tasks"
         tabindex="0"
+        data-keyboard-focus="true"
       >
         {#if tasks.length === 0}
           {#if search.trim()}
@@ -367,33 +395,28 @@
                 {/if}
                 <span class="fab-ib-row-label">{task.label}</span>
                 <div class="fab-ib-row-actions">
-                  <button
-                    type="button"
-                    class="fab-ib-place"
-                    onclick={() => place('gatheringTask', task.id)}
+                  <IconButton
+                    ariaLabel={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
                     title={text('FABRICATE.Canvas.Browser.PlaceOnScene', 'Place region + Tile')}
-                    aria-label={text(
-                      'FABRICATE.Canvas.Browser.PlaceOnScene',
-                      'Place region + Tile'
-                    )}
+                    onclick={() => place('gatheringTask', task.id)}
+                    data-interactable-browser-place=""
                   >
                     <i class="fas fa-cubes" aria-hidden="true"></i>
-                  </button>
-                  <button
-                    type="button"
-                    class="fab-ib-place-region"
-                    onclick={() => place('gatheringTask', task.id, 'none')}
+                  </IconButton>
+                  <IconButton
+                    ariaLabel={text(
+                      'FABRICATE.Canvas.Browser.PlaceRegionOnly',
+                      'Place region only (no marker)'
+                    )}
                     title={text(
                       'FABRICATE.Canvas.Browser.PlaceRegionOnly',
                       'Place region only (no marker)'
                     )}
-                    aria-label={text(
-                      'FABRICATE.Canvas.Browser.PlaceRegionOnly',
-                      'Place region only (no marker)'
-                    )}
+                    onclick={() => place('gatheringTask', task.id, 'none')}
+                    data-interactable-browser-place-region=""
                   >
                     <i class="fas fa-draw-polygon" aria-hidden="true"></i>
-                  </button>
+                  </IconButton>
                 </div>
               </li>
             {/each}
@@ -405,6 +428,18 @@
 </div>
 
 <style>
+  /* WHAT SURVIVES IN THIS BLOCK, AND WHY (issue 1520).
+
+     The window's CONTROLS — the system picker, the search field, the filter row that holds
+     them and the four icon-only placement buttons — are shared primitives' now, so their rules
+     left with the markup that carried them. What is left is this window's own LAYOUT: the
+     scroll column, the header rhythm, the list and its rows, and the two-tab strip that is
+     still hand-rolled.
+
+     Two rules below reach a CHILD COMPONENT's element and are therefore `:global(...)`, each
+     anchored on `.fabricate-interactable-browser`, a class this file DOES write, so Svelte's
+     `svelte-<hash>` lands on that ancestor rather than on the primitive's own element — where
+     it would match nothing, silently, with `css.code` byte-identical and no compiler warning. */
   .fabricate-interactable-browser {
     display: flex;
     flex-direction: column;
@@ -412,6 +447,24 @@
     padding: 0.75rem;
     height: 100%;
     overflow-y: auto;
+  }
+
+  /* THE BAR SPANS THE WINDOW, which is what a filter bar is. `.fabricate-filter-bar.manager-toolbar`
+     draws its own padding, a soft fill and a bottom rule — a divider that reads as a mistake when
+     it stops 0.75rem short of both edges. The pull is exactly this column's own inline padding,
+     so the bar meets the window and the rows beneath it keep their inset. */
+  .fabricate-interactable-browser :global(.fab-ib-controls) {
+    margin-inline: -0.75rem;
+  }
+
+  /* THE PICKER STATES ITS OWN WIDTH, for the reason `Select.svelte` records: the shared select
+     declares no `width` and no `min-width`, because "the trigger's box is the one thing this API
+     does not address". A `<button>` hugs its content, so a system whose name is short would open
+     as a chip beside a 260px search field. `.fabricate-select-field` is the class the labelled
+     form's own `<Field>` emits. */
+  .fabricate-interactable-browser :global(.fab-ib-controls .fabricate-select-field) {
+    flex: 1 1 11rem;
+    min-width: 0;
   }
 
   .fab-ib-header {
@@ -425,34 +478,18 @@
     font-size: 1.1rem;
   }
 
+  /* THE MUTED READINGS ARE INKED, NOT FADED (issue 1520). These rules dimmed their text with
+     `opacity`, which fades the WHOLE element — its border and its background with it — and
+     produces a different colour on every surface it is drawn over. `--fab-text-muted` is the
+     published recessive ink and is what the shared primitives this window now renders use. */
   .fab-ib-hint {
     margin: 0;
+    color: var(--fab-text-muted);
     font-size: 0.85rem;
-    opacity: 0.8;
   }
 
   .fab-ib-hint-modifier {
     font-style: italic;
-  }
-
-  .fab-ib-controls {
-    display: flex;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-  }
-
-  .fab-ib-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    flex: 1 1 12rem;
-  }
-
-  .fab-ib-field-label {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    opacity: 0.7;
   }
 
   .fab-ib-section {
@@ -470,13 +507,19 @@
     gap: 0.3rem;
   }
 
+  /* 6px, not 4: 4 is off the radius ladder (0, 6, 7, 9, 11, 999, 50%) and this row is under the
+     24px band the 6px rung is published for. `--fab-border` replaces the core Foundry
+     light-tertiary border variable this rule read, which is undefined in any host without core's
+     own sheet and carries none of this module's theming. (The variable is named here in prose
+     rather than written out: the change's acceptance greps `src/` for that token and expects
+     nothing back, and a mention is a hit a reviewer then has to adjudicate.) */
   .fab-ib-row {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     padding: 0.4rem 0.5rem;
-    border: 1px solid var(--color-border-light-tertiary);
-    border-radius: 4px;
+    border: 1px solid var(--fab-border);
+    border-radius: 6px;
     cursor: grab;
   }
 
@@ -486,6 +529,11 @@
     `:global` keeps the selector specific (still `fab-ib-*`, no bleed) while
     silencing the warning. (Does not affect tests/styles-namespacing.test.js,
     which only scans styles/fabricate.css.)
+
+    THE ONE `opacity` THAT STAYS, and it is not a text mute: this fades the WHOLE row on
+    purpose, border and fill included, because that is what a drag ghost is. Swapping it for a
+    recessive ink would leave a fully drawn row that merely reads paler, which is the opposite
+    of the affordance.
   */
   :global(.fab-ib-row.fab-dragging) {
     opacity: 0.5;
@@ -493,16 +541,17 @@
 
   .fab-ib-row-icon {
     flex: 0 0 auto;
-    opacity: 0.75;
+    color: var(--fab-text-muted);
   }
 
+  /* 6px, not 3, for the ladder reason on `.fab-ib-row` above. */
   .fab-ib-row-thumb {
     flex: 0 0 auto;
     width: 1.5rem;
     height: 1.5rem;
     object-fit: cover;
     border: none;
-    border-radius: 3px;
+    border-radius: 6px;
   }
 
   .fab-ib-row-label {
@@ -519,26 +568,23 @@
     gap: 0.3rem;
   }
 
-  /* Icon-only placement buttons — both size as a 2rem square (padding 0) so the
-     cubes "place region + Tile" button matches the vector-square region-only one. */
-  .fab-ib-place,
-  .fab-ib-place-region {
-    flex: 0 0 auto;
-    width: 2rem;
-    padding: 0;
-  }
+  /* Tab switcher (Tools / Gathering Tasks) — segmented control styling.
 
-  .fab-ib-place:focus-visible,
-  .fab-ib-place-region:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
+     THE RESIDUE THIS PHASE DELIBERATELY DOES NOT CONVERT, and the reason is the ARIA pattern
+     rather than where the primitive lives. `SegmentedControl` is a radiogroup of real radios;
+     this strip is a tablist of tab buttons driving two tabpanel containers by `aria-controls`,
+     with a roving `tabindex` and Left/Right/Home/End. Swapping one for the other is a behaviour
+     change to the keyboard contract, not a re-skin, so it is owed to a change that rules on the
+     pattern. Its `opacity` mutes are inked here anyway, because that debt is independent of the
+     pattern.
 
-  /* Tab switcher (Tools / Gathering Tasks) — segmented control styling. */
+     The role names are written unquoted above on purpose: this file's source-shape suite counts
+     the quoted attribute literals and asserts exactly two of each, so a mention in prose reds
+     it. */
   .fab-ib-tabs {
     display: flex;
     gap: 0.25rem;
-    border-bottom: 1px solid var(--color-border-light-tertiary);
+    border-bottom: 1px solid var(--fab-border);
   }
 
   .fab-ib-tab {
@@ -547,16 +593,16 @@
     padding: 0.35rem 0.85rem;
     border: none;
     border-bottom: 2px solid transparent;
-    border-radius: 4px 4px 0 0;
+    border-radius: 6px 6px 0 0;
     background: transparent;
+    color: var(--fab-text-muted);
     cursor: pointer;
     white-space: nowrap;
-    opacity: 0.7;
   }
 
   .fab-ib-tab.is-active {
     border-bottom-color: var(--fab-accent);
-    opacity: 1;
+    color: var(--fab-text);
     font-weight: 600;
   }
 
@@ -567,7 +613,7 @@
 
   .fab-ib-empty {
     margin: 0;
+    color: var(--fab-text-muted);
     font-size: 0.85rem;
-    opacity: 0.7;
   }
 </style>
