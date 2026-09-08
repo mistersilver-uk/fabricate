@@ -366,6 +366,7 @@ The keyboard is moved FIRST and the sentence is announced BEHIND it, never the o
 A polite announcement is queued speech and a focus change cancels queued speech, so a sentence written into the region before the hop is a sentence the GM may never hear — which is the original silence, with a working focus hop concealing it.
 When no focus move happens the sentence is announced immediately, since there is then nothing for it to queue behind.
 This ordering governs every live region paired with a focus move in this specification, including the delete card's own outcome.
+The validation surface's row action, which moves focus to a validation issue's destination control and then announces where the GM landed, is a caller of this ordering too.
 
 A bulk edit panel may render a sibling card after the shell.
 Apply's dock then clamps to the panel's own box rather than to the rail's bottom edge, and that is accepted.
