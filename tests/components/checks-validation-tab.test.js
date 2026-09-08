@@ -441,18 +441,43 @@ describe('every Checks address the producer emits is carried by a real control',
     );
   });
 
-  it('gives the set-level destination the focusability a real browser needs', () => {
-    // THE MUTATION THIS EXISTS FOR: happy-dom focuses anything, so a mounted assertion that the
-    // trigger list took focus passes even with the tabindex deleted, while a real browser would
-    // have done nothing. The attribute is read off the SOURCE for that reason, and the Foundry
-    // keyboard declaration is read with it — without it Space pauses the game and the arrows
-    // pan the canvas behind the open application.
-    const triggers = sourceOf('checks/CheckTriggers.svelte');
-    const stamp = triggers.indexOf('data-validation-target="checks-triggers"');
-    assert.ok(stamp >= 0, 'the trigger list carries the address');
-    const element = triggers.slice(stamp, stamp + 200);
-    assert.match(element, /tabindex="-1"/u, 'a div takes focus only with an explicit tabindex');
-    assert.match(element, /data-keyboard-focus="true"/u, 'and must declare itself to Foundry');
+  it('stamps every address on an element that can REALLY take focus', () => {
+    // THE MUTATION THIS EXISTS FOR, and it is the one a mounted assertion cannot see: happy-dom
+    // focuses anything — `.focus()` on a bare `<div>` sets `document.activeElement` — so moving
+    // a stamp off the field control and onto its wrapper leaves every mounted clause passing
+    // while a real browser focuses nothing and `focusValidationTarget` refuses the target. The
+    // element carrying each address is therefore read off the SOURCE: either it is one of the
+    // tags that take focus with no `tabindex` of their own, or it declares BOTH the `tabindex`
+    // that makes the focus real and the `data-keyboard-focus` that tells Foundry the window is
+    // focused — without the second, Space pauses the game and the arrows pan the canvas.
+    const NATIVELY_FOCUSABLE = new Set(['input', 'button', 'select', 'textarea']);
+    const offenders = [];
+    for (const [address, file] of Object.entries(DESTINATIONS)) {
+      const source = sourceOf(file);
+      const stamp = source.indexOf(`data-validation-target="${address}"`);
+      if (stamp === -1) {
+        offenders.push(`${address}: ${file} carries no such stamp`);
+        continue;
+      }
+      // The element the stamp rides: back to the nearest tag opening, forward to its close.
+      const opening = source.slice(0, stamp).lastIndexOf('<');
+      const element = source.slice(opening, source.indexOf('>', stamp) + 1);
+      const tag = (/^<([a-zA-Z][\w-]*)/u.exec(element) ?? [])[1] || '';
+      if (NATIVELY_FOCUSABLE.has(tag.toLowerCase())) continue;
+      if (!/tabindex="-1"/u.test(element)) {
+        offenders.push(`${address}: <${tag}> in ${file} takes focus from nothing — no tabindex`);
+        continue;
+      }
+      if (!/data-keyboard-focus="true"/u.test(element)) {
+        offenders.push(`${address}: <${tag}> in ${file} does not declare itself focused`);
+      }
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      'a validation row addresses one of these, and the element it resolves to cannot hold ' +
+        'focus, so the action would change route and focus nothing:\n  ' + offenders.join('\n  ')
+    );
   });
 });
 
