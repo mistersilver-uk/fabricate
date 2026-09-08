@@ -48,6 +48,12 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   'src/ui/svelte/actions/anchoredPopover.js',
   'src/ui/svelte/util/overlayBounds.js',
   'src/ui/svelte/apps/manager/checks/checksReadiness.js',
+  // The Validation route's focus half (issue 1517). `ChecksView` awaits it after opening the
+  // activity a validation row names, so it is in the STATIC import graph of every suite that
+  // mounts the studio root — `check-preview-mounted`, `checks-modifier-catalogue-mounted` and
+  // the must-not-regress characterization suite. Mechanical, like the rest of this manifest:
+  // omit it and the harness's own closure validator refuses to set those suites up at all.
+  'src/ui/svelte/apps/manager/validationFocus.js',
   // The ONE copy map (issue 1096): the Validation route and the section-level Callout both
   // render an issue's sentence from it, so both halves of the checks tree import it.
   'src/ui/svelte/apps/manager/checks/checksCopy.js',

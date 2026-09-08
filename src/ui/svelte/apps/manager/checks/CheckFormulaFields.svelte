@@ -144,8 +144,14 @@
        visible label repeating it. -->
   <div class="manager-checks-formula-input">
     <i class="fas fa-dice-d20" aria-hidden="true"></i>
+    <!-- THE CONTROL HALF of the Validation route's row action (issue 1517). All three roll
+         issues — no formula, and the two retired-placeholder ones — are about THIS field, and
+         it is the roll section's first control in every editor that renders the section, so
+         `ChecksValidationTab` addresses it as `checks-roll-formula`. An `<input>` is natively
+         focusable, so it needs no `tabindex` and no keyboard-focus declaration. -->
     <input
       data-check-roll-formula
+      data-validation-target="checks-roll-formula"
       aria-label={formulaLabel}
       value={rollFormula || ''}
       {placeholder}

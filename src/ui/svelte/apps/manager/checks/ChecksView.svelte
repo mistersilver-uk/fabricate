@@ -60,6 +60,7 @@
   } from './checksReadiness.js';
   import Callout from '../Callout.svelte';
   import CheckModeCallout from './CheckModeCallout.svelte';
+  import { focusValidationTarget } from '../validationFocus.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import { checkIssueCopy, interpolate } from './checksCopy.js';
   import {
@@ -755,10 +756,76 @@
     })
   );
 
-  /** Deep-link from the Validation route to the control that raised an issue. */
-  function selectIssue(target) {
+  // ── THE VALIDATION ROW ACTION (issue 1517) ──────────────────────────────────────────────
+  //
+  // This studio's own root, so `focusValidationTarget` resolves a `data-validation-target`
+  // inside THIS route rather than anywhere in the manager window.
+  let checksRoot = $state(null);
+
+  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME, not a count. Activating a row action
+  // changes no tally, so a count-subjected region would recite an unchanged number at the
+  // moment a GM most needs to know where they landed.
+  let issueAnnouncement = $state('');
+
+  /** The activity's own name, from the rail's key, so one word is not spelt two ways. */
+  function activityLabel(id) {
+    const key = `FABRICATE.Admin.Manager.Checks.Tabs.${id[0].toUpperCase()}${id.slice(1)}`;
+    return text(key, id);
+  }
+
+  /** The section's own name, from the strip's table for the same reason. */
+  function sectionLabel(id) {
+    const meta = SECTION_META[id];
+    if (!meta) return '';
+    return text(`FABRICATE.Admin.Manager.Checks.Sections.${meta.labelKey}`, meta.labelFallback);
+  }
+
+  /**
+   * The focused control's own accessible name, read off the DOM. `aria-label` first, then the
+   * `<label for>` that names it, then `title`. A destination with none of the three — the
+   * trigger list, say — yields '' and the announcement names the route alone.
+   *
+   * @param {Element|null} element
+   * @returns {string}
+   */
+  function accessibleNameOf(element) {
+    if (!element) return '';
+    const label = element.getAttribute('aria-label');
+    if (label) return label.trim();
+    const id = element.getAttribute('id');
+    const labelling = id ? checksRoot?.querySelector(`label[for="${id}"]`) : null;
+    if (labelling) return (labelling.textContent || '').trim();
+    return (element.getAttribute('title') || '').trim();
+  }
+
+  /**
+   * Deep-link from the Validation route to the control that raised an issue: open the ACTIVITY
+   * and the SECTION that own the gap, THEN move focus to the offending control.
+   *
+   * THE ORDER IS THE MECHANISM, not a preference. `onOpenActivity` is the router's own
+   * synchronous state write — the same one the rail's click makes — so Svelte has flushed the
+   * route change and the destination panel exists by the time the helper's `queueMicrotask`
+   * runs its query. And the announcement is derived FROM the element the helper resolves, so
+   * it cannot be written before focus moved: there is nothing to write it from.
+   *
+   * A ROUTE-ONLY ROW IS NORMAL HERE. Eleven of the sixteen registered issues carry no control
+   * address — see the table in `ChecksValidationTab.svelte` — so the helper resolves `null`,
+   * focus stays put and the announcement names the route it opened, which is still the answer
+   * to "where did I just go".
+   *
+   * @param {{activity?: string, section?: string}} target the ROUTE the row carries.
+   * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
+   */
+  async function selectIssue(target, focusTarget) {
     if (!target?.activity) return;
-    onOpenActivity(target.activity, target.section || 'roll');
+    const section = target.section || 'roll';
+    onOpenActivity(target.activity, section);
+    const focused = await focusValidationTarget(checksRoot, focusTarget);
+    const route = [activityLabel(target.activity), sectionLabel(section)]
+      .filter(Boolean)
+      .join(' — ');
+    const controlName = accessibleNameOf(focused);
+    issueAnnouncement = controlName ? `${route} — ${controlName}` : route;
   }
 
   const configTitle = text('FABRICATE.Admin.Manager.Checks.Configuration', 'Configuration');
@@ -1547,7 +1614,30 @@
   />
 {/snippet}
 
-<div class="manager-environment-edit-view" data-environment-editor data-checks-editor>
+<div
+  class="manager-environment-edit-view"
+  data-environment-editor
+  data-checks-editor
+  bind:this={checksRoot}
+>
+  <!--
+    THE ROW ACTION'S LIVE REGION, and it is HOSTED HERE rather than in the validation surface
+    for a reason that is not stylistic (issue 1517). Activating a row action routes to another
+    ACTIVITY, which unmounts the whole validation panel — live region included — in the same
+    update that was supposed to announce. So the element carrying `aria-live` is ALWAYS in the
+    DOM, outside the `{#if activity === 'validation'}` chain below, with its own `{#if}` INSIDE
+    it.
+
+    A THIRD CHILD OF THIS TWO-ROW GRID IS SAFE, which is worth saying because it would not be
+    if the element were in flow: `.visually-hidden` is `position: absolute`, so it is not a
+    grid item at all and consumes no track of `grid-template-rows: auto minmax(0, 1fr)`.
+
+    It wears the shipped `.visually-hidden` utility, rooted at the MODULE, and is addressed by
+    a `data-` hook rather than a class, so it joins no pinned class family.
+  -->
+  <div class="visually-hidden" role="status" aria-live="polite" data-checks-issue-announcement>
+    {#if issueAnnouncement}{issueAnnouncement}{/if}
+  </div>
   {#if activity !== 'validation'}
     <ChecksEditorTabs
       {sections}

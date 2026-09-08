@@ -85,6 +85,68 @@
     return { passing, warnings, blocking };
   });
 
+  /**
+   * WHICH CONTROL EACH ISSUE NAMES — the `data-validation-target` half of a row's address
+   * (issue 1517), keyed by ISSUE ID rather than by section.
+   *
+   * A row's `target` is the ROUTE (`{ activity, section }`, resolved through the one
+   * `CHECK_ISSUE_SECTIONS` map the section dots and the rail badge also read) and this is the
+   * CONTROL the GM has to reach once that route has opened. Keyed by issue id because a
+   * section is not one control: `roll` renders the formula field and the Difficulty card, and
+   * only the formula field is ever the offender.
+   *
+   * ROUTE-ONLY IS A STATED OUTCOME, NEVER A SILENT ONE. A row with no entry here still renders
+   * a View button and still changes route; it simply focuses nothing, and the mounted suite
+   * asserts which of the two shapes a given row is, so an address going missing reds rather
+   * than degrading into a tab switch nobody notices. Every one of the sixteen registered issue
+   * ids is accounted for below, with the reason where there is no control to name:
+   *
+   *  | issue id                        | section   | address              |
+   *  |---------------------------------|-----------|----------------------|
+   *  | noRollFormula                   | roll      | checks-roll-formula  |
+   *  | retiredPlaceholderBreaksFormula | roll      | checks-roll-formula  |
+   *  | retiredPlaceholderInFormula     | roll      | checks-roll-formula  |
+   *  | danglingTierStepTarget          | triggers  | checks-triggers      |
+   *  | multipleTierStepTargets         | triggers  | checks-triggers      |
+   *  | unnamedOutcome                  | outcomes  | route-only (a)       |
+   *  | noSuccessOutcome                | outcomes  | route-only (a)       |
+   *  | rangeInvalid                    | outcomes  | route-only (a)       |
+   *  | rangeOverlap                    | outcomes  | route-only (a)       |
+   *  | rangeGap                        | outcomes  | route-only (a)       |
+   *  | modifierBoundsInverted          | modifiers | route-only (b)       |
+   *  | modifierBoundsUnsafe            | modifiers | route-only (b)       |
+   *  | modifierExpressionInvalid       | modifiers | route-only (b)       |
+   *  | modifiersInertNoCheck           | modifiers | route-only (c)       |
+   *  | modifiersInertNoModifierSupport | modifiers | route-only (c)       |
+   *  | modifiersInertNoFormula         | modifiers | route-only (c)       |
+   *
+   * (a) The Outcomes section's tier rows are authored INLINE in the routed and simple check
+   *     editors, which are not this change's to stamp; each of the five is about one tier
+   *     among several anyway, and the row carries no tier id to pick it out with.
+   * (b) The offending control is a row of the modifier catalogue card, again one row among
+   *     several, and the issue names the modifiers in its own sentence instead.
+   * (c) These three say the SELECTION cannot reach a roll at all — the remedy is the mode or
+   *     the formula, not a control on the section the row routes to — so there is nothing on
+   *     the destination to point at.
+   *
+   * The two addresses, and the files that carry them:
+   *
+   *  - `checks-roll-formula` -> `CheckFormulaFields.svelte`, the roll formula input
+   *  - `checks-triggers`     -> `CheckTriggers.svelte`, the trigger list itself, which is a
+   *                             SET-level destination: both trigger issues are about the tier
+   *                             targets across the whole list, and each trigger's own tier
+   *                             control sits inside a collapsed disclosure.
+   *
+   * @type {Readonly<Record<string, string>>}
+   */
+  const CHECK_ISSUE_CONTROLS = Object.freeze({
+    noRollFormula: 'checks-roll-formula',
+    retiredPlaceholderBreaksFormula: 'checks-roll-formula',
+    retiredPlaceholderInFormula: 'checks-roll-formula',
+    danglingTierStepTarget: 'checks-triggers',
+    multipleTierStepTargets: 'checks-triggers',
+  });
+
   // ONE row per check tick and per issue, BUILT in that order, so a group reads as "what holds"
   // followed by "what does not". An issue's row carries the deep-link target; a satisfied
   // tick has nowhere to go.
@@ -117,6 +179,11 @@
         title: issueTitle(issue.id, issue.data),
         status: issue.severity === 'critical' ? 'block' : 'warn',
         target: { activity: subsystem, section: sectionForIssue(issue.id) },
+        // NO KEY rather than an empty one for a route-only row: the host treats any non-empty
+        // string as a control it must resolve, so a `focusTarget: ''` would ask it to query
+        // for something that cannot exist and the row would report as focus-wired while
+        // focusing nothing.
+        ...(CHECK_ISSUE_CONTROLS[issue.id] ? { focusTarget: CHECK_ISSUE_CONTROLS[issue.id] } : {}),
         dataAttrs: {
           'data-subsystem': subsystem,
           'data-issue': issue.id,
