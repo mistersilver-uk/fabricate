@@ -4391,6 +4391,7 @@
           },
           "Validation": {
             "Title": "Validation",
+            "Intro": "An environment saves even while incomplete, but only enables when every blocking issue is cleared.",
             "Readiness": "Environment readiness",
             "Issues": "Issues",
             "NoIssues": "No issues detected.",
@@ -4414,9 +4415,20 @@
             "ViewEvent": "View event",
             "Severity": {
               "critical": "Critical",
-              "warning": "Warning",
-              "info": "Info"
-            }
+              "warning": "Warning"
+            },
+            "SummaryAllClear": "All clear",
+            "SummaryAllClearSub": "Every readiness check passes. Ready to enable.",
+            "SummaryWarnings": "Enabled with warnings",
+            "SummaryWarningsSub": "Saves and enables — review the warnings when you can.",
+            "SummaryBlocked": "Cannot be enabled",
+            "SummaryBlockedSub": "Clear every blocking issue before this environment can be enabled.",
+            "CountPassing": "Passing",
+            "CountWarnings": "Warnings",
+            "CountBlocking": "Blocking",
+            "StatusPass": "Pass",
+            "StatusWarn": "Warning",
+            "StatusBlock": "Blocks enable"
           },
           "Tasks": {
             "Title": "Tasks",

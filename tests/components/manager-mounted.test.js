@@ -22613,6 +22613,56 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
+    // THE TAB IS THE SHARED SURFACE AS OF ISSUE 1517, and this block is the deep link's
+    // coverage RE-EXPRESSED through the surface's hooks rather than replaced. Every assertion
+    // below the fixture is the one that was here before; these four are what the conversion
+    // added, and each is a claim the old markup could not make.
+    //
+    // The site's own root hook is what makes the rest of them addressable: `data-environment-tab`
+    // travels through `hookAttrs.root`, so the View Lab case that opens this tab, the tab-panel
+    // selectors below and this line all still resolve. `data-editor-validation-surface` is the
+    // primitive's own, emitted ALONGSIDE it rather than instead of it.
+    const surface = target.querySelector('[data-environment-tab="validation"]');
+    assert.ok(
+      surface.hasAttribute('data-editor-validation-surface'),
+      'the validation tab renders through EditorValidationSurface'
+    );
+    assert.equal(
+      surface
+        .querySelector('[data-editor-validation-summary]')
+        .getAttribute('data-editor-validation-summary'),
+      'warn',
+      'three warnings and no blocking issue is the warn verdict'
+    );
+    assert.deepEqual(
+      Array.from(surface.querySelectorAll('[data-editor-validation-count]')).map((tile) => [
+        tile.getAttribute('data-editor-validation-count'),
+        tile.textContent.trim(),
+      ]),
+      [
+        ['passing', '6'],
+        ['warnings', '3'],
+        ['blocking', '0'],
+      ],
+      'the counts rail reports six satisfied checks and the three issues, none of them blocking'
+    );
+
+    // `info` COLLAPSES TO `warn` IN THIS TAB'S ROW BUILDER, and both halves are asserted. The
+    // ROW takes the amber word because the surface has only three; the row's own hook keeps the
+    // DOMAIN severity `environmentReadiness.js` emitted, which is unedited. Fed `info` verbatim
+    // the row would fall through to `statusIcons.pass` — a green tick beside a note saying the
+    // record composes anyway — and its pill would render the literal string `undefined`.
+    const staleRow = surface.querySelector('[data-issue="staleIncluded"]');
+    assert.ok(Boolean(staleRow), 'the not-matching included event still raises its note');
+    assert.ok(
+      staleRow.classList.contains('is-warn'),
+      `the info note takes the warn row word, got ${staleRow.className}`
+    );
+    assert.equal(
+      staleRow.getAttribute('data-issue-severity'),
+      'info',
+      'the domain severity is unchanged on the row hook'
+    );
     // Selected by the control's OWN hook rather than by its label text (issue 1118). The
     // bespoke `manager-environment-issue-action` class it used to be found by styled nothing
     // in any theme — it was a test selector wearing a style class's clothes — and matching on
@@ -22633,6 +22683,15 @@ describe('CraftingSystemManager mounted behavior', () => {
       assert.ok(
         action.classList.contains('is-ghost'),
         `the View ${kind} link takes the ghost role, got ${action.className}`
+      );
+      // TWO VERBS DOWN ONE LIST, which is what `row.viewLabel` exists for: the surface's own
+      // `viewLabel` is a single scalar, so a conversion that ignored the per-row override would
+      // announce both deep links as one word. The harness localizer is the identity, so the
+      // rendered text IS the key each row carried — which is the sharpest available form of this
+      // assertion, because a collapsed label would show one key on both.
+      assert.ok(
+        action.textContent.includes(kind === 'event' ? 'ViewEvent' : 'ViewTask'),
+        `the View ${kind} link keeps its own verb, got ${action.textContent.trim()}`
       );
     }
 

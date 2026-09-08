@@ -200,7 +200,20 @@
  * 243 across 119 rows. The rule count rises by one and the key and singleton counts each rise by
  * six, which is the plain shape: one added rule, six added keys, none of them shared.
  *
- * ISSUE 1509 PHASE 4 IS THE FIRST OF THIS CHANGE'S PHASES TO RE-KEY A ROW, AND IT RE-KEYS EXACTLY
+ * ISSUE 1517 PHASE 6 RE-KEYED NO ROW AND MOVED THE THREE CONTEXTUAL FIGURES DOWNWARD, which is
+ * the mirror of Phase 3 above: it deletes EIGHT rule blocks of twelve selectors and adds none.
+ * The blocks are the environment editor Validation tab own family — its issue list, its check
+ * list, its check rows and their two satisfied/unsatisfied glyph re-tones, its issue row and
+ * that row title — plus the dead `manager-environment-layer` family that shared three of those
+ * selector lists and was the reason a dead family survived a dead-rule sweep at all. The tab was
+ * converted onto `EditorValidationSurface`, so every class the blocks named stopped being
+ * emitted, and `styles-dead-classes.test.js` named all eight before the deletion.
+ *
+ * All twelve are singletons in both keyings, measured rather than assumed, because no rule
+ * outside that family names any of those classes: the rule count falls by eight, the key and
+ * singleton counts each fall by twelve, and `pinnedTotal` STAYS 243 across 119 rows. Re-derived
+ * by running the census, not predicted from the diff.
+ * * ISSUE 1509 PHASE 4 IS THE FIRST OF THIS CHANGE'S PHASES TO RE-KEY A ROW, AND IT RE-KEYS EXACTLY
  * ONE. Rooting `ToggleCard` at `fabricate-toggle-card` rewrites the leading compound of ten
  * selectors and rooting `ItemDropZone` at `fabricate-link-field` rewrites fifteen more, and of
  * those twenty-five exactly one is a repeated key: `.manager-item-drop-zone-copy small`, which the

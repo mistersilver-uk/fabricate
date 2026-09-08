@@ -1,8 +1,48 @@
 <!-- Svelte 5 runes mode -->
+<!--
+  The environment editor's Validation tab, on the shared `EditorValidationSurface` (issue 1517).
+
+  It was the last hand-rolled validation screen in the manager: two bordered cards, a tick/cross
+  check list and a severity-chipped issue list, with no verdict and no counts. That arrangement was
+  ADJUDICATED at issue 1444 as a different surface rather than an unconverted one, and issue 1517
+  overturns that ruling deliberately — `spec.md`'s "Validation is one screen everywhere" now asks
+  for the same verdict, the same counts rail and the same grouped rows on every editor, so a second
+  arrangement here is the thing the requirement forbids rather than an exemption from it. The
+  overturn is recorded where the old ruling lived, in `scripts/lib/designSystemPrimitives.js`.
+
+  ── THREE THINGS THE ADOPTION HAD TO ANSWER ──────────────────────────────────────────────────
+
+  (a) `severity: 'info'` HAS NO HOME IN THE ROW VOCABULARY, so it collapses to `warn` HERE.
+  `environmentReadiness.js` emits `info` for the two notes that state a fact without grading it —
+  a picked record that does not match, and a locally excluded one — and the surface's row words are
+  `pass | warn | block` only. Fed `info` verbatim the row would draw a GREEN TICK beside "composes
+  anyway" and a pill reading `undefined`. The collapse is a PRESENTATION mapping in this file,
+  exactly where `checks/ChecksValidationTab` maps `critical` to `block`; `environmentReadiness.js`
+  is not edited, because `info` is still the right domain severity and the tab badge counts read
+  it. The two notes are therefore amber and they feed the Warnings count. The count vocabulary is
+  closed, so there is no Info tile and none is invented.
+
+  (b) TWO VERBS DOWN ONE LIST. The deep link says "View task" beside "View event", and the
+  surface's `viewLabel` is a single scalar — so a naive conversion would replace two distinct
+  accessible names with one "View". Each row carries its own `viewLabel` KEY instead, which the
+  surface prefers over its default. Both `lang/en.json` keys keep their consumer and both names
+  survive.
+
+  (c) `onSelectRecord(kind, id)` TAKES TWO ARGUMENTS. That is what the surface's two-field row
+  contract is for: `target` is the ROUTE and `focusTarget` the CONTROL, passed positionally, so
+  this tab spends them as its own `(kind, recordId)` pair with no adapter and no composite string.
+  The reuse is deliberate rather than a type violation — this deep link OPENS A DIFFERENT RECORD
+  on another tab; it is not the focus move the other five surfaces wire, and there is no control
+  on this tab to move focus to.
+
+  Only an issue that names a record carries either field, so the View button renders on exactly
+  the rows it rendered before. `viewDataAttr` carries the route, which reproduces
+  `data-environment-issue-action="task"` and `="event"` verbatim — the `data-` prefix is part of
+  the prop's VALUE, because the surface uses it as the whole attribute name.
+-->
 <script>
+  import EditorValidationSurface from '../../../components/EditorValidationSurface.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import Chip from '../../../components/Chip.svelte';
-  import ManagerButton from '../../../components/ManagerButton.svelte';
   import { evaluateEnvironmentReadiness } from './environmentReadiness.js';
 
   let { environment = null, composition = { counts: {} }, onSelectRecord = () => {} } = $props();
@@ -12,21 +52,7 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // Issue severity is this surface's vocabulary; `Chip` names colour families. `info`
-  // deliberately maps to the receding NEUTRAL tone rather than the informational blue,
-  // preserving what the hand-rolled chip rendered.
-  function severityTone(severity) {
-    if (severity === 'critical') return 'danger';
-    if (severity === 'warning') return 'warning';
-    return 'neutral';
-  }
-
   const readiness = $derived(evaluateEnvironmentReadiness(environment || {}, composition || {}));
-  const issuesBy = $derived({
-    critical: readiness.issues.filter((issue) => issue.severity === 'critical'),
-    warning: readiness.issues.filter((issue) => issue.severity === 'warning'),
-    info: readiness.issues.filter((issue) => issue.severity === 'info'),
-  });
 
   const CHECK_LABELS = {
     hasName: ['CheckName', 'Has a name'],
@@ -70,13 +96,23 @@
     },
   };
 
+  /** The two verbs the deep link renders, as keys the surface resolves per row. */
+  const VIEW_LABEL_KEYS = {
+    task: 'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewTask',
+    event: 'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewEvent',
+  };
+
+  function recordKind(issue) {
+    return issue.recordKind === 'event' ? 'event' : 'task';
+  }
+
   function checkLabel(id) {
     const meta = CHECK_LABELS[id] || [id, id];
     return text(`FABRICATE.Admin.Manager.EnvironmentEditor.Validation.${meta[0]}`, meta[1]);
   }
   function issueTitle(issue) {
-    const recordKind = issue.recordKind === 'event' ? 'event' : 'task';
-    const recordMeta = issue.recordName ? RECORD_ISSUE_LABELS[issue.id]?.[recordKind] : null;
+    const kind = recordKind(issue);
+    const recordMeta = issue.recordName ? RECORD_ISSUE_LABELS[issue.id]?.[kind] : null;
     if (recordMeta) {
       return text(
         `FABRICATE.Admin.Manager.EnvironmentEditor.Validation.${recordMeta[0]}`,
@@ -86,95 +122,170 @@
     const meta = ISSUE_LABELS[issue.id] || [issue.id, issue.id];
     const base = text(`FABRICATE.Admin.Manager.EnvironmentEditor.Validation.${meta[0]}`, meta[1]);
     return issue.recordName
-      ? `${recordKind === 'event' ? 'Event' : 'Task'} "${issue.recordName}": ${base}`
+      ? `${kind === 'event' ? 'Event' : 'Task'} "${issue.recordName}": ${base}`
       : base;
   }
-</script>
 
-<section
-  class="manager-environment-tab manager-environment-validation"
-  data-environment-tab="validation"
-  aria-label={text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Title', 'Validation')}
->
-  <section class="manager-environment-card" data-validation-section="readiness">
-    <h3 class="manager-card-title">
-      {text(
+  /**
+   * One issue's ROW status. See (a) in the header: `info` is not a row word, and collapsing it to
+   * `pass` would put a green tick beside a note that says something composes anyway.
+   *
+   * @param {string} severity the domain severity, unchanged on the row's own `data-` hook
+   * @returns {string} one of the surface's three row words
+   */
+  function issueStatus(severity) {
+    return severity === 'critical' ? 'block' : 'warn';
+  }
+
+  const counts = $derived({
+    passing: readiness.checks.filter((check) => check.satisfied).length,
+    warnings: readiness.issues.filter((issue) => issue.severity !== 'critical').length,
+    blocking: readiness.issues.filter((issue) => issue.severity === 'critical').length,
+  });
+
+  const readinessRows = $derived(
+    readiness.checks.map((check) => ({
+      id: check.id,
+      title: checkLabel(check.id),
+      status: check.satisfied ? 'pass' : 'warn',
+      dataAttrs: { 'data-satisfied': String(check.satisfied) },
+    }))
+  );
+
+  // A ROW ID IS UNIQUE WITHIN ITS GROUP, which is a constraint the card list did not have: the
+  // surface keys each row by `group-id`, and two issue ids repeat by design — one `staleIncluded`
+  // per non-matching record and one `taskNoDescription` per undescribed task. The record id
+  // disambiguates them; the `data-issue` hook keeps the bare issue id, which is what selectors
+  // and the smoke harness read.
+  //
+  // A GROUP WITH NO ROWS STILL STATES ITS RESULT. An empty issue list used to say "No issues
+  // detected." in so many words, and a filtered-away group would replace that with a heading over
+  // nothing — so the sentence becomes a passing row rather than disappearing.
+  const issueRows = $derived.by(() => {
+    if (readiness.issues.length === 0) {
+      return [
+        {
+          id: 'noIssues',
+          title: text(
+            'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.NoIssues',
+            'No issues detected.'
+          ),
+          status: 'pass',
+          dataAttrs: { 'data-environment-no-issues': '' },
+        },
+      ];
+    }
+    return readiness.issues.map((issue) => {
+      const kind = recordKind(issue);
+      return {
+        id: issue.recordId ? `${issue.id}-${issue.recordId}` : issue.id,
+        title: issueTitle(issue),
+        status: issueStatus(issue.severity),
+        dataAttrs: { 'data-issue': issue.id, 'data-issue-severity': issue.severity },
+        ...(issue.recordId
+          ? { target: kind, focusTarget: issue.recordId, viewLabel: VIEW_LABEL_KEYS[kind] }
+          : {}),
+      };
+    });
+  });
+
+  // Readiness first, then issues: the order the two cards were drawn in, kept as the group order.
+  const groups = $derived([
+    {
+      id: 'readiness',
+      icon: 'fas fa-clipboard-check',
+      label: text(
         'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Readiness',
         'Environment readiness'
-      )}
-    </h3>
-    <ul class="manager-environment-check-list">
-      {#each readiness.checks as check (check.id)}
-        <li
-          class={`manager-environment-check ${check.satisfied ? 'is-satisfied' : 'is-unsatisfied'}`}
-          data-check={check.id}
-          data-satisfied={check.satisfied}
-        >
-          <i
-            class={check.satisfied ? 'fas fa-circle-check' : 'fas fa-circle-xmark'}
-            aria-hidden="true"
-          ></i>
-          <span>{checkLabel(check.id)}</span>
-        </li>
-      {/each}
-    </ul>
-  </section>
+      ),
+      dataAttrs: { 'data-validation-section': 'readiness' },
+      rows: readinessRows,
+    },
+    {
+      id: 'issues',
+      icon: 'fas fa-triangle-exclamation',
+      label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Issues', 'Issues'),
+      dataAttrs: { 'data-validation-section': 'issues' },
+      rows: issueRows,
+    },
+  ]);
 
-  <section class="manager-environment-card" data-validation-section="issues">
-    <h3 class="manager-card-title">
-      {text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Issues', 'Issues')}
-    </h3>
-    {#if readiness.issues.length === 0}
-      <p class="manager-muted">
-        {text(
-          'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.NoIssues',
-          'No issues detected.'
-        )}
-      </p>
-    {:else}
-      {#each ['critical', 'warning', 'info'] as severity (severity)}
-        {#if issuesBy[severity].length > 0}
-          <ul class="manager-environment-issue-list" data-issue-severity={severity}>
-            {#each issuesBy[severity] as issue, index (issue.id + index)}
-              <li class={`manager-environment-issue is-${severity}`} data-issue={issue.id}>
-                <Chip tone={severityTone(severity)}
-                  >{text(
-                    `FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity.${severity}`,
-                    severity
-                  )}</Chip
-                >
-                <span class="manager-environment-issue-title">{issueTitle(issue)}</span>
-                {#if issue.recordId}
-                  <!-- `data-environment-issue-action` replaces the bespoke
-                       `manager-environment-issue-action` class (issue 1118): the sheet
-                       declared NOTHING for it in any theme, so it was a test selector
-                       wearing a style class's clothes, and it named neither the verb nor
-                       the record it opens. -->
-                  <!-- Ghost (issue 1118, row 44), for the reason the system overview's
-                       identical deep link is: the quiet NAVIGATIONAL verb of
-                       `ui-integration/spec.md`, beside a severity chip that is meant to
-                       carry the row's weight. -->
-                  <ManagerButton
-                    role="ghost"
-                    data-environment-issue-action={issue.recordKind}
-                    onclick={() => onSelectRecord(issue.recordKind, issue.recordId)}
-                  >
-                    {issue.recordKind === 'event'
-                      ? text(
-                          'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewEvent',
-                          'View event'
-                        )
-                      : text(
-                          'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewTask',
-                          'View task'
-                        )}
-                  </ManagerButton>
-                {/if}
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      {/each}
-    {/if}
-  </section>
-</section>
+  const summary = $derived.by(() => {
+    if (counts.blocking > 0) {
+      return {
+        status: 'block',
+        title: text(
+          'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.SummaryBlocked',
+          'Cannot be enabled'
+        ),
+        sub: text(
+          'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.SummaryBlockedSub',
+          'Clear every blocking issue before this environment can be enabled.'
+        ),
+      };
+    }
+    if (counts.warnings > 0) {
+      return {
+        status: 'warn',
+        title: text(
+          'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.SummaryWarnings',
+          'Enabled with warnings'
+        ),
+        sub: text(
+          'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.SummaryWarningsSub',
+          'Saves and enables — review the warnings when you can.'
+        ),
+      };
+    }
+    return {
+      status: 'pass',
+      title: text(
+        'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.SummaryAllClear',
+        'All clear'
+      ),
+      sub: text(
+        'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.SummaryAllClearSub',
+        'Every readiness check passes. Ready to enable.'
+      ),
+    };
+  });
+
+  const tabTitle = $derived(
+    text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Title', 'Validation')
+  );
+</script>
+
+<EditorValidationSurface
+  title={tabTitle}
+  intro={text(
+    'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Intro',
+    'An environment saves even while incomplete, but only enables when every blocking issue is cleared.'
+  )}
+  {summary}
+  {counts}
+  countLabels={{
+    passing: text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.CountPassing', 'Passing'),
+    warnings: text(
+      'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.CountWarnings',
+      'Warnings'
+    ),
+    blocking: text(
+      'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.CountBlocking',
+      'Blocking'
+    ),
+  }}
+  {groups}
+  statusLabels={{
+    pass: text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.StatusPass', 'Pass'),
+    warn: text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.StatusWarn', 'Warning'),
+    block: text(
+      'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.StatusBlock',
+      'Blocks enable'
+    ),
+  }}
+  viewDataAttr="data-environment-issue-action"
+  hookAttrs={{
+    root: { 'data-environment-tab': 'validation', 'aria-label': tabTitle },
+  }}
+  onSelectIssue={(kind, id) => onSelectRecord(kind, id)}
+/>

@@ -175,11 +175,20 @@ const SHARED_PRIMITIVES = [
   // in more mounted trees than any entry above except `Chip`.
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
-  // THE editor validation surface (issue 1444), closed onto seven renderers across the Checks
-  // Studio, the essence and Tool studios, the world essence entry page and both recipe
-  // editors. It sits in more mounted trees than its four direct callers suggest, because the
-  // scoped shell in between puts it in every tree that mounts an essence or a tool — and the
-  // conversion that closed it dropped it into two more, each of which had to name it or hang.
+  // THE editor validation surface (issue 1444), and as of issue 1517 it draws TEN GM-visible
+  // surfaces: the Checks studio, the component editor, both recipe editors, the environment
+  // editor's Validation tab, the essence and Tool studios, and the three world entry pages.
+  //
+  // BOTH FIGURES ARE RE-DERIVED FROM THE TREE rather than adjusted, because the pair this note
+  // replaced had drifted in opposite directions — it said seven renderers and four direct
+  // callers while the tree held nine and five. The measurement is a grep for the import
+  // specifier, which returns SIX direct importers; one of them is `scoped/ScopedValidationTab`,
+  // an intermediary rather than a screen, and that shell has five callers of its own, so the
+  // surface count is 6 - 1 + 5.
+  //
+  // It therefore sits in more mounted trees than its importer count suggests, because the shell
+  // in between puts it in every tree that mounts an essence, a tool or a world entry page — and
+  // each conversion since has dropped it into another tree that had to name it here or hang.
   'src/ui/svelte/components/EditorValidationSurface.svelte',
   // THE manager's searchable picker (issue 1458), and the entry with the LONGEST tail: it
   // renders `Chip` and `EmptyState`, both already here, so an omission does not cancel one
