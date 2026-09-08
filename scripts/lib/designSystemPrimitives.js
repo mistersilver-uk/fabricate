@@ -406,29 +406,52 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * ── THE `evidence` COLUMN HERE ─────────────────────────────────────────────────────────────────
  *
  * These rows carry `evidence` truthfully rather than aspirationally — it records what
- * `BROAD_SIGNAL_PATTERN` DOES with the path, not what anyone thinks the file deserves. The five
- * under `src/ui/svelte/components/` are `'broad'` because that directory leg matches them today
- * whatever anyone thinks of them, which is the point issue 1378 makes: a directory cannot tell a
- * primitive from a component that merely lives there. The other five — `SystemOverviewView`,
- * `downtime/WorldDowntimeTabs`, `environment/EnvironmentValidationTab`,
- * `recipe-item/RecipeItemLimitsTab` and `apps/crafting/ComponentSourcesBar` — are `'targeted'`,
- * the four manager ones because membership in the broad set there is by NAME and none of them is
- * on a name list, and the crafting one because the pattern does not reach that directory at all.
+ * `BROAD_SIGNAL_PATTERN` DOES with the path, not what anyone thinks the file deserves. The FOUR
+ * under `src/ui/svelte/components/` — `DropZone`, `ImagePathPicker`, `ManagerColorPicker` and
+ * `RowDisclosure` — are `'broad'` because that directory leg matches them today whatever anyone
+ * thinks of them, which is the point issue 1378 makes: a directory cannot tell a primitive from a
+ * component that merely lives there. The other EIGHT are `'targeted'`: the SIX under
+ * `apps/manager/` because membership in the broad set there is by NAME and none of them is on a
+ * name list, and `apps/ActorSelectTopBar` and `apps/crafting/ComponentSourcesBar` because the
+ * pattern does not reach `apps/` at all — it names `styles/`, `src/ui/svelte/components/`,
+ * `src/ui/theme.js` and a NAME LIST under `apps/manager/`, and nothing else.
  * Either way the frames that claim each by `sourceMatches` are reached.
+ *
+ * THE FOUR AND FIVE THIS PARAGRAPH USED TO COUNT WERE DRIFT, corrected at issue 1513 against
+ * `NOT_A_PRIMITIVE.length`, which `tests/design-system-primitives.test.js` pins at 12. That
+ * change moves no row COUNT — it amends one row's ground, which is arithmetic-free — so the
+ * numerals are corrected in the docblock it was already amending rather than by subtraction.
+ * The "seven manager ones" in the same pass was drift of the same kind and is corrected here:
+ * only six of the eight targeted rows are under `apps/manager/`, and reading the eighth as a
+ * seventh manager row attributed `apps/ActorSelectTopBar` — a PLAYER-app file — to the name-list
+ * ground rather than to the one it actually rests on.
  *
  * ── THE ROWS THAT ARE NOT UNDER-CALLED CANDIDATES ──────────────────────────────────────────────
  *
  * `SystemOverviewView` and `environment/EnvironmentValidationTab` were added at issue 1444, and
- * `recipe-item/RecipeItemLimitsTab` and `apps/crafting/ComponentSourcesBar` at issue 1458. They are
- * a different kind of non-member from the other six: all four are plainly single-caller, but none
- * was proposed as a primitive in its own right. The first two were proposed as unconverted CALL
- * SITES of `EditorValidationSurface` — the plan that change came from named four hand-rollers of
- * the validation surface and two of them render a different surface entirely — and the second two
- * as unconverted call sites of `SearchablePopover`. So what each records is the measurement that
+ * `recipe-item/RecipeItemLimitsTab` at issue 1458. They are a different kind of non-member from
+ * the caller-count rows: all three are plainly single-caller, but none was proposed as a primitive
+ * in its own right. The first two were proposed as unconverted CALL SITES of
+ * `EditorValidationSurface` — the plan that change came from named four hand-rollers of the
+ * validation surface and two of them render a different surface entirely — and the third as an
+ * unconverted call site of `SearchablePopover`. So what each records is the measurement that
  * settles that, not a caller count. The distinction matters because the repair the register exists
- * to prevent is different in each case: for the other six it is "someone re-proposes promoting
- * this", and for these four it is "someone re-proposes converting this", which would be a visual
- * redesign or a change of announced widget filed as an adoption.
+ * to prevent is different in each case: for the caller-count rows it is "someone re-proposes
+ * promoting this", and for these three it is "someone re-proposes converting this", which would be
+ * a visual redesign or a change of announced widget filed as an adoption.
+ *
+ * `apps/crafting/ComponentSourcesBar` WAS THE FOURTH MEMBER OF THIS GROUP AND HAS LEFT IT, at
+ * issue 1513, for the caller-count rows — and the move is stated here rather than implied because
+ * a row cannot stay in a group whose stated ground is "the measurement that settles this, not a
+ * caller count" once that measurement has been settled the other way. It was recorded on a
+ * disqualifier that named a missing capability: the control is a multi-select checklist and
+ * `SearchablePopover` had a single `value` and closed on choose, so "a conversion needs a
+ * multi-select mode on the primitive, which is a design question this row does not settle". Issue
+ * 1513 settled it, added `multiple` and `stayOpen` to the primitive and CONVERTED the panel, so
+ * the row survives on what every caller-count row rests on: one caller, and a screen region of
+ * that size is not a shared primitive whichever primitives it reuses.
+ * `recipe-item/RecipeItemLimitsTab` is now this group's ONLY member carrying a live
+ * `SearchablePopover` adjudication.
  *
  * `checks/ChecksEditorTabs` was recorded here too and is DELIBERATELY GONE, not lost. It was recorded here by
  * issue 1038 on the ground that its count is a bare mono numeral rather than a chip and "the two
@@ -448,9 +471,9 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * genuinely functional capabilities `EditorTabs` still lacks.
  *
  * That is why the integrity test runs its per-row clauses over THESE rows too. The disk clause in
- * particular is live here: two of the ten name files nothing imports, and their `callers` is the
- * empty array rather than an omitted field, because "measured, and there are none" and "nobody
- * filled this in" must not be the same value.
+ * particular is live here: two of the twelve name files nothing imports, and their `callers` is
+ * the empty array rather than an omitted field, because "measured, and there are none" and
+ * "nobody filled this in" must not be the same value.
  *
  * @type {readonly {path: string, library: string|null, evidence: string,
  *   callers: readonly string[], why: string}[]}

@@ -59,6 +59,8 @@ import assert from 'node:assert/strict';
 
 import { parse } from 'svelte/compiler';
 
+import { measureImporters } from '../../scripts/lib/componentImporters.js';
+import { repoRoot } from '../helpers/sourceScan.js';
 import {
   definePrimitiveAdoptionContract,
   walkTemplate,
@@ -156,6 +158,13 @@ const popover = definePrimitiveAdoptionContract({
     // The loop below still reads the primitive's own source and refuses a name it does not
     // declare with a `false` default, so this is a declaration being recorded, not a widening.
     'ignoreScrollWithin',
+    // Issue 1513's two, and they have DIFFERENT callers: `ComponentSourcesBar` writes
+    // `multiple` bare (which implies the gate), and `RecipeItemContentsTab` writes `stayOpen`
+    // bare without it — a single-value picker whose panel survives the choice. The loop below
+    // re-reads the primitive's own source, so recording a name it does not declare with a
+    // `false` default reds here rather than widening anything.
+    'multiple',
+    'stayOpen',
   ]),
   detectorFixture: {
     source: DETECTOR_FIXTURE,
@@ -213,6 +222,112 @@ function snippetTriggerName(site) {
   return found;
 }
 
+/**
+ * ISSUE 1513'S TWO CAPABILITIES ARE DEFAULT-OFF, AND THAT IS ASSERTED AS A CONJUNCTION.
+ *
+ * A quantifier alone ("every importer renders unchanged") is not measurable from a source read,
+ * so the claim is split into the two halves that ARE:
+ *
+ *   (a) the primitive declares `multiple = false` and `stayOpen = false` — checked by the
+ *       valueless-attribute clause's own loop above, which re-reads the primitive's source and
+ *       refuses to exempt a name it does not find declared that way; and
+ *   (b) NO importer other than the adopters named here passes either prop, which is this clause.
+ *
+ * The population is `scripts/lib/componentImporters.js` — the same measurement the design-system
+ * register's membership bar uses — because "no OTHER importer" is a claim about the import
+ * graph. The ANSWER, though, is read from the component walk's parsed call sites: an importer
+ * that passes a prop does it on a `<SearchablePopover>` node, so the two measurements have to
+ * agree about the file set and only the AST can say what a node actually passes. The clause
+ * asserts that agreement rather than assuming it.
+ *
+ * ADOPTERS ARE PINNED BY EXACT SET rather than by count. A new caller is a decision about the
+ * capability's spread and belongs in a diff that says so.
+ */
+const MULTI_SELECT_ADOPTERS = Object.freeze([
+  'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
+  // The link-recipe picker, which takes the GATE ALONE (issue 1513, phase 4). Linking stays one
+  // choice at a time — no `multiple`, so the panel still announces a single-value listbox — but
+  // linking a second recipe is the common next action and each choice SHRINKS the option list it
+  // was made from, which is the case the gate's cursor clamp exists for.
+  'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte',
+]);
+
+// THE TWO PROPS ARE READ THROUGH SEPARATE NON-VACUITY PROBES rather than through the adopter
+// list's first entry, because the entries no longer agree about which prop they pass. A single
+// probe against one file cannot see a reader that has stopped finding the other, and the
+// set-equality clause above passes either way: a pattern matching nothing makes it pass the day
+// both adopters are removed, which is the direction that hides.
+const MULTIPLE_ADOPTER = 'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte';
+const STAY_OPEN_ADOPTER = 'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte';
+
+/** Every file with a `<SearchablePopover>` node that passes one of the two capability props. */
+function adopterFiles() {
+  return [
+    ...new Set(
+      popover.callSites
+        .filter((site) => site.attribute('multiple') || site.attribute('stayOpen'))
+        .map((site) => site.file)
+    ),
+  ].sort((left, right) => left.localeCompare(right));
+}
+
+test('`multiple` and `stayOpen` are passed by the adopters alone, so every other importer is unmoved', () => {
+  // THE READER IS THE AST, NOT THE FILE TEXT, and the difference is a defect this clause once
+  // had rather than a preference. It used to test each importer's WHOLE SOURCE against
+  // `/(?<![\w-])(multiple|stayOpen)(?![\w-])/`, which matches the words wherever they occur —
+  // and both adopters carry them in prose: `ComponentSourcesBar`'s docblock explains what
+  // `multiple` reads, and this very file's names are quoted in half a dozen comments across the
+  // tree. Measured: deleting the `multiple` attribute from `ComponentSourcesBar`'s call site
+  // left the clause 11/11 GREEN, because the paragraph above the call site still said the word.
+  // A pin that survives the deletion it exists to catch is decorative, and the two probes below
+  // were the same read and therefore vacuous in the same way.
+  //
+  // `site.attribute(name)` resolves against the parsed call site's OWN attributes, so a comment
+  // cannot satisfy it and a prop moved onto a wrapper cannot either.
+  assert.deepEqual(
+    adopterFiles(),
+    [...MULTI_SELECT_ADOPTERS].sort((left, right) => left.localeCompare(right)),
+    'a file outside the adopter set passes `multiple` or `stayOpen`. Both props are additive and ' +
+      'default-off precisely so the other importers render exactly as they did, and a new one ' +
+      'is a decision about where a multi-selectable listbox is announced'
+  );
+
+  // THE POPULATION IS STILL EVERY IMPORTER, asserted rather than assumed. The component walk the
+  // call sites come from and the import graph are two different measurements, and this clause is
+  // a claim about the second: "no OTHER importer passes either prop". So the graph has to be
+  // alive — a floor, because an `importersOf` that returned nothing would leave the deepEqual
+  // above quantifying over a corpus this file never checked — and every adopter has to be in it,
+  // which is what says the two measurements are looking at the same set of files.
+  const importers = measureImporters(repoRoot).importersOf(POPOVER_PATH);
+  assert.ok(
+    importers.length >= 20,
+    `only ${importers.length} importing files, so the import graph stopped seeing this ` +
+      'primitive and the clause above quantifies over a corpus nothing verified'
+  );
+  assert.deepEqual(
+    adopterFiles().filter((file) => !importers.includes(file)),
+    [],
+    'an adopter renders `<SearchablePopover>` without importing it, so the component walk and ' +
+      'the import graph disagree about which files this contract is over'
+  );
+
+  // NON-VACUITY, on the reader rather than on the result: an `attribute()` that resolved nothing
+  // would make the deepEqual above pass the day the adopter list emptied, and one that resolved
+  // everything would fail loudly, which is the safe direction. This pins the first, once per
+  // prop, because the two adopters no longer both carry both names.
+  assert.ok(
+    popover.callSites.some((site) => site.file === MULTIPLE_ADOPTER && site.attribute('multiple')),
+    'the reader must find a `multiple` ATTRIBUTE on the call site in the one file that passes ' +
+      'it, or it is finding nothing anywhere and this clause is decorative'
+  );
+  assert.ok(
+    popover.callSites.some((site) => site.file === STAY_OPEN_ADOPTER && site.attribute('stayOpen')),
+    'the reader must find a `stayOpen` ATTRIBUTE on the call site in the one file that passes ' +
+      'it WITHOUT `multiple`, or the gate is being asserted through the prop that implies it ' +
+      'and its own adoption is unmeasured'
+  );
+});
+
 test('the snippet-trigger naming route reads the element the spread lands on', () => {
   // NON-VACUITY, and it is the whole reason this route can be trusted: the two pickers are the
   // only sites that take it, so a reader that silently found nothing would push them into the
@@ -221,10 +336,15 @@ test('the snippet-trigger naming route reads the element the spread lands on', (
   const snippetSites = popover.callSites.filter((site) => site.snippetSource('trigger'));
   assert.equal(
     snippetSites.length,
-    2,
-    `${snippetSites.length} call sites hand the primitive a \`trigger\` snippet; two do — ` +
-      '`IconPicker` and `EssenceSourceSelector`. A different number means the route has gained ' +
-      'or lost a caller and the figures in this file need re-measuring.'
+    3,
+    `${snippetSites.length} call sites hand the primitive a \`trigger\` snippet; three do — ` +
+      '`IconPicker`, `EssenceSourceSelector` and, since issue 1513, ' +
+      '`apps/crafting/ComponentSourcesBar`. A different number means the route has gained or ' +
+      'lost a caller and the figures in this file need re-measuring. The third took the route ' +
+      'for a reason neither of the first two states: its trigger is a 40px dashed well sized to ' +
+      'the row of portrait buttons beside it, and the rule that draws it is in the CALLER`s ' +
+      'scoped block — which cannot reach the primitive`s own button, so `triggerClass` would ' +
+      'have named an element no rule of its could paint.'
   );
 
   for (const site of snippetSites) {

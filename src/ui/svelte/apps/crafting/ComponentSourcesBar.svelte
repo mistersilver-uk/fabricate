@@ -3,30 +3,57 @@
   ComponentSourcesBar is the Crafting tab's right-slot content in the shared
   ActorSelectTopBar. It shows the actors whose inventories the listing pulls
   ingredients from (services.craftingSources.sources) as a row of focusable avatar
-  buttons, plus an edit/add popover (reusing .actor-bar-popover) listing every
-  owned actor to toggle.
+  buttons, plus an add/edit picker listing every owned actor to toggle.
 
   A11y: each avatar is a <button> with an always-present aria-label (the actor
   name); the visible name reveals on :hover AND :focus-visible; removal uses a
   visible + keyboard "×" (shown on hover/focus) and right-click as an additive
   shortcut. The required (non-removable) crafting actor renders with a lock badge,
   aria-disabled, and an "always included" aria suffix, and exposes no "×".
+
+  THE PICKER IS THE SHARED `SearchablePopover` IN ITS MULTI-SELECT MODE (issue 1513).
+  The hand-rolled panel this replaced positioned itself (`position: absolute`,
+  `z-index: 4000`) inside the bar, rendered no query field, and reached neither the
+  portal nor the clipping-bounds pass — so it drew under the crafting listing's own
+  overflow and had no way to find an actor in a long owned-actor list. Three things
+  decided the conversion rather than one:
+
+    - it COMMITS ON CHOOSE, straight through to `store.toggle`, because the surfaces
+      that read the selection re-derive live: the inventory view reloads on it and
+      the open recipe's requirement rail and essence pool recompute from it, so
+      staging the write would remove the answer from the moment of the question;
+    - its `aria-selected` is true on EVERY chosen actor at once, which is what the
+      primitive's new `multiple` mode announces and what a single-value listbox
+      cannot say; and
+    - the panel stays open across choices, so adding four source actors is four
+      clicks rather than four open-choose-reopen cycles.
+
+  IT PASSES THE `option` SNIPPET, and that is not decoration. The primitive's own
+  option markup draws `option.img` as a bare `<img>`, so taking the default here
+  would revert issue 1514's conversion of this row onto the shared `Avatar` — the
+  32px square tile, and with it the INITIALS fallback that replaced the `fa-user`
+  glyph. The snippet is the row's SOLE content, so it draws all three parts: the
+  tile, the name and the selected-state check.
 -->
 <script>
-  import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import { localize } from '../../util/foundryBridge.js';
   import Avatar from '../../components/Avatar.svelte';
-  import EmptyState from '../manager/EmptyState.svelte';
+  import SearchablePopover from '../../components/SearchablePopover.svelte';
 
   let { services = null } = $props();
 
   const store = $derived(services?.craftingSources ?? null);
   const sources = $derived(store?.sources ?? []);
   const available = $derived(store?.available ?? []);
-  const selectedIds = $derived(new Set(store?.selectedSourceIds ?? []));
+  const selectedSourceIds = $derived(store?.selectedSourceIds ?? []);
+  const selectedIds = $derived(new Set(selectedSourceIds));
 
-  let editorOpen = $state(false);
-  let barRoot = $state(null);
+  // The owned actors, in the picker's own option shape. `label` is what the primitive searches
+  // and what the snippet renders as the row's name; `img` is the artwork the tile draws, and an
+  // actor with none falls back to its initials inside `Avatar` rather than here.
+  const sourceOptions = $derived(
+    available.map((actor) => ({ id: actor.id, label: actor.name, img: actor.img }))
+  );
 
   function hasImg(actor) {
     return typeof actor?.img === 'string' && actor.img.trim() !== '';
@@ -51,23 +78,14 @@
     store?.remove(source.id);
   }
 
-  function toggleEditor() {
-    editorOpen = !editorOpen;
-  }
-  function closeEditor() {
-    editorOpen = false;
-  }
+  // COMMIT ON CHOOSE. One `store.toggle` per click and nothing else — no staged set, no Apply
+  // and no Clear — because every surface that reads the selection re-derives from it live.
   function toggleAvailable(id) {
     store?.toggle(id);
   }
 </script>
 
-<div
-  bind:this={barRoot}
-  class="crafting-sources-bar"
-  data-crafting-sources
-  use:dismissOnOutsideClick={{ enabled: editorOpen, onDismiss: closeEditor }}
->
+<div class="crafting-sources-bar" data-crafting-sources>
   <span class="crafting-sources-label">{localize('FABRICATE.App.Crafting.Sources.Label')}</span>
 
   <div
@@ -128,72 +146,95 @@
       </span>
     {/each}
 
-    <button
-      type="button"
-      class="crafting-sources-add"
-      data-crafting-sources-add
-      aria-haspopup="dialog"
-      aria-expanded={editorOpen}
-      aria-label={localize('FABRICATE.App.Crafting.Sources.Edit')}
-      title={localize('FABRICATE.App.Crafting.Sources.Edit')}
-      onclick={toggleEditor}
+    <!-- `value` is the ARRAY of chosen ids, which is what `multiple` reads: the panel marks
+         every source actor at once rather than announcing one of N. `emptyDetail` rather than
+         `emptyHint`, because `Sources.Empty` is a body sentence and this primitive's
+         `emptyHint` feeds `EmptyState`'s `<h3>` — the same `EmptyState note` slot the deleted
+         markup already put it in. `noMatchesHint` takes the primitive's default: this control
+         has never had a search, so it has no more specific sentence of its own to state.
+
+         `popoverClass` and `optionClass` carry this file's two published hooks onto the
+         primitive's own elements. They are DOM handles rather than paint: the panel is portaled
+         out of this component's subtree, so nothing in the scoped block below could reach either
+         one, and the primitive draws both. -->
+    <SearchablePopover
+      multiple
+      showFilteredCount
+      options={sourceOptions}
+      value={selectedSourceIds}
+      optionClass="crafting-source-option"
+      popoverClass="crafting-sources-popover"
+      dialogAriaLabel={localize('FABRICATE.App.Crafting.Sources.Edit')}
+      searchPlaceholder={localize('FABRICATE.App.Crafting.Sources.SearchCharacters')}
+      searchAriaLabel={localize('FABRICATE.App.Crafting.Sources.SearchCharacters')}
+      emptyDetail={localize('FABRICATE.App.Crafting.Sources.Empty')}
+      onChoose={toggleAvailable}
     >
-      <i class="fas fa-plus" aria-hidden="true"></i>
-    </button>
+      <!-- THE TRIGGER IS THIS FILE'S OWN BUTTON, through the primitive's `trigger` snippet, and
+           that is a decision rather than an oversight. The dashed 40px square is the `+` well
+           beside a row of 40px portraits and it is sized to them; a `triggerClass` handed to the
+           primitive's own button would land on an element this component's scoped block cannot
+           reach, so the rule that draws it would paint nothing. The snippet's button keeps the
+           published `[data-crafting-sources-add]` hook the capture walk and the perf scenarios
+           address it by, and the spread supplies `type`, `aria-haspopup="dialog"`,
+           `aria-expanded` and the attachment the panel is anchored to.
 
-    {#if editorOpen}
-      <div
-        class="crafting-sources-popover"
-        role="dialog"
-        aria-label={localize('FABRICATE.App.Crafting.Sources.Edit')}
-      >
-        <div
-          class="crafting-source-options"
-          role="listbox"
+           `aria-label` and `title` are written on the button rather than passed as
+           `triggerAriaLabel`/`triggerTitle`: the primitive renders NO button of its own in this
+           shape, so those props would ride the spread and OVERRIDE the name this snippet writes
+           rather than naming anything. They are written BEFORE the spread because the primitive
+           omits undefined-valued keys precisely so a caller's own name survives it. -->
+      {#snippet trigger({ attributes })}
+        <button
+          class="crafting-sources-add"
+          data-crafting-sources-add
           aria-label={localize('FABRICATE.App.Crafting.Sources.Edit')}
+          title={localize('FABRICATE.App.Crafting.Sources.Edit')}
+          {...attributes}
         >
-          {#each available as actor (actor.id)}
-            <button
-              type="button"
-              class="crafting-source-option"
-              class:is-selected={selectedIds.has(actor.id)}
-              role="option"
-              aria-selected={selectedIds.has(actor.id)}
-              title={actor.name}
-              onclick={() => toggleAvailable(actor.id)}
-            >
-              <!-- The same portrait at the picker's own 32px rung, which is `Avatar`'s default
-                   and the canon's single portrait mark. `alt=""` because the option renders the
-                   actor's name as adjacent text on the same row.
+          <i class="fas fa-plus" aria-hidden="true"></i>
+        </button>
+      {/snippet}
 
-                   THIS SITE MOVES THREE THINGS AND NONE OF THEM IS A SIZE, so they are named
-                   here rather than left for a frame that cannot show them. The deleted rule drew
-                   32x32 at a 6px corner over a `var(--fab-surface-raised)` ground with NO border;
-                   the tile draws the same 32x32 at the ladder's 9px over `var(--fab-bg-3)` with a
-                   1px `var(--fab-border)` hairline it did not have. The option row is
-                   `min-height: 44px` and the tile does not set one, so the row's height is
-                   unmoved. UNPHOTOGRAPHABLE: no View Lab case opens this popover — the registry
-                   has no step naming `data-crafting-sources-add` — so `component-sources-bar-mounted`
-                   is what holds this conversion, and the same is true of the no-owned-actors line
-                   below it. -->
-              <Avatar
-                art={hasImg(actor) ? actor.img : ''}
-                name={actor.name}
-                alt=""
-                shape="square"
-                size={32}
-              />
-              <span class="crafting-source-option-name">{actor.name}</span>
-              {#if selectedIds.has(actor.id)}
-                <i class="fas fa-check crafting-source-option-check" aria-hidden="true"></i>
-              {/if}
-            </button>
-          {:else}
-            <EmptyState note hint={localize('FABRICATE.App.Crafting.Sources.Empty')} />
-          {/each}
-        </div>
-      </div>
-    {/if}
+      <!-- The row's SOLE content (the primitive renders its own markup only where no `option`
+           snippet is supplied), so all three parts are drawn here.
+
+           THE SNIPPET IS WHY THIS ROUTE DOES NOT REVERT ISSUE 1514. The primitive's default
+           option markup draws `option.img` as a bare `<img>`; this row's portrait has been the
+           shared `Avatar` since that change, square at the picker's own 32px rung, and its
+           no-artwork state is INITIALS rather than the `fa-user` glyph the markup drew before.
+           `alt=""` because the option renders the actor's name as adjacent text on the same row.
+
+           THE THREE THINGS THAT SITE MOVED AT ISSUE 1514 AND NONE OF THEM IS A SIZE, named here
+           rather than left for a frame that cannot show them: the deleted rule drew 32x32 at a
+           6px corner over a `var(--fab-surface-raised)` ground with NO border, and the tile
+           draws the same 32x32 at the ladder's 9px over `var(--fab-bg-3)` with a 1px
+           `var(--fab-border)` hairline it did not have.
+
+           THE CLAIM THIS PARAGRAPH USED TO MAKE IS FALSE NOW, and it is restated rather than
+           deleted because it was a measurement of the tree on the day it was written. It said
+           UNPHOTOGRAPHABLE: no View Lab case opened this popover, the registry having no step
+           naming `data-crafting-sources-add`. Issue 1513 registered
+           `player-crafting-sources-picker`, whose one step is that trigger, so this panel and
+           the no-owned-actors line below it now have a published frame.
+
+           THE MOUNTED ASSERTION STAYS ALL THE SAME, and the two prove different things: a frame
+           is a photograph of the panel, not a measurement of a 32.00x32.00 tile at a 9px corner.
+           `component-sources-bar-mounted` remains what holds the moves named above. -->
+      {#snippet option(actor)}
+        <Avatar
+          art={hasImg(actor) ? actor.img : ''}
+          name={actor.label}
+          alt=""
+          shape="square"
+          size={32}
+        />
+        <span class="crafting-source-option-name">{actor.label}</span>
+        {#if selectedIds.has(actor.id)}
+          <i class="fas fa-check crafting-source-option-check" aria-hidden="true"></i>
+        {/if}
+      {/snippet}
+    </SearchablePopover>
   </div>
 </div>
 
@@ -393,71 +434,19 @@
     outline-offset: 2px;
   }
 
-  /* In-place popover listing every owned actor to toggle as a source. Mirrors the
-     actor-bar popover visual treatment, scoped locally (the actor-bar's own
-     popover styles are component-scoped and do not reach here). */
-  .crafting-sources-popover {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    left: auto;
-    z-index: 4000;
-    display: flex;
-    flex-direction: column;
-    width: max-content;
-    min-width: 220px;
-    max-width: 320px;
-    max-height: min(60vh, 420px);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface);
-    box-shadow: var(--fab-shadow-lg);
-    overflow: hidden;
-  }
+  /* THE PANEL, THE LIST AND THE OPTION ROW ARE THE PRIMITIVE'S NOW (issue 1513), so their
+     rules are DELETED rather than restated. `.crafting-sources-popover` positioned itself with
+     `position: absolute`, `z-index: 4000` and an 8px corner; `.crafting-source-options` and
+     `.crafting-source-option` drew the scroll box and the row. `SearchablePopover` portals,
+     measures and clamps the panel and paints the row from `.fabricate-picker-popover
+     .manager-travel-option`, so a scoped copy here would either lose (it cannot reach an
+     element another component owns, and the compiler would prune it as unused) or fight a
+     shared rule for no gain.
 
-  .crafting-source-options {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 6px;
-    overflow-y: auto;
-  }
-
-  .crafting-source-option {
-    box-sizing: border-box;
-    position: relative;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 10px;
-    height: auto;
-    min-height: 44px;
-    padding: 4px 8px;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--fab-text);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .crafting-source-option:hover {
-    background: var(--fab-surface-raised);
-  }
-
-  .crafting-source-option.is-selected {
-    background: var(--fab-accent-soft);
-    border-color: var(--fab-accent);
-    color: var(--fab-accent);
-  }
-
-  .crafting-source-option:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
-  }
+     THE TWO RULES BELOW SURVIVE FOR THE OPPOSITE REASON: the `option` snippet is this file's
+     markup, so the name span and the check glyph ARE elements this component owns and this
+     block reaches. `.crafting-source-option` itself travels as `optionClass`, which keeps the
+     published row hook on the primitive's element without asking this block to paint it. */
 
   .crafting-source-option-name {
     flex: 1 1 auto;

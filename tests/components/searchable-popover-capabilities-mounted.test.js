@@ -53,6 +53,7 @@ import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
+import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import {
   SEARCHABLE_POPOVER_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -882,6 +883,229 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
         'field-caption',
         'the prop rides `triggerAttributes`, so it is part of the contract a snippet caller ' +
           'spreads rather than something only the primitive`s own button can have'
+      );
+      harness.remount();
+    });
+  });
+
+  /**
+   * THE MULTI-SELECT MODE AND THE STAY-OPEN GATE (issue 1513).
+   *
+   * Two props, both additive and both default-off, and the pair is deliberately not one prop.
+   * `multiple` turns on three things at once because a panel with any two of them lies about
+   * itself: membership-driven `aria-selected`, `aria-multiselectable` on the list, and a panel
+   * that survives a choice. `stayOpen` is the third of those ALONE, for a caller whose chosen
+   * option LEAVES the option set and therefore has no selection to announce.
+   *
+   * WHY THE `aria-selected` CLAUSE READS EXACT STRINGS. The attribute is emitted
+   * unconditionally on every row, so `hasAttribute` is true whatever the expression behind it
+   * is: a defect that marks one row instead of four passes a presence check and passes a
+   * truthiness check on the marked row. Only the whole row-by-row vector can see it.
+   */
+  describe('`multiple` and `stayOpen`', () => {
+    it('marks EVERY selected option, and announces the list as multi-selectable', async () => {
+      await mountPicker({ multiple: true, value: ['beaker', 'dagger'] });
+      const open = await openPanel();
+
+      assert.deepEqual(
+        optionRows(open).map((row) => row.getAttribute('aria-selected')),
+        ['false', 'true', 'false', 'true', 'false'],
+        'two of five are marked, at their own positions. A single-value listbox compares ' +
+          '`option.id === value` and can only ever mark ONE, which is what would silently tell ' +
+          'a screen-reader user that one source actor is selected when four are'
+      );
+      assert.equal(listOf(open).getAttribute('aria-multiselectable'), 'true');
+      harness.remount();
+    });
+
+    it('announces NOTHING multi-selectable in the default mode, and marks by equality there', async () => {
+      await mountPicker({ value: 'coin' });
+      const open = await openPanel();
+
+      assert.equal(
+        listOf(open).hasAttribute('aria-multiselectable'),
+        false,
+        'ABSENT rather than "false": `aria-multiselectable="false"` is a claim about a widget ' +
+          'that has no such axis, and all 23 importers measured at this change render the ' +
+          'single-value list'
+      );
+      assert.deepEqual(
+        optionRows(open).map((row) => row.getAttribute('aria-selected')),
+        ['false', 'false', 'true', 'false', 'false'],
+        'and the scalar path is the expression it always was, so those importers are unmoved'
+      );
+      harness.remount();
+    });
+
+    it('keeps the panel, the query and the focus holder across consecutive choices', async () => {
+      const chosenHere = [];
+      await mountPicker({ multiple: true, value: [], onChoose: (id) => chosenHere.push(id) });
+      const open = await openPanel();
+      search(open, 'a');
+      const holder = holderOf(open);
+
+      optionRows(panel())[0].click();
+      flushSync();
+      assert.ok(Boolean(panel()), 'the panel is still in the DOM after the first choice');
+      assert.equal(
+        holderOf(panel()).value,
+        'a',
+        'and the query is UNCLEARED. `close()` clears it, so the default mode loses the GM`s ' +
+          'filter on every choice — which is the whole cost of adding four entries to a set'
+      );
+      // `assert.ok(a === b)` rather than `assert.equal`: on failure `node:assert` serialises
+      // the actual value to build its diff and walks a mounted happy-dom element's circular
+      // tree until the heap dies, so a one-line assertion failure surfaces as an OOM and a
+      // `# cancelled` suite with no message.
+      assert.ok(document.activeElement === holder, 'focus stays on the holder, not the trigger');
+
+      optionRows(panel())[1].click();
+      flushSync();
+      assert.deepEqual(
+        chosenHere,
+        ['anvil', 'beaker'],
+        'two consecutive choices reach the caller, from one open panel'
+      );
+      assert.ok(Boolean(panel()), 'and the panel is still open after the second');
+      harness.remount();
+    });
+
+    it('closes on choose under `stayOpen` off, which is every shipped caller today', async () => {
+      await mountPicker({ multiple: false });
+      const open = await openPanel();
+      optionRows(open)[0].click();
+      flushSync();
+      assert.ok(!panel(), 'the default is unchanged: one choice, one close');
+      harness.remount();
+    });
+
+    it('gates the close alone under `stayOpen`, without announcing a selection model', async () => {
+      await mountPicker({ stayOpen: true });
+      const open = await openPanel();
+      assert.equal(
+        listOf(open).hasAttribute('aria-multiselectable'),
+        false,
+        '`stayOpen` alone must NOT imply `multiple`: a picker whose chosen option leaves the ' +
+          'option set has nothing left to mark, and announcing a multi-selectable list over an ' +
+          'empty selection model is the class of lie the naming rules forbid'
+      );
+      optionRows(open)[0].click();
+      flushSync();
+      assert.ok(Boolean(panel()), 'and the panel survives the choice, which is the whole prop');
+      harness.remount();
+    });
+
+    /**
+     * THE SELECTED FACE `multiple` OWES ITS ROWS, AND WHY THIS CLAUSE IS NOT MOUNTED.
+     *
+     * `design-system/spec.md` — "A SELECTED face is a FILL and an EDGE" — and its multi-select
+     * scenario requires a tinted fill plus an accent border on each chosen row. The primitive's
+     * shared row painted rest and hover only, so a converted checklist's chosen rows carried the
+     * caller's trailing check glyph and nothing else, and HOVER read stronger than SELECTED.
+     *
+     * A mounted assertion cannot see this: happy-dom computes no cascade, so `getComputedStyle`
+     * on a mounted row answers with the inline style and nothing the stylesheet says. The rule is
+     * read out of the COMPILED CSS instead (`{ css: 'external' }`), which is the same artifact the
+     * browser is handed and therefore the only place a pruned or mis-keyed rule shows up.
+     *
+     * THE KEY IS THE OTHER HALF, and it is what makes this safe for the 23 single-select
+     * importers: the selector hangs on the LISTBOX's `aria-multiselectable`, which the primitive
+     * emits only under `multiple`. Every `aria-selected` rule in the block is checked for a
+     * qualifier for that reason — an unkeyed one would repaint the marked row of every picker in
+     * the product, which is a redesign wearing a bug fix's clothes.
+     */
+    it('paints a fill and an edge on every multi-selected row, keyed on `aria-multiselectable`', () => {
+      const { css } = scopedComponentCss(
+        resolve(repoRoot, 'src/ui/svelte/components/SearchablePopover.svelte')
+      );
+      const flat = css.replaceAll(/\/\*[\s\S]*?\*\//gu, '').replaceAll(/\s+/gu, ' ');
+      const rules = [...flat.matchAll(/([^{}]+)\{([^{}]*)\}/gu)].map(([, selector, body]) => ({
+        selector: selector.trim(),
+        body,
+      }));
+
+      const selectedFaces = rules.filter((rule) =>
+        rule.selector.includes("[aria-selected='true']")
+      );
+      assert.ok(
+        selectedFaces.length >= 3,
+        `only ${selectedFaces.length} selected-row rules survived compilation, against the three ` +
+          'this block writes (the compact mode`s marked row and its hover, and the multi-select ' +
+          'pair). Svelte PRUNES a scoped rule it cannot match against the template, so a rule ' +
+          'deleted and a rule pruned look the same from here — and both are the defect'
+      );
+      for (const rule of selectedFaces) {
+        assert.ok(
+          rule.selector.includes('is-compact-option-rows') ||
+            rule.selector.includes("[aria-multiselectable='true']"),
+          `"${rule.selector}" paints a selected row with no mode qualifier, so it reaches every ` +
+            'one of the primitive`s single-select importers. Both keys are opt-in markers the ' +
+            'primitive writes itself: the compact class and the multi-selectable listbox'
+        );
+      }
+
+      const multi = selectedFaces.find((rule) =>
+        rule.selector.includes("[aria-multiselectable='true']")
+      );
+      assert.ok(Boolean(multi), 'no rule keys a selected face on the multi-selectable listbox');
+      assert.match(multi.body, /border-color: var\(--fab-accent-border\)/u, 'the EDGE');
+      assert.match(multi.body, /background: var\(--fab-surface-active\)/u, 'and the FILL');
+      assert.ok(
+        !multi.body.includes('--fab-accent-soft'),
+        '`--fab-accent-soft` under a 3px inset bar is the RADIO CARD group`s selected treatment, ' +
+          'and `spec.md` reserves it for the list whose one answer that bar names. Joining a ' +
+          'multi-select row to it is the exact confusion the rule exists to prevent'
+      );
+      assert.match(
+        multi.selector,
+        /\[aria-selected='true'\][^,]*:hover/u,
+        'and the hover half is restated inside the same rule, or hovering a chosen row reverts ' +
+          'it to the neutral surface and reads as deselecting it'
+      );
+    });
+
+    /**
+     * THE CURSOR CANNOT OUTLIVE A LIST THAT SHRANK UNDER IT.
+     *
+     * `close()` is what used to clear the cursor after every choice; under the gate the panel
+     * survives and the rendered list may get SHORTER while it is open. Two mechanisms answer
+     * that and this clause exercises the second, because the first cannot reach it: the
+     * generation stamp reads `options.length` and both end ids, so it catches a caller that
+     * removes an option — but a caller `filterOptions` SEAM narrows the rendered list from
+     * state of its own with `options` unmoved, and the generation is byte-identical across it.
+     * The range clamp on `activeIndex` is what refuses the stale index there.
+     *
+     * A dangling `aria-activedescendant` is the visible defect: it names a DOM id that resolves
+     * to no element, which is exactly the state the primitive already refuses while its empty
+     * branch renders.
+     */
+    it('drops a cursor that would point past the end of a list narrowed under an open panel', async () => {
+      await mountPicker({ multiple: true, value: [] });
+      const open = await openPanel();
+      for (let step = 0; step < 5; step += 1) pressKey('ArrowDown');
+
+      const holder = holderOf(open);
+      const parked = activeDescendant(holder);
+      assert.equal(
+        parked,
+        optionRows(panel()).at(-1).getAttribute('id'),
+        'the cursor is parked on the LAST of five rows, which is the position a shorter list ' +
+          'cannot contain'
+      );
+
+      await harness.setProps({ filterOptions: (list) => list.slice(0, 2) });
+      assert.equal(optionRows(panel()).length, 2, 'the rendered list is shorter');
+      assert.equal(
+        activeDescendant(holderOf(panel())) ?? null,
+        null,
+        'and the cursor is GONE rather than naming row 4 of a two-row list. The generation is ' +
+          'unchanged here — same options, same query, same open state — so the stamp cannot ' +
+          'see this narrowing and the range clamp is what answers it'
+      );
+      assert.equal(
+        panel().querySelectorAll('[data-active-option]').length,
+        0,
+        'and no row paints the cursor either'
       );
       harness.remount();
     });

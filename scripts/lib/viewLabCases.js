@@ -825,6 +825,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // primitive's own rows, so a change to the grid rung or to the snippet seam published nothing
     // that could contain it.
     'manager-essences-source-picker',
+    // A NINTH AND A TENTH, and they are the primitive's MULTI-SELECT mode and the one caller
+    // that stays open without it (issue 1513). `player-crafting-sources-picker` is the only
+    // frame in the registry that draws `aria-multiselectable` over rows marked several at once,
+    // and it is a PLAYER frame drawing a caller's `option` snippet inside the primitive's own
+    // row; `manager-recipe-item-contents-picker` is the only one that draws the panel a choice
+    // does not close. Neither state exists in any of the eight above, so a change to the
+    // selection model or to the stay-open gate published eight frames none of which could
+    // contain it.
+    'player-crafting-sources-picker',
+    'manager-recipe-item-contents-picker',
   ]),
   // THE APP'S OWN SELECT (issue 1504), whose panel is drawn by the primitive above and whose whole
   // subject — the option list — exists only while it is OPEN. Neither representative frame holds
@@ -5132,6 +5142,104 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-recipe-item-contents',
+    label: 'Manager — Recipe item contents',
+    // THE TAB BETWEEN THE TWO THAT HAD FRAMES (issue 1513). `manager-recipe-item-overview` stops
+    // on the editor's opening tab and both validation cases step straight past this one to
+    // `[data-recipe-item-tab-button="validation"]`, so the Contents tab — the list of recipes a
+    // reader can learn from the item — was drawn by no published frame at all.
+    //
+    // It is the RESTING half of a pair. The case below drives the same tab one click further and
+    // opens its link-recipe picker, and a panel frame cannot stand in for this one: the open
+    // panel covers the very list this tab is about.
+    //
+    // `hb-book` for the reason both validation cases open it — it is the herbalism world's one
+    // definition carrying authored membership, so the linked-list branch renders here rather than
+    // the `data-recipe-item-contents-empty` line. The membership is pinned against
+    // `buildLabContent()` in `tests/view-lab-cases.test.js`, because a drifted fixture id in a
+    // step selector is otherwise undetected (issue 1632).
+    //
+    // `beyond` with NO smoke label, on the measurement `manager-recipe-item-overview` records: the
+    // smoke walk clicks through to validation and captures only the two validation frames, so an
+    // `exact` claim here would name a counterpart that does not exist.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-book"]' },
+      { selector: '[data-recipe-item-tab-button="contents"]' },
+    ],
+    expectView: 'recipe-item-edit',
+    // The PANEL and the populated list inside it, not the tab BUTTON: a strip that kept its
+    // buttons while the panel stopped rendering would leave every other claim here true, and the
+    // list is what says the fixture's membership reached the screen rather than the empty line.
+    expectSelector: '[data-recipe-item-tab="contents"] [data-recipe-item-contents-list]',
+    kinds: ['manager', 'books-scrolls'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-item-contents-picker',
+    label: 'Manager — Recipe item contents, the link-recipe picker open',
+    // THE PICKER NO CASE OPENED (issue 1513). `RecipeItemContentsTab` renders a `SearchablePopover`
+    // over the whole linkable recipe library, and every case that reached this editor drew that
+    // control CLOSED — so the panel, its option rows and the search it is about to gain were
+    // published by nothing. The phase that turns that search on comes after this case, which is
+    // why the case lands first: the before frame has to exist while the tree still draws it.
+    //
+    // `hb-book` links three of herbalism's nine recipes, so six are linkable: the trigger is
+    // enabled (it carries `triggerAriaDisabled={linkable.length === 0}`, and the primitive refuses
+    // to open on that flag exactly as it does on `disabled`) and the panel opens over a POPULATED
+    // list rather than over its no-matches branch.
+    //
+    // `beyond`, `smokeLabels: []`: the live smoke opens no recipe-item picker, so there is no
+    // counterpart to fall short of, and a `beyond` case must claim zero labels.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-book"]' },
+      { selector: '[data-recipe-item-tab-button="contents"]' },
+      { selector: '[data-recipe-item-link-recipe-toggle]' },
+    ],
+    expectView: 'recipe-item-edit',
+    // THE PANEL, ITS SEARCH ROW AND A ROW IN IT. The panel alone would pass over an empty list,
+    // and the option row is what makes this frame evidence for the populated presentation. Scoped
+    // to `.fabricate-manager` because the panel is PORTALED there — a portal that failed to land
+    // would leave it inside the tab's own clipped column, where this selector cannot match.
+    //
+    // `:has(.manager-travel-popover-search)` IS A RESTATEMENT, in the commit that falsified the
+    // claim it replaces (`design-system/spec.md:222`: a docblock refusing something the tree has
+    // since overturned is restated by the change that overturns it, not left standing). This
+    // comment used to read "No `.manager-travel-popover-search` claim: this call site passes
+    // `showSearch={false}` today, and that is exactly what the next phase changes." That phase
+    // has landed — `RecipeItemContentsTab` passes no `showSearch` at all now — so the frame's
+    // SUBJECT moved: it is the searchable library panel, and a regression that took the field
+    // back off would otherwise publish a frame that still passed. The `:has()` form is the one
+    // `player-actor-picker` already uses to claim a sibling subtree from a single selector.
+    expectSelector:
+      '.fabricate-manager .fabricate-picker-popover.manager-travel-popover' +
+      ':has(.manager-travel-popover-search)' +
+      ' .manager-travel-popover-options .manager-travel-option',
+    kinds: ['manager', 'books-scrolls'],
+    // `...ANCHORED_POPOVER_SOURCES` because this frame RESTS ON AN OPEN PANEL the shared
+    // positioning seam measured, clamped and portaled, which is that array's own membership test.
+    // `SearchablePopover.svelte` is deliberately NOT named here, for the reason
+    // `manager-recipe-edit-tag-picker` records: it is a broad-signal file, so a pattern naming it
+    // is shadowed by that signal and the mapping gate reds on it.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  managerCase({
     id: 'manager-recipe-item-validation',
     label: 'Manager — Recipe item validation',
     smokeLabels: ['manager-recipe-item-validation'],
@@ -5978,6 +6086,48 @@ export const VIEW_LAB_CASES = Object.freeze([
       // gate produces.
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/crafting\/craftingNav\.js$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-access-inspector',
+    label: 'Manager — Recipe access inspector, a recipe selected',
+    // THE INSPECTOR NO FRAME FILLED (issue 1513). `manager-recipe-edit-access-rail` above is the
+    // Access screen's resting frame and it draws this inspector's SELECT-A-RECIPE empty state:
+    // `selectedRecipeIdForAccess` opens as `''` and that case's steps select no row. So the two
+    // rosters — the search field that never appears below seven rows and the hand-rolled pager
+    // beside it — were published by nothing at all.
+    //
+    // A NEW CASE rather than a step added to the rail frame, because that frame is `reaches:
+    // 'exact'` against a live smoke label: driving it one click further would move a frame the
+    // smoke has a counterpart for, and the counterpart does not move with it.
+    //
+    // `al-r-elixir` is REACHABLE, not merely present. The list opens unfiltered at
+    // `pageSize = 10` and `lab-alchemy` holds five recipes, so every row is on page one — both
+    // facts pinned against `buildLabContent()` in `tests/view-lab-cases.test.js`, because a
+    // drifted fixture id in a step selector is otherwise undetected (issue 1632).
+    //
+    // NO GRANT IS SEEDED, and the refusal is deliberate rather than an omission. An ungranted
+    // roster draws both sections and both controls, which is the whole subject of this frame,
+    // while a seeded grant reaches `RecipeVisibilityService`'s player-visibility resolution on a
+    // `restricted` system — the class of mechanism `labContent.js` already records pushing player
+    // cases onto page 2. The granted-row appearance is held by
+    // `tests/components/grant-access-inspector-mounted.test.js`.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-alchemy' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-access' },
+      { selector: '[data-access-row="al-r-elixir"]' },
+    ],
+    expectView: 'access',
+    // The inspector's CHARACTERS roster, not the inspector root: the root renders in BOTH
+    // branches, so naming it alone would pass over the empty state this case exists to leave.
+    expectSelector: '[data-access-inspector] [data-access-roster="characters"]',
+    kinds: ['manager', 'access'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
     ],
   }),
   managerCase({
@@ -10814,9 +10964,17 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'inventory' },
     steps: [],
     kinds: ['player', 'inventory'],
+    // `ComponentSourcesBar` NAMED EXPLICITLY (issue 1513), the repair issue 1500 made for
+    // `ActorSelectTopBar` on the same measurement. The bar's `showSourcesBar` is
+    // `isCrafting || isInventory || isAlchemy`, so it draws in THREE tabs while its only routing
+    // was `CRAFTING_SHARED` — a crafting-directory pattern that cannot reach an inventory or
+    // alchemy frame. A change to the bar therefore published nothing of the two tabs it also
+    // renders in. The pattern is exact rather than a directory leg, because the rest of
+    // `apps/crafting/` is genuinely not this frame's subject.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/inventory\//,
       /^src\/ui\/svelte\/stores\/inventoryStore/,
+      /^src\/ui\/svelte\/apps\/crafting\/ComponentSourcesBar\.svelte$/,
       PLAYER_VIEW_STATE,
     ],
   }),
@@ -11652,6 +11810,60 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
+    id: 'player-crafting-sources-picker',
+    label: 'Player app — Crafting component sources picker',
+    // THE PANEL TWENTY-SEVEN FRAMES CLAIM AND NONE OPENS (issue 1513). `ComponentSourcesBar` is
+    // matched by `CRAFTING_SHARED`, so every crafting case reports SATISFIED for a change to it —
+    // and in all twenty-seven the picker is CLOSED, because no case's steps have ever named
+    // `data-crafting-sources-add`. That is the View Lab's quieter false positive: a case that
+    // NAMES the changed file computes its expectation from the same selection the pattern
+    // produced, so the evidence set looks fuller than an unregistered window's while showing none
+    // of the state that moved.
+    //
+    // The twenty-seven claims are NOT narrowed by this case. The closed avatar row is honestly
+    // drawn in all of them and the change that follows moves it too; this frame is the state they
+    // cannot reach, not a correction to what they show.
+    //
+    // ONE STEP, and it is the trigger. The panel's options are `store.available`, which resolves
+    // through the same `getBarSelectableActors` the actor bar's own picker lists — the picker
+    // `player-actor-picker` photographs with rows in it — so this panel opens over a populated
+    // list rather than over its no-owned-actors line.
+    //
+    // `reaches: 'beyond'`, `smokeLabels: []`: the live smoke opens no sources picker, so there is
+    // no counterpart to fall short of, and a `beyond` case must claim zero labels.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { tab: 'crafting' },
+    steps: [{ selector: '[data-crafting-sources-add]' }],
+    // THE PORTALED FORM, as of the phase that routed this control onto the shared picker. The
+    // panel was a `position: absolute` child of the bar and this selector began
+    // `[data-crafting-sources]`; it is now `SearchablePopover`'s panel, portaled to the
+    // application root and therefore OUTSIDE the bar's subtree entirely, so an ancestor-scoped
+    // assertion could not match it and would fail the capture WHOLE rather than publish. What
+    // survives the move is the caller's own two hooks: `popoverClass` puts
+    // `crafting-sources-popover` on the portaled panel and `optionClass` puts
+    // `crafting-source-option` on the primitive's row, so the frame still asserts THIS panel
+    // rather than whichever picker happens to be open.
+    //
+    // AND IT TAKES `...ANCHORED_POPOVER_SOURCES` NOW, which it deliberately did not before. The
+    // panel is measured, clamped and portaled by that seam from this commit forward, so a
+    // regression in the pass is visible here — which is the membership test the array's own
+    // failure text states, read the right way round.
+    expectSelector:
+      '.fabricate-picker-popover.crafting-sources-popover ' +
+      '.manager-travel-popover-options .crafting-source-option',
+    kinds: ['player', 'crafting'],
+    // `apps/crafting/ComponentSourcesBar.svelte` NAMED EXPLICITLY rather than left to
+    // `CRAFTING_SHARED`. The shared pattern already admits it, so this entry changes no selection
+    // — it states which file this frame is evidence ABOUT, which is what the other two repairs in
+    // this commit give `player-inventory` and `player-alchemy-workbench`.
+    sourceMatches: [
+      CRAFTING_SHARED,
+      /^src\/ui\/svelte\/apps\/crafting\/ComponentSourcesBar\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  playerCase({
     id: 'player-crafting-ingredient-routed',
     label: 'Player app — Crafting ingredient routed',
     smokeLabels: ['player-crafting-ingredient-routed'],
@@ -12181,7 +12393,14 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { tab: 'alchemy' },
     steps: [],
     kinds: ['player', 'alchemy'],
-    sourceMatches: [/^src\/ui\/svelte\/apps\/alchemy\//, PLAYER_VIEW_STATE],
+    // The ALCHEMY end of the same repair `player-inventory` above carries (issue 1513): this tab
+    // is the third `showSourcesBar` renders in, and it is the alchemy frame that draws the bar at
+    // the app's own default geometry with no step to reach it.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/alchemy\//,
+      /^src\/ui\/svelte\/apps\/crafting\/ComponentSourcesBar\.svelte$/,
+      PLAYER_VIEW_STATE,
+    ],
   }),
   playerCase({
     id: 'player-alchemy-stacked',

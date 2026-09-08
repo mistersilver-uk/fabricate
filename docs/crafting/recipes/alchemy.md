@@ -148,6 +148,8 @@ The discipline's name and its **Switch discipline** button sit above the **Known
 
 By default the workbench only shows the components carried by the character you selected.
 A bar above the columns lets you add other characters you own as extra component sources.
+Open it to search your other characters by name, then choose one to add it.
+The list stays open, so you can add several characters in a row, and it shows a running count of how many match your search out of your total.
 Their alchemy components then appear in **Your components** alongside the selected character's, so you can brew with items spread across several characters.
 
 ### Choosing a discipline

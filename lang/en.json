@@ -884,7 +884,8 @@
           "Add": "Add a component source",
           "Remove": "Remove {name} from component sources",
           "AlwaysIncluded": "always included",
-          "Empty": "No other owned characters to add."
+          "Empty": "No other owned characters to add.",
+          "SearchCharacters": "Search characters…"
         }
       },
       "Journal": {
@@ -6167,7 +6168,9 @@
           "Table": "Recipe access table",
           "Title": "Recipe access",
           "ToggleNamed": "Toggle access for {name}",
-          "RolePlayer": "Player"
+          "RolePlayer": "Player",
+          "RosterPagination": "{roster} pagination",
+          "RosterPageNavigation": "{roster} page navigation"
         },
         "Scoped": {
           "ComponentCatalogueTitle": "Component catalogue",
@@ -6855,6 +6858,7 @@
             "LinkRecipe": "Link recipe",
             "NoneLinkable": "Every recipe is already linked",
             "Remove": "Remove recipe",
+            "SearchRecipes": "Search recipes…",
             "Title": "Recipes inside",
             "Uncategorized": "General"
           },

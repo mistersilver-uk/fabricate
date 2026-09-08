@@ -106,22 +106,245 @@ describe('ComponentSourcesBar mounted behavior', () => {
     assert.deepEqual(calls.remove, ['b'], 'right-click did NOT remove the required source');
   });
 
-  it('opens the add/edit popover listing every owned actor to toggle', async () => {
+  /**
+   * THE PANEL IS `SearchablePopover`'S NOW, AND IT IS PORTALED (issue 1513).
+   *
+   * Every selector here reads from the mount TARGET rather than from the bar: the primitive
+   * moves its panel to the resolved application root, so `[data-crafting-sources]` is no longer
+   * an ancestor of it. The two caller hooks are what keep these assertions about THIS panel —
+   * `popoverClass` puts `crafting-sources-popover` on the portaled node and `optionClass` puts
+   * `crafting-source-option` on the primitive's row.
+   *
+   * `assert.ok(!node)` rather than `assert.equal(node, null)` for the closed state: on failure
+   * `node:assert` serialises the actual value to build its diff and walks a mounted happy-dom
+   * element's circular tree until the heap dies, so a two-second failure would surface as an
+   * OOM with no message.
+   */
+  it('opens the add/edit picker listing every owned actor to toggle, and commits on choose', async () => {
     const { store, calls } = craftingSources();
     const target = await harness.mount({ services: { craftingSources: store } });
 
-    assert.equal(target.querySelector('.crafting-sources-popover'), null, 'popover closed by default');
+    assert.ok(!target.querySelector('.crafting-sources-popover'), 'panel closed by default');
     target.querySelector('[data-crafting-sources-add]').click();
     flushSync();
 
     const popover = target.querySelector('.crafting-sources-popover');
-    assert.ok(popover, 'popover opened');
+    assert.ok(Boolean(popover), 'panel opened');
+    assert.ok(
+      !popover.closest('[data-crafting-sources]'),
+      'and it is PORTALED out of the bar rather than positioned inside it, which is the whole ' +
+        'reason the hand-rolled `position: absolute` panel could be clipped by the listing'
+    );
     const options = popover.querySelectorAll('.crafting-source-option');
     assert.equal(options.length, 3, 'one option per available owned actor');
 
     options[2].click();
     flushSync();
     assert.deepEqual(calls.toggle, ['c'], 'toggling an available actor calls store.toggle');
+    assert.ok(
+      Boolean(target.querySelector('.crafting-sources-popover')),
+      'and the panel STAYS OPEN, because a control that adds four source actors must not cost ' +
+        'four open-choose-reopen cycles'
+    );
+
+    target
+      .querySelectorAll('.crafting-sources-popover .crafting-source-option')[1]
+      .click();
+    flushSync();
+    assert.deepEqual(
+      calls.toggle,
+      ['c', 'b'],
+      'a second choice commits straight through as well: there is no staged set, no Apply and ' +
+        'no Clear, because every surface reading the selection re-derives from it live'
+    );
+  });
+
+  /**
+   * THE MULTI-SELECT ANNOUNCEMENT, which is the single most important thing the conversion had
+   * to preserve.
+   *
+   * The hand-rolled panel wrote `aria-selected={selectedIds.has(actor.id)}` per row and was
+   * CORRECT: it was true on every chosen actor at once. Routing it onto a primitive that
+   * announces one-of-N would have been an accessibility regression shipped as a design-system
+   * adoption, so this asserts the exact strings on every row rather than the presence of the
+   * attribute — the primitive emits `aria-selected` unconditionally, so a presence check passes
+   * straight over the defect.
+   */
+  it('announces every chosen source actor at once, not one of N', async () => {
+    const { store } = craftingSources();
+    const target = await harness.mount({ services: { craftingSources: store } });
+    target.querySelector('[data-crafting-sources-add]').click();
+    flushSync();
+
+    const popover = target.querySelector('.crafting-sources-popover');
+    assert.equal(
+      popover.querySelector('[role="listbox"]').getAttribute('aria-multiselectable'),
+      'true',
+      'the list declares itself multi-selectable'
+    );
+    const marks = [...popover.querySelectorAll('.crafting-source-option')].map((row) =>
+      row.getAttribute('aria-selected')
+    );
+    assert.deepEqual(
+      marks,
+      ['true', 'true', 'false'],
+      'the fixture selects `a` and `b` and not `c`, and the panel says so on all three rows. A ' +
+        'single-value listbox can only ever mark ONE, which is the announcement this control ' +
+        'has always made correctly and must not lose to the conversion'
+    );
+    assert.equal(
+      popover.querySelectorAll('.crafting-source-option-check').length,
+      2,
+      'and the visible check glyph agrees with the announcement'
+    );
+  });
+
+  /**
+   * THE SECOND STAY-OPEN HAZARD: A RE-PROJECTION UNDER AN OPEN PANEL (issue 1513, review r1).
+   *
+   * The clause above proves the panel survives a CHOICE. It does not prove it survives the thing
+   * the choice causes: `store.toggle` writes through to the crafting store, and every surface
+   * reading the selection re-derives — so the bar is handed a NEW services object, a NEW
+   * `available` array and a changed `selectedSourceIds` while its panel is still open. Three
+   * things could go wrong there and none of them is visible in the choose test: the panel could
+   * unmount and take the GM's query with it, the rows could be re-created (losing the DOM the
+   * keyboard cursor addresses by id), or the marks could stay on the pre-toggle selection.
+   *
+   * A NEW OBJECT AT EVERY LEVEL is the point of the fixture. Mutating the existing store proves
+   * nothing here — `$derived` reads the same identity and would re-run for the wrong reason.
+   */
+  it('survives a re-projection while open, keeping the query and re-marking the rows', async () => {
+    const { store } = craftingSources();
+    const target = await harness.mount({ services: { craftingSources: store } });
+    target.querySelector('[data-crafting-sources-add]').click();
+    flushSync();
+
+    const field = target.querySelector('.crafting-sources-popover .manager-travel-popover-search input');
+    field.value = 'c';
+    field.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+
+    const before = [...target.querySelectorAll('.crafting-sources-popover .crafting-source-option')];
+    assert.equal(before.length, 1, 'the query narrows the owned-actor list to Cy');
+    assert.equal(before[0].getAttribute('aria-selected'), 'false');
+
+    // What toggling `c` does to this component's inputs: a fresh store object carrying a fresh
+    // `available` array and a selection that now holds `c`.
+    const { store: next } = craftingSources({
+      available: [
+        { id: 'a', name: 'Aria', img: 'icons/svg/mystery-man.svg' },
+        { id: 'b', name: 'Borin', img: '' },
+        { id: 'c', name: 'Cy', img: '' }
+      ],
+      selectedSourceIds: ['a', 'b', 'c']
+    });
+    await harness.setProps({ services: { craftingSources: next } });
+
+    const popover = target.querySelector('.crafting-sources-popover');
+    assert.ok(Boolean(popover), 'the panel survives a whole new services object');
+    assert.equal(
+      popover.querySelector('.manager-travel-popover-search input').value,
+      'c',
+      'and so does the query the GM typed, which a close-and-reopen would have cleared'
+    );
+
+    const after = [...popover.querySelectorAll('.crafting-source-option')];
+    assert.equal(after.length, 1, 'the filtered list is still the filtered list');
+    assert.ok(
+      after[0] === before[0],
+      'and it is the SAME element: the rows are keyed by option id, so a re-projection that ' +
+        'happens to produce the same ids must not re-create the DOM the keyboard cursor names ' +
+        'through `aria-activedescendant`'
+    );
+    assert.equal(
+      after[0].getAttribute('aria-selected'),
+      'true',
+      'and the mark follows the new selection rather than the one the panel opened over'
+    );
+    assert.equal(
+      popover.querySelectorAll('.crafting-source-option-check').length,
+      1,
+      'the visible check agrees with it'
+    );
+  });
+
+  /**
+   * THE PANEL AND ITS LIST BOTH ANNOUNCE A NAME (issue 1513, review r1).
+   *
+   * `dialogAriaLabel` feeds BOTH the portaled `role="dialog"` and the `role="listbox"` inside it,
+   * and the source contract cannot finish that job: a call site's string is present and non-empty
+   * in the text while resolving to `''` at runtime. Only the rendered attribute can say it.
+   */
+  it('names the portaled panel and the listbox inside it', async () => {
+    const { store } = craftingSources();
+    const target = await harness.mount({ services: { craftingSources: store } });
+    target.querySelector('[data-crafting-sources-add]').click();
+    flushSync();
+
+    const popover = target.querySelector('.crafting-sources-popover');
+    const panelName = popover.getAttribute('aria-label');
+    const listName = popover.querySelector('[role="listbox"]').getAttribute('aria-label');
+    assert.notEqual(panelName, '', 'an unnamed dialog is invisible in a frame and is not a compiler error');
+    assert.notEqual(listName, '', 'and an unnamed listbox inside it is the same defect one level down');
+    assert.match(panelName, /Sources\.Edit/u, 'the mount stub echoes the key this control names itself by');
+    assert.equal(listName, panelName, 'one string names both, which is what the primitive passes');
+  });
+
+  /**
+   * THE SEARCH FIELD AND THE MATCHED-OF-TOTAL COUNT, neither of which this control has ever had.
+   *
+   * `Sources.SearchCharacters` is the placeholder AND the field's accessible name, taken
+   * verbatim from the GM-side `Access.SearchCharacters` so one control does not read differently
+   * in two windows.
+   */
+  it('renders a query field and a matched-of-total count over the owned-actor list', async () => {
+    const { store } = craftingSources();
+    const target = await harness.mount({ services: { craftingSources: store } });
+    target.querySelector('[data-crafting-sources-add]').click();
+    flushSync();
+
+    const popover = target.querySelector('.crafting-sources-popover');
+    const field = popover.querySelector('.manager-travel-popover-search input');
+    assert.ok(Boolean(field), 'the panel renders a query field');
+    assert.ok(
+      (field.getAttribute('aria-label') || '').trim() !== '',
+      'and it is named, rather than relying on a placeholder assistive technology may not read'
+    );
+    assert.equal(popover.querySelector('[data-popover-filtered-count]').textContent, '3 of 3');
+
+    field.value = 'ar';
+    field.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+    assert.equal(
+      target.querySelector('.crafting-sources-popover [data-popover-filtered-count]').textContent,
+      '1 of 3',
+      'and the count answers the query rather than restating the list length'
+    );
+  });
+
+  /**
+   * THE NO-OWNED-ACTORS LINE, in the slot it has always occupied.
+   *
+   * `Sources.Empty` is a body SENTENCE. The primitive's `emptyHint` feeds `EmptyState`'s `<h3>`
+   * and `emptyDetail` feeds its `<p>`, so the sentence routes to `emptyDetail` — which is the
+   * same `EmptyState note` slot the deleted `<EmptyState note hint={...}/>` markup put it in.
+   * Demoting it into a heading would have been the visible cost of taking the nearer-looking
+   * prop name.
+   */
+  it('draws the no-owned-actors sentence as a body line, not as a heading', async () => {
+    const { store } = craftingSources({ available: [] });
+    const target = await harness.mount({ services: { craftingSources: store } });
+    target.querySelector('[data-crafting-sources-add]').click();
+    flushSync();
+
+    const empty = target.querySelector('.crafting-sources-popover .manager-travel-popover-empty');
+    assert.ok(Boolean(empty), 'the empty branch renders');
+    assert.ok(!empty.querySelector('h3'), 'and it renders NO heading');
+    assert.match(
+      empty.querySelector('p').textContent,
+      /Sources\.Empty/u,
+      'and the sentence is the one this control has always drawn (the mount stub echoes the key)'
+    );
   });
 
   /**
@@ -169,7 +392,9 @@ describe('ComponentSourcesBar mounted behavior', () => {
     target.querySelector('[data-crafting-sources-add]').click();
     flushSync();
 
-    const tiles = [...target.querySelectorAll('.crafting-source-option .fab-avatar')];
+    const tiles = [
+      ...target.querySelectorAll('.crafting-sources-popover .crafting-source-option .fab-avatar'),
+    ];
     assert.equal(tiles.length, 3, 'one shared portrait per available actor');
     assert.ok(
       tiles.every((tile) => tile.classList.contains('is-square') && tile.style.width === '32px'),

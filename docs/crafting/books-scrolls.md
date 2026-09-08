@@ -27,7 +27,9 @@ You manage which recipes a book contains on the book's own page in [Books & Scro
 You link recipes to a book from the book's own page in [Books & Scrolls](#books--scrolls), not from the recipe editor.
 Open a recipe item, then use its **Contents** tab to build the list of recipes the book teaches.
 
-- Use **Link recipe** to add a recipe to the book.
+- Use **Link recipe** to open a searchable list of the crafting system's recipes not already in this book.
+  Type to find one by name, then choose it to link it.
+  The list stays open, so you can link several recipes in a row.
 - Use **Remove recipe** on a listed recipe to take it out of the book.
 - A book with no recipes yet says so until you link the first one.
 

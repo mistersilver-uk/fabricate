@@ -281,7 +281,16 @@ export function isExemptSpacingPixels(pixels) {
 // `.actor-bar-stamina-track` and `.essence-pool-bar` keep a width and a display and no spacing at
 // all. What the primitives absorb is `var(--fab-space-*)` throughout, so the nine occupancies are
 // paid rather than relocated. Measured on the tree, not subtracted.
-export const KNOWN_RAW_SPACING_TOTAL = 844;
+// 844 -> 839 (issue 1513): the crafting sources picker's panel, its scroll box and its option row
+// are `SearchablePopover`'s elements now, and the three rules that declared them went with the
+// markup. ONE row SHRINKS and FOUR at one occupancy VANISH. The one that shrinks is
+// `ComponentSourcesBar | gap 10`, whose second occupancy was the option row's own gap; the bar's
+// own row gap is untouched. The four that vanish are `gap 2` and `padding 6` (the deleted scroll
+// box) and `padding 4` and `padding 8` (the deleted option row's one shorthand). `gap 6` is
+// UNMOVED and is the avatar row's, which this change does not touch. What the primitive absorbs
+// is `var(--fab-space-*)` throughout, so the five occupancies are paid rather than relocated.
+// Measured on the tree, not subtracted.
+export const KNOWN_RAW_SPACING_TOTAL = 839;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

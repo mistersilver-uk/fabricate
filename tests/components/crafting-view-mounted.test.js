@@ -325,9 +325,17 @@ describe('the crafting tab conversions and the routings they refused (issue 1514
    * unless the conversion really happened: a file that still writes its own empty class has not
    * converted, and a file importing nothing cannot be rendering the panel.
    */
-  it('routes the tab`s four one-line empties through the released `note` panel', () => {
+  it('routes the tab`s remaining one-line empties through the released `note` panel', () => {
+    // THE SOURCES BAR LEFT THIS LIST WITHOUT LEAVING THE TREATMENT (issue 1513). Its picker is
+    // the shared `SearchablePopover` now, so the sentence reaches the same `EmptyState note`
+    // panel through the primitive's `emptyDetail` prop rather than through markup of its own —
+    // which is why the pair this loop asserts (imports `EmptyState` AND deleted its own class)
+    // stopped being the readable proof for that file. `component-sources-bar-mounted.test.js`
+    // holds it instead, on the RENDERED DOM: a `<p>` under the panel and no `<h3>`, which is
+    // stronger than either half of the pair and is the assertion that would catch the one
+    // mistake available here — routing a body sentence into `emptyHint`, whose slot is the
+    // heading.
     const NOTE_SITES = [
-      ['src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte', 'crafting-sources-empty'],
       ['src/ui/svelte/apps/crafting/detail/ConsumptionPlanPanel.svelte', 'consumption-plan-empty'],
       ['src/ui/svelte/apps/crafting/detail/EssencePoolPanel.svelte', 'essence-pool-empty'],
       ['src/ui/svelte/apps/crafting/detail/OutcomeTierTable.svelte', 'crafting-tiers-empty'],

@@ -93,17 +93,42 @@
          `:global(...)` disabled rule below, which would otherwise stop reaching the chip.
 
          `is-neutral` rides `triggerClass` because the primitive renders the chip without a
-         `tone`, and that class is exactly what `tone="neutral"` emitted. `showSearch={false}`
-         keeps `triggerHasPopup="listbox"` truthful, and `showChevron={false}` keeps the trigger
-         an ADD control — its leading `fa-plus` says what it does, and a value chevron beside it
-         would imply it shows a current selection. -->
+         `tone`, and that class is exactly what `tone="neutral"` emitted. `showChevron={false}`
+         keeps the trigger an ADD control — its leading `fa-plus` says what it does, and a value
+         chevron beside it would imply it shows a current selection.
+
+         THE SEARCH FIELD IS ON, AND `triggerHasPopup` CAME OFF WITH IT (issue 1513). This panel
+         offers every recipe in the world that is not already linked, which on a real world is a
+         library rather than the handful of fixed names the four converted MENUS offer — and a
+         list you scroll to find a name in is the case the primitive's search exists for. The
+         two props move TOGETHER because they are one statement read from either end:
+         `aria-haspopup` says what activating the trigger OPENS, and with a query field in it
+         the panel is a dialog that CONTAINS a listbox rather than a bare listbox. Dropping the
+         prop takes the truthful `dialog` default, which is what
+         `searchable-popover-source-contract.test.js` holds in both directions.
+
+         `stayOpen` WITHOUT `multiple`, which is the separation issue 1513 built the gate for:
+         linking is still one choice at a time and the panel still announces a single-value
+         listbox, but linking a second recipe is the overwhelmingly common next action and
+         re-opening the trigger, re-typing the query and re-finding the place in the library
+         between each one is the whole cost. `showFilteredCount` states the matched-of-total the
+         field now makes reachable.
+
+         `triggerAriaDisabled` RATHER THAN `disabled`, and `stayOpen` is what made the difference
+         load-bearing. The panel outlives a choice now, so the LAST linkable recipe is linked with
+         the panel still open: a native `disabled` would leave the trigger `disabled` and
+         `aria-expanded="true"` at the same time, and Escape's `restoreTriggerFocus()` calls
+         `focus()` on a disabled button — a silent no-op that drops the keyboard user to `<body>`,
+         where Foundry's canvas keybindings are live again. The primitive refuses to open on
+         either flag, so the affordance is closed exactly as firmly; what changes is that the
+         button stays focusable and keeps announcing why it will not open. -->
     <div class="manager-recipe-item-link-recipe">
       <SearchablePopover
         options={linkOptions}
         triggerChip
-        showSearch={false}
+        stayOpen
+        showFilteredCount
         showChevron={false}
-        triggerHasPopup="listbox"
         triggerClass="manager-recipe-item-link-recipe-toggle is-neutral"
         triggerIcon="fas fa-plus"
         triggerLabel={text('FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe', 'Link recipe')}
@@ -112,7 +137,15 @@
           'Link recipe'
         )}
         triggerData={{ 'data-recipe-item-link-recipe-toggle': '' }}
-        disabled={linkable.length === 0}
+        searchPlaceholder={text(
+          'FABRICATE.Admin.Manager.RecipeItem.Contents.SearchRecipes',
+          'Search recipes…'
+        )}
+        searchAriaLabel={text(
+          'FABRICATE.Admin.Manager.RecipeItem.Contents.SearchRecipes',
+          'Search recipes…'
+        )}
+        triggerAriaDisabled={linkable.length === 0}
         emptyHint={text(
           'FABRICATE.Admin.Manager.RecipeItem.Contents.NoneLinkable',
           'Every recipe is already linked'
@@ -199,8 +232,18 @@
      stamps its hash on this component's own elements only, and a child component's root
      never carries it. Reaching it needs `:global`, nested under a selector that DOES
      carry the hash so nothing leaks. `cursor: pointer` is gone because the primitive's
-     own button rule already sets it; only the disabled state is this component's own. */
-  .manager-recipe-item-link-recipe :global(.manager-recipe-item-link-recipe-toggle:disabled) {
+     own button rule already sets it; only the disabled state is this component's own.
+
+     IT READS BOTH SPELLINGS OF "CLOSED", because since issue 1513 this call site passes
+     `triggerAriaDisabled` rather than `disabled`: the trigger carries `aria-disabled="true"`
+     with the native attribute ABSENT, so it stays focusable and keeps announcing why it will
+     not open. A `:disabled` selector alone therefore stopped matching the only state it was
+     written for — the "every recipe is already linked" panel drew a full-opacity trigger with
+     `cursor: pointer` that silently did nothing. `:is()` rather than a second rule so the two
+     spellings cannot drift apart, and `:disabled` is kept rather than replaced because the
+     primitive still renders the native attribute for any caller that passes `disabled`. */
+  .manager-recipe-item-link-recipe
+    :global(.manager-recipe-item-link-recipe-toggle:is(:disabled, [aria-disabled='true'])) {
     opacity: 0.5;
     cursor: not-allowed;
   }

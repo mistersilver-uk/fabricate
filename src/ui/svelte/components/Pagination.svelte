@@ -150,6 +150,27 @@
     // the route unmounts, and it is unreachable at the default size on any list the choice could
     // matter for — but it is the one thing this mode gives up.
     multiPageOnly = false,
+    // ── THE TWO LANDMARKS THIS COMPONENT EMITS, NAMED BY THE CALLER (issue 1513) ──────────
+    //
+    // The root is a `<section>` with an `aria-label`, which makes it a REGION landmark, and it
+    // contains a `<nav>`, which is a second one. Both took a fixed string, so a screen drawing
+    // two of these bars published two regions called "Pagination" and two navigations called
+    // "Page navigation" — and a landmark list is exactly the surface a screen-reader user
+    // navigates BY, so identical names there make the two indistinguishable in the one place
+    // the distinction is needed. The Access route's grant inspector is the shipped instance:
+    // two rosters, one pager each, in a 300px column.
+    //
+    // BOTH ARE OPTIONAL AND DEFAULT TO TODAY'S STRINGS, so all 25 importers render unchanged;
+    // a caller that draws one bar has nothing to disambiguate and passes neither.
+    //
+    // The default is `''` and the fallback is written at the USE SITE rather than as the prop's
+    // default value, which is the shape `tests/design-system-required-names.test.js` requires of
+    // a name-bearing prop: a hard-coded English default is a name `game.i18n` never sees, and a
+    // bare `aria-label={label}` over an empty default is a label of nothing that suppresses the
+    // element's own name. Callers pass a RESOLVED string rather than a key, because the names
+    // that make two bars tell apart are composed from the caller's own roster title.
+    label = '',
+    navLabel = '',
   } = $props();
 
   const totalPages = $derived(Math.max(1, Math.ceil(totalCount / Math.max(1, pageSize))));
@@ -214,7 +235,7 @@
 {#if showPagination}
   <section
     class="fabricate-pagination manager-pagination"
-    aria-label={text('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
+    aria-label={label || text('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
   >
     <span class="manager-pagination-summary" data-pagination-summary>
       {text('FABRICATE.Admin.Manager.Pagination.Range', 'Showing {first}–{last} of {total}')
@@ -225,7 +246,8 @@
     {#if showNav}
       <nav
         class="manager-pagination-nav"
-        aria-label={text('FABRICATE.Admin.Manager.Pagination.Navigation', 'Page navigation')}
+        aria-label={navLabel ||
+          text('FABRICATE.Admin.Manager.Pagination.Navigation', 'Page navigation')}
       >
         <IconButton
           data-pagination-prev=""

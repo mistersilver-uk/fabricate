@@ -429,9 +429,17 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * essence pool's track and fill drew 999px and the stamina track drew 999px — all three are
  * published rungs and none ever had a row. Re-derived from the JSON at this head.
  *
+ * 289 → 288 with issue 1513, one occurrence on one row: `crafting/ComponentSourcesBar.svelte |
+ * 8px` 3 → 2. The picker popover this file positioned for itself — `position: absolute`,
+ * `z-index: 4000` and an 8px corner — is `SearchablePopover`'s panel now, and the corner goes
+ * with the rule rather than being snapped: the shared panel draws its own, so restating a radius
+ * here would be a second copy of a value this file no longer owns. The row SURVIVES on its other
+ * two, the remove overlay and the add trigger, and neither is a panel. Nothing else in the phase
+ * touches a corner — the option row's own 6px was a published rung and never had a row.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 289;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 288;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -664,9 +672,19 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * so the debt is PAID rather than moved, and the slot is closed rather than left open for the
  * next author to fill.
  *
+ * 242 → 241 with issue 1513, one occurrence on one row: `crafting/ComponentSourcesBar.svelte`
+ * 4 → 3. The picker's option row was a raw `<button>` this file wrote; it is
+ * `SearchablePopover`'s row now, and the primitive writes a literal `data-keyboard-focus="true"`
+ * on it — the same payment issue 1503 recorded three times over when the icon and source
+ * pickers' rows moved into that same element. The row SURVIVES on the three raw buttons the
+ * file still writes: the source portrait, its remove overlay and the picker TRIGGER, which is
+ * this caller's own button through the `trigger` snippet and takes its attribute through a
+ * spread this source-level scanner cannot see. Nothing is being banked that the scanner did not
+ * measure — that trigger is deliberately still counted, exactly as the primitive's own is.
+ *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 242;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 241;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.
