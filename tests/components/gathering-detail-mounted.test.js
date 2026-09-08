@@ -12,7 +12,7 @@ import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 // (issue 1504). Spread from the harness's own roster rather than copied, so a module added
 // there cannot go missing here.
 import {
-  GATHERING_PLAYER_COMPILED_MODULES,
+  PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
@@ -245,7 +245,7 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringDropModifiers.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDrops.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringTaskDetail.svelte');
-    for (const primitive of GATHERING_PLAYER_COMPILED_MODULES) writeCompiledSvelte(primitive);
+    for (const primitive of PLAYER_APP_COMPILED_MODULES) writeCompiledSvelte(primitive);
     writeCompiledSvelte('src/ui/svelte/apps/gathering/GatheringView.svelte');
 
     GatheringView = (await import(pathToFileURL(join(

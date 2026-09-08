@@ -311,16 +311,16 @@ export const MARKS_AND_NOTICES_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/Callout.svelte',
 ]);
 
-// THE SHARED PRIMITIVES THE PLAYER GATHERING TREE RENDERS, as ONE closure (issue 1514).
+// THE SHARED PRIMITIVES THE PLAYER WINDOW'S TREES RENDER, as ONE closure (issue 1514).
 //
-// Three suites mount that tree — `gathering-detail-mounted`, `gathering-environments-mounted`
-// and `gathering-view-actor-bar` — and all three are HAND-ROLLED rather than built on
-// `createMountedComponentHarness`, so a module the tree renders and the manifest omits is not
-// the named "add it to compiledModules" error the shared harness raises. It is
-// `ERR_MODULE_NOT_FOUND` in `before()`, and `node --test` reports the whole file as
-// `# cancelled`, never `# fail`.
+// It began as the GATHERING tree's roster, because three suites mount that tree —
+// `gathering-detail-mounted`, `gathering-environments-mounted` and `gathering-view-actor-bar` —
+// and all three are HAND-ROLLED rather than built on `createMountedComponentHarness`, so a
+// module the tree renders and the manifest omits is not the named "add it to compiledModules"
+// error the shared harness raises. It is `ERR_MODULE_NOT_FOUND` in `before()`, and
+// `node --test` reports the whole file as `# cancelled`, never `# fail`.
 //
-// ONE ROSTER RATHER THAN THREE COPIES, and the reason is measured rather than stylistic. Issue
+// ONE ROSTER RATHER THAN N COPIES, and the reason is measured rather than stylistic. Issue
 // 1514's first phase added the same six-line comment and its two `writeCompiledSvelte` calls to
 // each of those three suites and to `fabricate-app-root-mounted`, and SonarCloud reported
 // `new_duplicated_lines_density` at 6.8% against a 3% threshold naming exactly those four files
@@ -328,7 +328,18 @@ export const MARKS_AND_NOTICES_COMPILED_MODULES = Object.freeze([
 // inside a duplicated block, and these harness manifests are near-identical across suites
 // already, so every line inserted into one lands inside such a block. The fix is therefore to
 // insert FEWER lines rather than to reword them: the prose lives here once and each call site
-// is a single loop.
+// is a single loop or a single spread.
+//
+// WIDENED FROM THE GATHERING TREE TO THE WINDOW at issue 1514's third phase, rather than
+// copied. That phase adopts the same primitives in the ALCHEMY and JOURNAL trees, whose five
+// suites are `createMountedComponentHarness`-based and so fail loudly — but the manifests are
+// the same near-identical block, and five more hand-listed entries across five of them is the
+// same duplicated-lines measurement in a different file set. A SECOND frozen array beside this
+// one would not have helped: SonarCloud's copy-paste detector normalises literals, so two
+// adjacent five-line arrays of component paths match each other by SHAPE whatever the strings
+// say. So there is one list, `FillBar` joins it for the Journal run card's progress track, and
+// a suite compiling a member its own tree never renders writes one inert file into a temp
+// directory — which is cheaper than the roster it would otherwise fork.
 //
 // FLAT, and one quoted literal per entry, because the static guard in
 // `mounted-harness-primitive-allowlist.test.js` resolves an imported roster by matching
@@ -336,10 +347,11 @@ export const MARKS_AND_NOTICES_COMPILED_MODULES = Object.freeze([
 // inside this body would resolve to nothing and the guard would read these suites as compiling
 // none of it — green, and blind. That is why `Kicker`, `Notice` and `Callout` are restated here
 // rather than spread from the roster above.
-export const GATHERING_PLAYER_COMPILED_MODULES = Object.freeze([
+export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   'src/ui/svelte/apps/PlayerViewState.svelte',
+  'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/Medallion.svelte',
   'src/ui/svelte/components/Notice.svelte',

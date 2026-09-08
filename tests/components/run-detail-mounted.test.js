@@ -9,6 +9,7 @@ import { resolve } from 'node:path';
 import {
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
+  PLAYER_APP_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness
 } from '../helpers/svelte-component-harness.js';
@@ -37,6 +38,10 @@ const harness = createMountedComponentHarness({
     // Issue 1506: the journal's status pill retired into the shared chip, which this list
     // reaches through the `<Select>` closure rather than by a fourth hand-written literal.
     ...SELECT_COMPILED_MODULES,
+    // The shared primitives this tree draws, as ONE spread (issue 1514). See
+    // `PLAYER_APP_COMPILED_MODULES` in the harness for why it is one roster and not a
+    // list per suite.
+    ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/apps/journal/JournalCard.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/journal/StepTimeline.svelte',
@@ -80,9 +85,14 @@ describe('RunDetail mounted behavior', () => {
     assert.equal(target.querySelector('[data-step-index="1"]').getAttribute('data-step-state'), 'pending');
   });
 
+  // BOTH TITLE LOCATORS MOVED WITH THE MARKUP (issue 1514). `JournalCard` drew its heading as
+  // a hand-rolled `.journal-card-title` `<h3>`; it is a `<Kicker as="h3">` now, so the class is
+  // gone and `.fab-kicker` is the locator. A test that kept the old selector would not have
+  // failed loudly — `querySelector` returns null and the assertion dies on `textContent`, which
+  // is what these two did before this line was written.
   it('titles the requirements card "Step requirements" for a multi-step run', async () => {
     const target = await harness.mount({ run: makeCraftingRun(), now: 0, services: services() });
-    const title = target.querySelector('[data-journal-card="step-details"] .journal-card-title');
+    const title = target.querySelector('[data-journal-card="step-details"] .fab-kicker');
     assert.equal(title.textContent, 'FABRICATE.App.Journal.StepDetails.Title', 'multi-step keeps the step title');
   });
 
@@ -106,7 +116,7 @@ describe('RunDetail mounted behavior', () => {
     });
     const target = await harness.mount({ run, now: 0, services: services() });
     assert.equal(target.querySelector('[data-journal-timeline]'), null, 'single-step run omits the step timeline');
-    const title = target.querySelector('[data-journal-card="step-details"] .journal-card-title');
+    const title = target.querySelector('[data-journal-card="step-details"] .fab-kicker');
     assert.equal(title.textContent, 'FABRICATE.App.Journal.StepDetails.TitleSingleStep', 'single-step uses the craft title');
   });
 

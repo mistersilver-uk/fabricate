@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  createMountedComponentHarness,
+  PLAYER_APP_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -21,10 +24,11 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-alchemy-workbench-',
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
   compiledModules: [
-    'src/ui/svelte/apps/alchemy/EssenceChips.svelte',
-    // The shared notice the last-brew banner composes (issue 1505). A compiled component
+    // The shared notice the last-brew banner composes (issue 1505) plus the tile and the label
+    // the bench and the Produces heading draw (issue 1514), as ONE spread. A compiled component
     // missing from this list does not fail the suite, it HANGS it (# cancelled).
-    'src/ui/svelte/components/Notice.svelte',
+    ...PLAYER_APP_COMPILED_MODULES,
+    'src/ui/svelte/apps/alchemy/EssenceChips.svelte',
     'src/ui/svelte/apps/alchemy/Workbench.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/alchemy/Workbench.svelte'
@@ -318,5 +322,124 @@ describe('Workbench (mounted)', () => {
         'nothing has happened yet, so there is nothing for a notice to report'
       );
     });
+  });
+});
+
+/**
+ * The Workbench's adoption of the shared tile and label, and the two conversions this phase
+ * measured and REFUSED (issue 1514, phase 3).
+ *
+ * The refusals are asserted as well as the conversions, because a deferral recorded only in a
+ * comment is a deferral the next author reverses without reading it. Both are stated as the
+ * measurement that produced them: the status strip is the one banner in the tab whose resting
+ * tone no `Notice` can paint, and the still-needed well is the one whose body no `Callout` can
+ * hold.
+ */
+describe('Workbench primitive adoption (issue 1514)', () => {
+  before(() => harness.setup());
+  after(() => harness.teardown());
+  beforeEach(() => harness.remount());
+
+  const MISSING = [{ componentId: 'ash', name: 'Ashroot', need: 2 }];
+
+  it('draws the bench chip and the result tile at the sizes their rules drew, glyph and ink carried', async () => {
+    const target = await harness.mount({
+      mode: 'ready',
+      targetName: 'Elixir',
+      benchEmpty: false,
+      benchChips: BENCH,
+      result: RESULT,
+      brewEnabled: true
+    });
+    const tiles = {
+      chip: target.querySelector('[data-alchemy-chip="emberroot"] .fab-medallion'),
+      result: target.querySelector('[data-alchemy-result] .fab-medallion')
+    };
+    assert.deepEqual(
+      {
+        chip: /width:\s*(\d+)px/.exec(tiles.chip.getAttribute('style'))?.[1],
+        result: /width:\s*(\d+)px/.exec(tiles.result.getAttribute('style'))?.[1]
+      },
+      { chip: '40', result: '46' },
+      'the 40px bench chip and the 46px result tile keep the boxes their own rules drew'
+    );
+    for (const [name, tile] of Object.entries(tiles)) {
+      assert.equal(tile.getAttribute('data-medallion-tint'), 'peach', `${name} keeps the peach ink`);
+      assert.ok(Boolean(tile.querySelector('i.fa-flask')), `${name} keeps the flask face`);
+    }
+    assert.match(
+      tiles.result.getAttribute('style'),
+      /--fab-medallion-glyph:\s*19px/,
+      "the result tile keeps its rule's 19px glyph rather than the tile's 0.9rem default"
+    );
+  });
+
+  it('draws the Produces label as the shared kicker, with its 28px of separation on the wrapper', async () => {
+    const target = await harness.mount({ mode: 'empty', benchEmpty: true });
+    const slot = target.querySelector('.alchemy-produces-slot');
+    assert.ok(Boolean(slot), 'the wrapper carrying the margin survives the conversion');
+    const kicker = slot.querySelector('.fab-kicker');
+    assert.ok(Boolean(kicker), 'the label itself is the shared kicker');
+    assert.equal(kicker.tagName.toLowerCase(), 'p', 'the `div` host becomes the kicker`s `p` fallback');
+    assert.ok(
+      !target.querySelector('.alchemy-produces-label'),
+      'the hand-rolled label class is gone rather than left beside the primitive'
+    );
+  });
+
+  it('draws both bench signature labels as the shared kicker', async () => {
+    const target = await harness.mount({
+      mode: 'untried',
+      benchEmpty: false,
+      benchChips: BENCH,
+      signatureText: 'Emberroot ×1',
+      benchEssences: [{ id: 'toxic', name: 'Toxic', icon: 'fas fa-skull', quantity: 4 }]
+    });
+    const labels = [
+      target.querySelector('.alchemy-signature .fab-kicker'),
+      target.querySelector('[data-alchemy-bench-essences] .fab-kicker')
+    ];
+    assert.deepEqual(
+      labels.map((label) => label?.tagName.toLowerCase()),
+      ['span', 'span'],
+      'both are `span` hosts, which the kicker renders natively rather than falling back'
+    );
+  });
+
+  it('leaves the live status strip hand-rolled, because its RESTING tone is one no notice paints', async () => {
+    const target = await harness.mount({ mode: 'empty', benchEmpty: true });
+    const strip = target.querySelector('[data-alchemy-status]');
+    assert.ok(Boolean(strip), 'the strip still reports the bench state');
+    assert.equal(strip.getAttribute('aria-live'), 'polite', 'and still announces it');
+    assert.ok(
+      !strip.classList.contains('fab-notice'),
+      'a `Notice` has no neutral tone and falls back to DANGER, which would paint the empty ' +
+        "bench's own instruction as an alert — see the markup comment"
+    );
+    assert.ok(
+      strip.classList.contains('alchemy-status-empty'),
+      'the neutral resting mode is the class this strip keeps for exactly that reason'
+    );
+  });
+
+  it('leaves the still-needed well hand-rolled, because its body is a wrapping chip row', async () => {
+    const target = await harness.mount({
+      mode: 'assembling',
+      benchEmpty: false,
+      benchChips: BENCH,
+      missing: MISSING
+    });
+    const well = target.querySelector('[data-alchemy-missing]');
+    assert.ok(Boolean(well), 'the assembling bench lists what is still needed');
+    assert.ok(
+      !well.classList.contains('manager-callout'),
+      '`Callout` takes `title` and `text` as strings and one non-wrapping `actions` cluster, ' +
+        'none of which can hold this row — see the markup comment'
+    );
+    assert.equal(
+      well.querySelectorAll('.alchemy-missing-chip').length,
+      MISSING.length,
+      'and the chips it could not hold are still chips'
+    );
   });
 });
