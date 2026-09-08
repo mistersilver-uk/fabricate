@@ -1189,6 +1189,55 @@ function worldNavItem(id) {
   return target.querySelector(`#manager-world-nav-${id}`);
 }
 
+/**
+ * Run one browse row's overflow command (issue 1515).
+ *
+ * The four browse rows carry Edit as an `<IconButton>` and their remaining verbs inside a shared
+ * `<ActionMenu>`, so a verb is reached by OPENING the row's menu and then choosing its item. The
+ * trigger is addressed inside the row — which is what proves the right record's menu opened — and
+ * the panel is addressed at the mount root, because `<ActionMenu>` portals it out of the row
+ * entirely. Exactly one menu is open at a time, which the assertion below holds rather than
+ * assumes.
+ *
+ * One helper rather than a copy per row: the six call sites differ only in the row selector and
+ * the item's label, and six near-identical open-then-click blocks are what the duplication gate
+ * fails on.
+ */
+async function openRowMenu(rowSelector) {
+  const trigger = target.querySelector(`${rowSelector} .manager-icon-button[aria-haspopup="menu"]`);
+  assert.ok(Boolean(trigger), `${rowSelector} renders no overflow menu trigger`);
+  trigger.click();
+  await tick();
+  flushSync();
+
+  const panels = target.querySelectorAll('[role="menu"]');
+  assert.equal(panels.length, 1, 'exactly one row menu is open at a time');
+  return panels[0];
+}
+
+/** The commands one row's overflow menu offers, read and then closed again. */
+async function rowMenuCommands(rowSelector) {
+  const panel = await openRowMenu(rowSelector);
+  const labels = Array.from(panel.querySelectorAll('[role="menuitem"]')).map((item) =>
+    item.textContent.trim()
+  );
+  target.querySelector(`${rowSelector} .manager-icon-button[aria-haspopup="menu"]`).click();
+  await tick();
+  flushSync();
+  return labels;
+}
+
+async function runRowMenuCommand(rowSelector, itemLabel) {
+  const panel = await openRowMenu(rowSelector);
+  const item = Array.from(panel.querySelectorAll('[role="menuitem"]')).find(
+    (candidate) => candidate.textContent.trim() === itemLabel
+  );
+  assert.ok(Boolean(item), `${rowSelector}'s menu offers no "${itemLabel}" command`);
+  item.click();
+  await tick();
+  flushSync();
+}
+
 // The mounted harness stubs `game.i18n.localize` as `(key) => key`, which makes the root's
 // `text(key, fallback)` return the FALLBACK for everything. That is fine for behaviour, and
 // useless for copy: a component reading the WRONG key and a lang value that has drifted from
@@ -3767,7 +3816,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('.manager-main'));
     assert.ok(target.querySelector('.manager-inspector'));
     assert.equal(target.querySelectorAll('.manager-system-row').length, 2);
-    assert.equal(target.querySelectorAll('.manager-table-head [role="columnheader"]').length, 4);
+    // The strip is `aria-hidden` and carries no `columnheader` since issue 1515: the library is a
+    // `role="list"` of `role="listitem"` rows, and a column header outside a table names nothing.
+    // It is still four VISUAL labels over the four-column grid the rows share.
+    const systemsHead = target.querySelector('.manager-table-head');
+    assert.equal(systemsHead.getAttribute('aria-hidden'), 'true');
+    assert.deepEqual(
+      Array.from(systemsHead.querySelectorAll('span')).map((label) => label.textContent.trim()),
+      ['System', 'Resolution', 'Status', 'Actions']
+    );
+    assert.equal(target.querySelectorAll('[role="columnheader"]').length, 0);
+    assert.equal(target.querySelectorAll('.manager-systems-table[role="list"]').length, 1);
+    assert.equal(target.querySelectorAll('.manager-system-row[role="listitem"]').length, 2);
     assert.equal(target.querySelectorAll('.manager-count-cluster').length, 0);
     assert.ok(target.querySelector('.manager-breadcrumbs'));
     // ONE PAGE HEADER, EYEBROW INCLUDED (issue 1515). The library used to draw its own
@@ -7383,13 +7443,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.deepEqual(calls.slice(-1), [['toggleSystemEnabled', 'smithing', true]]);
+    // Selection reads as `aria-current` on the `listitem` (issue 1515). `aria-selected` is not
+    // valid outside a listbox, and the unselected row carries the attribute at all rather than
+    // announcing itself as "not selected".
     assert.equal(
-      target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-selected'),
+      target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-current'),
       'true'
     );
     assert.equal(
-      target.querySelector('[data-system-id="smithing"]').getAttribute('aria-selected'),
-      'false'
+      target.querySelector('[data-system-id="smithing"]').hasAttribute('aria-current'),
+      false
     );
     assert.equal(
       target.querySelector('[aria-label="Disable Smithing"]').getAttribute('aria-pressed'),
@@ -7549,7 +7612,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'selected system scope should remain visible'
     );
     assert.equal(
-      target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-selected'),
+      target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-current'),
       'true'
     );
     // The Crafting group is still open, and that is the fix rather than a leak (issue 1185):
@@ -13919,11 +13982,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Gather Moon Herbs'));
     assert.ok(target.textContent.includes('Prospect Crystal Veins'));
     const tasksHead = target.querySelector('.manager-gathering-task-table-head');
-    const taskHeaders = Array.from(tasksHead.querySelectorAll('[role="columnheader"]')).map(
-      (node) => node.textContent.trim()
+    assert.equal(tasksHead.getAttribute('aria-hidden'), 'true');
+    const taskHeaders = Array.from(tasksHead.querySelectorAll('span')).map((node) =>
+      node.textContent.trim()
     );
-    assert.equal(taskHeaders.length, 4, 'task table should have four headers');
+    assert.equal(taskHeaders.length, 4, 'task list should have four column labels');
     assert.deepEqual(taskHeaders, ['Gathering task', 'Tags', 'Status', 'Actions']);
+    assert.equal(
+      target.querySelectorAll('.manager-gathering-tasks-table[role="list"]').length,
+      1,
+      'the gathering task browser is a list, not a table (issue 1515)'
+    );
+    assert.equal(target.querySelectorAll('.manager-gathering-task-row[role="listitem"]').length, 3);
     const firstTaskRow = target.querySelector('.manager-gathering-task-row');
     const tagsCell = firstTaskRow.querySelector(
       '.manager-gathering-task-tags-cell[data-gathering-task-tags]'
@@ -14051,16 +14121,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     target.querySelector('[data-gathering-task-id="task-herbs"] .manager-status-toggle').click();
-    target
-      .querySelector(
-        '[data-gathering-task-id="task-herbs"] [aria-label="Duplicate Gather Moon Herbs"]'
-      )
-      .click();
-    target
-      .querySelector(
-        '[data-gathering-task-id="task-herbs"] [aria-label="Delete Gather Moon Herbs"]'
-      )
-      .click();
+    await runRowMenuCommand(
+      '[data-gathering-task-id="task-herbs"]',
+      'Duplicate Gather Moon Herbs'
+    );
+    await runRowMenuCommand('[data-gathering-task-id="task-herbs"]', 'Delete Gather Moon Herbs');
     assert.ok(
       calls.some(
         (call) =>
@@ -15140,10 +15205,17 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelectorAll('.manager-environment-row').length, 2);
 
     const environmentTable = target.querySelector('.manager-environments-table');
+    assert.equal(
+      environmentTable.getAttribute('role'),
+      'list',
+      'the environments browser is a list, not a table (issue 1515)'
+    );
+    assert.equal(target.querySelectorAll('.manager-environment-row[role="listitem"]').length, 2);
+    assert.equal(environmentTable.querySelectorAll('[role="columnheader"]').length, 0);
     assert.deepEqual(
-      Array.from(environmentTable.querySelectorAll('[role="columnheader"]')).map((header) =>
-        header.textContent.trim()
-      ),
+      Array.from(
+        environmentTable.querySelectorAll('.manager-environment-table-head[aria-hidden="true"] span')
+      ).map((header) => header.textContent.trim()),
       ['Environment', 'Selection mode', 'Tasks', 'Status', 'Actions']
     );
     assert.equal(environmentTable.textContent.includes('Linked scene'), false);
@@ -15159,8 +15231,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(forestRow.querySelector('.manager-status-toggle'));
     assert.ok(forestRow.querySelector('.manager-environment-action-grid'));
     assert.ok(forestRow.querySelector('[aria-label="Edit Moonlit Forest"]'));
-    assert.ok(forestRow.querySelector('[aria-label="Duplicate Moonlit Forest"]'));
-    assert.ok(forestRow.querySelector('[aria-label="Delete Moonlit Forest"]'));
+    // Edit stays the row's own `<IconButton>`; Duplicate and Delete are commands in the shared
+    // overflow menu since issue 1515, so they are read from the portaled panel rather than as two
+    // more buttons in the row.
+    assert.deepEqual(await rowMenuCommands('[data-environment-id="env-forest"]'), [
+      'Duplicate Moonlit Forest',
+      'Delete Moonlit Forest',
+    ]);
     assert.equal(
       forestRow.querySelector('.manager-environment-reorder-stack'),
       null,
@@ -15210,12 +15287,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.ok(calls.some((call) => call[0] === 'selectEnvironment' && call[1] === 'env-cavern'));
 
-    target
-      .querySelector('[data-environment-id="env-cavern"] [aria-label="Duplicate Quiet Cavern"]')
-      .click();
-    target
-      .querySelector('[data-environment-id="env-cavern"] [aria-label="Delete Quiet Cavern"]')
-      .click();
+    await runRowMenuCommand('[data-environment-id="env-cavern"]', 'Duplicate Quiet Cavern');
+    await runRowMenuCommand('[data-environment-id="env-cavern"]', 'Delete Quiet Cavern');
     assert.ok(
       calls.some((call) => call[0] === 'duplicateEnvironmentDraft' && call[1] === 'env-cavern')
     );
@@ -22809,15 +22882,27 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
+    // THE ROW ITSELF IS INERT (issue 1515). It was a `role="row"` `<div>` with a click handler and
+    // `tabindex="0"`, so clicking any cell selected the system and Enter on the row did too. It is
+    // a `listitem` now: the selecting control is the identity `<button>` inside it, and a click on
+    // a plain cell selects nothing. Both halves are exercised, because a check that only presses
+    // the new control cannot see the old whole-row handler surviving beside it.
     target.querySelector('[data-system-id="smithing"] .manager-labeled-cell').click();
     await tick();
     flushSync();
-    target
-      .querySelector('[data-system-id="smithing"]')
-      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    assert.equal(
+      callsWithoutRouteScopedClear(calls).some((call) => call[0] === 'selectSystem'),
+      false,
+      'a click on a non-identity cell should no longer select the row'
+    );
+
+    target.querySelector('[data-system-id="smithing"] .manager-system-identity').click();
     await tick();
     flushSync();
-    target.querySelector('[aria-label="Export Smithing"]').click();
+    target.querySelector('[data-system-id="smithing"] .manager-system-identity').click();
+    await tick();
+    flushSync();
+    await runRowMenuCommand('[data-system-id="smithing"]', 'Export Smithing');
     target.querySelector('[aria-label="Edit Smithing"]').click();
     await Promise.resolve();
     await Promise.resolve();

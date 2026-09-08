@@ -8,6 +8,7 @@
   import StatusToggle from '../../components/StatusToggle.svelte';
   import { buildSystemLabelMap, systemDisplayLabel } from '../../util/systemDisambiguation.js';
   import IconButton from '../../components/IconButton.svelte';
+  import ActionMenu from '../../components/ActionMenu.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
   import {
@@ -107,15 +108,29 @@
     onSelectSystem(systemId);
   }
 
-  function selectRowFromKeyboard(event, systemId) {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    selectRow(systemId);
-  }
-
   function clearFilters() {
     ui.searchTerm = '';
     ui.statusFilter = 'all';
+  }
+
+  // The two commands that left the row's three-button cluster for the overflow menu. Edit stays
+  // an `<IconButton>` because it is the row's primary act; Export and Delete are built as data so
+  // the shared `<ActionMenu>` owns the trigger, the portaled panel and the keyboard contract.
+  function rowMenuItems(system) {
+    const name = systemDisplayLabel(system, systemLabels);
+    return [
+      {
+        id: 'export',
+        label: text('FABRICATE.Admin.Manager.ExportNamed', 'Export {name}').replace('{name}', name),
+        icon: 'fas fa-file-export',
+      },
+      {
+        id: 'delete',
+        label: text('FABRICATE.Admin.Manager.DeleteNamed', 'Delete {name}').replace('{name}', name),
+        icon: 'fas fa-trash',
+        danger: true,
+      },
+    ];
   }
 
   function toggleEnabled(systemId, enabled, event) {
@@ -208,32 +223,49 @@
         >
       </EmptyState>
     {:else}
+      <!--
+        THE LIBRARY IS A LIST, NOT A TABLE (issue 1515). `role="table"` promises columns a screen
+        reader can walk cell by cell, and this surface has never had them: the leading column is an
+        identity block and the trailing one a control cluster, and at the stacked breakpoint the
+        grid collapses to a single column entirely. So the container announces `role="list"`, each
+        row announces `role="listitem"`, and the column strip is `aria-hidden` — it labels the
+        VISUAL grid the rows share, and the rows carry their own labels through `data-label` once
+        the strip is hidden. `RecipesBrowserView`'s `manager-recipe-table-head` is the same answer,
+        already shipped.
+      -->
       <div
         class="manager-systems-table"
-        role="table"
+        role="list"
         aria-label={text('FABRICATE.Admin.Manager.SystemsTableShort', 'Crafting systems')}
       >
-        <div class="manager-table-head" role="row">
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.Column.System', 'System')}</span>
-          <span role="columnheader"
-            >{text('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}</span
-          >
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
-          <span role="columnheader"
-            >{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span
-          >
+        <div class="manager-table-head" aria-hidden="true">
+          <span>{text('FABRICATE.Admin.Manager.Column.System', 'System')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}</span>
+          <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
         </div>
         {#each paginatedSystems as system (system.id)}
+          <!-- SELECTION IS `aria-current`, AND THE SELECTING CONTROL IS A REAL `<button>`.
+               `aria-selected` is not valid on a `listitem` outside a listbox, and the row itself
+               is no longer a focus target: it was a handler-bearing `<div>` carrying `role="row"`
+               and `tabindex="0"`, which put a whole row in the tab order announcing a table row
+               that no longer exists. The identity button is what a keyboard reaches now, exactly
+               as `RecipesBrowserView` and `EssenceRow` already do. It declares
+               `data-keyboard-focus` because Foundry recognises a `<button>` only inside a
+               `<form>` and this window renders none, so without it Space pauses the game and the
+               arrows pan the canvas while the row has focus. -->
           <div
             class={`manager-system-row ${isSelectedSystem(system) ? 'is-selected' : ''}`}
-            role="row"
-            tabindex="0"
-            aria-selected={isSelectedSystem(system)}
+            role="listitem"
+            aria-current={isSelectedSystem(system) ? 'true' : undefined}
             data-system-id={system.id}
-            onclick={() => selectRow(system.id)}
-            onkeydown={(event) => selectRowFromKeyboard(event, system.id)}
           >
-            <span class="manager-system-identity" role="cell">
+            <button
+              type="button"
+              class="manager-system-identity"
+              data-keyboard-focus="true"
+              onclick={() => selectRow(system.id)}
+            >
               <span class="manager-system-icon" aria-hidden="true">
                 <i class="fas fa-layer-group"></i>
               </span>
@@ -251,16 +283,14 @@
                   >
                 {/if}
               </span>
-            </span>
+            </button>
             <span
-              role="cell"
               class="manager-labeled-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Resolution', 'Resolution')}
             >
               <Chip>{resolutionModeLabel(system.resolutionMode)}</Chip>
             </span>
             <span
-              role="cell"
               class="manager-labeled-cell manager-status-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}
             >
@@ -283,7 +313,6 @@
               />
             </span>
             <span
-              role="cell"
               class="manager-action-group manager-labeled-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
             >
@@ -300,33 +329,15 @@
               >
                 <i class="fas fa-edit" aria-hidden="true"></i>
               </IconButton>
-              <IconButton
-                ariaLabel={text('FABRICATE.Admin.Manager.ExportNamed', 'Export {name}').replace(
-                  '{name}',
-                  systemDisplayLabel(system, systemLabels)
-                )}
-                title={text('FABRICATE.Admin.Manager.ExportSystem', 'Export system')}
-                onclick={(event) => {
-                  event.stopPropagation();
-                  onExportSystem(system.id);
+              <ActionMenu
+                items={rowMenuItems(system)}
+                triggerLabel={text('FABRICATE.Admin.Manager.SystemActions', 'System actions')}
+                triggerTitle={text('FABRICATE.Admin.Manager.SystemActions', 'System actions')}
+                onSelect={(action) => {
+                  if (action === 'export') onExportSystem(system.id);
+                  else onDeleteSystem(system.id);
                 }}
-              >
-                <i class="fas fa-file-export" aria-hidden="true"></i>
-              </IconButton>
-              <IconButton
-                class="is-danger"
-                ariaLabel={text('FABRICATE.Admin.Manager.DeleteNamed', 'Delete {name}').replace(
-                  '{name}',
-                  systemDisplayLabel(system, systemLabels)
-                )}
-                title={text('FABRICATE.Admin.Manager.DeleteSystem', 'Delete system')}
-                onclick={(event) => {
-                  event.stopPropagation();
-                  onDeleteSystem(system.id);
-                }}
-              >
-                <i class="fas fa-trash" aria-hidden="true"></i>
-              </IconButton>
+              />
             </span>
           </div>
         {/each}

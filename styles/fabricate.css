@@ -7643,7 +7643,6 @@
   min-height: 72px;
   padding: var(--fab-space-3);
   color: var(--fab-text);
-  cursor: pointer;
 }
 
 .fabricate-manager .manager-system-row .manager-labeled-cell {
@@ -7678,7 +7677,6 @@
 
 .fabricate-manager .manager-system-row .manager-action-group {
   width: 100%;
-  cursor: default;
 }
 
 /* THE FAMILY'S BARE-ELEMENT TYPE BASELINE, at the family root ALONE (issue 1508). The switch's
@@ -8058,10 +8056,16 @@
   gap: var(--fab-space-3);
 }
 
+/* The system row's identity is a real `<button>` since issue 1515 — the row itself was a
+   handler-bearing `<div>` before it — so this reset now has to carry `height: auto` as well.
+   Foundry pins a fixed `height` on every `button` and used height resolves to
+   `max(height, min-height)`, so without it the two-line identity is cropped. Its four siblings
+   state the same pair in their own shared reset below, for the same reason. */
 .fabricate-manager .manager-system-identity {
   appearance: none;
   -webkit-appearance: none;
   width: 100%;
+  height: auto;
   padding: 0;
   border: 0;
   color: inherit;

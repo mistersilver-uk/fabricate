@@ -52,13 +52,17 @@ describe('GatheringEventsBrowserView source contract', () => {
     assert.ok(browserSource.includes('onToggleEventEnabled'), 'browser should call onToggleEventEnabled');
   });
 
-  it('renders the card-style row with four column headers (Event / Tags / Status / Actions)', () => {
+  it('renders the card-style row with four column labels (Event / Tags / Status / Actions)', () => {
     const headBlockStart = browserSource.indexOf('manager-table-head manager-gathering-event-table-head');
     assert.ok(headBlockStart >= 0, 'head block should be present');
     const headBlockEnd = browserSource.indexOf('</div>', headBlockStart);
     const headBlock = browserSource.slice(headBlockStart, headBlockEnd);
-    const headerMatches = headBlock.match(/role="columnheader"/g) || [];
-    assert.equal(headerMatches.length, 4, 'expected four column headers');
+    // See `gathering-task-browser-redesign.test.js`: issue 1515 made this browser a list, so the
+    // strip is `aria-hidden` and its labels carry no `columnheader` role.
+    assert.ok(headBlock.includes('aria-hidden="true"'), 'the column strip should be aria-hidden');
+    assert.equal(headBlock.includes('role="columnheader"'), false, 'no column headers in a list');
+    const headerMatches = headBlock.match(/<span/g) || [];
+    assert.equal(headerMatches.length, 4, 'expected four column labels');
     for (const removed of ['DangerTags', 'DropRate', 'Environments']) {
       assert.equal(
         headBlock.includes(`FABRICATE.Admin.Manager.Environment.Events.${removed}`),

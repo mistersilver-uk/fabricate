@@ -575,11 +575,18 @@ export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 2;
  * they were excluded twice over and no conversion of the tab strip could ever have cleared this
  * row. The panels are what a GM tabs into, each is its own scroll box, and until this phase
  * Foundry kept its own bindings live over both.
+ *
+ * 19 -> 18 with issue 1515's browse-list phase, and the population itself drops 21 -> 20.
+ * `apps/manager/SystemsBrowserView.svelte | 1` is DELETED rather than paid: the element was the
+ * system row `<div>`, which carried `role="row"` and `tabindex="0"` so a whole table row sat in
+ * the tab order. The row is a `listitem` now and the thing a keyboard reaches is the identity
+ * `<button>` inside it, so there is no role-bearing focus target left to declare. Only ONE of the
+ * four converted browse views appears here because only this one's row had a `tabindex` at all.
  */
 export const KNOWN_ROLE_FOCUS_TARGETS = knownDebt('roleFocusTargets');
 
 /** @see KNOWN_ROLE_FOCUS_TARGETS */
-export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 19;
+export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 18;
 
 /**
  * A `<button>` outside any `<form>` that does not declare `data-keyboard-focus`, keyed `file`.

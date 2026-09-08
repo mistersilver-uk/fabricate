@@ -8,6 +8,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import IconButton from '../../components/IconButton.svelte';
+  import ActionMenu from '../../components/ActionMenu.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
@@ -207,6 +208,33 @@
     ).trim();
   }
 
+  // The two commands that left the row's three-button cluster for the overflow menu (issue 1515).
+  // Edit stays an `<IconButton>` — it is the row's primary act — and Duplicate and Delete are
+  // built as data so the shared `<ActionMenu>` owns the trigger, the portaled panel and the
+  // keyboard contract that three loose buttons never had.
+  function rowMenuItems(task) {
+    const name = taskName(task);
+    return [
+      {
+        id: 'duplicate',
+        label: text(
+          'FABRICATE.Admin.Manager.Environment.Tasks.DuplicateNamed',
+          'Duplicate {name}'
+        ).replace('{name}', name),
+        icon: 'fas fa-copy',
+      },
+      {
+        id: 'delete',
+        label: text(
+          'FABRICATE.Admin.Manager.Environment.Tasks.DeleteNamed',
+          'Delete {name}'
+        ).replace('{name}', name),
+        icon: 'fas fa-trash',
+        danger: true,
+      },
+    ];
+  }
+
   function taskImage(task) {
     return task?.img || DEFAULT_GATHERING_TASK_IMG;
   }
@@ -399,35 +427,33 @@
         >
       </EmptyState>
     {:else}
+      <!-- A LIST, NOT A TABLE (issue 1515): see `SystemsBrowserView` for the whole reasoning. The
+           column strip stays as the VISUAL header over the shared grid and is `aria-hidden`,
+           because a `columnheader` outside a `table` names nothing. -->
       <div
         class="manager-gathering-tasks-table"
-        role="table"
+        role="list"
         aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.TableShort', 'Gathering tasks')}
       >
-        <div class="manager-table-head manager-gathering-task-table-head" role="row">
-          <span role="columnheader"
+        <div class="manager-table-head manager-gathering-task-table-head" aria-hidden="true">
+          <span
             >{text('FABRICATE.Admin.Manager.Environment.Tasks.Column.Task', 'Gathering task')}</span
           >
-          <span role="columnheader"
-            >{text('FABRICATE.Admin.Manager.Environment.Tasks.Tags', 'Tags')}</span
-          >
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
-          <span role="columnheader"
-            >{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span
-          >
+          <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Tags', 'Tags')}</span>
+          <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
         </div>
         {#each paginatedTasks as task (task.id)}
           <div
             class={`manager-gathering-task-row ${selectedTaskId === task.id ? 'is-selected' : ''}`}
-            role="row"
-            aria-selected={selectedTaskId === task.id}
+            role="listitem"
+            aria-current={selectedTaskId === task.id ? 'true' : undefined}
             data-gathering-task-id={task.id}
           >
             <button
               type="button"
               class="manager-gathering-task-identity"
               onclick={() => onSelectTask(task.id)}
-              role="cell"
             >
               <img class="manager-gathering-task-thumb" src={taskImage(task)} alt="" />
               <span class="manager-system-copy">
@@ -443,7 +469,7 @@
                 {/if}
               </span>
             </button>
-            <div class="manager-gathering-task-tags-cell" role="cell" data-gathering-task-tags>
+            <div class="manager-gathering-task-tags-cell" data-gathering-task-tags>
               {#each rowChips(task) as chip (chip.key)}
                 <span class={`manager-availability-pill is-${chip.kind}`} style={chip.style}>
                   <i class={chip.icon} aria-hidden="true"></i>
@@ -452,7 +478,6 @@
               {/each}
             </div>
             <span
-              role="cell"
               class="manager-labeled-cell manager-status-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}
             >
@@ -473,7 +498,6 @@
               />
             </span>
             <span
-              role="cell"
               class="manager-action-group manager-labeled-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
             >
@@ -490,33 +514,21 @@
               >
                 <i class="fas fa-edit" aria-hidden="true"></i>
               </IconButton>
-              <IconButton
-                ariaLabel={text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.DuplicateNamed',
-                  'Duplicate {name}'
-                ).replace('{name}', taskName(task))}
-                title={text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.Duplicate',
-                  'Duplicate gathering task'
+              <ActionMenu
+                items={rowMenuItems(task)}
+                triggerLabel={text(
+                  'FABRICATE.Admin.Manager.Environment.Tasks.Actions',
+                  'Gathering task actions'
                 )}
-                onclick={() => onDuplicateTask(selectedSystemId, task.id)}
-              >
-                <i class="fas fa-copy" aria-hidden="true"></i>
-              </IconButton>
-              <IconButton
-                class="is-danger"
-                ariaLabel={text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.DeleteNamed',
-                  'Delete {name}'
-                ).replace('{name}', taskName(task))}
-                title={text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.Delete',
-                  'Delete gathering task'
+                triggerTitle={text(
+                  'FABRICATE.Admin.Manager.Environment.Tasks.Actions',
+                  'Gathering task actions'
                 )}
-                onclick={() => onDeleteTask(selectedSystemId, task.id)}
-              >
-                <i class="fas fa-trash" aria-hidden="true"></i>
-              </IconButton>
+                onSelect={(action) => {
+                  if (action === 'duplicate') onDuplicateTask(selectedSystemId, task.id);
+                  else onDeleteTask(selectedSystemId, task.id);
+                }}
+              />
             </span>
           </div>
         {/each}

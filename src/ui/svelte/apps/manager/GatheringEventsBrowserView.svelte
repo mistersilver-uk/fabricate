@@ -8,6 +8,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import IconButton from '../../components/IconButton.svelte';
+  import ActionMenu from '../../components/ActionMenu.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
@@ -265,6 +266,33 @@
     ).trim();
   }
 
+  // The two commands that left the row's three-button cluster for the overflow menu (issue 1515).
+  // Edit stays an `<IconButton>` — it is the row's primary act — and Duplicate and Delete are
+  // built as data so the shared `<ActionMenu>` owns the trigger, the portaled panel and the
+  // keyboard contract that three loose buttons never had.
+  function rowMenuItems(event) {
+    const name = eventName(event);
+    return [
+      {
+        id: 'duplicate',
+        label: text(
+          'FABRICATE.Admin.Manager.Environment.Events.DuplicateNamed',
+          'Duplicate {name}'
+        ).replace('{name}', name),
+        icon: 'fas fa-copy',
+      },
+      {
+        id: 'delete',
+        label: text(
+          'FABRICATE.Admin.Manager.Environment.Events.DeleteNamed',
+          'Delete {name}'
+        ).replace('{name}', name),
+        icon: 'fas fa-trash',
+        danger: true,
+      },
+    ];
+  }
+
   function eventImage(event) {
     return event?.img || DEFAULT_GATHERING_EVENT_IMG;
   }
@@ -406,38 +434,34 @@
         >
       </EmptyState>
     {:else}
+      <!-- A LIST, NOT A TABLE (issue 1515): see `SystemsBrowserView` for the whole reasoning. The
+           column strip stays as the VISUAL header over the shared grid and is `aria-hidden`,
+           because a `columnheader` outside a `table` names nothing. -->
       <div
         class="manager-gathering-events-table"
-        role="table"
+        role="list"
         aria-label={text(
           'FABRICATE.Admin.Manager.Environment.Events.TableShort',
           'Gathering events'
         )}
       >
-        <div class="manager-table-head manager-gathering-event-table-head" role="row">
-          <span role="columnheader"
-            >{text('FABRICATE.Admin.Manager.Environment.Events.Column.Event', 'Event')}</span
-          >
-          <span role="columnheader"
-            >{text('FABRICATE.Admin.Manager.Environment.Tasks.Tags', 'Tags')}</span
-          >
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
-          <span role="columnheader"
-            >{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span
-          >
+        <div class="manager-table-head manager-gathering-event-table-head" aria-hidden="true">
+          <span>{text('FABRICATE.Admin.Manager.Environment.Events.Column.Event', 'Event')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Tags', 'Tags')}</span>
+          <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
         </div>
         {#each paginatedEvents as event (event.id)}
           <div
             class={`manager-gathering-event-row ${selectedEventId === event.id ? 'is-selected' : ''}`}
-            role="row"
-            aria-selected={selectedEventId === event.id}
+            role="listitem"
+            aria-current={selectedEventId === event.id ? 'true' : undefined}
             data-gathering-event-id={event.id}
           >
             <button
               type="button"
               class="manager-gathering-event-identity"
               onclick={() => onSelectEvent(event.id)}
-              role="cell"
             >
               <img class="manager-gathering-event-thumb" src={eventImage(event)} alt="" />
               <span class="manager-system-copy">
@@ -453,7 +477,7 @@
                 {/if}
               </span>
             </button>
-            <div class="manager-gathering-event-tags-cell" role="cell" data-gathering-event-tags>
+            <div class="manager-gathering-event-tags-cell" data-gathering-event-tags>
               {#each rowChips(event) as chip (chip.key)}
                 <span class={chip.pillClass} style={chip.style}>
                   {#if chip.icon}<i class={chip.icon} aria-hidden="true"></i>{/if}
@@ -462,7 +486,6 @@
               {/each}
             </div>
             <span
-              role="cell"
               class="manager-labeled-cell manager-status-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}
             >
@@ -483,7 +506,6 @@
               />
             </span>
             <span
-              role="cell"
               class="manager-action-group manager-labeled-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
             >
@@ -497,30 +519,15 @@
               >
                 <i class="fas fa-edit" aria-hidden="true"></i>
               </IconButton>
-              <IconButton
-                ariaLabel={text(
-                  'FABRICATE.Admin.Manager.Environment.Events.DuplicateNamed',
-                  'Duplicate {name}'
-                ).replace('{name}', eventName(event))}
-                title={text(
-                  'FABRICATE.Admin.Manager.Environment.Events.Duplicate',
-                  'Duplicate event'
-                )}
-                onclick={() => onDuplicateEvent(selectedSystemId, event.id)}
-              >
-                <i class="fas fa-copy" aria-hidden="true"></i>
-              </IconButton>
-              <IconButton
-                class="is-danger"
-                ariaLabel={text(
-                  'FABRICATE.Admin.Manager.Environment.Events.DeleteNamed',
-                  'Delete {name}'
-                ).replace('{name}', eventName(event))}
-                title={text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}
-                onclick={() => onDeleteEvent(selectedSystemId, event.id)}
-              >
-                <i class="fas fa-trash" aria-hidden="true"></i>
-              </IconButton>
+              <ActionMenu
+                items={rowMenuItems(event)}
+                triggerLabel={text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
+                triggerTitle={text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
+                onSelect={(action) => {
+                  if (action === 'duplicate') onDuplicateEvent(selectedSystemId, event.id);
+                  else onDeleteEvent(selectedSystemId, event.id);
+                }}
+              />
             </span>
           </div>
         {/each}
