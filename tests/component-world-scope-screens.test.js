@@ -82,6 +82,17 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
         // exactly the same module it did before, mints no route with it, and the primitive is
         // a badge rather than a surface.
         '../../components/Chip.svelte',
+        // DRAGGED IN BY ISSUE 1515's HEADER CONVERSION (D12), and it is a LABEL PRIMITIVE
+        // rather than a screen — the same reading as the two file-move rows above, reached from
+        // what the import DOES rather than from where it moved. `one page header per manager
+        // route` deleted the six per-view section headers that each drew their own eyebrow and
+        // gave the shell one, so the gateway now renders that line itself, as the shared
+        // `<Kicker>` leaf, from `viewKicker()`. It mints no route (the route enumeration below
+        // is unchanged and asserted as a whole set), renders no `data-scoped-page`, is
+        // unreachable from the nav, and draws copy the six headers were already drawing.
+        // It matches this clause's `/component/i` filter only because the shared primitives live
+        // under `components/`.
+        '../../components/Kicker.svelte',
         '../../components/ManagerButton.svelte',
         '../../components/Medallion.svelte',
         '../../util/componentEditor.js',

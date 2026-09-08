@@ -58,12 +58,13 @@ const PRIMITIVE = 'src/ui/svelte/components/InspectorCard.svelte';
 const CLASS_EXCEPTIONS = Object.freeze([
   Object.freeze({
     file: PRIMITIVE,
-    count: 2,
+    count: 1,
     why:
       'the primitive itself, which writes the class once so that no call site has to remember ' +
-      'it. The count is 2 rather than 1 because a `//` note on the `class` prop names the token ' +
-      'in prose, and `withoutComments` deliberately does not strip `//` comments — a `//` ' +
-      'stripper deletes real code wherever a URL appears',
+      'it. The count was 2 while a `//` note on the `class` prop naming the token in prose ' +
+      'counted alongside the emission; issue 1515 taught the shared reader to blank `//` ' +
+      'comments inside `<script>` — quote-aware, and confined to script so a bare URL in markup ' +
+      'survives — so the count is now exactly the one place that writes it',
   }),
   Object.freeze({
     file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
