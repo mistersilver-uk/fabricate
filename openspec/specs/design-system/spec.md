@@ -596,7 +596,9 @@ The component-editor half of that ruling is RETIRED rather than outstanding: the
 The interactables half LANDED: `InteractableBrowserApp`, `InteractableConfigApp` and `InteractablesManagerApp` each declare `fabricate-app` in `DEFAULT_OPTIONS.classes`, so the eligible list is still two CLASSES while the windows those two classes cover went from two to four — which is what makes the adoption a prerequisite for converting any control that portals, rather than a skin change that could follow one.
 The prerequisite was then SPENT rather than left standing: the same change converted twelve native `<select>` elements across those three windows onto the shared select, which is a thin composition over the portalled popover, so each one now opens a panel appended to its own window's frame.
 Because a portal that falls back to `document.body` still draws the panel where its trigger is, and loses only the window's stacking and its clip, the failure is invisible in a resting frame and nearly invisible in an open one — so a REGISTERED CAPTURE CASE opens one of those panels and asserts the panel is a DIRECT CHILD of the frame element.
-That direct-child assertion is what distinguishes the two outcomes, and a change that adds a portalled control to a window carries one.
+That direct-child assertion is what distinguishes the two outcomes, and a change that adds a portalled control to a window carries one PER WINDOW.
+The requirement is per window rather than per change because the resolver walks UP from the trigger: a window whose frame lacks the class resolves to `document.body` no matter how many of its siblings resolve correctly, so one window's passing frame proves nothing about the next.
+It is satisfied by a frame-scoped `expectSelector` OR by a frame-scoped capture STEP, which are the same gating force — a step whose selector matches nothing fails the capture whole, and publishes nothing, exactly as a failed expectation does.
 Two facts the ruling did not state are recorded with it, because both are ways of honouring its letter while breaking what it is for.
 
 First, THE LEVEL.

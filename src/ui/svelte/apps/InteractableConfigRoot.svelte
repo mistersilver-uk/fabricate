@@ -41,6 +41,27 @@
 
   let { services = null } = $props();
 
+  /**
+   * The widest an option panel in this window may open, in px.
+   *
+   * AN OPTION LIST IS NEVER NARROWER THAN THE CONTROL IT DROPS FROM (issue 1520 review). A
+   * native `<select>`'s popup never is, and these controls replaced native `<select>`s; the
+   * shared select's `form` rung caps its panel at 340px, which was the primitive's own
+   * untouched band and is narrower than a full-width trigger in this 480px window - the
+   * published frame shows a 340px panel hanging under a 450px trigger.
+   *
+   * The number is this window's DECLARED WIDTH rather than the trigger's measured one, which
+   * says the thing the cap is for: in this window the cap never binds, and the trigger's own
+   * box decides. `iconPickerPopover` computes `clamp(max(triggerWidth, minWidth), minWidth,
+   * maxWidth)` and floors `maxWidth` at the available viewport width, so raising it cannot
+   * push a panel off screen.
+   *
+   * Stated here rather than on the primitive's `form` rung because the rung serves the manager
+   * and the player app too, where a form control is one column of a much wider screen; this is
+   * per-site skin, which is what `maxWidth` is exposed for.
+   */
+  const OPTION_PANEL_MAX_WIDTH = 480;
+
   function text(key, fallback = key) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
@@ -402,6 +423,7 @@
             value={selType}
             options={typeOptions}
             onChange={(next) => onSelectType(next)}
+            maxWidth={OPTION_PANEL_MAX_WIDTH}
             triggerData={{ 'data-interactable-identity-type': '' }}
           />
 
@@ -413,6 +435,7 @@
             value={selSystemId}
             options={systemSelectOptions}
             onChange={(next) => onSelectSystem(next)}
+            maxWidth={OPTION_PANEL_MAX_WIDTH}
             triggerData={{ 'data-interactable-identity-system': '' }}
           />
 
@@ -424,6 +447,7 @@
             options={sourceSelectOptions}
             disabled={!selSystemId}
             onChange={(next) => (selReferenceId = next)}
+            maxWidth={OPTION_PANEL_MAX_WIDTH}
             triggerData={{ 'data-interactable-identity-source': '' }}
           />
 
@@ -436,6 +460,7 @@
               value={selEnvironmentId}
               options={environmentSelectOptions}
               onChange={(next) => (selEnvironmentId = next)}
+              maxWidth={OPTION_PANEL_MAX_WIDTH}
               triggerData={{ 'data-interactable-identity-environment': '' }}
             />
           {/if}
@@ -638,6 +663,7 @@
             value={scopedNode.depletionTiming}
             options={depleteOptions}
             onChange={(next) => setNodeDeplete(next)}
+            maxWidth={OPTION_PANEL_MAX_WIDTH}
             triggerData={{ 'data-interactable-node-deplete': '' }}
           />
 
@@ -646,6 +672,7 @@
             value={respawnPolicy}
             options={respawnOptions}
             onChange={(next) => setNodeRespawnPolicy(next)}
+            maxWidth={OPTION_PANEL_MAX_WIDTH}
             triggerData={{ 'data-interactable-node-respawn': '' }}
           />
 
@@ -757,27 +784,41 @@
         value={view.linkedVisual.missingPolicy}
         options={missingPolicyOptions}
         onChange={(next) => setMissingPolicy(next)}
+        maxWidth={OPTION_PANEL_MAX_WIDTH}
         triggerData={{ 'data-interactable-missing-policy': '' }}
       />
     </section>
 
-    <!-- Presentation toggles -->
+    <!-- Presentation toggles.
+
+         THE HIDDEN SWITCH IS THE SHARED ONE, and the reason is a contrast measurement rather
+         than tidiness (issue 1520 review). It was a raw `<input type="checkbox">` inside a
+         `<label>` that supplied flex layout and a font size and nothing else - no box, no
+         border, no `accent-color` - so the browser's own control drew it. Adopting the area
+         class put `color-scheme: dark` on this window, which is the accepted consequence
+         everywhere else and a regression HERE specifically: the UA checkbox went from the light
+         box that was plainly visible on a dark panel to a flat dark square on a dark panel,
+         decoded off the published frame at 1.15:1 against WCAG 2.2 SC 1.4.11's 3:1 for a
+         UI-component boundary. The shared switch paints its own track and knob from the theme
+         tokens, so it carries its own contrast on any surface.
+
+         It is a switch rather than a checkbox for the routing reason as well: the library routes
+         an immediately-applied binary state to the toggle, and this panel already renders that
+         primitive. Its `label` IS a state reading - "Hidden from players" describes the
+         interactable when the knob is on - which is what the two controls beside the Delete
+         verb below could not say and why they stayed buttons. -->
     <section class="fab-ic-section">
-      <label class="fab-ic-toggle">
-        <input
-          type="checkbox"
-          checked={view.presentation.hidden}
-          onchange={(e) => setHidden(e.currentTarget.checked)}
-        />
-        <span
-          >{text('FABRICATE.Canvas.Interactable.Config.HiddenLabel', 'Hidden from players')}</span
-        >
-      </label>
+      <StatusToggle
+        on={view.presentation.hidden}
+        label={text('FABRICATE.Canvas.Interactable.Config.HiddenLabel', 'Hidden from players')}
+        onclick={() => setHidden(!view.presentation.hidden)}
+      />
       <Select
         label={text('FABRICATE.Canvas.Interactable.Config.AudienceLabel', 'Who can activate')}
         value={view.activation.audience}
         options={audienceOptions}
         onChange={(next) => setAudience(next)}
+        maxWidth={OPTION_PANEL_MAX_WIDTH}
         triggerData={{ 'data-interactable-audience': '' }}
       />
     </section>
@@ -796,39 +837,48 @@
       </ManagerButton>
     </section>
 
-    <!-- State toggle row. Disabled and Locked are STATES of the interactable, so each is a
-         switch whose position IS the state: `on` reads disabled / locked, which is the polarity
-         the pressed `is-active` button before it carried and the polarity `aria-pressed` still
-         announces.
+    <!-- State toggle row. These two are PRESSED BUTTONS and stay pressed buttons, which is the
+         one place this window declined the conversion the rest of it made (issue 1520, maintainer
+         ruling at review).
 
-         THE READING IS THE SHIPPED ACTION VERB, UNCHANGED, AND IT IS NOT WHAT A SWITCH WANTS.
-         `StatusToggle`'s `label` is documented as the READING beside the switch - a state, not
-         a verb - and these two flip between "Disable"/"Enable" and "Lock"/"Unlock" because a
-         button had to say what pressing it would do. So the switch reads ON-and-"Enable" when
-         the interactable is disabled, which states the opposite of its own knob.
+         A switch's knob is a CLAIM about the thing it sits beside, and these two labels are
+         action verbs rather than state readings: the copy flips between "Disable"/"Enable" and
+         "Lock"/"Unlock" because a button had to say what pressing it would do. Converted, a
+         DISABLED interactable drew an accent-filled track with the knob to the right beside the
+         word "Enable", and a LOCKED one drew the same beside "Unlock" - so the control stated the
+         opposite of the state it was reporting, in a form every sighted GM could read. As a
+         button the same polarity is only an `aria-pressed` announcement, which is a pre-existing
+         copy defect rather than a drawn falsehood: the shipped button already announced "Enable,
+         toggle button, PRESSED" in exactly that state.
 
-         THAT PAIRING IS PRE-EXISTING RATHER THAN INTRODUCED HERE: the button this converts
-         already announced "Enable, toggle button, PRESSED" in exactly that state. Fixing it
-         needs state readings ("Disabled", "Locked") that `lang/en.json` does not carry, and
-         the alternative - a static axis name - orphans
+         The repair is state readings ("Disabled", "Locked") that `lang/en.json` does not carry,
+         and issue 1625 owns them; a static axis name instead would orphan
          `FABRICATE.Canvas.Interactable.Config.Enable` and `.Unlock`, which
-         `tests/lang-keys-no-orphans.test.js` refuses. The copy is therefore carried across
-         byte-for-byte and the defect is recorded for the change that owns the strings. -->
+         `tests/lang-keys-no-orphans.test.js` refuses. Flipping `on` was rejected for a narrower
+         reason: it inverts the `aria-pressed` polarity, and the polarity is what the Foundry
+         smoke and a registered capture case both key on for this panel's other switch.
+
+         WHAT THE PRESSED STATE LOOKS LIKE IS STATED ONCE, IN THE SCOPED BLOCK BELOW, AGAINST
+         `aria-pressed` - the attribute that already carries the state - rather than against a
+         second `is-active` class saying the same thing twice. That is the same correction this
+         change made for the Manage panel's promote disclosure. -->
     <section class="fab-ic-section fab-ic-actions">
-      <StatusToggle
-        on={view.state.enabled === false}
-        label={view.state.enabled
+      <ManagerButton
+        aria-pressed={view.state.enabled === false}
+        onclick={() => run(() => services?.setEnabled?.(!view.state.enabled))}
+      >
+        {view.state.enabled
           ? text('FABRICATE.Canvas.Interactable.Config.Disable', 'Disable')
           : text('FABRICATE.Canvas.Interactable.Config.Enable', 'Enable')}
-        onclick={() => run(() => services?.setEnabled?.(!view.state.enabled))}
-      />
-      <StatusToggle
-        on={view.state.locked === true}
-        label={view.state.locked
+      </ManagerButton>
+      <ManagerButton
+        aria-pressed={view.state.locked === true}
+        onclick={() => run(() => services?.setLocked?.(!view.state.locked))}
+      >
+        {view.state.locked
           ? text('FABRICATE.Canvas.Interactable.Config.Unlock', 'Unlock')
           : text('FABRICATE.Canvas.Interactable.Config.Lock', 'Lock')}
-        onclick={() => run(() => services?.setLocked?.(!view.state.locked))}
-      />
+      </ManagerButton>
       <ManagerButton role="danger" onclick={() => run(() => services?.deleteInteractable?.())}>
         {text('FABRICATE.Canvas.Interactable.Config.Delete', 'Delete interactable')}
       </ManagerButton>
@@ -1032,17 +1082,28 @@
     font-weight: 600;
   }
 
-  .fab-ic-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.9rem;
-  }
-
   .fab-ic-actions {
     flex-direction: row;
     flex-wrap: wrap;
     gap: 0.4rem;
+  }
+
+  /* THE PRESSED STATE'S ACCENT, STATED AGAINST THE ATTRIBUTE THAT CARRIES IT (issue 1520).
+     The Disable and Lock buttons in the second of these rows report a live state as well as
+     offering an action, and without a treatment that state has no visual expression at all -
+     which is the defect this sheet records for the component browser's grouping switch, a
+     `.manager-button` under a class with no CSS anywhere. Keyed on `aria-pressed` rather than
+     on a companion class, so the drawn state and the announced state cannot drift; the same
+     correction the Manage panel's promote disclosure took for its `aria-expanded` edge.
+
+     `:global(...)` because the element is `ManagerButton`'s, anchored on a class this file
+     writes so Svelte's hash lands on the ancestor. The first `.fab-ic-actions` row holds no
+     pressed control, so the compound reaches exactly the two buttons it names. */
+  .fab-ic-actions :global(.fabricate-button[aria-pressed='true']) {
+    border-color: var(--fab-accent);
+    background: var(--fab-accent-soft);
+    color: var(--fab-accent-strong);
+    font-weight: 600;
   }
 
   .fab-ic-actions-inline {

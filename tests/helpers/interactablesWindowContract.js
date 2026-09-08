@@ -37,10 +37,17 @@ import { byTokenName } from './interactablesSmokeLocators.js';
  * scroll column, the section rhythm, the facts grid, the node-state colours - which is the
  * half a shared primitive cannot own.
  *
- * `fab-ic-toggle` is on the list and is NOT an unconverted control: it is the `<label>`
- * around the native "Hidden from players" checkbox, which carries no `aria-pressed` and is
- * not a switch. `fab-ic-node-count-field` is on it because the stepper's width cap is layout
- * the `<Field>` it now travels to does not own.
+ * `fab-ic-toggle` LEFT this list at review, and the way it left is the point. It was recorded
+ * here as "not an unconverted control - the `<label>` around the native Hidden from players
+ * checkbox, which carries no `aria-pressed` and is not a switch", and that reading was wrong in
+ * a way an allow-list cannot catch: the class supplied flex layout and a font size and nothing
+ * else, so the checkbox inside it was drawn by the browser - and adopting the area class put
+ * `color-scheme: dark` on this window, taking that control from a light UA box on a dark panel
+ * to a dark box on a dark panel at 1.15:1. It is a `StatusToggle` now, and the name went with
+ * the markup. A residue entry justified by what a control is NOT is worth re-reading.
+ *
+ * `fab-ic-node-count-field` is on the list because the stepper's width cap is layout the
+ * `<Field>` it now travels to does not own.
  */
 export const CONFIG_PANEL_CONTRACT = Object.freeze({
   rootClass: 'fabricate-interactable-config',
@@ -76,7 +83,6 @@ export const CONFIG_PANEL_CONTRACT = Object.freeze({
     'fab-ic-section',
     'fab-ic-section-title',
     'fab-ic-title',
-    'fab-ic-toggle',
     'fab-ic-visual-status',
   ]),
 });

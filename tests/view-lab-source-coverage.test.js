@@ -35,8 +35,13 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
  * halves are a pair — a root registered in the case registry and not here reports its own real
  * claims as phantoms, and a root here with no case reports its whole subtree as unclaimed.
  *
- * Measured when the three were added: the closure grows by exactly three. None of them imports a
- * `.svelte` component at all, so they bring no unclaimed subtree with them.
+ * Measured when the three were added: the closure grows by exactly three, 319 to 322. The reason
+ * is NOT that they import no components — they render twelve of the shared primitives between
+ * them, and an earlier revision of this note said otherwise. It is that every one of those
+ * twelve was ALREADY in the closure, reachable from the manager or the player root, and already
+ * claimed by a case there. So the three roots add themselves and no unclaimed subtree, which is
+ * the property this list needs; a window that reached for a component nothing else renders would
+ * add that component too, and the second test below is what would say so.
  */
 const MOUNTED_ROOTS = [
   'src/ui/svelte/apps/FabricateAppRoot.svelte',

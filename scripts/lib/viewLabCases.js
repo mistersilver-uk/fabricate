@@ -1115,15 +1115,25 @@ function previewAsActor(actorId) {
  * A sentinel option carrying the empty string is stamped `__unchanged__` instead, because an
  * attribute cannot carry an empty value (`Select.svelte`); no case chooses one today.
  *
+ * `host` MAKES THE ROW STEP A PORTAL ASSERTION as well as a click (issue 1520 review). The
+ * design-system capability requires a change that adds a portalled control to a window to carry
+ * a case proving the panel is a DIRECT CHILD of that window's frame, because the fallback still
+ * draws the panel where its trigger is and loses only the window's stacking and its clip — so
+ * the two outcomes are nearly indistinguishable in a rendered frame, and the unscoped form above
+ * matches a `<body>`-hosted panel exactly as happily. A step that cannot match fails the capture
+ * WHOLE, which is the same gating force an `expectSelector` has, so passing the frame class here
+ * discharges that requirement for a window without spending a second frame on it. Left off where
+ * the case is not the one making that claim: every manager and player call site inherits the
+ * unscoped form, and their windows' portal is asserted by their own cases.
+ *
  * @param {string} trigger Selector for the control's trigger button.
  * @param {string} value The option's own value, as `data-popover-option` carries it.
+ * @param {string} [host] The window frame class the panel must be a direct child of.
  * @returns {object[]} The ordered steps.
  */
-function chooseSelectOption(trigger, value) {
-  return [
-    { selector: trigger },
-    { selector: `.fabricate-select-popover [data-popover-option="${value}"]` },
-  ];
+function chooseSelectOption(trigger, value, host = '') {
+  const panel = host ? `${host} > .fabricate-select-popover` : '.fabricate-select-popover';
+  return [{ selector: trigger }, { selector: `${panel} [data-popover-option="${value}"]` }];
 }
 
 /**
@@ -12802,6 +12812,45 @@ export const VIEW_LAB_CASES = Object.freeze([
     // The populated list, not merely the window: an empty `fab-ib-list` renders the "No tools in
     // this system." branch, which is a different screen wearing the same chrome.
     expectSelector: '.fabricate-interactable-browser .fab-ib-list .fab-ib-row',
+    // THE NARROWEST WINDOW IN THE REGISTRY GATES ITS OWN SPILL (issue 1520 review). At 420px the
+    // filter bar holds two controls side by side and every row holds a thumbnail, a label and two
+    // icon buttons, so a control that stops shrinking puts a horizontal scrollbar in a window a
+    // GM cannot widen far. The bar is the specific risk the root is included for: it is pulled to
+    // the window edge with a negative inline margin exactly equal to this column's padding, so an
+    // over-wide control inside it spills past the padding box rather than into it.
+    expectNoHorizontalOverflow: ['.fabricate-interactable-browser', '.fab-ib-list'],
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/InteractableBrowserRoot\.svelte$/,
+      /^src\/ui\/InteractableBrowserApp\.svelte\.js$/,
+    ],
+  }),
+  browserCase({
+    // THE WINDOW'S SECOND TAB, WHICH NOTHING PHOTOGRAPHED (issue 1520 review). The two cases
+    // beside this one both rest on the Tools tab, and the panels are an `{#if}`/`{:else}` pair
+    // rather than a shown/hidden pair — so `fab-ib-panel-tasks` was not merely off screen, it was
+    // UNRENDERED in every frame of this window. That matters beyond completeness: this phase
+    // re-skins that panel (row actions to the shared icon button, opacity mutes to inked ones,
+    // row radii onto the ladder), and its leaf-icon fallback is the ONE place in the window that
+    // renders at all, because every tool row is unconditionally a thumbnail.
+    //
+    // It is also the shape the requirement this change AUTHORED forbids: a window is registered
+    // in the View Lab before a change re-skins it, and a re-skinned panel with zero frames is
+    // that rule failing on the change that wrote it.
+    id: 'interactables-browser-tasks',
+    label: 'Interactable browser — Gathering tasks tab, populated',
+    reaches: 'beyond',
+    smokeLabels: [],
+    // ONE STEP, and it is the tab button's own id rather than a positional `:nth-child`. The
+    // tablist is hand-rolled here — this phase deliberately did not convert it, because a roving
+    // tabindex driving two `aria-controls` panels is a keyboard contract rather than a radio
+    // group — so the id is the stable handle, and it is pinned by the window's residue census.
+    steps: [{ selector: '#fab-ib-tab-tasks' }],
+    // SCOPED INSIDE THE PANEL, not to the list class the Tools frame also matches: the whole
+    // claim of this case is that the OTHER branch rendered, and `.fab-ib-list .fab-ib-row` alone
+    // is satisfied by the tab this case navigated away from.
+    expectSelector: '#fab-ib-panel-tasks .fab-ib-list .fab-ib-row',
+    expectNoHorizontalOverflow: ['.fabricate-interactable-browser', '.fab-ib-list'],
     kinds: ['canvas', 'interactables'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/InteractableBrowserRoot\.svelte$/,
@@ -12822,7 +12871,11 @@ export const VIEW_LAB_CASES = Object.freeze([
       // is no `<select>` left to issue `selectOption` against — the trigger is clicked by the
       // stable hook it carries on `Select`'s `triggerData`, and the row by its own
       // `data-popover-option` identity handle inside the portalled panel.
-      ...chooseSelectOption('[data-interactable-browser-system]', 'lab-smithing'),
+      ...chooseSelectOption(
+        '[data-interactable-browser-system]',
+        'lab-smithing',
+        '.fabricate-interactable-browser-app'
+      ),
       // "Forge" matches exactly one smithing Tool — `sm-tool-tongs`, "Forge Tongs" — so the
       // filtered list is ONE row rather than a shorter version of the same list. The field is
       // `ManagerSearchField` now; the hook rides its `inputAttrs`, because the rest spread
@@ -12830,6 +12883,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-interactable-browser-search]', fill: 'Forge' },
     ],
     expectSelector: '.fabricate-interactable-browser .fab-ib-list .fab-ib-row',
+    expectNoHorizontalOverflow: ['.fabricate-interactable-browser', '.fab-ib-list'],
     kinds: ['canvas', 'interactables'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/InteractableBrowserRoot\.svelte$/,
@@ -12952,7 +13006,11 @@ export const VIEW_LAB_CASES = Object.freeze([
       // against. The old form addressed it POSITIONALLY — `label.fab-im-field:first-of-type
       // select` — which would have silently moved to another picker had the panel's field order
       // changed; the hook names the control instead.
-      ...chooseSelectOption('[data-interactable-manager-region]', 'deep-gate'),
+      ...chooseSelectOption(
+        '[data-interactable-manager-region]',
+        'deep-gate',
+        '.fabricate-interactables-manager'
+      ),
     ],
     // `:not([disabled])` is the whole point of the step above: it asserts `canPromote`, which is
     // region AND system AND source, so an auto-pick that silently stopped working fails here.

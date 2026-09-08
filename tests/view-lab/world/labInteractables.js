@@ -31,6 +31,16 @@
  *     and a non-default state badge, so `markerLabel` and `stateBadges` are photographed rather
  *     than assumed. The smoke has no such interactable, which is why the manager cases declare
  *     `reaches: 'window'` rather than `exact`.
+ *   - `deep-gate-lost` — a TOOL interactable whose configured marker does NOT resolve, added at
+ *     issue 1520's review. `classifyMarkerStatus` returns `missing` only for a marker that is
+ *     configured AND unresolvable, so no amount of leaving a field out produces it: the uuid has
+ *     to be present, well-formed and absent from the world's document index. Until this
+ *     behaviour existed the three docblocks above were an accurate record that `markerStatus ===
+ *     'missing'` was unreachable in the lab — which mattered because `missing` is the largest of
+ *     the marker badge's three tone changes (`danger`, against `muted` and `neutral`), so the
+ *     one tone a reviewer most needed to see was the one no frame could show. `state.enabled:
+ *     false` rides along on the same row for the same reason: `Disabled` was the one state badge
+ *     no seeded behaviour produced.
  *
  * ── WHY A SECOND BEHAVIOUR RATHER THAN A `buildLabWorld` FLAG ──────────────────────────────────
  *
@@ -115,6 +125,17 @@ export const LAB_INTERACTABLE_REFS = Object.freeze({
 
 /** The Tile document the tool interactable's marker resolves to. */
 const MARKER_TILE_UUID = 'Scene.lab-map.Tile.deep-gate-marker';
+
+/**
+ * A Tile uuid that resolves to NOTHING, for the one behaviour whose marker is missing.
+ *
+ * It is deliberately well-formed and deliberately not registered: `classifyMarkerStatus` reads
+ * `missing` off "a marker is configured AND it does not resolve", so a malformed or blank uuid
+ * would classify as `region-only` instead and the frame would show the wrong badge with nothing
+ * saying so. The id says what it models — a GM deleted the Tile the interactable pointed at,
+ * which is the only way a shipped world reaches this state.
+ */
+const DELETED_MARKER_TILE_UUID = 'Scene.lab-map.Tile.deep-gate-deleted-marker';
 
 /**
  * A minimal Foundry collection over a fixed list.
@@ -345,6 +366,39 @@ export function seedLabInteractables(world) {
     },
   });
 
+  // The row whose marker is MISSING: same shape as `cache`, pointing at a uuid the world does
+  // not carry, and disabled. It reuses `toolSource` rather than naming a second one because the
+  // row this frame is for is about the MARKER and the STATE, not about which Tool it resolves —
+  // and a second source id would tie the fixture to a second content ordering for nothing.
+  const lost = behaviorDocument({
+    region,
+    id: 'deep-gate-lost',
+    name: 'Collapsed shaft winch',
+    system: {
+      ...buildInteractableBehaviorSystem({
+        interactableType: 'tool',
+        sourceUuid: buildInteractableSourceUuid({
+          interactableType: 'tool',
+          systemId: toolSource.systemId,
+          referenceId: toolSource.toolId,
+        }),
+        systemId: toolSource.systemId,
+        toolId: toolSource.toolId,
+        name: 'Collapsed shaft winch',
+        linkedVisual: { uuid: DELETED_MARKER_TILE_UUID, documentName: 'Tile', mode: 'marker' },
+      }),
+      // Applied over the built system for the reason `cache`'s note gives: the builder always
+      // returns a freshly-enabled, unlocked state and ignores `state` entirely.
+      state: {
+        enabled: false,
+        consumed: false,
+        locked: false,
+        uses: { max: null, used: 0 },
+        cooldown: { seconds: null, lastUsedWorldTime: null },
+      },
+    },
+  });
+
   const draft = behaviorDocument({
     region,
     id: LAB_INTERACTABLE_REFS.unconfigured.behaviorId,
@@ -352,6 +406,6 @@ export function seedLabInteractables(world) {
     system: null,
   });
 
-  region.behaviors = collectionOf([forage, cache, draft]);
+  region.behaviors = collectionOf([forage, cache, lost, draft]);
   scene.regions = collectionOf([region]);
 }

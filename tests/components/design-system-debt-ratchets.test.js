@@ -1301,7 +1301,9 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
  * keying: its reset half went with the other copies, so it left the exemption list in the same
  * commit, while its `select` ring paints an INSET `box-shadow` against the module's OUTSET
  * `outline` and is a VARIANT the module cannot cover. Membership here is not a licence to
- * delete — the population is keyed on ELEMENTS, and elements are the part a variant shares. `Field`'s is TWO comma-separated legs — `.fabricate-field
+ * delete — the population is keyed on ELEMENTS, and elements are the part a variant shares.
+ *
+ * `Field`'s is TWO comma-separated legs — `.fabricate-field
  * input:focus-visible, .fabricate-field textarea:focus-visible` — rather than one
  * `:is(input, textarea)` member, and that is a requirement of this population rather than a
  * preference: {@link RING_COMPOUND} targets `[tabindex]` or a bare element name, so an `:is()`

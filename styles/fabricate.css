@@ -994,7 +994,15 @@
      `tests/view-lab-app-options-parity.test.js` guards this as a PAIR: the floor declarations
      must be here, AND the shared `.fabricate.fabricate-app` rule must declare neither of them.
      The positive half alone catches a MOVE and misses an ADD, and an add is the likelier way
-     back — someone reads the shared rule, finds no floor, and "restores" it. */
+     back — someone reads the shared rule, finds no floor, and "restores" it.
+
+     THE THIRD LEG IS WHAT ACTUALLY CLOSES IT, and it is worth naming because the pair above is
+     selector-shaped and a floor can be re-added on a selector neither half reads.
+     `assertWindowGeometry` in `tests/view-lab/foundryFrame.js` reproduces Foundry's own clamp
+     off the COMPUTED min box and throws when the applied size differs from the size the case
+     declared, so ANY re-added floor that reaches these four windows — by any selector, in any
+     block — fails the capture loudly in CI rather than publishing an inflated frame. The three
+     canvas windows at 420, 480 and 560 wide are what make that measurable. */
   min-width: 1024px;
   min-height: 640px;
 }
@@ -20837,8 +20845,17 @@
    `height: var(--button-size)` in `@layer elements.forms`, so a window rendering its own
    custom-content buttons has to left-align them and turn the fixed height back into a floor.
 
-   MEASURED at issue 1520: every `<button>` this window now renders is a shared primitive's, and
-   each one out-specifies this rule on all three declarations —
+   MEASURED at issue 1520 over the population this rule ACTUALLY reaches, which grew in the same
+   change: every `<button>` this window renders AND every element portalled into it. The frame is
+   the overlay host now, so a popover panel opened from any control in this window is appended to
+   the frame and is a descendant of this selector — the widest reading, and the one an earlier
+   revision of this comment missed by measuring the window's own markup alone. The travel
+   picker's option row is the case that decides it: `.fabricate-picker-popover
+   .manager-travel-option` is (0,2,0) against this rule's (0,1,1) and restates all three
+   declarations, so it wins wherever it is portalled.
+
+   Every `<button>` this window now renders is a shared primitive's, and each one out-specifies
+   this rule on all three declarations —
    `.fabricate-icon-button.manager-icon-button` and `.fabricate-button.manager-button` at (0,2,0)
    against this rule's (0,1,1), and the select trigger through
    `.fabricate-select .fabricate-select-trigger-form`'s `min-height` at (0,2,0), with the other

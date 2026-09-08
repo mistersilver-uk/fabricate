@@ -47,6 +47,10 @@ const segmentedSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/apps/manager/SegmentedControl.svelte'),
   'utf8'
 );
+const selectSource = readFileSync(
+  resolve(__dirname, '../../src/ui/svelte/components/Select.svelte'),
+  'utf8'
+);
 
 describe('InteractablesManagerApp singleton window', () => {
   it('is an ApplicationV2 + SvelteApplicationMixin app keyed by a stable id', () => {
@@ -306,6 +310,51 @@ describe('InteractablesManagerRoot body', () => {
   // browser's and the config panel's copies of this clause.
   it('renders the shared control primitives and keeps only its own layout classes', () => {
     assertWindowContract({ rootSource, contract: MANAGE_PANEL_CONTRACT });
+  });
+
+  // THE PROMOTE CARD IS ONE COLUMN OF ONE CONTROL WIDTH (issue 1520 review).
+  //
+  // `Select` declares no `width` and no `min-width` - "the trigger's box is the one thing this
+  // API does not address" - so a `<button>` hugs its content, and the published frame showed
+  // three pickers at 291px, 144px and 137px interleaved with four full-width 508px controls in a
+  // single column. The native `<select>`s they replaced filled it, because core gives an
+  // `<input>`-family control `width: 100%`.
+  //
+  // AND THE PANEL FOLLOWS THE TRIGGER, which is the half that only becomes necessary once the
+  // trigger is full width: the primitive's `form` rung caps its panel at 340px, so widening the
+  // trigger to the column would otherwise have hung a short panel under each of the three.
+  //
+  // The rule's ANCHOR is asserted, not just its declaration. `.fab-im-promote` is a `class` PROP
+  // handed to `InspectorCard`, so Svelte stamps no scoping hash on it and a rule rooted there
+  // would compile and match nothing - the silent failure this window's own style block already
+  // warns about twice.
+  it('fills the promote column with its pickers and opens their panels to match', () => {
+    assert.ok(
+      /\.fabricate-interactables-manager-body\s*\n?\s*:global\(\.fabricate-select-field \.fabricate-select-trigger\)\s*\{\s*width:\s*100%/.test(
+        rootSource
+      ),
+      'the trigger fills the column, rooted at an element this file actually writes'
+    );
+    assert.ok(
+      rootSource.includes('class="fabricate-interactables-manager-body"'),
+      'and that root class is on an element rather than passed to a component'
+    );
+    assert.ok(
+      rootSource.includes('const OPTION_PANEL_MAX_WIDTH = 560'),
+      "the panel cap is this window's declared width, so it never binds and the trigger decides"
+    );
+    const selects = rootSource.match(/<Select\b[\s\S]*?\/>/g) ?? [];
+    assert.equal(selects.length, 3, 'the promote card renders three shared selects');
+    for (const tag of selects) {
+      assert.ok(
+        tag.includes('maxWidth={OPTION_PANEL_MAX_WIDTH}'),
+        `a select opens at the primitive's 340px band under a full-width trigger:\n${tag}`
+      );
+    }
+    assert.ok(
+      selectSource.includes('maxWidth={maxWidth || band.maxWidth}'),
+      'a caller-supplied cap wins over the rung band'
+    );
   });
 
   // EVERY LOCATOR THE SMOKE USES IS STILL EMITTED (issue 1520).
