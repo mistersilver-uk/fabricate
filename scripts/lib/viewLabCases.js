@@ -620,8 +620,9 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // stale by issue 1517 and they are dropped rather than reset: they were never the argument, and
   // a reset buys one commit of accuracy before it rots again.)
   //
-  // THREE MEMBERS. The first two are the surface's two rail ARITIES, which one frame cannot hold
-  // both of. The third is the row's View deep link, which neither arity frame can draw.
+  // FOUR MEMBERS. The first two are the surface's two rail ARITIES, which one frame cannot hold
+  // both of. The third is the row's View deep link, which neither arity frame can draw. The
+  // fourth is the IN-GROUP ORDER, which none of the first three can show.
   //
   // `manager-checks-validation` is the only published frame that draws it inside
   // `.manager-checks-validation-route`, and that route is the one place its metrics are
@@ -644,21 +645,43 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // target at eleven sites, and the Checks route, which synthesises one in its own tab. The pair
   // above holds neither — `manager-recipe-item-validation-blocked`'s producer builds its rows
   // inline with no target at all — so a change to that button published two frames that could not
-  // contain it. This entry used to record that gap and leave it open; the frame closes it.
+  // contain it.
   //
-  // WHAT IT DOES NOT YET SETTLE, stated because the honest answer is "the capture will tell us".
-  // Whether the lab world's fixtures put the recipe this case opens into a state with a routed
-  // issue row was still not established when the case joined this set. Its `expectSelector` names
-  // a ROW of the surface rather than the button, deliberately: readiness always emits its
-  // structural checks, so a row is guaranteed and the assertion is one this tree can prove,
-  // whereas naming `[data-recipe-issue-view]` would fail the capture job WHOLE — and publish
-  // nothing, for every case in the run — on any fixture that happens to be all-clear. If the
-  // published frame does carry the button, tightening the selector onto it is the change that
-  // turns this from evidence into a gate.
+  // THE MEMBERSHIP ALONE DID NOT CLOSE THAT GAP, and a first draft of this paragraph said it did.
+  // The case reached the tab by clicking the FIRST Edit button of an A-to-Z list, and it asserted
+  // `.manager-recipe-val-row` — a class every row carries whatever its status, on a tab where
+  // `evaluateRecipeReadiness` always emits its structural ticks. So the selector was satisfied by
+  // construction on every recipe in the corpus and could not reject an all-clear frame: the entry
+  // read SATISFIED while naming a frame that structurally could not contain the button, which is
+  // the issue-1444 defect this whole table exists to refuse, wearing the table's own uniform.
+  //
+  // IT IS CLOSED BY PINNING THE RECIPE AND THE BUTTON. The case now opens
+  // `sm-r-runeplate-draft` by id and asserts `[data-recipe-issue-view]`, the hook the recipe
+  // editor puts on the button itself. Derived rather than assumed: of the lab world's 35 recipes
+  // that one is the ONLY one whose readiness emits an issue carrying a `target`, and
+  // `tests/view-lab-cases.test.js` re-derives that from `buildLabContent()` through the real
+  // `evaluateRecipeReadiness` rather than trusting this sentence. The registry called that
+  // tightening "the change that turns this from evidence into a gate"; this is it.
+  // `manager-checks-validation-retired-placeholder` is the fourth, and it is the ONE PUBLISHED
+  // FRAME IN WHICH THE IN-GROUP SORT IS VISIBLE (issue 1517). The surface lifts blocking rows to
+  // the top of their group, which can only be SEEN where a group holds more than one kind of row
+  // — and the Checks route is the only one that does, drawing a check tick and an issue in the
+  // same subsystem group. `manager-checks-validation` is that route in its clean state, so its
+  // groups are ticks alone; this case types a placement the shim refuses and reaches a CRITICAL
+  // issue, which is the row that rises. Its `sourceMatches` are `apps/manager/checks/` only, so
+  // before this entry a change to the shared surface did not select it at all.
+  //
+  // WHAT THE FRAME SHOWS, stated so a reader can check it: the crafting group's FIRST row is the
+  // `retiredPlaceholderBreaksFormula` row, above that subsystem's ticks. That criterion is
+  // enforced in `tests/components/checks-validation-tab.test.js` rather than folded into this
+  // case's `expectSelector`, deliberately — a positional selector that stops matching fails the
+  // capture job WHOLE and publishes nothing for every case in the run, which is too much to
+  // wager on a fixture's issue set staying single-membered.
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([
     'manager-checks-validation',
     'manager-recipe-item-validation-blocked',
     'manager-recipe-edit-validation',
+    'manager-checks-validation-retired-placeholder',
   ]),
   // The shared empty panel. Both representative frames are POPULATED states — the components
   // browser lists components and the player app shell lists recipes — so the dashed panel this
@@ -5739,9 +5762,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-recipe-edit-validation'],
     reaches: 'exact',
     query: {},
+    // THE RECIPE IS NAMED, and that is the whole difference between this frame and the one it
+    // replaces. `.manager-icon-button[aria-label^="Edit"]` opened whichever row sorted first,
+    // and `adminRecipeRowProjection` sorts A to Z — so the frame landed on a complete recipe
+    // whose validation tab is five green ticks and no View button at all.
+    //
+    // `sm-r-runeplate-draft` is the corpus's one routed-issue recipe: it has ingredient sets and
+    // NO result groups, so readiness raises a critical `noResultGroup` deep-linking to Results
+    // and a warning `disabledIncomplete` deep-linking to Overview. Two buttons, in a tab that
+    // also draws ticks, which is the mixed row stack this member exists to photograph. The id is
+    // pinned the way `manager-recipe-edit-multistep` pins its own.
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-recipe-edit="sm-r-runeplate-draft"]' },
       { selector: '#recipe-tab-validation' },
     ],
     expectView: 'recipe-edit',
@@ -5751,13 +5784,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     // name promising validation, and a change to the surface's rows would have read it as
     // evidence.
     //
-    // A ROW, not the panel. The panel renders whether or not the surface drew anything, and the
-    // thing this frame represents is the row stack. `evaluateRecipeReadiness` emits its three
-    // structural checks for any recipe at all, so at least one row is guaranteed regardless of
-    // which recipe the first Edit button opens — which is what makes this an assertion the tree
-    // can prove rather than a bet on the fixture. See the override entry above for why it stops
-    // short of naming the View button itself.
-    expectSelector: '[data-recipe-tab="validation"] .manager-recipe-val-row',
+    // THE BUTTON, not a row. A row was the first attempt and it could not fail: the surface puts
+    // `manager-recipe-val-row` on every `<li>` whatever its status, and readiness always emits
+    // its structural ticks, so that selector was satisfied by construction on every recipe here.
+    // It rejected a wrong tab and an empty stack and never a missing button — under a case whose
+    // stated subject IS the button. `[data-recipe-issue-view]` is the hook the recipe editor
+    // passes as `viewDataAttr`, so it exists only where a row carried a route and the surface
+    // drew the action. That makes the selector a gate on the thing this member represents, and it
+    // is safe to name because the recipe is pinned above rather than taken from a sort order.
+    expectSelector: '[data-recipe-tab="validation"] [data-recipe-issue-view]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,

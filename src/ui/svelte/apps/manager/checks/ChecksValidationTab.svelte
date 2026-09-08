@@ -85,9 +85,17 @@
     return { passing, warnings, blocking };
   });
 
-  // ONE row per check tick and per issue, in that order, so a group reads as "what holds"
+  // ONE row per check tick and per issue, BUILT in that order, so a group reads as "what holds"
   // followed by "what does not". An issue's row carries the deep-link target; a satisfied
   // tick has nowhere to go.
+  //
+  // BUILT IS NOT RENDERED, as of issue 1517, and this is the qualification a reader chasing a
+  // "the blocker jumped above my ticks" report needs. `EditorValidationSurface` sorts each
+  // group's rows with `block` first, and two blocks down a `critical` issue maps to `block` —
+  // so a critical issue RISES ABOVE EVERY TICK in its subsystem group. That is the requirement
+  // being met, not a defect to repair. Everything else is one rank there, including an
+  // unsatisfied tick and a non-critical issue, which are both `warn`; so below the criticals the
+  // order this function authors is exactly the order the tab draws.
   //
   // A group with NEITHER still states its result (issue 1096). That is a reachable state, not
   // a hypothetical: a gathering check in `d100` mode with no eligible check modifiers reports

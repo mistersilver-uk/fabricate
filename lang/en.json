@@ -2145,7 +2145,8 @@
           "EssenceStepUp": "Step {name} up"
         },
         "Validation": {
-          "View": "View"
+          "View": "View",
+          "ViewNamed": "View: {subject}"
         },
         "Recipe": {
           "Kicker": "Recipes View",

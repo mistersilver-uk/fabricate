@@ -211,6 +211,33 @@ function bagKeys(file, attributeName) {
 }
 
 /**
+ * The attribute names one file writes on `<EditorValidationSurface>`.
+ *
+ * HAYSTACK, STATED, because the thing it replaces got this wrong. This reads `Attribute` nodes on
+ * `Component` nodes named {@link TAG} in the PARSED template — nothing else. Docblock prose,
+ * `<!-- … -->` blocks, `<style>` contents and string literals in the `<script>` are all outside
+ * it, because the parser puts them in nodes this never visits.
+ *
+ * A text scan over `SOURCES[file]` has the opposite haystack and this corpus makes the difference
+ * concrete: `recipe/RecipeValidationTab.svelte`'s own header NAMES `viewDataAttr` in prose, and
+ * survives a `\bviewDataAttr=` scan only by not writing the `=`. Moving the real attribute into an
+ * HTML comment left that scan green.
+ *
+ * @param {string} file repo-relative component path
+ * @returns {Set<string>} empty when the file renders no `<EditorValidationSurface>` at all
+ */
+function surfaceAttributeNames(file) {
+  const names = new Set();
+  walkTemplate(parse(SOURCES[file], { modern: true, filename: file }).fragment, (node) => {
+    if (node.type !== 'Component' || node.name !== TAG) return;
+    for (const attribute of node.attributes ?? []) {
+      if (attribute.type === 'Attribute') names.add(attribute.name);
+    }
+  });
+  return names;
+}
+
+/**
  * The region names the primitive actually spreads, read out of its own `hooksFor('…')` calls.
  *
  * @returns {string[]}
@@ -329,13 +356,25 @@ test('the recipe editor is the only site hooking the row action, and none restat
   // labelling shipped an untranslated word beside translated ones. Issue 1517 ended that
   // obligation by moving it INTO the surface: the name is a key the surface resolves itself,
   // so the correct number of call sites restating it is zero.
-  const withHook = [];
-  const withLabel = [];
-  for (const [file, source] of Object.entries(SOURCES)) {
-    if (!new RegExp(String.raw`<${TAG}[\s/>]`).test(source)) continue;
-    if (/\bviewDataAttr=/.test(source)) withHook.push(file);
-    if (/\bviewLabel=/.test(source)) withLabel.push(file);
-  }
+  //
+  // READ FROM THE AST, not from the file's text. See {@link surfaceAttributeNames} for the
+  // haystack and for the measured way the text scan this replaces could be greened.
+  const rendered = Object.keys(SOURCES)
+    .map((file) => [file, surfaceAttributeNames(file)])
+    .filter(([, attributes]) => attributes.size > 0);
+  // NON-VACUITY, because both clauses below are ABSENCE claims over this population: a walk that
+  // stopped resolving the component would report the empty set and read as two clean gates.
+  assert.ok(
+    rendered.length >= 4,
+    `only ${rendered.length} files were seen passing an attribute to <${TAG}>; the walk has ` +
+      'stopped resolving it and both clauses below are quantified over nothing'
+  );
+  const withHook = rendered
+    .filter(([, attributes]) => attributes.has('viewDataAttr'))
+    .map(([file]) => file);
+  const withLabel = rendered
+    .filter(([, attributes]) => attributes.has('viewLabel'))
+    .map(([file]) => file);
   assert.deepEqual(
     withHook,
     ['src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'],
@@ -367,7 +406,13 @@ test('the recipe editor is the only site hooking the row action, and none restat
  * and never reads the code at all. Slices below are taken from AST node ranges for the same
  * reason: a range names exactly one expression.
  *
- * @returns {{defaults: Map<string, object|null>, button: object, source: string}}
+ * `constants` is the third population and is read for the same reason as the first two: the
+ * subject-bearing accessible name is a MODULE constant rather than a prop — a caller must not be
+ * able to swap it — so there is no `$props()` default to read it from, and its literal appears in
+ * this file's header prose as well as in the declaration.
+ *
+ * @returns {{defaults: Map<string, object|null>, constants: Map<string, unknown>, button: object,
+ *   source: string}}
  */
 function surfaceRowAction() {
   const source = SOURCES[SURFACE_PATH];
@@ -386,6 +431,16 @@ function surfaceRowAction() {
     defaults.set(property.key?.name, value.type === 'AssignmentPattern' ? value.right : null);
   }
 
+  const constants = new Map();
+  for (const node of ast.instance?.content?.body ?? []) {
+    if (node.type !== 'VariableDeclaration') continue;
+    for (const declarator of node.declarations) {
+      if (declarator.id?.type === 'Identifier' && declarator.init?.type === 'Literal') {
+        constants.set(declarator.id.name, declarator.init.value);
+      }
+    }
+  }
+
   const buttons = [];
   walkTemplate(ast.fragment, (node) => {
     if (node.type === 'Component' && node.name === 'ManagerButton') buttons.push(node);
@@ -396,11 +451,28 @@ function surfaceRowAction() {
     `${SURFACE_PATH} renders ${buttons.length} <ManagerButton>s; the row action is one button ` +
       'and the clauses below read it by being the only one'
   );
-  return { defaults, button: buttons[0], source };
+  return { defaults, constants, button: buttons[0], source };
+}
+
+/**
+ * One static attribute of a node, as the SOURCE TEXT of its single expression.
+ *
+ * @param {object} node
+ * @param {string} name
+ * @param {string} source
+ * @returns {string|null}
+ */
+function expressionAttribute(node, name, source) {
+  const attribute = (node.attributes ?? []).find(
+    (candidate) => candidate.type === 'Attribute' && candidate.name === name
+  );
+  const value = Array.isArray(attribute?.value) ? attribute.value[0] : attribute?.value;
+  const expression = value?.expression;
+  return expression ? source.slice(expression.start, expression.end) : null;
 }
 
 test("the View button's name is a translatable key, in a shared namespace, resolved here", () => {
-  const { defaults, button, source } = surfaceRowAction();
+  const { defaults, constants, button, source } = surfaceRowAction();
 
   const fallback = defaults.get('viewLabel');
   assert.equal(fallback?.type, 'Literal', '`viewLabel` must default to a string literal');
@@ -427,6 +499,31 @@ test("the View button's name is a translatable key, in a shared namespace, resol
       'English one it replaced — every one of these buttons then reads as a dotted path — and ' +
       'the `??` is what lets one site draw two different verbs down one list ("View task" ' +
       'beside "View event") without a second whole-surface prop.'
+  );
+
+  // AND THE ACCESSIBLE NAME CARRIES THE SUBJECT. The visible child above is a verb and nothing
+  // else, so a tab of routed rows announces as "View, button" repeated — the row's subject is in
+  // a sibling element and the `data-*` hook holds the ROUTE, which assistive technology never
+  // reads. One producer routes at eleven sites, and this is the one place a default name for
+  // every surface that renders this primitive can be installed.
+  assert.equal(
+    expressionAttribute(button, 'aria-label', source),
+    'localize(VIEW_NAMED_LABEL, { subject: row.title })',
+    "the row action must name itself by its row's title. Composing the SUBJECT is the point: " +
+      'the verb alone is the same word on every button of the list.'
+  );
+  const named = constants.get('VIEW_NAMED_LABEL');
+  assert.match(
+    String(named),
+    /^FABRICATE\.(?:[A-Za-z0-9_]+\.)+[A-Za-z0-9_]+$/u,
+    `the subject-bearing name resolves "${named}", which is not a localization key. It is the ` +
+      'accessible name of a control on every validation screen and it interpolates a title, so ' +
+      'an English pattern here is a sentence no world can reorder or re-punctuate.'
+  );
+  assert.ok(
+    !String(named).startsWith('FABRICATE.Admin.Manager.Recipe.'),
+    `the subject-bearing name is filed under "${named}", inside the RECIPE editor's namespace, ` +
+      'for a default this primitive gives every one of its surfaces'
   );
 });
 

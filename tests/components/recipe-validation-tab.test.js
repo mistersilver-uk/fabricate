@@ -266,6 +266,7 @@ describe('EditorValidationSurface row action (mounted)', () => {
   // screen if the key reached `localize()`.
   const TRANSLATIONS = {
     'FABRICATE.Admin.Manager.Validation.View': 'Ver',
+    'FABRICATE.Admin.Manager.Validation.ViewNamed': 'Ver: {subject}',
     'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewTask': 'Ver tarea'
   };
 
@@ -273,12 +274,30 @@ describe('EditorValidationSurface row action (mounted)', () => {
   const rowIds = (scope) =>
     [...scope.querySelectorAll('.manager-recipe-val-row')].map((row) => row.dataset.check);
 
+  // `Localization#format`'s REAL semantics — substitute each `{token}` from `data` into the
+  // world's own string — rather than the shared harness's default stub, which returns
+  // `key:{"subject":"…"}`. A stub looser than the helper it doubles passes whether or not the
+  // surface resolved anything, and the whole subject of the clause below is what came out.
+  const formatFake = (key, data) =>
+    Object.entries(data ?? {}).reduce(
+      (phrase, [token, value]) => phrase.replaceAll(`{${token}}`, String(value)),
+      TRANSLATIONS[key] ?? key
+    );
+
+  const foundryI18n = {};
+
   before(async () => {
     await surfaceHarness.setup();
+    // RESTORED in `after`. The globals are installed once per process and this describe happens
+    // to be last in the file today, so a leak is invisible until it is not.
+    foundryI18n.localize = globalThis.game.i18n.localize;
+    foundryI18n.format = globalThis.game.i18n.format;
     globalThis.game.i18n.localize = (key) => TRANSLATIONS[key] ?? key;
+    globalThis.game.i18n.format = formatFake;
   });
 
   after(() => {
+    Object.assign(globalThis.game.i18n, foundryI18n);
     surfaceHarness.teardown();
   });
 
@@ -426,6 +445,45 @@ describe('EditorValidationSurface row action (mounted)', () => {
       'Ver tarea',
       'and a row that carries its own key wins, which is what keeps two different verbs ' +
         'distinguishable down one list'
+    );
+    surfaceHarness.remount();
+  });
+
+  it('gives every row action an accessible name carrying that row’s subject', async () => {
+    // WHAT A SCREEN READER GETS, which is not what the eye gets. `recipeReadiness` routes an
+    // issue at eleven sites, so a validation tab of routed rows announced by its visible text
+    // alone is "View, button… View, button… View, button…" — the row's subject sits in a SIBLING
+    // element, reachable only in linear reading mode, and the `data-*` hook beside the button
+    // carries the route rather than the subject and is invisible to assistive technology either
+    // way. This is the commit that installs one shared default name for every surface that
+    // renders the primitive, so the clause belongs to the primitive.
+    const target = await surfaceHarness.mount({
+      groups: [
+        groupOf('checks', [
+          { id: 'noResultGroup', status: 'block', title: 'Add a result group', target: 'results' },
+          { id: 'noName', status: 'warn', title: 'Name this recipe', target: 'overview' }
+        ])
+      ]
+    });
+    const action = (check) =>
+      target.querySelector(`[data-check="${check}"] .manager-recipe-val-view`);
+    assert.equal(
+      action('noResultGroup').getAttribute('aria-label'),
+      'Ver: Add a result group',
+      'the name is the row TITLE composed into a translated pattern, so two buttons on one tab ' +
+        'are told apart by what they lead to rather than by their position in the list'
+    );
+    assert.equal(
+      action('noName').getAttribute('aria-label'),
+      'Ver: Name this recipe',
+      'every row that draws the action gets one, not just the blocking ones'
+    );
+    assert.equal(
+      action('noName').textContent.trim(),
+      'Ver',
+      'and the VISIBLE word is untouched. The visible verb is the per-row override seam a later ' +
+        'phase needs for a two-verb list; naming the button is a different job and must not ' +
+        'consume it'
     );
     surfaceHarness.remount();
   });

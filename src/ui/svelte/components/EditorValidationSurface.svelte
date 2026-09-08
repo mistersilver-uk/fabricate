@@ -35,6 +35,10 @@
    - counts / countLabels: the count tiles. See {@link COUNT_ORDER} for which tiles are drawn.
    - groups: `{ id, icon, label, rows, dataAttrs? }[]`; each row is
      `{ id, status, title, detail?, target?, focusTarget?, viewLabel?, dataAttrs? }`.
+     ROWS ARE RE-ORDERED — blocking first, within each group — so a caller's authored sequence is
+     a tiebreak rather than a guarantee, and a site that fixes its order on purpose (a named
+     constant, a prerequisite chain, a lifecycle) keeps that order only among rows of equal rank.
+     See {@link orderedRows}.
    - statusLabels: the per-status pill word, localized by the caller.
    - rowDataAttr: one attribute name, carrying the row id, put on every row.
    - viewDataAttr: the same idea for the row's View button, carrying the row's ROUTE.
@@ -69,6 +73,20 @@
   DIFFERENT verbs down one list — "View task" beside "View event" — and a single scalar prop
   would collapse both into one word. `row.viewLabel ?? viewLabel`, so a row that says nothing
   takes the surface's default.
+
+  AND THE VISIBLE WORD IS NOT THE WHOLE NAME. One producer emits a route on eleven sites, so a
+  tab of routed rows announced by their visible text alone is "View, button… View, button… View,
+  button…", with the row's SUBJECT in a sibling element a screen reader reaches only in linear
+  reading mode. The `data-*` hook beside the button carries the route, not the subject, and is
+  invisible to assistive technology either way. So the button carries an `aria-label` built from
+  {@link VIEW_NAMED_LABEL} and `row.title` — one shared default for every surface that renders
+  this component, installed here rather than left for each of them to rediscover.
+
+  The visible child is UNCHANGED and stays `row.viewLabel ?? viewLabel`: the override swaps the
+  visible VERB, not the context, and it is the seam a later phase's two-verb list needs. A row
+  whose verb differs from the default therefore has a name whose leading word is the default one;
+  no shipped producer overrides the verb today, and the surface says so here rather than encoding
+  a guess about what the first one will want.
    - class: an EXTRA class appended to this surface's own, never a replacement — the idiom
      `ManagerButton`, `Field` and `Chip` already use. It exists so a site whose root carried its
      own classes keeps them, so no shipped rule stops matching.
@@ -108,6 +126,15 @@
     class: extraClass = '',
     onSelectIssue = () => {},
   } = $props();
+
+  /**
+   * The pattern the row action's ACCESSIBLE name is built from, as a localization key.
+   *
+   * Not a prop, and not a `$props()` default: the visible verb is already caller-overridable per
+   * row, and a second knob for the subject-bearing form would be a second place one accessible
+   * name lives. It takes one `{subject}`, which is the row's own title. See the header block.
+   */
+  const VIEW_NAMED_LABEL = 'FABRICATE.Admin.Manager.Validation.ViewNamed';
 
   const statusIcons = {
     pass: 'fas fa-circle-check',
@@ -230,13 +257,29 @@
    * `spec.md` asks that blocking issues sort above warnings inside a group and says nothing about
    * passing rows; sinking every tick below every issue would turn "here is what was checked, in
    * order" into "here is what is wrong, then a tail of ticks" on nine surfaces, for a sentence
-   * that did not ask for it. It is also the reading that leaves the Checks studio alone: that tab
-   * builds ticks first and issues second, and under a three-rank sort a `warn` tick and a `warn`
-   * issue would interleave — two different kinds of row made adjacent and told apart only by a
-   * data attribute. Both are rank 1 here, so both keep the positions the tab authored.
+   * that did not ask for it.
    *
-   * The rank reads the ROW vocabulary (`pass|warn|block`), which every producer emits uniformly.
-   * That is a different axis from {@link COUNT_ORDER}, which orders the aggregate tiles.
+   * THE HAZARD IT AVOIDS IS ONE INTERLEAVE SPECIFICALLY, and it is narrower than an earlier
+   * draft of this comment claimed. `checks/ChecksValidationTab` builds ticks first and issues
+   * second, and there BOTH an unsatisfied tick and a non-critical issue are `warn` — so a
+   * three-rank sort would sink that tab's ticks past its issues and stand a failed CHECK beside a
+   * WARNING ISSUE, two different kinds of row told apart only by a data attribute. Both are rank
+   * 1 here, so a `warn` tick and a `warn` issue keep the positions the tab authored.
+   *
+   * A `critical` ISSUE IS NOT LEFT ALONE, and must not be. That tab maps it to `block`, which is
+   * rank 0, so it rises above every tick in its subsystem group — the requirement being met
+   * rather than a side effect. Anything that reads this as "the Checks tab keeps every position
+   * it authored" is reading a claim that is true of `warn` rows only.
+   *
+   * The rank reads the ROW vocabulary (`pass|warn|block`), and two producers emit a two-word
+   * subset of it: `recipe-item/RecipeItemValidationTab` builds `check.ok ? 'pass' : 'block'` and
+   * `tools/ToolValidationTab` builds `check.valid ? 'pass' : 'block'` plus an all-`block`
+   * `general` group. On those two, two ranks and three ranks are the SAME sort and the reason
+   * above cannot tell the options apart. That is accepted deliberately: their rows are one tick
+   * per check with no second kind to interleave with, so "failures first, then a tail of ticks"
+   * is the only reading available there, and it is the one the requirement asks for.
+   *
+   * All of this is a different axis from {@link COUNT_ORDER}, which orders the aggregate tiles.
    *
    * STABLE by construction rather than by relying on the engine: the authored position is carried
    * through the comparison as the tiebreak, so equal-rank rows can only come out in the order they
@@ -344,6 +387,7 @@
               <ManagerButton
                 role="ghost"
                 class="manager-recipe-val-view"
+                aria-label={localize(VIEW_NAMED_LABEL, { subject: row.title })}
                 {...namedAttr(viewDataAttr, row.target)}
                 onclick={() => onSelectIssue(row.target, row.focusTarget)}
                 >{localize(row.viewLabel ?? viewLabel)}</ManagerButton

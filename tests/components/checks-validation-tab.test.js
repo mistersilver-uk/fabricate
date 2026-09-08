@@ -93,6 +93,54 @@ describe('ChecksValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  it('draws a critical issue ABOVE the ticks of its own subsystem group (issue 1517)', async () => {
+    // THE ONE ROUTE WHERE TWO KINDS OF ROW SHARE A GROUP, and therefore the only place the
+    // shared surface's in-group sort is observable end to end. `rowsFor` builds ticks first and
+    // issues second; `EditorValidationSurface` ranks `block` at 0 and everything else at 1, and
+    // this tab maps a `critical` issue to `block` — so the built order and the drawn order
+    // deliberately differ, and BOTH files' comments say so in as many words.
+    //
+    // Asserted on POSITION rather than on presence: `filter`/`some` over the same rows is what
+    // every other clause in this file does, and not one of them can see an order.
+    const target = await harness.mount({
+      sections: [
+        {
+          subsystem: 'crafting',
+          mode: 'routed',
+          check: {
+            type: 'relative',
+            rollFormula: '1d20',
+            relativeOutcomes: [{ id: 'a', name: '  ', success: false, dc: 0 }],
+          },
+        },
+      ],
+    });
+    const rows = [
+      ...target.querySelectorAll(
+        '[data-checks-validation-section="crafting"] .manager-recipe-val-row'
+      ),
+    ];
+    const kinds = rows.map((row) => (row.dataset.issue ? 'issue' : 'tick'));
+    const ticks = kinds.indexOf('tick');
+    assert.ok(ticks >= 0, 'the fixture draws at least one check tick to be risen above');
+    assert.ok(
+      rows.filter((row) => row.dataset.issueSeverity === 'critical').length > 0,
+      'and at least one critical issue'
+    );
+    const lastCritical = rows.reduce(
+      (found, row, index) => (row.dataset.issueSeverity === 'critical' ? index : found),
+      -1
+    );
+    assert.ok(
+      lastCritical < ticks,
+      'every critical issue must precede the first tick of its group. A GM opens this tab ' +
+        'because something is wrong, and reads down: the blocker cannot sit under a list of ' +
+        `things that passed. Got ${JSON.stringify(kinds)} with the last critical at ` +
+        `${lastCritical} and the first tick at ${ticks}`
+    );
+    harness.remount();
+  });
+
   it('renders the tier-step target issues and their shared green tick (issue 975)', async () => {
     const target = await harness.mount({
       sections: [

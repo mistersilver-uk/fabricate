@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { parse } from 'svelte/compiler';
 
 import {
   APP_CHROME,
@@ -42,6 +43,7 @@ import {
   WORLD_TOOL_SEARCH_TERM,
 } from '../scripts/lib/viewLabCases.js';
 
+import { evaluateRecipeReadiness } from '../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
 import { MODIFIER_POLICY_OPTION_ATTR } from '../src/ui/svelte/apps/manager/checks/modifierPolicyAttrs.js';
 import { CHECK_SECTION_IDS } from '../src/ui/svelte/apps/manager/checks/checksReadiness.js';
 import {
@@ -51,7 +53,8 @@ import {
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
-import { collectWorkingTreeSources, stripComments } from './helpers/sourceScan.js';
+import { collectWorkingTreeSources } from './helpers/sourceScan.js';
+import { SOURCES, walkTemplate } from './helpers/primitiveAdoptionContract.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -5093,9 +5096,30 @@ test('the validation surface is represented by a frame that can draw its View de
       JSON.stringify(members)
   );
 
-  // And that frame has to prove it drew the surface. `expectView` gates the ROUTE, and a route
+  // The FOURTH member, pinned the same way and for a state neither the pair nor the recipe frame
+  // can reach: the IN-GROUP SORT. A group has to hold two kinds of row for the lift to be visible
+  // at all, and the Checks route is the only one that draws a tick and an issue together — in its
+  // CLEAN state (`manager-checks-validation`) the groups are ticks alone. This case types a
+  // placement the migration shim refuses and reaches a critical issue, which is the row that
+  // rises. Its own `sourceMatches` name `apps/manager/checks/` only, so without this entry a
+  // change to the shared surface never selects it.
+  assert.ok(
+    members.includes('manager-checks-validation-retired-placeholder'),
+    "the surface's representative set must include the one frame whose group holds both a " +
+      `critical issue and a tick, or the in-group sort is published by nothing; it is ${JSON.stringify(members)}`
+  );
+
+  // And that frame has to prove it drew the BUTTON. `expectView` gates the ROUTE, and a route
   // survives a tab click that did nothing — so without this the case publishes whatever tab the
   // recipe editor opened on and reports SATISFIED for a change about validation rows.
+  //
+  // A ROW WAS THE FIRST ATTEMPT AND COULD NOT FAIL, which is why the clause is written on the
+  // hook instead. `EditorValidationSurface` puts `manager-recipe-val-row` on every `<li>`
+  // whatever its status and `evaluateRecipeReadiness` always emits its structural ticks, so
+  // `.manager-recipe-val-row` was satisfied by construction on every recipe in the corpus: it
+  // rejected a wrong tab and an empty stack, and never the missing button this member exists to
+  // represent. `data-recipe-issue-view` is what the recipe editor passes as `viewDataAttr`, and
+  // the surface writes it only where a row carried a route.
   const recipeFrame = getCaseById('manager-recipe-edit-validation');
   assert.equal(
     typeof recipeFrame.expectSelector,
@@ -5103,9 +5127,37 @@ test('the validation surface is represented by a frame that can draw its View de
     'manager-recipe-edit-validation must assert the surface it represents is on screen'
   );
   assert.ok(
-    recipeFrame.expectSelector.includes('manager-recipe-val-row'),
-    `it must name a ROW of the surface, not just its container, or an empty row stack passes: ` +
-      `got "${recipeFrame.expectSelector}"`
+    recipeFrame.expectSelector.includes('data-recipe-issue-view'),
+    'it must name the row action itself, or an all-clear validation tab satisfies it and the ' +
+      `member reports SATISFIED for a frame that cannot contain the button: got ` +
+      `"${recipeFrame.expectSelector}"`
+  );
+
+  // …AND THE FIXTURE HAS TO BE ABLE TO DRAW ONE. The clause above is a claim about the selector;
+  // this is the claim about the world it runs against, and it is the half whose absence let the
+  // first attempt ship. Derived through the REAL readiness evaluator over the REAL lab corpus
+  // rather than trusting the case's comment: a recipe whose issues all lose their `target`, or a
+  // step id that drifts off the one recipe that has one, fails the capture job WHOLE and
+  // publishes nothing for every case in the run.
+  const routed = content.recipes
+    .filter((recipe) => evaluateRecipeReadiness(recipe, {}).issues.some((issue) => issue.target))
+    .map((recipe) => recipe.id);
+  assert.deepEqual(
+    routed,
+    ['sm-r-runeplate-draft'],
+    'the set of lab recipes whose readiness deep-links an issue changed. This frame is the only ' +
+      "representative one that can contain the surface's View button, and it can only do that " +
+      'while the recipe its steps open is in this set'
+  );
+  const opened = recipeFrame.steps
+    .map((step) => /^\[data-recipe-edit="([^"]+)"\]$/u.exec(step?.selector ?? '')?.[1])
+    .filter(Boolean);
+  assert.deepEqual(
+    opened,
+    routed,
+    'the case must open a recipe that draws the button BY ID. Clicking the first Edit button of ' +
+      'an A-to-Z list opens whichever recipe happens to sort first, which is how this frame came ' +
+      'to photograph five green ticks under a case named for a deep link'
   );
 
   const environmentFrame = getCaseById('manager-environment-validation');
@@ -5116,6 +5168,110 @@ test('the validation surface is represented by a frame that can draw its View de
   );
 });
 
+/**
+ * The `name=value` pairs a component file writes STATICALLY, from its parsed template.
+ *
+ * ── THE HAYSTACK, STATED, BECAUSE THE VERSION THIS REPLACES GOT IT WRONG ─────────────────────
+ * Three node populations of the Svelte AST and nothing else:
+ *
+ *  1. `Attribute` nodes with a single `Text` value on any element or component node — the markup
+ *     form, `data-environment-tab="validation"`;
+ *  2. the properties of the `ObjectExpression` a call site passes as `hookAttrs.root` — the
+ *     hook-bag form `root: { 'data-recipe-tab': 'validation' }`, which is how a site that adopted
+ *     `EditorValidationSurface` hands its own root hook to the shared surface;
+ *  3. and, through (1), a component PROP written as a literal, such as
+ *     `viewDataAttr="data-recipe-issue-view"`.
+ *
+ * JS comments, `<!-- … -->` blocks, `<style>` contents, string literals in the `<script>` and
+ * template TEXT NODES are all OUTSIDE it: the parser puts them in nodes this never visits.
+ *
+ * The predecessor was a regex over comment-stripped file TEXT, and its own comment claimed a
+ * conversion that dropped the hook would red here. It would not. Measured: deleting
+ * `data-environment-tab="validation"` from the root element outright and declaring a
+ * `const hookAttrs = { root: { 'data-environment-tab': 'validation' } }` that NOTHING spreads
+ * left the whole file green — the exact adoption slip the pin was written for. The same literal
+ * as visible `<p>` text satisfied it too.
+ *
+ * @param {string} source `.svelte` text
+ * @param {string} filename for the parser's own error messages
+ * @returns {Set<string>} every static pair, as `name=value`
+ */
+function staticPairsIn(source, filename) {
+  const pairs = new Set();
+  const literalText = (attribute) => {
+    const nodes = Array.isArray(attribute.value) ? attribute.value : [attribute.value];
+    return nodes.length === 1 && nodes[0]?.type === 'Text' ? nodes[0].data : null;
+  };
+  walkTemplate(parse(source, { modern: true, filename }).fragment, (node) => {
+    for (const attribute of node.attributes ?? []) {
+      if (attribute.type !== 'Attribute') continue;
+      const text = literalText(attribute);
+      if (text !== null) pairs.add(`${attribute.name}=${text}`);
+      if (attribute.name !== 'hookAttrs') continue;
+      const bag = Array.isArray(attribute.value) ? attribute.value[0] : attribute.value;
+      if (bag?.expression?.type !== 'ObjectExpression') continue;
+      for (const region of bag.expression.properties) {
+        if ((region.key?.name ?? region.key?.value) !== 'root') continue;
+        if (region.value?.type !== 'ObjectExpression') continue;
+        for (const hook of region.value.properties) {
+          const name = hook.key?.name ?? hook.key?.value;
+          if (typeof name === 'string' && hook.value?.type === 'Literal') {
+            pairs.add(`${name}=${hook.value.value}`);
+          }
+        }
+      }
+    }
+  });
+  return pairs;
+}
+
+/**
+ * {@link staticPairsIn} over one repo-relative `.svelte` path.
+ *
+ * @param {string} file
+ * @returns {Set<string>}
+ */
+function staticAttributePairs(file) {
+  const source = SOURCES[file];
+  assert.ok(source, `${file} is not in the .svelte corpus this reads`);
+  return staticPairsIn(source, file);
+}
+
+/**
+ * A SYNTHETIC component carrying one probe hook six times over, in six different positions.
+ *
+ * Three of the six render and three do not, and the corpus cannot tell them apart: a completed
+ * conversion contains no negative case, so the live files can only ever confirm that the reader
+ * finds what is there. What the clause below actually needs is the other direction — that the
+ * reader does NOT find the four spellings that reach no DOM — and the one the pin exists for is
+ * `unspread`: a bag DECLARED and never passed, which is the adoption slip that ships green.
+ */
+const HOOK_DETECTOR_SOURCE = [
+  '<!-- data-probe="commented" -->',
+  '<script>',
+  "  // data-probe='in-a-js-comment'",
+  "  const unspread = { root: { 'data-probe': 'unspread' } };",
+  '</script>',
+  '',
+  '<section data-probe="markup">',
+  '  <p>data-probe="prose"</p>',
+  "  <EditorValidationSurface hookAttrs={{ root: { 'data-probe': 'bagged' } }}",
+  '    viewDataAttr="data-probe-view" />',
+  '</section>',
+].join('\n');
+
+test('the validation hook reader sees what renders and not what merely appears', () => {
+  const pairs = staticPairsIn(HOOK_DETECTOR_SOURCE, 'hook-detector.svelte');
+  assert.deepEqual(
+    [...pairs].sort(),
+    ['data-probe=bagged', 'data-probe=markup', 'viewDataAttr=data-probe-view'],
+    'the reader must find the markup attribute, the `hookAttrs.root` property and the literal ' +
+      'prop — and NOTHING else. `commented`, `in-a-js-comment` and `prose` are the text-scan ' +
+      'haystack this replaced; `unspread` is a bag declared and never passed, which renders no ' +
+      'attribute at all and is the precise conversion slip the clause below exists to catch.'
+  );
+});
+
 test('each validation frame names a hook the component it opens actually writes', () => {
   // THE SUITE-WIDE `expectSelector` CHECK CANNOT DO THIS, and the gap is measured rather than
   // assumed. That check tokenizes the selector against a whole-tree haystack and strips attribute
@@ -5123,52 +5279,48 @@ test('each validation frame names a hook the component it opens actually writes'
   // `data-environment-tab="events"` in a different file. Proved by mutation: renaming the
   // attribute on the validation tab alone, and on the recipe validation tab alone, left that
   // check green in both cases. What a capture actually resolves is the attribute on THAT
-  // component, so that is what this pins — one file, one hook, per frame.
+  // component, so that is what this pins — one file, one pair, per frame.
   //
   // It is also the contract a later adoption of `EditorValidationSurface` has to keep. The
-  // surface preserves a site's own hooks through `hookAttrs`, so both spellings are admitted:
-  // the markup form `data-environment-tab="validation"` and the hook-bag form
-  // `'data-environment-tab': 'validation'`. A conversion that drops the hook rather than passing
-  // it through reds here — which is the only warning available before the capture job fails
-  // WHOLE and publishes nothing for every case in the run.
-  //
-  // COMMENTS ARE STRIPPED FIRST, including Svelte's `<!-- -->` form, which `stripComments` does
-  // not touch. These three files all describe their own hooks in prose — naming the literal is
-  // how the contract is documented — so a scan over the raw text would be answered by the
-  // docblock recording that the hook exists rather than by the hook.
+  // surface preserves a site's own hooks through `hookAttrs`, so both spellings are admitted —
+  // see {@link staticAttributePairs} for which, and for the haystack that makes a DECLARED and
+  // unspread bag fail rather than pass.
   const pins = [
     [
+      // The markup form: the tab writes the hook on its own root element.
       'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',
-      /data-environment-tab["']?\s*[:=]\s*["']validation["']/u,
+      'data-environment-tab=validation',
       'manager-environment-validation',
     ],
     [
+      // The hook-bag form: this tab is converted, so its root hook reaches the DOM only because
+      // it is a property of the object it passes as `hookAttrs.root`.
       'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
-      /data-recipe-tab["']?\s*[:=]\s*["']validation["']/u,
+      'data-recipe-tab=validation',
       'manager-recipe-edit-validation',
     ],
     [
-      // BOUNDED, because the surface writes `manager-recipe-val-rows` on the list one line above
-      // the row's own class. An unbounded match reads the plural and passes on a tree where the
-      // row class has been renamed — the prefix coincidence this file's token check records
-      // having been bitten by twice.
-      'src/ui/svelte/components/EditorValidationSurface.svelte',
-      /manager-recipe-val-row(?![\w-])/u,
+      // The row ACTION's hook, which the same frame's selector now names. The surface writes this
+      // attribute only where a row carried a route, so the pin is on the site's `viewDataAttr`
+      // prop; that the surface spreads it is held by `recipe-validation-tab.test.js`, which
+      // mounts the tab and reads `[data-recipe-issue-view]` out of the rendered DOM.
+      'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
+      'viewDataAttr=data-recipe-issue-view',
       'manager-recipe-edit-validation',
     ],
   ];
 
-  for (const [file, hook, caseId] of pins) {
-    const source = stripComments(readFileSync(resolve(ROOT, file), 'utf8')).replaceAll(
-      /<!--[\s\S]*?-->/gu,
-      ' '
-    );
+  for (const [file, pair, caseId] of pins) {
     assert.ok(
-      hook.test(source),
-      `${file} no longer writes the hook ${hook}, which ${caseId}'s expectSelector names. The ` +
-        'capture job would fail whole and publish nothing.'
+      staticAttributePairs(file).has(pair),
+      `${file} no longer writes \`${pair}\`, which ${caseId}'s expectSelector names. The capture ` +
+        'job would fail whole and publish nothing, for every case in the run.'
     );
   }
+
+  // The reader's own discrimination is driven over a synthetic fixture in the test above, which
+  // is where non-vacuity for these three membership tests lives: a live file can confirm only
+  // that the reader finds what is present.
 });
 
 // ── The world-tool capture cases and the lab fixture that feeds them (issue 1373) ──────────
