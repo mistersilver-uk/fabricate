@@ -228,9 +228,9 @@ const SHARED_PRIMITIVES = [
   // membership: measured before that change, ZERO of the eleven mounted suites that named a
   // crafting-thumb path carried a Medallion entry, so every one of them would have taken the
   // silent `# cancelled` rather than the named "mounts a tree that renders it but never compiles
-  // it" failure. Its sibling `Avatar` deliberately does NOT join at two callers, which is this
-  // list's rule read the other way; the two rulings were taken as one question and the second is
-  // recorded below rather than by silence.
+  // it" failure. Its sibling `Avatar` deliberately did NOT join at two callers, which was this
+  // list's rule read the other way; that ruling has since been overturned by the caller it named
+  // as its own condition — see the entry below.
   'src/ui/svelte/components/Medallion.svelte',
   // THE FOUR THAT ARRIVED IN `components/` AT ISSUE 1509, adjudicated together because the change
   // that moved them made no ruling either way and four unadjudicated arrivals in the directory
@@ -261,24 +261,36 @@ const SHARED_PRIMITIVES = [
   'src/ui/svelte/components/ToggleCard.svelte',
   'src/ui/svelte/components/ItemDropZone.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
+  // THE PORTRAIT (issue 1514), joining on exactly the condition its own non-membership note set:
+  // "it joins the moment a third caller in a third tree arrives, which is what makes this a
+  // criterion rather than a preference." The player inventory inspector's source-actor portrait
+  // is that caller, and the player window is that tree — the two shipped sites are the GM
+  // Knowledge roster row and its detail header, both under the manager root. Nothing about the
+  // criterion moved; the tree did. It is also the entry with the sharpest silent failure on this
+  // list, because it was the one component here whose omission was NOT named: three suites mount
+  // an inventory tree, and each of them would have taken a `# cancelled` with no message rather
+  // than the named "mounts a tree that renders it but never compiles it" line.
+  'src/ui/svelte/components/Avatar.svelte',
 ];
 
 /**
- * The one component adjudicated AGAINST membership, and why a non-entry is worth recording.
+ * Components adjudicated AGAINST membership, and why a non-entry is worth recording.
  *
- * `components/Avatar.svelte` shipped at issue 1506 with exactly two callers — the GM Knowledge
- * surface's roster row and its detail header — and both sit under ONE mounted tree, the manager
- * root. The list above goes on at a THIRD tree, so the portrait does not qualify, and the two
- * suites that mount it name it in their own `compiledModules` instead. That is a real cost and it
- * is taken deliberately: until a third tree renders one, an omitted portrait entry is a silent
- * `# cancelled` rather than the named failure the entries above buy. It joins the moment a third
- * caller in a third tree arrives, which is what makes this a criterion rather than a preference.
+ * IT IS EMPTY, AND THAT IS A RESULT RATHER THAN AN ABSENCE (issue 1514). Its one entry was
+ * `components/Avatar.svelte`, adjudicated out at issue 1506 because both its callers — the GM
+ * Knowledge surface's roster row and its detail header — sat under ONE mounted tree, the manager
+ * root, and this list goes on at a THIRD tree. That ruling named its own expiry in terms: "it
+ * joins the moment a third caller in a third tree arrives, which is what makes this a criterion
+ * rather than a preference." The player inventory inspector's source-actor portrait is that
+ * caller, so the portrait moved UP to the list above in the commit that added it, and this
+ * record is what proves the two lists never both held it — the assertion below is written to
+ * red by name if they ever did.
  *
- * Recorded here rather than left unsaid because its sibling `Medallion` JOINED in the same
- * change, and one ruling stated beside its opposite is a decision; one stated alone is an
- * omission that reads like an oversight.
+ * The structure is kept rather than deleted with its last entry: a ruling stated beside its
+ * opposite is a decision, and the next component measured against this bar needs somewhere to be
+ * recorded when the answer is no.
  */
-const ADJUDICATED_NON_MEMBERS = Object.freeze(['src/ui/svelte/components/Avatar.svelte']);
+const ADJUDICATED_NON_MEMBERS = Object.freeze([]);
 
 test('a component adjudicated OUT of the shared set is really out of it, and really exists', () => {
   // Two ways this record rots, and both leave it looking like configuration. A path that no

@@ -252,7 +252,20 @@ export function isExemptSpacingPixels(pixels) {
 // 10 are literals either way, so a wrapper carrying a margin verbatim moves no occupancy. What
 // the primitives absorb is `var(--fab-space-*)` throughout, so the fourteen occupancies are paid
 // rather than relocated. Measured on the tree, not subtracted.
-export const KNOWN_RAW_SPACING_TOTAL = 863;
+// 863 -> 853 (issue 1514, phase 4): the inventory tab's kind filter, its actor portrait, its two
+// remaining banners and its fourteen pane empties moved onto primitives that own their own
+// geometry. Eight rows at one occupancy VANISH and one SHRINKS by two. The whole of
+// `SalvageMisconfiguredBody`'s scoped block goes with the body it drew (`gap 4`, `gap 6`,
+// `padding 10`), as does `.inventory-detail-broken-banner`'s `padding 8`, the portrait well's
+// `padding 10`, `InventoryDetail`'s centred stack `gap 12`, and the kind pill's `padding 3` and
+// `padding 10`; `InventoryFilters | gap 6` falls 3 -> 1 because two of its three were the pill
+// strip's own gap and the gap between a pill's glyph, label and count, both of which
+// `SegmentedControl` declares in tokens. The one caller-owned WRAPPER this phase keeps brings
+// nothing back — `.inventory-detail-broken-slot` declares `flex-shrink` alone, which is not
+// spacing — and the `.inventory-detail-empty` fill wrapper keeps the `var(--fab-space-4)` it
+// already had. What the primitives absorb is `var(--fab-space-*)` throughout, so the ten
+// occupancies are paid rather than relocated. Measured on the tree, not subtracted.
+export const KNOWN_RAW_SPACING_TOTAL = 853;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

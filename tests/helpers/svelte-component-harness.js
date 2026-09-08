@@ -347,10 +347,23 @@ export const MARKS_AND_NOTICES_COMPILED_MODULES = Object.freeze([
 // inside this body would resolve to nothing and the guard would read these suites as compiling
 // none of it — green, and blind. That is why `Kicker`, `Notice` and `Callout` are restated here
 // rather than spread from the roster above.
+//
+// WIDENED AGAIN AT THE FOURTH PHASE, on the same rule and for the same reason. That phase gives
+// the INVENTORY tree its first `Avatar` (a source actor's portrait) and its first
+// `SegmentedControl` (the kind filter), and the three suites that mount it — `inventory-view`,
+// `inventory-view-salvage-reload` and `fabricate-app-root-mounted` — spread this roster instead
+// of naming the two paths each. Two entries in three manifests is six new lines inside blocks
+// Sonar already reads as duplicated; one spread per suite is three, and each of those three
+// REPLACES two entries the roster already carries. Neither of the newcomers is rendered by the
+// gathering, alchemy or Journal trees, and that is the same trade the paragraph above makes:
+// a suite compiling a member its own tree never renders writes one inert file into a temp
+// directory, which is cheaper than the roster it would otherwise fork.
 export const PLAYER_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/PlayerViewState.svelte',
+  'src/ui/svelte/components/Avatar.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/Kicker.svelte',
   'src/ui/svelte/components/Medallion.svelte',

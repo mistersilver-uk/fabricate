@@ -122,8 +122,16 @@ export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
  * `style` attribute, where this text scan cannot see it, and all three are banked on
  * `offLadderArtSizes` instead. The nine remaining converted tiles never had a row here, because
  * their sizes — 44, 34, 46, 28, 64, 24 — are not on the retired list this baseline scans for.
+ *
+ * 67 until the FOURTH phase moved the inventory inspector's source-actor portrait onto `<Avatar
+ * shape="square" size={40}>`, which takes the last of them: `InventoryComponentDetail | height |
+ * 40` VANISHES on exactly the reading above. It was a 40x40 PORTRAIT WELL rather than a control,
+ * its box is the primitive's interpolated `style` attribute now, and the size is unchanged and
+ * banked on `offLadderArtSizes`. Nothing else in that phase declares a height at all: the two
+ * banners, the fourteen empties and the five eyebrows it converts each hand their geometry to a
+ * primitive that states its own.
  */
-export const KNOWN_RETIRED_HEIGHT_TOTAL = 67;
+export const KNOWN_RETIRED_HEIGHT_TOTAL = 66;
 
 /**
  * The per-corpus height-declaration counts the floors were CHOSEN AGAINST, at the commit that
@@ -161,7 +169,6 @@ const ROWS = Object.freeze([
   'src/ui/svelte/apps/gathering/GatheringTasksPanel.svelte | height | 32 | 1 | 32px => 32px',
   'src/ui/svelte/apps/inventory/InventoryFilters.svelte | min-height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte | min-height | 40 | 1 | 40px => 40px',
-  'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte | height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/manager/BooksScrollsView.svelte | height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte | height | 36 | 1 | 36px => 36px',
   'src/ui/svelte/apps/manager/EmptyState.svelte | height | 32 | 1 | 32px => 32px',

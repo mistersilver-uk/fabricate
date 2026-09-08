@@ -84,6 +84,17 @@
       />
     </div>
   {:else}
+    <!-- HAND-ROLLED, AND DEFERRED RATHER THAN CONVERTED (issue 1514). Every other one-line
+         empty in this tab is `EmptyState note` now. This one is not, and the reason is a
+         property of that variant rather than of this site: `note` declares
+         `place-items: start` and `text-align: left` on ITSELF, so a caller cannot restore a
+         centred line through a wrapper — an inherited alignment loses to the variant's own
+         declaration. Measured in the View Lab at the default window: this sentence is a
+         full-width centred line 48.25px tall standing in for the whole 630px card grid, and
+         under `note` it became a 146.55px line 26px tall in the top-left corner of that
+         column. `filtered` centres but keeps the dashed panel, which is the box the frame-move
+         rule forbids. So it goes to the geometry-and-gaps register with the measurement, and
+         a centred one-line form is what would close it. -->
     <p class="inventory-grid-empty" data-inventory-grid-empty>
       {filtering
         ? localize('FABRICATE.App.Inventory.NoMatches')

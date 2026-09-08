@@ -104,10 +104,15 @@
  *           primitive-rooted. That proof is the hand-authored entries in
  *           `tests/components/searchable-popover-area-scope.test.js`, which carry a family pattern,
  *           roots, anchors, three floors and mirrored fixture pairs that no row here holds. The
- *           register records the decision; the gate proves the rooting. Two rows are `shared` from
+ *           register records the decision; the gate proves the rooting. FOUR rows are `shared` from
  *           an `apps/manager/` path, because a player-window importer is measured on each: a
  *           location debt is not a scope, and recording it as one would make the register lie about
- *           a component the player window already renders.
+ *           a component the player window already renders. The figure is re-derived from the table
+ *           here rather than incremented — it read `two` when issue 1509 shipped it and THREE rows
+ *           already qualified, `Callout`, `ComplicationSummaryRow` and `EmptyState`. The fourth is
+ *           `SegmentedControl`, which issue 1514 moved off `manager-only` because that row's own
+ *           1509 clause named a player caller as the thing that would move it and issue 1514's
+ *           inventory phase supplied one.
  * `callers` NON-MEMBER ROWS ONLY. Every file under `src/` that imports this one, as
  *           repository-relative POSIX paths in code-point order — the spec's "WITH ITS CALLERS
  *           NAMED", as data. Asserted EQUAL to what `scripts/lib/componentImporters.js` measures
