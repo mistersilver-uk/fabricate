@@ -2062,14 +2062,18 @@ describe('Tool Studio editor (mounted)', () => {
     // `LINKED ITEM` heading, on a screen that cannot link one (issue 1373). It is stated as a
     // routed notice now, and only when the link is genuinely missing.
     assert.equal(root.querySelectorAll('[data-tool-validation-check]').length, 5);
+    // BLOCKING ROWS FIRST, then the studio's authored order (issue 1517). `repair` is the second
+    // blocking check on this fixture and it is authored third, so the surface's in-group sort
+    // lifts it above `on-break`; the three non-blocking checks keep the order this tab wrote
+    // them in, because everything that does not block shares one rank.
     assert.deepEqual(
       [...root.querySelectorAll('[data-tool-validation-check] .manager-recipe-val-title')].map(
         (node) => node.textContent
       ),
       [
         'Breakage settings are complete',
-        'On-break action is complete',
         'Repair requirements are complete',
+        'On-break action is complete',
         'Character prerequisites are complete',
         'Check bonus is complete',
       ]

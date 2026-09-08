@@ -34,13 +34,41 @@
      that constant for what the sheet actually painted and what a GM saw instead.
    - counts / countLabels: the count tiles. See {@link COUNT_ORDER} for which tiles are drawn.
    - groups: `{ id, icon, label, rows, dataAttrs? }[]`; each row is
-     `{ id, status, title, detail?, target?, dataAttrs? }`.
+     `{ id, status, title, detail?, target?, focusTarget?, viewLabel?, dataAttrs? }`.
    - statusLabels: the per-status pill word, localized by the caller.
    - rowDataAttr: one attribute name, carrying the row id, put on every row.
-   - viewDataAttr / viewLabel: the same idea for the row's View button, plus its label. Both are
-     supplied by ONE caller today (`recipe/RecipeValidationTab`), which is the only site whose
-     rows carry both a deep-link target and a localized verb; the other View-rendering caller
-     takes the defaults. They are named props rather than row data because neither varies by row.
+   - viewDataAttr: the same idea for the row's View button, carrying the row's ROUTE.
+   - viewLabel: the View button's accessible name, as a LOCALIZATION KEY this surface resolves
+     itself. See the block below for why it defaults to one and why a row may override it.
+
+  ── THE ROW ACTION IS A TWO-FIELD CONTRACT (issue 1517) ──────────────────────────────────────
+  A row carries `target` — the ROUTE, whatever the host needs to bring the destination into the
+  DOM, opaque here — and `focusTarget` — the CONTROL, the value of the `data-validation-target`
+  attribute the offending control carries. The button renders when a row carries EITHER, and the
+  click passes both, positionally: `onSelectIssue(row.target, row.focusTarget)`.
+
+  Two positional arguments rather than one object, because both existing hosts read argument 0 as
+  the route and keep their one-argument signatures compiling unchanged. `target` could not simply
+  become the control id: for the recipe editor it is a TAB id consumed by a whitelist, and for the
+  Checks studio it is an `{ activity, section }` object — neither is a control selector, and a
+  host that never resolves its route renders no destination for the focus move to land in.
+
+  `viewDataAttr` carries `row.target`, so a row that carries ONLY a `focusTarget` renders the
+  button with no site hook on it. That is stated rather than silent: the hook names the ROUTE, and
+  a row with no route has none to name. Its one caller's rows all carry a route.
+
+  ── THE ACCESSIBLE NAME IS THIS SURFACE'S OWN JOB (issue 1517) ───────────────────────────────
+  `viewLabel` defaults to a `FABRICATE.…` key and the template renders `localize(...)`, which is
+  the `DropZone` idiom: a default written into a `$props()` destructuring is a string `game.i18n`
+  never sees, so an English default there is an accessible name no world can translate. The key
+  is `FABRICATE.Admin.Manager.Validation.View`, a SHARED namespace rather than the recipe
+  editor's, because it is the default name of one primitive on nine surfaces and eight of them
+  are not the recipe editor.
+
+  A row may override it with `row.viewLabel`, also a key. That exists because one caller draws two
+  DIFFERENT verbs down one list — "View task" beside "View event" — and a single scalar prop
+  would collapse both into one word. `row.viewLabel ?? viewLabel`, so a row that says nothing
+  takes the surface's default.
    - class: an EXTRA class appended to this surface's own, never a replacement — the idiom
      `ManagerButton`, `Field` and `Chip` already use. It exists so a site whose root carried its
      own classes keeps them, so no shipped rule stops matching.
@@ -62,6 +90,7 @@
 <script>
   import Chip from './Chip.svelte';
   import ManagerButton from './ManagerButton.svelte';
+  import { localize } from '../util/foundryBridge.js';
 
   let {
     title = 'Validation',
@@ -73,7 +102,7 @@
     statusLabels = { pass: 'PASS', warn: 'WARNING', block: 'BLOCKS ENABLE' },
     rowDataAttr = '',
     viewDataAttr = '',
-    viewLabel = 'View',
+    viewLabel = 'FABRICATE.Admin.Manager.Validation.View',
     hookAttrs = {},
     countAttrs = {},
     class: extraClass = '',
@@ -192,6 +221,42 @@
    * @returns {object}
    */
   const namedAttr = (name, value) => (name ? { [name]: value } : {});
+
+  /**
+   * THE IN-GROUP ORDER: blocking rows first, everything else in the order its site authored
+   * (issue 1517).
+   *
+   * TWO ranks rather than three, and the narrow reading is a decision rather than a fallback.
+   * `spec.md` asks that blocking issues sort above warnings inside a group and says nothing about
+   * passing rows; sinking every tick below every issue would turn "here is what was checked, in
+   * order" into "here is what is wrong, then a tail of ticks" on nine surfaces, for a sentence
+   * that did not ask for it. It is also the reading that leaves the Checks studio alone: that tab
+   * builds ticks first and issues second, and under a three-rank sort a `warn` tick and a `warn`
+   * issue would interleave — two different kinds of row made adjacent and told apart only by a
+   * data attribute. Both are rank 1 here, so both keep the positions the tab authored.
+   *
+   * The rank reads the ROW vocabulary (`pass|warn|block`), which every producer emits uniformly.
+   * That is a different axis from {@link COUNT_ORDER}, which orders the aggregate tiles.
+   *
+   * STABLE by construction rather than by relying on the engine: the authored position is carried
+   * through the comparison as the tiebreak, so equal-rank rows can only come out in the order they
+   * arrived. A source array is never sorted in place — `rows` belongs to the caller.
+   *
+   * @param {Array<{status?: string}>|undefined} rows one group's rows, as the caller authored them
+   * @returns {Array<{status?: string}>} the same rows, blocking ones first
+   */
+  const orderedRows = (rows) =>
+    (Array.isArray(rows) ? rows : [])
+      .map((row, authored) => ({ row, authored }))
+      .sort(
+        (left, right) => rowRank(left.row) - rowRank(right.row) || left.authored - right.authored
+      )
+      .map((entry) => entry.row);
+
+  /** Blocking rows rank 0; every other row ranks 1. See {@link orderedRows}. */
+  function rowRank(row) {
+    return row?.status === 'block' ? 0 : 1;
+  }
 </script>
 
 <!--
@@ -257,7 +322,7 @@
         <i class={group.icon} aria-hidden="true"></i><span>{group.label}</span>
       </p>
       <ul class="manager-recipe-val-rows">
-        {#each group.rows as row, index (`${group.id}-${row.id || index}`)}
+        {#each orderedRows(group.rows) as row, index (`${group.id}-${row.id || index}`)}
           <li
             class={`manager-recipe-val-row is-${row.status}`}
             class:is-invalid={row.status === 'block'}
@@ -275,12 +340,13 @@
                   >{row.detail}</span
                 >{/if}
             </div>
-            {#if row.target}
+            {#if row.target || row.focusTarget}
               <ManagerButton
                 role="ghost"
                 class="manager-recipe-val-view"
                 {...namedAttr(viewDataAttr, row.target)}
-                onclick={() => onSelectIssue(row.target)}>{viewLabel}</ManagerButton
+                onclick={() => onSelectIssue(row.target, row.focusTarget)}
+                >{localize(row.viewLabel ?? viewLabel)}</ManagerButton
               >
             {/if}
             <Chip class={`manager-recipe-val-pill is-${row.status}`}

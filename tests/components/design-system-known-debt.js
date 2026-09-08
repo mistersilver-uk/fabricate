@@ -500,16 +500,26 @@ export const KNOWN_AREA_SCOPED_STRING_USE_TOTAL = 2;
  * its label to `'FABRICATE.DropZone.DefaultLabel'`, which resolves through the lang files like any
  * other key.
  *
- * The issue predicted eight rows and the gate measures TEN, on the same defects. The difference is
+ * The issue predicted eight rows and the gate measured TEN, on the same defects. The difference is
  * granularity rather than scope: the key is (file, prop, text), so `ManagerColorPicker`'s two
  * defaults and `ManagerColorPopover`'s three are five rows here where the issue's prose collapsed
  * them into one sentence naming three strings. The finer key is what stops a swap inside one file
  * — 'Custom hex' becoming 'Hex value' — from leaving the count unmoved.
+ *
+ * ONE ROW HAS BEEN PAID DOWN, 10 → 9 (issue 1517).
+ * `EditorValidationSurface.svelte | viewLabel | View | 1` is gone because that surface now takes
+ * the `DropZone` route: its `viewLabel` defaults to `'FABRICATE.Admin.Manager.Validation.View'`
+ * and the template resolves it through `localize()`, so the View button on all nine validation
+ * screens carries a name a world can translate. The row is DELETED here rather than left banked,
+ * because `assertRatchet` reports an un-banked pay-down as `VANISHED` and fails on it as loudly
+ * as on a regression — a baseline is an exact set in both directions.
+ *
+ * The remaining nine are unmoved and are the same defects the measurement found.
  */
 export const KNOWN_UNTRANSLATED_NAME_DEFAULTS = knownDebt('untranslatedNameDefaults');
 
 /** @see KNOWN_UNTRANSLATED_NAME_DEFAULTS */
-export const KNOWN_UNTRANSLATED_NAME_DEFAULT_TOTAL = 10;
+export const KNOWN_UNTRANSLATED_NAME_DEFAULT_TOTAL = 9;
 
 /**
  * An `aria-label` bound to a prop that defaults to the empty string, keyed `file | expression`.

@@ -322,11 +322,13 @@ test('every call site that hooks a count also reports it', () => {
   );
 });
 
-test('the recipe editor is the only site taking the row action, and it takes both halves', () => {
-  // `viewDataAttr` and `viewLabel` are the surface's two one-caller props, and this is the
-  // clause that keeps that honest rather than merely true. The View button renders only where
-  // a row carries a `target`; the pair is what a site puts ON it, and a site passing the hook
-  // without the label ships an untranslated verb next to a translated one.
+test('the recipe editor is the only site hooking the row action, and none restates its name', () => {
+  // `viewDataAttr` is the surface's one-caller hook prop, and this is the clause that keeps
+  // that honest rather than merely true. `viewLabel` USED to be its pair — a site hooking the
+  // action also had to hand the surface a localized verb, and a site that hooked without
+  // labelling shipped an untranslated word beside translated ones. Issue 1517 ended that
+  // obligation by moving it INTO the surface: the name is a key the surface resolves itself,
+  // so the correct number of call sites restating it is zero.
   const withHook = [];
   const withLabel = [];
   for (const [file, source] of Object.entries(SOURCES)) {
@@ -337,15 +339,94 @@ test('the recipe editor is the only site taking the row action, and it takes bot
   assert.deepEqual(
     withHook,
     ['src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'],
-    'the set of sites hooking the row action changed. A second one is welcome and makes both ' +
-      'props ordinary rather than single-caller; this pin is here so that arrival is a ' +
+    'the set of sites hooking the row action changed. A second one is welcome and makes the ' +
+      'prop ordinary rather than single-caller; this pin is here so that arrival is a ' +
       'deliberate edit rather than something a reviewer has to notice.'
   );
   assert.deepEqual(
     withLabel,
-    withHook,
-    'a site hooking the row action must also localize its label, and vice versa: the two are ' +
-      'one decision about one button'
+    [],
+    'a call site is passing `viewLabel` again. The surface defaults it to a localization key ' +
+      'and resolves it, so a site that passes one is either restating that default — which is ' +
+      'a second place the accessible name lives — or overriding it for EVERY row, which is not ' +
+      'what varies: a site whose rows need different verbs sets `row.viewLabel` per row. If a ' +
+      'genuine whole-surface override arrives, move this pin deliberately:\n  ' +
+      withLabel.join('\n  ')
+  );
+});
+
+/**
+ * The surface's own `$props()` defaults, and its View button node, read from the AST.
+ *
+ * HAYSTACK, stated, because it is the whole reason this is a parser rather than a regex: the
+ * `ObjectPattern` of the `let { … } = $props()` declaration, and the template's element tree.
+ * Comments, docblocks, `<!-- … -->` blocks and `<style>` are NOT in either — the parser drops
+ * them into `ast.comments` or into nodes this never visits. THIS SURFACE'S HEADER EXPLAINS ITS
+ * `viewLabel` default and its `localize()` call in prose, naming both the key and the function,
+ * so every text-shaped matcher over `SOURCES[SURFACE_PATH]` reports what the DOCUMENTATION says
+ * and never reads the code at all. Slices below are taken from AST node ranges for the same
+ * reason: a range names exactly one expression.
+ *
+ * @returns {{defaults: Map<string, object|null>, button: object, source: string}}
+ */
+function surfaceRowAction() {
+  const source = SOURCES[SURFACE_PATH];
+  const ast = parse(source, { modern: true, filename: SURFACE_PATH });
+  const declared = (ast.instance?.content?.body ?? []).find(
+    (node) =>
+      node.type === 'VariableDeclaration' &&
+      node.declarations[0]?.init?.type === 'CallExpression' &&
+      node.declarations[0]?.init?.callee?.name === '$props'
+  );
+  assert.ok(declared, `${SURFACE_PATH} no longer destructures \`$props()\`, so nothing is read`);
+  const defaults = new Map();
+  for (const property of declared.declarations[0].id.properties ?? []) {
+    if (property.type !== 'Property') continue;
+    const value = property.value;
+    defaults.set(property.key?.name, value.type === 'AssignmentPattern' ? value.right : null);
+  }
+
+  const buttons = [];
+  walkTemplate(ast.fragment, (node) => {
+    if (node.type === 'Component' && node.name === 'ManagerButton') buttons.push(node);
+  });
+  assert.equal(
+    buttons.length,
+    1,
+    `${SURFACE_PATH} renders ${buttons.length} <ManagerButton>s; the row action is one button ` +
+      'and the clauses below read it by being the only one'
+  );
+  return { defaults, button: buttons[0], source };
+}
+
+test("the View button's name is a translatable key, in a shared namespace, resolved here", () => {
+  const { defaults, button, source } = surfaceRowAction();
+
+  const fallback = defaults.get('viewLabel');
+  assert.equal(fallback?.type, 'Literal', '`viewLabel` must default to a string literal');
+  assert.match(
+    fallback.value,
+    /^FABRICATE\.(?:[A-Za-z0-9_]+\.)+[A-Za-z0-9_]+$/u,
+    `\`viewLabel\` defaults to "${fallback.value}". A default written into a \`$props()\` ` +
+      'destructuring is a string `game.i18n` never sees, so an English word here is the ' +
+      'accessible name of a control on nine validation screens that no world can translate.'
+  );
+  assert.ok(
+    !fallback.value.startsWith('FABRICATE.Admin.Manager.Recipe.'),
+    `\`viewLabel\` defaults to "${fallback.value}", under the RECIPE editor's namespace. This ` +
+      'is the default name of a shared primitive on nine surfaces, eight of which are not the ' +
+      'recipe editor; a key filed under one of the nine reads as that screen\'s property.'
+  );
+
+  const children = button.fragment.nodes.filter((node) => node.type !== 'Text');
+  assert.equal(children.length, 1, 'the button renders exactly one expression as its name');
+  assert.equal(
+    source.slice(children[0].expression.start, children[0].expression.end),
+    'localize(row.viewLabel ?? viewLabel)',
+    'the button must RESOLVE its name. A key default interpolated raw is worse than the ' +
+      'English one it replaced — every one of these buttons then reads as a dotted path — and ' +
+      'the `??` is what lets one site draw two different verbs down one list ("View task" ' +
+      'beside "View event") without a second whole-surface prop.'
   );
 });
 
