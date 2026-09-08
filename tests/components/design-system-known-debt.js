@@ -714,14 +714,14 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * raw buttons — the sort-direction switch, the row's select target, and the row's `Edit rules`
  * and `Add to system` routes — are unconverted and stay.
  *
- * 241 -> 240 with issue 1515's sixth phase, and the row VANISHES rather than shrinking:
+ * 240 -> 239 with issue 1515's sixth phase, and the row VANISHES rather than shrinking:
  * `apps/manager/BooksScrollsView.svelte` declared exactly one, the library row's identity
  * `<button>`, and it carries `data-keyboard-focus="true"` now. That is the whole of that file's
  * raw-button population, so the slot is closed rather than left open for the next author to fill.
  *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 240;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 239;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.
