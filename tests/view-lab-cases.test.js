@@ -1968,10 +1968,19 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
 
   // The check above is only worth anything if it looked at the cases. It did not, in its first
   // draft, and passed clean.
+  //
+  // 31 rather than 28 as of issue 1513, and the three that joined are three DIFFERENT things
+  // this scan now sees. `player-crafting-sources-picker` is a genuine new crafting case, and it
+  // opens the sources picker rather than a recipe detail, so claiming no body is correct for it.
+  // `player-inventory` and `player-alchemy-workbench` are NOT crafting frames at all: they joined
+  // because this predicate reads any `apps/crafting` path, and those two now name
+  // `apps/crafting/ComponentSourcesBar.svelte` explicitly — the bar draws in their tabs as well,
+  // and `CRAFTING_SHARED` could never route to them. Both open no recipe detail, so both are
+  // required to claim no body, which is exactly what the `wrong` sweep above holds them to.
   assert.equal(
     examined.length,
-    28,
-    `expected the 28 crafting cases to be examined, saw ${examined.length}`
+    31,
+    `expected the 31 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>
@@ -2204,12 +2213,24 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   );
 });
 
-// The fifteen frames a change to the shared positioning seam must publish (issue 1500; the
+// The sixteen frames a change to the shared positioning seam must publish (issue 1500; the
 // eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the
 // twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
 // PLAYER window, which is a second application root for the seam to clamp against — and the
 // fourteenth and fifteenth at issue 1520's second review round, which is the two GM canvas
 // windows' open option panels).
+//
+// THE SIXTEENTH ARRIVED BY THE SAME DOOR AS THE THREE BEFORE IT (issue 1513).
+// `manager-recipe-item-contents-picker` opens the recipe-item editor's link-recipe picker, which
+// is a `SearchablePopover` and therefore already portaled and anchored by this seam — the case is
+// new, the wiring it exercises is not. It is a growth in the direction this array's failure text
+// permits: the frame RESTS ON AN OPEN PANEL, which is the membership test itself, rather than
+// drawing a trigger closed.
+//
+// `player-crafting-sources-picker` lands in the same commit and is deliberately ABSENT here. Its
+// panel is a `position: absolute` child of `ComponentSourcesBar` that this seam does not place,
+// so naming the seam in that case would claim a regression the frame cannot show — the mirror
+// image of the closed-trigger error, and the reason that case's own comment states the omission.
 //
 // THOSE LAST TWO ARRIVED THE WAY THE THREE BEFORE THEM DID: a frame resting on an open panel that
 // did not name the seam. `interactables-config-source-open` was PUBLISHED, and it is the frame the
@@ -2239,6 +2260,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-gathering-task-availability-menu',
   'manager-recipe-edit-ingredients-or-menu',
   'manager-recipe-edit-tag-picker',
+  'manager-recipe-item-contents-picker',
   'manager-recipes-bulk-edit-check-tier',
   'manager-recipes-bulk-edit-picker',
   'manager-system-edit-lists',
@@ -5615,5 +5637,156 @@ test('a capture case that clicks a scoped-list row can actually reach it', async
   assert.ok(
     content.componentScope.entities.some((entity) => !entity.originItemUuid),
     'the entry validation frame needs a record with NO source item, which is its one blocking row'
+  );
+});
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// The fixture ids the three issue-1513 cases click, pinned against the lab world (issue 1632).
+//
+// Every OTHER guard in this file checks a selector's HOOKS against `src/`, and attribute VALUES
+// are stripped before that check runs — deliberately, because a value is a fixture id and fixture
+// ids do not live in `src/`. The consequence is that a drifted id inside a step selector is
+// checked by nothing: `[data-access-row="al-r-nonexistent"]` passes every sweep here and then
+// throws by name in the capture driver, which aborts the WHOLE run and publishes no frame at all.
+//
+// So these two read the fixture the same way `every world component id the capture cases click
+// exists in the lab world` reads its own, and they go one step further where existence is not
+// reachability: a row that exists on page four is as absent as a row that does not exist.
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+test('the recipe-item contents cases open a definition the lab world holds, with recipes left to link', async () => {
+  const { buildLabContent } = await import('./view-lab/world/labContent.js');
+  const content = buildLabContent();
+
+  // The cases and the definition each clicks, read off the registry rather than restated: a case
+  // retargeted onto another book must move this check with it or fail here.
+  const clicked = [];
+  for (const viewCase of VIEW_LAB_CASES) {
+    if (!String(viewCase.expectView || '').startsWith('recipe-item')) continue;
+    for (const step of viewCase.steps || []) {
+      for (const [, id] of String(step.selector || '').matchAll(
+        /\[data-books-scrolls-edit="([^"]+)"\]/g
+      )) {
+        clicked.push({ caseId: viewCase.id, id, system: viewCase.query?.system });
+      }
+    }
+  }
+  assert.ok(clicked.length > 0, 'the scan found no clicked recipe-item definition; it is broken');
+
+  for (const { caseId, id, system } of clicked) {
+    const definitions =
+      (content.systems ?? []).find((entry) => entry.id === system)?.recipeItemDefinitions ?? [];
+    assert.ok(
+      definitions.some((definition) => String(definition?.id) === id),
+      `${caseId} opens the recipe-item definition "${id}", which "${system}" does not hold`
+    );
+  }
+
+  // AND THE TWO STATES THE CONTENTS PAIR NEEDS, which mere existence gives neither of them.
+  const herbalism = (content.systems ?? []).find((entry) => entry.id === 'lab-herbalism');
+  const book = (herbalism?.recipeItemDefinitions ?? []).find(
+    (definition) => String(definition?.id) === 'hb-book'
+  );
+  const linked = (book?.recipeIds ?? []).length;
+  const systemRecipes = (content.recipes ?? []).filter(
+    (entry) => String(entry?.craftingSystemId) === 'lab-herbalism'
+  ).length;
+
+  assert.ok(
+    linked > 0,
+    'manager-recipe-item-contents expects the LINKED list; with no membership `hb-book` draws ' +
+      'the `data-recipe-item-contents-empty` line, its expectSelector matches nothing, and the ' +
+      'capture fails WHOLE'
+  );
+  assert.ok(
+    systemRecipes > linked,
+    'manager-recipe-item-contents-picker expects an ENABLED trigger over a populated panel. ' +
+      '`RecipeItemContentsTab` passes `disabled={linkable.length === 0}`, so a book linking every ' +
+      `recipe in its system (${linked} of ${systemRecipes}) leaves a trigger the driver clicks ` +
+      'to no effect and a panel that never opens'
+  );
+});
+
+test('the access inspector case clicks a recipe row on the Access list first page', async () => {
+  const { buildLabContent } = await import('./view-lab/world/labContent.js');
+  const content = buildLabContent();
+
+  // THE SCREEN'S OWN PAGE SIZE, read from its source rather than restated — a hard-coded 10 here
+  // would go on passing the day the Access list changes, which is the drift this file exists to
+  // stop.
+  const view = readFileSync(resolve(ROOT, 'src/ui/svelte/apps/manager/AccessTabView.svelte'), 'utf8');
+  const pageSize = Number(view.match(/let pageSize = \$state\((\d+)\);/)?.[1]);
+  assert.ok(pageSize > 0, 'the Access list declares a default page size; the read is broken');
+
+  const clicked = [];
+  for (const viewCase of VIEW_LAB_CASES) {
+    for (const step of viewCase.steps || []) {
+      for (const [, id] of String(step.selector || '').matchAll(/\[data-access-row="([^"]+)"\]/g)) {
+        clicked.push({ caseId: viewCase.id, id, system: viewCase.query?.system });
+      }
+    }
+  }
+  assert.ok(clicked.length > 0, 'the scan found no clicked access row; it is broken');
+
+  for (const { caseId, id, system } of clicked) {
+    const recipes = (content.recipes ?? []).filter(
+      (entry) => String(entry?.craftingSystemId) === String(system)
+    );
+    assert.ok(
+      recipes.some((entry) => String(entry?.id) === id),
+      `${caseId} clicks the access row "${id}", which "${system}" does not hold`
+    );
+    // REACHABILITY, answered without appealing to the list's sort order: the Access list opens
+    // unfiltered, so every row of a system holding no more than one page of recipes is on page one
+    // whatever order they arrive in. A system that outgrows a page would need this check to know
+    // that order, and the assertion says so rather than passing quietly.
+    assert.ok(
+      recipes.length <= pageSize,
+      `${caseId} clicks "${id}" on a system holding ${recipes.length} recipes against a ` +
+        `${pageSize}-row first page, so the row may not be rendered at all. The capture driver ` +
+        'throws by name on a selector that matches nothing and aborts the WHOLE run.'
+    );
+  }
+});
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// `ComponentSourcesBar` publishes the three tabs it draws in, not only the one its directory names.
+//
+// The bar is the Crafting tab's right-slot content in the SHARED `ActorSelectTopBar`, and
+// `showSourcesBar` is `isCrafting || isInventory || isAlchemy` — three tabs. Its only routing was
+// `CRAFTING_SHARED`, a pattern over `apps/crafting/`, which cannot reach an inventory or alchemy
+// frame however many crafting frames it selects. Issue 1500 made exactly this repair for
+// `ActorSelectTopBar`, and its pin above is the shape this one takes.
+//
+// Written out rather than derived from the patterns: a pin that recomputed the answer from the
+// same `sourceMatches` it is checking would agree with any wiring, including the one it exists to
+// correct.
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+test('the crafting sources bar routes to the inventory and alchemy frames that draw it too', () => {
+  const selected = mapChangedFilesToCases([
+    'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
+  ]).map((viewCase) => viewCase.id);
+
+  for (const id of ['player-inventory', 'player-alchemy-workbench']) {
+    assert.ok(
+      selected.includes(id),
+      `a change confined to the sources bar no longer publishes "${id}", which is a tab the bar ` +
+        'renders in and whose own `sourceMatches` is the only thing that can reach it — ' +
+        '`CRAFTING_SHARED` covers `apps/crafting/` and stops there'
+    );
+  }
+  // AND THE FRAME THAT OPENS ITS PANEL. Every other frame in this set draws the picker CLOSED, so
+  // without this one a change to the panel published twenty-nine photographs of a shut trigger.
+  assert.ok(
+    selected.includes('player-crafting-sources-picker'),
+    'the one frame in the registry that opens the sources picker must be in the set a change to ' +
+      'the bar publishes'
+  );
+  // NON-VACUITY, and it is the half that would rot silently: the two ids above are also reachable
+  // through a pattern claiming the whole player tree, which would satisfy every assertion here
+  // while making the routing meaningless.
+  assert.ok(
+    !selected.includes('player-journal-stacked'),
+    'the bar must not select a tab it does not render in; the routing has been widened'
   );
 });

@@ -172,10 +172,19 @@
                    the tile draws the same 32x32 at the ladder's 9px over `var(--fab-bg-3)` with a
                    1px `var(--fab-border)` hairline it did not have. The option row is
                    `min-height: 44px` and the tile does not set one, so the row's height is
-                   unmoved. UNPHOTOGRAPHABLE: no View Lab case opens this popover — the registry
-                   has no step naming `data-crafting-sources-add` — so `component-sources-bar-mounted`
-                   is what holds this conversion, and the same is true of the no-owned-actors line
-                   below it. -->
+                   unmoved.
+
+                   THE CLAIM THIS PARAGRAPH USED TO MAKE IS FALSE NOW, and it is restated rather
+                   than deleted because it was a measurement of the tree on the day it was written.
+                   It said UNPHOTOGRAPHABLE: no View Lab case opened this popover, the registry
+                   having no step naming `data-crafting-sources-add`. Issue 1513 registered
+                   `player-crafting-sources-picker`, whose one step is that trigger, so this panel
+                   and the no-owned-actors line below it now have a published frame.
+
+                   THE MOUNTED ASSERTION STAYS ALL THE SAME, and the two prove different things: a
+                   frame is a photograph of the panel, not a measurement of a 32.00x32.00 tile at a
+                   9px corner inside an unmoved 44px row. `component-sources-bar-mounted` remains
+                   what holds the three moves named above. -->
               <Avatar
                 art={hasImg(actor) ? actor.img : ''}
                 name={actor.name}
