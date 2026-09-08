@@ -318,12 +318,40 @@ describe('1515 Chip — removable is REFUSED rather than dropped', () => {
     });
   }
 
-  it('refuses a control it cannot name', async () => {
-    await assert.rejects(
-      () => chip.mount({ ...REMOVABLE, removeLabel: '' }),
-      /removeLabel/u,
-      'the glyph is aria-hidden, so a control with no label is announced as nothing at all'
-    );
+  it('refuses a control it cannot name, in every falsy spelling of "no name"', async () => {
+    // `removeLabel` defaults to `undefined` rather than to `''` (issue 1515, after the
+    // required-names gate), so BOTH spellings of an absent name reach this refusal and the
+    // `aria-label={removeLabel || undefined}` guard is unreachable rather than a fallback.
+    for (const removeLabel of ['', undefined, null]) {
+      await assert.rejects(
+        () => chip.mount({ ...REMOVABLE, removeLabel }),
+        /removeLabel/u,
+        `the glyph is aria-hidden, so a control named ${JSON.stringify(removeLabel)} is announced as nothing at all`
+      );
+      chip.remount();
+    }
+  });
+
+  it('leaves NO reachable state in which the control renders an empty name', async () => {
+    // The whole point of the refusal above, stated as the property it buys rather than as the
+    // mechanism. An `aria-label=""` does not fall back to the element's content — it REPLACES
+    // the name with nothing, so a rendered control carrying one is announced as an unnamed
+    // button. The gate at `tests/design-system-required-names.test.js` polices the SPELLING
+    // from the source; this polices the rendered result, which is the thing that matters and
+    // the thing a future default — localized or not — would silently change.
+    for (const removeLabel of ['', undefined, null]) {
+      await assert.rejects(() => chip.mount({ ...REMOVABLE, removeLabel }));
+      assert.ok(
+        !document.querySelector('[data-chip-remove]'),
+        `a chip with removeLabel ${JSON.stringify(removeLabel)} rendered a control anyway, which is the unnamed button this refusal exists to prevent`
+      );
+      chip.remount();
+    }
+
+    const target = await chip.mount(REMOVABLE);
+    const name = target.querySelector('[data-chip-remove]').getAttribute('aria-label');
+    assert.equal(name, 'Remove Perception', 'and a named control keeps the caller\u2019s name');
+    assert.ok(name.length > 0, 'which is the property the source gate is a proxy for');
     chip.remount();
   });
 

@@ -181,7 +181,23 @@
      `is-removable` class; `removeLabel` is that button’s `aria-label` and must name the
      member it takes out ("Remove Perception"), because the chip’s own label arrives as a
      snippet and no component can read a name out of one; `onRemove` is called once focus has
-     moved. The read-only state chip is this same component saying something the GM cannot
+     moved.
+
+     `removeLabel` DEFAULTS TO `undefined` RATHER THAN TO `''` OR TO A WORD OF ITS OWN, and
+     `aria-label` is written `{removeLabel || undefined}` (issue 1515, after the required-names
+     gate). Three facts decide it. An `aria-label=""` is not "no label": it REPLACES the name
+     the element would take from its own content with nothing, so it is strictly worse than
+     writing no attribute at all — `tests/design-system-required-names.test.js` ratchets exactly
+     that shape and `IconButton` and `SelectionCheckbox` ship the guarded spelling this now
+     matches. A hard-coded English default is a name no world can change, because `game.i18n`
+     never sees it, and that gate ratchets that too. And a LOCALIZED generic — "Remove",
+     repeated down a row of eight chips — is eight identically named buttons, which is why
+     `ModifierPillSelect` composes `${Remove} ${optionLabel(option)}` rather than naming its
+     control from the key alone. So the caller always has a better name than this primitive
+     could invent, which is the case that same gate says to answer by defaulting to `undefined`
+     and REQUIRING it. The refusal below is what makes that requirement real, and it is why the
+     `|| undefined` branch is unreachable in a rendered chip rather than a silent fallback: a
+     removable chip either has a name or does not render. The read-only state chip is this same component saying something the GM cannot
      delete, and it never takes this prop: a fact chip that grew an `x` would offer an edit
      the screen cannot honour.
 
@@ -262,7 +278,7 @@
     density = 'default',
     iconOnly = false,
     removable = false,
-    removeLabel = '',
+    removeLabel = undefined,
     onRemove = null,
     disabled = false,
     element = $bindable(null),
@@ -514,7 +530,7 @@
       data-chip-remove
       data-keyboard-focus="true"
       {disabled}
-      aria-label={removeLabel}
+      aria-label={removeLabel || undefined}
       onclick={remove}><i class="fas fa-xmark" aria-hidden="true"></i></button
     >{:else}{@render children?.()}{/if}</svelte:element
 >
