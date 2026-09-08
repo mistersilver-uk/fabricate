@@ -116,17 +116,23 @@
   // The two commands that left the row's three-button cluster for the overflow menu. Edit stays
   // an `<IconButton>` because it is the row's primary act; Export and Delete are built as data so
   // the shared `<ActionMenu>` owns the trigger, the portaled panel and the keyboard contract.
-  function rowMenuItems(system) {
-    const name = systemDisplayLabel(system, systemLabels);
+  // THE MENU ITEMS NAME THE COMMAND, NOT THE ROW (issue 1515). `ActionMenu`'s `label` is both the
+  // visible text and the `menuitem`'s accessible name, and the shipped callers that predate this
+  // conversion — `ComponentBrowserInspector` and `environment/CompositionList` — both spell it as a
+  // generic verb ("Delete component", "Move up"). The row is identified by the trigger the menu was
+  // opened from, so repeating its name in every item widens the panel to restate what the reader
+  // just acted on. This is also why `Recipe.DuplicateNamed` and `Component.DeleteNamed` are already
+  // dead in `tests/lang-known-orphans.js`: the earlier conversions retired the same `{name}` copy.
+  function rowMenuItems() {
     return [
       {
         id: 'export',
-        label: text('FABRICATE.Admin.Manager.ExportNamed', 'Export {name}').replace('{name}', name),
+        label: text('FABRICATE.Admin.Manager.ExportSystem', 'Export system'),
         icon: 'fas fa-file-export',
       },
       {
         id: 'delete',
-        label: text('FABRICATE.Admin.Manager.DeleteNamed', 'Delete {name}').replace('{name}', name),
+        label: text('FABRICATE.Admin.Manager.DeleteSystem', 'Delete system'),
         icon: 'fas fa-trash',
         danger: true,
       },
@@ -330,7 +336,7 @@
                 <i class="fas fa-edit" aria-hidden="true"></i>
               </IconButton>
               <ActionMenu
-                items={rowMenuItems(system)}
+                items={rowMenuItems()}
                 triggerLabel={text('FABRICATE.Admin.Manager.SystemActions', 'System actions')}
                 triggerTitle={text('FABRICATE.Admin.Manager.SystemActions', 'System actions')}
                 onSelect={(action) => {

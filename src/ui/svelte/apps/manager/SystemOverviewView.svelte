@@ -197,19 +197,31 @@
     description this section used to carry are retired with it. The counts are not header
     chrome — `openspec/specs/design-system/spec.md` requires the validation surface itself to
     carry them — so the row is lifted out of the deleted `<section>` and kept as a direct child
-    of `.manager-main`, with `data-system-overview-counts` and every per-count hook unchanged.
+    of `.manager-main`, with `data-system-overview-counts` unchanged.
+
+    AND IT SPEAKS THE SPEC'S CLOSED VOCABULARY, AS THE SUBSET IT CAN SUPPLY. `spec.md:1268`
+    gives the validation surface "passing, warning and blocking counts" and `:1199` fixes that
+    as their order. This row used to read `critical / warnings / notes`, which agreed with the
+    spec on one word of three. Reconciled per the maintainer ruling on issue 1515:
+
+      - `passing` is OMITTED, not invented. The report is `evaluateSystemValidation`'s, which
+        counts ISSUES and never checks run, so there is no denominator here and no pass figure
+        to derive; a "0 passing" or a "2 of 40" would both be a number this surface made up.
+      - `warning` and `blocking` render, in the spec's relative order. `blocking` reads
+        `counts.critical`, because `critical` is the REPORT's severity name for the same fact
+        and only the surface's own copy is governed by the vocabulary.
+      - `info` gains no chip, because a fourth word is not in a closed vocabulary to add. It
+        loses nothing: the groups below draw a row per issue with that issue's own severity
+        chip, whatever its severity.
   -->
   <div class="manager-chip-row manager-system-overview-counts" data-system-overview-counts>
-    <Chip tone="danger" data-overview-count="critical"
-      >{counts.critical}
-      {text('FABRICATE.Admin.Manager.SystemOverview.CountCritical', 'critical')}</Chip
-    >
     <Chip tone="warning" data-overview-count="warning"
       >{counts.warning}
       {text('FABRICATE.Admin.Manager.SystemOverview.CountWarning', 'warnings')}</Chip
     >
-    <Chip tone="neutral" data-overview-count="info"
-      >{counts.info} {text('FABRICATE.Admin.Manager.SystemOverview.CountInfo', 'notes')}</Chip
+    <Chip tone="danger" data-overview-count="blocking"
+      >{counts.critical}
+      {text('FABRICATE.Admin.Manager.SystemOverview.CountBlocking', 'blocking')}</Chip
     >
   </div>
 

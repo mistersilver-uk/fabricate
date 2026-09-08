@@ -270,23 +270,23 @@
   // Edit stays an `<IconButton>` — it is the row's primary act — and Duplicate and Delete are
   // built as data so the shared `<ActionMenu>` owns the trigger, the portaled panel and the
   // keyboard contract that three loose buttons never had.
-  function rowMenuItems(event) {
-    const name = eventName(event);
+  // THE MENU ITEMS NAME THE COMMAND, NOT THE ROW (issue 1515). `ActionMenu`'s `label` is both the
+  // visible text and the `menuitem`'s accessible name, and the shipped callers that predate this
+  // conversion — `ComponentBrowserInspector` and `environment/CompositionList` — both spell it as a
+  // generic verb ("Delete component", "Move up"). The row is identified by the trigger the menu was
+  // opened from, so repeating its name in every item widens the panel to restate what the reader
+  // just acted on. This is also why `Recipe.DuplicateNamed` and `Component.DeleteNamed` are already
+  // dead in `tests/lang-known-orphans.js`: the earlier conversions retired the same `{name}` copy.
+  function rowMenuItems() {
     return [
       {
         id: 'duplicate',
-        label: text(
-          'FABRICATE.Admin.Manager.Environment.Events.DuplicateNamed',
-          'Duplicate {name}'
-        ).replace('{name}', name),
+        label: text('FABRICATE.Admin.Manager.Environment.Events.Duplicate', 'Duplicate event'),
         icon: 'fas fa-copy',
       },
       {
         id: 'delete',
-        label: text(
-          'FABRICATE.Admin.Manager.Environment.Events.DeleteNamed',
-          'Delete {name}'
-        ).replace('{name}', name),
+        label: text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event'),
         icon: 'fas fa-trash',
         danger: true,
       },
@@ -519,10 +519,23 @@
               >
                 <i class="fas fa-edit" aria-hidden="true"></i>
               </IconButton>
+              <!--
+                THE ROW MENU IS NAMED FOR WHAT IT ACTS ON (issue 1515), mirroring the sibling
+                gathering-task browser. `Column.Actions` is the COLUMN's name and is right in the
+                head strip and the stacked-cell label above, where the surrounding row supplies the
+                subject; it is wrong as the accessible name of an icon-only trigger, which a screen
+                reader reads on its own and which every browse view would then announce identically.
+              -->
               <ActionMenu
-                items={rowMenuItems(event)}
-                triggerLabel={text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
-                triggerTitle={text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
+                items={rowMenuItems()}
+                triggerLabel={text(
+                  'FABRICATE.Admin.Manager.Environment.Events.Actions',
+                  'Event actions'
+                )}
+                triggerTitle={text(
+                  'FABRICATE.Admin.Manager.Environment.Events.Actions',
+                  'Event actions'
+                )}
                 onSelect={(action) => {
                   if (action === 'duplicate') onDuplicateEvent(selectedSystemId, event.id);
                   else onDeleteEvent(selectedSystemId, event.id);

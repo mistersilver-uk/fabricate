@@ -14121,11 +14121,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     target.querySelector('[data-gathering-task-id="task-herbs"] .manager-status-toggle').click();
-    await runRowMenuCommand(
-      '[data-gathering-task-id="task-herbs"]',
-      'Duplicate Gather Moon Herbs'
-    );
-    await runRowMenuCommand('[data-gathering-task-id="task-herbs"]', 'Delete Gather Moon Herbs');
+    await runRowMenuCommand('[data-gathering-task-id="task-herbs"]', 'Duplicate gathering task');
+    await runRowMenuCommand('[data-gathering-task-id="task-herbs"]', 'Delete gathering task');
     assert.ok(
       calls.some(
         (call) =>
@@ -15233,10 +15230,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(forestRow.querySelector('[aria-label="Edit Moonlit Forest"]'));
     // Edit stays the row's own `<IconButton>`; Duplicate and Delete are commands in the shared
     // overflow menu since issue 1515, so they are read from the portaled panel rather than as two
-    // more buttons in the row.
+    // more buttons in the row. They name the COMMAND, not the row: `ActionMenu`'s `label` is the
+    // `menuitem`'s accessible name as well as its visible text, and the shipped callers that
+    // predate this conversion spell it generically. The row is named by the trigger the menu was
+    // opened from — which this helper addresses by, so the binding is still asserted here.
     assert.deepEqual(await rowMenuCommands('[data-environment-id="env-forest"]'), [
-      'Duplicate Moonlit Forest',
-      'Delete Moonlit Forest',
+      'Duplicate environment',
+      'Delete environment',
     ]);
     assert.equal(
       forestRow.querySelector('.manager-environment-reorder-stack'),
@@ -15287,8 +15287,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.ok(calls.some((call) => call[0] === 'selectEnvironment' && call[1] === 'env-cavern'));
 
-    await runRowMenuCommand('[data-environment-id="env-cavern"]', 'Duplicate Quiet Cavern');
-    await runRowMenuCommand('[data-environment-id="env-cavern"]', 'Delete Quiet Cavern');
+    await runRowMenuCommand('[data-environment-id="env-cavern"]', 'Duplicate environment');
+    await runRowMenuCommand('[data-environment-id="env-cavern"]', 'Delete environment');
     assert.ok(
       calls.some((call) => call[0] === 'duplicateEnvironmentDraft' && call[1] === 'env-cavern')
     );
@@ -22902,7 +22902,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     target.querySelector('[data-system-id="smithing"] .manager-system-identity').click();
     await tick();
     flushSync();
-    await runRowMenuCommand('[data-system-id="smithing"]', 'Export Smithing');
+    await runRowMenuCommand('[data-system-id="smithing"]', 'Export system');
     target.querySelector('[aria-label="Edit Smithing"]').click();
     await Promise.resolve();
     await Promise.resolve();
@@ -23361,23 +23361,41 @@ describe('CraftingSystemManager mounted behavior', () => {
     // Pinned by POSITION as well as presence, because "lifted out of the deleted section" is a
     // claim a presence check alone cannot tell apart from "left inside something else".
     const overviewCounts = target.querySelector('[data-system-overview-counts]');
-    assert.ok(overviewCounts, 'the critical/warning/notes summary badges render');
+    assert.ok(overviewCounts, 'the warning/blocking summary badges render');
     assert.ok(
       overviewCounts.parentElement?.hasAttribute('data-system-overview'),
       'the counts row is a direct child of the validation surface, not of a page header'
     );
-    // THE ORDER IS THE CONTRACT, not the wording. `spec.md` states the counts as a closed ordered
-    // vocabulary and this surface answers the SUBSET it can: the report it renders carries no
-    // denominator — `evaluateSystemValidation` counts issues, never checks run — so no passing
-    // figure is derivable from it and none is invented here. What is pinned is that the severities
-    // run in increasing severity-of-attention order, so a re-spelling of the words cannot silently
-    // reorder them.
+    // THE VOCABULARY IS CLOSED AND THIS SURFACE RENDERS THE SUBSET IT CAN SUPPLY — the maintainer
+    // ruling of 2026-09-08 on issue 1515, applying `openspec/specs/design-system/spec.md:1268`
+    // ("the validation surface ... carries passing, warning and blocking counts") and its ordering
+    // twin at `:1199` ("the pass, warning and blocking counts in that order").
+    //
+    // The report this surface draws is `evaluateSystemValidation`'s, which counts ISSUES and never
+    // checks run, so no passing figure is derivable and none is invented: the row is `warning` then
+    // `blocking`, which is the spec's order with the underivable member omitted. `info` is a FOURTH
+    // word the closed vocabulary does not contain, so it gets no chip — and losing a chip loses no
+    // information, because the LIST below is severity-agnostic: it draws a row per issue carrying
+    // that issue's own severity chip, whatever the severity is, which is the second assertion here.
+    // (`info` additionally has no producer in `src/systems/systemValidation.js` today, so the chip
+    // this removes read "0 notes" on every report the surface can be handed.) No denominator is
+    // added either; a chip reading "2 of 40" would be the same invention wearing a different shape.
+    //
+    // Pinned as an ORDERED SET rather than by wording, so a re-spelling of the labels cannot
+    // silently reorder or re-admit a member.
     assert.deepEqual(
       [...overviewCounts.querySelectorAll('[data-overview-count]')].map((chip) =>
         chip.getAttribute('data-overview-count')
       ),
-      ['critical', 'warning', 'info'],
-      'the counts render in one fixed order'
+      ['warning', 'blocking'],
+      'the counts render the spec vocabulary it can supply, in the spec order'
+    );
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-overview-issue]')].map((row) =>
+        row.querySelector('[data-overview-severity]')?.getAttribute('data-overview-severity')
+      ),
+      ['critical', 'warning'],
+      'every issue stays listed under its group with its own severity chip, counted or not'
     );
 
     const recipeLink = target.querySelector(
