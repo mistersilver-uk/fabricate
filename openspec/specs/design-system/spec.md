@@ -845,6 +845,12 @@ An adder for the collection MUST render as the list's own footer rather than as 
 
 Where a record belongs to a set too large to render inline — its tags, the books it appears in, the recipes a book carries — the control MUST be searchable, MUST bound what it renders in place, and MUST stage its selections rather than writing on click.
 
+THIS REQUIREMENT'S SUBJECT IS A SET A RECORD BELONGS TO, and a control that chooses which records a SESSION reads from is a different thing that happens to look identical.
+The session control is NOT bound by the two obligations above: it commits on choose rather than staging, because the surfaces that read its selection re-derive live and deferring the write removes the answer from the moment of the question, and it is not required to bound its trigger, because the selection is the working set the reader is holding in mind rather than a record's membership they are auditing.
+What binds both is the ANNOUNCEMENT: a panel that marks several entries at once says so, whichever of the two it serves.
+A change proposing to stage such a control states which of the two it is, and the answer is decided by what reads the selection, not by how the control looks.
+One record's membership is this control's; a MULTI-RECORD edit is the staging inset's, and the requirement below states what that one owns.
+
 The trigger renders a FIXED maximum number of selected tokens and then an overflow count.
 It MUST NOT grow with the size of the set: a record in forty books renders a few tokens and a count, because a control that renders every member pushes the editor that contains it off the screen.
 The picker panel scrolls internally at a fixed maximum height and states how many entries the query matched against the total, so a GM can tell when to refine the search rather than keep scrolling.
@@ -852,9 +858,7 @@ The picker panel scrolls internally at a fixed maximum height and states how man
 Every selection MUST be reversible before it is committed.
 The panel stages changes and applies them on an explicit action, and a Clear action is reachable at all times.
 
-In BULK mode the per-entry control MUST carry three states — add, remove, and leave unchanged — and MUST NOT be a two-state checkbox.
-An unchecked two-state box cannot distinguish "remove this from every selected record" from "do not touch this one", so the two-state form silently strips membership from records the GM never intended to change.
-The commit action names the number of records it writes to.
+Where the control edits several entries at once, the panel STAYS OPEN across choices and announces a multi-selectable list.
 
 #### Scenario: A record belongs to many members of the set
 
@@ -862,9 +866,27 @@ The commit action names the number of records it writes to.
 - **THEN** the trigger shows its bounded token run followed by an overflow count
 - **AND** the host editor does not grow with the size of the set
 
+#### Scenario: A session-scope multi-select
+
+- **WHEN** a control chooses which records a session reads from
+- **THEN** the panel stays open across choices and marks every chosen entry
+- **AND** each choice reaches the session immediately
+- **AND** the surfaces that read the selection re-derive from it without a further action
+
+### Requirement: A bulk staging inset carries a third state, because "unchecked" cannot mean two things
+
+The inset a GM stages a multi-record edit through renders a search well, a FIXED window of rows and a pager, and its per-entry control MUST carry three states — add, remove, and leave unchanged — and MUST NOT be a two-state checkbox.
+An unchecked two-state box cannot distinguish "remove this from every selected record" from "do not touch this one", so the two-state form silently strips membership from records the GM never intended to change.
+The PANEL THAT COMMITS the inset's staging names the number of records it writes to.
+The commit action belongs to the bulk panel, not to the inset, which stages and does not write.
+
+The third state is drawn as ONE CYCLING CONTROL rather than as a three-way segmented control, which is a decision taken on the reference and not a free choice: the row is a list entry inside a scrolling window, and a segmented control per row spends the row's whole width on a control the GM reads rather than operates.
+
+Where a product draws more than one such inset, they are the same object over different data.
+
 #### Scenario: A GM bulk-edits membership across selected records
 
-- **WHEN** a GM opens the picker over a multi-record selection
+- **WHEN** a GM stages a membership change across a multi-record selection
 - **THEN** each entry offers add, remove and leave unchanged
 - **AND** entries left unchanged are not written to any selected record
 
@@ -893,15 +915,16 @@ Without both halves the spread erases the very name this clause requires and re-
 The gate therefore reads the SOURCE route AND a mounted assertion of the rendered name and disabled state, because a source read alone would pass over a nameless, enabled DOM.
 
 A control that resembles the picker MUST be adjudicated against it by its WIDGET rather than by its markup, and the verdict MUST be recorded with the measurement that produced it.
-Three families are adjudicated NON-MEMBERS and are recorded in `scripts/lib/designSystemPrimitives.json`:
+Three families have been adjudicated against it, and each verdict is recorded in `scripts/lib/designSystemPrimitives.json` with the measurement that produced it; two are NON-MEMBERS and the third is a MODE of this picker rather than a separate widget:
 
 - A TYPEAHEAD COMBOBOX is not a picker.
 It has no trigger, its suggestion list hangs off an input whose expanded state is driven by the query rather than by a control, and it therefore has no closed state to open from.
 - An ACTION MENU is not a picker.
 `role="menu"` with `role="menuitem"` children announces a list of things to DO, while the picker announces `role="listbox"` with `role="option"` children, a list of things to BE — converting one to the other changes what a screen reader says about the widget, not how it looks.
 It is a SET MEMBER in its own right rather than merely a non-member, and the requirement below states what it owns.
-- A MULTI-SELECT CHECKLIST is not a picker.
-It toggles membership, stays open across choices and marks several options selected at once, while the picker carries a single value and closes on choose.
+- A MULTI-SELECT CHECKLIST is not the SINGLE-VALUE picker.
+It toggles membership, stays open across choices and marks several options selected at once, which a single-value listbox cannot announce.
+It is the shared picker's own MULTI-SELECT MODE rather than a fourth family, so a control of this shape is ROUTED onto that mode rather than hand-rolled; what stays a non-member is the SITE, recorded on its caller count, and a row that rested on the missing mode records that the mode now exists.
 
 A picker whose class family is scoped to one application root MUST NOT be adopted by a surface outside that root until the family is unscoped.
 `SearchablePopover`'s family has been unscoped onto the primitive's own `fabricate-picker` and `fabricate-picker-popover` roots, so it satisfies this and is adoptable outside the manager.
@@ -924,6 +947,13 @@ The bar runs the other way too, and moved out of the same directory in the same 
 - **WHEN** a `role="menu"` control is proposed for conversion onto the shared picker
 - **THEN** it is recorded as an adjudicated non-member with its role and child roles measured
 - **AND** it keeps its menu semantics rather than being announced as a listbox
+
+#### Scenario: A multi-select membership control is proposed for conversion
+
+- **WHEN** a control toggles several entries and stays open across choices
+- **THEN** it is routed onto the picker's multi-select mode rather than hand-rolled or recorded as a non-member
+- **AND** its panel announces a multi-selectable list
+- **AND** any register row that rested on the mode's absence records the measurement that settled it
 
 ### Requirement: The overflow action menu is a primitive of its own, and never a mode of the picker
 
@@ -1321,14 +1351,20 @@ The player window carries NO premium signal in any state, and a player-side choo
 Screenshot evidence for a change to a window OUTSIDE the case registry is not merely absent; it is FALSELY POSITIVE, and that is why registration is a requirement rather than a courtesy.
 `mapChangedFilesToCases` returns its fallback case id when nothing matched, the evidence matcher computes its expectation from the same selector, finds that id in it, and reports SATISFIED — so a conversion touching four windows can go green on a frame of a window it does not touch, automatically, with no human involved.
 The smoke path fails differently and no better: its theme-or-global-ui fallback arms only when NOTHING matched, so a diff in which some windows have recipes and others do not leaves the others with zero frames while the gate reports a match.
+There is a SECOND MECHANISM, and it is the one that arms for a file the registry already claims, because the fallback case id cannot: a case that NAMES the changed file reports SATISFIED whatever its frame contains, because the matcher computes its expectation from the same selection the pattern produced — so a change to a control STATE that no claiming case's steps reach is a false positive at smaller scale, with a fuller-looking evidence set than an unregistered window produces.
 
 A change that re-skins an unregistered window therefore REGISTERS it as a phase of that same change, BEFORE the phases that alter what it looks like.
 Registration is four artifacts: a chrome entry restating the window's real `DEFAULT_OPTIONS`, a mount path, the fixture state its screens read, and cases whose `reaches` and `smokeLabels` are ANSWERED per case rather than blanket-declared.
 `screenshots-exempt` is not the answer here and is refused by name: an exemption on a change that deletes whole skin families is an exemption on exactly the case the gate exists for.
 
+That obligation runs from a WINDOW down to a CONTROL STATE, because the second mechanism above arms at that scale.
+A state no published frame renders is registered as a phase BEFORE the phases that alter it where the case can be written against the tree as it stands, and in the SAME COMMIT that creates it where the state does not yet exist.
+A change states which of the two applies per site, because the two land at different points in its own phase order.
+
 The requirement carries ONE exception, stated rather than left implicit.
 A deletion whose no-op is proved by an ELEMENT-AND-RANK argument — the deleted rule and the surviving rule select the same elements at the same or lower rank, so no pixel can differ — needs no frame, and a change taking the exception invokes it BY NAME for the window concerned and publishes that argument.
 The exception covers deletions proved redundant, never re-skins, and never a VARIANT mistaken for a copy; any deletion that cannot carry the argument registers its window like the rest.
+It is PRESERVED by the extension above and now reads on control states on the same terms: a deletion inside a state no frame opens needs no frame where the element-and-rank argument holds for it.
 
 #### Scenario: A change re-skins a window outside the View Lab's case registry
 
@@ -1341,6 +1377,12 @@ The exception covers deletions proved redundant, never re-skins, and never a VAR
 - **WHEN** a deleted rule and a surviving rule select the same elements at the same or lower rank
 - **THEN** the change may invoke the exception by naming the window and publishing the element-and-rank argument
 - **AND** a rule declaring a DIFFERENT treatment is a variant rather than a copy and is not covered
+
+#### Scenario: A change alters a panel no frame opens
+
+- **WHEN** a change alters a control state that no published frame renders, including a state inside a file that claiming cases already name
+- **THEN** a case that opens it is registered before the phase that alters it, or, where the state does not yet exist, in the same commit
+- **AND** the change states which of the two applies per site
 
 ### Requirement: A view's loading, error and empty states are one composition, and a loading view says so
 
