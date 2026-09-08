@@ -26,6 +26,8 @@
   import { resolveCraftingArt } from '../../../../util/craftingArtResolution.js';
   import { localize } from '../../../../util/foundryBridge.js';
   import Chip from '../../../../components/Chip.svelte';
+  import EmptyState from '../../../manager/EmptyState.svelte';
+  import Kicker from '../../../../components/Kicker.svelte';
 
   let { salvage = null, result = null } = $props();
 
@@ -43,7 +45,7 @@
   data-inventory-routed-type={routedType}
 >
   <p class="salvage-body-title">
-    {localize('FABRICATE.App.Inventory.Salvage.OutcomesTitle')}
+    <Kicker as="span">{localize('FABRICATE.App.Inventory.Salvage.OutcomesTitle')}</Kicker>
     <!-- Present for RELATIVE only: a fixed check has no DC — checkRoll never reads one
          and the GM editor hides the field entirely for that pairing. -->
     {#if dc !== null}
@@ -54,7 +56,7 @@
   </p>
 
   {#if outcomes.length === 0}
-    <p class="salvage-empty">{localize('FABRICATE.App.Inventory.Salvage.NoOutcomes')}</p>
+    <EmptyState note hint={localize('FABRICATE.App.Inventory.Salvage.NoOutcomes')} />
   {:else}
     <ul class="salvage-outcome-list" data-inventory-salvage-outcomes>
       {#each outcomes as outcome, index (outcome.id ?? index)}
@@ -112,9 +114,10 @@
               {/each}
             </ul>
           {:else}
-            <p class="salvage-empty">
-              {localize('FABRICATE.App.Inventory.Salvage.OutcomeAwardsNothing')}
-            </p>
+            <EmptyState
+              note
+              hint={localize('FABRICATE.App.Inventory.Salvage.OutcomeAwardsNothing')}
+            />
           {/if}
         </li>
       {/each}
@@ -129,31 +132,29 @@
     gap: 8px;
   }
 
+  /* THE ROW ONLY (issue 1514). The eyebrow itself is the shared `Kicker` now, which declares
+     every type property this rule used to — the size, the weight, the tracking, the transform
+     and the ink — so what is left here is what was genuinely the CALLER's: the flex row that
+     places the label beside its trailing figure, and the `line-height` that sets THAT figure's
+     leading. The kicker declares its own 1.3 and is unaffected by the inherited value. */
   .salvage-body-title {
     display: flex;
     align-items: center;
     gap: 6px;
     margin: 0;
-    font-size: 10px;
-    font-weight: 700;
     line-height: 1;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--fab-text-muted);
   }
 
+  /* `letter-spacing: 0` used to be a RESET of the 0.12em the eyebrow rule above set on the row;
+     that tracking moved onto the `Kicker` with the rest of the label's type, so this reaches
+     nothing now and is kept only because the mono figure is authored untracked either way. The
+     string is "DC {dc}", already capital, so the eyebrow's `text-transform` never reached it. */
   .salvage-dc {
     font-family: var(--fab-font-mono);
     font-size: 8.5px;
     font-weight: 700;
     letter-spacing: 0;
     color: var(--fab-text-secondary);
-  }
-
-  .salvage-empty {
-    margin: 0;
-    font-size: 11px;
-    color: var(--fab-text-muted);
   }
 
   .salvage-outcome-list {

@@ -332,7 +332,23 @@
   }
 
   /* The thumbnail is the positioning context for every overlay: the pips sit INSIDE
-     its bounds, not hanging off the card. */
+     its bounds, not hanging off the card.
+
+     HAND-ROLLED, AND DEFERRED ON THREE COUNTS (issue 1514). Every other art tile in this tab
+     is `Medallion` now; this one cannot be, and none of the three reasons is about paint:
+
+       1. the box is FLUID — `width: 100%` at `aspect-ratio: 1 / 1`, sized by the grid's
+          `minmax(120px, 1fr)` track — while `Medallion` takes a px `size` and no ladder rung
+          has a fluid value at all;
+       2. this element is `position: relative` and is the positioning context for the quantity
+          pip, the broken badge, the essence pips and the selection tick, all of which are
+          absolutely positioned against it. `Medallion` declares no `position`, so the overlays
+          would resolve against the card instead and hang off its bounds;
+       3. the `<img>` inside carries `draggable="false"`, and `Medallion`'s own `<img>` has no
+          `draggable` and no rest spread — the same blocker that defers the two progressive
+          stage tiles.
+
+     All three go to the register with their measurements. */
   .inventory-card-thumb {
     position: relative;
     display: block;

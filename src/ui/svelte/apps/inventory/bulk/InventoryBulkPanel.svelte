@@ -69,6 +69,7 @@
   import { localize, formatList } from '../../../util/foundryBridge.js';
   import { statusChipTone } from '../../../util/statusChipTone.js';
   import Chip from '../../../components/Chip.svelte';
+  import EmptyState from '../../manager/EmptyState.svelte';
   import InventoryDetailHeader from '../detail/InventoryDetailHeader.svelte';
   import InventoryBulkSection from './InventoryBulkSection.svelte';
   import InventoryBulkRow from './InventoryBulkRow.svelte';
@@ -368,9 +369,11 @@
           {/each}
         </InventoryBulkSection>
       {:else if state === 'empty'}
-        <p class="inventory-detail-empty-note" data-inventory-bulk-empty>
-          {localize('FABRICATE.App.Inventory.Bulk.NothingToSalvage')}
-        </p>
+        <EmptyState
+          note
+          hint={localize('FABRICATE.App.Inventory.Bulk.NothingToSalvage')}
+          dataAttr="data-inventory-bulk-empty"
+        />
       {:else}
         <!-- ABOVE the queue, and PRE-COMMIT only. The forecast is what the player weighs
              before spending the one gesture that rolls the whole batch, so it has to be
@@ -585,6 +588,10 @@
     color: var(--fab-text-secondary);
   }
 
+  /* HAND-ROLLED, AND DEFERRED (issue 1514). `FillBar` is the product's one horizontal fill
+     bar and this is one, but the bar publishes two rungs — `sm` at 6px and `md` at 8px — and
+     4px is neither. Converting would grow the running-batch track by half again, which is a
+     size move rather than a frame move, so it goes to the geometry sweep with the figure. */
   .bulk-progress-track {
     height: 4px;
     border-radius: 999px;

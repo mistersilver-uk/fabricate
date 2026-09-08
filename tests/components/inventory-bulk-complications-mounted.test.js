@@ -22,6 +22,7 @@ import { describe, it, before, after, afterEach } from 'node:test';
 
 import {
   MARKS_AND_NOTICES_COMPILED_MODULES,
+  PLAYER_APP_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
@@ -45,7 +46,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listReorderAnnouncement.js',
   ],
   compiledModules: [
-    'src/ui/svelte/components/Medallion.svelte',
+    // The player window's own shared roster (issue 1514), spread rather than listed. The bulk
+    // panel and its report render `EmptyState` for their three empty lines and `Kicker` for the
+    // report's roll label now, and the roster already carries the record tile this list named.
+    ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/components/RowDisclosure.svelte',
     ...MARKS_AND_NOTICES_COMPILED_MODULES,
     'src/ui/svelte/components/Chip.svelte',

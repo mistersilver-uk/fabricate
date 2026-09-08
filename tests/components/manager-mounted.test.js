@@ -80,9 +80,10 @@ const sharedComponentNames = [
   // the allowlist omits does NOT fail — it hangs, reported as `# cancelled`.
   'Medallion',
   // The actor portrait (issue 1506), reached through the Knowledge roster and detail header,
-  // both of which are in this root's static graph. It is deliberately NOT on
-  // `SHARED_PRIMITIVES` at two callers, so omitting it HANGS every mounted manager test as
-  // `# cancelled` rather than failing one by name.
+  // both of which are in this root's static graph. It was deliberately NOT on
+  // `SHARED_PRIMITIVES` at two callers; issue 1514 gave it a third caller in the player
+  // window and moved it onto that list, so an omission here is a NAMED failure now rather
+  // than a hung suite. The entry stays where it is — this loop is how this tree compiles it.
   'Avatar',
   'CollapsibleGroupHeader',
   // The duration editor's per-unit steppers are the shared editable-input Stepper.
@@ -474,6 +475,12 @@ function compileManagerRoot() {
   // THE at-a-glance figure (issue 1505), reached through `ItemPageInspector`'s three stat
   // tiles. Same failure mode.
   writeCompiledSvelte('src/ui/svelte/components/StatBox.svelte');
+  // THE banner that can hold a live region (issue 1505), reached through the EMBEDDED PLAYER
+  // INVENTORY DETAIL below rather than through anything in the manager: issue 1514 routed the
+  // component inspector's broken-tool banner and the salvage panel's misconfigured body onto
+  // it, and both are in the "How players see it" preview's static graph. A leaf two rungs down
+  // reached without anything here naming a banner, which is the shape this list exists for.
+  writeCompiledSvelte('src/ui/svelte/components/Notice.svelte');
   for (const knowledgeComponent of [
     'KnowledgeTabs',
     'KnowledgeRoster',

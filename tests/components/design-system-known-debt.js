@@ -343,9 +343,22 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * tiles at 6px — `journal/HistoryRow` and `journal/RunCard` — move nothing in either direction,
  * because 6 is already on the ladder and neither ever had a row.
  *
+ * 300 → 299 with the same issue's INVENTORY phase, and it is one occurrence of the same snap:
+ * `inventory/detail/InventoryComponentDetail.svelte | border-radius | 8px` falls 2 → 1 as the
+ * source-actor portrait's `.inventory-detail-portrait` rule goes and `<Avatar shape="square">`
+ * takes its place at the ladder's own 9px. The row SURVIVES rather than vanishing, because the
+ * same file draws `.inventory-detail-row` at 8px too and that is a row, not a tile. The key count
+ * does not move.
+ *
+ * Nothing else in that phase touches a corner. The three banner and empty conversions each
+ * DELETE a rule drawing 8px or 9px — `.inventory-detail-broken-banner` r8, `.salvage-misconfigured`
+ * r9 — but 9 is on the ladder and the r8 banner's rule is counted under `.inventory-detail-row`'s
+ * own row above rather than under a row of its own, which is why the total falls by one and not
+ * by three. Re-derived from the JSON at this head rather than reasoned about.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 300;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 299;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -525,9 +538,16 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * row. The two hand-rolled `manager-status-toggle` buttons in `CraftingSystemManagerRoot.svelte`
  * are `<span>`s and a `<button>` inside the root's own rows, and their file's row is unmoved.
  *
+ * 272 → 271 with issue 1514's inventory phase, and the row VANISHES rather than shrinking:
+ * `apps/inventory/InventoryFilters.svelte` declared exactly one, the kind filter's five
+ * `<button aria-pressed>` pills sharing a rule, and the strip is a `SegmentedControl` now. Its
+ * segments are `<label>`s over real radios, which Foundry recognises without a `<form>` at all —
+ * so the debt is PAID rather than moved, and the slot is closed rather than left open for the
+ * next author to fill.
+ *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 272;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 271;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.
@@ -654,8 +674,26 @@ export const KNOWN_OFF_LADDER_ART_SIZES = knownDebt('offLadderArtSizes');
  *
  * All twelve are pre-existing geometry becoming visible, on the same reading as the two above.
  * Issue 1519's sweep owns lowering them.
+ *
+ * 72 ACROSS THE SAME 53 KEYS since the fourth phase moved the INVENTORY inspector's source-actor
+ * portrait onto `<Avatar shape="square" size={40}>`. NO new key: the file already carried
+ * `InventoryComponentDetail.svelte | 40` at six occurrences — the six record tiles converted
+ * before it — and this is the seventh element in that same row.
+ *
+ * THE RUNG REJECTED IS 38, and this one is the case the requirement's own second clause is for.
+ * 40 is not merely near a rung: `Avatar.svelte:97-102` records that the PORTRAIT ladder published
+ * at `spec.md:427` carries 32 as its single mark and 26 stacked, and neither is 38 — 38 belongs
+ * to the ART ladder, which is `Medallion`'s. This census filters BOTH primitives against
+ * `ART_SIZE_LADDER` alone, so a portrait is measured against a ladder the canon does not publish
+ * for it, and a row is banked here whatever size the tile takes. The size itself was rejected on
+ * the ordinary ground as well: the portrait shares a 56px-min row with six `<Medallion size={40}>`
+ * record tiles in the same body, and cutting one of the seven to 38 would make the sources list
+ * the only list in the inspector whose leading tile is smaller than its neighbours'.
+ *
+ * Pre-existing geometry becoming visible, on the same reading as the twelve above. Reconciling
+ * `ART_SIZE_LADDER` with the two ladders the requirement publishes is issue 1519's, by name.
  */
-export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 71;
+export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 72;
 
 export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredSharedComponents');
 

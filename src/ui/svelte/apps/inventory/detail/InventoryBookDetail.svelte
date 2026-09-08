@@ -24,6 +24,7 @@
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
+  import EmptyState from '../../manager/EmptyState.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { recipeItemAccessBadge } from '../../../util/recipeItemAccessBadge.js';
@@ -291,9 +292,7 @@
       {localize('FABRICATE.App.Inventory.Detail.RecipesTitle')}
     </p>
     {#if bookRecipes.length === 0}
-      <p class="inventory-detail-empty-note">
-        {localize('FABRICATE.App.Inventory.Detail.NoRecipes')}
-      </p>
+      <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.NoRecipes')} />
     {:else if bookRecipes.length === 1}
       {@const recipe = bookRecipes[0]}
       <div class="inventory-detail-accordion-item" data-inventory-learn-recipe={recipe.id}>
@@ -327,9 +326,10 @@
         </div>
       {/if}
       {#if filteredRecipes.length === 0}
-        <p class="inventory-detail-empty-note">
-          {localize('FABRICATE.App.Inventory.Detail.NoRecipeMatches')}
-        </p>
+        <!-- `note`, not `filtered`, although a zero-result recipe SEARCH is a filtered empty:
+             `filtered` keeps the dashed panel and this is one line. The distinction stays in the
+             sentence, which is the only place it has ever lived here. -->
+        <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.NoRecipeMatches')} />
       {:else}
         <ul class="inventory-detail-accordion" data-inventory-recipe-accordion>
           {#each pagedRecipes as recipe (recipe.id)}
@@ -360,9 +360,10 @@
                   {#if recipe.description}
                     <p class="inventory-detail-recipe-desc">{recipe.description}</p>
                   {:else}
-                    <p class="inventory-detail-empty-note">
-                      {localize('FABRICATE.App.Inventory.Detail.NoRecipeDescription')}
-                    </p>
+                    <EmptyState
+                      note
+                      hint={localize('FABRICATE.App.Inventory.Detail.NoRecipeDescription')}
+                    />
                   {/if}
                 </div>
               {/if}

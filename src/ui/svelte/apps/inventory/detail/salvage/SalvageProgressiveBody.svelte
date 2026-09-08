@@ -49,6 +49,8 @@
   import Chip from '../../../../components/Chip.svelte';
   import ProgressiveStageList from '../../../crafting/detail/ProgressiveStageList.svelte';
   import Callout from '../../../manager/Callout.svelte';
+  import EmptyState from '../../../manager/EmptyState.svelte';
+  import Kicker from '../../../../components/Kicker.svelte';
 
   let {
     stages = [],
@@ -170,7 +172,7 @@
        Only with a RECORD, though — a runless salvage cannot count what it awarded, and a
        "0 of 4 recovered" derived from an absent record is a lie, not a default. -->
   <p class="salvage-body-title">
-    <span>{localize('FABRICATE.App.Inventory.Salvage.OrderedResultsTitle')}</span>
+    <Kicker as="span">{localize('FABRICATE.App.Inventory.Salvage.OrderedResultsTitle')}</Kicker>
     {#if !resolved}
       <span class="salvage-body-hint" data-inventory-salvage-roll-hint>
         {localize('FABRICATE.App.Inventory.Salvage.RollToResolve')}
@@ -186,7 +188,7 @@
   </p>
 
   {#if stages.length === 0}
-    <p class="salvage-empty">{localize('FABRICATE.App.Inventory.Salvage.NoResults')}</p>
+    <EmptyState note hint={localize('FABRICATE.App.Inventory.Salvage.NoResults')} />
   {:else}
     <ProgressiveStageList
       {stages}
@@ -240,31 +242,34 @@
     gap: 8px;
   }
 
-  /* The section eyebrow, matching its two sibling bodies. */
+  /* The section eyebrow's ROW, matching its two sibling bodies — and the three copies of the
+     type it used to restate are one `Kicker` now, which is the drift that component exists to
+     end.
+THE ROW ONLY (issue 1514). The eyebrow itself is the shared `Kicker` now, which declares
+     every type property this rule used to — the size, the weight, the tracking, the transform
+     and the ink — so what is left here is what was genuinely the CALLER's: the flex row that
+     places the label beside its trailing figure, and the `line-height` that sets THAT figure's
+     leading. The kicker declares its own 1.3 and is unaffected by the inherited value. */
   .salvage-body-title {
     display: flex;
     align-items: center;
     gap: 6px;
     margin: 0;
-    font-size: 10px;
-    font-weight: 700;
     line-height: 1;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--fab-text-muted);
   }
 
+  /* THE TRANSFORM AND THE TRACKING ARE DECLARED HERE NOW, and that is a repair rather than an
+     addition (issue 1514). This span never had either: it INHERITED them from the eyebrow rule
+     on `.salvage-body-title`, which the conversion moved onto `Kicker`. Measured in the View Lab
+     before it was noticed — the hint fell from 89.52px to 55.64px wide, because "Roll to
+     resolve" had silently stopped being "ROLL TO RESOLVE". Restated at the values it rendered. */
   .salvage-body-hint {
     margin-left: auto;
     font-size: 9px;
     font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
     color: var(--fab-text-subtle);
-  }
-
-  .salvage-empty {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
   }
 
   /* A positioning wrapper only — the chip inside is the shared `Chip`, which owns every

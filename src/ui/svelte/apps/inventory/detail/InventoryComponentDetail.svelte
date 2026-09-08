@@ -18,7 +18,10 @@
   Prop-driven; navigation routes back through the store seams.
 -->
 <script>
+  import Avatar from '../../../components/Avatar.svelte';
   import Medallion from '../../../components/Medallion.svelte';
+  import Notice from '../../../components/Notice.svelte';
+  import EmptyState from '../../manager/EmptyState.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
   import { essenceTintToken } from '../../../util/essenceTint.js';
@@ -280,7 +283,20 @@
   {#if salvageable}
     <!-- ARIA contract reproduced from the in-repo precedent, GatheringDetailTabs:
          role=tablist/tab, aria-selected, aria-controls, roving tabindex, Arrow-key
-         navigation. No tab bar at all when the item is not salvageable. -->
+         navigation. No tab bar at all when the item is not salvageable.
+
+         HAND-ROLLED, AND CORRECT AS BUILT (issue 1514). This looks like the shared
+         `SegmentedControl` — the same soft track carrying two rounded segments, and the kind
+         filter in `InventoryFilters` converted onto it in this same change — and it is not one.
+         `SegmentedControl` emits a RADIOGROUP: real radios, `aria-checked` by state, and no
+         `aria-controls` at all. This is a genuine tablist wired to two `role="tabpanel"`
+         regions, and the strip is the only thing that names them: converting it would drop
+         `aria-controls`, drop `aria-selected`, and leave two panels with nothing pointing at
+         them. A radiogroup is the right semantics for CHOOSING A VALUE; a tablist is the right
+         semantics for SWITCHING A VIEW, and these are two views of the same item. Its roving
+         `tabindex` is nine lines and its `activeTab` is also driven by a two-branch `$effect` a
+         radio `onChange` would have to reproduce, so the deletion is not a saving either.
+         Refused, and handed to nobody. -->
     <div
       class="inventory-detail-tabs"
       role="tablist"
@@ -341,11 +357,23 @@
       {#if broken}
         <!-- Read-only: brokenness is a derived verdict, no engine method un-breaks a tool,
          and the only "Repair" string in the codebase is a shopping-list label that
-         repairs nothing. So this states the cause and offers NO action. -->
-        <p class="inventory-detail-broken-banner" data-inventory-broken-banner role="status">
-          <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-          <span>{localize('FABRICATE.App.Inventory.Detail.BrokenBanner')}</span>
-        </p>
+         repairs nothing. So this states the cause and offers NO action.
+
+         THE SHARED `Notice`, NON-BLOCKING (issue 1514). The hand-rolled banner already carried
+         `role="status"`, and a non-blocking notice is the only one of the two banner primitives
+         that can keep it: `Callout` emits `role="note"` or nothing. Non-blocking also adds
+         `aria-live="polite"`, which the strip did not have and which is what makes a banner that
+         appears when a tool breaks mid-session announce itself. No `action` and no `dismissable`,
+         so it still offers nothing to press. The wrapper below is the caller's and declares only
+         the `flex-shrink: 0` the deleted rule did — the panel is a flex column, and a notice that
+         may shrink is a notice whose sentence is squeezed. -->
+        <div class="inventory-detail-broken-slot">
+          <Notice
+            tone="danger"
+            title={localize('FABRICATE.App.Inventory.Detail.BrokenBanner')}
+            dataAttr="data-inventory-broken-banner"
+          />
+        </div>
       {/if}
 
       {#if description}
@@ -382,13 +410,22 @@
         <ul class="inventory-detail-list">
           {#each sliceOf(sources, 'sources') as source (source.actorId)}
             <li class="inventory-detail-row">
-              <span class="inventory-detail-portrait" aria-hidden="true">
-                {#if hasImg(source.actorImg)}
-                  <img src={source.actorImg} alt="" />
-                {:else}
-                  <i class="fas fa-user"></i>
-                {/if}
-              </span>
+              <!-- THE SHARED `Avatar` (issue 1514), and `shape` is not optional here: the
+                   component defaults to `round`, which draws a 999px person mark, and this is a
+                   SOURCE ACTOR's portrait in a square 40px well beside six converted record
+                   tiles. `alt=""` because the actor's name is rendered as adjacent text on the
+                   next line, so alt text would be a second reading of the same word — the
+                   decision is taken rather than left silent, which is what
+                   `avatar-source-contract.test.js` polices. `name` is what makes the
+                   no-artwork state INITIALS rather than the `fa-user` glyph this markup drew:
+                   that is a content change, and it is the state the phase's frames record. -->
+              <Avatar
+                art={hasImg(source.actorImg) ? source.actorImg : ''}
+                name={source.actorName}
+                alt=""
+                shape="square"
+                size={40}
+              />
               <span class="inventory-detail-row-name">{source.actorName}</span>
               <span class="inventory-detail-row-qty" data-inventory-source-qty
                 >×{source.quantity}</span
@@ -431,9 +468,7 @@
               onPage={(value) => setPage('contributors', value)}
             />
           {:else}
-            <p class="inventory-detail-empty-note">
-              {localize('FABRICATE.App.Inventory.Detail.ContributingEmpty')}
-            </p>
+            <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.ContributingEmpty')} />
           {/if}
         </section>
       {/if}
@@ -471,9 +506,7 @@
               onPage={(value) => setPage('used', value)}
             />
           {:else}
-            <p class="inventory-detail-empty-note">
-              {localize('FABRICATE.App.Inventory.Detail.UsedByEmpty')}
-            </p>
+            <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.UsedByEmpty')} />
           {/if}
         </section>
       {/if}
@@ -516,9 +549,7 @@
               onPage={(value) => setPage('required', value)}
             />
           {:else}
-            <p class="inventory-detail-empty-note">
-              {localize('FABRICATE.App.Inventory.Detail.RequiredForEmpty')}
-            </p>
+            <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.RequiredForEmpty')} />
           {/if}
         </section>
       {/if}
@@ -569,9 +600,7 @@
               onPage={(value) => setPage('produced', value)}
             />
           {:else}
-            <p class="inventory-detail-empty-note">
-              {localize('FABRICATE.App.Inventory.Detail.ProducedByEmpty')}
-            </p>
+            <EmptyState note hint={localize('FABRICATE.App.Inventory.Detail.ProducedByEmpty')} />
           {/if}
         </section>
       {/if}
@@ -661,22 +690,13 @@
     color: var(--fab-text-muted);
   }
 
-  /* Read-only broken banner: two signals (danger ramp + warning glyph), never colour
-     alone, and no action — nothing repairs a tool. */
-  .inventory-detail-broken-banner {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
+  /* THE SLOT ONLY. Every declaration that painted the broken banner — the danger edge, the
+     danger fill, the danger ink, the glyph and the type — is what `Notice tone="danger"` draws,
+     so the rule keeps the one thing that was the CALLER's: this panel is a flex column, and
+     without `flex-shrink: 0` a long sentence is compressed rather than allowed to grow the
+     scrolling column. */
+  .inventory-detail-broken-slot {
     flex-shrink: 0;
-    margin: 0;
-    padding: 8px 10px;
-    border: 1px solid var(--fab-danger-border);
-    border-radius: 8px;
-    background: var(--fab-danger-soft);
-    color: var(--fab-danger-text);
-    font-size: 11.5px;
-    font-weight: 400;
-    line-height: 1.5;
   }
 
   .inventory-detail-list {
@@ -718,27 +738,6 @@
   .inventory-detail-recipe:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
-  }
-
-  .inventory-detail-portrait {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 6px;
-    overflow: hidden;
-    background: var(--fab-surface-raised);
-    color: var(--fab-text-muted);
-    font-size: 15px;
-  }
-
-  .inventory-detail-portrait img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
   }
 
   .inventory-detail-row-qty {

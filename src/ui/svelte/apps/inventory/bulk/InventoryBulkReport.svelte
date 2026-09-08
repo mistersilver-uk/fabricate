@@ -38,6 +38,8 @@
   import { statusChipTone } from '../../../util/statusChipTone.js';
   import Chip from '../../../components/Chip.svelte';
   import Notice from '../../../components/Notice.svelte';
+  import EmptyState from '../../manager/EmptyState.svelte';
+  import Kicker from '../../../components/Kicker.svelte';
   import InventoryBulkSection from './InventoryBulkSection.svelte';
   import InventoryBulkRow from './InventoryBulkRow.svelte';
 
@@ -251,9 +253,11 @@
   />
 
   {#if cancelled}
-    <p class="inventory-detail-empty-note" data-inventory-bulk-cancelled>
-      {localize('FABRICATE.App.Inventory.Bulk.ReportCancelled')}
-    </p>
+    <EmptyState
+      note
+      hint={localize('FABRICATE.App.Inventory.Bulk.ReportCancelled')}
+      dataAttr="data-inventory-bulk-cancelled"
+    />
   {/if}
   {#if runError}
     <p class="bulk-report-error" data-inventory-bulk-error>
@@ -278,9 +282,7 @@
           {#snippet trailing()}
             {#if Number.isFinite(item.rollValue)}
               <span class="bulk-roll">
-                <span class="bulk-roll-label"
-                  >{localize('FABRICATE.App.Inventory.Bulk.ReportRoll')}</span
-                >
+                <Kicker as="span">{localize('FABRICATE.App.Inventory.Bulk.ReportRoll')}</Kicker>
                 <span class="bulk-roll-value">{item.rollValue}</span>
               </span>
             {/if}
@@ -304,9 +306,11 @@
       {/each}
     </InventoryBulkSection>
   {:else if !isDestroy}
-    <p class="inventory-detail-empty-note" data-inventory-bulk-nothing-added>
-      {localize('FABRICATE.App.Inventory.Bulk.ReportNothingAdded')}
-    </p>
+    <EmptyState
+      note
+      hint={localize('FABRICATE.App.Inventory.Bulk.ReportNothingAdded')}
+      dataAttr="data-inventory-bulk-nothing-added"
+    />
   {/if}
 
   {#if lost.length > 0}
@@ -348,14 +352,6 @@
     display: inline-flex;
     align-items: baseline;
     gap: 4px;
-  }
-
-  .bulk-roll-label {
-    font-size: 9.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--fab-text-subtle);
   }
 
   .bulk-roll-value {

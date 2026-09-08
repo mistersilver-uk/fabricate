@@ -81,7 +81,18 @@
   rule in the global sheet, which is the wrong answer for a player screen — `PlayerViewState`
   declares the `height: 100%` centred fill in its own scoped block and nests this panel inside
   it, and the empties still hand-rolled in `salvage-empty`, `alchemy-*-empty` and
-  `inventory-detail-empty-note` convert on the same terms as they are reached.
+  `inventory-detail-empty-note` convert on the same terms as they are reached — all three of
+  those families are gone as of the inventory phase, each caller keeping only the fill or the
+  centring its own container needed.
+
+  ONE MEASURED LIMIT OF `note`, recorded because a caller was refused on it. The variant
+  declares `place-items: start` and `text-align: left` on ITSELF, so a caller cannot restore a
+  centred line through a wrapper: an inherited `text-align` loses to the variant's own
+  declaration. `InventoryGrid`'s "No items match the current filters." is the shipped instance
+  — a full-width centred 13px sentence standing in for the whole card grid — and it stays
+  hand-rolled for that reason rather than becoming a 10px line in the top-left corner of a
+  630px-tall empty column. A centred one-line form would close it; `filtered` centres but keeps
+  the dashed panel, which is the box the frame-move rule forbids.
 -->
 <script>
   let {

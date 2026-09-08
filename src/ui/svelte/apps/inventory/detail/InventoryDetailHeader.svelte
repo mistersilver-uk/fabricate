@@ -3,7 +3,14 @@
   InventoryDetailHeader is the ONE inspector shell both detail bodies render
   inside: the scrolling `.inventory-detail` column, the identity header
   (thumbnail + name + "N total" + chips), and the shared leaf styles their bodies
-  author (sections, section eyebrows, row names, empty notes, chips).
+  author (sections, section eyebrows, row names, chips).
+
+  THE EMPTY NOTE LEAF IS GONE (issue 1514). `.inventory-detail-empty-note` was the tenth
+  published leaf and its ten consumers across four files — the bulk panel, the bulk report,
+  the book body and the component body — all render `EmptyState note` now, so the rule was
+  deleted with the last of them rather than left orphaned. That is what "converts together
+  or not at all" means for a `:global(:where())` family: a family whose rule outlives its
+  markup paints nothing, and one whose markup outlives its rule loses its type silently.
 
   WHY A SHELL AND NOT JUST A HEADER (issue 675). `InventoryComponentDetail` and
   `InventoryBookDetail` were split out of one file and then hand-rolled the SAME
@@ -255,7 +262,22 @@
     gap: 8px;
   }
 
-  /* Section eyebrows: uppercase, wide-tracked, muted (brief §2 type scale). */
+  /* Section eyebrows: uppercase, wide-tracked, muted (brief §2 type scale).
+
+     HAND-ROLLED, AND REFUSED AS A FAMILY (issue 1514). This is a `:global(:where())` leaf with
+     eight markup consumers across three files, so it converts together or not at all — a rule
+     that outlives its markup paints nothing and markup that outlives its rule loses its type.
+     One of the eight cannot convert: `InventoryBulkSection` renders it with
+     `class:has-trailing` and declares `.inventory-detail-section-title.has-trailing { display:
+     flex; align-items: baseline; gap }` so the complication count sits on the eyebrow's own
+     line. `Kicker` forwards no `class` and no `style`, and its documented answer — keep your own
+     wrapper and nest the kicker inside it — cannot be taken here without changing the ELEMENT
+     the seven other consumers write, which is the whole point of a published family.
+
+     So the family stays, and it goes to the register with that measurement. A `class`
+     passthrough is not the answer (the primitive refuses one by design); what would close it is
+     converting the seven plain consumers and giving the bulk section its own wrapper in the same
+     change, which is a markup move in three files rather than a conversion. */
   :global(:where(.inventory-detail) .inventory-detail-section-title) {
     margin: 0;
     font-size: 10px;
@@ -274,11 +296,5 @@
     white-space: nowrap;
     font-size: 12px;
     font-weight: 600;
-  }
-
-  :global(:where(.inventory-detail) .inventory-detail-empty-note) {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
   }
 </style>
