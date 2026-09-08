@@ -193,6 +193,11 @@
     return text(key, tag.charAt(0).toUpperCase() + tag.slice(1));
   }
 
+  // THE FACET'S OWN FACE, ROUTED ONCE HERE (issue 1515). A biome carries an AUTHORED colour,
+  // so it takes the primitive's `tint` - "this chip IS that colour" - and the style string
+  // states the exact value, because a biome may hold a hex and `tint` validates bare
+  // `--fab-tag-*` keys only. Time of day and weather have no authored colour: their purple
+  // and amber are the family's, and they are stated as TONES so a theme owns them.
   function biomeChips(event) {
     const values = Array.isArray(event?.biomes) ? event.biomes : [];
     return values
@@ -202,7 +207,7 @@
         ...entry,
         kind: 'biome',
         key: `biome:${entry.id}`,
-        pillClass: 'manager-availability-pill is-biome',
+        tint: entry.colorToken || 'sage',
         style: biomeChipStyle(entry),
       }));
   }
@@ -215,7 +220,7 @@
       .map((entry) => ({
         ...entry,
         key: `timeOfDay:${entry.id}`,
-        pillClass: 'manager-availability-pill is-timeOfDay',
+        tone: 'tag',
       }));
   }
 
@@ -227,7 +232,7 @@
       .map((entry) => ({
         ...entry,
         key: `weather:${entry.id}`,
-        pillClass: 'manager-availability-pill is-weather',
+        tone: 'warning',
       }));
   }
 
@@ -478,11 +483,29 @@
               </span>
             </button>
             <div class="manager-gathering-event-tags-cell" data-gathering-event-tags>
+              <!-- THE DANGER TAG IS NOT A CHIP (issue 1515). Its six levels are a RAMP -
+                   `.manager-danger-tag-pill.is-safe` through `.is-extreme` in
+                   `styles/fabricate.css`, four of which MIX two semantic families per level -
+                   and no `Chip` tone states a mix. That sheet imports at `layer(modules)` while
+                   the primitive's scoped block is unlayered, so routing this pill through the
+                   primitive would not merely fail to reproduce the ramp: the chip's own fill
+                   would WIN over all six rules and the danger level would stop being visible.
+                   The three FACET chips beside it carry no such ramp and convert. -->
               {#each rowChips(event) as chip (chip.key)}
-                <span class={chip.pillClass} style={chip.style}>
-                  {#if chip.icon}<i class={chip.icon} aria-hidden="true"></i>{/if}
-                  <span>{chip.label}</span>
-                </span>
+                {#if chip.pillClass}
+                  <span class={chip.pillClass}>
+                    <i class={chip.icon} aria-hidden="true"></i>
+                    <span>{chip.label}</span>
+                  </span>
+                {:else}
+                  <Chip
+                    tone={chip.tone || ''}
+                    tint={chip.tint || ''}
+                    icon={chip.icon}
+                    style={chip.style}
+                    data-gathering-event-tag={chip.kind}>{chip.label}</Chip
+                  >
+                {/if}
               {/each}
             </div>
             <span

@@ -506,16 +506,14 @@
       the class on the bar instead would move the field out of a carrier the class names and take
       those three rules with it. `tool-rules-list-parity.test.js` reads the source for both halves.
 
-      THE LANDMARK REUSES THE FILTER'S OWN NAME. Every other bar is named
-      `<Area>.Filters` ("Component filters", "Access filters"); `Tools.Filters` does not exist in
-      `lang/en.json` and this phase does not own that file, so the bar takes the one shipped string
-      that describes the whole band. The radiogroup keeps it too, which is a duplicated
-      announcement rather than a wrong one, and a dedicated key retires it.
+      THE LANDMARK HAS ITS OWN NAME NOW. Every other bar is named `<Area>.Filters`
+      ("Component filters", "Access filters"), and this one reused the radiogroup's
+      `Tools.FilterLabel` for one phase only because `lang/en.json` was unowned then; the
+      duplicated announcement that produced - the band and the control inside it saying the same
+      sentence - is what the dedicated key retires (issue 1515).
     -->
     <section class="manager-tools-library-card" data-manager-tools-search>
-      <ManagerToolbar
-        ariaLabel={text('FABRICATE.Admin.Manager.Tools.FilterLabel', 'Which Tools this list shows')}
-      >
+      <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.Tools.Filters', 'Tool filters')}>
         <ManagerSearchField
           value={searchTerm}
           onInput={(next) => {

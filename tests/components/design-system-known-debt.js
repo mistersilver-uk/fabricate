@@ -453,6 +453,10 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  *  - `styles/fabricate.css | 10px` 12 -> 11. The recipes blocked-enable toast's r10 goes with the
  *    rule that drew it, into `<Notice>`'s own r11.
  *
+ * 286 -> 285 with issue 1515's seventh phase: `styles/fabricate.css | 5px` 14 -> 13. The
+ * currency sub-unit pill's own r5 rule goes with the pill, which is the shared chip now and
+ * draws the ladder's own corner from the primitive's scoped block.
+ *
  * Re-derived from the JSON at this head rather than reasoned about.
  *
  * @see KNOWN_OFF_LADDER_RADII
@@ -719,9 +723,20 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * `<button>`, and it carries `data-keyboard-focus="true"` now. That is the whole of that file's
  * raw-button population, so the slot is closed rather than left open for the next author to fill.
  *
+ * 240 -> 232 with issue 1515's seventh phase, across four files, three SHRINKING and one
+ * VANISHING. The availability pill family's hand-written remove crosses were eight raw
+ * `<button>` elements written four ways, and every one of them is the shared chip's own declared
+ * control now: `GatheringTaskEditView` 10 -> 7, `GatheringEventEditView` 5 -> 3,
+ * `environment/EnvironmentOverviewTab` 4 -> 2, and `world/WorldCurrencyTab` vanishes, its single
+ * raw button having been the currency sub-unit's remove cross. The debt is PAID by conversion
+ * rather than by an attribute, which is why three of the four slots close by that much and the
+ * fourth closes outright. The danger-tag row's cross is the one that does NOT convert - its six
+ * colour levels are a ramp no chip tone states - so it declares the attribute in place and is
+ * absent from these rows for that reason rather than for the other one.
+ *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 239;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 232;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.

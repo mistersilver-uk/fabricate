@@ -80,7 +80,13 @@ describe('GatheringEventsBrowserView source contract', () => {
     assert.equal(browserSource.includes('regionChips('), false, 'region chips are removed (region is geography, not composition)');
     assert.ok(browserSource.includes('data-gathering-event-tags'), 'tags cell exposes a data attribute');
     assert.ok(browserSource.includes("icon: 'fa-solid fa-triangle-exclamation'"), 'danger chips should render a triangle warning icon');
-    assert.ok(browserSource.includes('{#if chip.icon}<i class={chip.icon} aria-hidden="true"></i>{/if}'), 'row chip icons should be decorative');
+    // DECORATIVE ON BOTH BRANCHES (issue 1515). The three FACET chips render through the shared
+    // `Chip` now, which draws its `icon` prop `aria-hidden` itself, so what this file can pin is
+    // that the glyph is handed to the primitive rather than written beside it; the danger chip
+    // does not convert - its six colour levels are a ramp no chip tone states - so its own glyph
+    // still carries the attribute here.
+    assert.ok(browserSource.includes('icon={chip.icon}'), 'facet row chips hand their glyph to the chip primitive');
+    assert.ok(browserSource.includes('<i class={chip.icon} aria-hidden="true"></i>'), 'the danger chip glyph is decorative');
     assert.equal(/function\s+activeEnvironmentCount\s*\(/.test(browserSource), false, 'activeEnvironmentCount should be removed');
     assert.equal(/function\s+dropRateLabel\s*\(/.test(browserSource), false, 'dropRateLabel should be removed');
   });

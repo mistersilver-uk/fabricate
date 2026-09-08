@@ -864,8 +864,11 @@ describe('CraftingSystemManager source contract', () => {
       // The unit card's collapsed summary row reuses the character-modifier summary class; it
       // moved with the card rather than staying behind on System Settings.
       'manager-character-modifier-summary',
-      'manager-availability-pill is-currency',
-      'manager-availability-pill-amount',
+      // The sub-unit token is the shared `Chip` as of issue 1515, and the amount input beside it
+      // is not a chip at all - a number a GM can change keeps its own control - so the pin
+      // follows the two CONSTRUCTS rather than the retired `manager-availability-*` names.
+      'data-world-currency-subunit={contained.unitId}',
+      'manager-currency-subunit-amount',
     ]) {
       assert.ok(
         worldCurrencySource.includes(snippet),
@@ -1039,7 +1042,7 @@ describe('CraftingSystemManager source contract', () => {
     // input, remove cross) live only after the provider-managed branch.
     assert.ok(
       worldCurrencySource.indexOf('data-world-currency-provider-managed') <
-        worldCurrencySource.indexOf('class="manager-availability-pill-amount"'),
+        worldCurrencySource.indexOf('class="manager-currency-subunit-amount"'),
       'provider-managed read-only branch should render before the editable unit list'
     );
     for (const prop of [

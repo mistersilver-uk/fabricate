@@ -14001,13 +14001,14 @@ describe('CraftingSystemManager mounted behavior', () => {
       '.manager-gathering-task-tags-cell[data-gathering-task-tags]'
     );
     assert.ok(tagsCell, 'tags chip cell renders as its own grid cell');
-    const tagPills = Array.from(tagsCell.querySelectorAll('.manager-availability-pill'));
-    const tagKinds = new Set();
-    for (const pill of tagPills) {
-      for (const kind of ['biome', 'timeOfDay', 'weather']) {
-        if (pill.classList.contains(`is-${kind}`)) tagKinds.add(kind);
-      }
-    }
+    // BY THE FACET HOOK, NOT BY A VARIANT CLASS (issue 1515). The three facet chips render
+    // through the shared `Chip` now, whose face is a `tone` or a `tint` rather than an
+    // `is-<facet>` class of the retired availability family, so the row's own data hook is what
+    // says which dimension each chip states.
+    const tagPills = Array.from(tagsCell.querySelectorAll('.manager-chip[data-gathering-task-tag]'));
+    const tagKinds = new Set(
+      tagPills.map((pill) => pill.getAttribute('data-gathering-task-tag'))
+    );
     assert.equal(
       tagKinds.size,
       3,
@@ -14624,7 +14625,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         `[data-gathering-task-availability-pill="${kind}"][data-condition-id="${conditionId}"]`
       );
     const availabilityTrigger = (field) =>
-      field.querySelector('.manager-availability-menu-button');
+      field.querySelector('.manager-condition-menu-button');
     const openAvailabilityMenu = async (field) => {
       availabilityTrigger(field).click();
       await tick();
@@ -14632,7 +14633,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     };
     const removeAvailabilityPill = async (field, kind, conditionId) => {
       availabilityPill(field, kind, conditionId)
-        .querySelector('.manager-availability-remove')
+        .querySelector('[data-chip-remove]')
         .click();
       await tick();
       flushSync();
@@ -24052,12 +24053,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       'no edit/delete icon buttons in read-only summary'
     );
     assert.equal(
-      card.querySelectorAll('.manager-availability-pill-amount').length,
+      card.querySelectorAll('.manager-currency-subunit-amount').length,
       0,
       'no editable amount inputs in read-only mode'
     );
     assert.equal(
-      card.querySelectorAll('.manager-availability-remove').length,
+      card.querySelectorAll('[data-chip-remove]').length,
       0,
       'no remove-cross controls in read-only mode'
     );
@@ -24409,7 +24410,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const lanternPill = Array.from(afterAddPills).find(
       (node) => node.getAttribute('data-gathering-task-required-tool-pill') === 'tool-pickaxe'
     );
-    lanternPill.querySelector('.manager-availability-remove').click();
+    lanternPill.querySelector('[data-chip-remove]').click();
     await tick();
     flushSync();
     const afterRemovePills = target.querySelectorAll('[data-gathering-task-required-tool-pill]');
@@ -24548,7 +24549,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'search input should hide when library is empty'
     );
 
-    stalePill.querySelector('.manager-availability-remove').click();
+    stalePill.querySelector('[data-chip-remove]').click();
     await tick();
     flushSync();
 

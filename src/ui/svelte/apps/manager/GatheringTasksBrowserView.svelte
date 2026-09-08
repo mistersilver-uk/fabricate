@@ -168,6 +168,11 @@
     return vocabularyEntry(kind, id).label;
   }
 
+  // THE FACET'S OWN FACE, ROUTED ONCE HERE (issue 1515). A biome carries an AUTHORED colour,
+  // so it takes the primitive's `tint` - "this chip IS that colour" - and the style string
+  // states the exact value, because a biome may hold a hex and `tint` validates bare
+  // `--fab-tag-*` keys only. Time of day and weather have no authored colour: their purple
+  // and amber are the family's, and they are stated as TONES so a theme owns them.
   function biomeChips(task) {
     const values = Array.isArray(task?.biomes) ? task.biomes : [];
     return values
@@ -177,6 +182,7 @@
         ...entry,
         kind: 'biome',
         key: `biome:${entry.id}`,
+        tint: entry.colorToken || 'sage',
         style: biomeChipStyle(entry),
       }));
   }
@@ -186,7 +192,7 @@
     return values
       .map((id) => conditionEntry('timeOfDay', id))
       .filter((entry) => entry.label)
-      .map((entry) => ({ ...entry, key: `timeOfDay:${entry.id}` }));
+      .map((entry) => ({ ...entry, key: `timeOfDay:${entry.id}`, tone: 'tag' }));
   }
 
   function weatherChips(task) {
@@ -194,7 +200,7 @@
     return values
       .map((id) => conditionEntry('weather', id))
       .filter((entry) => entry.label)
-      .map((entry) => ({ ...entry, key: `weather:${entry.id}` }));
+      .map((entry) => ({ ...entry, key: `weather:${entry.id}`, tone: 'warning' }));
   }
 
   function rowChips(task) {
@@ -474,10 +480,13 @@
             </button>
             <div class="manager-gathering-task-tags-cell" data-gathering-task-tags>
               {#each rowChips(task) as chip (chip.key)}
-                <span class={`manager-availability-pill is-${chip.kind}`} style={chip.style}>
-                  <i class={chip.icon} aria-hidden="true"></i>
-                  <span>{chip.label}</span>
-                </span>
+                <Chip
+                  tone={chip.tone || ''}
+                  tint={chip.tint || ''}
+                  icon={chip.icon}
+                  style={chip.style}
+                  data-gathering-task-tag={chip.kind}>{chip.label}</Chip
+                >
               {/each}
             </div>
             <span

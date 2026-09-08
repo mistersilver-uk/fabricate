@@ -1,5 +1,5 @@
 {
-  "pinnedTotal": 239,
+  "pinnedTotal": 233,
   "rows": [
     {
       "key": "(top level) | .fabricate-button.manager-button",
@@ -58,19 +58,7 @@
       "count": 2
     },
     {
-      "key": "(top level) | .fabricate-manager .manager-availability-pill.is-realm",
-      "count": 2
-    },
-    {
       "key": "(top level) | .fabricate-manager .manager-availability-pill.is-tag",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-availability-pill.is-timeOfDay",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-availability-pill.is-weather",
       "count": 2
     },
     {

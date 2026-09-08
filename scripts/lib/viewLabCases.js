@@ -8586,7 +8586,7 @@ export const VIEW_LAB_CASES = Object.freeze([
           '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
       },
       { selector: '[data-gathering-task-availability]', scroll: true },
-      { selector: '[data-gathering-task-field="biomes"] .manager-availability-menu-button' },
+      { selector: '[data-gathering-task-field="biomes"] .manager-condition-menu-button' },
     ],
     expectView: 'gathering-task-edit',
     // The PORTALED panel, and an option inside it. Asserting the option alone would be satisfied

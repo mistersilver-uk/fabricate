@@ -1536,7 +1536,8 @@
            own `handleNumberKeydown` keeps the keyboard one. Its spinner IS suppressed,
            by the scoped rule at `.manager-drop-rate-percent`.
        R2  `apps/manager/world/WorldCurrencyTab.svelte`'s currency sub-unit amount — a bare field
-           inside a bordered `.manager-availability-pill.is-currency` chip, which is not a
+           inside the removable membership `Chip` that carries it (issue 1515; it was a
+           bordered `.manager-availability-pill.is-currency` before), which is not a
            form row and cannot hold a Stepper without widening every wrapping chip. It
            KEEPS its native spinner.
 
@@ -5207,19 +5208,11 @@
   margin: 0;
 }
 
-.fabricate-manager .manager-availability-pill.is-currency {
-  min-height: 34px;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
-  border-color: color-mix(in srgb, var(--fab-info) 50%, transparent);
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--fab-info) 16%, var(--fab-bg-3));
-}
-
-.fabricate-manager .manager-availability-pill.is-currency > i {
-  color: var(--fab-info);
-}
-
-.fabricate-manager .manager-availability-pill-amount {
+/* The sub-unit AMOUNT, which is not a chip and never was: a number a GM can change is an
+   editable control, so it keeps its own box inside the membership token that carries it. The
+   class moved out of the retiring `.manager-availability-*` family with the pill (issue 1515);
+   the geometry is unchanged. */
+.fabricate-manager .manager-currency-subunit-amount {
   width: 56px;
   min-width: 0;
   height: 25px;
@@ -8362,10 +8355,6 @@
   padding-right: var(--fab-space-1);
 }
 
-.fabricate-manager .manager-availability-pill.is-realm { --fab-chip-color: var(--fab-info); }
-.fabricate-manager .manager-availability-pill.is-weather { --fab-chip-color: var(--fab-warning); }
-.fabricate-manager .manager-availability-pill.is-timeOfDay { --fab-chip-color: var(--fab-purple); }
-
 /* A component TAG (issue 676). The pill vehicle is Gathering's, and the component
    editor's tag pills inherited its unmapped default — the AMBER `--fab-warning` fill
    below — which reads as a warning on a plain authored tag. Tags are purple, so they
@@ -8378,9 +8367,6 @@
    concept, so it gets the informational (blue) accent. */
 .fabricate-manager .manager-availability-pill.is-modifier { --fab-chip-color: var(--fab-info); }
 
-.fabricate-manager .manager-availability-pill.is-realm,
-.fabricate-manager .manager-availability-pill.is-weather,
-.fabricate-manager .manager-availability-pill.is-timeOfDay,
 .fabricate-manager .manager-availability-pill.is-tag,
 .fabricate-manager .manager-availability-pill.is-modifier,
 .fabricate-manager .manager-availability-pill.is-biome {
@@ -15033,7 +15019,8 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-availability-menu-button {
+.fabricate-manager .manager-availability-menu-button,
+.fabricate-manager .manager-condition-menu-button {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -15050,7 +15037,9 @@
 }
 
 .fabricate-manager .manager-availability-menu-button:hover,
-.fabricate-manager .manager-availability-menu-button:focus-visible {
+.fabricate-manager .manager-availability-menu-button:focus-visible,
+.fabricate-manager .manager-condition-menu-button:hover,
+.fabricate-manager .manager-condition-menu-button:focus-visible {
   border-color: var(--fab-warning-border);
   outline: none;
   box-shadow: 0 0 0 2px var(--fab-warning-soft);
@@ -15135,7 +15124,8 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-availability-remove {
+.fabricate-manager .manager-availability-remove,
+.fabricate-manager .manager-danger-tag-remove {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -15149,7 +15139,9 @@
 }
 
 .fabricate-manager .manager-availability-remove:hover,
-.fabricate-manager .manager-availability-remove:focus-visible {
+.fabricate-manager .manager-availability-remove:focus-visible,
+.fabricate-manager .manager-danger-tag-remove:hover,
+.fabricate-manager .manager-danger-tag-remove:focus-visible {
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
   outline: none;
@@ -19311,7 +19303,7 @@
   line-height: 1.35;
 }
 
-.fabricate-manager .manager-environment-context-field .manager-availability-pill-row {
+.fabricate-manager .manager-environment-context-field .manager-chip-row {
   margin-top: var(--fab-space-2xs);
 }
 

@@ -5107,6 +5107,7 @@
           "RowOverrides": "Overrides {sections}",
           "RowNoRulesHere": "No rules in this system",
           "FilterLabel": "Which Tools this list shows",
+          "Filters": "Tool filters",
           "FilterInSystem": "In this system ({count})",
           "FilterInSystemShort": "In this system",
           "FilterAllWorld": "All world tools ({count})",

@@ -51,7 +51,10 @@ describe('GatheringTasksBrowserView card-style row', () => {
     assert.ok(browserSource.includes('weatherChips(task)'), 'weather chip helper should exist');
     assert.ok(browserSource.includes('rowChips(task)'), 'rowChips concatenates all dimensions');
     assert.ok(browserSource.includes('data-gathering-task-tags'), 'tags chip row exposes a data attribute');
-    assert.ok(/manager-availability-pill is-\$\{chip\.kind\}/.test(browserSource), 'chips render with per-kind variant class');
+    // BY THE FACET HOOK, NOT BY A VARIANT CLASS (issue 1515): the row chips render through the
+    // shared `Chip`, whose face is a `tone` or a `tint`, so the dimension is stated by the data
+    // attribute the row writes rather than by an `is-<facet>` class of the retired family.
+    assert.ok(/data-gathering-task-tag=\{chip\.kind\}/.test(browserSource), 'chips state their dimension through the row hook');
     assert.equal(browserSource.includes("' is-any'"), false, 'unrestricted dimensions render no chip (no is-any placeholder)');
     assert.equal(/function\s+anyChip\s*\(/.test(browserSource), false, 'anyChip helper should be removed');
   });

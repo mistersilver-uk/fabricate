@@ -25,11 +25,11 @@
  * all, and the chain joined by ` >> ` when a rule is nested. The at-context is part of the key
  * because two rules under different conditions are never the same rule: the same selector inside
  * a `@container` and at the top level is two different pieces of authoring, and merging them is
- * not a thing that can be done. Keyed on the selector ALONE the sheet holds 211 repeated selectors
- * rather than these 117, and both figures are published so a reader can tell which produced a pin.
+ * not a thing that can be done. Keyed on the selector ALONE the sheet holds 208 repeated selectors
+ * rather than these 114, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,051 `(at-context, selector)` keys, of which 2,934 appear exactly
+ * Unfiltered, the sheet holds 3,052 `(at-context, selector)` keys, of which 2,938 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -41,7 +41,7 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,577 rules at that head, 117 repeated keys and 239 appearances
+ * printed from. The sheet holds 2,572 rules at that head, 114 repeated keys and 233 appearances
  * between them; five keys appear three times and none appears four or more.
  *
  * ISSUE 1515 DELETED TWO ROWS, which is a shape none of the entries below took: every one of them
@@ -89,6 +89,26 @@
  * owns. So SIX selectors go while THREE rules do net: the rule count falls to 2,577 and the key
  * and singleton counts each fall by five to 3,051 and 2,934, with the repeated table untouched
  * and `pinnedTotal` staying 239 across 117 rows.
+ *
+ * ISSUE 1515 PHASE 7 IS THE FIRST ENTRY HERE THAT MOVES THE REPEATED TABLE, and it moves it
+ * DOWNWARDS by three whole rows. The availability pill family's per-facet colour mappings -
+ * `.manager-availability-pill.is-realm`, `.is-weather` and `.is-timeOfDay` - were each written
+ * TWICE at the top level: once alone, to declare the facet's `--fab-chip-color`, and once as a
+ * member of the six-selector list that mixed that property into a fill and an edge. Nothing emits
+ * any of the three any more, so both halves go, which is why each is a VANISHED row rather than a
+ * shrunken one. `.is-tag`, `.is-modifier` and `.is-biome` survive in the list, because all three
+ * classes are still emitted elsewhere in the tree.
+ *
+ * The three CONTEXTUAL figures move in three different directions, and that is worth stating
+ * because a reader expecting them to track the rule count will find they do not. FIVE rules are
+ * deleted - the three facet one-liners plus the currency sub-unit pill's own skin and its glyph
+ * colour - so the rule count falls to 2,572. But SIX selectors also ARRIVE, in four surviving
+ * lists: the condition picker's trigger and the danger tag's remove control each take a name
+ * outside the retiring family while the primitive that keeps the family goes on emitting the old
+ * one, so each of those two rules and each of their two `:hover, :focus-visible` twins gains a
+ * leg. Every arriving selector is a singleton in both keyings. Net: the key count RISES by one to
+ * 3,052 and the singleton count rises by four to 2,938, while `pinnedTotal` falls to 233 across
+ * 114 rows. Re-derived by running the census twice, not subtracted.
  *
  * RE-DERIVED BY RUNNING THE CENSUS RATHER THAN SUBTRACTED. Two of the six selectors leaving are
  * list members, which is the shape that CAN move the repeated table, and here it does not: each
@@ -323,6 +343,6 @@ export const SELECTOR_REPETITION_BASELINE = checkedRows(TABLE.rows);
  *
  * `assertRatchet` asserts exactly that and throws before any comparison if the two disagree, so
  * this is the one figure a reviewer can check against the issue without reading the table. At the
- * measured commit it is 239 across 117 rows.
+ * measured commit it is 233 across 114 rows.
  */
 export const SELECTOR_REPETITION_TOTAL = TABLE.pinnedTotal;
