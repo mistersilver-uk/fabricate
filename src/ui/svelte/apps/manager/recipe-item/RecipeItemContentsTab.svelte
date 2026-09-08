@@ -232,8 +232,18 @@
      stamps its hash on this component's own elements only, and a child component's root
      never carries it. Reaching it needs `:global`, nested under a selector that DOES
      carry the hash so nothing leaks. `cursor: pointer` is gone because the primitive's
-     own button rule already sets it; only the disabled state is this component's own. */
-  .manager-recipe-item-link-recipe :global(.manager-recipe-item-link-recipe-toggle:disabled) {
+     own button rule already sets it; only the disabled state is this component's own.
+
+     IT READS BOTH SPELLINGS OF "CLOSED", because since issue 1513 this call site passes
+     `triggerAriaDisabled` rather than `disabled`: the trigger carries `aria-disabled="true"`
+     with the native attribute ABSENT, so it stays focusable and keeps announcing why it will
+     not open. A `:disabled` selector alone therefore stopped matching the only state it was
+     written for — the "every recipe is already linked" panel drew a full-opacity trigger with
+     `cursor: pointer` that silently did nothing. `:is()` rather than a second rule so the two
+     spellings cannot drift apart, and `:disabled` is kept rather than replaced because the
+     primitive still renders the native attribute for any caller that passes `disabled`. */
+  .manager-recipe-item-link-recipe
+    :global(.manager-recipe-item-link-recipe-toggle:is(:disabled, [aria-disabled='true'])) {
     opacity: 0.5;
     cursor: not-allowed;
   }

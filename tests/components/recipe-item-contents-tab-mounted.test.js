@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -272,6 +273,49 @@ describe('RecipeItemContentsTab (mounted)', () => {
 
     button.focus();
     assert.ok(document.activeElement === button, 'an aria-disabled trigger still takes focus');
+  });
+
+  // AND IT IS STILL PAINTED AS CLOSED, which the clause above cannot see. happy-dom computes no
+  // cascade, so a mounted assertion reads nothing the stylesheet says — and the swap from
+  // `disabled` to `triggerAriaDisabled` moved the trigger OUT of the only selector that dimmed
+  // it. `:disabled` matches an element carrying the native attribute, and this one no longer
+  // does, so the "every recipe is already linked" panel drew a full-opacity trigger at
+  // `cursor: pointer` that silently did nothing: a control that looks live and is not is worse
+  // than one that looks dead. The rule is read out of the COMPILED CSS, which is the artifact
+  // the browser is handed and the only place a pruned or mis-keyed selector shows up.
+  it('paints the closed trigger through a selector that reads the ARIA flag it now carries', () => {
+    const { css } = scopedComponentCss(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte')
+    );
+    const flat = css.replaceAll(/\/\*[\s\S]*?\*\//gu, '').replaceAll(/\s+/gu, ' ');
+    const rules = [...flat.matchAll(/([^{}]+)\{([^{}]*)\}/gu)].map(([, selector, body]) => ({
+      selector: selector.trim(),
+      body,
+    }));
+
+    const closed = rules.filter((rule) =>
+      rule.selector.includes('manager-recipe-item-link-recipe-toggle')
+    );
+    assert.equal(
+      closed.length,
+      1,
+      `${closed.length} rules paint the link trigger, against the one this component writes. ` +
+        'Svelte PRUNES a scoped rule it cannot match, so a rule deleted and a rule pruned look ' +
+        'the same from here, and both leave the closed state unpainted'
+    );
+    assert.match(
+      closed[0].selector,
+      /\[aria-disabled='true'\]/u,
+      'the selector must read `aria-disabled`, because that is the flag this call site sets: it ' +
+        'passes `triggerAriaDisabled` so the button stays focusable, which means the native ' +
+        '`:disabled` this rule was written against never matches it again'
+    );
+    assert.match(
+      closed[0].body,
+      /opacity: 0\.5/u,
+      'and it still dims, or the state is announced and not drawn'
+    );
+    assert.match(closed[0].body, /cursor: not-allowed/u);
   });
 
   // THE STATE THE FIXTURE USED TO PIN AS AN ARTIFACT. The stay-open clause above asserts two rows
