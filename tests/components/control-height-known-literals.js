@@ -140,8 +140,14 @@ export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
  * is a real control at a retired rung and stays exactly 40px through the conversion — the tile
  * nested inside it takes the 40 from the primitive's `style` attribute, and the button's own
  * declaration is what keeps the row's hit target where it was.
+ *
+ * 64 after issue 1515's SIXTH phase, and this one is a control rather than a portrait:
+ * `GatheringPartiesTab | height | 32` VANISHES because the World > Parties search row WAS the
+ * field — a hand-built 32px box holding a glyph and a borderless input — and the field is
+ * `ManagerSearchField` now, which paints itself at the ladder's own 34px. The row is layout and
+ * declares no height at all, so the debt is PAID by adoption rather than snapped to a rung.
  */
-export const KNOWN_RETIRED_HEIGHT_TOTAL = 65;
+export const KNOWN_RETIRED_HEIGHT_TOTAL = 64;
 
 /**
  * The per-corpus height-declaration counts the floors were CHOSEN AGAINST, at the commit that
@@ -181,7 +187,6 @@ const ROWS = Object.freeze([
   'src/ui/svelte/apps/manager/BooksScrollsView.svelte | height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte | height | 36 | 1 | 36px => 36px',
   'src/ui/svelte/apps/manager/EmptyState.svelte | height | 32 | 1 | 32px => 32px',
-  'src/ui/svelte/apps/manager/GatheringPartiesTab.svelte | height | 32 | 1 | 32px => 32px',
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte | min-height | 36 | 1 | 36px => 36px',
   'src/ui/svelte/apps/manager/PartyTravelActorPanel.svelte | height | 32 | 1 | 32px => 32px',
   'src/ui/svelte/apps/manager/RosterRow.svelte | height | 32 | 1 | 32px => 32px',
