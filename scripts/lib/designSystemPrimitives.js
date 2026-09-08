@@ -410,15 +410,21 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * under `src/ui/svelte/components/` — `DropZone`, `ImagePathPicker`, `ManagerColorPicker` and
  * `RowDisclosure` — are `'broad'` because that directory leg matches them today whatever anyone
  * thinks of them, which is the point issue 1378 makes: a directory cannot tell a primitive from a
- * component that merely lives there. The other EIGHT are `'targeted'`: the seven manager ones
- * because membership in the broad set there is by NAME and none of them is on a name list, and
- * `apps/crafting/ComponentSourcesBar` because the pattern does not reach that directory at all.
+ * component that merely lives there. The other EIGHT are `'targeted'`: the SIX under
+ * `apps/manager/` because membership in the broad set there is by NAME and none of them is on a
+ * name list, and `apps/ActorSelectTopBar` and `apps/crafting/ComponentSourcesBar` because the
+ * pattern does not reach `apps/` at all — it names `styles/`, `src/ui/svelte/components/`,
+ * `src/ui/theme.js` and a NAME LIST under `apps/manager/`, and nothing else.
  * Either way the frames that claim each by `sourceMatches` are reached.
  *
  * THE FOUR AND FIVE THIS PARAGRAPH USED TO COUNT WERE DRIFT, corrected at issue 1513 against
  * `NOT_A_PRIMITIVE.length`, which `tests/design-system-primitives.test.js` pins at 12. That
  * change moves no row COUNT — it amends one row's ground, which is arithmetic-free — so the
  * numerals are corrected in the docblock it was already amending rather than by subtraction.
+ * The "seven manager ones" in the same pass was drift of the same kind and is corrected here:
+ * only six of the eight targeted rows are under `apps/manager/`, and reading the eighth as a
+ * seventh manager row attributed `apps/ActorSelectTopBar` — a PLAYER-app file — to the name-list
+ * ground rather than to the one it actually rests on.
  *
  * ── THE ROWS THAT ARE NOT UNDER-CALLED CANDIDATES ──────────────────────────────────────────────
  *
@@ -443,9 +449,9 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * multi-select mode on the primitive, which is a design question this row does not settle". Issue
  * 1513 settled it, added `multiple` and `stayOpen` to the primitive and CONVERTED the panel, so
  * the row survives on what every caller-count row rests on: one caller, and a screen region of
- * that size is not a shared primitive whichever primitives it reuses. `recipe-item/
- * RecipeItemLimitsTab` is now this group's ONLY member carrying a live `SearchablePopover`
- * adjudication.
+ * that size is not a shared primitive whichever primitives it reuses.
+ * `recipe-item/RecipeItemLimitsTab` is now this group's ONLY member carrying a live
+ * `SearchablePopover` adjudication.
  *
  * `checks/ChecksEditorTabs` was recorded here too and is DELIBERATELY GONE, not lost. It was recorded here by
  * issue 1038 on the ground that its count is a bare mono numeral rather than a chip and "the two

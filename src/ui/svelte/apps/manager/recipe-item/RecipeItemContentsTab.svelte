@@ -112,7 +112,16 @@
          listbox, but linking a second recipe is the overwhelmingly common next action and
          re-opening the trigger, re-typing the query and re-finding the place in the library
          between each one is the whole cost. `showFilteredCount` states the matched-of-total the
-         field now makes reachable. -->
+         field now makes reachable.
+
+         `triggerAriaDisabled` RATHER THAN `disabled`, and `stayOpen` is what made the difference
+         load-bearing. The panel outlives a choice now, so the LAST linkable recipe is linked with
+         the panel still open: a native `disabled` would leave the trigger `disabled` and
+         `aria-expanded="true"` at the same time, and Escape's `restoreTriggerFocus()` calls
+         `focus()` on a disabled button — a silent no-op that drops the keyboard user to `<body>`,
+         where Foundry's canvas keybindings are live again. The primitive refuses to open on
+         either flag, so the affordance is closed exactly as firmly; what changes is that the
+         button stays focusable and keeps announcing why it will not open. -->
     <div class="manager-recipe-item-link-recipe">
       <SearchablePopover
         options={linkOptions}
@@ -136,7 +145,7 @@
           'FABRICATE.Admin.Manager.RecipeItem.Contents.SearchRecipes',
           'Search recipes…'
         )}
-        disabled={linkable.length === 0}
+        triggerAriaDisabled={linkable.length === 0}
         emptyHint={text(
           'FABRICATE.Admin.Manager.RecipeItem.Contents.NoneLinkable',
           'Every recipe is already linked'

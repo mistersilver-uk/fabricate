@@ -5717,10 +5717,47 @@ test('the recipe-item contents cases open a definition the lab world holds, with
   );
   assert.ok(
     systemRecipes > linked,
-    'manager-recipe-item-contents-picker expects an ENABLED trigger over a populated panel. ' +
-      '`RecipeItemContentsTab` passes `disabled={linkable.length === 0}`, so a book linking every ' +
-      `recipe in its system (${linked} of ${systemRecipes}) leaves a trigger the driver clicks ` +
-      'to no effect and a panel that never opens'
+    'manager-recipe-item-contents-picker expects an OPENABLE trigger over a populated panel. ' +
+      '`RecipeItemContentsTab` passes `triggerAriaDisabled={linkable.length === 0}`, and the ' +
+      'primitive refuses to open on that flag exactly as it does on `disabled`, so a book ' +
+      `linking every recipe in its system (${linked} of ${systemRecipes}) leaves a trigger the ` +
+      'driver clicks to no effect and a panel that never opens'
+  );
+});
+
+// ── THE PICKER FRAME'S SUBJECT MOVED WITH THE SEARCH FIELD (issue 1513, review r1) ────────
+// The case was registered one phase before the field existed and recorded, beside its own
+// `expectSelector`, that it made "no `.manager-travel-popover-search` claim: this call site
+// passes `showSearch={false}` today". That phase has landed and the claim is false, so
+// `design-system/spec.md:222` applies — a refusal the tree has overturned is RESTATED by the
+// change that overturns it. This clause is what keeps the two halves in step: the call site and
+// the frame's own assertion are a hand-maintained mirror, and a frame that stopped claiming the
+// field would go on publishing green over a panel that had lost it.
+test('the recipe-item picker frame claims the search field its call site now renders', () => {
+  const callSite = readFileSync(
+    resolve(ROOT, 'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte'),
+    'utf8'
+  );
+  assert.ok(
+    !/showSearch=\{false\}/u.test(callSite),
+    '`RecipeItemContentsTab` suppresses its search field again. Either the phase was reverted — ' +
+      'in which case the frame must stop claiming the field — or the search is off by accident'
+  );
+
+  const picker = VIEW_LAB_CASES.find((viewCase) => viewCase.id === 'manager-recipe-item-contents-picker');
+  assert.ok(Boolean(picker), 'the case is registered');
+  assert.match(
+    picker.expectSelector,
+    /:has\(\.manager-travel-popover-search\)/u,
+    'the frame photographs a SEARCHABLE library panel now, so its own assertion has to require ' +
+      'the field. Without it the capture passes over the pre-phase presentation and publishes a ' +
+      'frame that cannot show the regression it is evidence against'
+  );
+  assert.match(
+    picker.expectSelector,
+    /\.manager-travel-popover-options \.manager-travel-option/u,
+    'and it still requires a populated option row, because a panel over an empty list is not ' +
+      'evidence for the presentation this frame exists to publish'
   );
 });
 

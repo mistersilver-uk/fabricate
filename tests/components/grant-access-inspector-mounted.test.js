@@ -19,9 +19,10 @@ const harness = createMountedComponentHarness({
     // `SearchablePopover`'s whole raw closure whether or not `showPageSize={false}`
     // ever renders one. A raw module missing from a manifest does not fail the suite —
     // the harness throws in `before()` and every subtest reports `# cancelled`.
+    // It already carries `foundryBridge.js` and `listReorderAnnouncement.js`, so this list does
+    // not restate them: a duplicate entry is not an error the harness reports, it is a
+    // hand-maintained mirror that quietly disagrees with its source.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
-    'src/ui/svelte/util/foundryBridge.js',
-    'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/utils/recipeCategories.js',
     // The inspector's lifted roster view-state (issue 1438).
@@ -204,6 +205,73 @@ describe('GrantAccessInspector (mounted)', () => {
     assert.deepEqual(calls[0].access.characterIds.sort(), ['c7', 'c8']);
   });
 
+  // ── TWO PAGERS AT ONCE, WHICH IS THE STATE NO FIXTURE HELD (issue 1513, review r1) ─────
+  // Every pager assertion above mounts a roster long enough to page and a second roster of two,
+  // so exactly ONE bar renders and `[data-access-roster="…"]` discriminates nothing. Measured:
+  // re-pointing the PLAYERS section's `onPageChange` at `ui.characterPageIndex` shipped GREEN
+  // against the whole suite, because the crossed write moved a page index no rendered bar read.
+  // The fix is a fixture, not another assertion: both rosters over the page size at once.
+  it('draws a pager per roster and each one pages only its own rows', async () => {
+    const root = await harness.mount({
+      recipe: makeRecipe(),
+      characters: makeCharacters(8),
+      players: makePlayers(8)
+    });
+
+    const summaryOf = (key) =>
+      root.querySelector(`[data-access-roster="${key}"] [data-pagination-summary]`).textContent.trim();
+
+    assert.equal(
+      root.querySelectorAll('[data-pagination-next]').length,
+      2,
+      'eight rows in each roster draws both bars, which is the only fixture that can tell them apart'
+    );
+    assert.equal(summaryOf('characters'), 'Showing 1–6 of 8');
+    assert.equal(summaryOf('players'), 'Showing 1–6 of 8');
+
+    root.querySelector('[data-access-roster="players"] [data-pagination-next]').click();
+    flushSync();
+
+    assert.equal(summaryOf('players'), 'Showing 7–8 of 8', 'the players bar advanced its own roster');
+    assert.equal(
+      summaryOf('characters'),
+      'Showing 1–6 of 8',
+      'and the characters bar did NOT move: a crossed onPageChange is exactly what this reads'
+    );
+    assert.equal(root.querySelectorAll('[data-access-player-row]').length, 2);
+    assert.equal(root.querySelectorAll('[data-access-character-row]').length, 6);
+  });
+
+  // ── THE TWO BARS ARE TWO NAMED LANDMARKS (issue 1513, review r1) ───────────────────────
+  // `Pagination` emits a `<section aria-label>` (a REGION) around a `<nav aria-label>`, and with
+  // the primitive's defaults this screen published two regions called "Pagination" and two
+  // navigations called "Page navigation". A landmark list is navigated BY NAME, so identical
+  // names there make the two bars indistinguishable in the one place the distinction is needed —
+  // and `[data-access-roster]`, which every assertion above leans on, is not reachable from it.
+  it('names each roster pager after its own roster', async () => {
+    const root = await harness.mount({
+      recipe: makeRecipe(),
+      characters: makeCharacters(8),
+      players: makePlayers(8)
+    });
+
+    const regionName = (key) =>
+      root.querySelector(`[data-access-roster="${key}"] .fabricate-pagination`).getAttribute('aria-label');
+    const navName = (key) =>
+      root.querySelector(`[data-access-roster="${key}"] .manager-pagination-nav`).getAttribute('aria-label');
+
+    assert.equal(regionName('characters'), 'Characters pagination');
+    assert.equal(regionName('players'), 'Players pagination');
+    assert.notEqual(
+      regionName('characters'),
+      regionName('players'),
+      'two regions with one name are one landmark as far as a landmark list is concerned'
+    );
+    assert.equal(navName('characters'), 'Characters page navigation');
+    assert.equal(navName('players'), 'Players page navigation');
+    assert.notEqual(navName('characters'), navName('players'));
+  });
+
   // ── THE SEARCH FIELD IS UNCONDITIONAL (issue 1513) ─────────────────────────────────────
   // It used to render only where the roster exceeded the page size, so a world with six
   // characters — the common case — drew no way to find one by name. THREE and TWO is the row
@@ -282,6 +350,40 @@ describe('GrantAccessInspector (mounted)', () => {
     const rows = root.querySelectorAll('[data-access-character-row]');
     assert.equal(rows.length, 1);
     assert.equal(rows[0].querySelector('.manager-roster-name').textContent.trim(), 'Char 8');
+  });
+
+  // ── AND IT IS A SEARCH OVER SOMETHING (issue 1513, review r1) ──────────────────────────
+  // The threshold that came off was the PAGE SIZE. A roster holding no rows at all is a
+  // different fact: a query box over it can only ever produce the empty line the screen already
+  // shows. The gate reads the UNFILTERED roster, so a query that matches nothing still keeps the
+  // field the GM typed into — asserted here, because a gate on `slice.filtered` would pass every
+  // other clause in this file and trap the GM with no way to clear their own term.
+  it('withholds a roster search field only where that roster is empty', async () => {
+    const root = await harness.mount({
+      recipe: makeRecipe(),
+      characters: makeCharacters(3),
+      players: []
+    });
+
+    assert.ok(
+      Boolean(root.querySelector('[data-access-roster-search="characters"]')),
+      'a three-character roster draws its search field'
+    );
+    assert.ok(
+      !root.querySelector('[data-access-roster-search="players"]'),
+      'an empty player roster draws no field, because there is nothing to find by typing'
+    );
+
+    const search = root.querySelector('[data-access-roster-search="characters"]');
+    search.value = 'nothing matches this';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+
+    assert.equal(root.querySelectorAll('[data-access-character-row]').length, 0);
+    assert.ok(
+      Boolean(root.querySelector('[data-access-roster-search="characters"]')),
+      'a query that matched nothing keeps its own field, or the term cannot be cleared'
+    );
   });
 
   it('renders the no-selection empty state when no recipe is selected', async () => {

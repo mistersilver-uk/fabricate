@@ -5192,7 +5192,8 @@ export const VIEW_LAB_CASES = Object.freeze([
     // why the case lands first: the before frame has to exist while the tree still draws it.
     //
     // `hb-book` links three of herbalism's nine recipes, so six are linkable: the trigger is
-    // enabled (it carries `disabled={linkable.length === 0}`) and the panel opens over a POPULATED
+    // enabled (it carries `triggerAriaDisabled={linkable.length === 0}`, and the primitive refuses
+    // to open on that flag exactly as it does on `disabled`) and the panel opens over a POPULATED
     // list rather than over its no-matches branch.
     //
     // `beyond`, `smokeLabels: []`: the live smoke opens no recipe-item picker, so there is no
@@ -5208,16 +5209,24 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-recipe-item-link-recipe-toggle]' },
     ],
     expectView: 'recipe-item-edit',
-    // THE PANEL AND A ROW IN IT, in the shape `manager-recipe-edit-tag-picker` uses for the same
-    // primitive: the panel alone would pass over an empty list, and the row is what makes this
-    // frame evidence for the populated presentation. Scoped to `.fabricate-manager` because the
-    // panel is PORTALED there — a portal that failed to land would leave it inside the tab's own
-    // clipped column, where this selector cannot match. No `.manager-travel-popover-search` claim:
-    // this call site passes `showSearch={false}` today, and that is exactly what the next phase
-    // changes.
+    // THE PANEL, ITS SEARCH ROW AND A ROW IN IT. The panel alone would pass over an empty list,
+    // and the option row is what makes this frame evidence for the populated presentation. Scoped
+    // to `.fabricate-manager` because the panel is PORTALED there — a portal that failed to land
+    // would leave it inside the tab's own clipped column, where this selector cannot match.
+    //
+    // `:has(.manager-travel-popover-search)` IS A RESTATEMENT, in the commit that falsified the
+    // claim it replaces (`design-system/spec.md:222`: a docblock refusing something the tree has
+    // since overturned is restated by the change that overturns it, not left standing). This
+    // comment used to read "No `.manager-travel-popover-search` claim: this call site passes
+    // `showSearch={false}` today, and that is exactly what the next phase changes." That phase
+    // has landed — `RecipeItemContentsTab` passes no `showSearch` at all now — so the frame's
+    // SUBJECT moved: it is the searchable library panel, and a regression that took the field
+    // back off would otherwise publish a frame that still passed. The `:has()` form is the one
+    // `player-actor-picker` already uses to claim a sibling subtree from a single selector.
     expectSelector:
-      '.fabricate-manager .fabricate-picker-popover.manager-travel-popover ' +
-      '.manager-travel-popover-options .manager-travel-option',
+      '.fabricate-manager .fabricate-picker-popover.manager-travel-popover' +
+      ':has(.manager-travel-popover-search)' +
+      ' .manager-travel-popover-options .manager-travel-option',
     kinds: ['manager', 'books-scrolls'],
     // `...ANCHORED_POPOVER_SOURCES` because this frame RESTS ON AN OPEN PANEL the shared
     // positioning seam measured, clamped and portaled, which is that array's own membership test.

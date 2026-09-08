@@ -27,11 +27,13 @@
 
   // Fixed roster page size (design: 6 per roster).
   //
-  // THE SEARCH FIELD IS UNCONDITIONAL (issue 1513). It used to render only where the roster
-  // was longer than one page, which withheld it from exactly the rosters a GM reads most: a
-  // world of six characters drew no way to find one by name at all, and a field that appears
-  // when a seventh actor joins reads as a layout glitch rather than as a capability. Nothing
-  // about finding a name by typing it depends on how many names there are.
+  // THE SEARCH FIELD IS UNCONDITIONAL WITH RESPECT TO THE PAGE SIZE (issue 1513). It used to
+  // render only where the roster was longer than one page, which withheld it from exactly the
+  // rosters a GM reads most: a world of six characters drew no way to find one by name at all,
+  // and a field that appears when a seventh actor joins reads as a layout glitch rather than as
+  // a capability. Nothing about finding a name by typing it depends on how many names there are
+  // — but it does depend on there being some, so the markup gates the field on the UNFILTERED
+  // roster being non-empty and on nothing else.
   //
   // THE PAGER KEEPS ITS THRESHOLD, and that is not an inconsistency: a bar that can only say
   // "Page 1 of 1" states nothing the list beneath it does not already show. The shared
@@ -154,6 +156,31 @@
   const charSlice = $derived(pageSlice(characterRows, charQuery, charPage));
   const playerSlice = $derived(pageSlice(playerRows, playerQuery, playerPage));
 
+  // THE TWO PAGERS' LANDMARK NAMES (issue 1513), composed from the roster's own title.
+  //
+  // `Pagination` emits a `<section aria-label>` (a REGION) containing a `<nav aria-label>`, and
+  // this screen draws two of them in one 300px column — so with the primitive's defaults a
+  // screen-reader user's landmark list held two regions called "Pagination" and two navigations
+  // called "Page navigation", which is the one surface where the two have to be told apart. The
+  // qualifier is the SAME string the roster heading shows, so the landmark and the visible
+  // heading cannot drift.
+  //
+  // Composed from a template key rather than by concatenating two localized fragments: word
+  // order is a translator's decision, and `{roster} pagination` is the only shape that lets a
+  // language put the qualifier last.
+  function rosterLandmarks(title) {
+    return {
+      label: text('FABRICATE.Admin.Manager.Access.RosterPagination', '{roster} pagination').replace(
+        '{roster}',
+        title
+      ),
+      navLabel: text(
+        'FABRICATE.Admin.Manager.Access.RosterPageNavigation',
+        '{roster} page navigation'
+      ).replace('{roster}', title),
+    };
+  }
+
   // Two section descriptors drive a single markup block so the Characters and
   // Players rosters share one implementation (no duplicated section markup).
   const sections = $derived([
@@ -161,6 +188,7 @@
       key: 'characters',
       title: text('FABRICATE.Admin.Manager.Access.Characters', 'Characters'),
       icon: 'fas fa-user',
+      rows: characterRows,
       query: charQuery,
       searchPlaceholder: text(
         'FABRICATE.Admin.Manager.Access.SearchCharacters',
@@ -181,6 +209,7 @@
       key: 'players',
       title: text('FABRICATE.Admin.Manager.Access.Players', 'Players'),
       icon: 'fas fa-user-group',
+      rows: playerRows,
       query: playerQuery,
       searchPlaceholder: text('FABRICATE.Admin.Manager.Access.SearchPlayers', 'Search players…'),
       onSearch: (value) => {
@@ -236,14 +265,23 @@
           <i class={section.icon} aria-hidden="true"></i>
           <span>{section.title}</span>
         </div>
-        <ManagerSearchField
-          class="manager-access-roster-search"
-          value={section.query}
-          onInput={(next) => section.onSearch(next)}
-          placeholder={section.searchPlaceholder}
-          ariaLabel={section.searchPlaceholder}
-          inputAttrs={{ 'data-access-roster-search': section.key }}
-        />
+        <!-- A SEARCH OVER SOMETHING (issue 1513). The field is unconditional with respect to
+             the PAGE SIZE — that threshold is what withheld it from the rosters a GM reads most
+             — but a roster holding no rows at all is a different fact: there is nothing to find
+             by typing, and a query box over it can only ever produce the same empty line the
+             screen already shows. The gate reads the UNFILTERED rows, never `slice.filtered`,
+             because a field that removed itself once a query matched nothing would trap the GM
+             with no way to clear the term they typed. -->
+        {#if section.rows.length > 0}
+          <ManagerSearchField
+            class="manager-access-roster-search"
+            value={section.query}
+            onInput={(next) => section.onSearch(next)}
+            placeholder={section.searchPlaceholder}
+            ariaLabel={section.searchPlaceholder}
+            inputAttrs={{ 'data-access-roster-search': section.key }}
+          />
+        {/if}
         {#if section.slice.filtered.length === 0}
           <p class="manager-access-roster-empty" data-access-roster-empty={section.key}>
             {text('FABRICATE.Admin.Manager.Access.NoMatches', 'No matches')}
@@ -275,14 +313,18 @@
                IT STAYS INSIDE [data-access-roster], and that placement is load-bearing: this
                screen draws TWO of these bars and the primitive stamps a bare
                data-pagination-prev/-next with no per-instance key, so the roster section is the
-               only thing that tells the two apart. The retired data-access-roster-prev/-next
-               hooks carried the key themselves; a reader of either addresses it by ancestor
-               now. -->
+               only thing that tells the two apart FOR A TEST OR A CAPTURE. The retired
+               data-access-roster-prev/-next hooks carried the key themselves; a reader of either
+               addresses it by ancestor now. For a screen-reader user the ancestor is not
+               reachable, which is what `label`/`navLabel` answer: the two bars are two REGION
+               landmarks and two navigations, and a landmark list is navigated by NAME. -->
           <Pagination
             totalCount={section.slice.filtered.length}
             pageSize={ROSTER_PAGE_SIZE}
             pageIndex={section.page}
             showPageSize={false}
+            label={rosterLandmarks(section.title).label}
+            navLabel={rosterLandmarks(section.title).navLabel}
             onPageChange={section.onPageChange}
           />
         {/if}

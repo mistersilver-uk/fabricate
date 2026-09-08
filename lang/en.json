@@ -6168,7 +6168,9 @@
           "Table": "Recipe access table",
           "Title": "Recipe access",
           "ToggleNamed": "Toggle access for {name}",
-          "RolePlayer": "Player"
+          "RolePlayer": "Player",
+          "RosterPagination": "{roster} pagination",
+          "RosterPageNavigation": "{roster} page navigation"
         },
         "Scoped": {
           "ComponentCatalogueTitle": "Component catalogue",

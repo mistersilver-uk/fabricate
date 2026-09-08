@@ -766,13 +766,15 @@
   //
   // `openspec/specs/design-system/spec.md` requires a listbox to keep DOM focus on ONE element —
   // the HOLDER — and drive selection with `aria-activedescendant`. The holder is the query
-  // `<input>` where one is rendered and the TRIGGER where one is not (`showSearch={false}`, five
-  // app surfaces plus `ModifierPillSelect` and `Select`), and the option rows NEVER receive DOM
-  // focus. Roving focus onto them is what the prohibition forbids, because it re-arms Foundry's
-  // canvas bindings — and there is a second, independent reason: `styles/fabricate.css` rings any
-  // focused `[tabindex]` under `.fabricate` (`.fabricate [tabindex]:focus-visible`, a 2px accent
-  // outline at a POSITIVE offset), so a row that took focus would draw a competing ring around
-  // the keyboard cursor's own inset one.
+  // `<input>` where one is rendered and the TRIGGER where one is not (`showSearch={false}`, FOUR
+  // app surfaces — `GatheringTaskEditView`, `GatheringEventEditView`, `WorldComponentEntryPage`
+  // and `RecipeIngredientGroupCard` — plus `ModifierPillSelect` and `Select`; the fifth was
+  // `RecipeItemContentsTab`, which turned its search ON at issue 1513), and the option rows NEVER
+  // receive DOM focus. Roving focus onto them is what the prohibition forbids, because it re-arms
+  // Foundry's canvas bindings — and there is a second, independent reason: `styles/fabricate.css`
+  // rings any focused `[tabindex]` under `.fabricate` (`.fabricate [tabindex]:focus-visible`, a
+  // 2px accent outline at a POSITIVE offset), so a row that took focus would draw a competing
+  // ring around the keyboard cursor's own inset one.
   //
   // `aria-controls` and `aria-activedescendant` are OMITTED while the list itself is absent: the
   // `role="listbox"` element renders only when `filteredOptions.length > 0`, and the empty branch
@@ -1506,8 +1508,19 @@
             <span class="manager-travel-popover-title">{popoverTitle}</span>
           {/if}
           {#if showFilteredCount}
-            <span class="manager-travel-popover-count" data-popover-filtered-count
-              >{filteredCount}</span
+            <!-- A POLITE STATUS, NOT A DECORATIVE NUMERAL (issue 1513). This is the same shape
+                 the empty branch below already takes, and `stayOpen` is what made it owed: a
+                 panel that closes on choose confirms the choice by closing, and a panel that
+                 stays open confirms it with nothing at all unless something announces. The
+                 count is the one element whose text moves on every link — "6 of 9" becomes
+                 "5 of 8" — so it is the region that can carry the confirmation without a second
+                 live element competing with it. It is `polite` rather than `assertive` because
+                 the GM caused the change and is looking at the list it happened in. -->
+            <span
+              class="manager-travel-popover-count"
+              data-popover-filtered-count
+              role="status"
+              aria-live="polite">{filteredCount}</span
             >
           {/if}
         </div>
@@ -1673,6 +1686,35 @@
     .manager-travel-option[aria-selected='true']:hover {
     border-color: var(--fab-accent-border);
     background: var(--fab-accent-soft);
+  }
+
+  /* THE MULTI-SELECT SELECTED FACE (issue 1513). `design-system/spec.md` — "A SELECTED face is a
+     FILL and an EDGE", and its multi-select scenario requires a tinted fill plus an accent border
+     on every chosen row. The primitive's shared row paints rest and hover only, so before this
+     rule a checklist's chosen rows carried nothing but the caller's trailing check glyph and
+     HOVER read stronger than SELECTED — the one comparison a GM makes while scanning a list they
+     have already ticked.
+
+     KEYED ON THE LISTBOX'S `aria-multiselectable`, which is the primitive's own marker for the
+     mode (`multiple ? 'true' : undefined` on the `role="listbox"` element above) rather than a
+     caller class. That is what leaves the single-select importers untouched: they render the
+     attribute nowhere, so this rule cannot match in any of them, and the compact mode's own
+     marked-row rule above keeps the single-value picker's face exactly as it was.
+
+     `--fab-surface-active` behind `--fab-accent-border`, NOT `--fab-accent-soft`: the same spec
+     paragraph reserves the soft fill for the radio card group whose one answer its 3px inset bar
+     names, and joining a multi-select row to a radio card's treatment is the shape the rule
+     exists to prevent. The `:hover` half is restated for the reason the compact mode restates
+     its own — a selected row that reverted to the neutral hover surface would read as
+     deselecting under the pointer. */
+  .manager-travel-popover
+    [aria-multiselectable='true']
+    .manager-travel-option[aria-selected='true'],
+  .manager-travel-popover
+    [aria-multiselectable='true']
+    .manager-travel-option[aria-selected='true']:hover {
+    border-color: var(--fab-accent-border);
+    background: var(--fab-surface-active);
   }
 
   /* The compact search row, matching `.manager-travel-picker-inline`'s 30px bordered field

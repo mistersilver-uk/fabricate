@@ -59,9 +59,6 @@ import assert from 'node:assert/strict';
 
 import { parse } from 'svelte/compiler';
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
 import { measureImporters } from '../../scripts/lib/componentImporters.js';
 import { repoRoot } from '../helpers/sourceScan.js';
 import {
@@ -237,10 +234,11 @@ function snippetTriggerName(site) {
  *   (b) NO importer other than the adopters named here passes either prop, which is this clause.
  *
  * The population is `scripts/lib/componentImporters.js` — the same measurement the design-system
- * register's membership bar uses — rather than the component-node walk above, because an
- * importer that renders the primitive through a wrapper it also owns is still a file whose paint
- * a defaulted prop could move, and the import graph sees it where a per-node attribute scan
- * might not.
+ * register's membership bar uses — because "no OTHER importer" is a claim about the import
+ * graph. The ANSWER, though, is read from the component walk's parsed call sites: an importer
+ * that passes a prop does it on a `<SearchablePopover>` node, so the two measurements have to
+ * agree about the file set and only the AST can say what a node actually passes. The clause
+ * asserts that agreement rather than assuming it.
  *
  * ADOPTERS ARE PINNED BY EXACT SET rather than by count. A new caller is a decision about the
  * capability's spread and belongs in a diff that says so.
@@ -262,41 +260,71 @@ const MULTI_SELECT_ADOPTERS = Object.freeze([
 const MULTIPLE_ADOPTER = 'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte';
 const STAY_OPEN_ADOPTER = 'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte';
 
-test('`multiple` and `stayOpen` are passed by the adopters alone, so every other importer is unmoved', () => {
-  const importers = measureImporters(repoRoot).importersOf(POPOVER_PATH);
-  assert.ok(
-    importers.length >= 20,
-    `only ${importers.length} importing files, so the import graph stopped seeing this ` +
-      'primitive and every clause below quantifies over nothing'
-  );
+/** Every file with a `<SearchablePopover>` node that passes one of the two capability props. */
+function adopterFiles() {
+  return [
+    ...new Set(
+      popover.callSites
+        .filter((site) => site.attribute('multiple') || site.attribute('stayOpen'))
+        .map((site) => site.file)
+    ),
+  ].sort((left, right) => left.localeCompare(right));
+}
 
-  const passing = importers.filter((file) =>
-    /(?<![\w-])(multiple|stayOpen)(?![\w-])/u.test(readFileSync(join(repoRoot, file), 'utf8'))
-  );
+test('`multiple` and `stayOpen` are passed by the adopters alone, so every other importer is unmoved', () => {
+  // THE READER IS THE AST, NOT THE FILE TEXT, and the difference is a defect this clause once
+  // had rather than a preference. It used to test each importer's WHOLE SOURCE against
+  // `/(?<![\w-])(multiple|stayOpen)(?![\w-])/`, which matches the words wherever they occur —
+  // and both adopters carry them in prose: `ComponentSourcesBar`'s docblock explains what
+  // `multiple` reads, and this very file's names are quoted in half a dozen comments across the
+  // tree. Measured: deleting the `multiple` attribute from `ComponentSourcesBar`'s call site
+  // left the clause 11/11 GREEN, because the paragraph above the call site still said the word.
+  // A pin that survives the deletion it exists to catch is decorative, and the two probes below
+  // were the same read and therefore vacuous in the same way.
+  //
+  // `site.attribute(name)` resolves against the parsed call site's OWN attributes, so a comment
+  // cannot satisfy it and a prop moved onto a wrapper cannot either.
   assert.deepEqual(
-    passing.sort((left, right) => left.localeCompare(right)),
+    adopterFiles(),
     [...MULTI_SELECT_ADOPTERS].sort((left, right) => left.localeCompare(right)),
-    'a file outside the adopter set names `multiple` or `stayOpen`. Both props are additive and ' +
+    'a file outside the adopter set passes `multiple` or `stayOpen`. Both props are additive and ' +
       'default-off precisely so the other importers render exactly as they did, and a new one ' +
       'is a decision about where a multi-selectable listbox is announced'
   );
 
-  // NON-VACUITY, on the reader rather than on the result: a pattern that matched nothing would
-  // make the deepEqual above pass the day the adopter list emptied, and a pattern that matched
+  // THE POPULATION IS STILL EVERY IMPORTER, asserted rather than assumed. The component walk the
+  // call sites come from and the import graph are two different measurements, and this clause is
+  // a claim about the second: "no OTHER importer passes either prop". So the graph has to be
+  // alive — a floor, because an `importersOf` that returned nothing would leave the deepEqual
+  // above quantifying over a corpus this file never checked — and every adopter has to be in it,
+  // which is what says the two measurements are looking at the same set of files.
+  const importers = measureImporters(repoRoot).importersOf(POPOVER_PATH);
+  assert.ok(
+    importers.length >= 20,
+    `only ${importers.length} importing files, so the import graph stopped seeing this ` +
+      'primitive and the clause above quantifies over a corpus nothing verified'
+  );
+  assert.deepEqual(
+    adopterFiles().filter((file) => !importers.includes(file)),
+    [],
+    'an adopter renders `<SearchablePopover>` without importing it, so the component walk and ' +
+      'the import graph disagree about which files this contract is over'
+  );
+
+  // NON-VACUITY, on the reader rather than on the result: an `attribute()` that resolved nothing
+  // would make the deepEqual above pass the day the adopter list emptied, and one that resolved
   // everything would fail loudly, which is the safe direction. This pins the first, once per
   // prop, because the two adopters no longer both carry both names.
-  assert.match(
-    readFileSync(join(repoRoot, MULTIPLE_ADOPTER), 'utf8'),
-    /(?<![\w-])multiple(?![\w-])/u,
-    'the reader must find `multiple` in the one file that passes it, or it is finding nothing ' +
-      'anywhere and this clause is decorative'
+  assert.ok(
+    popover.callSites.some((site) => site.file === MULTIPLE_ADOPTER && site.attribute('multiple')),
+    'the reader must find a `multiple` ATTRIBUTE on the call site in the one file that passes ' +
+      'it, or it is finding nothing anywhere and this clause is decorative'
   );
-  assert.match(
-    readFileSync(join(repoRoot, STAY_OPEN_ADOPTER), 'utf8'),
-    /(?<![\w-])stayOpen(?![\w-])/u,
-    'the reader must find `stayOpen` in the one file that passes it WITHOUT `multiple`, or ' +
-      'the gate is being asserted through the prop that implies it and its own adoption is ' +
-      'unmeasured'
+  assert.ok(
+    popover.callSites.some((site) => site.file === STAY_OPEN_ADOPTER && site.attribute('stayOpen')),
+    'the reader must find a `stayOpen` ATTRIBUTE on the call site in the one file that passes ' +
+      'it WITHOUT `multiple`, or the gate is being asserted through the prop that implies it ' +
+      'and its own adoption is unmeasured'
   );
 });
 

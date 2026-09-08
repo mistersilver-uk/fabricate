@@ -200,6 +200,97 @@ describe('ComponentSourcesBar mounted behavior', () => {
   });
 
   /**
+   * THE SECOND STAY-OPEN HAZARD: A RE-PROJECTION UNDER AN OPEN PANEL (issue 1513, review r1).
+   *
+   * The clause above proves the panel survives a CHOICE. It does not prove it survives the thing
+   * the choice causes: `store.toggle` writes through to the crafting store, and every surface
+   * reading the selection re-derives — so the bar is handed a NEW services object, a NEW
+   * `available` array and a changed `selectedSourceIds` while its panel is still open. Three
+   * things could go wrong there and none of them is visible in the choose test: the panel could
+   * unmount and take the GM's query with it, the rows could be re-created (losing the DOM the
+   * keyboard cursor addresses by id), or the marks could stay on the pre-toggle selection.
+   *
+   * A NEW OBJECT AT EVERY LEVEL is the point of the fixture. Mutating the existing store proves
+   * nothing here — `$derived` reads the same identity and would re-run for the wrong reason.
+   */
+  it('survives a re-projection while open, keeping the query and re-marking the rows', async () => {
+    const { store } = craftingSources();
+    const target = await harness.mount({ services: { craftingSources: store } });
+    target.querySelector('[data-crafting-sources-add]').click();
+    flushSync();
+
+    const field = target.querySelector('.crafting-sources-popover .manager-travel-popover-search input');
+    field.value = 'c';
+    field.dispatchEvent(new window.Event('input', { bubbles: true }));
+    flushSync();
+
+    const before = [...target.querySelectorAll('.crafting-sources-popover .crafting-source-option')];
+    assert.equal(before.length, 1, 'the query narrows the owned-actor list to Cy');
+    assert.equal(before[0].getAttribute('aria-selected'), 'false');
+
+    // What toggling `c` does to this component's inputs: a fresh store object carrying a fresh
+    // `available` array and a selection that now holds `c`.
+    const { store: next } = craftingSources({
+      available: [
+        { id: 'a', name: 'Aria', img: 'icons/svg/mystery-man.svg' },
+        { id: 'b', name: 'Borin', img: '' },
+        { id: 'c', name: 'Cy', img: '' }
+      ],
+      selectedSourceIds: ['a', 'b', 'c']
+    });
+    await harness.setProps({ services: { craftingSources: next } });
+
+    const popover = target.querySelector('.crafting-sources-popover');
+    assert.ok(Boolean(popover), 'the panel survives a whole new services object');
+    assert.equal(
+      popover.querySelector('.manager-travel-popover-search input').value,
+      'c',
+      'and so does the query the GM typed, which a close-and-reopen would have cleared'
+    );
+
+    const after = [...popover.querySelectorAll('.crafting-source-option')];
+    assert.equal(after.length, 1, 'the filtered list is still the filtered list');
+    assert.ok(
+      after[0] === before[0],
+      'and it is the SAME element: the rows are keyed by option id, so a re-projection that ' +
+        'happens to produce the same ids must not re-create the DOM the keyboard cursor names ' +
+        'through `aria-activedescendant`'
+    );
+    assert.equal(
+      after[0].getAttribute('aria-selected'),
+      'true',
+      'and the mark follows the new selection rather than the one the panel opened over'
+    );
+    assert.equal(
+      popover.querySelectorAll('.crafting-source-option-check').length,
+      1,
+      'the visible check agrees with it'
+    );
+  });
+
+  /**
+   * THE PANEL AND ITS LIST BOTH ANNOUNCE A NAME (issue 1513, review r1).
+   *
+   * `dialogAriaLabel` feeds BOTH the portaled `role="dialog"` and the `role="listbox"` inside it,
+   * and the source contract cannot finish that job: a call site's string is present and non-empty
+   * in the text while resolving to `''` at runtime. Only the rendered attribute can say it.
+   */
+  it('names the portaled panel and the listbox inside it', async () => {
+    const { store } = craftingSources();
+    const target = await harness.mount({ services: { craftingSources: store } });
+    target.querySelector('[data-crafting-sources-add]').click();
+    flushSync();
+
+    const popover = target.querySelector('.crafting-sources-popover');
+    const panelName = popover.getAttribute('aria-label');
+    const listName = popover.querySelector('[role="listbox"]').getAttribute('aria-label');
+    assert.notEqual(panelName, '', 'an unnamed dialog is invisible in a frame and is not a compiler error');
+    assert.notEqual(listName, '', 'and an unnamed listbox inside it is the same defect one level down');
+    assert.match(panelName, /Sources\.Edit/u, 'the mount stub echoes the key this control names itself by');
+    assert.equal(listName, panelName, 'one string names both, which is what the primitive passes');
+  });
+
+  /**
    * THE SEARCH FIELD AND THE MATCHED-OF-TOTAL COUNT, neither of which this control has ever had.
    *
    * `Sources.SearchCharacters` is the placeholder AND the field's accessible name, taken

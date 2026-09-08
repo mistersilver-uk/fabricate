@@ -53,6 +53,7 @@ import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
 import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
+import { scopedComponentCss } from '../helpers/scoped-component-css.js';
 import {
   SEARCHABLE_POPOVER_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -952,7 +953,11 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
         'and the query is UNCLEARED. `close()` clears it, so the default mode loses the GM`s ' +
           'filter on every choice — which is the whole cost of adding four entries to a set'
       );
-      assert.equal(document.activeElement, holder, 'focus stays on the holder, not the trigger');
+      // `assert.ok(a === b)` rather than `assert.equal`: on failure `node:assert` serialises
+      // the actual value to build its diff and walks a mounted happy-dom element's circular
+      // tree until the heap dies, so a one-line assertion failure surfaces as an OOM and a
+      // `# cancelled` suite with no message.
+      assert.ok(document.activeElement === holder, 'focus stays on the holder, not the trigger');
 
       optionRows(panel())[1].click();
       flushSync();
@@ -988,6 +993,75 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
       flushSync();
       assert.ok(Boolean(panel()), 'and the panel survives the choice, which is the whole prop');
       harness.remount();
+    });
+
+    /**
+     * THE SELECTED FACE `multiple` OWES ITS ROWS, AND WHY THIS CLAUSE IS NOT MOUNTED.
+     *
+     * `design-system/spec.md` — "A SELECTED face is a FILL and an EDGE" — and its multi-select
+     * scenario requires a tinted fill plus an accent border on each chosen row. The primitive's
+     * shared row painted rest and hover only, so a converted checklist's chosen rows carried the
+     * caller's trailing check glyph and nothing else, and HOVER read stronger than SELECTED.
+     *
+     * A mounted assertion cannot see this: happy-dom computes no cascade, so `getComputedStyle`
+     * on a mounted row answers with the inline style and nothing the stylesheet says. The rule is
+     * read out of the COMPILED CSS instead (`{ css: 'external' }`), which is the same artifact the
+     * browser is handed and therefore the only place a pruned or mis-keyed rule shows up.
+     *
+     * THE KEY IS THE OTHER HALF, and it is what makes this safe for the 23 single-select
+     * importers: the selector hangs on the LISTBOX's `aria-multiselectable`, which the primitive
+     * emits only under `multiple`. Every `aria-selected` rule in the block is checked for a
+     * qualifier for that reason — an unkeyed one would repaint the marked row of every picker in
+     * the product, which is a redesign wearing a bug fix's clothes.
+     */
+    it('paints a fill and an edge on every multi-selected row, keyed on `aria-multiselectable`', () => {
+      const { css } = scopedComponentCss(
+        resolve(repoRoot, 'src/ui/svelte/components/SearchablePopover.svelte')
+      );
+      const flat = css.replaceAll(/\/\*[\s\S]*?\*\//gu, '').replaceAll(/\s+/gu, ' ');
+      const rules = [...flat.matchAll(/([^{}]+)\{([^{}]*)\}/gu)].map(([, selector, body]) => ({
+        selector: selector.trim(),
+        body,
+      }));
+
+      const selectedFaces = rules.filter((rule) =>
+        rule.selector.includes("[aria-selected='true']")
+      );
+      assert.ok(
+        selectedFaces.length >= 3,
+        `only ${selectedFaces.length} selected-row rules survived compilation, against the three ` +
+          'this block writes (the compact mode`s marked row and its hover, and the multi-select ' +
+          'pair). Svelte PRUNES a scoped rule it cannot match against the template, so a rule ' +
+          'deleted and a rule pruned look the same from here — and both are the defect'
+      );
+      for (const rule of selectedFaces) {
+        assert.ok(
+          rule.selector.includes('is-compact-option-rows') ||
+            rule.selector.includes("[aria-multiselectable='true']"),
+          `"${rule.selector}" paints a selected row with no mode qualifier, so it reaches every ` +
+            'one of the primitive`s single-select importers. Both keys are opt-in markers the ' +
+            'primitive writes itself: the compact class and the multi-selectable listbox'
+        );
+      }
+
+      const multi = selectedFaces.find((rule) =>
+        rule.selector.includes("[aria-multiselectable='true']")
+      );
+      assert.ok(Boolean(multi), 'no rule keys a selected face on the multi-selectable listbox');
+      assert.match(multi.body, /border-color: var\(--fab-accent-border\)/u, 'the EDGE');
+      assert.match(multi.body, /background: var\(--fab-surface-active\)/u, 'and the FILL');
+      assert.ok(
+        !multi.body.includes('--fab-accent-soft'),
+        '`--fab-accent-soft` under a 3px inset bar is the RADIO CARD group`s selected treatment, ' +
+          'and `spec.md` reserves it for the list whose one answer that bar names. Joining a ' +
+          'multi-select row to it is the exact confusion the rule exists to prevent'
+      );
+      assert.match(
+        multi.selector,
+        /\[aria-selected='true'\][^,]*:hover/u,
+        'and the hover half is restated inside the same rule, or hovering a chosen row reverts ' +
+          'it to the neutral surface and reads as deselecting it'
+      );
     });
 
     /**
