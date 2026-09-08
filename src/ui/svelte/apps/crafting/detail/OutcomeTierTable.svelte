@@ -10,6 +10,7 @@
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
   import Kicker from '../../../components/Kicker.svelte';
+  import EmptyState from '../../manager/EmptyState.svelte';
 
   let { tiers = [] } = $props();
 
@@ -56,7 +57,7 @@
       {/each}
     </ul>
   {:else}
-    <p class="crafting-tiers-empty">{localize('FABRICATE.App.Crafting.Detail.NoOutcomes')}</p>
+    <EmptyState note hint={localize('FABRICATE.App.Crafting.Detail.NoOutcomes')} />
   {/if}
 </section>
 
@@ -150,13 +151,6 @@
   .crafting-tier-award-qty {
     font-variant-numeric: tabular-nums;
     font-weight: 600;
-    color: var(--fab-text-muted);
-  }
-
-  .crafting-tiers-empty {
-    margin: 0;
-    font-size: 12px;
-    font-style: italic;
     color: var(--fab-text-muted);
   }
 </style>

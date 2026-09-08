@@ -45,6 +45,15 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
+    // The two the bar reaches as of issue 1514's crafting phase. `FillBar` is the stamina
+    // track the bar draws directly; `Avatar` arrives through `ComponentSourcesBar` below, whose
+    // two actor portraits are the shared tile now — so the bar pulls a portrait in without
+    // naming one. An omission is named by THIS HARNESS rather than by `SHARED_PRIMITIVES`:
+    // `mounted-harness-primitive-allowlist.test.js:506` exempts every
+    // `createMountedComponentHarness` suite, and this is one, so what reds is
+    // `validateMountedComponentDependencies` — as `not ok` on the suite, with `# fail 0`.
+    'src/ui/svelte/components/Avatar.svelte',
+    'src/ui/svelte/components/FillBar.svelte',
     'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
     'src/ui/svelte/apps/ActorSelectTopBar.svelte'
   ],
@@ -133,8 +142,16 @@ describe('ActorSelectTopBar mounted behavior', () => {
     const bar = target.querySelector('[data-actor-bar-stamina]');
     assert.ok(bar, 'stamina bar renders on the gathering tab');
     assert.ok(bar.textContent.includes('4/10'), 'shows current/max');
-    const fill = bar.querySelector('.actor-bar-stamina-fill');
+    // The track is `FillBar` since issue 1514, so the fill is the primitive's element and the
+    // percentage arrives through its `value` prop rather than through a hand-written `style`.
+    const fill = bar.querySelector('.fab-fill-bar-fill');
+    assert.ok(Boolean(fill), 'the shared fill bar renders inside the caller-owned width pin');
     assert.ok(/width:\s*40%/.test(fill.getAttribute('style') || ''), 'fill width reflects 4/10');
+    assert.equal(
+      bar.querySelector('.actor-bar-stamina-track').style.width,
+      '',
+      'the 72px pin is a scoped rule on the wrapper, not an inline width'
+    );
   });
 
   it('hides the stamina bar when there is no pool or off the gathering tab', async () => {

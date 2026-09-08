@@ -15,6 +15,8 @@
 <script>
   import { dismissOnOutsideClick } from '../../actions/dismissOnOutsideClick.js';
   import { localize } from '../../util/foundryBridge.js';
+  import Avatar from '../../components/Avatar.svelte';
+  import EmptyState from '../manager/EmptyState.svelte';
 
   let { services = null } = $props();
 
@@ -88,13 +90,23 @@
           title={source.name}
           oncontextmenu={(event) => onAvatarContext(source, event)}
         >
-          <span class="crafting-source-portrait" aria-hidden="true">
-            {#if hasImg(source)}
-              <img src={source.img} alt="" />
-            {:else}
-              <i class="fas fa-user"></i>
-            {/if}
-          </span>
+          <!-- THE SHARED `Avatar` (issue 1514). `shape` is not optional: the component defaults
+               to `round`, which draws a 999px person mark, and this well has always drawn a
+               rounded square. `alt=""` because the button's own `aria-label` already carries the
+               actor's name, so alt text would announce it twice. `name` is what makes the
+               no-artwork state INITIALS rather than the `fa-user` glyph this markup drew — a
+               content change, and the state no lab frame can draw because every lab actor
+               carries a portrait. The button's own edge came off in the same commit: two
+               concentric hairlines is what the conversion would otherwise render, and the
+               required actor's accent ring moved to an inset `outline` that paints over this
+               tile's own border rather than beside it. -->
+          <Avatar
+            art={hasImg(source) ? source.img : ''}
+            name={source.name}
+            alt=""
+            shape="square"
+            size={40}
+          />
           {#if source.removable === false}
             <span class="crafting-source-lock" aria-hidden="true">
               <i class="fas fa-lock"></i>
@@ -150,20 +162,34 @@
               title={actor.name}
               onclick={() => toggleAvailable(actor.id)}
             >
-              <span class="crafting-source-option-portrait" aria-hidden="true">
-                {#if hasImg(actor)}
-                  <img src={actor.img} alt="" />
-                {:else}
-                  <i class="fas fa-user"></i>
-                {/if}
-              </span>
+              <!-- The same portrait at the picker's own 32px rung, which is `Avatar`'s default
+                   and the canon's single portrait mark. `alt=""` because the option renders the
+                   actor's name as adjacent text on the same row.
+
+                   THIS SITE MOVES THREE THINGS AND NONE OF THEM IS A SIZE, so they are named
+                   here rather than left for a frame that cannot show them. The deleted rule drew
+                   32x32 at a 6px corner over a `var(--fab-surface-raised)` ground with NO border;
+                   the tile draws the same 32x32 at the ladder's 9px over `var(--fab-bg-3)` with a
+                   1px `var(--fab-border)` hairline it did not have. The option row is
+                   `min-height: 44px` and the tile does not set one, so the row's height is
+                   unmoved. UNPHOTOGRAPHABLE: no View Lab case opens this popover — the registry
+                   has no step naming `data-crafting-sources-add` — so `component-sources-bar-mounted`
+                   is what holds this conversion, and the same is true of the no-owned-actors line
+                   below it. -->
+              <Avatar
+                art={hasImg(actor) ? actor.img : ''}
+                name={actor.name}
+                alt=""
+                shape="square"
+                size={32}
+              />
               <span class="crafting-source-option-name">{actor.name}</span>
               {#if selectedIds.has(actor.id)}
                 <i class="fas fa-check crafting-source-option-check" aria-hidden="true"></i>
               {/if}
             </button>
           {:else}
-            <p class="crafting-sources-empty">{localize('FABRICATE.App.Crafting.Sources.Empty')}</p>
+            <EmptyState note hint={localize('FABRICATE.App.Crafting.Sources.Empty')} />
           {/each}
         </div>
       </div>
@@ -200,14 +226,29 @@
     align-items: center;
   }
 
-  /* The image dims on hover/focus so the centered remove "×" reads clearly over it.
+  /* The portrait dims on hover/focus so the centered remove "×" reads clearly over it.
      The name is exposed via the avatar's title tooltip + aria-label, not an inline
-     label that would reflow the row. */
-  .crafting-source:hover .crafting-source-portrait img,
-  .crafting-source:focus-within .crafting-source-portrait img {
+     label that would reflow the row.
+
+     IT DIMS THE BUTTON NOW, NOT THE IMAGE (issue 1514). The `<img>` this rule used to name
+     is inside `Avatar` since the conversion, and a caller's scoped block cannot reach a child
+     component's element at all — so the dim moved OUT to the one element this file still owns.
+     Scoped to the REMOVABLE row by its own published hook rather than applied to every source:
+     the required actor renders no "×" to reveal, and dimming it would have been a hover state
+     invented for a control that is not there. Everything the filter now covers is the tile
+     itself; the "×" is a SIBLING of this button, so it stays at full brightness over it. */
+  .crafting-source[data-source-removable='true']:hover .crafting-source-avatar,
+  .crafting-source[data-source-removable='true']:focus-within .crafting-source-avatar {
     filter: brightness(0.5);
   }
 
+  /* THE BUTTON IS A HIT TARGET NOW, NOT A TILE (issue 1514). It drew its own 1px
+     `var(--fab-border)` edge over an r8 `var(--fab-surface)` ground, and the nested `Avatar`
+     draws a 1px `var(--fab-border)` edge of its own that cannot be turned off — so keeping
+     both would render two concentric hairlines where the design draws one. The edge, the
+     ground and the corner all come off here and the tile owns them; `border-radius` stays
+     only to match the tile's own 9px, so no sliver of button shows outside its corner. The
+     40px box is unchanged, which is what keeps the row's geometry where it was. */
   .crafting-source-avatar {
     box-sizing: border-box;
     position: relative;
@@ -218,38 +259,26 @@
     height: 40px;
     min-height: 40px;
     padding: 0;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface);
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
     color: var(--fab-text-muted);
     cursor: pointer;
   }
 
+  /* An `outline` at a NEGATIVE offset, which paints exactly over the tile's own 1px border
+     rather than beside it — so the required actor still reads as one accent ring and the row
+     still measures 40px. A `border-color` cannot do this any more: the border it recoloured
+     belongs to the nested tile, and a caller cannot reach it. */
   .crafting-source-avatar.is-required {
-    border-color: var(--fab-accent);
+    outline: 1px solid var(--fab-accent);
+    outline-offset: -1px;
     cursor: default;
   }
 
   .crafting-source-avatar:focus-visible {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
-  }
-
-  .crafting-source-portrait {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    border-radius: inherit;
-    overflow: hidden;
-  }
-
-  .crafting-source-portrait img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
   }
 
   .crafting-source-lock {
@@ -395,26 +424,6 @@
     outline-offset: 2px;
   }
 
-  .crafting-source-option-portrait {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    overflow: hidden;
-    background: var(--fab-surface-raised);
-    color: var(--fab-text-muted);
-  }
-
-  .crafting-source-option-portrait img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
   .crafting-source-option-name {
     flex: 1 1 auto;
     min-width: 0;
@@ -428,12 +437,5 @@
     flex: 0 0 auto;
     margin-left: auto;
     color: var(--fab-accent);
-  }
-
-  .crafting-sources-empty {
-    margin: 0;
-    padding: 8px;
-    color: var(--fab-text-muted);
-    font-size: 12px;
   }
 </style>

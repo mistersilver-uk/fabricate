@@ -467,7 +467,19 @@
             <!-- draggable="false" is REQUIRED, not decorative: an <img> is natively
                  draggable, so a drag started on the artwork becomes an image drag with the
                  wrong ghost, and dropping it outside the app can navigate away. This is the
-                 first drag row in the repo to contain an image — the GM's row has none. -->
+                 first drag row in the repo to contain an image — the GM's row has none.
+
+                 AND IT IS WHY THIS TILE IS DEFERRED RATHER THAN CONVERTED (issue 1514). Every
+                 other raw art tile in the player window is the shared `Medallion` now. Both of
+                 this file's are not, on two independent grounds either of which is sufficient.
+                 `Medallion.svelte:146` renders its `<img>` with no `draggable` prop and no rest
+                 spread, so a caller cannot say the word above, and this change builds no
+                 primitive. And the stacked row re-sizes this tile and re-radiuses it to 6px in
+                 its own rule below, which one fixed `size` and the ladder's fixed 9px corner
+                 cannot express. Measured unstacked in the View Lab at 24.00x24.00 at a 4px
+                 corner, unmoved by this change, which is the evidence the deferral was honoured.
+                 A `draggable` prop on the tile, plus a second corner it can take from a caller,
+                 is what would close it. -->
             <img
               class="crafting-stage-img"
               src={stage.img}

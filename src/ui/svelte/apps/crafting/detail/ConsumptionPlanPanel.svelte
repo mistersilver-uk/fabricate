@@ -23,6 +23,7 @@
   import { formatList as localeFormatList, localize } from '../../../util/foundryBridge.js';
   import EssenceContribution from './EssenceContribution.svelte';
   import Kicker from '../../../components/Kicker.svelte';
+  import EmptyState from '../../manager/EmptyState.svelte';
 
   let {
     // `{ rows, pending }` from buildConsumptionPlan.
@@ -60,9 +61,7 @@
   </p>
 
   {#if rows.length === 0}
-    <p class="consumption-plan-empty">
-      {localize('FABRICATE.App.Crafting.ConsumptionPlan.Empty')}
-    </p>
+    <EmptyState note hint={localize('FABRICATE.App.Crafting.ConsumptionPlan.Empty')} />
   {:else}
     <ul class="consumption-plan-rows">
       {#each rows as row (row.key)}
@@ -142,12 +141,6 @@
   .consumption-plan-title i {
     color: var(--fab-accent);
     font-size: 11px;
-  }
-
-  .consumption-plan-empty {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
   }
 
   .consumption-plan-rows {

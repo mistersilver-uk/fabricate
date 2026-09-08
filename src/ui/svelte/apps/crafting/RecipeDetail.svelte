@@ -14,6 +14,7 @@
   import IngredientRoutedBody from './detail/IngredientRoutedBody.svelte';
   import RoutedByCheckBody from './detail/RoutedByCheckBody.svelte';
   import ProgressiveBody from './detail/ProgressiveBody.svelte';
+  import PlayerViewState from '../PlayerViewState.svelte';
 
   let {
     recipe = null,
@@ -79,14 +80,26 @@
     progressive: ProgressiveBody,
   };
   const Body = $derived(BODIES[mode] ?? SimpleRecipeBody);
+
+  // THE SIXTH COPY of the player views' not-yet-ready chrome (issue 1514), and the one branch
+  // this pane can reach. It is a PANE state rather than a view root, so there is no loading
+  // branch and therefore no `aria-busy`: the composition sets that attribute only for
+  // `kind: 'loading'`, and a pane that can never be loading must not claim to be busy. The hook
+  // NAME and VALUE are this pane's own, forwarded verbatim — `data-crafting-detail-state` is
+  // read by the smoke's Playwright locators, which HANG rather than fail when a hook moves.
+  const viewStates = $derived([
+    {
+      when: !recipe,
+      kind: 'empty',
+      hook: 'data-crafting-detail-state',
+      value: 'empty',
+      icon: 'fas fa-hand-pointer',
+      message: localize('FABRICATE.App.Crafting.Detail.SelectHint'),
+    },
+  ]);
 </script>
 
-{#if !recipe}
-  <div class="crafting-detail-empty" data-crafting-detail-state="empty">
-    <i class="fas fa-hand-pointer" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Crafting.Detail.SelectHint')}</p>
-  </div>
-{:else}
+<PlayerViewState branches={viewStates}>
   <div class="crafting-detail" data-crafting-detail-state="selected" data-recipe-detail-mode={mode}>
     <RecipeDetailHeader {recipe} />
     {#if !redacted}
@@ -114,7 +127,7 @@
       </div>
     {/if}
   </div>
-{/if}
+</PlayerViewState>
 
 <style>
   .crafting-detail {
@@ -141,26 +154,5 @@
     flex: 0 0 auto;
     padding-top: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
-  }
-
-  .crafting-detail-empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    height: 100%;
-    padding: var(--fab-space-4);
-    text-align: center;
-    color: var(--fab-text-muted);
-  }
-
-  .crafting-detail-empty i {
-    font-size: 28px;
-  }
-
-  .crafting-detail-empty p {
-    margin: 0;
-    font-size: 13px;
   }
 </style>

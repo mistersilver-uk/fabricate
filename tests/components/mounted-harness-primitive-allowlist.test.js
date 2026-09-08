@@ -271,6 +271,27 @@ const SHARED_PRIMITIVES = [
   // an inventory tree, and each of them would have taken a `# cancelled` with no message rather
   // than the named "mounts a tree that renders it but never compiles it" line.
   'src/ui/svelte/components/Avatar.svelte',
+  // THE ONE NOT-YET-READY CHROME the player views draw (issue 1514), and the only entry on this
+  // list that is not a primitive. It cannot be one: `spec.md:43` says "a candidate that
+  // decomposes entirely into existing members is a COMPOSITION and MUST NOT enter the set", and
+  // this is `EmptyState` plus `Callout` plus one line of chrome. What decides membership HERE is
+  // a different question from what decides membership in the design system — this list exists so
+  // that a component a mounted tree renders and a HAND-ROLLED harness omits fails BY NAME
+  // instead of cancelling the suite — and on that question it is the sharpest arrival since
+  // `Kicker`. SIX callers across five directories render it, and `RecipeDetail` is the shape
+  // the list is for: a suite that mounts the crafting DETAIL pane pulls the composition in,
+  // and `EmptyState` and `Callout` in behind it, without naming a view state anywhere.
+  //
+  // THE ENTRY IS LOAD-BEARING AND IT WAS MEASURED BOTH WAYS, because an addition to this list
+  // that changes nothing is the shape of guard this file exists to prevent. Dropping the path
+  // from `PLAYER_APP_COMPILED_MODULES` reds the clause below by name against SEVEN hand-rolled
+  // suites — the alchemy view, the app root, two gathering suites, the gathering actor bar and
+  // both inventory suites. Dropping it from BOTH that roster and this list leaves the file
+  // GREEN. The pair is what proves the entry is doing the work rather than describing it. Note
+  // which suites those are: every one is hand-rolled, because `:506` exempts the
+  // `createMountedComponentHarness` ones, whose own dependency validation names an omission
+  // up front instead.
+  'src/ui/svelte/apps/PlayerViewState.svelte',
 ];
 
 /**

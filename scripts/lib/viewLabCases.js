@@ -10566,7 +10566,8 @@ export const VIEW_LAB_CASES = Object.freeze([
       // of which this is one. Moving it to `apps/` took it out of both legs of
       // `BROAD_SIGNAL_PATTERN`, so without this pattern a change to a 506-line screen region
       // would publish only the frame that opens its picker and never the frame that draws it
-      // closed — which is where its own 18 scoped rules are visible.
+      // closed — which is where its own 17 scoped rules are visible. (18 until issue 1514 moved
+      // the contextual stamina track onto the shared fill bar and its fill rule went with it.)
       /^src\/ui\/svelte\/apps\/ActorSelectTopBar\.svelte$/,
       PLAYER_VIEW_STATE,
     ],

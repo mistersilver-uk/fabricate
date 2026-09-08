@@ -608,6 +608,29 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // not reach. Omitting either does not fail a crafting suite: it CANCELS it.
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/PlayerViewState.svelte',
+  // The four the Crafting tab reaches as of issue 1514's crafting phase, each written FLAT for
+  // the reason `SELECT_COMPILED_MODULES` records above — the static guard in
+  // `mounted-harness-primitive-allowlist.test.js` reads this array's own source text for quoted
+  // literals, and a nested `...NAME` is not one. `Avatar` is the component-sources bar's two
+  // actor portraits; `Notice` is the detail header's blocking well; `FillBar` is the essence
+  // pool's per-essence meter; `EmptyState` is four pane empties, the shopping planner's panel
+  // and `RecipeDetail`'s no-selection pane.
+  //
+  // WHAT AN OMISSION COSTS HERE, MEASURED RATHER THAN ASSUMED, because the obvious sentence is
+  // wrong twice over. Dropping `Avatar` from this array leaves
+  // `mounted-harness-primitive-allowlist.test.js` GREEN — that guard exempts every
+  // `createMountedComponentHarness` suite by name (`:506`), and each crafting suite is one — so
+  // `SHARED_PRIMITIVES` membership is NOT what makes the omission loud. What makes it loud is
+  // this harness's own up-front `validateMountedComponentDependencies`, which names the
+  // importer, the missing module and this list. And the shape of that failure is not `# fail`:
+  // measured, `crafting-view-mounted` reports `not ok 1 - CraftingView mounted behavior` with
+  // the named message, `# fail 0` and `# cancelled 14`, because a throw from a `describe` body
+  // escapes the failure count. That is why the acceptance bar for this change is an unanchored
+  // grep for `not ok` and a `# cancelled 0`, not the summary line.
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/components/Avatar.svelte',
+  'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/apps/crafting/CraftingView.svelte'
 ]);
 
