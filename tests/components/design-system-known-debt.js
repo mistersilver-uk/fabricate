@@ -453,7 +453,7 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  *  - `styles/fabricate.css | 10px` 12 -> 11. The recipes blocked-enable toast's r10 goes with the
  *    rule that drew it, into `<Notice>`'s own r11.
  *
- * 286 -> 285 with issue 1515's seventh phase: `styles/fabricate.css | 5px` 14 -> 13. The
+ * 285 -> 284 with issue 1515's seventh phase: `styles/fabricate.css | 5px` 14 -> 13. The
  * currency sub-unit pill's own r5 rule goes with the pill, which is the shared chip now and
  * draws the ladder's own corner from the primitive's scoped block.
  *
@@ -461,7 +461,7 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 285;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 284;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -723,7 +723,7 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * `<button>`, and it carries `data-keyboard-focus="true"` now. That is the whole of that file's
  * raw-button population, so the slot is closed rather than left open for the next author to fill.
  *
- * 240 -> 232 with issue 1515's seventh phase, across four files, three SHRINKING and one
+ * 239 -> 231 with issue 1515's seventh phase, across four files, three SHRINKING and one
  * VANISHING. The availability pill family's hand-written remove crosses were eight raw
  * `<button>` elements written four ways, and every one of them is the shared chip's own declared
  * control now: `GatheringTaskEditView` 10 -> 7, `GatheringEventEditView` 5 -> 3,
@@ -736,7 +736,7 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 232;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 231;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.
