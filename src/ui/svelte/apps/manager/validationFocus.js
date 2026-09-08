@@ -21,7 +21,24 @@
  * the active element" passes even when the heading carries no `tabindex` and a real browser
  * would have done nothing. {@link isFocusable} is therefore a pure predicate with its own
  * unit table, and this helper REFUSES a target it cannot really focus: it does not call
- * `.focus()`, resolves `null`, and warns naming the target.
+ * `.focus()` and resolves `null`.
+ *
+ * IT SPEAKS FOR ONE OF THE TWO REFUSALS AND IS SILENT FOR THE OTHER. A control refused for its
+ * SHAPE — a `<div>` or a `<section>` with no `tabindex` — is an AUTHORING defect: the producer
+ * emits an address the destination cannot honour, nobody will ever see focus land, and the
+ * remedy is a `tabindex` or no `focusTarget`. That warns, naming the target. A control refused
+ * for its STATE — `disabled`, `inert`, or `aria-disabled="true"` — is a NORMAL RUNTIME STATE of a
+ * correctly authored pair: the Tool on-break fieldset is disabled precisely while the Tool is
+ * immune, and the recipe-item Link-recipe trigger is `aria-disabled` precisely while every recipe
+ * is already linked. The row still changes route, which is the whole of what it can usefully do.
+ * Warning there would print a console line, with a remedy that does not apply, every time a GM
+ * used the feature as designed.
+ *
+ * `aria-disabled` IS A STATE REFUSAL EVEN THOUGH IT IS FOCUSABLE, and that is the point of it: it
+ * is the spelling a control uses when it wants to STAY in the tab order while telling the user it
+ * cannot be operated. So `isFocusable` — which answers "would a browser move focus here" — says
+ * yes, and this helper still declines, because moving the keyboard into a control the GM has just
+ * been told they cannot use is not the help the row action is offering.
  *
  * (2) The pointer-path MARK. The module's focus-ring contract is a pair — a `:focus` reset
  * that strips whatever ring the browser or Foundry core would draw, and a `:focus-visible`
@@ -150,7 +167,8 @@ function focusResolvedTarget(root, focusTarget) {
   const element = root.querySelector(selector);
   if (!element) return null;
 
-  if (!isFocusable(element)) {
+  const refusal = refusalOf(element);
+  if (refusal === SHAPE_REFUSAL) {
     console.warn(
       `Fabricate | validationFocus: ${JSON.stringify(focusTarget)} resolved to a <${String(
         element.tagName || ''
@@ -159,10 +177,37 @@ function focusResolvedTarget(root, focusTarget) {
     );
     return null;
   }
+  if (refusal) return null;
 
   element.focus?.();
+
+  // FOCUS IS A REQUEST, AND THE STAMP FOLLOWS THE ANSWER. `.focus()` returns nothing and a
+  // browser may decline it — a control inside a `content-visibility: hidden` subtree, a
+  // destination removed between the query and the call — so the mark is written only once the
+  // element really holds the keyboard. Stamping first would paint the accent ring on a control
+  // that never took focus, and the ring's own removal is a `blur` that then never fires.
+  if (element.ownerDocument?.activeElement !== element) return null;
+
   element.scrollIntoView?.({ block: 'nearest' });
   element.setAttribute(VALIDATION_FOCUS_ATTRIBUTE, '');
   element.addEventListener?.('blur', clearValidationFocusMark, { once: true });
   return element;
+}
+
+/** The authoring defect: a destination that could never take focus. See the header note. */
+const SHAPE_REFUSAL = 'shape';
+
+/**
+ * Why a resolved destination must not take focus, as the two answers that want different
+ * treatment: `'state'` for the transient `disabled` / `inert` / `aria-disabled="true"` a correct
+ * pair reaches at runtime, `SHAPE_REFUSAL` for a destination authored so that focus could never
+ * land on it, and `null` when it can be focused.
+ *
+ * @param {Element} element
+ * @returns {string|null}
+ */
+function refusalOf(element) {
+  if (element.hasAttribute('disabled') || element.hasAttribute('inert')) return 'state';
+  if (element.getAttribute('aria-disabled') === 'true') return 'state';
+  return isFocusable(element) ? null : SHAPE_REFUSAL;
 }

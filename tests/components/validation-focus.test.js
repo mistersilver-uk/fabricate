@@ -52,6 +52,25 @@ function assertIs(actual, expected, message) {
 }
 
 /**
+ * Collect `console.warn` for the duration of one clause. Returned as a handle rather than
+ * installed globally, so a clause that forgets to restore cannot silence the next one.
+ *
+ * @returns {{restore: () => string[]}} `restore` puts the real `console.warn` back and returns
+ *   what was written while it was replaced.
+ */
+function captureWarnings() {
+  const written = [];
+  const real = console.warn;
+  console.warn = (...args) => written.push(args.join(' '));
+  return {
+    restore() {
+      console.warn = real;
+      return written;
+    },
+  };
+}
+
+/**
  * Build an element from a tag and a flat attribute bag, appended to the document so focus
  * and blur behave the way they do in a rendered tree.
  *
@@ -91,6 +110,13 @@ const FOCUSABLE_TABLE = [
   ['div', { tabindex: '-1', disabled: '' }, false],
   ['button', { inert: '' }, false],
   ['div', { tabindex: '-1', inert: '' }, false],
+  // `aria-disabled` IS STILL FOCUSABLE, and the row is here to say so. It is the spelling a
+  // control uses when it means to stay in the tab order while telling the user it cannot be
+  // operated, so a browser DOES move focus there — which is what this predicate answers. The row
+  // action declines it anyway, one layer up in `focusValidationTarget`, and the clauses below
+  // prove that decline is silent. Ranking it `false` here would make the predicate lie about the
+  // browser to express a policy that is not the predicate's.
+  ['button', { 'aria-disabled': 'true' }, true],
 ];
 
 describe('validationFocus: isFocusable ranks a destination the way a browser would', () => {
@@ -224,17 +250,79 @@ describe('validationFocus: focusValidationTarget resolves, focuses and marks', (
     );
   });
 
-  it('REFUSES a target it cannot really focus, and resolves null', async () => {
+  it('REFUSES a target it cannot really focus, and WARNS, naming it', async () => {
+    // THE SHAPE REFUSAL. A destination that could never take focus is an AUTHORING defect — the
+    // producer emits an address the destination cannot honour and nobody will ever see focus land
+    // — so this one speaks, and the console line is part of the contract rather than debug noise.
     const heading = destination('h3', 'ingredient-group-abc');
     const elsewhere = document.createElement('input');
     document.body.appendChild(elsewhere);
     elsewhere.focus();
+    const warnings = captureWarnings();
 
     const focused = await focusValidationTarget(root, 'ingredient-group-abc');
 
     assertIs(focused, null, 'the helper refuses rather than focusing it');
     assertIs(document.activeElement, elsewhere, 'focus must not have moved');
     assert.equal(heading.getAttribute(VALIDATION_FOCUS_ATTRIBUTE), null);
+    assert.equal(warnings.restore().length, 1, 'and it says so exactly once');
+  });
+
+  // ── THE STATE REFUSAL IS SILENT, AND THE SHAPE REFUSAL IS NOT ─────────────────────────────
+  //
+  // Both resolve `null` and leave focus alone, so no assertion on the OUTCOME can tell them
+  // apart — which is how one console line ended up covering both. `disabled` and `inert` are
+  // normal runtime states of a correctly authored pair: the Tool on-break fieldset is disabled
+  // precisely while the Tool is immune, and `aria-disabled="true"` is what a control uses when it
+  // means to STAY focusable while saying it cannot be operated — the recipe-item Link-recipe
+  // trigger, once every recipe is already linked. Warning there printed a remedy that does not
+  // apply ("give the control a tabindex") every time the feature worked as designed.
+  for (const [label, attributes] of [
+    ['disabled', { disabled: '' }],
+    ['inert', { inert: '' }],
+    ['aria-disabled="true"', { 'aria-disabled': 'true' }],
+  ]) {
+    it(`refuses a ${label} destination SILENTLY, and still resolves null`, async () => {
+      const control = destination('button', 'recipe-item-link-recipe', attributes);
+      const elsewhere = document.createElement('input');
+      document.body.appendChild(elsewhere);
+      elsewhere.focus();
+      const warnings = captureWarnings();
+
+      const focused = await focusValidationTarget(root, 'recipe-item-link-recipe');
+
+      assertIs(focused, null, 'the row still changes route, and focuses nothing');
+      assertIs(document.activeElement, elsewhere, 'focus must not have moved');
+      assert.equal(control.getAttribute(VALIDATION_FOCUS_ATTRIBUTE), null, 'and nothing is marked');
+      assert.deepEqual(
+        warnings.restore(),
+        [],
+        'a normal runtime state must not print an authoring remedy at a GM using the feature'
+      );
+    });
+  }
+
+  it('resolves null, and does NOT mark, when focus does not actually land', async () => {
+    // `.focus()` RETURNS NOTHING AND MAY BE DECLINED. The mark's whole lifetime is a focus and
+    // the `blur` that clears it, so stamping an element that never took the keyboard paints a
+    // permanent accent ring: the blur that would remove it never comes. The refusal is read back
+    // off `activeElement` rather than assumed from the call.
+    const control = destination('input', 'recipe-name');
+    const elsewhere = document.createElement('input');
+    document.body.appendChild(elsewhere);
+    elsewhere.focus();
+    // A browser declining the move, reproduced at the only seam a unit test has for it.
+    control.focus = () => {};
+
+    const focused = await focusValidationTarget(root, 'recipe-name');
+
+    assertIs(focused, null, 'a refused move is not a move');
+    assertIs(document.activeElement, elsewhere, 'focus really did stay put');
+    assert.equal(
+      control.getAttribute(VALIDATION_FOCUS_ATTRIBUTE),
+      null,
+      'and the mark is not painted on a control that never took the keyboard'
+    );
   });
 
   it('resolves null for a target nothing carries', async () => {
@@ -334,18 +422,35 @@ describe('validationFocus: the pointer path is painted, measured in Chromium', (
   });
 
   /**
-   * Click a button with the MOUSE — the activation path the whole rule exists for — then read
-   * the outline it actually paints, with and without the mark.
+   * The two element shapes the mark is stamped on, as a probe apiece.
    *
-   * @param {boolean} marked Whether to stamp `data-validation-focused` before measuring.
-   * @returns {Promise<{focusVisible: boolean, active: boolean, width: string, style: string, color: string}>}
+   * PARAMETERISED, because the rule is two ranks and the oracle used to measure ONE of them. The
+   * five typed selectors are (0,2,1) and the `[tabindex]` one is (0,3,0), each tying its own
+   * `:focus` counterpart and winning by position — different arithmetic, and it is the
+   * `[tabindex]` rank that carries most destinations: every requirement card, result set card,
+   * essence card, Tool section and identity panel a validation row addresses is a `[tabindex]`
+   * carrier, and only the name/description/formula fields are the typed kind.
+   *
+   * `id="probe"` on both, so every measurement below reads the same selector.
    */
-  async function outlineAfterPointerFocus(marked) {
+  const PROBES = [
+    ['<button>', '<button id="probe" type="button">Probe</button>'],
+    ['<div tabindex="-1">', '<div id="probe" tabindex="-1" data-keyboard-focus="true">Probe</div>'],
+  ];
+
+  /**
+   * Click a probe with the MOUSE — the activation path the whole rule exists for — then read the
+   * outline it actually paints, with and without the mark.
+   *
+   * @param {string} markup The probe's markup; it carries `id="probe"`.
+   * @param {boolean} marked Whether to stamp `data-validation-focused` before measuring.
+   * @returns {Promise<{focusVisible: boolean, active: boolean, width: string, style: string,
+   *   color: string, accent: string, accentColor: string}>}
+   */
+  async function outlineAfterPointerFocus(markup, marked) {
     const context = await browser.newContext();
     const page = await context.newPage();
-    await page.setContent(
-      `<style>${sheet}</style><div class="fabricate"><button id="probe" type="button">Probe</button></div>`
-    );
+    await page.setContent(`<style>${sheet}</style><div class="fabricate">${markup}</div>`);
     await page.click('#probe');
     if (marked) {
       await page.evaluate(() =>
@@ -355,47 +460,128 @@ describe('validationFocus: the pointer path is painted, measured in Chromium', (
     const measured = await page.evaluate(() => {
       const probe = document.querySelector('#probe');
       const computed = getComputedStyle(probe);
+      // THE TOKEN, RESOLVED BY THE BROWSER ITSELF rather than restated as an rgb() triple here.
+      // A pinned literal is a second copy of a design token in a test file: re-tuning the accent
+      // reds this clause for no defect, and — worse — the two agreeing proves only that somebody
+      // updated both. Painting the token onto a throwaway element makes the browser normalise it
+      // exactly as it normalises the outline colour, so the comparison is of one value with
+      // itself, through the cascade.
+      const accent = getComputedStyle(document.documentElement)
+        .getPropertyValue('--fab-accent')
+        .trim();
+      const swatch = document.createElement('span');
+      swatch.style.color = accent;
+      document.body.append(swatch);
+      const accentColor = getComputedStyle(swatch).color;
+      swatch.remove();
       return {
         active: probe === document.activeElement,
         focusVisible: probe.matches(':focus-visible'),
         width: computed.outlineWidth,
         style: computed.outlineStyle,
         color: computed.outlineColor,
-        accent: getComputedStyle(document.documentElement).getPropertyValue('--fab-accent').trim()
+        accent,
+        accentColor,
       };
     });
     await context.close();
     return measured;
   }
 
-  it('states the defect: a pointer-focused control is stripped of its ring and given none', async () => {
-    const measured = await outlineAfterPointerFocus(false);
-    assert.equal(measured.active, true, 'the click did focus the button');
-    assert.equal(
-      measured.focusVisible,
-      false,
-      'and :focus-visible does NOT match, which is the whole premise'
-    );
-    assert.equal(
-      measured.style,
-      'none',
-      'so the :focus reset wins and the repaint never fires — no mark on the destination'
-    );
-  });
+  for (const [label, markup] of PROBES) {
+    it(`states the defect on ${label}: pointer focus strips the ring and supplies none`, async () => {
+      const measured = await outlineAfterPointerFocus(markup, false);
+      assert.equal(measured.active, true, 'the click did focus the probe');
+      assert.equal(
+        measured.focusVisible,
+        false,
+        'and :focus-visible does NOT match, which is the whole premise'
+      );
+      assert.equal(
+        measured.style,
+        'none',
+        'so the :focus reset wins and the repaint never fires — no mark on the destination'
+      );
+    });
 
-  it('paints the accent ring on the marked control, at the repaint’s own declarations', async () => {
-    const measured = await outlineAfterPointerFocus(true);
-    assert.equal(measured.focusVisible, false, 'still a pointer focus, not a keyboard one');
-    assert.equal(measured.style, 'solid');
-    assert.equal(measured.width, '2px');
-    assert.ok(
-      measured.accent !== '',
-      'the accent token resolves; an unresolved var() would invalidate the whole declaration'
+    it(`paints the accent ring on a marked ${label}, at the repaint’s own declarations`, async () => {
+      const measured = await outlineAfterPointerFocus(markup, true);
+      assert.equal(measured.focusVisible, false, 'still a pointer focus, not a keyboard one');
+      assert.equal(measured.style, 'solid');
+      assert.equal(measured.width, '2px');
+      assert.ok(
+        measured.accent !== '',
+        'the accent token resolves; an unresolved var() would invalidate the whole declaration'
+      );
+      assert.equal(
+        measured.color,
+        measured.accentColor,
+        'and the colour is the accent TOKEN as this browser resolves it, so a GM cannot tell a ' +
+          'pointer activation from a keyboard one'
+      );
+    });
+  }
+
+  /*
+   * ── AND THE RING HAS TO FIT (issue 1517, review r1) ──────────────────────────────────────
+   *
+   * The repaint is `outline-offset: 2px`, which paints OUTSIDE the element's border box, and the
+   * editor tab panels every destination sits in are `overflow: auto` with no left padding — a
+   * combination that clips painting to the padding box. A card at the panel's flush-left edge
+   * therefore loses the left arm of its own ring, which reads as three sides of a rectangle
+   * rather than as a mark.
+   *
+   * MEASURED, NOT ASSUMED, and measured on the real sheet: the geometry below is read from a
+   * Chromium layout of `.manager-editor-tab-panel` with a `[tabindex]` destination inside it,
+   * exactly as the recipe editor renders one. The remedy is `outline-offset: -2px` on the
+   * `[tabindex]` selector only — an INSET ring, which no overflow can clip — and it is confined
+   * to that selector because the typed carriers are fields with their own inset spacing whose
+   * declarations stay byte-identical to the repaint.
+   */
+  it('paints the mark INSIDE a flush-left destination, where an overflow clip cannot reach it', async () => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.setContent(
+      `<style>${sheet}</style>` +
+        '<div class="fabricate fabricate-manager" style="width:400px">' +
+        '<div class="manager-editor-tab-panel" style="height:120px">' +
+        '<div id="probe" tabindex="-1" data-keyboard-focus="true" data-validation-focused="">' +
+        'Requirement</div></div></div>'
     );
+    const measured = await page.evaluate(() => {
+      const panel = document.querySelector('.manager-editor-tab-panel');
+      const probe = document.querySelector('#probe');
+      const panelBox = panel.getBoundingClientRect();
+      const probeBox = probe.getBoundingClientRect();
+      const computed = getComputedStyle(probe);
+      return {
+        // How far the destination's own box sits inside the panel's, on the clipped edge.
+        insetFromClip: probeBox.left - (panelBox.left + panel.clientLeft),
+        panelPaddingLeft: getComputedStyle(panel).paddingLeft,
+        panelOverflowX: getComputedStyle(panel).overflowX,
+        offset: computed.outlineOffset,
+        width: computed.outlineWidth,
+        style: computed.outlineStyle,
+      };
+    });
+    await context.close();
+
+    // THE MEASUREMENT, RECORDED EITHER WAY. These three are the clip: the panel scrolls, it has
+    // no left padding, and the destination is flush against that edge — so any positive offset
+    // paints the left arm of the ring outside the padding box the panel clips to.
+    assert.equal(measured.panelOverflowX, 'auto', 'the panel clips its own painting');
+    assert.equal(measured.panelPaddingLeft, '0px', 'with nothing on the left for a ring to sit in');
+    assert.equal(measured.insetFromClip, 0, 'and the destination is flush against that edge');
+
+    assert.equal(measured.style, 'solid', 'the mark is painted');
+    assert.equal(measured.width, '2px', 'at the repaint’s own width');
     assert.equal(
-      measured.color,
-      'rgb(232, 198, 167)',
-      'and the colour is the accent token, so a GM cannot tell a pointer activation from a keyboard one'
+      measured.offset,
+      '-2px',
+      'and INSET, so the whole rectangle is inside the box the panel clips to. A positive offset ' +
+        'here loses the left arm of the ring on every flush-left destination, which is most of ' +
+        'them: the requirement and result-set cards, the essence cards and the Tool sections all ' +
+        'span the panel’s full width'
     );
   });
 });

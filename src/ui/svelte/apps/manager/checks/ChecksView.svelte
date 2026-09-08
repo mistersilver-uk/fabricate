@@ -61,6 +61,7 @@
   import Callout from '../Callout.svelte';
   import CheckModeCallout from './CheckModeCallout.svelte';
   import { focusValidationTarget } from '../validationFocus.js';
+  import { announceValidationOutcome } from '../validationAnnouncement.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import { checkIssueCopy, interpolate } from './checksCopy.js';
   import {
@@ -767,6 +768,11 @@
   // moment a GM most needs to know where they landed.
   let issueAnnouncement = $state('');
 
+  // The destination SECTION PANEL, and it is the focus fallback for a route-only row
+  // (issue 1517). Eleven of the sixteen registered issues carry no control address, so this is
+  // the majority path here rather than an edge.
+  let sectionPanel = $state(null);
+
   /** The activity's own name, from the rail's key, so one word is not spelt two ways. */
   function activityLabel(id) {
     const key = `FABRICATE.Admin.Manager.Checks.Tabs.${id[0].toUpperCase()}${id.slice(1)}`;
@@ -781,51 +787,41 @@
   }
 
   /**
-   * The focused control's own accessible name, read off the DOM. `aria-label` first, then the
-   * `<label for>` that names it, then `title`. A destination with none of the three — the
-   * trigger list, say — yields '' and the announcement names the route alone.
-   *
-   * @param {Element|null} element
-   * @returns {string}
-   */
-  function accessibleNameOf(element) {
-    if (!element) return '';
-    const label = element.getAttribute('aria-label');
-    if (label) return label.trim();
-    const id = element.getAttribute('id');
-    const labelling = id ? checksRoot?.querySelector(`label[for="${id}"]`) : null;
-    if (labelling) return (labelling.textContent || '').trim();
-    return (element.getAttribute('title') || '').trim();
-  }
-
-  /**
    * Deep-link from the Validation route to the control that raised an issue: open the ACTIVITY
    * and the SECTION that own the gap, THEN move focus to the offending control.
    *
    * THE ORDER IS THE MECHANISM, not a preference. `onOpenActivity` is the router's own
    * synchronous state write — the same one the rail's click makes — so Svelte has flushed the
-   * route change and the destination panel exists by the time the helper's `queueMicrotask`
-   * runs its query. And the announcement is derived FROM the element the helper resolves, so
-   * it cannot be written before focus moved: there is nothing to write it from.
+   * route change and the destination panel exists by the time the focus helper's
+   * `queueMicrotask` runs its query. Everything after that — the panel fallback, the sentence,
+   * and the delay that queues it behind the focus utterance — belongs to
+   * `validationAnnouncement.js`, which owns it for all five hosts.
    *
    * A ROUTE-ONLY ROW IS NORMAL HERE. Eleven of the sixteen registered issues carry no control
-   * address — see the table in `ChecksValidationTab.svelte` — so the helper resolves `null`,
-   * focus stays put and the announcement names the route it opened, which is still the answer
-   * to "where did I just go".
+   * address — see the table in `ChecksValidationTab.svelte` — so the focus helper resolves
+   * `null` and the SECTION PANEL takes the keyboard instead, with the announcement naming the
+   * route it opened. Leaving focus where it was is not the alternative: the row's own button is
+   * unmounted by the route change, so focus would fall to `<body>` and every Foundry keybinding
+   * would go live under a GM who is looking at an open window.
    *
    * @param {{activity?: string, section?: string}} target the ROUTE the row carries.
    * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
    */
-  async function selectIssue(target, focusTarget) {
+  function selectIssue(target, focusTarget) {
     if (!target?.activity) return;
     const section = target.section || 'roll';
     onOpenActivity(target.activity, section);
-    const focused = await focusValidationTarget(checksRoot, focusTarget);
-    const route = [activityLabel(target.activity), sectionLabel(section)]
-      .filter(Boolean)
-      .join(' — ');
-    const controlName = accessibleNameOf(focused);
-    issueAnnouncement = controlName ? `${route} — ${controlName}` : route;
+    announceValidationOutcome({
+      root: checksRoot,
+      routeLabel: [activityLabel(target.activity), sectionLabel(section)]
+        .filter(Boolean)
+        .join(' — '),
+      focus: () => focusValidationTarget(checksRoot, focusTarget),
+      fallbackPanel: sectionPanel,
+      announce: (sentence) => {
+        issueAnnouncement = sentence;
+      },
+    });
   }
 
   const configTitle = text('FABRICATE.Admin.Manager.Checks.Configuration', 'Configuration');
@@ -1649,11 +1645,19 @@
   {/if}
 
   <div class="manager-environment-workspace">
+    <!-- `tabindex="-1"` and `data-keyboard-focus="true"` are the ROUTE-ONLY row's focus
+         destination (issue 1517): eleven of the sixteen registered issues name a route and no
+         control, and the button they were activated from is unmounted by that route change, so
+         without this focus falls to `<body>` and every Foundry keybinding goes live. `-1`, not
+         `0`: the panel is a programmatic destination, not a tab stop. -->
     <div
       class="manager-environment-tab-panel"
       role="tabpanel"
       id={`checks-panel-${activity === 'validation' ? 'validation' : activeSection}`}
       aria-labelledby={activity === 'validation' ? undefined : `checks-section-${activeSection}`}
+      tabindex="-1"
+      data-keyboard-focus="true"
+      bind:this={sectionPanel}
     >
       {#if paneHead && !routeIsOff}
         <header class="manager-checks-pane-head" data-checks-pane-head={activeSection}>

@@ -281,22 +281,34 @@ export function describeValidationHostContract({
       assert.match(host, new RegExp(wiring, 'u'));
     });
 
-    it('writes the route BEFORE it awaits the focus move, and announces only after', () => {
-      // THE ORDER IS THE MECHANISM. The route write is synchronous, and the helper defers with
-      // `queueMicrotask` so Svelte has flushed it and the destination panel exists when the query
-      // runs; awaiting the focus move first would query a panel that is not in the DOM. And the
-      // announcement is derived FROM the element the helper resolved, so it cannot be written
-      // before focus moved.
-      const signature = String.raw`async function ${handler}\([\s\S]*?\n {2}\}`;
+    it('writes the route BEFORE it hands over, and hands the announcement to the shared leaf', () => {
+      // THE ORDER IS THE MECHANISM, and since issue 1517's review round the host owns only the
+      // first half of it. The route write is synchronous and FIRST, so Svelte has flushed it and
+      // the destination panel exists when `focusValidationTarget`'s `queueMicrotask` runs its
+      // query; moving focus first would query a panel that is not in the DOM. Everything after
+      // that — the panel fallback for a route-only row, the sentence composed FROM the element
+      // that resolved, and the delay that queues it behind the focus utterance — belongs to
+      // `validationAnnouncement.js`, which owns it for all five hosts. So what this reads is that
+      // the host still writes its route first, hands the focus move over as the `focus` mover
+      // rather than performing it, and gives the leaf its own live-region write.
+      const signature = String.raw`(?:async )?function ${handler}\([\s\S]*?\n {2}\}`;
       const body = new RegExp(signature, 'u').exec(host);
       assert.ok(Boolean(body), 'the row-action handler could not be located');
       const route = body[0].indexOf(routeCall);
-      const focus = body[0].indexOf('await focusValidationTarget(');
+      const handover = body[0].indexOf('announceValidationOutcome(');
+      const focus = body[0].indexOf('focusValidationTarget(');
       const announce = body[0].indexOf('issueAnnouncement =');
-      const allPresent = [route, focus, announce].every((at) => at !== -1);
-      assert.ok(allPresent, 'all three steps must be present');
-      assert.ok(route < focus, `\`${routeCall}\` must run before the focus move is awaited`);
-      assert.ok(focus < announce, 'the announcement must be written after the focus move resolved');
+      const allPresent = [route, handover, focus, announce].every((at) => at !== -1);
+      assert.ok(allPresent, 'all four steps must be present');
+      assert.ok(route < handover, `\`${routeCall}\` must run before the handover`);
+      assert.ok(handover < focus, "the focus move is the leaf's to make, not the host's");
+      assert.ok(focus < announce, 'the announcement is written from what the focus move resolved');
+      assert.match(
+        body[0],
+        /fallbackPanel:/u,
+        'a route-only row must have a panel to fall back to, or focus lands on `<body>` and every ' +
+          'Foundry keybinding goes live'
+      );
     });
 
     it(`hosts the live region OUTSIDE the ${regionOutsideNoun}, so the route change cannot unmount it`, () => {

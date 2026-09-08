@@ -634,7 +634,14 @@ function compileManagerRoot() {
   // is CraftingSettingsView's; `validationFocus.js` is RecipeEditView's focus helper
   // (issue 1517). This harness's list has NO validator, so an omission here HANGS every
   // mounted manager test as `# cancelled` rather than failing one by name.
-  for (const managerModule of ['resolutionModeOptions.js', 'validationFocus.js']) {
+  for (const managerModule of [
+    'resolutionModeOptions.js',
+    'validationFocus.js',
+    // …and the announcement half beside it (issue 1517, review r1). It imports
+    // `util/announceAfterFocus.js`, which this tree already copies for the root's own bulk
+    // announcements, so this single entry closes the edge.
+    'validationAnnouncement.js',
+  ]) {
     const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/${managerModule}`);
     mkdirSync(dirname(moduleDestination), { recursive: true });
     writeFileSync(
@@ -22857,11 +22864,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.deepEqual(
       validationBadges.map((node) => node.textContent.trim()),
-      ['2', '2'],
-      // TWO errors, not three (issue #1315): `noAvailableTasks` and `activeNoComposition`. The
+      ['2', '4'],
+      // TWO blocking, not three (issue #1315): `noAvailableTasks` and `activeNoComposition`. The
       // third used to be `staleIncluded` on the not-matching event, and that is now an `info`
       // note — the record composes deliberately, so refusing to enable the environment over it
-      // told the GM to undo what manual mode invites. Only critical and warning are badged.
+      // told the GM to undo what manual mode invites.
+      //
+      // AND FOUR WARNINGS, WHERE THIS READ 2 BEFORE ISSUE 1517's REVIEW ROUND. The badge counted
+      // `severity === 'warning'` — two issues — while the Validation tab it badges counted
+      // `!== 'critical'`, and drew a row per readiness CHECK besides. The four are those two
+      // warnings, the `info` note the tab has always shown in its Warnings tile, and the one
+      // unsatisfied readiness check (`hasAvailableTask`) that nothing badged at all. Both numbers
+      // now come from `countReadiness`, so the badge cannot report a state the tab contradicts.
       'validation badges should show counts only'
     );
     assert.equal(
@@ -22888,6 +22902,181 @@ describe('CraftingSystemManager mounted behavior', () => {
       true,
       'warning validation badge should use warning tone'
     );
+  });
+
+  // ── THE RAIL, THE VERDICT AND THE ROWS ARE ONE READING (issue 1517, review r1) ─────────────
+  //
+  // Three screens report an environment's validation state — the Validation tab's counts rail and
+  // verdict, the editor tab strip's badge, and the summary inspector's chips — and they counted
+  // three different populations under two definitions of "warning". The three cases below are the
+  // states where that showed, and no fixture in this file reached any of them: the deep-link
+  // fixture above satisfies every check and raises three issues, so its 6/3/0 rail was the same
+  // number either way.
+  const environmentDraftWith = (overrides) => ({
+    id: 'env-forest',
+    craftingSystemId: 'alchemy',
+    name: 'Moonlit Forest',
+    description: 'Old trees and moonlit herbs.',
+    enabled: true,
+    selectionMode: 'targeted',
+    compositionMode: 'automatic',
+    biomes: ['forest'],
+    dangerLevel: 'dangerous',
+    sceneUuid: 'Scene.forest',
+    ...overrides,
+  });
+
+  const describedTask = (id, name) => ({
+    id,
+    kind: 'task',
+    record: { name, description: 'Gather herbs by moonlight.', img: 'icons/svg/item-bag.svg' },
+    compositionState: 'includedByMatch',
+    runtimeState: 'available',
+    evidence: {},
+  });
+
+  function mountEnvironmentEditor(environmentDraft, composition) {
+    target = document.createElement('div');
+    document.body.appendChild(target);
+    mounted = mount(EnvironmentEditViewComponent, {
+      target,
+      props: { environmentDraft, composition },
+    });
+    flushSync();
+    target.querySelector('[data-environment-tab-button="validation"]').click();
+    flushSync();
+    return target;
+  }
+
+  /** The rail's three tiles, as numbers, keyed by the count they report. */
+  const railCounts = () =>
+    Object.fromEntries(
+      Array.from(target.querySelectorAll('[data-editor-validation-count]')).map((tile) => [
+        tile.getAttribute('data-editor-validation-count'),
+        Number(tile.textContent.trim()),
+      ])
+    );
+
+  /** The SAME question asked of the rendered rows: how many of each status is drawn. */
+  const rowStatusTally = () => {
+    const tally = { passing: 0, warnings: 0, blocking: 0 };
+    for (const row of target.querySelectorAll('[data-validation-group] .manager-recipe-val-row')) {
+      if (row.classList.contains('is-pass')) tally.passing += 1;
+      if (row.classList.contains('is-warn')) tally.warnings += 1;
+      if (row.classList.contains('is-block')) tally.blocking += 1;
+    }
+    return tally;
+  };
+
+  const verdict = () => target.querySelector('[data-editor-validation-summary]');
+
+  it('counts an unsatisfied check that raises NO issue, and does not call it all clear', async () => {
+    // THE REPRO. Only `hasAvailableTask` pairs with an issue, so a missing description and a
+    // missing danger level are amber ROWS that raised nothing — and the rail counted issues. The
+    // GM saw two amber rows under "Warnings: 0" and a green "All clear" verdict above them.
+    mountEnvironmentEditor(
+      environmentDraftWith({ description: '', dangerLevel: '' }),
+      {
+        compositionMode: 'automatic',
+        counts: { availableTasks: 1, availableEvents: 0 },
+        tasks: [describedTask('task-moon-herbs', 'Gather Moon Herbs')],
+        events: [],
+      }
+    );
+
+    assert.equal(
+      target.querySelectorAll('[data-check="hasDescription"].is-warn').length,
+      1,
+      'the unsatisfied description check paints an amber row'
+    );
+    assert.deepEqual(
+      railCounts(),
+      { passing: 5, warnings: 2, blocking: 0 },
+      'and the rail counts it: four satisfied checks plus the "no issues" result, and the two ' +
+        'unsatisfied checks as warnings'
+    );
+    assert.deepEqual(
+      rowStatusTally(),
+      railCounts(),
+      'the rail is a TALLY OF THE ROWS, so the two cannot disagree — which is the whole defect: ' +
+        'a count is a reading of a result, and there were two readings'
+    );
+    assert.equal(
+      verdict().getAttribute('data-editor-validation-summary'),
+      'warn',
+      'and the verdict is not "All clear" over two amber rows'
+    );
+  });
+
+  it('badges an INFO-only environment with the same warnings count the rail shows', async () => {
+    // `info` collapses to the Warnings tile inside the tab — there is no Info tile and the count
+    // vocabulary is closed — but the badge counted `severity === 'warning'`, so this environment
+    // showed NO badge at all over a rail reading "Warnings: 1".
+    mountEnvironmentEditor(environmentDraftWith({}), {
+      compositionMode: 'manual',
+      counts: { availableTasks: 1, availableEvents: 1, includedNotMatchingEvents: 1 },
+      tasks: [describedTask('task-moon-herbs', 'Gather Moon Herbs')],
+      events: [
+        {
+          id: 'event-thorns',
+          kind: 'event',
+          record: { name: 'Thorn Snare', description: 'Tangled thorns.', img: 'icons/svg/hazard.svg' },
+          compositionState: 'includedNotMatching',
+          runtimeState: 'unavailable',
+          evidence: {},
+        },
+      ],
+    });
+
+    assert.equal(railCounts().warnings, 1, 'the rail counts the info note as a warning');
+    assert.deepEqual(
+      Array.from(
+        target.querySelectorAll(
+          '[data-environment-tab-button="validation"] .manager-environment-tab-badge'
+        )
+      ).map((node) => node.textContent.trim()),
+      ['1'],
+      'and so does the badge, which showed nothing here'
+    );
+  });
+
+  it('refuses "Saves and enables" for a disabled environment nothing can enable', async () => {
+    // `noAvailableTasks` is `critical` on an ACTIVE environment and `warning` on a disabled one —
+    // the same missing task, graded by how loud it needs to be — and it carries `blocks: 'enable'`
+    // in both states. Routing the verdict off severity told the GM of a disabled, taskless
+    // environment that it "Saves and enables". It does not: it cannot be enabled at all.
+    mountEnvironmentEditor(
+      environmentDraftWith({ enabled: false, dangerLevel: '' }),
+      {
+        compositionMode: 'automatic',
+        counts: { availableTasks: 0, availableEvents: 0 },
+        tasks: [],
+        events: [],
+      }
+    );
+
+    assert.equal(
+      verdict().getAttribute('data-editor-validation-summary'),
+      'block',
+      'the verdict answers `blocks: enable`, not the severity ranking'
+    );
+    assert.equal(
+      verdict().textContent.includes('Saves and enables'),
+      false,
+      'so the sub-line does not promise something the environment cannot do'
+    );
+    const row = target.querySelector('[data-issue="noAvailableTasks"]');
+    assert.ok(Boolean(row), 'the row is drawn');
+    assert.ok(
+      row.classList.contains('is-block'),
+      `a row that blocks enabling takes the block word, got ${row.className}`
+    );
+    assert.equal(
+      row.getAttribute('data-issue-severity'),
+      'warning',
+      'while the DOMAIN severity is unchanged on its own hook: the two are different questions'
+    );
+    assert.equal(railCounts().blocking, 1, 'and the Blocking tile counts it, as the row shows it');
   });
 
   it('uses configured danger choices while preserving stale current danger values', async () => {

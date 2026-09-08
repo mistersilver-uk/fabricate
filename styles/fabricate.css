@@ -1124,9 +1124,10 @@
 
    NO NEW RANK ENTERS THE SHEET — both ranks are ones the suppress/supply pair already
    occupies for exactly these elements — so the invariant above, that a per-component focus
-   ring still wins, survives. The element list stays identical to both halves of the pair,
-   and the declarations are byte-identical to the repaint, so a GM cannot tell a pointer
-   activation from a keyboard one.
+   ring still wins, survives. The element list stays identical to both halves of the pair, and
+   the colour and width are the repaint's, so a GM cannot tell a pointer activation from a
+   keyboard one. The `[tabindex]` half is written as its own rule below for ONE declaration —
+   the offset is inset rather than outward — and the reason is with it.
 
    ROOTED AT `.fabricate`, never at `.fabricate-validation`. This adds no focus pseudo-class
    rule anywhere, and nothing under that family, which is a REFUSED pair (issue 1509). */
@@ -1134,10 +1135,29 @@
 .fabricate button[data-validation-focused],
 .fabricate input[data-validation-focused],
 .fabricate select[data-validation-focused],
-.fabricate textarea[data-validation-focused],
-.fabricate [tabindex][data-validation-focused] {
+.fabricate textarea[data-validation-focused] {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
+}
+
+/* THE `[tabindex]` HALF, SPLIT OFF FOR ONE DECLARATION: the ring is INSET.
+
+   Same colour, same width, same rank — this is still the (0,3,0) selector tying
+   `.fabricate [tabindex]:focus` and winning by position, and splitting it into its own rule adds
+   no selector and no rank. What changes is the OFFSET, and it changes because of where these
+   destinations sit. A `[tabindex]` carrier is a card, a section or a panel that spans the full
+   width of `.manager-editor-tab-panel`, which is `overflow: auto` with no left padding — and a
+   scroll container clips its descendants' painting to its padding box. An outline offset OUTWARD
+   from a flush-left box is therefore painted where the panel clips, so the left arm of the ring
+   disappears and the mark reads as three sides of a rectangle. Measured in Chromium, at pixel
+   level, in `tests/components/validation-focus.test.js`.
+
+   Inset by the ring's own width, so the rectangle sits entirely inside the box it marks. The five
+   typed selectors above keep the outward offset: a field is not flush with the panel and its ring
+   needs the gap to clear the control's own border. */
+.fabricate [tabindex][data-validation-focused] {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: -2px;
 }
 
 /* ══════════════════════════════════════════

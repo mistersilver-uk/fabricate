@@ -2139,7 +2139,17 @@
         },
         "Validation": {
           "View": "View",
-          "ViewNamed": "{action}: {subject}"
+          "ViewNamed": "{action}: {subject}",
+          "CountPassing": "Passing",
+          "CountWarnings": "Warnings",
+          "CountBlocking": "Blocking",
+          "StatusPass": "Pass",
+          "StatusWarn": "Warning",
+          "StatusBlock": "Blocks enable",
+          "SummaryAllClear": "All clear",
+          "SummaryWarnings": "Enabled with warnings",
+          "SummaryWarningsSub": "Saves and enables — review the warnings when you can.",
+          "SummaryBlocked": "Cannot be enabled"
         },
         "Recipe": {
           "Kicker": "Recipes View",
@@ -4413,22 +4423,8 @@
             "IssueLocallyExcluded": "Some tasks or events are excluded locally.",
             "ViewTask": "View task",
             "ViewEvent": "View event",
-            "Severity": {
-              "critical": "Critical",
-              "warning": "Warning"
-            },
-            "SummaryAllClear": "All clear",
             "SummaryAllClearSub": "Every readiness check passes. Ready to enable.",
-            "SummaryWarnings": "Enabled with warnings",
-            "SummaryWarningsSub": "Saves and enables — review the warnings when you can.",
-            "SummaryBlocked": "Cannot be enabled",
-            "SummaryBlockedSub": "Clear every blocking issue before this environment can be enabled.",
-            "CountPassing": "Passing",
-            "CountWarnings": "Warnings",
-            "CountBlocking": "Blocking",
-            "StatusPass": "Pass",
-            "StatusWarn": "Warning",
-            "StatusBlock": "Blocks enable"
+            "SummaryBlockedSub": "Clear every blocking issue before this environment can be enabled."
           },
           "Tasks": {
             "Title": "Tasks",

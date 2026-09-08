@@ -44,24 +44,54 @@ export const ANNOUNCE_AFTER_FOCUS_MS = 150;
 /**
  * Move the keyboard, then announce.
  *
- * @param {() => boolean} moveFocus  Attempts the focus move; returns `true` only if it
- *   actually moved focus. Every caller here declines the move in some state — the GM is
- *   somewhere they chose to be, or the target is gone — and a decline must NOT buy the delay:
- *   with no focus utterance to queue behind there is nothing to wait for, and waiting would
- *   only delay the one thing the GM is owed.
- * @param {() => void} announce  Writes the sentence into the live region.
+ * THE MOVER ANSWERS IN ONE OF TWO SHAPES, and the second is not a second policy (issue 1517).
+ * A synchronous mover reports `true`/`false`, which is what the two 1157 call sites do. An
+ * ASYNCHRONOUS one — the validation row action, whose destination panel does not exist until
+ * Svelte has flushed the route it just wrote — returns a promise of the element it landed on,
+ * or `null` when it landed nowhere. Both are read by {@link queueAnnouncement} as the same
+ * question, "did focus move", and both are queued behind the same {@link
+ * ANNOUNCE_AFTER_FOCUS_MS}. The alternative was a second helper holding a third ordering
+ * policy, which is the drift the paragraph above exists to prevent.
+ *
+ * @param {() => boolean|Promise<Element|null>} moveFocus  Attempts the focus move. Returns
+ *   `true` — or, in the promise shape, the element it focused — only if it actually moved
+ *   focus. Every caller here declines the move in some state — the GM is somewhere they chose
+ *   to be, or the target is gone — and a decline must NOT buy the delay: with no focus
+ *   utterance to queue behind there is nothing to wait for, and waiting would only delay the
+ *   one thing the GM is owed.
+ * @param {(focused: Element|null) => void} announce  Writes the sentence into the live region.
+ *   It is handed the element the mover resolved, so a caller composing its sentence FROM the
+ *   destination cannot write one before focus moved: there is nothing to write it from. A
+ *   `true`/`false` mover has no element to hand over and its callers take no argument.
  * @param {number} [delayMs]  Overridable for tests; callers use the exported default.
  */
 export function announceAfterFocusMove(moveFocus, announce, delayMs = ANNOUNCE_AFTER_FOCUS_MS) {
   // The microtask is not part of the ordering rule — it is what makes the focus target
-  // resolvable at all. Both callers act from a state write that has already scheduled
+  // resolvable at all. Every caller acts from a state write that has already scheduled
   // Svelte's flush, so the node to focus is only re-rendered (and, for the card, only
   // re-enabled) after this callback's turn comes round.
   queueMicrotask(() => {
-    if (moveFocus?.() !== true) {
-      announce?.();
+    const outcome = moveFocus?.();
+    if (typeof outcome?.then === 'function') {
+      outcome.then((resolved) => queueAnnouncement(resolved, announce, delayMs));
       return;
     }
-    setTimeout(() => announce?.(), delayMs);
+    queueAnnouncement(outcome, announce, delayMs);
   });
+}
+
+/**
+ * The ordering rule itself, over whichever shape the mover answered in.
+ *
+ * @param {boolean|Element|null|undefined} outcome  What the mover reported.
+ * @param {(focused: Element|null) => void} announce
+ * @param {number} delayMs
+ */
+function queueAnnouncement(outcome, announce, delayMs) {
+  const focused = outcome !== null && typeof outcome === 'object' ? outcome : null;
+  if (outcome !== true && !focused) {
+    announce?.(null);
+    return;
+  }
+  setTimeout(() => announce?.(focused), delayMs);
 }

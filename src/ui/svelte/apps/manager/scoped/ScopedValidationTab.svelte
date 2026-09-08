@@ -210,14 +210,20 @@
   const shownSummary = $derived(verdictSummary ? verdictOf(counts) : summary);
 
   const wrapperAttributes = $derived(hookAttribute ? { [hookAttribute]: hookValue } : {});
+  // THE SHARED VOCABULARY, UNDER ITS OWN NAME AND IN ONE CASING (issue 1517). These five words
+  // were read from the RECIPE editor's namespace by a tab that is not the recipe editor's, and
+  // their fallbacks were `PASS` and `WARNING` where the shipped English — and every other
+  // validation surface — says `Pass` and `Warning`. Both halves are the same defect: one
+  // vocabulary with more than one home drifts, and the fallback is the copy a reader of this file
+  // believes. `block` stays the caller's word: it is the only one a call site chooses.
   const countLabels = $derived({
-    passing: text('FABRICATE.Admin.Manager.Recipe.Validation.CountPassing', 'Passing'),
-    warnings: text('FABRICATE.Admin.Manager.Recipe.Validation.CountWarnings', 'Warnings'),
-    blocking: text('FABRICATE.Admin.Manager.Recipe.Validation.CountBlocking', 'Blocking'),
+    passing: text('FABRICATE.Admin.Manager.Validation.CountPassing', 'Passing'),
+    warnings: text('FABRICATE.Admin.Manager.Validation.CountWarnings', 'Warnings'),
+    blocking: text('FABRICATE.Admin.Manager.Validation.CountBlocking', 'Blocking'),
   });
   const statusLabels = $derived({
-    pass: text('FABRICATE.Admin.Manager.Recipe.Validation.StatusPass', 'PASS'),
-    warn: text('FABRICATE.Admin.Manager.Recipe.Validation.StatusWarn', 'WARNING'),
+    pass: text('FABRICATE.Admin.Manager.Validation.StatusPass', 'Pass'),
+    warn: text('FABRICATE.Admin.Manager.Validation.StatusWarn', 'Warning'),
     block: blockLabel,
   });
 </script>

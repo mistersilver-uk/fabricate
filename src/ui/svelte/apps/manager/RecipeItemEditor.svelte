@@ -38,6 +38,7 @@
   import RecipeItemLimitsTab from './recipe-item/RecipeItemLimitsTab.svelte';
   import RecipeItemValidationTab from './recipe-item/RecipeItemValidationTab.svelte';
   import { focusValidationTarget } from './validationFocus.js';
+  import { announceValidationOutcome } from './validationAnnouncement.js';
 
   let {
     recipeItem = null,
@@ -83,44 +84,37 @@
   // moment a GM most needs to know where they landed.
   let issueAnnouncement = $state('');
 
-  /**
-   * The focused control's own accessible name, read off the DOM. `aria-label` first, then the
-   * `<label for>` that names it, then `title`. A destination with none of the three — the Item
-   * drop zone, say — yields '' and the announcement names the route alone.
-   *
-   * @param {Element|null} element
-   * @returns {string}
-   */
-  function accessibleNameOf(element) {
-    if (!element) return '';
-    const label = element.getAttribute('aria-label');
-    if (label) return label.trim();
-    const id = element.getAttribute('id');
-    const labelling = id ? editorRoot?.querySelector(`label[for="${id}"]`) : null;
-    if (labelling) return (labelling.textContent || '').trim();
-    return (element.getAttribute('title') || '').trim();
-  }
+  // The destination TAB PANEL, and it is the focus fallback for a route-only row (issue 1517).
+  // It is one element outside the tab chain rather than one per branch, so the reference stays
+  // valid across the route change the row action just made.
+  let tabPanel = $state(null);
 
   /**
    * Deep-link from a validation issue: switch to the tab that hosts the gap, THEN move focus to
    * the offending control.
    *
    * THE ORDER IS THE MECHANISM, not a preference. The route is requested synchronously and
-   * first — `onSelectTab` is the router's own state write, exactly as the tab strip's own click
-   * is — so Svelte has flushed it and the destination panel exists by the time the helper's
-   * `queueMicrotask` runs its query. And the announcement is derived FROM the element the helper
-   * resolves, so it cannot be written before focus moved: there is nothing to write it from.
+   * FIRST — `onSelectTab` is the router's own state write, exactly as the tab strip's own click
+   * is — so Svelte has flushed it and the destination panel exists by the time the focus
+   * helper's `queueMicrotask` runs its query. Everything after that — the panel fallback for a
+   * route-only row, the sentence, and the delay that queues it behind the focus utterance —
+   * belongs to `validationAnnouncement.js`, which owns it for all five hosts.
    *
    * @param {string} targetTab the ROUTE the row carries.
    * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
    */
-  async function selectIssue(targetTab, focusTarget) {
+  function selectIssue(targetTab, focusTarget) {
     const route = Object.hasOwn(ISSUE_TABS, targetTab) ? targetTab : null;
     if (route) onSelectTab(route);
-    const focused = await focusValidationTarget(editorRoot, focusTarget);
-    const routeLabel = route ? text(ISSUE_TABS[route].key, ISSUE_TABS[route].fallback) : '';
-    const controlName = accessibleNameOf(focused);
-    issueAnnouncement = controlName ? `${routeLabel} — ${controlName}` : routeLabel;
+    announceValidationOutcome({
+      root: editorRoot,
+      routeLabel: route ? text(ISSUE_TABS[route].key, ISSUE_TABS[route].fallback) : '',
+      focus: () => focusValidationTarget(editorRoot, focusTarget),
+      fallbackPanel: tabPanel,
+      announce: (sentence) => {
+        issueAnnouncement = sentence;
+      },
+    });
   }
 
   const modeItem = $derived(visibilityMode === 'item');
@@ -434,11 +428,18 @@
       <div class="manager-recipe-item-editor-body">
         <RecipeItemEditorTabs {activeTab} {badges} onSelect={onSelectTab} />
 
+        <!-- `tabindex="-1"` and `data-keyboard-focus="true"` are the ROUTE-ONLY row's focus
+             destination (issue 1517): a row that names a tab and no control leaves focus on a
+             button this update unmounts, and `<body>` is where every Foundry keybinding is
+             live. `-1`, not `0`: the panel is a programmatic destination, not a tab stop. -->
         <div
           class="manager-editor-tab-panel manager-recipe-item-editor-panel"
           role="tabpanel"
           id={`recipe-item-panel-${activeTab}`}
           aria-labelledby={`recipe-item-tab-${activeTab}`}
+          tabindex="-1"
+          data-keyboard-focus="true"
+          bind:this={tabPanel}
         >
           {#if activeTab === 'overview'}
             <RecipeItemOverviewTab

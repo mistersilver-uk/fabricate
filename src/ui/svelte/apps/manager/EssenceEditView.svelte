@@ -54,6 +54,7 @@
   import EssenceEditorTabs from './essences/EssenceEditorTabs.svelte';
   import EssenceIdentityTab from './essences/EssenceIdentityTab.svelte';
   import { focusValidationTarget } from './validationFocus.js';
+  import { announceValidationOutcome } from './validationAnnouncement.js';
   import EssenceOnCraftTab from './essences/EssenceOnCraftTab.svelte';
   import EssenceValidationTab from './essences/EssenceValidationTab.svelte';
   import {
@@ -356,32 +357,20 @@
   // moment a GM most needs to know where they landed.
   let issueAnnouncement = $state('');
 
-  /**
-   * The focused control's own accessible name, read off the DOM. `aria-label` first, then the
-   * `<label for>` that names it, then `title`. A destination with none of the three — a card
-   * addressed as a whole, say — yields '' and the announcement names the route alone.
-   *
-   * @param {Element|null} element
-   * @returns {string}
-   */
-  function accessibleNameOf(element) {
-    if (!element) return '';
-    const label = element.getAttribute('aria-label');
-    if (label) return label.trim();
-    const id = element.getAttribute('id');
-    const labelling = id ? editorRoot?.querySelector(`label[for="${id}"]`) : null;
-    if (labelling) return (labelling.textContent || '').trim();
-    return (element.getAttribute('title') || '').trim();
-  }
+  // The destination TAB PANEL, and it is the focus fallback for a route-only row (issue 1517).
+  // Four of this editor's checks are about the RECORD rather than one control, so they route
+  // and address nothing; the panel is where their action lands.
+  let tabPanel = $state(null);
 
   /**
    * Deep-link from a validation issue: switch to the tab that hosts the gap, THEN move focus to
    * the offending control.
    *
-   * THE ORDER IS THE MECHANISM, not a preference. The route is set synchronously and first, so
-   * Svelte has flushed it and the destination panel exists by the time the helper's
-   * `queueMicrotask` runs its query. And the announcement is derived FROM the element the helper
-   * resolves, so it cannot be written before focus moved: there is nothing to write it from.
+   * THE ORDER IS THE MECHANISM, not a preference. The route is set synchronously and FIRST, so
+   * Svelte has flushed it and the destination panel exists by the time the focus helper's
+   * `queueMicrotask` runs its query. Everything after that — the panel fallback for a route-only
+   * row, the sentence, and the delay that queues it behind the focus utterance — belongs to
+   * `validationAnnouncement.js`, which owns it for all five hosts.
    *
    * The route is checked against the LIVE tab set rather than a fixed list, because this editor
    * renders two — a stale route from the other set must not select a tab the strip does not
@@ -390,14 +379,19 @@
    * @param {string} targetTab the ROUTE the row carries.
    * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
    */
-  async function selectIssue(targetTab, focusTarget) {
+  function selectIssue(targetTab, focusTarget) {
     const route = editorTabIds.includes(targetTab) ? targetTab : null;
     if (route) activeTab = route;
     const label = route ? ISSUE_TAB_LABELS[route] : null;
-    const focused = await focusValidationTarget(editorRoot, focusTarget);
-    const routeLabel = label ? text(label.key, label.fallback) : '';
-    const controlName = accessibleNameOf(focused);
-    issueAnnouncement = controlName ? `${routeLabel} — ${controlName}` : routeLabel;
+    announceValidationOutcome({
+      root: editorRoot,
+      routeLabel: label ? text(label.key, label.fallback) : '',
+      focus: () => focusValidationTarget(editorRoot, focusTarget),
+      fallbackPanel: tabPanel,
+      announce: (sentence) => {
+        issueAnnouncement = sentence;
+      },
+    });
   }
 
   // The macro's display NAME, resolved cancellably. The `cancelled` latch inside
@@ -645,6 +639,8 @@
   </div>
 
   <form id="manager-essence-edit-form" class="manager-essence-edit-view" onsubmit={handleSave}>
+    <!-- The pair below was already declared for the keyboard; since issue 1517 it is also the
+         ROUTE-ONLY validation row's focus destination, which is why the panel is BOUND. -->
     <div
       class="manager-essence-tab-panel"
       id={`essence-panel-${activeTab}`}
@@ -652,6 +648,7 @@
       aria-labelledby={`essence-tab-${activeTab}`}
       tabindex="-1"
       data-keyboard-focus="true"
+      bind:this={tabPanel}
     >
       {#if activeTab === 'validation'}
         <EssenceValidationTab

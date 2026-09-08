@@ -309,9 +309,19 @@ describeValidationAddressPairing({
   destinationNoun: 'tab',
   // TWO OF THE FOUR RIDE AN ATTRIBUTE BAG — the Item drop zone's `hookAttrs.root` and the
   // link-recipe popover's `triggerData` — so the element they land on belongs to a primitive and
-  // cannot be read from this tab's source. Their focusability is a property of that primitive,
-  // proved where it is mounted; declared here rather than skipped so that a stamp moving from a
-  // written attribute to a bag, which silently drops the static proof, has to be acknowledged.
+  // cannot be read from this tab's source. Declared here rather than skipped so that a stamp
+  // moving from a written attribute to a bag, which silently drops the static proof, has to be
+  // acknowledged.
+  //
+  // WHERE THE PROOF ACTUALLY IS, named because this list used to assert one that did not exist
+  // (issue 1517, review r1). `recipe-item-source` rides `linkHooks.root` with `tabindex: '-1'`
+  // and `'data-keyboard-focus': 'true'` as BAG KEYS — object properties, which
+  // `design-system-keyboard-focus`'s AST walk cannot see any more than this scan can — so
+  // deleting both left the whole repository green while a real browser focused nothing. It is now
+  // read off the RENDERED element by `RecipeItemEditor — the validation row action reaches the
+  // control` in `recipe-item-editor-mounted.test.js`, which is the only place those two
+  // attributes exist to be read. `recipe-item-link-recipe` is `SearchablePopover`'s trigger, a
+  // real `<button>`, which needs no tabindex to hold focus.
   focusProvenElsewhere: ['recipe-item-link-recipe', 'recipe-item-source'],
 });
 

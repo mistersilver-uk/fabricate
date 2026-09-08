@@ -10,6 +10,7 @@
   import ToolValidationTab from './tools/ToolValidationTab.svelte';
   import { toolDisplayImage, toolDisplayName, toolEditorValidation } from './tools/toolStudio.js';
   import { focusValidationTarget } from './validationFocus.js';
+  import { announceValidationOutcome } from './validationAnnouncement.js';
 
   let {
     tool = null,
@@ -231,45 +232,36 @@
   // moment a GM most needs to know where they landed.
   let issueAnnouncement = $state('');
 
-  /**
-   * The focused control's own accessible name, read off the DOM. `aria-label` first, then the
-   * `<label for>` that names it, then `title`. A destination with none of the three — a
-   * requirements section, say — yields '' and the announcement names the route alone.
-   *
-   * @param {Element|null} element
-   * @returns {string}
-   */
-  function accessibleNameOf(element) {
-    if (!element) return '';
-    const label = element.getAttribute('aria-label');
-    if (label) return label.trim();
-    const id = element.getAttribute('id');
-    const labelling = id ? editorRoot?.querySelector(`label[for="${id}"]`) : null;
-    if (labelling) return (labelling.textContent || '').trim();
-    return (element.getAttribute('title') || '').trim();
-  }
+  // The destination TAB PANEL, and it is the focus fallback for a route-only row (issue 1517).
+  // Every `general` row this editor draws is route-only, so this is the majority path here.
+  let tabPanel = $state(null);
 
   /**
    * Deep-link from a validation issue: switch to the tab that hosts the gap, THEN move focus to
    * the offending control.
    *
    * THE ORDER IS THE MECHANISM, not a preference. The route is requested synchronously and
-   * first — `onTabChange` is the shell's own `$state` write, exactly as the tab strip's own
-   * click is — so Svelte has flushed it and the destination panel exists by the time the
-   * helper's `queueMicrotask` runs its query. And the announcement is derived FROM the element
-   * the helper resolves, so it cannot be written before focus moved: there is nothing to write
-   * it from. That is a property of the data flow rather than of a test.
+   * FIRST — `onTabChange` is the shell's own `$state` write, exactly as the tab strip's own
+   * click is — so Svelte has flushed it and the destination panel exists by the time the focus
+   * helper's `queueMicrotask` runs its query. Everything after that — the panel fallback for a
+   * route-only row, the sentence, and the delay that queues it behind the focus utterance —
+   * belongs to `validationAnnouncement.js`, which owns it for all five hosts.
    *
    * @param {string} targetTab the ROUTE the row carries.
    * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
    */
-  async function selectIssue(targetTab, focusTarget) {
+  function selectIssue(targetTab, focusTarget) {
     const route = Object.hasOwn(ISSUE_TABS, targetTab) ? targetTab : null;
     if (route) onTabChange(route);
-    const focused = await focusValidationTarget(editorRoot, focusTarget);
-    const routeLabel = route ? text(ISSUE_TABS[route].key, ISSUE_TABS[route].fallback) : '';
-    const controlName = accessibleNameOf(focused);
-    issueAnnouncement = controlName ? `${routeLabel} — ${controlName}` : routeLabel;
+    announceValidationOutcome({
+      root: editorRoot,
+      routeLabel: route ? text(ISSUE_TABS[route].key, ISSUE_TABS[route].fallback) : '',
+      focus: () => focusValidationTarget(editorRoot, focusTarget),
+      fallbackPanel: tabPanel,
+      announce: (sentence) => {
+        issueAnnouncement = sentence;
+      },
+    });
   }
 </script>
 
@@ -401,13 +393,22 @@
   />
 
   <div class="manager-tool-edit-composition">
+    <!-- `tabindex="-1"`, WAS `0` (issue 1517). The panel is the ROUTE-ONLY row's focus
+         destination — a row that names a tab and no control leaves focus on a button this
+         update unmounts, and `<body>` is where every Foundry keybinding is live — so it must be
+         focusable programmatically. It is not a tab STOP: `0` put an empty scroll container in
+         the Tab order between the strip and the first field, which no other editor panel in the
+         manager does, and nothing reads it. `data-keyboard-focus="true"` is what tells Foundry
+         the window is focused once it lands. -->
     <div
       class="manager-tool-editor-panel"
       role="tabpanel"
       id={`tool-panel-${activeTab}`}
       aria-labelledby={`tool-tab-${activeTab}`}
       data-tool-editor-panel={activeTab}
-      tabindex="0"
+      tabindex="-1"
+      data-keyboard-focus="true"
+      bind:this={tabPanel}
     >
       {#if activeTab === 'requirements'}
         <ToolRequirementsTab

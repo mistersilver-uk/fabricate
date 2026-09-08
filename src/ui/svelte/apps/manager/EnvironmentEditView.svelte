@@ -18,7 +18,10 @@
   import EnvironmentEventsTab from './environment/EnvironmentEventsTab.svelte';
   import EnvironmentValidationTab from './environment/EnvironmentValidationTab.svelte';
   import EnvironmentRightInspector from './environment/EnvironmentRightInspector.svelte';
-  import { evaluateEnvironmentReadiness } from './environment/environmentReadiness.js';
+  import {
+    countReadiness,
+    evaluateEnvironmentReadiness,
+  } from './environment/environmentReadiness.js';
   import { ENVIRONMENT_INCLUDED_COMPOSITION_STATES } from '../../../../systems/gatheringComposition.js';
 
   let {
@@ -102,15 +105,19 @@
   );
   const taskCompositionCount = $derived(countIncludedRecords(composition?.tasks));
   const eventCompositionCount = $derived(countIncludedRecords(composition?.events));
-  const errorCount = $derived(
-    readiness.issues.filter((issue) => issue.severity === 'critical').length
-  );
-  const warningCount = $derived(
-    readiness.issues.filter((issue) => issue.severity === 'warning').length
-  );
+  // THE BADGE IS THE VALIDATION TAB'S OWN COUNTS, READ THROUGH THE SHARED ACCESSOR (issue 1517).
+  // It used to count `critical` and `warning` severities here, while the tab counted
+  // `!== 'critical'` inside — so an `info`-only environment showed NO badge over a rail reading
+  // "Warnings: 2", and an unsatisfied readiness check with no issue behind it was badged by
+  // nothing at all. Two numbers describing one screen have to be one number.
+  const validationCounts = $derived(countReadiness(readiness));
   const validationBadges = $derived([
-    ...(errorCount > 0 ? [{ label: String(errorCount), tone: 'danger' }] : []),
-    ...(warningCount > 0 ? [{ label: String(warningCount), tone: 'warning' }] : []),
+    ...(validationCounts.blocking > 0
+      ? [{ label: String(validationCounts.blocking), tone: 'danger' }]
+      : []),
+    ...(validationCounts.warnings > 0
+      ? [{ label: String(validationCounts.warnings), tone: 'warning' }]
+      : []),
   ]);
   const badges = $derived({
     tasks: taskCompositionCount || 0,

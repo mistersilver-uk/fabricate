@@ -54,6 +54,12 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
   // the must-not-regress characterization suite. Mechanical, like the rest of this manifest:
   // omit it and the harness's own closure validator refuses to set those suites up at all.
   'src/ui/svelte/apps/manager/validationFocus.js',
+  // …and the announcement half beside it (issue 1517, review r1): the panel fallback for a
+  // route-only row, the control's accessible name, and the handoff to the module's shared
+  // "move focus, then announce" ordering rule — which is why `util/announceAfterFocus.js` is
+  // a raw module here too. It was five copies inside five hosts before it was one leaf.
+  'src/ui/svelte/apps/manager/validationAnnouncement.js',
+  'src/ui/svelte/util/announceAfterFocus.js',
   // The ONE copy map (issue 1096): the Validation route and the section-level Callout both
   // render an issue's sentence from it, so both halves of the checks tree import it.
   'src/ui/svelte/apps/manager/checks/checksCopy.js',

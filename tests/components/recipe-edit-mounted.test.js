@@ -8,6 +8,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { Recipe } from '../../src/models/Recipe.js';
+import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 import {
   TOOL_DISPLAY_PRECEDENCE_CASES,
   flattenToolForRecipeLibrary,
@@ -69,6 +70,12 @@ const RAW_MODULES = [
   // through this pure leaf (issue 1517). This harness DOES validate its dependency graph,
   // so omitting it throws a named "add it to rawModules" error rather than hanging.
   'src/ui/svelte/apps/manager/validationFocus.js',
+  // …and the announcement half beside it (issue 1517, review r1): the panel fallback for a
+  // route-only row, the control's accessible name, and the handoff to the module's shared
+  // "move focus, then announce" ordering rule — which is why `util/announceAfterFocus.js` is
+  // a raw module here too. It was five copies inside five hosts before it was one leaf.
+  'src/ui/svelte/apps/manager/validationAnnouncement.js',
+  'src/ui/svelte/util/announceAfterFocus.js',
   // The validation tab localizes a signature-collision blocker row via this pure
   // leaf (issue 549).
   'src/utils/recipeActivationMessages.js',
@@ -6437,6 +6444,26 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     return target.querySelector('[data-recipe-issue-announcement]').textContent.trim();
   }
 
+  /**
+   * Wait for a sentence that is QUEUED BEHIND A FOCUS UTTERANCE (issue 1157, adopted here at
+   * 1517's review round).
+   *
+   * A `polite` region is queued speech and a focus change CANCELS queued speech, so the
+   * announcement is written after the move rather than with it — the rule
+   * `src/ui/svelte/util/announceAfterFocus.js` owns for the whole module, and which this row
+   * action now goes through instead of holding a third policy of its own. The delay is IMPORTED:
+   * a local copy of the number would silently start asserting the un-delayed state the moment the
+   * rule changed it.
+   */
+  async function flushAnnouncement() {
+    await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_AFTER_FOCUS_MS + 40));
+    await flushRender();
+  }
+
+  function tabPanel(target) {
+    return target.querySelector('.manager-editor-tab-panel');
+  }
+
   async function activateIssueView(target, issueId) {
     const button = target.querySelector(`[data-issue="${issueId}"] [data-recipe-issue-view]`);
     assert.ok(button, `the ${issueId} row renders a View button`);
@@ -6482,9 +6509,38 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     );
     assert.equal(
       announcement(target),
-      'Overview — Recipe name',
-      'the region names the destination it reached'
+      '',
+      'and the region is EMPTY while the move is in flight — it is cleared before the move and ' +
+        'written after it, which is what makes a REPEAT activation of the same row a change the ' +
+        'live region announces rather than an identical string reassigned in silence'
     );
+
+    await flushAnnouncement();
+    assert.equal(
+      announcement(target),
+      'Overview — Recipe name',
+      'the region names the destination it reached, once the focus utterance has had its turn'
+    );
+    editHarness.remount();
+  });
+
+  it('announces AGAIN when the same row is activated a second time', async () => {
+    // THE STATE A GM REACHES BY PRESSING AGAIN because they are not sure it worked. A live region
+    // announces a CHANGE of text, and the second activation composes the same sentence, so
+    // assigning it was a no-op and the second press was silent. The region is cleared first, so
+    // the same sentence arrives as two changes rather than one assignment. Asserting the EMPTY
+    // intermediate is what makes this real: "the sentence is there afterwards" passes either way.
+    const target = await openValidation(NAMELESS_RECIPE);
+    await activateIssueView(target, 'noName');
+    await flushAnnouncement();
+    assert.equal(announcement(target), 'Overview — Recipe name');
+
+    await openTab(target, 'validation');
+    await activateIssueView(target, 'noName');
+    assert.equal(announcement(target), '', 'the second activation clears the region first');
+
+    await flushAnnouncement();
+    assert.equal(announcement(target), 'Overview — Recipe name', 'and writes it again');
     editHarness.remount();
   });
 
@@ -6541,26 +6597,41 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     editHarness.remount();
   });
 
-  it('changes route and moves NO focus for a row that carries no focusTarget', async () => {
+  it('changes route and focuses the destination PANEL for a row that carries no focusTarget', async () => {
     // ROUTE-ONLY IS A STATED OUTCOME, NOT A SILENT ONE. `noResultGroup` fires when the step
     // has no result set at all, so there is no card to address; the remedy is the tab's own
     // adder. This asserts WHICH of the two the row is, so a `focusTarget` going missing from
     // a row that should have one reds here rather than degrading into a tab switch that
     // focuses nothing and that nobody notices.
+    //
+    // AND FOCUS STILL MOVES. Activating the row unmounts the Validation panel the View button
+    // was in, so "no control to focus" used to mean focus fell to `<body>` — where every Foundry
+    // keybinding is live: Space pauses the game, the arrows pan the canvas behind the window and
+    // Tab walks out of the application. The destination TAB PANEL takes it instead.
     const target = await openValidation(RESULTLESS_RECIPE);
 
     await activateIssueView(target, 'noResultGroup');
 
     assert.ok(target.querySelector('[data-recipe-tab="results"]'), 'the route still changed');
+    const panel = tabPanel(target);
+    assert.ok(Boolean(panel), 'the editor renders its tab panel');
+    assertIs(document.activeElement, panel, 'and the panel holds focus, not `<body>`');
+    // Read off the DOM, never through `isFocusable`: happy-dom focuses anything, so the
+    // attributes are what make the assertion above mean something in a real browser.
+    assert.equal(panel.getAttribute('tabindex'), '-1', 'a programmatic destination, not a tab stop');
+    assert.equal(panel.getAttribute('data-keyboard-focus'), 'true', 'and it declares itself focused');
     assertIs(
       target.querySelector('[data-validation-focused]')?.tagName ?? null,
       null,
-      'nothing in the editor is marked'
+      'nothing is MARKED: the accent ring names the control a row addressed, and this row ' +
+        'addressed none — the panel is where focus went, not what the row was about'
     );
+
+    await flushAnnouncement();
     assert.equal(
       announcement(target),
       'Results',
-      'and the region names the destination alone, with no control'
+      'and the region names the destination alone, with no control — the panel is not one'
     );
     editHarness.remount();
   });

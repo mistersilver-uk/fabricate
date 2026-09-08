@@ -11,6 +11,11 @@ import {
   STATUS_TONE_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { WORLD_TOOL_SCOPE_RAW_MODULES } from '../helpers/toolMountModules.js';
+import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
+import {
+  describeValidationAddressPairing,
+  describeValidationHostContract,
+} from '../helpers/validationAddressContracts.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
@@ -48,6 +53,12 @@ const harness = createMountedComponentHarness({
     // dependency graph, so an omission throws a named "add it to rawModules" error rather than
     // hanging — but the error arrives from `before()`, which reports as `# cancelled`.
     'src/ui/svelte/apps/manager/validationFocus.js',
+    // …and the announcement half beside it (issue 1517, review r1): the panel fallback for a
+    // route-only row, the control's accessible name, and the handoff to the module's shared
+    // "move focus, then announce" ordering rule — which is why `util/announceAfterFocus.js` is
+    // a raw module here too. It was five copies inside five hosts before it was one leaf.
+    'src/ui/svelte/apps/manager/validationAnnouncement.js',
+    'src/ui/svelte/util/announceAfterFocus.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
     // The repair block's plain-language readback (issue 1373, maintainer round 5): a pure
     // module so the two scopes that render the block share one copy of the sentence.
@@ -375,7 +386,12 @@ describe('Tool Studio editor (mounted)', () => {
     const tabPanel = root.querySelector('[role="tabpanel"]');
     assert.equal(tabPanel.id, 'tool-panel-breakage');
     assert.equal(tabPanel.getAttribute('aria-labelledby'), 'tool-tab-breakage');
-    assert.equal(tabPanel.getAttribute('tabindex'), '0');
+    // `-1`, NOT `0` (issue 1517, review r1). The panel is the ROUTE-ONLY validation row's focus
+    // destination and must be focusable programmatically; it is not a tab STOP, which is what `0`
+    // made it — an empty scroll container in the Tab order between the strip and the first field,
+    // which no other editor panel in the manager is.
+    assert.equal(tabPanel.getAttribute('tabindex'), '-1');
+    assert.equal(tabPanel.getAttribute('data-keyboard-focus'), 'true');
     // THE LINKED-ITEM CARD IS NOT HERE, and its absence is the assertion (issue 1373). It used
     // to open this tab with a drop zone, a copy-uuid action and an unlink action, which let a
     // CRAFTING SYSTEM re-point which game-world Item a Tool IS. Identity is world-scoped, so the
@@ -2469,6 +2485,19 @@ describe('ToolEditView — the validation row action reaches the control (issue 
     return button;
   }
 
+  /**
+   * Wait for a sentence that is QUEUED BEHIND A FOCUS UTTERANCE (issue 1157, adopted here at
+   * 1517's review round). A `polite` region is queued speech and a focus change CANCELS queued
+   * speech, so the sentence is written after the move — the rule
+   * `src/ui/svelte/util/announceAfterFocus.js` owns for the whole module. The delay is IMPORTED:
+   * a local copy would silently start asserting the un-delayed state the moment the rule changed.
+   */
+  async function flushAnnouncement() {
+    await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_AFTER_FOCUS_MS + 40));
+    await tick();
+    flushSync();
+  }
+
   it('hosts the live region OUTSIDE the tab chain, so the route change cannot unmount it', async () => {
     // The defect this shape exists to prevent: the validation surface is inside the tab chain, so
     // activating a row action unmounts the region in the same update that was to announce.
@@ -2519,7 +2548,19 @@ describe('ToolEditView — the validation row action reaches the control (issue 
       '',
       'and it is marked, so a POINTER activation paints a ring the :focus reset would strip'
     );
-    assert.equal(announcement(root), 'Requirements', 'the region names the destination');
+    assert.equal(
+      announcement(root),
+      '',
+      'and the region is EMPTY while the move is in flight: it is cleared before the move and ' +
+        'written after it, so a repeat activation of the same row is a CHANGE the region announces'
+    );
+
+    await flushAnnouncement();
+    assert.equal(
+      announcement(root),
+      'Requirements',
+      'the region names the destination, once the focus utterance has had its turn'
+    );
   });
 
   it('focuses the breakage FORMULA field, a natively focusable control, for a formula failure', async () => {
@@ -2581,14 +2622,25 @@ describe('ToolEditView — the validation row action reaches the control (issue 
       'breakage',
       'the route still changed'
     );
+    // AND FOCUS STILL MOVES, to the destination panel. Activating the row unmounts the
+    // Validation panel the View button was in, so "no control to focus" used to mean focus fell
+    // to `<body>`, where every Foundry keybinding is live: Space pauses the game, the arrows pan
+    // the canvas behind the window and Tab walks out of the application.
+    const panel = root.querySelector('[data-tool-editor-panel]');
+    assertIs(document.activeElement, panel, 'the panel holds focus, not `<body>`');
+    assert.equal(panel.getAttribute('tabindex'), '-1', 'a programmatic destination, not a tab stop');
+    assert.equal(panel.getAttribute('data-keyboard-focus'), 'true', 'and it declares itself focused');
     assert.ok(
       !root.querySelector('[data-validation-focused]'),
-      'nothing in the editor is marked'
+      'nothing is MARKED: the accent ring names the control a row addressed, and this row ' +
+        'addressed none — the panel is where focus went, not what the row was about'
     );
+
+    await flushAnnouncement();
     assert.equal(
       announcement(root),
       'Breakage',
-      'and the region names the destination alone, with no control'
+      'and the region names the destination alone, with no control — the panel is not one'
     );
   });
 
@@ -2614,4 +2666,60 @@ describe('ToolEditView — the validation row action reaches the control (issue 
       ['passing', 'blocking']
     );
   });
+});
+// ── THE PAIR, AND THE HOST THAT JOINS IT (issue 1517, review r1) ────────────────────────────
+//
+// Both contracts below are registered from `tests/helpers/validationAddressContracts.js`, driven
+// by THIS editor's facts: the producer's own address table, the destination declared for each
+// address it emits, and the host's own route call. The machinery those facts feed is written once
+// there and explained in its docblock.
+//
+// IT WAS REGISTERED FOR TWO OF THE FIVE SURFACES AND IS NOW REGISTERED FOR FOUR. Nothing read
+// this producer's table against the tabs that carry it, so deleting `tabindex="-1"` from the
+// prerequisites section, or mistyping `'tool-max-uses'` in the table, left every suite green: the
+// mounted clauses above cover the addresses their fixtures reach, and happy-dom focuses anything.
+describeValidationAddressPairing({
+  title: 'every Tool address the producer emits is carried by a real control',
+  producerFile: 'tools/toolStudio.js',
+  tableName: 'CONTROL_BY_ERROR',
+  tablePattern: /const CONTROL_BY_ERROR = \{([\s\S]*?)\n\};/u,
+  addressPattern: /'([^']+)'/gu,
+  expectedAddressCount: 7,
+  expectation: 'the four breakage controls, the on-break fieldset and the two requirement sections',
+  // WHICH FILE IS SUPPOSED TO CARRY WHICH ADDRESS. The table is keyed by ERROR rather than by
+  // check — one check is five different controls depending on the breakage mechanic — so ten
+  // entries resolve to seven distinct addresses.
+  destinations: {
+    'tool-max-uses': 'tools/ToolBreakageTab.svelte',
+    'tool-breakage-chance': 'tools/ToolBreakageTab.svelte',
+    'tool-breakage-formula': 'tools/ToolBreakageTab.svelte',
+    'tool-breakage-threshold': 'tools/ToolBreakageTab.svelte',
+    'tool-on-break': 'tools/ToolBreakageTab.svelte',
+    'tool-prerequisites': 'tools/ToolRequirementsTab.svelte',
+    'tool-bonus': 'tools/ToolRequirementsTab.svelte',
+  },
+  routeNoun: 'tab',
+  destinationNoun: 'tab',
+  // THREE OF THE SEVEN RIDE AN ATTRIBUTE BAG — two stepper `inputProps` and the chance slider's
+  // `numberProps` — so the element they land on belongs to a primitive and cannot be read from
+  // this tab's source. Their focusability is a property of that primitive; declared here rather
+  // than skipped so that a stamp moving between the two spellings, which silently gains or loses
+  // the static proof, has to be acknowledged.
+  focusProvenElsewhere: ['tool-breakage-chance', 'tool-breakage-threshold', 'tool-max-uses'],
+});
+
+describeValidationHostContract({
+  title: 'ToolEditView wires the row action in the order the mechanism needs',
+  hostFile: 'ToolEditView.svelte',
+  tabComponent: 'ToolValidationTab',
+  routeCall: 'onTabChange(route)',
+  regionMarker: 'data-tool-issue-announcement',
+  regionOutsideNoun: 'tab chain',
+  mustPrecede: [
+    {
+      marker: "{#if activeTab === 'requirements'}",
+      present: 'the tab chain must exist',
+      order: 'the region sits outside the tab chain',
+    },
+  ],
 });

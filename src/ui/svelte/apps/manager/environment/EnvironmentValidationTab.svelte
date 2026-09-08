@@ -17,10 +17,20 @@
   a picked record that does not match, and a locally excluded one — and the surface's row words are
   `pass | warn | block` only. Fed `info` verbatim the row would draw a GREEN TICK beside "composes
   anyway" and a pill reading `undefined`. The collapse is a PRESENTATION mapping in this file,
-  exactly where `checks/ChecksValidationTab` maps `critical` to `block`; `environmentReadiness.js`
-  is not edited, because `info` is still the right domain severity and the tab badge counts read
-  it. The two notes are therefore amber and they feed the Warnings count. The count vocabulary is
-  closed, so there is no Info tile and none is invented.
+  exactly where `checks/ChecksValidationTab` maps `critical` to `block`; the domain severity is
+  unedited and still reaches the DOM on the row's own `data-issue-severity` hook. The two notes
+  are therefore amber. The count vocabulary is closed, so there is no Info tile and none is
+  invented — and the SAME collapse is made for the tab strip's badge and the summary inspector's
+  chips, by `countReadiness` in `environmentReadiness.js`, which all three read. It has to be:
+  they are three reports of one state, and an `info`-only environment used to show no badge at all
+  over a rail reading "Warnings: 2".
+
+  (a2) THE COUNTS ARE A TALLY OF THE ROWS, not a second reading beside them. `countReadiness`
+  counts every check AND every issue in the surface's own three words, which is what the rows
+  draw, so the rail cannot report a state the list contradicts. It used to count issues only,
+  while the readiness group drew a row per CHECK: an unsatisfied `hasDescription` raises no issue,
+  so it painted an amber row with the rail reading "Warnings: 0" and the verdict reading "All
+  clear" above it.
 
   (b) TWO VERBS DOWN ONE LIST. The deep link says "View task" beside "View event", and the
   surface's `viewLabel` is a single scalar — so a naive conversion would replace two distinct
@@ -28,12 +38,14 @@
   surface prefers over its default. Both `lang/en.json` keys keep their consumer and both names
   survive.
 
-  (c) `onSelectRecord(kind, id)` TAKES TWO ARGUMENTS. That is what the surface's two-field row
-  contract is for: `target` is the ROUTE and `focusTarget` the CONTROL, passed positionally, so
-  this tab spends them as its own `(kind, recordId)` pair with no adapter and no composite string.
-  The reuse is deliberate rather than a type violation — this deep link OPENS A DIFFERENT RECORD
-  on another tab; it is not the focus move the other five surfaces wire, and there is no control
-  on this tab to move focus to.
+  (c) `onSelectRecord(kind, id)` TAKES TWO ARGUMENTS, and the second one is a RECORD ID rather
+  than a control address. The surface's row carries `target` — the ROUTE, `task` or `event` here —
+  and ONE address beside it, which a row names either `focusTarget`, a control inside the route,
+  or `recordId`, a record the route selects. This tab emits `recordId`. It used to spend
+  `focusTarget` on the id, which read as this tab wiring the focus move the other five wire: it
+  does not, and there is no control on this tab to move focus to. Naming the field for what it
+  holds is the whole of the difference; the surface passes whichever is present as one argument,
+  because a row addresses one destination and a host resolves exactly one kind.
 
   Only an issue that names a record carries either field, so the View button renders on exactly
   the rows it rendered before. `viewDataAttr` carries the route, which reproduces
@@ -43,7 +55,11 @@
 <script>
   import EditorValidationSurface from '../../../components/EditorValidationSurface.svelte';
   import { localize } from '../../../util/foundryBridge.js';
-  import { evaluateEnvironmentReadiness } from './environmentReadiness.js';
+  import {
+    blocksEnable,
+    countReadiness,
+    evaluateEnvironmentReadiness,
+  } from './environmentReadiness.js';
 
   let { environment = null, composition = { counts: {} }, onSelectRecord = () => {} } = $props();
 
@@ -130,18 +146,24 @@
    * One issue's ROW status. See (a) in the header: `info` is not a row word, and collapsing it to
    * `pass` would put a green tick beside a note that says something composes anyway.
    *
-   * @param {string} severity the domain severity, unchanged on the row's own `data-` hook
+   * `blocks: 'enable'` FIRST, and severity second. The surface's block word is literally "Blocks
+   * enable", which is what that field says; reading severity alone drew an amber row, and counted
+   * a warning, for the one thing standing between this environment and being enabled — on a
+   * DISABLED environment, where `noAvailableTasks` is graded `warning` and still blocks. The
+   * severity check stays behind it so a `critical` issue that names no consequence is never
+   * softened into a warning.
+   *
+   * @param {{severity?: string, blocks?: string}} issue the issue, whose domain severity reaches
+   *   the DOM unchanged on the row's own `data-` hook
    * @returns {string} one of the surface's three row words
    */
-  function issueStatus(severity) {
-    return severity === 'critical' ? 'block' : 'warn';
+  function issueStatus(issue) {
+    return issue.blocks === 'enable' || issue.severity === 'critical' ? 'block' : 'warn';
   }
 
-  const counts = $derived({
-    passing: readiness.checks.filter((check) => check.satisfied).length,
-    warnings: readiness.issues.filter((issue) => issue.severity !== 'critical').length,
-    blocking: readiness.issues.filter((issue) => issue.severity === 'critical').length,
-  });
+  // ONE READING, SHARED WITH THE TAB BADGE AND THE INSPECTOR. See `countReadiness`'s own docblock
+  // for what counts as what and for the two divergences it closed.
+  const counts = $derived(countReadiness(readiness));
 
   const readinessRows = $derived(
     readiness.checks.map((check) => ({
@@ -180,10 +202,10 @@
       return {
         id: issue.recordId ? `${issue.id}-${issue.recordId}` : issue.id,
         title: issueTitle(issue),
-        status: issueStatus(issue.severity),
+        status: issueStatus(issue),
         dataAttrs: { 'data-issue': issue.id, 'data-issue-severity': issue.severity },
         ...(issue.recordId
-          ? { target: kind, focusTarget: issue.recordId, viewLabel: VIEW_LABEL_KEYS[kind] }
+          ? { target: kind, recordId: issue.recordId, viewLabel: VIEW_LABEL_KEYS[kind] }
           : {}),
       };
     });
@@ -210,14 +232,18 @@
     },
   ]);
 
+  // THE VERDICT ANSWERS `blocks: 'enable'`, NOT A SEVERITY RANKING. The sub-line below promises
+  // that the environment "Saves and enables", so the only thing that may make it false is
+  // something that stops it enabling — which is the field the domain writes for exactly that,
+  // and which a `warning` can carry. `counts.blocking` is the same population read through the
+  // rows, and both are named rather than one being inferred from the other.
+  const blocked = $derived(blocksEnable(readiness.issues) || counts.blocking > 0);
+
   const summary = $derived.by(() => {
-    if (counts.blocking > 0) {
+    if (blocked) {
       return {
         status: 'block',
-        title: text(
-          'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.SummaryBlocked',
-          'Cannot be enabled'
-        ),
+        title: text('FABRICATE.Admin.Manager.Validation.SummaryBlocked', 'Cannot be enabled'),
         sub: text(
           'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.SummaryBlockedSub',
           'Clear every blocking issue before this environment can be enabled.'
@@ -227,22 +253,16 @@
     if (counts.warnings > 0) {
       return {
         status: 'warn',
-        title: text(
-          'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.SummaryWarnings',
-          'Enabled with warnings'
-        ),
+        title: text('FABRICATE.Admin.Manager.Validation.SummaryWarnings', 'Enabled with warnings'),
         sub: text(
-          'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.SummaryWarningsSub',
+          'FABRICATE.Admin.Manager.Validation.SummaryWarningsSub',
           'Saves and enables — review the warnings when you can.'
         ),
       };
     }
     return {
       status: 'pass',
-      title: text(
-        'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.SummaryAllClear',
-        'All clear'
-      ),
+      title: text('FABRICATE.Admin.Manager.Validation.SummaryAllClear', 'All clear'),
       sub: text(
         'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.SummaryAllClearSub',
         'Every readiness check passes. Ready to enable.'
@@ -263,26 +283,7 @@
   )}
   {summary}
   {counts}
-  countLabels={{
-    passing: text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.CountPassing', 'Passing'),
-    warnings: text(
-      'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.CountWarnings',
-      'Warnings'
-    ),
-    blocking: text(
-      'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.CountBlocking',
-      'Blocking'
-    ),
-  }}
   {groups}
-  statusLabels={{
-    pass: text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.StatusPass', 'Pass'),
-    warn: text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.StatusWarn', 'Warning'),
-    block: text(
-      'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.StatusBlock',
-      'Blocks enable'
-    ),
-  }}
   viewDataAttr="data-environment-issue-action"
   hookAttrs={{
     root: { 'data-environment-tab': 'validation', 'aria-label': tabTitle },

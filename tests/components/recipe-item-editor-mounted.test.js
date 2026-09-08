@@ -9,6 +9,7 @@ import {
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
+import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -27,6 +28,12 @@ const harness = createMountedComponentHarness({
     // dependency graph, so an omission throws a named "add it to rawModules" error rather than
     // hanging — but the error arrives from `before()`, which reports as `# cancelled`.
     'src/ui/svelte/apps/manager/validationFocus.js',
+    // …and the announcement half beside it (issue 1517, review r1): the panel fallback for a
+    // route-only row, the control's accessible name, and the handoff to the module's shared
+    // "move focus, then announce" ordering rule — which is why `util/announceAfterFocus.js` is
+    // a raw module here too. It was five copies inside five hosts before it was one leaf.
+    'src/ui/svelte/apps/manager/validationAnnouncement.js',
+    'src/ui/svelte/util/announceAfterFocus.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     // The Limits tab's character-prerequisite picker imports the pure engine (issue 544).
     'src/systems/characterPrerequisites.js',
@@ -532,6 +539,145 @@ describe('RecipeItemEditor (mounted)', () => {
       root.querySelector('[data-recipe-item-preview] [data-inventory-requirement]'),
       null,
       'no preview requirement chips when off'
+    );
+  });
+});
+// ── THE ROW ACTION MOVES FOCUS, END TO END (issue 1517, review r1) ──────────────────────────
+//
+// The recipe-item editor was the one host of the five whose row action was proved only by SOURCE
+// READS — `describeValidationHostContract` in `recipe-item-validation-tab-mounted.test.js` reads
+// the ordering out of the file, and the address pairing reads the producer's table against the
+// destination tabs. Neither watches the keyboard actually move, and neither can: the pairing scan
+// reads the ELEMENT a stamp is written on, and two of this editor's four addresses reach the DOM
+// through a primitive's attribute bag, where there is no element in this source to read.
+//
+// `recipe-item-source` IS ONE OF THOSE TWO, and it was the hole. It rides `ItemDropZone`'s
+// `hookAttrs.root` with `tabindex: '-1'` and `'data-keyboard-focus': 'true'` as BAG KEYS — object
+// properties, invisible to `design-system-keyboard-focus`'s AST walk, which reads written
+// attributes — so deleting both from `RecipeItemOverviewTab` left every gate in the repository
+// green while a real browser focused nothing. The pairing suite's `focusProvenElsewhere` list
+// DECLARED that its focusability was "proved by a mounted suite"; no such clause existed. It does
+// now, and it reads the two attributes off the rendered element, which is the only place they can
+// be seen.
+describe('RecipeItemEditor — the validation row action reaches the control (issue 1517)', () => {
+  // Identity, asserted as a BOOLEAN. Handing a live happy-dom element to `node:assert` renders its
+  // subtree, its parents and its owner document when the assertion fails, which takes the process
+  // out with a heap OOM — a real failure wearing a crash's costume.
+  const assertIs = (actual, expected, message) => assert.equal(actual === expected, true, message);
+
+  /**
+   * Mount the editor on its Validation tab with the shell's own route write wired back into the
+   * `activeTab` prop, exactly as `RecipeItemEditView` does: this editor does not own its route,
+   * so a test that dropped `onSelectTab` would prove the action changed nothing.
+   */
+  async function openValidation(props) {
+    const root = await harness.mount({
+      activeTab: 'validation',
+      visibilityMode: 'item',
+      onSelectTab: (tab) => harness.setProps({ activeTab: tab }),
+      ...props,
+    });
+    return root;
+  }
+
+  async function activateIssueView(root, checkId) {
+    const button = root.querySelector(
+      `[data-recipe-item-check="${checkId}"] [data-recipe-item-validation-view]`
+    );
+    assert.ok(Boolean(button), `the ${checkId} row renders a View button`);
+    button.click();
+    // NO `flushSync` BEFORE THE AWAIT, deliberately. The mechanism is that the route change's own
+    // flush is queued as a microtask BEFORE the focus helper's, so draining microtasks is what
+    // proves the ordering rather than a synchronous flush papering over it.
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    flushSync();
+    return button;
+  }
+
+  const announcement = (root) =>
+    root.querySelector('[data-recipe-item-issue-announcement]').textContent.trim();
+
+  /**
+   * Wait for a sentence that is QUEUED BEHIND A FOCUS UTTERANCE (issue 1157). A `polite` region is
+   * queued speech and a focus change CANCELS queued speech, so the sentence is written after the
+   * move — the rule `src/ui/svelte/util/announceAfterFocus.js` owns for the whole module. The
+   * delay is IMPORTED: a local copy would silently start asserting the un-delayed state.
+   */
+  async function flushAnnouncement() {
+    await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_AFTER_FOCUS_MS + 40));
+    flushSync();
+  }
+
+  it('routes to Overview and focuses the DROP ZONE, whose focusability rides an attribute bag', async () => {
+    const root = await openValidation({
+      recipeItem: draft({ originItemUuid: '' }),
+      linkedItem: null,
+      linkedRecipes: [],
+    });
+
+    await activateIssueView(root, 'itemLinked');
+
+    assert.ok(Boolean(root.querySelector('[data-recipe-item-tab="overview"]')), 'the route changed');
+    const zone = root.querySelector('[data-validation-target="recipe-item-source"]');
+    assert.ok(Boolean(zone), 'the Overview tab carries the addressed zone');
+    assertIs(document.activeElement, zone, 'and it holds focus');
+    // THE TWO ATTRIBUTES, READ OFF THE RENDERED ELEMENT. happy-dom focuses anything, so the line
+    // above is vacuous on its own — and the AST walk that would otherwise catch a missing
+    // `tabindex` cannot see these two, because they are bag keys rather than written attributes.
+    // This is the only reading of them there is. Named mutation: delete either from
+    // `RecipeItemOverviewTab`'s `linkHooks.root` and this clause reds.
+    assert.equal(zone.tagName, 'DIV', 'a zone root is not natively focusable');
+    assert.equal(zone.getAttribute('tabindex'), '-1', 'so it declares the tabindex that makes the focus real');
+    assert.equal(
+      zone.getAttribute('data-keyboard-focus'),
+      'true',
+      'and the attribute that tells Foundry the window is focused — without which Space pauses ' +
+        'the game and the arrows pan the canvas behind the open application'
+    );
+    assert.equal(
+      zone.getAttribute('data-validation-focused'),
+      '',
+      'and it is marked, so a POINTER activation paints a ring the :focus reset would strip'
+    );
+    assert.equal(
+      announcement(root),
+      '',
+      'and the region is EMPTY while the move is in flight: it is cleared before the move and ' +
+        'written after it, so a repeat activation of the same row is a CHANGE the region announces'
+    );
+
+    await flushAnnouncement();
+    assert.equal(
+      announcement(root),
+      'Overview',
+      'the region names the destination it reached; the zone carries no accessible name of its ' +
+        'own, so there is no control to name beside it'
+    );
+  });
+
+  it('changes route and focuses the destination PANEL for a route-only row', async () => {
+    // `recipeLinked` names the CONTENTS tab and no control: the remedy is that tab's own
+    // Link-recipe menu, and the check is about the list rather than about one control in it.
+    // Activating it unmounts the Validation panel the button was in, so with nothing to fall back
+    // to focus lands on `<body>`, where every Foundry keybinding is live.
+    const root = await openValidation({
+      recipeItem: draft(),
+      linkedItem: LINKED_ITEM,
+      linkedRecipes: [],
+    });
+
+    await activateIssueView(root, 'recipeLinked');
+
+    assert.ok(Boolean(root.querySelector('[data-recipe-item-tab="contents"]')), 'the route changed');
+    const panel = root.querySelector('.manager-recipe-item-editor-panel');
+    assert.ok(Boolean(panel), 'the editor renders its tab panel');
+    assertIs(document.activeElement, panel, 'and the panel holds focus, not `<body>`');
+    assert.equal(panel.getAttribute('tabindex'), '-1', 'a programmatic destination, not a tab stop');
+    assert.equal(panel.getAttribute('data-keyboard-focus'), 'true', 'and it declares itself focused');
+    assert.ok(
+      !root.querySelector('[data-validation-focused]'),
+      'nothing is MARKED: the accent ring names the control a row addressed, and this row ' +
+        'addressed none — the panel is where focus went, not what the row was about'
     );
   });
 });

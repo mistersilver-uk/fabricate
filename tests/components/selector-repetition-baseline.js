@@ -186,34 +186,7 @@
  * table, and it did not, because a private per-window family is by construction not shared with
  * anything. It is re-derived by running the census, not predicted.
  *
- * ISSUE 1517 PHASE 3 RE-KEYED NO ROW AND MOVED THE THREE CONTEXTUAL FIGURES, by adding ONE rule
- * of six selectors and deleting none. The rule paints `[data-validation-focused]`, the transient
- * mark a validation row's focus action stamps on the control it lands on, and it is written FLAT
- * over the module focus pair's own element list — `a`, `button`, `input`, `select`, `textarea`
- * each as `.fabricate <el>[data-validation-focused]`, plus `.fabricate [tabindex][…]` — because a
- * single `.fabricate [data-validation-focused]` selector is (0,2,0) and would lose outright to the
- * (0,2,1) and (0,3,0) `:focus` reset above it, painting nothing at all. So the six selectors are
- * the point of the rule rather than a stylistic expansion of it.
- *
- * All six are singletons in both keyings — measured — because no other rule in the sheet names
- * `[data-validation-focused]` at all, so the repeated table is untouched and `pinnedTotal` stays
- * 243 across 119 rows. The rule count rises by one and the key and singleton counts each rise by
- * six, which is the plain shape: one added rule, six added keys, none of them shared.
- *
- * ISSUE 1517 PHASE 6 RE-KEYED NO ROW AND MOVED THE THREE CONTEXTUAL FIGURES DOWNWARD, which is
- * the mirror of Phase 3 above: it deletes EIGHT rule blocks of twelve selectors and adds none.
- * The blocks are the environment editor Validation tab own family — its issue list, its check
- * list, its check rows and their two satisfied/unsatisfied glyph re-tones, its issue row and
- * that row title — plus the dead `manager-environment-layer` family that shared three of those
- * selector lists and was the reason a dead family survived a dead-rule sweep at all. The tab was
- * converted onto `EditorValidationSurface`, so every class the blocks named stopped being
- * emitted, and `styles-dead-classes.test.js` named all eight before the deletion.
- *
- * All twelve are singletons in both keyings, measured rather than assumed, because no rule
- * outside that family names any of those classes: the rule count falls by eight, the key and
- * singleton counts each fall by twelve, and `pinnedTotal` STAYS 243 across 119 rows. Re-derived
- * by running the census, not predicted from the diff.
- * * ISSUE 1509 PHASE 4 IS THE FIRST OF THIS CHANGE'S PHASES TO RE-KEY A ROW, AND IT RE-KEYS EXACTLY
+ * ISSUE 1509 PHASE 4 IS THE FIRST OF THIS CHANGE'S PHASES TO RE-KEY A ROW, AND IT RE-KEYS EXACTLY
  * ONE. Rooting `ToggleCard` at `fabricate-toggle-card` rewrites the leading compound of ten
  * selectors and rooting `ItemDropZone` at `fabricate-link-field` rewrites fifteen more, and of
  * those twenty-five exactly one is a repeated key: `.manager-item-drop-zone-copy small`, which the

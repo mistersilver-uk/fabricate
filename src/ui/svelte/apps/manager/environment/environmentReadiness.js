@@ -109,6 +109,65 @@ export function countIssues(issues = [], severity) {
   return issues.filter(issue => issue.severity === severity).length;
 }
 
+/**
+ * THE ONE READING OF A READINESS RESULT (issue 1517).
+ *
+ * Three screens report this environment's validation state — the Validation tab's counts rail,
+ * the editor tab strip's badge and the summary inspector's two chips — and before this function
+ * they counted three different populations with two different definitions of "warning". The tab
+ * counted ISSUES while drawing rows for CHECKS, so an unsatisfied check with no issue behind it
+ * (a missing description, a missing biome) painted an amber row the rail said nothing about and
+ * the verdict called "All clear"; and the badge counted `severity === 'warning'` where the tab
+ * counted `!== 'critical'`, so an `info`-only environment showed no badge over a rail reading
+ * "Warnings: 2". Both are one defect: a count is a reading of a result, and there was no one
+ * place that read it.
+ *
+ * WHAT COUNTS AS WHAT, and it is the vocabulary the shared validation surface draws rather than
+ * the domain's own severities:
+ *
+ *  - every CHECK contributes — satisfied to `passing`, unsatisfied to `warnings`. An unsatisfied
+ *    readiness check is exactly an amber row, so it is exactly a warning.
+ *  - every ISSUE contributes — one that BLOCKS ENABLING, or is `critical`, to `blocking`, and
+ *    every other one, `warning` and `info` alike, to `warnings`. `info` has no tile of its own
+ *    and the count vocabulary is closed; collapsing it here is what makes the badge and the rail
+ *    agree, whichever of the two a GM is looking at.
+ *  - an EMPTY issue list contributes one `passing`. "No issues detected." is a result the tab
+ *    draws as a passing row rather than as a heading over an empty group, and the rail counts
+ *    what the rows show.
+ *
+ * `blocks: 'enable'` rather than severity for the blocking tally, because that is the question
+ * the tile and the verdict both answer — see {@link blocksEnable}. A disabled environment with
+ * no available task downgrades to `severity: 'warning'` while still carrying `blocks: 'enable'`,
+ * and it cannot be enabled; a tile reading 0 beside a verdict reading "Cannot be enabled" would
+ * be the same contradiction one rung down.
+ *
+ * @param {{checks?: ReadinessCheck[], issues?: ReadinessIssue[]}} readiness
+ * @returns {{passing: number, warnings: number, blocking: number}}
+ */
+export function countReadiness(readiness = {}) {
+  const checks = Array.isArray(readiness?.checks) ? readiness.checks : [];
+  const issues = Array.isArray(readiness?.issues) ? readiness.issues : [];
+  const blocking = issues.filter(issue => issue.blocks === 'enable' || issue.severity === 'critical');
+  return {
+    passing: checks.filter(check => check.satisfied).length + (issues.length === 0 ? 1 : 0),
+    warnings: checks.filter(check => !check.satisfied).length + (issues.length - blocking.length),
+    blocking: blocking.length
+  };
+}
+
+/**
+ * Whether anything refuses to let this environment be enabled.
+ *
+ * THE VERDICT'S OWN QUESTION, and it is not a severity ranking (issue 1517). `noAvailableTasks`
+ * is `critical` on an active environment and `warning` on a disabled one — the same missing
+ * task, graded by how loud it needs to be — but it carries `blocks: 'enable'` in both states,
+ * because an environment with no available task cannot be enabled either way. Reading the verdict
+ * off severity told the GM of a disabled, taskless environment that it "Saves and enables"; it
+ * does not.
+ *
+ * @param {ReadinessIssue[]} [issues]
+ * @returns {boolean}
+ */
 export function blocksEnable(issues = []) {
   return issues.some(issue => issue.blocks === 'enable');
 }

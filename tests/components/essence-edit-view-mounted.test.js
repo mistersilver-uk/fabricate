@@ -16,6 +16,11 @@ import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { makeEssenceRow } from '../helpers/makeEssenceRow.js';
+import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
+import {
+  describeValidationAddressPairing,
+  describeValidationHostContract,
+} from '../helpers/validationAddressContracts.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -45,6 +50,12 @@ const harness = createMountedComponentHarness({
     // dependency graph, so an omission throws a named "add it to rawModules" error rather than
     // hanging — but the error arrives from `before()`, which reports as `# cancelled`.
     'src/ui/svelte/apps/manager/validationFocus.js',
+    // …and the announcement half beside it (issue 1517, review r1): the panel fallback for a
+    // route-only row, the control's accessible name, and the handoff to the module's shared
+    // "move focus, then announce" ordering rule — which is why `util/announceAfterFocus.js` is
+    // a raw module here too. It was five copies inside five hosts before it was one leaf.
+    'src/ui/svelte/apps/manager/validationAnnouncement.js',
+    'src/ui/svelte/util/announceAfterFocus.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
     // The behaviour preview's "How players see it" card mounts the REAL player InventoryItemCard
     // (issue 1036, round 3), fed synthetic rows by the pure essencePreviewRow helper — both
@@ -975,8 +986,9 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
 //
 // A validation row carries two independent addresses: `target`, the ROUTE, and `focusTarget`,
 // the CONTROL — the value of a `data-validation-target` attribute the offending control carries.
-// The editor sets the route synchronously and FIRST, then awaits `focusValidationTarget`, then
-// writes the announcement FROM the element that resolved.
+// The editor sets the route synchronously and FIRST, then hands over to
+// `validationAnnouncement.js`, which moves focus and writes the announcement FROM the element
+// that resolved — behind the module's shared "move focus, then announce" delay.
 //
 // EVERY FOCUS ASSERTION BELOW ALSO READS THE FOCUSABILITY OFF THE DOM, and that is not
 // belt-and-braces. happy-dom focuses ANYTHING — `.focus()` on a bare `<div>` sets
@@ -1021,6 +1033,18 @@ describe('EssenceEditView — the validation row action reaches the control (iss
     return button;
   }
 
+  /**
+   * Wait for a sentence that is QUEUED BEHIND A FOCUS UTTERANCE (issue 1157, adopted here at
+   * 1517's review round). A `polite` region is queued speech and a focus change CANCELS queued
+   * speech, so the sentence is written after the move — the rule
+   * `src/ui/svelte/util/announceAfterFocus.js` owns for the whole module. The delay is IMPORTED:
+   * a local copy would silently start asserting the un-delayed state the moment the rule changed.
+   */
+  async function flushAnnouncement() {
+    await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_AFTER_FOCUS_MS + 40));
+    flushSync();
+  }
+
   it('hosts the live region OUTSIDE the tab chain, so the route change cannot unmount it', async () => {
     // The defect this shape exists to prevent: the validation surface is inside the tab chain,
     // so activating a row action unmounts the region in the same update that was to announce.
@@ -1063,8 +1087,16 @@ describe('EssenceEditView — the validation row action reaches the control (iss
     );
     assert.equal(
       announcement(root),
+      '',
+      'and the region is EMPTY while the move is in flight: it is cleared before the move and ' +
+        'written after it, so a repeat activation of the same row is a CHANGE the region announces'
+    );
+
+    await flushAnnouncement();
+    assert.equal(
+      announcement(root),
       'Identity — Description',
-      'the region names the destination it reached'
+      'the region names the destination it reached, once the focus utterance has had its turn'
     );
     harness.remount();
   });
@@ -1085,11 +1117,39 @@ describe('EssenceEditView — the validation row action reaches the control (iss
     assert.equal(card.getAttribute('tabindex'), '-1');
     assert.equal(card.getAttribute('data-keyboard-focus'), 'true');
     assert.equal(card.getAttribute('data-validation-focused'), '');
+
+    await flushAnnouncement();
     assert.equal(
       announcement(root),
       'On craft',
       'a card carries no accessible name of its own, so the region names the route alone'
     );
+    harness.remount();
+  });
+
+  it('declares the tab panel as the ROUTE-ONLY row\'s focus destination', async () => {
+    // FOUR OF THIS EDITOR'S CHECKS ARE ABOUT THE RECORD rather than about one control — whether
+    // this system has rules for the essence at all, whether it is enabled here, whether anything
+    // carries it — so they emit a route and no control. Activating one unmounts the Validation
+    // panel the button was in, so with nothing to fall back to focus lands on `<body>`, where
+    // every Foundry keybinding is live: Space pauses the game, the arrows pan the canvas behind
+    // the window, Tab walks out of the application.
+    //
+    // THE ATTRIBUTES ARE THE ASSERTION HERE, and the wiring that uses them is read from source by
+    // `describeValidationHostContract`'s `fallbackPanel:` clause below. All four of those checks
+    // belong to the SYSTEM-SCOPE screen, which this suite has no fixture for — the world editor
+    // it does mount emits a control address for every failing row — so the end-to-end move is
+    // proved on the recipe and Tool editors, whose route-only rows are reachable from a props
+    // literal. What can be proved here is that the destination those hosts fall back to is real
+    // on this one too: happy-dom focuses anything, so a panel missing `tabindex` would still
+    // "hold focus" in a mounted assertion while a real browser moved nothing.
+    const root = await harness.mount(props({ essence: BROKEN }));
+    openTab(root, 'validation');
+
+    const panel = root.querySelector('.manager-essence-tab-panel');
+    assert.ok(Boolean(panel), 'the editor renders its tab panel');
+    assert.equal(panel.getAttribute('tabindex'), '-1', 'a programmatic destination, not a tab stop');
+    assert.equal(panel.getAttribute('data-keyboard-focus'), 'true', 'and it declares itself focused');
     harness.remount();
   });
 
@@ -1127,4 +1187,58 @@ describe('EssenceEditView — the validation row action reaches the control (iss
     );
     harness.remount();
   });
+});
+// ── THE PAIR, AND THE HOST THAT JOINS IT (issue 1517, review r1) ────────────────────────────
+//
+// Both contracts below are registered from `tests/helpers/validationAddressContracts.js`, driven
+// by THIS editor's facts: the producer's own address table, the destination declared for each
+// address it emits, and the host's own route call. The machinery those facts feed — the comment
+// stripping that keeps a scan from finding an address in the sentence explaining it, both
+// attribute spellings, the focusability read that a mounted assertion cannot make, and the
+// ordering — is written once there and explained in its docblock.
+//
+// IT WAS REGISTERED FOR TWO OF THE FIVE SURFACES AND IS NOW REGISTERED FOR FOUR. Nothing read
+// this producer's table against the tabs that carry it, so deleting `tabindex="-1"` from the
+// identity panel, or deleting `data-validation-target="essence-macro"` from the on-craft macro
+// card, left every suite green: the mounted clauses above cover the two addresses their fixture
+// reaches, and happy-dom focuses anything, so neither could see it.
+describeValidationAddressPairing({
+  title: 'every essence address the producer emits is carried by a real control',
+  producerFile: 'essences/essenceStudio.js',
+  tableName: 'CHECK_CONTROL',
+  tablePattern: /const CHECK_CONTROL = Object\.freeze\(\{([\s\S]*?)\n\}\);/u,
+  addressPattern: /'([^']+)'/gu,
+  expectedAddressCount: 6,
+  expectation: 'the four identity controls and the two on-craft cards',
+  // WHICH FILE IS SUPPOSED TO CARRY WHICH ADDRESS. This is the half a producer cannot check: an
+  // address no control carries is a View button that changes tab and focuses nothing, and neither
+  // half alone can see it. `systemEffectSource` and `systemMacro` reuse the two on-craft
+  // addresses, because they ARE those two cards read at system scope, so eight table entries are
+  // six distinct addresses.
+  destinations: {
+    'essence-name': 'essences/EssenceIdentityTab.svelte',
+    'essence-description': 'essences/EssenceIdentityTab.svelte',
+    'essence-icon': 'essences/EssenceIdentityTab.svelte',
+    'essence-colour': 'essences/EssenceIdentityTab.svelte',
+    'essence-source': 'essences/EssenceOnCraftTab.svelte',
+    'essence-macro': 'essences/EssenceOnCraftTab.svelte',
+  },
+  routeNoun: 'tab',
+  destinationNoun: 'tab',
+});
+
+describeValidationHostContract({
+  title: 'EssenceEditView wires the row action in the order the mechanism needs',
+  hostFile: 'EssenceEditView.svelte',
+  tabComponent: 'EssenceValidationTab',
+  routeCall: 'activeTab = route',
+  regionMarker: 'data-essence-issue-announcement',
+  regionOutsideNoun: 'tab chain',
+  mustPrecede: [
+    {
+      marker: "{#if activeTab === 'validation'}",
+      present: 'the tab chain must exist',
+      order: 'the region sits outside the tab chain',
+    },
+  ],
 });
