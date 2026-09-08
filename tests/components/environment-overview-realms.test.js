@@ -125,6 +125,39 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     remount();
   });
 
+  it('announces the set each editable row now holds, which the chip primitive cannot do for it', async () => {
+    // THE LIVE REGION IS THE CALLER'S, and this is the clause that says so in the DOM rather than
+    // in a docblock. Neither adding nor removing a member moves focus into the row, and a region
+    // wrapped around the row itself announces each added chip's whole subtree on an add and
+    // NOTHING AT ALL on a removal, because `aria-relevant` defaults to `additions text` and a
+    // removed keyed child is excluded outright. So the row owes one polite summary beside it,
+    // restated on every change to the set — which is what the two mounts below read.
+    await mountTab(baseProps({
+      realmsEnabled: true,
+      realmRecords: [{ id: 'r1', name: 'Verdant' }, { id: 'r2', name: 'Dunes' }],
+      environment: { id: 'env-1', name: 'Moonlit Forest', enabled: true, biomes: [], includedRealmIds: ['r1', 'r2'] }
+    }));
+    const both = target.querySelector('[data-environment-realm-status]');
+    assert.ok(Boolean(both), 'the realm row books a live region');
+    assert.equal(both.getAttribute('aria-live'), 'polite');
+    assert.ok(both.classList.contains('visually-hidden'), 'the summary is for the screen reader, not the screen');
+    assert.equal(both.textContent.trim(), 'Verdant and Dunes');
+    remount();
+
+    // The same row with one member taken out: the region names what SURVIVES, which is the
+    // reading a removal has to produce and the one a bare row cannot.
+    await mountTab(baseProps({
+      realmsEnabled: true,
+      realmRecords: [{ id: 'r1', name: 'Verdant' }, { id: 'r2', name: 'Dunes' }],
+      environment: { id: 'env-1', name: 'Moonlit Forest', enabled: true, biomes: [], includedRealmIds: ['r1'] }
+    }));
+    assert.equal(
+      target.querySelector('[data-environment-realm-status]').textContent.trim(),
+      'Verdant'
+    );
+    remount();
+  });
+
   it('draws a biome chip in the colour the biome was AUTHORED in, not the one its token names', async () => {
     // THE ONE CLAIM IN THIS ROUTE THAT A READER CANNOT CHECK BY EYE (issue 1515). The chip
     // primitive's `tint` is what arms its tinted face, and it validates BARE `--fab-tag-*` palette
