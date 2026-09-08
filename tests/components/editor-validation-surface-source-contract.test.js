@@ -47,6 +47,8 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { parse } from 'svelte/compiler';
 
 import {
@@ -211,6 +213,33 @@ function bagKeys(file, attributeName) {
 }
 
 /**
+ * The attribute names one file writes on `<EditorValidationSurface>`.
+ *
+ * HAYSTACK, STATED, because the thing it replaces got this wrong. This reads `Attribute` nodes on
+ * `Component` nodes named {@link TAG} in the PARSED template — nothing else. Docblock prose,
+ * `<!-- … -->` blocks, `<style>` contents and string literals in the `<script>` are all outside
+ * it, because the parser puts them in nodes this never visits.
+ *
+ * A text scan over `SOURCES[file]` has the opposite haystack and this corpus makes the difference
+ * concrete: `recipe/RecipeValidationTab.svelte`'s own header NAMES `viewDataAttr` in prose, and
+ * survives a `\bviewDataAttr=` scan only by not writing the `=`. Moving the real attribute into an
+ * HTML comment left that scan green.
+ *
+ * @param {string} file repo-relative component path
+ * @returns {Set<string>} empty when the file renders no `<EditorValidationSurface>` at all
+ */
+function surfaceAttributeNames(file) {
+  const names = new Set();
+  walkTemplate(parse(SOURCES[file], { modern: true, filename: file }).fragment, (node) => {
+    if (node.type !== 'Component' || node.name !== TAG) return;
+    for (const attribute of node.attributes ?? []) {
+      if (attribute.type === 'Attribute') names.add(attribute.name);
+    }
+  });
+  return names;
+}
+
+/**
  * The region names the primitive actually spreads, read out of its own `hooksFor('…')` calls.
  *
  * @returns {string[]}
@@ -322,30 +351,188 @@ test('every call site that hooks a count also reports it', () => {
   );
 });
 
-test('the recipe editor is the only site taking the row action, and it takes both halves', () => {
-  // `viewDataAttr` and `viewLabel` are the surface's two one-caller props, and this is the
-  // clause that keeps that honest rather than merely true. The View button renders only where
-  // a row carries a `target`; the pair is what a site puts ON it, and a site passing the hook
-  // without the label ships an untranslated verb next to a translated one.
-  const withHook = [];
-  const withLabel = [];
-  for (const [file, source] of Object.entries(SOURCES)) {
-    if (!new RegExp(String.raw`<${TAG}[\s/>]`).test(source)) continue;
-    if (/\bviewDataAttr=/.test(source)) withHook.push(file);
-    if (/\bviewLabel=/.test(source)) withLabel.push(file);
-  }
+test('the recipe editor is the only site hooking the row action, and none restates its name', () => {
+  // `viewDataAttr` is the surface's one-caller hook prop, and this is the clause that keeps
+  // that honest rather than merely true. `viewLabel` USED to be its pair — a site hooking the
+  // action also had to hand the surface a localized verb, and a site that hooked without
+  // labelling shipped an untranslated word beside translated ones. Issue 1517 ended that
+  // obligation by moving it INTO the surface: the name is a key the surface resolves itself,
+  // so the correct number of call sites restating it is zero.
+  //
+  // READ FROM THE AST, not from the file's text. See {@link surfaceAttributeNames} for the
+  // haystack and for the measured way the text scan this replaces could be greened.
+  const rendered = Object.keys(SOURCES)
+    .map((file) => [file, surfaceAttributeNames(file)])
+    .filter(([, attributes]) => attributes.size > 0);
+  // NON-VACUITY, because both clauses below are ABSENCE claims over this population: a walk that
+  // stopped resolving the component would report the empty set and read as two clean gates.
+  assert.ok(
+    rendered.length >= 4,
+    `only ${rendered.length} files were seen passing an attribute to <${TAG}>; the walk has ` +
+      'stopped resolving it and both clauses below are quantified over nothing'
+  );
+  const withHook = rendered
+    .filter(([, attributes]) => attributes.has('viewDataAttr'))
+    .map(([file]) => file);
+  const withLabel = rendered
+    .filter(([, attributes]) => attributes.has('viewLabel'))
+    .map(([file]) => file);
   assert.deepEqual(
     withHook,
     ['src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'],
-    'the set of sites hooking the row action changed. A second one is welcome and makes both ' +
-      'props ordinary rather than single-caller; this pin is here so that arrival is a ' +
+    'the set of sites hooking the row action changed. A second one is welcome and makes the ' +
+      'prop ordinary rather than single-caller; this pin is here so that arrival is a ' +
       'deliberate edit rather than something a reviewer has to notice.'
   );
   assert.deepEqual(
     withLabel,
-    withHook,
-    'a site hooking the row action must also localize its label, and vice versa: the two are ' +
-      'one decision about one button'
+    [],
+    'a call site is passing `viewLabel` again. The surface defaults it to a localization key ' +
+      'and resolves it, so a site that passes one is either restating that default — which is ' +
+      'a second place the accessible name lives — or overriding it for EVERY row, which is not ' +
+      'what varies: a site whose rows need different verbs sets `row.viewLabel` per row. If a ' +
+      'genuine whole-surface override arrives, move this pin deliberately:\n  ' +
+      withLabel.join('\n  ')
+  );
+});
+
+/**
+ * The surface's own `$props()` defaults, and its View button node, read from the AST.
+ *
+ * HAYSTACK, stated, because it is the whole reason this is a parser rather than a regex: the
+ * `ObjectPattern` of the `let { … } = $props()` declaration, and the template's element tree.
+ * Comments, docblocks, `<!-- … -->` blocks and `<style>` are NOT in either — the parser drops
+ * them into `ast.comments` or into nodes this never visits. THIS SURFACE'S HEADER EXPLAINS ITS
+ * `viewLabel` default and its `localize()` call in prose, naming both the key and the function,
+ * so every text-shaped matcher over `SOURCES[SURFACE_PATH]` reports what the DOCUMENTATION says
+ * and never reads the code at all. Slices below are taken from AST node ranges for the same
+ * reason: a range names exactly one expression.
+ *
+ * `constants` is the third population and is read for the same reason as the first two: the
+ * subject-bearing accessible name is a MODULE constant rather than a prop — a caller must not be
+ * able to swap it — so there is no `$props()` default to read it from, and its literal appears in
+ * this file's header prose as well as in the declaration.
+ *
+ * @returns {{defaults: Map<string, object|null>, constants: Map<string, unknown>, button: object,
+ *   source: string}}
+ */
+function surfaceRowAction() {
+  const source = SOURCES[SURFACE_PATH];
+  const ast = parse(source, { modern: true, filename: SURFACE_PATH });
+  const declared = (ast.instance?.content?.body ?? []).find(
+    (node) =>
+      node.type === 'VariableDeclaration' &&
+      node.declarations[0]?.init?.type === 'CallExpression' &&
+      node.declarations[0]?.init?.callee?.name === '$props'
+  );
+  assert.ok(declared, `${SURFACE_PATH} no longer destructures \`$props()\`, so nothing is read`);
+  const defaults = new Map();
+  for (const property of declared.declarations[0].id.properties ?? []) {
+    if (property.type !== 'Property') continue;
+    const value = property.value;
+    defaults.set(property.key?.name, value.type === 'AssignmentPattern' ? value.right : null);
+  }
+
+  const constants = new Map();
+  for (const node of ast.instance?.content?.body ?? []) {
+    if (node.type !== 'VariableDeclaration') continue;
+    for (const declarator of node.declarations) {
+      if (declarator.id?.type === 'Identifier' && declarator.init?.type === 'Literal') {
+        constants.set(declarator.id.name, declarator.init.value);
+      }
+    }
+  }
+
+  const buttons = [];
+  walkTemplate(ast.fragment, (node) => {
+    if (node.type === 'Component' && node.name === 'ManagerButton') buttons.push(node);
+  });
+  assert.equal(
+    buttons.length,
+    1,
+    `${SURFACE_PATH} renders ${buttons.length} <ManagerButton>s; the row action is one button ` +
+      'and the clauses below read it by being the only one'
+  );
+  return { defaults, constants, button: buttons[0], source };
+}
+
+/**
+ * One static attribute of a node, as the SOURCE TEXT of its single expression.
+ *
+ * @param {object} node
+ * @param {string} name
+ * @param {string} source
+ * @returns {string|null}
+ */
+function expressionAttribute(node, name, source) {
+  const attribute = (node.attributes ?? []).find(
+    (candidate) => candidate.type === 'Attribute' && candidate.name === name
+  );
+  const value = Array.isArray(attribute?.value) ? attribute.value[0] : attribute?.value;
+  const expression = value?.expression;
+  return expression ? source.slice(expression.start, expression.end) : null;
+}
+
+test("the View button's name is a translatable key, in a shared namespace, resolved here", () => {
+  const { defaults, constants, button, source } = surfaceRowAction();
+
+  const fallback = defaults.get('viewLabel');
+  assert.equal(fallback?.type, 'Literal', '`viewLabel` must default to a string literal');
+  assert.match(
+    fallback.value,
+    /^FABRICATE\.(?:[A-Za-z0-9_]+\.)+[A-Za-z0-9_]+$/u,
+    `\`viewLabel\` defaults to "${fallback.value}". A default written into a \`$props()\` ` +
+      'destructuring is a string `game.i18n` never sees, so an English word here is the ' +
+      'accessible name of a control on nine validation screens that no world can translate.'
+  );
+  assert.ok(
+    !fallback.value.startsWith('FABRICATE.Admin.Manager.Recipe.'),
+    `\`viewLabel\` defaults to "${fallback.value}", under the RECIPE editor's namespace. This ` +
+      'is the default name of a shared primitive on nine surfaces, eight of which are not the ' +
+      'recipe editor; a key filed under one of the nine reads as that screen\'s property.'
+  );
+
+  const children = button.fragment.nodes.filter((node) => node.type !== 'Text');
+  assert.equal(children.length, 1, 'the button renders exactly one expression as its name');
+  assert.equal(
+    source.slice(children[0].expression.start, children[0].expression.end),
+    'localize(row.viewLabel ?? viewLabel)',
+    'the button must RESOLVE its name. A key default interpolated raw is worse than the ' +
+      'English one it replaced — every one of these buttons then reads as a dotted path — and ' +
+      'the `??` is what lets one site draw two different verbs down one list ("View task" ' +
+      'beside "View event") without a second whole-surface prop.'
+  );
+
+  // AND THE ACCESSIBLE NAME CARRIES THE SUBJECT. The visible child above is a verb and nothing
+  // else, so a tab of routed rows announces as "View, button" repeated — the row's subject is in
+  // a sibling element and the `data-*` hook holds the ROUTE, which assistive technology never
+  // reads. One producer routes at eleven sites, and this is the one place a default name for
+  // every surface that renders this primitive can be installed.
+  //
+  // WHITESPACE-NORMALISED, because the expression is wrapped by the formatter and its line breaks
+  // are Prettier's decision rather than a contract. The TOKENS are the contract.
+  assert.equal(
+    expressionAttribute(button, 'aria-label', source)?.replaceAll(/\s+/gu, ' '),
+    'localize(VIEW_NAMED_LABEL, { action: localize(row.viewLabel ?? viewLabel), subject: row.title, })',
+    "the row action must name itself by its row's title, AND by the verb it visibly renders. " +
+      '`action` is fed from the same expression as the visible child on purpose: hard-coding ' +
+      '"View" there makes the accessible name of an overriding row ("View: Gather herbs") one ' +
+      'that does not contain its visible label ("View task"), which is a WCAG 2.5.3 ' +
+      'label-in-name failure and is unreachable for a speech-input user. Composing the resolved ' +
+      'verb makes containment true by construction.'
+  );
+  const named = constants.get('VIEW_NAMED_LABEL');
+  assert.match(
+    String(named),
+    /^FABRICATE\.(?:[A-Za-z0-9_]+\.)+[A-Za-z0-9_]+$/u,
+    `the subject-bearing name resolves "${named}", which is not a localization key. It is the ` +
+      'accessible name of a control on every validation screen and it interpolates a title, so ' +
+      'an English pattern here is a sentence no world can reorder or re-punctuate.'
+  );
+  assert.ok(
+    !String(named).startsWith('FABRICATE.Admin.Manager.Recipe.'),
+    `the subject-bearing name is filed under "${named}", inside the RECIPE editor's namespace, ` +
+      'for a default this primitive gives every one of its surfaces'
   );
 });
 
@@ -361,4 +548,36 @@ test('no call site restates a count label the surface would draw unlabelled', ()
     `the four call sites are ${[...files].join(', ')}; a missing one means the surface lost a ` +
       'renderer or the tag scan stopped resolving it'
   );
+});
+
+test('the shipped name pattern still has somewhere to put the visible verb', () => {
+  // THE OTHER HALF OF THE LABEL-IN-NAME CONTRACT, and the half no source pin above can see. The
+  // template passes `action` and `subject`; whether either reaches the screen is decided by the
+  // STRING, and `lang/en.json` is data rather than code. Edit that value back to a pattern with
+  // no `{action}` and `Localization#format` silently drops the argument — the button goes back to
+  // announcing "View: …" beside a visible "View task", which is the exact WCAG 2.5.3 failure the
+  // composition exists to make unrepresentable. Nothing else in the tree reads this key's shape.
+  //
+  // HAYSTACK: the parsed `lang/en.json` object, resolved by the key the surface declares rather
+  // than by a path re-typed here — so moving the key moves this clause with it.
+  const { constants } = surfaceRowAction();
+  const key = String(constants.get('VIEW_NAMED_LABEL'));
+  const english = JSON.parse(
+    readFileSync(resolve(import.meta.dirname, '../../lang/en.json'), 'utf8')
+  );
+  const pattern = key.split('.').reduce((node, part) => node?.[part], english);
+  assert.equal(
+    typeof pattern,
+    'string',
+    `${key} resolves to nothing in lang/en.json, so every row action is named by the dotted ` +
+      'path itself'
+  );
+  for (const token of ['{action}', '{subject}']) {
+    assert.ok(
+      pattern.includes(token),
+      `the shipped "${key}" pattern is "${pattern}", which drops ${token}. Both are passed by ` +
+        'the template and both are load-bearing: `{subject}` is what tells one row action from ' +
+        'another, and `{action}` is what keeps the accessible name containing the visible label.'
+    );
+  }
 });

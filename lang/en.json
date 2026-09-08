@@ -2144,6 +2144,10 @@
           "EssenceStepDown": "Step {name} down",
           "EssenceStepUp": "Step {name} up"
         },
+        "Validation": {
+          "View": "View",
+          "ViewNamed": "{action}: {subject}"
+        },
         "Recipe": {
           "Kicker": "Recipes View",
           "Title": "Recipes",
@@ -2464,7 +2468,6 @@
             "Readiness": "Recipe readiness",
             "Issues": "Issues",
             "NoIssues": "No issues detected.",
-            "View": "View",
             "GroupIngredients": "Ingredients",
             "GroupResults": "Results",
             "GroupResolution": "Resolution",

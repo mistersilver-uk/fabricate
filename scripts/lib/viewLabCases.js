@@ -605,15 +605,24 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-environment-edit-events',
     'manager-knowledge-learned-lost-copy',
   ]),
-  // THE editor validation surface (issue 1444), closed onto seven renderers. NEITHER
-  // representative frame can contain one, and that is established from the static import
-  // closure rather than from looking at a frame: walking every transitive `.svelte` import,
-  // `ComponentsBrowserView` reaches 22 modules and `FabricateAppRoot` reaches 164, and this
-  // surface is in neither closure — only `CraftingSystemManagerRoot`'s 356-module closure holds
-  // it. So a restyle of the medallion, the count tiles or the row stack published two frames
-  // that structurally could not contain one.
+  // THE editor validation surface (issue 1444). Five files render it and it reaches NINE
+  // GM-visible surfaces — `scoped/ScopedValidationTab` is one of the five and is an intermediary
+  // rather than a screen, with five callers of its own, so 5 + 5 − 1. The figure written here
+  // used to be "seven renderers", which was neither of those two numbers and matched nothing that
+  // could be measured; issue 1517 replaced it with both counts and the arithmetic between them.
   //
-  // Two, because the surface has two rail ARITIES and one frame cannot hold both.
+  // NEITHER of the original representative frames can contain the surface, and that is
+  // established from the static import closure rather than from looking at a frame: walking every
+  // transitive `.svelte` import, this surface is in neither `ComponentsBrowserView`'s closure nor
+  // `FabricateAppRoot`'s — only `CraftingSystemManagerRoot`'s holds it. So a restyle of the
+  // medallion, the count tiles or the row stack published two frames that structurally could not
+  // contain one. (Three module counts used to be quoted for those three closures. Every one was
+  // stale by issue 1517 and they are dropped rather than reset: they were never the argument, and
+  // a reset buys one commit of accuracy before it rots again.)
+  //
+  // FOUR MEMBERS. The first two are the surface's two rail ARITIES, which one frame cannot hold
+  // both of. The third is the row's View deep link, which neither arity frame can draw. The
+  // fourth is the IN-GROUP ORDER, which none of the first three can show.
   //
   // `manager-checks-validation` is the only published frame that draws it inside
   // `.manager-checks-validation-route`, and that route is the one place its metrics are
@@ -630,14 +639,49 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // twin is NOT listed: the arity is the same in both and the blocked one additionally draws
   // the danger medallion and a Block pill.
   //
-  // Still uncovered, and named rather than left to be discovered: the row's View deep-link,
-  // which renders only where a row carries a `target` and so appears in the recipe editor's
-  // and the Checks route's ISSUE rows rather than in every frame. Whether the lab world's
-  // fixtures put either surface into a state that has one was not established here, so a
-  // change to that button's treatment may publish two frames that do not contain it.
+  // `manager-recipe-edit-validation` is the third member, and it is the ROW'S VIEW DEEP LINK
+  // (issue 1517). That button renders only where a row carries a `target`, and exactly two of the
+  // nine surfaces produce such rows: the recipe editor, whose `recipe/recipeReadiness.js` emits a
+  // target at eleven sites, and the Checks route, which synthesises one in its own tab. The pair
+  // above holds neither — `manager-recipe-item-validation-blocked`'s producer builds its rows
+  // inline with no target at all — so a change to that button published two frames that could not
+  // contain it.
+  //
+  // THE MEMBERSHIP ALONE DID NOT CLOSE THAT GAP, and a first draft of this paragraph said it did.
+  // The case reached the tab by clicking the FIRST Edit button of an A-to-Z list, and it asserted
+  // `.manager-recipe-val-row` — a class every row carries whatever its status, on a tab where
+  // `evaluateRecipeReadiness` always emits its structural ticks. So the selector was satisfied by
+  // construction on every recipe in the corpus and could not reject an all-clear frame: the entry
+  // read SATISFIED while naming a frame that structurally could not contain the button, which is
+  // the issue-1444 defect this whole table exists to refuse, wearing the table's own uniform.
+  //
+  // IT IS CLOSED BY PINNING THE RECIPE AND THE BUTTON. The case now opens
+  // `sm-r-runeplate-draft` by id and asserts `[data-recipe-issue-view]`, the hook the recipe
+  // editor puts on the button itself. Derived rather than assumed: of the lab world's 35 recipes
+  // that one is the ONLY one whose readiness emits an issue carrying a `target`, and
+  // `tests/view-lab-cases.test.js` re-derives that from `buildLabContent()` through the real
+  // `evaluateRecipeReadiness` rather than trusting this sentence. The registry called that
+  // tightening "the change that turns this from evidence into a gate"; this is it.
+  // `manager-checks-validation-retired-placeholder` is the fourth, and it is the ONE PUBLISHED
+  // FRAME IN WHICH THE IN-GROUP SORT IS VISIBLE (issue 1517). The surface lifts blocking rows to
+  // the top of their group, which can only be SEEN where a group holds more than one kind of row
+  // — and the Checks route is the only one that does, drawing a check tick and an issue in the
+  // same subsystem group. `manager-checks-validation` is that route in its clean state, so its
+  // groups are ticks alone; this case types a placement the shim refuses and reaches a CRITICAL
+  // issue, which is the row that rises. Its `sourceMatches` are `apps/manager/checks/` only, so
+  // before this entry a change to the shared surface did not select it at all.
+  //
+  // WHAT THE FRAME SHOWS, stated so a reader can check it: the crafting group's FIRST row is the
+  // `retiredPlaceholderBreaksFormula` row, above that subsystem's ticks. That criterion is
+  // enforced in `tests/components/checks-validation-tab.test.js` rather than folded into this
+  // case's `expectSelector`, deliberately — a positional selector that stops matching fails the
+  // capture job WHOLE and publishes nothing for every case in the run, which is too much to
+  // wager on a fixture's issue set staying single-membered.
   'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([
     'manager-checks-validation',
     'manager-recipe-item-validation-blocked',
+    'manager-recipe-edit-validation',
+    'manager-checks-validation-retired-placeholder',
   ]),
   // The shared empty panel. Both representative frames are POPULATED states — the components
   // browser lists components and the player app shell lists recipes — so the dashed panel this
@@ -1436,6 +1480,31 @@ const ANCHORED_POPOVER_SOURCES = Object.freeze([
   /^src\/ui\/svelte\/actions\/anchoredPopover\.js$/,
   /^src\/ui\/svelte\/util\/overlayBounds\.js$/,
 ]);
+
+/**
+ * The environment editor's directory, MINUS its validation tab (issue 1517).
+ *
+ * Four cases claim that directory — the environments browser, the Events tab, the blind task
+ * weights and the automatic Force add — and **not one of them opens the validation tab**. Because
+ * `EnvironmentValidationTab.svelte` is in the mounted import closure, those four claims were the
+ * only thing keeping `tests/view-lab-source-coverage.test.js` green on it, so the file was not
+ * unclaimed: it was claimed by four frames that structurally cannot contain it. A change to it
+ * published the environments list, the Events tab, a weight field and an open row menu, and every
+ * one of them reported SATISFIED. That is a worse failure than no evidence, and it is the one this
+ * registry exists to prevent.
+ *
+ * A NEGATIVE LOOKAHEAD rather than an explicit alternation of the directory's other members. Every
+ * other file in the directory must stay claimed or the coverage gate reds in the other direction;
+ * an alternation would have to be re-derived by hand every time a file lands there, and the
+ * failure of forgetting is silent — no count of that directory is written here for the same
+ * reason. The exclusion is anchored with `$`, so a future `EnvironmentValidationTab.svelte.js` —
+ * or anything else merely beginning with that name — stays claimed.
+ *
+ * SHARED rather than written out four times: the four cases exclude the same file for the same
+ * reason, and four copies of a regex are four chances for one of them to be edited alone.
+ */
+const ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB =
+  /^src\/ui\/svelte\/apps\/manager\/environment\/(?!EnvironmentValidationTab\.svelte$)/;
 
 export const VIEW_LAB_CASES = Object.freeze([
   managerCase({
@@ -5693,12 +5762,37 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['manager-recipe-edit-validation'],
     reaches: 'exact',
     query: {},
+    // THE RECIPE IS NAMED, and that is the whole difference between this frame and the one it
+    // replaces. `.manager-icon-button[aria-label^="Edit"]` opened whichever row sorted first,
+    // and `adminRecipeRowProjection` sorts A to Z — so the frame landed on a complete recipe
+    // whose validation tab is five green ticks and no View button at all.
+    //
+    // `sm-r-runeplate-draft` is the corpus's one routed-issue recipe: it has ingredient sets and
+    // NO result groups, so readiness raises a critical `noResultGroup` deep-linking to Results
+    // and a warning `disabledIncomplete` deep-linking to Overview. Two buttons, in a tab that
+    // also draws ticks, which is the mixed row stack this member exists to photograph. The id is
+    // pinned the way `manager-recipe-edit-multistep` pins its own.
     steps: [
       'Crafting',
-      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '[data-recipe-edit="sm-r-runeplate-draft"]' },
       { selector: '#recipe-tab-validation' },
     ],
     expectView: 'recipe-edit',
+    // A REPRESENTATIVE FRAME FOR `EditorValidationSurface` SINCE ISSUE 1517, and it had no
+    // assertion at all until then. `expectView` gates the ROUTE, and the route is `recipe-edit`
+    // whichever tab the editor is on — so a renamed tab id published the Overview tab under a
+    // name promising validation, and a change to the surface's rows would have read it as
+    // evidence.
+    //
+    // THE BUTTON, not a row. A row was the first attempt and it could not fail: the surface puts
+    // `manager-recipe-val-row` on every `<li>` whatever its status, and readiness always emits
+    // its structural ticks, so that selector was satisfied by construction on every recipe here.
+    // It rejected a wrong tab and an empty stack and never a missing button — under a case whose
+    // stated subject IS the button. `[data-recipe-issue-view]` is the hook the recipe editor
+    // passes as `viewDataAttr`, so it exists only where a row carried a route and the surface
+    // drew the action. That makes the selector a gate on the thing this member represents, and it
+    // is safe to name because the recipe is pinned above rather than taken from a sort order.
+    expectSelector: '[data-recipe-tab="validation"] [data-recipe-issue-view]',
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/RecipeEditView\.svelte$/,
@@ -7908,7 +8002,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Environment/,
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
-      /^src\/ui\/svelte\/apps\/manager\/environment\//,
+      ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
     ],
   }),
   managerCase({
@@ -8109,7 +8203,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       ' [data-record-inspector="event"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/environment\//,
+      ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
     ],
   }),
@@ -9206,7 +9300,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'environment-edit',
     kinds: ['manager', 'environments'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/environment\//,
+      ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
     ],
   }),
@@ -9264,7 +9358,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector: '.fabricate-manager .fabricate-action-menu-panel [data-action="force-include"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/environment\//,
+      ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
       // The positioning seam (issue 1500). The selector above names an item inside the PORTALED
       // menu panel, which is the only thing in this frame the seam can move, and this is the
@@ -9272,6 +9366,86 @@ export const VIEW_LAB_CASES = Object.freeze([
       // broad-signal override routes changes to that component; it says nothing about the action
       // the component delegates its placement to, so the seam is claimed here.
       ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  managerCase({
+    id: 'manager-environment-validation',
+    label: 'Manager — Environment edit Validation tab',
+    // BEYOND, with an empty label array to match: `screenshotCaptureMap.js` carries no routine for
+    // this tab, so the smoke has no counterpart to fall short of. It is also the pairing this case
+    // has to declare — `tests/view-lab-cases.test.js` requires a `beyond` case to name NO smoke
+    // label, and naming one would make this tab the smoke harness's problem as well as the lab's,
+    // which is a file this change deliberately does not touch.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // THE FIRST FRAME OF THIS TAB, and it is registered BEFORE the change that re-skins it
+    // (issue 1517), so the conversion has a before to be compared against. The gap it closes was
+    // not an absence: four cases claimed this file through the `environment/` directory prefix and
+    // none opens the tab — see `ENVIRONMENT_DIR_EXCEPT_VALIDATION_TAB`, which is the other half of
+    // this entry.
+    //
+    // SHADOW THICKET rather than Sunlit Grove, and the choice is the frame's content. Readiness
+    // always emits its six checks, so any environment draws the check list; what differs is the
+    // ISSUE list, and the grove carries a `sceneUuid` while the thicket does not — so the thicket
+    // is the environment whose `noScene` warning gives this frame a populated issues card and a
+    // non-clear verdict, and the grove would publish "No issues detected." No fixture changes for
+    // it: a `tests/view-lab/world/` edit selects the whole corpus, which is a cost this frame does
+    // not need to incur to show the surface it is registered for.
+    //
+    // WHAT THIS FRAME CANNOT SHOW, measured rather than discovered at review. The tab's deep-link
+    // button is gated on an issue carrying a `recordId`, and exactly two issues carry one:
+    //
+    //   `staleIncluded` needs a record whose composition state is `includedNotMatching`, which is
+    //   assigned ONLY to a manual environment's explicitly included record that fails its match.
+    //   The world holds two manual environments (Shadow Thicket, The Deepvault) and three tagged
+    //   records in total — `hb-task-slowbloom`, `-icecap` and `-ridgemoss`, all `biomes:
+    //   ['mountain']` — and neither manual environment includes any of the three. Everything they
+    //   do include is untagged, so nothing fails a match and the state is unreachable.
+    //
+    //   `taskNoDescription` needs an available task with an empty description. All seven lab
+    //   gathering tasks carry one.
+    //
+    // So no frame of this tab can draw the deep link, on any environment in the corpus, and a
+    // change to that button's treatment is covered by the mounted deep-link test rather than by a
+    // photograph. The tab's other `info` issue is unreachable for a third reason:
+    // `locallyExcluded` needs a `disabledTaskIds` or `disabledEventIds` entry, and no lab
+    // environment declares either. Closing any of these three is a `tests/view-lab/world/` edit,
+    // which selects the whole corpus — a cost this frame does not need to incur to photograph the
+    // surface it is registered for.
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      {
+        selector:
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '#environment-tab-validation' },
+    ],
+    expectView: 'environment-edit',
+    // The ROUTE survives a tab click that did nothing, and every other environment editor case
+    // proves that by opening a different tab of this same route. Without this assertion a strip
+    // rename would publish the Overview tab under a name promising the validation one — the
+    // `manager-import-report` failure, on a screen whose whole subject is the panel this names.
+    //
+    // The PANEL HOOK, not a class: `data-environment-tab` is the site contract every tab in this
+    // editor carries, and the surface's `hookAttrs` seam is what preserves a site's own hooks
+    // through an adoption. A conversion of this tab onto `EditorValidationSurface` keeps it by
+    // passing it as the root hook, exactly as the recipe editor's tab passes `data-recipe-tab`.
+    // Naming a class of the CURRENT markup instead would fail the capture job WHOLE the moment
+    // that markup is replaced — and a capture that fails whole publishes nothing, for every case
+    // in the run.
+    expectSelector: '[data-environment-tab="validation"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      // The tab itself, which no other case can now claim.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/EnvironmentValidationTab\.svelte$/,
+      // Its producer. The same evaluator feeds the tab strip's badge counts, so the four
+      // directory claims keep it too; this is the frame that draws its verdict and its rows.
+      /^src\/ui\/svelte\/apps\/manager\/environment\/environmentReadiness\.js$/,
+      // The host. It owns the tab panel wrapper and the one layout rule only this tab reaches —
+      // `is-inspector-hidden`, which releases the inspector column on the validation tab and on
+      // no other.
+      /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
     ],
   }),
   managerCase({

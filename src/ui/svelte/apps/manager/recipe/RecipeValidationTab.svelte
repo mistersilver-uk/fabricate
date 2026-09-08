@@ -337,7 +337,6 @@
   {groups}
   {statusLabels}
   viewDataAttr="data-recipe-issue-view"
-  viewLabel={text('FABRICATE.Admin.Manager.Recipe.Validation.View', 'View')}
   hookAttrs={{
     root: { 'data-recipe-tab': 'validation', 'aria-label': tabTitle },
     summaryRow: { 'data-recipe-section': 'validation-summary' },
