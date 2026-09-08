@@ -219,9 +219,14 @@ export const KNOWN_OFF_TOKEN_SHADOWS = knownDebt('offTokenShadows');
  * halves, turns each of those rows into two. Same declarations, same ranks, same source order, one
  * more row apiece.
  *
+ * 27 -> 26 with issue 1515's sixth phase, and the row VANISHES rather than shrinking: the recipes
+ * blocked-enable flash was a bespoke TOAST wearing `0 12px 40px var(--fab-overlay-dark-48)`, and
+ * it is a `<Notice blocking>` in the page's own flow now. A notice is a bar rather than a floating
+ * object, so it needs no elevation at all — the debt is PAID by the conversion, not moved.
+ *
  * @see KNOWN_OFF_TOKEN_SHADOWS
  */
-export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 27;
+export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 26;
 
 /**
  * A native `<select>` rendered by a Svelte template, keyed `file`.
@@ -437,9 +442,22 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * two, the remove overlay and the add trigger, and neither is a panel. Nothing else in the phase
  * touches a corner — the option row's own 6px was a published rung and never had a row.
  *
+ * 288 -> 285 with issue 1515's sixth phase (on top of issue 1513's 289 -> 288), three occurrences across two rows and every one of
+ * them a rule DELETED by a conversion rather than a value edited:
+ *
+ *  - `apps/manager/GatheringPartiesTab.svelte | 8px` 3 -> 1, which is TWO rules. The parties
+ *    search row drew its own r8 box and the pane's refusal banner drew another; the row is layout
+ *    only now, with `ManagerSearchField` drawing the pill at the ladder's own 6px, and the banner
+ *    is `<Notice>` at the specimen's r11. The row SURVIVES rather than vanishing because the same
+ *    file draws its create button at r8, and that is a button rather than a field or a banner.
+ *  - `styles/fabricate.css | 10px` 12 -> 11. The recipes blocked-enable toast's r10 goes with the
+ *    rule that drew it, into `<Notice>`'s own r11.
+ *
+ * Re-derived from the JSON at this head rather than reasoned about.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 288;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 285;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -696,9 +714,14 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * raw buttons — the sort-direction switch, the row's select target, and the row's `Edit rules`
  * and `Add to system` routes — are unconverted and stay.
  *
+ * 241 -> 240 with issue 1515's sixth phase, and the row VANISHES rather than shrinking:
+ * `apps/manager/BooksScrollsView.svelte` declared exactly one, the library row's identity
+ * `<button>`, and it carries `data-keyboard-focus="true"` now. That is the whole of that file's
+ * raw-button population, so the slot is closed rather than left open for the next author to fill.
+ *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 241;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 240;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.

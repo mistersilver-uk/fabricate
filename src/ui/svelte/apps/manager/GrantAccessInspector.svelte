@@ -283,9 +283,19 @@
           />
         {/if}
         {#if section.slice.filtered.length === 0}
-          <p class="manager-access-roster-empty" data-access-roster-empty={section.key}>
-            {text('FABRICATE.Admin.Manager.Access.NoMatches', 'No matches')}
-          </p>
+          <!-- THE SHARED NO-STATE PRIMITIVE IN ITS QUIET FORM (issue 1515). This roster sits in a
+               300px inspector column the screen has already drawn a boundary around, and
+               `openspec/specs/design-system/spec.md` rules such an emptiness a NOTE rather than a
+               panel: one quiet line at the column's own scale, with no dashed edge, no fill and no
+               icon tile. That is what the bespoke `<p>` this replaces already drew by hand — the
+               conversion changes the line's scale and its ink, not its shape, and it retires the
+               last hand-rolled no-state message on this screen. -->
+          <EmptyState
+            note
+            title={text('FABRICATE.Admin.Manager.Access.NoMatches', 'No matches')}
+            dataAttr="data-access-roster-empty"
+            dataValue={section.key}
+          />
         {:else}
           <div class="manager-access-roster-rows">
             {#each section.slice.visible as row (row.id)}
@@ -373,9 +383,4 @@
     gap: var(--fab-space-2);
   }
 
-  .manager-access-roster-empty {
-    margin: 0;
-    font-size: 0.74rem;
-    color: var(--fab-text-subtle);
-  }
 </style>

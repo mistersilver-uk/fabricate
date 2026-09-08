@@ -2435,12 +2435,18 @@
   explicitly rather than left to the shared `auto auto 1fr`, which would have handed the
   `1fr` to the PAGER once the duplicate header went.
 
-  `position: relative` is the containing block for the blocked-enable flash, which floats
-  over the list instead of shoving every row down the page when it fires.
+  FOUR TRACKS AS OF ISSUE 1515, not three: the blocked-enable strip is a `<Notice>` in the
+  page's own flow now, in the position the design system fixes for a blocking notice on a
+  browse screen, and its slot is the leading `auto`. The slot is an unconditional child that is
+  empty until a refusal, so the row it occupies is zero-height at rest and no track moves.
+
+  `position: relative` STAYS, and is no longer described by the flash it was introduced for:
+  it is this route's containing block, and retiring the one absolutely positioned element that
+  named it is not a reason to stop declaring one for the rest of the route.
 */
 .fabricate-manager[data-manager-view="recipes"] .manager-main {
   position: relative;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
 /* Tab strip, then the scrolling vocabulary workspace which takes the slack. Named
@@ -7528,48 +7534,28 @@
   font-weight: 600;
 }
 
-/* The blocked-enable flash: an ERROR the GM must be able to read and dismiss. It
-   REPLACES the Foundry notification (which the store suppresses while this owns the
-   message), so it never auto-hides out from under them.
+/* The blocked-enable notice's SLOT (issue 1515). The strip itself is `<Notice>`, which paints
+   its own edge, fill, corner and type and declares `margin: 0` because separation from what
+   sits beneath a notice is the caller's layout — so what is left here is the caller's layout
+   and nothing else.
 
-   It is a TOAST, not a banner. In flow between the toolbar and the list it shoved every
-   row down the page the instant it appeared — the GM's eye followed the movement, not the
-   message, and the row they had just clicked was no longer under the cursor. It now floats
-   bottom-centre over the list (the recipes `.manager-main` is its containing block), on
-   the opaque `--fab-bg-0` so the rows beneath it stay legible as rows. */
-.fabricate-manager .manager-recipe-flash {
-  position: absolute;
-  bottom: 18px;
-  left: 50%;
-  z-index: 40;
-  transform: translateX(-50%);
-  display: flex;
-  gap: var(--fab-space-2);
-  align-items: center;
-  max-width: calc(100% - (2 * var(--fab-space-4)));
-  margin: 0;
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-danger-border);
-  border-radius: 10px;
-  color: var(--fab-text);
-  background: var(--fab-bg-0);
-  box-shadow: 0 12px 40px var(--fab-overlay-dark-48);
-}
+   Four rules stood here before: a bespoke TOAST that floated bottom-centre over the list on
+   `--fab-bg-0`, plus its glyph, its message span and its dismiss button. All four are retired
+   with the conversion. `openspec/specs/design-system/spec.md` fixes a browse screen's element
+   order — a blocking notice sits between the page header and the filter bar — and this route
+   draws no per-view page header, so the notice is the first thing in the content region and
+   is in the page's own flow. What the toast was avoiding is answered by the position rather
+   than by leaving the flow: above the FILTER BAR it never lands between the row a GM just
+   clicked and the cursor.
 
-.fabricate-manager .manager-recipe-flash > i {
-  flex: 0 0 auto;
-  color: var(--fab-danger-text);
-}
-
-.fabricate-manager .manager-recipe-flash-message {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: 0.76rem;
-  font-weight: 600;
-}
-
-.fabricate-manager .manager-recipe-flash-dismiss {
-  flex: 0 0 auto;
+   THE INSET IS CONDITIONAL ON THE SLOT HOLDING SOMETHING. The slot is an unconditional grid
+   child (see the view's own comment for why a conditional one is a defect), so an
+   unconditional padding here would be dead space above the toolbar on every recipes frame.
+   `:has()` is how the slot asks; on an engine without it the whole rule is dropped and the
+   notice renders flush to the panel edge, which is a spacing shortfall rather than a
+   removed affordance. */
+.fabricate-manager .manager-recipe-notice:has(.fab-notice) {
+  padding: var(--fab-space-3) var(--fab-space-3) 0;
 }
 
 /* A flex row: identity grows, the badge run and the actions sit at the end. It WRAPS
@@ -21733,9 +21719,16 @@
 }
 
 /*
-  COMPOSITE SEARCH FIELDS — the World > Parties actor search, add-a-member search and
-  parties search. Each is a bordered ROW holding a leading glyph, a borderless `<input>`
-  and a trailing control, so what a GM reads as "the field" is the row, not the input.
+  COMPOSITE SEARCH FIELDS — the World > Parties add-a-member search and the travel-actor
+  picker's inline field. Each is a bordered ROW holding a leading glyph, a borderless
+  `<input>` and a trailing control, so what a GM reads as "the field" is the row, not the
+  input.
+
+  THE PANE'S OWN PARTIES SEARCH LEFT THIS BLOCK AT ISSUE 1515. It is `ManagerSearchField`
+  now, and that family declares BOTH halves of this same pair for itself
+  (`.fabricate-search input:focus` and `.fabricate-search input:focus-visible`) around the
+  control it owns — so keeping a row-level ring for it would have drawn the treatment twice,
+  at two boundaries, on one field.
 
   The manager's default ring (`input:focus-visible { outline: 2px; outline-offset: 2px }`
   above) is drawn around the INPUT and pushed 2px further out, and Foundry's own
@@ -21753,8 +21746,7 @@
   engine keeps the manager's default 2px outline instead.
 */
 @supports selector(:has(*)) {
-  .fabricate-manager .manager-party-add-search .manager-party-add-query:focus-visible,
-  .fabricate-manager .manager-travel-parties-search .manager-travel-parties-query:focus-visible {
+  .fabricate-manager .manager-party-add-search .manager-party-add-query:focus-visible {
     outline: none;
   }
 
@@ -21765,9 +21757,7 @@
     outline: none;
   }
 
-  .fabricate-manager .manager-party-add-search:has(.manager-party-add-query:focus-visible),
-  .fabricate-manager
-    .manager-travel-parties-search:has(.manager-travel-parties-query:focus-visible) {
+  .fabricate-manager .manager-party-add-search:has(.manager-party-add-query:focus-visible) {
     border-color: var(--fab-accent);
     box-shadow: inset 0 0 0 1px var(--fab-accent);
   }

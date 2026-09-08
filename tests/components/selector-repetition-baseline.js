@@ -29,7 +29,7 @@
  * rather than these 117, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,056 `(at-context, selector)` keys, of which 2,939 appear exactly
+ * Unfiltered, the sheet holds 3,051 `(at-context, selector)` keys, of which 2,934 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -41,7 +41,7 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,580 rules at that head, 117 repeated keys and 239 appearances
+ * printed from. The sheet holds 2,577 rules at that head, 117 repeated keys and 239 appearances
  * between them; five keys appear three times and none appears four or more.
  *
  * ISSUE 1515 DELETED TWO ROWS, which is a shape none of the entries below took: every one of them
@@ -77,6 +77,22 @@
  * because the primitive's family already writes that exact ring. So SIX selectors go while FIVE
  * rules do: the rule count falls to 2,580, the key and singleton counts each fall by six to 3,056
  * and 2,939, and the repeated table is untouched with `pinnedTotal` staying 239 across 117 rows.
+ *
+ * ISSUE 1515 PHASE 6 MOVED THE THREE CONTEXTUAL FIGURES BY DIFFERENT AMOUNTS AGAIN, AND STILL
+ * NONE OF THE REPEATED ONES. Four rules go and one arrives: the recipes blocked-enable flash was
+ * a bespoke floating toast with its own glyph, message and dismiss rules, and it is a `<Notice>`
+ * in the page's flow now, so what the sheet keeps is the SLOT's conditional inset and nothing
+ * else. Two MORE selectors leave without taking a rule with them, and they are the interesting
+ * pair: the composite-search-field focus reset and its inset ring are each written over a list
+ * whose other member is the add-a-member search, and only the parties search's half leaves,
+ * because `ManagerSearchField`'s own family already declares both halves around the control it
+ * owns. So SIX selectors go while THREE rules do net: the rule count falls to 2,577 and the key
+ * and singleton counts each fall by five to 3,051 and 2,934, with the repeated table untouched
+ * and `pinnedTotal` staying 239 across 117 rows.
+ *
+ * RE-DERIVED BY RUNNING THE CENSUS RATHER THAN SUBTRACTED. Two of the six selectors leaving are
+ * list members, which is the shape that CAN move the repeated table, and here it does not: each
+ * names a class only its own row's rules select, so both were singletons in both keyings.
  *
  * THAT LAST FIGURE IS RE-DERIVED RATHER THAN PREDICTED, and the phase's own plan expected it to
  * move. It does not: every one of the six is a singleton in both keyings, because a per-screen

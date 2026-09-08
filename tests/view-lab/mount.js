@@ -164,6 +164,23 @@ function readParams() {
     // deletion of systems can reach. `stripAuthoredWorldComponents` in `labWorld.js` owns that
     // and says why folding the two together would state something false.
     noAuthoredWorldComponents: params.get('noAuthoredWorldComponents') === '1',
+    // Grow the world's non-GM roster to eight, for the two Access frames whose subject is the
+    // Players roster's own pager and its no-match line (issue 1515). It is a SHIM call rather
+    // than a `buildLabWorld` argument, because the roster is `game.users` and nothing in the
+    // world fixture owns it; `installFoundryShim.js` holds the table and says why it is seven
+    // added rather than any other number.
+    //
+    // A SEPARATE FLAG rather than a widening of anything above, for the reason `clearSystem`
+    // records about itself: every other frame in the corpus is photographed against the
+    // two-seat table a resting lab world has, and a roster that grew for all of them would
+    // repaint the Knowledge roster and the recipe editor's context rail without saying so.
+    //
+    // Its COST is stated rather than discovered. Like every param here it sits outside the
+    // marked regions below, so a hunk touching it selects surface coverage rather than the two
+    // frames it moved — and the shim it calls is an unattributed lab input, which resolves the
+    // same way, so narrowing this one line would buy nothing while the other half of the change
+    // is in the same commit.
+    manyPlayers: params.get('manyPlayers') === '1',
     // Evidence-only localization stress. It changes no shipped string and exists solely so the
     // named long-label frame cannot collapse to the ordinary stacked Map frame.
     longTravelLabels: params.get('longTravelLabels') === '1',
@@ -1024,6 +1041,10 @@ async function boot() {
     // A case may override with `viewer=` when the GM/player difference is what it photographs.
     const defaultViewer = params.appId === 'fabricate-app' ? 'player' : 'gm';
     world.shim.setViewer(params.viewer ?? defaultViewer);
+    // BEFORE the services are built, for the same reason the viewer flip is: the manager's
+    // world-user projection reads `game.users.players` when it is constructed and nothing
+    // re-reads it afterwards.
+    if (params.manyPlayers) world.shim.seedPlayerRoster();
     // Before any step can click something that confirms.
     world.shim.setDialogAnswer(params.dialog);
     mounted = await mountAppFor(built.content, params);

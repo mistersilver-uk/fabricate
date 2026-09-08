@@ -85,6 +85,10 @@ const browser = createMountedComponentHarness({
     // rather than hoisted into RECIPE_PRIMITIVES.
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
+    // The blocked-enable strip is the shared `<Notice>` as of issue 1515. The inspector
+    // harness below renders none, so it is named here rather than hoisted; omitting it HANGS
+    // this suite (`# cancelled`) rather than failing it.
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'
@@ -914,9 +918,12 @@ describe('RecipesBrowserView lifted browser state', () => {
     assert.equal(flash.getAttribute('role'), 'alert');
     assert.match(flash.textContent, /This recipe has no result groups\./);
 
-    root.querySelector('[data-recipe-flash-dismiss]').click();
+    // `<Notice dismissable>` stamps no per-caller hook on the control it draws, so the dismiss
+    // is addressed by the primitive's own `data-notice-dismiss` (issue 1515). What the caller
+    // still owns is the `dataAttr` hook on the root, which is what `[data-recipe-flash]` reads.
+    root.querySelector('[data-notice-dismiss]').click();
     flushSync();
-    assert.equal(root.querySelector('[data-recipe-flash]'), null, 'the flash is dismissible');
+    assert.ok(!root.querySelector('[data-recipe-flash]'), 'the flash is dismissible');
   });
 
   it('never reaches for a Foundry notification itself', async () => {

@@ -20,6 +20,7 @@ import {
   minimumViewportFor,
 } from '../scripts/lib/foundryChromeSpec.js';
 import {
+  ACCESS_ROSTER_SEARCH_MISS_TERM,
   ACTOR_KNOWLEDGE_RENDER_FILES,
   BROAD_SIGNAL_CASE_OVERRIDES,
   FALLBACK_CASE_ID,
@@ -1559,8 +1560,11 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
   );
 
   const filtered = getCaseById('manager-world-parties-search-filtered');
+  // The hook on the INPUT, not the row's own class: the field is `ManagerSearchField` as of
+  // issue 1515, whose `class` prop lands on the `<label>` — a `fill` step targeting the label
+  // would throw — so the case types into the `inputAttrs` hook the caller passes through.
   assert.deepEqual(filtered.steps.at(-1), {
-    selector: '.manager-travel-parties-query',
+    selector: '[data-manager-party-search]',
     fill: WORLD_PARTIES_SEARCH_TERM,
   });
   assert.deepEqual(filtered.smokeLabels, []);
@@ -3384,6 +3388,91 @@ test('a region-attributed input widens by union too, and so does a straddling hu
   for (const id of LAB_SURFACE_CASE_IDS) {
     assert.ok(straddling.includes(id), `the straddling hunk dropped coverage frame "${id}"`);
   }
+});
+
+test('the two Access roster frames are pinned to the crowded roster the shim seeds', () => {
+  // A MIRROR GUARD ACROSS FOUR FILES THAT KNOW NOTHING ABOUT EACH OTHER (issue 1515): the two
+  // case literals here, `mount.js`'s query layer, `installFoundryShim.js`'s roster table and
+  // `GrantAccessInspector.svelte`'s own page size. A rename in any one of them leaves a query
+  // parameter nobody reads or a page size nothing fills, and neither failure says anything at
+  // the point it happens — it surfaces as a frame showing a one-row roster under a case named
+  // for a pager, which is exactly the class of defect issue 1632 records as undetectable.
+  //
+  // The ARITHMETIC is derived here rather than restated in the cases, for the reason the World >
+  // Parties page-size block a few hundred lines up gives: two magic numbers in two files drift,
+  // and the drift is invisible in a screenshot.
+  const shimSource = readFileSync(
+    resolve(ROOT, 'tests/view-lab/foundry/installFoundryShim.js'),
+    'utf8'
+  );
+  const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+  const inspectorSource = readFileSync(
+    resolve(ROOT, 'src/ui/svelte/apps/manager/GrantAccessInspector.svelte'),
+    'utf8'
+  );
+
+  // The seeded roster, read off the table rather than off a count the table does not state.
+  const table = /const LAB_EXTRA_PLAYER_USERS = Object\.freeze\(\[([\s\S]*?)\]\);/.exec(shimSource);
+  assert.ok(table, 'the shim no longer declares the opt-in extra player roster this pin reads');
+  const seededNames = [...table[1].matchAll(/name: '([^']+)'/gu)].map((found) => found[1]);
+  assert.ok(seededNames.length > 0, 'the roster table parsed to no users, so nothing below binds');
+  // Plus the resting world's own single non-GM user, which the seeder keeps at the head.
+  const rosterSize = seededNames.length + 1;
+
+  const pageSize = Number(/const ROSTER_PAGE_SIZE = (\d+);/.exec(inspectorSource)?.[1]);
+  assert.ok(Number.isInteger(pageSize) && pageSize > 0, 'the inspector states no roster page size');
+
+  // The two claims the paged frame rests on, in the order they fail: a FULL first page, and a
+  // SECOND page to put a bar under it. A roster that fell to the page size satisfies the first
+  // and not the second, and would publish a full page with no pager.
+  assert.ok(
+    rosterSize >= pageSize,
+    `the seeded roster is ${rosterSize} and the page size ${pageSize}, so page one is not full ` +
+      'and the selector the paged frame declares cannot resolve'
+  );
+  assert.ok(
+    rosterSize > pageSize,
+    `the seeded roster is ${rosterSize} at a page size of ${pageSize}, which is ONE page — so ` +
+      'the pager the frame is named for does not render at all'
+  );
+
+  const paged = getCaseById('manager-access-recipe-roster-paged');
+  const noMatch = getCaseById('manager-access-recipe-roster-no-match');
+  for (const viewCase of [paged, noMatch]) {
+    assert.equal(viewCase.query?.manyPlayers, '1', `${viewCase.id} must ask for the crowded roster`);
+    assert.equal(viewCase.query?.system, 'lab-alchemy', `${viewCase.id} needs a restricted system`);
+    assert.deepEqual(viewCase.smokeLabels, [], `${viewCase.id} has no smoke counterpart`);
+    assert.equal(viewCase.reaches, 'beyond', `${viewCase.id} is beyond the smoke walk`);
+  }
+
+  // The flag, end to end. Both halves, because reading the param without acting on it and acting
+  // on a param nothing parses fail in opposite directions and both render the resting roster.
+  assert.match(mountSource, /manyPlayers: params\.get\('manyPlayers'\) === '1'/);
+  assert.match(mountSource, /if \(params\.manyPlayers\) world\.shim\.seedPlayerRoster\(\);/);
+  assert.match(shimSource, /seedPlayerRoster\(\) \{/);
+
+  // The paged frame's selector names the page size it was derived from, so a page size that
+  // changed without this case changing with it fails here rather than in a capture.
+  assert.ok(
+    paged.expectSelector.includes(`[data-access-player-row]:nth-child(${pageSize})`),
+    `the paged case must name the roster's own page size (${pageSize}) as the row it proves`
+  );
+
+  // And the miss term misses. `matches()` in the inspector is a case-insensitive substring test
+  // over the user's name, so this is the same predicate the screen runs.
+  const needle = ACCESS_ROSTER_SEARCH_MISS_TERM.trim().toLowerCase();
+  assert.ok(needle.length > 0, 'an empty term matches everything and the no-match frame is a lie');
+  const hits = ['Lab Player', ...seededNames].filter((name) =>
+    name.toLowerCase().includes(needle)
+  );
+  assert.deepEqual(
+    hits,
+    [],
+    `${ACCESS_ROSTER_SEARCH_MISS_TERM} matches ${hits.join(', ')}, so the no-match frame would ` +
+      'publish a roster row under a case named for the line that stands in for one'
+  );
+  assert.equal(noMatch.steps.at(-1).fill, ACCESS_ROSTER_SEARCH_MISS_TERM);
+  assert.equal(noMatch.steps.at(-1).selector, '[data-access-roster-search="players"]');
 });
 
 test('the registry counts quoted in prose match the registry', () => {

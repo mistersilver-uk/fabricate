@@ -45,6 +45,7 @@
     deriveRecipeStatuses,
   } from '../../../../utils/recipeBrowserModel.js';
   import IconButton from '../../components/IconButton.svelte';
+  import Notice from '../../components/Notice.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
 
@@ -121,11 +122,23 @@
   // test and keeps the suppression invariant enforceable.
   let flashMessage = $state('');
 
+  // A REFUSAL COUNTER, WHICH THE SHARED NOTICE MAKES NECESSARY (issue 1515). `Notice` owns its
+  // own dismissal — `library.html:1060` declares `dismissable` as a boolean with no caller to
+  // tell, so the component simply leaves the DOM — and this view's message is not always new.
+  // Clearing the term and setting it again inside ONE toggle is a single batched update, so the
+  // `{#if}` never goes false and the same component instance survives with `dismissed` still
+  // true: refuse, dismiss, refuse the same recipe again, and the second refusal would be
+  // silent. Keying the block on a counter that rises on every refusal is what makes each one a
+  // new notice, which is the behaviour the bespoke strip had for free by clearing the caller's
+  // own state on dismissal.
+  let flashToken = $state(0);
+
   function handleToggleEnabled(recipe) {
     flashMessage = '';
     onToggleEnabled(recipe.id, recipe.enabled === false, {
       onBlocked: (message) => {
         flashMessage = message;
+        flashToken += 1;
       },
     });
   }
@@ -447,6 +460,44 @@
   what the breadcrumb and the titlebar's gold system badge already said.
 -->
 <main class="manager-main" aria-label={text('FABRICATE.Admin.Manager.Nav.Recipes', 'Recipes')}>
+  <!--
+    THE BLOCKED-ENABLE NOTICE, WHICH IS THE SHARED PRIMITIVE NOW (issue 1515).
+
+    It still REPLACES the Foundry notification — the store suppresses its own toast while this
+    view owns the message through the `onBlocked` sink — so it is the only place a GM is told
+    why the switch did not move, and it still does not auto-hide.
+
+    TWO THINGS CHANGED, and both are the design system's rulings rather than preferences.
+    `openspec/specs/design-system/spec.md` routes a strip carrying `role="alert"` to a BLOCKING
+    notice, which is the one form that keeps the role, and it fixes a browse screen's element
+    order: a blocking notice sits between the page header and the filter bar. This route has no
+    per-view page header, so that position is the first child of the content region. The bespoke
+    toast that floated bottom-centre over the list is therefore retired, along with the four
+    `.manager-recipe-flash*` rules that painted it: a notice is a bar in the page's own flow, and
+    a second geometry for the same meaning is exactly what the primitive exists to remove.
+
+    THE SLOT IS UNCONDITIONAL AND THE NOTICE INSIDE IT IS NOT. `.manager-main` is a grid whose
+    tracks this route names explicitly, so a CONDITIONAL direct child would move the collapsing
+    `minmax(0, 1fr)` onto a different child in each state — the defect
+    `assertOneTrackPerGridChild` names on three other routes. An empty slot is a zero-height
+    `auto` row, and the sheet gives it its inset only when it holds a notice.
+  -->
+  <div class="manager-recipe-notice">
+    {#key flashToken}
+      {#if flashMessage}
+        <Notice
+          blocking
+          tone="danger"
+          icon="fas fa-circle-exclamation"
+          title={flashMessage}
+          dismissable
+          dismissLabel={text('FABRICATE.Admin.Manager.Recipe.DismissFlash', 'Dismiss')}
+          dataAttr="data-recipe-flash"
+        />
+      {/if}
+    {/key}
+  </div>
+
   <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop
        (issue 1157) — see the twin note in `EssenceBrowserView`. The manager root lands the
        keyboard here when an action empties the bulk selection and unmounts the panel that
@@ -641,29 +692,6 @@
       onClear={clearBulkSelection}
     />
   </ManagerToolbar>
-
-  {#if flashMessage}
-    <!-- The blocked-enable flash. It REPLACES the Foundry notification (the store
-         suppresses it when this owns the message) so the GM is never told the same
-         thing twice; it is an error, so it is a dismissible role="alert" that does
-         not auto-hide.
-
-         It FLOATS over the list (absolutely positioned against the recipes
-         `.manager-main`), rather than sitting in flow between the toolbar and the
-         first row, where its appearance shoved every row down the page. -->
-    <div class="manager-recipe-flash" role="alert" data-recipe-flash>
-      <i class="fas fa-circle-exclamation" aria-hidden="true"></i>
-      <span class="manager-recipe-flash-message">{flashMessage}</span>
-      <IconButton
-        class="manager-recipe-flash-dismiss"
-        data-recipe-flash-dismiss=""
-        ariaLabel={text('FABRICATE.Admin.Manager.Recipe.DismissFlash', 'Dismiss')}
-        onclick={() => (flashMessage = '')}
-      >
-        <i class="fas fa-times" aria-hidden="true"></i>
-      </IconButton>
-    </div>
-  {/if}
 
   <section
     class="manager-table-scroll"

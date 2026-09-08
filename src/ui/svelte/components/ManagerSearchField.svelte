@@ -10,9 +10,12 @@
   gathering task editor's four, the access and knowledge rosters, both realm-environment
   columns, the Tool Studio's library card, the vocabulary panel's search row, the world
   scope's system-rules roster and the manager root's two. A field folded into the bar would have forced a bar around each
-  of them, which is a redesign of nine screens rather than an extraction. The bar has
-  eleven sites and one of them (`BooksScrollsView.svelte:279`) has no field at all.
-  Two components with an eleven-and-nineteen split is what the tree contains.
+  of them, which is a redesign of nine screens rather than an extraction. The bar had
+  eleven sites and one of them (`BooksScrollsView.svelte`) had no field at all — issue 1515
+  gave it one, which settles the question the census left open rather than changing the
+  argument: a bar without a field is what made a bar that RENDERS one wrong, and it is now
+  twelve bars with twelve fields.
+  Two components with an eleven-and-nineteen split is what the tree contained.
 
   Before this component the field was a CSS CONVENTION: `class="manager-search"` on a
   `<label>` wrapping an `<i class="fas fa-search">` and an `<input type="search">`, and
@@ -88,15 +91,22 @@
   either one needs an element-ref seam this primitive does not have and should not grow
   for two callers.
 
-  ── FIVE HAND-ROLLED TWINS ARE OUT OF SCOPE, RECORDED RATHER THAN CONVERTED ───────
-  `GatheringPartiesTab.svelte:259` and `PartyAddMemberPanel.svelte:136` render a `<div>`
-  with a `fa-magnifying-glass` glyph and a bare `<input>`;
-  `recipe-item/RecipeItemLimitsTab.svelte:531` and `:631` render
+  ── FOUR HAND-ROLLED TWINS ARE OUT OF SCOPE, RECORDED RATHER THAN CONVERTED ───────
+  `PartyAddMemberPanel.svelte:136` renders a `<div>` with a `fa-magnifying-glass` glyph
+  and a bare `<input>`; `recipe-item/RecipeItemLimitsTab.svelte:531` and `:631` render
   `class="manager-tag-search"` with `role="combobox"`; and
   `GatheringEconomyView.svelte:449` is a bare `<input type="search">` with no wrapper
   and no icon. None of them writes `manager-search`, none is painted by the rules
   above, and each would be a re-skin rather than a conversion — a change with visible
   output and its own review. They are named here so their absence is a decision.
+
+  THE FIFTH WAS `GatheringPartiesTab.svelte`, AND ISSUE 1515 IS THE REVIEW THIS CLAUSE
+  ASKED FOR. It is written out rather than deleted, because the clause's own terms are what
+  carried it: the pane's row was a bordered 32px box at an 8px corner on `--fab-bg-0`, a
+  second set of numbers for the shipped pill, so the conversion is visible output — the
+  field is the 34px rung at a 6px corner now — and it came with the two focus rules that
+  row had in `styles/fabricate.css` retired, because this family declares both halves of
+  that pair around the control it owns.
 
   ── NO SCOPED STYLE, AND WHY ──────────────────────────────────────────────────────
   Like `ManagerButton`, `IconButton` and `InspectorCard`, this leaf has no scoped

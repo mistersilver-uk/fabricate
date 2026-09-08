@@ -342,6 +342,40 @@ const LAB_ROLL_STATICS = {
   },
 };
 
+/**
+ * THE PLAYER ROSTER A CROWDED WORLD HAS, seeded on request rather than by default (issue 1515).
+ *
+ * `game.users.players` holds ONE non-GM user in the resting lab world, which is truthful for a
+ * two-seat table and leaves two states of the Access route's Players roster unreachable: it pages
+ * at seven and its per-roster search only has something to miss once there is something to find.
+ * Two frames photograph those states, and nothing else in the corpus asks for them — so this
+ * table is OPT-IN, reached only through `mount.js`'s `manyPlayers` query flag, and every other
+ * frame keeps the roster it had.
+ *
+ * SEVEN, and the number is derived rather than chosen: the roster pages at
+ * `GrantAccessInspector.svelte`'s `ROSTER_PAGE_SIZE` of six, so seven added to the resting one is
+ * the smallest roster that fills a page AND has a second one. `tests/view-lab-cases.test.js`
+ * re-derives that arithmetic from this table and from the component's own constant rather than
+ * restating either, because a fixture that quietly fell to six would publish a full page with no
+ * bar under a case named for the bar.
+ *
+ * NAMES AND ROLES ARE BOTH LOAD-BEARING. The manager sorts this roster by name
+ * (`SvelteCraftingSystemManagerApp.svelte.js`'s `getWorldUsers`), so the names decide which six
+ * land on page one and an alphabet is the only way to make that stable and readable. The roles
+ * decide the subtitle each row draws, and the two a grantable user can actually hold — Player and
+ * Trusted Player — are both represented, because a roster drawing one subtitle eight times
+ * photographs a field that could be a constant.
+ */
+const LAB_EXTRA_PLAYER_USERS = Object.freeze([
+  { id: 'user-lab-player-bram', name: 'Bram Holt', role: 1, css: '#a3c9a8' },
+  { id: 'user-lab-player-cass', name: 'Cass Vane', role: 2, css: '#e0b1cb' },
+  { id: 'user-lab-player-doryn', name: 'Doryn Vale', role: 1, css: '#ffb703' },
+  { id: 'user-lab-player-elspeth', name: 'Elspeth Rue', role: 1, css: '#bde0fe' },
+  { id: 'user-lab-player-ferrin', name: 'Ferrin Ashe', role: 2, css: '#c77dff' },
+  { id: 'user-lab-player-goss', name: 'Goss Merrow', role: 1, css: '#90be6d' },
+  { id: 'user-lab-player-hallis', name: 'Hallis Tarn', role: 1, css: '#f4a261' },
+]);
+
 export function installFoundryShim(world) {
   const random = installLabRandom({ seed: world.seed });
   const utils = createUtils(random.randomID);
@@ -364,16 +398,29 @@ export function installFoundryShim(world) {
     id: 'user-lab-player',
     name: 'Lab Player',
     isGM: false,
+    // DECLARED, and it was not before (issue 1515). `Users#players` is
+    // `!u.isGM && u.hasRole('PLAYER')`, so a roster entry with no role at all is not a player
+    // Foundry would put in that array — and the manager reads the field to draw each row's
+    // subtitle, which rendered `None` for the one user the lab had. A role-NONE user cannot be
+    // granted a recipe, so the frame was drawing an ungrantable target in a grant roster.
+    role: 1,
     color: { css: '#8ecae6' },
   };
+
+  // Rebuilt rather than mutated when the crowded roster is asked for: `createCollection` closes
+  // over the array it was handed AND over an id map built once, so pushing into `contents` would
+  // leave `game.users.get()` unable to find anything added.
+  function usersCollection(players) {
+    return Object.assign(createCollection([gmUser, ...players]), {
+      activeGM: gmUser,
+      players,
+    });
+  }
 
   const game = {
     ready: true,
     user: gmUser,
-    users: Object.assign(createCollection([gmUser, playerUser]), {
-      activeGM: gmUser,
-      players: [playerUser],
-    }),
+    users: usersCollection([playerUser]),
     actors: Object.assign(createCollection(world.actorList), {
       // The smoke imports its crafter and travel member from the hero pack rather than creating
       // them, so this is the call that decides who owns the inventory every craftability frame reads.
@@ -756,6 +803,29 @@ export function installFoundryShim(world) {
      */
     setViewer(role) {
       game.user = role === 'player' ? playerUser : gmUser;
+    },
+    /**
+     * Grow the world's non-GM roster to the crowded shape two Access frames need (issue 1515).
+     *
+     * Called from `mount.js` after the world is built and before the manager's services are, for
+     * `setViewer`'s reason: `getWorldUsers()` reads `game.users.players` when the projection is
+     * built, so the roster has to be in place by then and nothing re-reads it afterwards.
+     *
+     * @returns {number} How many non-GM users the roster now holds, so a caller can assert it.
+     */
+    seedPlayerRoster() {
+      const players = [
+        playerUser,
+        ...LAB_EXTRA_PLAYER_USERS.map(({ id, name, role, css }) => ({
+          id,
+          name,
+          isGM: false,
+          role,
+          color: { css },
+        })),
+      ];
+      game.users = usersCollection(players);
+      return players.length;
     },
     /**
      * Choose how the lab answers a dialog Foundry would wait on a human for: `open` to leave it

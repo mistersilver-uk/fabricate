@@ -1834,8 +1834,8 @@ test("the repetition ledger publishes the figures the sheet actually produces", 
 });
 
 test("the module sheet's cross-list selector repetition does not move", () => {
-  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 3,056 `(at-context, selector)`
-  // keys under this very keying, of which 2,939 appear exactly once; `assertRatchet` compares key
+  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 3,051 `(at-context, selector)`
+  // keys under this very keying, of which 2,934 appear exactly once; `assertRatchet` compares key
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.

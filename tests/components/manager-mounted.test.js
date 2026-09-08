@@ -7858,9 +7858,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(flash, 'the refusal the store pushes back through the sink renders in-window');
     assert.equal(flash.getAttribute('role'), 'alert');
     assert.match(flash.textContent, /This recipe has no result groups\./);
-    target.querySelector('[data-recipe-flash-dismiss]').click();
+    // The dismiss control is the shared `<Notice>`'s own as of issue 1515 — the primitive takes
+    // no per-caller hook for it — while the root keeps the caller's `data-recipe-flash`.
+    target.querySelector('[data-notice-dismiss]').click();
     flushSync();
-    assert.equal(target.querySelector('[data-recipe-flash]'), null, 'the flash is dismissible');
+    assert.ok(!target.querySelector('[data-recipe-flash]'), 'the flash is dismissible');
 
     // The recipes header no longer renders crafting-system import/export.
     assert.ok(
@@ -8622,7 +8624,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const searchStep = VIEW_LAB_CASES.find(
       (entry) => entry.id === 'manager-world-parties-search-filtered'
     ).steps.at(-1);
-    assert.equal(searchStep.selector, '.manager-travel-parties-query');
+    assert.equal(searchStep.selector, '[data-manager-party-search]');
     setInputValue(target.querySelector(searchStep.selector), searchStep.fill);
     await tick();
     flushSync();

@@ -2076,6 +2076,7 @@
           "RecipeCount": "{n} recipes",
           "Recipes": "Recipes",
           "RecipesInside": "Recipes inside",
+          "Search": "Search recipe items",
           "SelectHint": "Select a recipe item to see its page.",
           "SelectItem": "Select {name}",
           "StatusAll": "All statuses",
