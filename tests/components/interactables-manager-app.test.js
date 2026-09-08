@@ -21,9 +21,12 @@ import { fileURLToPath } from 'node:url';
 import {
   SMOKE_SOURCE,
   assertLocatorsEmitted,
-  classTokensMatching,
-  dataHooksMatching,
+  prefixedTokensIn,
 } from '../helpers/interactablesSmokeLocators.js';
+import {
+  MANAGE_PANEL_CONTRACT,
+  assertWindowContract,
+} from '../helpers/interactablesWindowContract.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appSource = readFileSync(
@@ -44,64 +47,6 @@ const segmentedSource = readFileSync(
   resolve(__dirname, '../../src/ui/svelte/apps/manager/SegmentedControl.svelte'),
   'utf8'
 );
-
-/**
- * Every control family this root imports from the shared library, and where each one lives.
- *
- * The IMPORT PATH is pinned, not merely the identifier: an adoption that reached for a local
- * copy is not this window joining the library. `SegmentedControl` is the one entry whose path is
- * `apps/manager/` rather than `components/`, and that is recorded rather than smoothed over -
- * issue 1509 moves it, and this pin is what makes the move visible here when it lands.
- */
-const ADOPTED_PRIMITIVES = Object.freeze([
-  ['Chip', '../../components/Chip.svelte'],
-  ['Field', '../../components/Field.svelte'],
-  ['IconButton', '../../components/IconButton.svelte'],
-  ['InspectorCard', '../../components/InspectorCard.svelte'],
-  ['ManagerButton', '../../components/ManagerButton.svelte'],
-  ['Select', '../../components/Select.svelte'],
-  ['SegmentedControl', '../manager/SegmentedControl.svelte'],
-]);
-
-/**
- * The `fab-im-*` names that survive the conversion, EXACTLY.
- *
- * Every one is this window's own LAYOUT - the header rhythm, the toolbar row, the promote card's
- * hint and action row, the list and its rows - which is the half a shared primitive cannot own.
- * No control family is on this list, and that is the assertion.
- *
- * The whole family also MOVED, from `styles/fabricate.css` into this root's own scoped block:
- * those 29 sheet rules were the only thing keeping the panel's appearance rooted at an
- * application class, so a scoped block is what makes the window host-independent.
- * `fabricate-interactables-manager-body` is deliberately NOT here - it stays in the sheet,
- * because the window's scroll containment is its frame contract rather than its content layout.
- *
- * THREE ENTRIES ARE NOT CLASSES AT ALL, and they are on the list because the scan reads the
- * prefix wherever it is written: `fab-im-source-type`, `fab-im-visual-mode` and
- * `fab-im-marker-kind` are the radio groups' `name` attributes, carried across the conversion
- * byte for byte. Pinning them here is what keeps a rename from silently detaching the Foundry
- * smoke's own radio locator from the group it addresses.
- */
-const SURVIVING_LAYOUT_CLASSES = Object.freeze([
-  'fab-im-empty',
-  'fab-im-header',
-  'fab-im-list',
-  'fab-im-list-section',
-  'fab-im-marker-kind',
-  'fab-im-promote',
-  'fab-im-promote-actions',
-  'fab-im-promote-hint',
-  'fab-im-row',
-  'fab-im-row-actions',
-  'fab-im-row-main',
-  'fab-im-row-meta',
-  'fab-im-row-name',
-  'fab-im-source-type',
-  'fab-im-subtitle',
-  'fab-im-title',
-  'fab-im-toolbar',
-  'fab-im-visual-mode',
-]);
 
 describe('InteractablesManagerApp singleton window', () => {
   it('is an ApplicationV2 + SvelteApplicationMixin app keyed by a stable id', () => {
@@ -356,31 +301,11 @@ describe('InteractablesManagerRoot body', () => {
     assert.ok(/\n\s*name=\{groupName\}/.test(segmentedSource), 'SegmentedControl honours groupName');
   });
 
-  // THE PANEL'S STYLING CONTRACT, STATED FORWARD (issue 1520).
+  // THE PANEL'S STYLING CONTRACT, STATED FORWARD (issue 1520). The statement and this panel's
+  // own allow-list both live in `tests/helpers/interactablesWindowContract.js`, shared with the
+  // browser's and the config panel's copies of this clause.
   it('renders the shared control primitives and keeps only its own layout classes', () => {
-    assert.ok(
-      rootSource.includes('class="fabricate-interactables-manager-body"'),
-      'root element carries the namespaced class'
-    );
-
-    for (const [primitive, path] of ADOPTED_PRIMITIVES) {
-      assert.ok(
-        rootSource.includes(`import ${primitive} from '${path}'`),
-        `${primitive} is imported from ${path}`
-      );
-      // ...and it is RENDERED, because an unused import adopts nothing.
-      assert.ok(
-        new RegExp(`<${primitive}[\\s/>]`).test(rootSource),
-        `${primitive} is rendered by the panel`
-      );
-    }
-
-    const residue = [...new Set(rootSource.match(/fab-im-[a-z-]+/g) ?? [])].sort();
-    assert.deepEqual(
-      residue,
-      [...SURVIVING_LAYOUT_CLASSES],
-      "the surviving fab-im-* names are exactly this window's own layout"
-    );
+    assertWindowContract({ rootSource, contract: MANAGE_PANEL_CONTRACT });
   });
 
   // EVERY LOCATOR THE SMOKE USES IS STILL EMITTED (issue 1520).
@@ -394,14 +319,14 @@ describe('InteractablesManagerRoot body', () => {
   // of which are shared with the config panel's own copy of this clause.
   it('still emits every locator the Foundry smoke drives against this panel', () => {
     assertLocatorsEmitted({
-      locators: dataHooksMatching(SMOKE_SOURCE, 'data-interactable-manager-'),
+      locators: prefixedTokensIn(SMOKE_SOURCE, 'data-interactable-manager-'),
       rootSource,
       floor: 6,
       what: 'manage-panel hooks',
       root: 'the interactables manager root',
     });
     assertLocatorsEmitted({
-      locators: classTokensMatching(SMOKE_SOURCE, 'fab-im-'),
+      locators: prefixedTokensIn(SMOKE_SOURCE, 'fab-im-'),
       rootSource,
       floor: 3,
       what: 'manage-panel layout classes',
