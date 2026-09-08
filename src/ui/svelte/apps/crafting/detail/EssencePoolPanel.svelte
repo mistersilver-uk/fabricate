@@ -26,6 +26,8 @@
   import Stepper from '../../../components/Stepper.svelte';
   import EssenceContribution from './EssenceContribution.svelte';
   import Kicker from '../../../components/Kicker.svelte';
+  import FillBar from '../../../components/FillBar.svelte';
+  import EmptyState from '../../manager/EmptyState.svelte';
 
   let {
     // `craftability.essencePool` — requirements, carriers, allocation, suggested.
@@ -70,11 +72,46 @@
     return delivered > 0 ? 'partial' : 'short';
   }
 
-  function meterWidth(requirement) {
+  function meterPercent(requirement) {
     const need = Number(requirement?.need ?? 0);
-    if (need <= 0) return '100%';
-    const pct = Math.min(100, Math.round((Number(requirement?.delivered ?? 0) / need) * 100));
-    return `${pct}%`;
+    if (need <= 0) return 100;
+    return Math.min(100, Math.round((Number(requirement?.delivered ?? 0) / need) * 100));
+  }
+
+  /**
+   * The bar's SEMANTIC tone, for a requirement whose essence declares no colour.
+   *
+   * These are the three fills the deleted `.essence-pool-bar-fill` state rules painted, moved
+   * from CSS onto the prop `FillBar` publishes for exactly this: a scoped block in this file
+   * cannot reach a child component's element, so the state that used to be a descendant
+   * selector has to arrive as data. `short` is `delivered === 0`, so its danger fill renders at
+   * 0% width and was never visible — it is stated anyway, because the three states of the
+   * matrix are declared together here as they were there.
+   *
+   * @param {object} requirement one pool requirement
+   * @returns {string} a `FillBar` tone
+   */
+  function meterTone(requirement) {
+    const state = meterState(requirement);
+    if (state === 'met') return 'success';
+    return state === 'short' ? 'danger' : 'accent';
+  }
+
+  /**
+   * A COLOURED essence keeps its own colour in every state, so the bar you fill reads as the
+   * same essence as the pip you filled it from — which is what the deleted `has-tint` triple
+   * said in CSS. `--fab-chip-color` is declared by `tintOf` on the meter this bar sits in and
+   * INHERITS into the bar, so the caller hands the primitive a reference rather than a value
+   * and no colour literal reaches this file.
+   *
+   * Losing the green does not lose the STATE: the ratio beside the name reads `5/5`, the fill
+   * reaches full width, and `data-essence-meter-state` still says `met`.
+   *
+   * @param {object} requirement one pool requirement
+   * @returns {string} a CSS colour reference, or '' to leave the tone in charge
+   */
+  function meterColor(requirement) {
+    return tintTokenOf(requirement) ? 'var(--fab-chip-color)' : '';
   }
 
   // Per-unit essence yields of one carrier, multiplied by the units currently
@@ -125,6 +162,10 @@
               >{requirement.delivered ?? 0}/{requirement.need ?? 0}</span
             >
           </div>
+          <!-- THE SHARED `FillBar` (issue 1514), inside the wrapper that keeps the ARIA. The
+               primitive is a LEAF by contract — no caption, no readout, no `role`, no `aria-*`
+               — so the `progressbar` role and all three `aria-value*` attributes stay on this
+               caller's own element, which is the only thing that element still does. -->
           <div
             class="essence-pool-bar"
             role="progressbar"
@@ -137,7 +178,12 @@
               need: requirement.need ?? 0,
             })}
           >
-            <span class="essence-pool-bar-fill" style={`width:${meterWidth(requirement)}`}></span>
+            <FillBar
+              size="sm"
+              value={meterPercent(requirement)}
+              tone={meterTone(requirement)}
+              color={meterColor(requirement)}
+            />
           </div>
         </div>
       {/each}
@@ -147,7 +193,7 @@
       <Kicker as="span">{localize('FABRICATE.App.Crafting.Pool.AddComponents')}</Kicker>
     </p>
     {#if carriers.length === 0}
-      <p class="essence-pool-empty">{localize('FABRICATE.App.Crafting.Pool.NoCarriers')}</p>
+      <EmptyState note hint={localize('FABRICATE.App.Crafting.Pool.NoCarriers')} />
     {:else}
       <ul class="essence-pool-carriers">
         {#each carriers as carrier (carrier.itemKey)}
@@ -318,58 +364,22 @@
     color: var(--fab-text);
   }
 
+  /* LAYOUT AND ARIA ONLY (issue 1514). The track, its corner, its ground and its fill are
+     `FillBar`'s now; this element survives to carry the `progressbar` role and the three
+     `aria-value*` attributes the primitive deliberately does not emit, and to give the bar a
+     block box to fill. The five fill-state rules that lived here — the base tint, the
+     met/partial/short trio and the `has-tint` triple — became the `tone` and `color` props
+     `meterTone` and `meterColor` derive, because a scoped block cannot reach inside a child
+     component to paint its fill.
+
+     ONE THING IS LOST AND IT IS RECORDED RATHER THAN WORKED AROUND: the fill had a
+     `transition: width 0.2s ease` with a `prefers-reduced-motion` escape, and `FillBar` has
+     neither, so the bar now moves instantly as units are stepped. Reaching into the primitive
+     with a `:global()` rule from here would be this file re-styling a component it does not
+     own, which is the whole reason the fill states above moved to props. A `transition` the
+     primitive owns is what would close it. */
   .essence-pool-bar {
-    height: 6px;
-    border-radius: 999px;
-    background: var(--fab-surface-active);
-    overflow: hidden;
-  }
-
-  .essence-pool-bar-fill {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
-    background: var(--fab-chip-color, var(--fab-accent));
-    transition: width 0.2s ease;
-  }
-
-  .essence-pool-meter.is-met .essence-pool-bar-fill {
-    background: var(--fab-success);
-  }
-
-  /* `partial` restates the tint the base rule already paints, so the three states of the
-     matrix are declared together rather than one of them being an implicit default. */
-  .essence-pool-meter.is-partial .essence-pool-bar-fill {
-    background: var(--fab-chip-color, var(--fab-accent));
-  }
-
-  .essence-pool-meter.is-short .essence-pool-bar-fill {
-    background: var(--fab-danger);
-  }
-
-  /* A COLOURED essence keeps its own colour in every state, so the bar you fill reads as the
-     same essence as the pip you filled it from. Without this the bar tracked the essence
-     while `partial` and then flipped to green the moment it was satisfied — the one moment
-     the player is looking at it — so the colour that identified it was dropped exactly when
-     it mattered.
-
-     Losing the green does not lose the STATE: the ratio beside the name reads `5/5`, the
-     fill reaches full width, and `data-essence-meter-state` still says `met`. The state was
-     always carried by those three; the fill colour only reinforced it. (`is-short` is
-     `delivered === 0`, so its danger fill renders at 0% width and was never visible.)
-
-     An essence with NO colour is untouched and keeps the success/danger palette it has
-     today — which the lab world exercises, since its `air` essence declares no colour. */
-  .essence-pool-meter.has-tint.is-met .essence-pool-bar-fill,
-  .essence-pool-meter.has-tint.is-partial .essence-pool-bar-fill,
-  .essence-pool-meter.has-tint.is-short .essence-pool-bar-fill {
-    background: var(--fab-chip-color);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .essence-pool-bar-fill {
-      transition: none;
-    }
+    display: flex;
   }
 
   /* LAYOUT ONLY. This sub-label kept its own 10px rung when the section title above it
@@ -378,12 +388,6 @@
      the one margin that separates it from the meters above, which the kicker zeroes. */
   .essence-pool-subtitle {
     margin: var(--fab-space-1) 0 0;
-  }
-
-  .essence-pool-empty {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
   }
 
   .essence-pool-carriers,

@@ -130,8 +130,18 @@ export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
  * banked on `offLadderArtSizes`. Nothing else in that phase declares a height at all: the two
  * banners, the fourteen empties and the five eyebrows it converts each hand their geometry to a
  * primitive that states its own.
+ *
+ * 65 after the FIFTH phase moved the Crafting tab's picker-option portrait onto `<Avatar
+ * shape="square" size={32}>`, which is the fourth instance of the same reading and the last of
+ * them: `ComponentSourcesBar | height | 32` VANISHES because it was a 32x32 PORTRAIT WELL rather
+ * than a control, its box is the primitive's interpolated `style` attribute now, and the size is
+ * unchanged and banked on `offLadderArtSizes`. The SAME file's `height | 40` and `min-height | 40`
+ * rows do NOT move, and the difference is the point: those two are the source-actor BUTTON, which
+ * is a real control at a retired rung and stays exactly 40px through the conversion — the tile
+ * nested inside it takes the 40 from the primitive's `style` attribute, and the button's own
+ * declaration is what keeps the row's hit target where it was.
  */
-export const KNOWN_RETIRED_HEIGHT_TOTAL = 66;
+export const KNOWN_RETIRED_HEIGHT_TOTAL = 65;
 
 /**
  * The per-corpus height-declaration counts the floors were CHOSEN AGAINST, at the commit that
@@ -159,7 +169,6 @@ export const FLOOR_REFERENCE_SVELTE_DECLARATIONS = 440;
 /** `'file | property | value | count | raw => resolved [; …]'`, in code-point key order. */
 const ROWS = Object.freeze([
   'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte | height | 36 | 1 | 36px => 36px',
-  'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte | height | 32 | 1 | 32px => 32px',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte | height | 40 | 2 | 40px => 40px',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte | min-height | 40 | 2 | 40px => 40px',
   'src/ui/svelte/apps/crafting/RecipeListRow.svelte | height | 32 | 1 | 32px => 32px',

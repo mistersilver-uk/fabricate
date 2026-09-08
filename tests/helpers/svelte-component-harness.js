@@ -608,6 +608,19 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // not reach. Omitting either does not fail a crafting suite: it CANCELS it.
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/PlayerViewState.svelte',
+  // The four the Crafting tab reaches as of issue 1514's crafting phase, each written FLAT for
+  // the reason `SELECT_COMPILED_MODULES` records above — the static guard in
+  // `mounted-harness-primitive-allowlist.test.js` reads this array's own source text for quoted
+  // literals, and a nested `...NAME` is not one. `Avatar` is the component-sources bar's two
+  // actor portraits; `Notice` is the detail header's blocking well; `FillBar` is the essence
+  // pool's per-essence meter; `EmptyState` is four pane empties, the shopping planner's panel
+  // and `RecipeDetail`'s no-selection pane. Every one of them is on `SHARED_PRIMITIVES`, so an
+  // omission here is a NAMED failure rather than the silent `# cancelled` an unlisted component
+  // costs — but it is still a failure, and the four are what the crafting tree now renders.
+  'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/components/Avatar.svelte',
+  'src/ui/svelte/components/FillBar.svelte',
+  'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/apps/crafting/CraftingView.svelte'
 ]);
 

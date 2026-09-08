@@ -856,7 +856,22 @@ describe('RecipeDetail mounted behavior', () => {
 
   it('shows a select-a-recipe hint when no recipe is provided', async () => {
     const target = await harness.mount({ recipe: null });
-    assert.ok(target.querySelector('[data-crafting-detail-state="empty"]'), 'empty hint rendered');
+    const empty = target.querySelector('[data-crafting-detail-state="empty"]');
+    assert.ok(Boolean(empty), 'empty hint rendered');
+    // THE SIXTH COPY, composed (issue 1514). This pane hand-rolled the same centred fill the
+    // five player VIEW roots drew, so it routes through the shared composition too — and the
+    // hook NAME and VALUE are forwarded verbatim, which is what the locator above still proves.
+    assert.ok(
+      Boolean(empty.querySelector('.manager-empty')),
+      'the pane draws the shared no-state panel rather than a bare glyph over a paragraph'
+    );
+    assert.equal(
+      empty.getAttribute('aria-busy'),
+      null,
+      'and it carries NO `aria-busy`: this is a PANE state with no loading branch, and the ' +
+        'composition sets that attribute only for `kind: "loading"`. A pane that can never be ' +
+        'loading must not claim to be busy'
+    );
   });
 
   it('renders the blocking-reasons callout when applicable', async () => {
@@ -870,7 +885,33 @@ describe('RecipeDetail mounted behavior', () => {
       craftability: craftability({ canCraft: false }),
     });
 
-    assert.ok(target.querySelector('[data-recipe-blocking]'), 'blocking callout rendered');
+    const blocking = target.querySelector('[data-recipe-blocking]');
+    assert.ok(Boolean(blocking), 'blocking notice rendered');
+    // THE WELL IS A NON-BLOCKING `Notice` (issue 1514), which is the only routing that keeps the
+    // `role="status"` this markup already carried — `Callout` emits `role="note"` or nothing.
+    // Both attributes matched on their exact values: `status` is a substring of nothing the
+    // primitive emits today, but a later role could contain it, and the ARIA contract is the
+    // whole reason this site went to `Notice` rather than to the strip beside it.
+    assert.equal(blocking.getAttribute('role'), 'status', 'the status role survives the conversion');
+    assert.equal(
+      blocking.getAttribute('aria-live'),
+      'polite',
+      'and non-blocking adds the live region this hand-rolled well never had'
+    );
+    assert.equal(
+      blocking.getAttribute('data-recipe-blocking'),
+      '',
+      'the hook was written BARE on the deleted element, so it is passed with an empty ' +
+        '`dataValue` rather than being coerced to `="true"` the way a bare attribute on a ' +
+        'component tag would be'
+    );
+    assert.ok(
+      !blocking.querySelector('li'),
+      'the `<ul>` goes: `Notice` takes `title` and `detail` as STRINGS and has no children slot, ' +
+        'and `CraftingListingBuilder._blockingReasons` returns `key ? [localize(key)] : []` — at ' +
+        'most ONE reason for every browse status there is, so the bulleted list was always a ' +
+        'one-item list. A second reason would land in `detail` rather than being dropped'
+    );
     // A non-craftable recipe still renders a (disabled) craft button.
     const craftButton = target.querySelector('[data-crafting-craft]');
     assert.ok(craftButton, 'craft button present');
@@ -902,9 +943,15 @@ describe('RecipeDetail mounted behavior', () => {
       null,
       'the labelled status badge is dropped in favour of the pip'
     );
-    assert.ok(
-      header.querySelector('[data-recipe-blocking].is-uncraftable'),
-      'the blocking callout uses the error palette when uncraftable'
+    // The well is a non-blocking `Notice` since issue 1514, so the palette is the primitive's
+    // resolved TONE rather than this file's `is-uncraftable` modifier class. Matched on the
+    // attribute's exact value: `danger` is a substring of nothing else the primitive emits, but
+    // a `.includes` on the class list would have gone on passing against `is-danger-soft` or
+    // any other name a later tone takes.
+    assert.equal(
+      header.querySelector('[data-recipe-blocking]').getAttribute('data-notice-tone'),
+      'danger',
+      'the blocking notice uses the error palette when uncraftable'
     );
   });
 

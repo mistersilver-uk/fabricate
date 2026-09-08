@@ -356,9 +356,27 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * own row above rather than under a row of its own, which is why the total falls by one and not
  * by three. Re-derived from the JSON at this head rather than reasoned about.
  *
+ * 299 → 296 with the same issue's CRAFTING-AND-ROOTS phase, three occurrences across three rows
+ * and each of them a rule DELETED or SNAPPED by a conversion rather than a value edited:
+ *
+ *  - `crafting/ComponentSourcesBar.svelte | 8px` 4 → 3. The source-portrait button drew its own
+ *    r8 tile; `<Avatar shape="square">` draws the tile now at the ladder's own 9px, and the
+ *    button keeps a radius only so no sliver of it shows outside the tile's corner. The row
+ *    SURVIVES because the same file draws the remove overlay, the add button and the picker
+ *    popover at 8px, and none of those three is a tile.
+ *  - `crafting/RecipeDetailHeader.svelte | 8px` 2 → 1. The blocking well's r8 goes with its rule
+ *    as the well becomes a non-blocking `<Notice>` at the specimen's r11. The row survives
+ *    because the header's own dashed frame is r8 too, and that is a frame, not a banner.
+ *  - `apps/FabricateAppRoot.svelte | 10px` 2 → 1. The companion-fault strip's r10 goes the same
+ *    way, into `<Notice blocking>`'s r11. The root's other 10px corner is untouched.
+ *
+ * The phase's other deletions move nothing: `.crafting-source-option-portrait` drew 6px, the
+ * essence pool's track and fill drew 999px and the stamina track drew 999px — all three are
+ * published rungs and none ever had a row. Re-derived from the JSON at this head.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 299;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 296;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -692,8 +710,32 @@ export const KNOWN_OFF_LADDER_ART_SIZES = knownDebt('offLadderArtSizes');
  *
  * Pre-existing geometry becoming visible, on the same reading as the twelve above. Reconciling
  * `ART_SIZE_LADDER` with the two ladders the requirement publishes is issue 1519's, by name.
+ *
+ * 74 ACROSS 55 KEYS since the fifth phase moved the Crafting tab's two SOURCE-ACTOR portraits
+ * onto `<Avatar shape="square">`. Two new keys, both in
+ * `crafting/ComponentSourcesBar.svelte` — `| 40 | 1` for the row of portrait buttons in the top
+ * bar, and `| 32 | 1` for the picker option beneath it.
+ *
+ * THE RUNG REJECTED AT 40 IS 38, and the reason is the one the inventory portrait recorded a
+ * phase earlier read from the other side. Here 38 is not merely near: the portrait button was
+ * ALREADY rendering its image at exactly 38, because the button is a 40px border-box drawing a
+ * 1px edge of its own. Snapping the tile to 38 would have kept the image where it was and
+ * shrunk the BUTTON to 38 with it — the row's hit target, its focus ring and its remove overlay
+ * all move — or left a 2px ring of button showing around the tile. The 40 preserves the
+ * rendered button, which is what a conversion is for.
+ *
+ * THE RUNG REJECTED AT 32 IS 30, a 2px cut. 32 is the PORTRAIT ladder's single mark
+ * (`spec.md:427`, restated at `Avatar.svelte:97-102`) and this is the tile the ladder was
+ * published for — so the row exists ONLY because this census filters both primitives against
+ * `ART_SIZE_LADDER`, which knows the art ladder alone. It is the second shipped instance of the
+ * conflation the entry above names, and the third counting `IoTable.svelte | 32 | 1`, which was
+ * already banked before this change. The option row is `min-height: 44px` and the tile does not
+ * set it, so 30 would have cost 2px of mark and moved nothing else — which is a geometry
+ * decision about one tile in isolation, and issue 1519's to take.
+ *
+ * Both are pre-existing geometry becoming visible, on the same reading as the thirteen above.
  */
-export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 72;
+export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 74;
 
 export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredSharedComponents');
 

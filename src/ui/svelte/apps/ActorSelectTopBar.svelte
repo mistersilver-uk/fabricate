@@ -44,6 +44,7 @@
   } from '../util/gatheringConditionIcons.js';
   import ComponentSourcesBar from './crafting/ComponentSourcesBar.svelte';
   import SearchablePopover from '../components/SearchablePopover.svelte';
+  import FillBar from '../components/FillBar.svelte';
 
   let {
     store = null,
@@ -254,8 +255,14 @@
             data-actor-bar-stamina
           >
             <i class="fas fa-bolt" aria-hidden="true"></i>
+            <!-- THE SHARED `FillBar` (issue 1514), with the 72px WIDTH pinned by this caller.
+                 The primitive declares `flex: 1 1 auto` on its own track, so dropped bare into
+                 this `inline-flex` row it would either stretch the bar or collapse it to
+                 nothing depending on what sits beside it — a column-width move either way. The
+                 element that used to BE the track survives as the pin: it declares the 72px and
+                 nothing else, and the bar inside it fills exactly that. -->
             <span class="actor-bar-stamina-track">
-              <span class="actor-bar-stamina-fill" style={`width:${staminaPct}%`}></span>
+              <FillBar size="sm" value={staminaPct} tone="accent" />
             </span>
             <span class="actor-bar-stamina-value">{staminaPool.current}/{staminaPool.max}</span>
           </span>
@@ -459,20 +466,15 @@
     color: var(--fab-text-muted);
   }
 
+  /* THE WIDTH PIN ONLY. The track's own height, corner, ground and fill are `FillBar`'s now;
+     this element exists to give the bar the 72px it cannot ask for itself, because the
+     primitive is `flex: 1 1 auto` by design and a caller is what decides how wide a bar is.
+     The fill's `transition: width 0.2s ease` is lost with the rule: the primitive declares
+     none, and reaching into it with a `:global()` rule from here would be this file re-styling
+     a component it does not own. */
   .actor-bar-stamina-track {
+    display: flex;
     width: 72px;
-    height: 6px;
-    border-radius: 999px;
-    background: var(--fab-surface-raised);
-    overflow: hidden;
-  }
-
-  .actor-bar-stamina-fill {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--fab-accent);
-    transition: width 0.2s ease;
   }
 
   .actor-bar-stamina-value {

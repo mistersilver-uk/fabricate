@@ -265,7 +265,23 @@ export function isExemptSpacingPixels(pixels) {
 // spacing — and the `.inventory-detail-empty` fill wrapper keeps the `var(--fab-space-4)` it
 // already had. What the primitives absorb is `var(--fab-space-*)` throughout, so the ten
 // occupancies are paid rather than relocated. Measured on the tree, not subtracted.
-export const KNOWN_RAW_SPACING_TOTAL = 853;
+// 853 -> 844 (issue 1514, phase 5): the crafting tab's two actor portraits, its blocking well, its
+// essence-pool track, its five pane empties and the roots' companion-fault strip moved onto
+// primitives that own their own geometry, and the rules those markup blocks declared went with
+// them. Two rows SHRINK by one occupancy each and seven rows at one occupancy VANISH. The two that
+// shrink are `ComponentSourcesBar | padding 8`, whose second occupancy was the picker's own empty
+// line, and `RecipeDetailHeader | gap 8`, whose third was the blocking well's. The seven that
+// vanish are the whole of `FabricateAppRoot`'s deleted fault strip (`gap 12`, `padding 14`,
+// `padding 16`, and the description's `margin 4`), `RecipeDetail`'s deleted centred stack
+// (`gap 12`), the blocking list's `padding-left 16` and the shopping planner's `gap 10`.
+// THREE CALLER-OWNED WRAPPERS THIS PHASE KEEPS BRING NOTHING BACK, and each is a different reason:
+// `.fabricate-app-extension-fault` keeps `max-width` and `margin: 20px`, and its 20 was already a
+// banked row on that same rule, so a wrapper carrying a margin verbatim moves no occupancy;
+// `.crafting-shopping-empty` keeps the `var(--fab-space-4)` it already had; and
+// `.actor-bar-stamina-track` and `.essence-pool-bar` keep a width and a display and no spacing at
+// all. What the primitives absorb is `var(--fab-space-*)` throughout, so the nine occupancies are
+// paid rather than relocated. Measured on the tree, not subtracted.
+export const KNOWN_RAW_SPACING_TOTAL = 844;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

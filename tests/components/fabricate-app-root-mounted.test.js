@@ -566,6 +566,25 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     assert.ok(Boolean(fault), 'Core renders its own error state in the panel');
     assert.equal(fault.dataset.playerExtensionFault, 'downtime');
     assert.match(fault.textContent, /downtime/, 'and it names the provider that failed');
+    // The strip is the shared `Notice` since issue 1514, and `blocking` is what keeps the role
+    // this state has always carried. Matched on the attribute's exact value rather than by
+    // substring: a non-blocking notice emits `status`, and `alert` is not a substring of it, but
+    // a later role would be — and `role="alert"` is the whole reason `Callout` was refused here.
+    assert.equal(fault.getAttribute('role'), 'alert', 'the strip is still announced as an alert');
+    assert.equal(
+      fault.getAttribute('aria-live'),
+      null,
+      'and `blocking` is what keeps it: a non-blocking notice would demote this to `status` ' +
+        'with `aria-live="polite"`, which is not what a companion whose mount threw is'
+    );
+    assert.equal(
+      fault.getAttribute('data-notice-tone'),
+      'danger',
+      'and the tone is danger, which is a published frame move: the deleted rule drew a NEUTRAL ' +
+        'band, `--fab-border-strong` over `--fab-surface-raised`, with only the glyph in the ' +
+        'danger ink. Measured in the View Lab as 560.00x85.09 becoming 560.00x77.09, unmoved in ' +
+        'width because the `max-width` and the margin stayed on this caller`s own wrapper'
+    );
     assert.ok(
       !root.querySelector('[data-companion-control]'),
       'the partial content the companion appended before throwing is gone'

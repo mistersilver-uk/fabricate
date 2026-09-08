@@ -31,6 +31,7 @@
   import InventoryView from './inventory/InventoryView.svelte';
   import ActorSelectTopBar from './ActorSelectTopBar.svelte';
   import PlayerExtensionHost from './PlayerExtensionHost.svelte';
+  import Notice from '../components/Notice.svelte';
   import { buildPlayerNavTabs, parseRouteKey } from '../../playerNavModel.js';
   import {
     DOMAIN_CONSUMERS,
@@ -545,20 +546,22 @@
              which is what lets it report `surfaceTabChanged` at all — and is recreated when
              the user moves to a different companion's surface. -->
         {#if activeSurface && activeProviderFaulted}
-          <div
-            class="fabricate-app-extension-fault"
-            data-player-extension-fault={activeSurface.surfaceId}
-            role="alert"
-          >
-            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-            <div>
-              <strong>{localize('FABRICATE.App.Extension.FaultTitle')}</strong>
-              <p>
-                {localize('FABRICATE.App.Extension.FaultDescription', {
-                  providerId: activeSurface.provider.id,
-                })}
-              </p>
-            </div>
+          <!-- THE SHARED `Notice`, BLOCKING (issue 1514). `blocking` is what keeps the
+               `role="alert"` this state has always carried; a non-blocking notice would demote
+               it to `status`. The wrapper below owns the `max-width` and the `margin` the
+               deleted rule declared, because the primitive forwards no class and no style. -->
+          <div class="fabricate-app-extension-fault">
+            <Notice
+              blocking
+              tone="danger"
+              icon="fas fa-triangle-exclamation"
+              title={localize('FABRICATE.App.Extension.FaultTitle')}
+              detail={localize('FABRICATE.App.Extension.FaultDescription', {
+                providerId: activeSurface.provider.id,
+              })}
+              dataAttr="data-player-extension-fault"
+              dataValue={activeSurface.surfaceId}
+            />
           </div>
         {:else if activeSurface}
           {#key activeSurfaceId}
@@ -738,42 +741,26 @@
      promotional: it names the provider that failed and says nothing about products,
      offers or subscriptions.
 
-     WHY THIS IS NOT `manager/Callout.svelte`. That component owns this meaning — a leading
-     semantic glyph plus prose in a bordered, rounded strip — it declares itself area-agnostic
-     and names `.fabricate-app` among its supported hosts, and it even defaults to the same
-     `fas fa-triangle-exclamation` glyph, so the mismatch has to be written down rather than
-     left for the next author to rediscover. Three things make it unusable here. Its root is a
-     `<p>`, which cannot legally contain the `<strong>` title plus `<p>` description this state
-     needs. Its tones are `info` and `warning` only, so a failure could not be coloured as one.
-     And it is a standing-statement strip, whereas this is a `role="alert"` error state
-     announced when it replaces the companion's panel. Extend one of these two rather than
-     writing a third.
+     THE STRIP IS `components/Notice.svelte` NOW, AND ONE OF THE THREE REASONS IT WAS NOT
+     SURVIVED (issue 1514). This block used to refuse `manager/Callout.svelte` on three
+     grounds, and the refusal has to be restated rather than deleted, because two of the three
+     were about the tree at the time they were written and are false at HEAD. Its root being a
+     `<p>` that cannot contain a `<strong>` and a `<p>`: FALSE — `Callout.svelte:122,129-131`
+     renders a `<div role="note">` when it is given a title. Its tones being `info` and
+     `warning` only: FALSE — `Callout.svelte:105` lists six. The third reason is STILL TRUE and
+     is what decided this: a callout is a standing statement that stays put, whereas this is a
+     `role="alert"` error state announced when it replaces the companion's panel, and
+     `Callout.svelte:131` emits `role="note"` or nothing. `Notice` is the primitive that owns
+     that meaning, and `blocking` is the prop that keeps the role.
 
-     `max-width` because the copy is ~650px of text: full-bleed across the ~1140px panel at the
-     default window size it reads as a sparse band with a long empty tail. */
+     WHAT IS LEFT HERE IS LAYOUT. `max-width` because the copy is ~650px of text: full-bleed
+     across the ~1140px panel at the default window size it reads as a sparse band with a long
+     empty tail. The margin separates it from the panel edge. The primitive forwards no class
+     and no style, so both stay on this caller-owned wrapper; everything else the deleted rule
+     declared — the edge, the fill, the corner, the glyph and both type scales — is the
+     notice's own. */
   .fabricate-app-extension-fault {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
     max-width: 560px;
     margin: 20px;
-    padding: 14px 16px;
-    border: 1px solid var(--fab-border-strong);
-    border-radius: 10px;
-    background: var(--fab-surface-raised);
-    color: var(--fab-text);
-  }
-
-  .fabricate-app-extension-fault i {
-    color: var(--fab-danger-text);
-    font-size: 18px;
-    line-height: 1.2;
-  }
-
-  .fabricate-app-extension-fault p {
-    margin: 4px 0 0;
-    color: var(--fab-text-muted);
-    font-size: 12px;
-    line-height: 1.4;
   }
 </style>

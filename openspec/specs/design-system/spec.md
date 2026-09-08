@@ -182,6 +182,20 @@ A primitive rendered by another primitive that a second application renders is e
 `Pagination` is exercised DIRECTLY — six of its 25 importers are player-app components — and `IconButton` is exercised TRANSITIVELY, because `Pagination` renders two of them as its page arrows and those six player components render that pager.
 A capability that nothing exercises is still worth having, and is not debt: it is the state a primitive is in between being made portable and being carried somewhere, and the requirement is what keeps the two from being confused.
 
+The player window is the second application for `EmptyState`, `Avatar` and `SegmentedControl`, and it deepens the `Medallion`, `Kicker`, `FillBar`, `Callout` and `Notice` adoptions that preceded it.
+That makes a COROLLARY of the paragraph above explicit, because the census made it visible: a component wearing an application's class names may be exercised in a SECOND application when it SELF-PAINTS from its own scoped block, since the class names are a naming convention and the area binding is what the rules root at.
+A docblock refusing such a caller is therefore a claim about the tree at the time it was written, and the change that adds the caller RESTATES it, in the commit that falsifies it, rather than leaving a refusal the tree has overturned.
+`EmptyState` is the shipped instance, in both of the docblocks that refused the player app.
+The same rule reaches a REASON as well as a refusal: a refusal standing on three grounds whose first two the tree has since falsified is restated to record which one survived, which is what `FabricateAppRoot`'s companion-fault strip did when it moved to a notice on the announcement ground alone.
+
+What the adoption does NOT reach is stated with it, because a conversion issue that only reports its successes cannot be audited.
+`SegmentedControl` and `Stepper` each end at ONE player caller, below the two-caller membership bar: the only further candidates were refused on ARIA semantics and on content model respectively, and a bar that a change declines to clear on the merits is a measurement rather than a shortfall.
+
+A COMPOSITION of existing members with many callers is the third outcome, and it is neither of the two the register already had.
+It is not a primitive, because a candidate that decomposes entirely into existing members MUST NOT enter the set; and it is not a recordable non-member either, because that record caps a component at one caller.
+Such a composition is BANKED as an unregistered shared component, which is the register's answer for a screen-region composition rather than a gap in it.
+That answer is PATH-CONDITIONAL and the condition is stated with it: it holds only while the file lives outside the primitive directory, so the same file moved inside it would demand a manifest row and a library specimen instead.
+
 The corollary is that a component OUTSIDE the shared directory may keep an area-scoped family, and doing so is correct rather than debt.
 Its markup cannot appear outside that area, so the ancestor is free, and unscoping it would spend specificity and widen the rule's blast radius for no reachable benefit.
 `RecipeDurationEditor`, `EnvironmentsBrowserView` and the manager modal keep `.fabricate-manager`-rooted overlay rules on exactly that basis.
@@ -1120,6 +1134,15 @@ A notice that appears without a focus change MUST be announced through a live re
 The notice is the unit that carries that distinction: a blocking notice takes the page position, a non-blocking one takes the stacking region, and either announces itself through the live region when it appears without a focus change.
 
 Grouped, navigable validation output is NOT a notice: it is the validation surface, which carries passing, warning and blocking counts simultaneously and drives the count on its own tab.
+
+UNTIL THE SHARED REGION SHIPS, A NOTICE RENDERS STANDALONE AT ITS OWN SITE, and stating that interim is what keeps this requirement honest about the tree it governs.
+A standalone notice satisfies the ANNOUNCEMENT clause through its OWN role — `role="alert"` when blocking, `role="status"` with `aria-live="polite"` otherwise — because a live-region role is recognised on insertion and a notice inserted together with its text has no later update to announce.
+It does NOT satisfy the ARBITRATION clause, so a screen rendering standalone notices MUST NOT put two blocking notices on the page at once, and the arbitration stays the region's to enforce when it lands.
+
+A BANNER'S CURRENT ROLE DECIDES ITS PRIMITIVE, which is the routing rule a conversion needs and the one thing the pair of components did not state.
+A banner already carrying `role="status"` routes to a NON-BLOCKING notice and never to a callout, because a callout emits `role="note"` or nothing and cannot express a live status region; a banner carrying `role="alert"` routes to a BLOCKING notice, which is the only form that keeps the role.
+A ROLELESS standing strip routes to a callout, and gains `role="note"` only when it passes a title or actions — an addition the converting change records rather than absorbing.
+A row that would have to LOSE its role does not convert.
 
 #### Scenario: Two independent problems are true at once
 
