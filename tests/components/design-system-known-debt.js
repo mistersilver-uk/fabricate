@@ -270,14 +270,16 @@ export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 27;
  * exactly as issue 1504's eight were - and it is the first payment made from OUTSIDE the manager
  * and the player app, which is what the interactables windows joining the design system means.
  *
- * The two remaining interactables rows - `InteractableBrowserRoot.svelte | 1` and
- * `interactables/InteractablesManagerRoot.svelte | 3` - STAY, and stay owed: they are the same
- * change's fifth phase, in files this phase does not open.
+ * 88 -> 84 with issue 1520's FIFTH phase, and the last two interactables rows leave with it:
+ * `InteractableBrowserRoot.svelte | 1` and `interactables/InteractablesManagerRoot.svelte | 3` are
+ * DELETED because all four elements now render `components/Select.svelte`. The file count falls
+ * 35 -> 33 with them, and NO interactables row is left in this table - the three canvas windows
+ * carry no native select between them.
  */
 export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 
 /** @see KNOWN_NATIVE_SELECT_ELEMENTS */
-export const KNOWN_NATIVE_SELECT_TOTAL = 88;
+export const KNOWN_NATIVE_SELECT_TOTAL = 84;
 
 /**
  * A native `<select>` written into a JavaScript template string, keyed `file`.
@@ -367,9 +369,22 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * unconfigured section's 6px, both compliant and neither on this table; the chip's went to
  * `Chip` and the section's went with the box the `<Notice>` replaced.
  *
+ * 307 -> 301 with issue 1520's FIFTH phase, and all six are snaps of the same kind, in the two
+ * remaining canvas windows. `apps/InteractableBrowserRoot.svelte | border-radius | 3px | 1` is the
+ * row thumbnail and `| 4px | 3` are the entry row and the tab strip's two top corners; all four
+ * take the 6px rung the ladder publishes at or below the 24px band, so both rows LEAVE and the key
+ * count falls by two. `styles/fabricate.css | border-radius | 4px` falls 24 -> 22 as the Manage
+ * Interactables panel's own 4px fieldset and row corners go with the `fab-im-*` family that moved
+ * into that root's scoped block, snapped to the same 6px rung on the way.
+ *
+ * NO INTERACTABLES ROW IS LEFT IN THIS TABLE. That is worth stating because it is the last of the
+ * four ceilings this change published, and the only one that came in UNDER its own plan: the plan
+ * priced 303, having counted the two Svelte rows and not the two sheet occurrences that left with
+ * them.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 307;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 301;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -483,11 +498,23 @@ export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 2;
  * The ten roving `tabindex={active ? 0 : -1}` sites in this corpus are outside this population by
  * construction: each either carries no static `role` or is a `<button>`, which the clause below
  * already counts.
+ *
+ * 21 -> 19 with issue 1520's FIFTH phase, and it is the FIRST payment this population has taken.
+ * `apps/InteractableBrowserRoot.svelte | 2` is DELETED because both members now declare
+ * `data-keyboard-focus="true"`, which is the remedy this gate's own message prescribes.
+ *
+ * WHICH TWO ELEMENTS THEY WERE IS WORTH RECORDING, because the row was twice attributed to the
+ * wrong ones while this change was planned. They are the browser's two `tabpanel` SCROLL
+ * CONTAINERS, not the tab strip above them: the tab buttons carry a roving `tabindex` EXPRESSION,
+ * which routes them to the disjoint `roving` population, AND they already declared themselves - so
+ * they were excluded twice over and no conversion of the tab strip could ever have cleared this
+ * row. The panels are what a GM tabs into, each is its own scroll box, and until this phase
+ * Foundry kept its own bindings live over both.
  */
 export const KNOWN_ROLE_FOCUS_TARGETS = knownDebt('roleFocusTargets');
 
 /** @see KNOWN_ROLE_FOCUS_TARGETS */
-export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 21;
+export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 19;
 
 /**
  * A `<button>` outside any `<form>` that does not declare `data-keyboard-focus`, keyed `file`.
@@ -559,9 +586,23 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * writes one raw `<button>` scores one. That is why this row could only ever be paid by
  * conversion, and why the payment is nineteen at once rather than nineteen attributes.
  *
+ * 253 -> 243 with the same change's FIFTH phase, and both remaining interactables rows leave
+ * whole: `apps/InteractableBrowserRoot.svelte | 4` and
+ * `apps/interactables/InteractablesManagerRoot.svelte | 6`. The browser's four are its per-row
+ * placement pair, now `<IconButton>`; the manager's six are its promote toggle, its confirm and
+ * cancel, and its three per-row actions, now `<ManagerButton>` and `<IconButton>`.
+ *
+ * THE BROWSER'S RAW COUNT IS SIX AND ITS ROW WAS FOUR, which is the one asymmetry worth naming
+ * here: the two tab-strip buttons carry `data-keyboard-focus="true"` already and were never debt.
+ * They are also the two this phase deliberately does NOT convert - a tablist is a keyboard
+ * contract rather than a radio group - so the row leaves without the file's raw count reaching
+ * zero, and that is correct rather than an omission.
+ *
+ * NO INTERACTABLES ROW IS LEFT IN THIS TABLE.
+ *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 253;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 243;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.

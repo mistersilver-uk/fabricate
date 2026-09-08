@@ -19,6 +19,11 @@ import { fileURLToPath } from 'node:url';
 
 import { emitInteractableBehaviorWrite } from '../../src/canvas/interactableSocketBridge.js';
 import { planSetEnabled, planSetLocked } from '../../src/canvas/regions/interactableConfigActions.js';
+import {
+  SMOKE_SOURCE,
+  assertLocatorsEmitted,
+  dataHooksMatching,
+} from '../helpers/interactablesSmokeLocators.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appSource = readFileSync(
@@ -347,20 +352,24 @@ describe('InteractableConfigRoot body', () => {
   // declared hook prop was used, because that component takes no rest spread. The View Lab's
   // two config cases select on three of them as well, and a lab selector that resolves nothing
   // fails the WHOLE capture rather than one frame.
+  //
+  // THE MECHANISM MOVED TO `tests/helpers/interactablesSmokeLocators.js` (issue 1520, phase 5),
+  // which is where the browser's and the manager's own copies of this clause read it from as
+  // well. One extraction and one matcher, so the token terminator and the non-vacuity floor
+  // cannot be right in one window's suite and wrong in another's - and so three near-identical
+  // loops do not become new duplicated lines under the SonarCloud gate.
+  //
+  // The PREFIX is scoped and the negative lookahead is load-bearing rather than tidy: phase 5
+  // added `data-interactable-manager-*` and `data-interactable-browser-*` hooks to the same
+  // harness, and an unscoped `data-interactable-*` scan would assert THIS root writes them.
   it('still emits every data-interactable-* locator the Foundry smoke drives', () => {
-    const located = [...new Set(smokeSource.match(/data-interactable-[a-z-]+/g) ?? [])].sort();
-    // A floor, so a harness rewrite that stopped locating anything cannot leave this vacuous.
-    assert.ok(located.length >= 9, `the smoke locates ${located.length} interactable hooks, expected at least 9`);
-    for (const hook of located) {
-      // `(?![a-z-])` rather than `includes`, and it is not pedantry: every hook here is a
-      // PREFIX of a longer name one edit away, so a substring test passes on a hook that has
-      // been renamed rather than kept. Proved by mutation - `data-interactable-node-respawn`
-      // renamed to `...-respawn-x` left the substring form green.
-      assert.ok(
-        new RegExp(`${hook}(?![a-z-])`).test(rootSource),
-        `${hook} is still written by the config root`
-      );
-    }
+    assertLocatorsEmitted({
+      locators: dataHooksMatching(SMOKE_SOURCE, 'data-interactable-(?!manager-|browser-)'),
+      rootSource,
+      floor: 9,
+      what: 'config-panel hooks',
+      root: 'the config root',
+    });
     // The window's own root container, which the smoke waits on three times and which the
     // conversion deliberately KEEPS: it is the scroll box, not a control family.
     assert.ok(smokeSource.includes('.fabricate-interactable-config'), 'the smoke keys on the root container');

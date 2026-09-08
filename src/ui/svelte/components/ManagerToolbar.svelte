@@ -89,11 +89,24 @@
 
   It deliberately has no scoped `<style>`, for `ManagerButton.svelte`'s,
   `IconButton.svelte`'s and `InspectorCard.svelte`'s reason: the bar is painted by
-  `styles/fabricate.css` under `.fabricate-manager`, and a scoped block here would be a
-  second source of truth for the same box. The consequence is theirs too — this is a
-  MANAGER primitive, and dropped into `.fabricate-app` it renders as an unstyled
-  `<section>`. That consequence is not reached in the product today: no player-app
-  component renders a filter bar.
+  `styles/fabricate.css`, and a scoped block here would be a second source of truth for the
+  same box.
+
+  THE "IT RENDERS UNSTYLED OUTSIDE THE MANAGER" CLAUSE THAT STOOD HERE WAS FALSE, and it
+  was already false when it was written (corrected in issue 1520). Issue 1508's second
+  phase re-rooted this family at `fabricate-filter-bar`, the class `classes` below emits, so
+  the padding-and-rule pair, the grid form and the flex branch that always wins are all
+  written `.fabricate-filter-bar.manager-toolbar` and reach the bar wherever it renders.
+
+  ONE RESIDUE IS REAL and is named rather than swept in with the claim: the responsive
+  narrowing at `styles/fabricate.css`'s `@container fabricate-manager (max-width: 680px)`
+  block, whose container NAME is established by `.fabricate-manager` itself. In a host with
+  no `.fabricate-manager` above the bar there is no such container to query, so that rule
+  simply does not apply — a residue of the responsive layer, owned by issue 1518, exactly as
+  `ManagerSearchField.svelte` records for its own two members of the same block.
+
+  The clause's second half is retired rather than re-dated: the Interactable browser renders
+  this bar as its system-and-search control row, inside a `.fabricate-app` frame.
 
   It is an IMPORT-FREE LEAF, like `Stepper`, `IconButton` and `InspectorCard`: props
   only, no `foundryBridge`, no util imports. Callers pass an ALREADY-LOCALIZED

@@ -26,6 +26,13 @@
     systemDisplayLabel,
     pickDefaultSystemId,
   } from '../../util/systemDisambiguation.js';
+  import Chip from '../../components/Chip.svelte';
+  import Field from '../../components/Field.svelte';
+  import IconButton from '../../components/IconButton.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Select from '../../components/Select.svelte';
+  import SegmentedControl from '../manager/SegmentedControl.svelte';
 
   let { services = null } = $props();
 
@@ -60,6 +67,24 @@
       default:
         return text('FABRICATE.Canvas.Manage.MarkerMissing', 'Missing');
     }
+  }
+
+  /**
+   * The marker badge's TONE, which is the statement the hand-rolled chip made with a
+   * danger-coloured edge and an `opacity` fade (issue 1520).
+   *
+   * `missing` is a fault the GM has to act on, so it stays in the danger family. `region-only`
+   * is not a fault at all — it is a deliberate configuration with no marker to report — which
+   * is exactly what `Chip`'s `muted` tone is documented for, and it replaces a fade that dimmed
+   * the pill's border and fill along with its text.
+   *
+   * @param {string} status The row's marker status.
+   * @returns {string} A `Chip` tone.
+   */
+  function markerTone(status) {
+    if (status === 'missing') return 'danger';
+    if (status === 'region-only') return 'muted';
+    return 'neutral';
   }
 
   function typeLabel(interactableType) {
@@ -145,6 +170,71 @@
       : (services?.listTasksForSystem?.(selectedSystemId) ?? [])
   );
 
+  // THE SHARED SELECT'S OPTION VOCABULARY (issue 1520). `Select` takes an `options` array
+  // rather than `<option>` children, so each list is built here from exactly the source the
+  // native `<select>` iterated. The region list keeps its LEADING EMPTY ROW rather than
+  // expressing it as the component's `placeholder`: it is a real selectable row, because
+  // clearing the region is how a GM abandons a half-built promotion, and a placeholder is only
+  // ever shown.
+  const regionSelectOptions = $derived([
+    {
+      value: '',
+      label: text('FABRICATE.Canvas.Manage.PromoteRegionPlaceholder', 'Choose a region…'),
+    },
+    ...regions.map((region) => ({
+      value: region.id,
+      label:
+        (region.name || region.id) +
+        (region.hasInteractable
+          ? ' (' +
+            text('FABRICATE.Canvas.Manage.RegionAlreadyInteractable', 'already an interactable') +
+            ')'
+          : ''),
+    })),
+  ]);
+
+  const systemSelectOptions = $derived(
+    systems.map((system) => ({ value: system.id, label: systemDisplayLabel(system, systemLabels) }))
+  );
+
+  // The empty-system row is CONDITIONAL here, exactly as the native `<select>`'s `{#if
+  // sources.length === 0}` option was: it is a report that this system has nothing to offer,
+  // not a way to choose nothing.
+  const sourceSelectOptions = $derived(
+    sources.length === 0
+      ? [
+          {
+            value: '',
+            label: text('FABRICATE.Canvas.Manage.PromoteNoSources', 'No sources in this system.'),
+          },
+        ]
+      : sources.map((source) => ({ value: source.id, label: source.name }))
+  );
+
+  const sourceTypeOptions = $derived([
+    { value: 'tool', fallback: text('FABRICATE.Canvas.Manage.TypeTool', 'Tool') },
+    {
+      value: 'gatheringTask',
+      fallback: text('FABRICATE.Canvas.Manage.TypeGatheringTask', 'Gathering task'),
+    },
+  ]);
+
+  const visualModeOptions = $derived([
+    {
+      value: 'marker',
+      fallback: text('FABRICATE.Canvas.Manage.PromoteMarkerVisible', 'Visible marker'),
+    },
+    {
+      value: 'none',
+      fallback: text('FABRICATE.Canvas.Manage.PromoteMarkerNone', 'Region only (no marker)'),
+    },
+  ]);
+
+  const markerKindOptions = $derived([
+    { value: 'Tile', fallback: text('FABRICATE.Canvas.Manage.MarkerTile', 'Tile') },
+    { value: 'Drawing', fallback: text('FABRICATE.Canvas.Manage.MarkerDrawing', 'Drawing') },
+  ]);
+
   // Reset the picked source when the system or the type changes so we never carry
   // a stale reference across systems.
   $effect(() => {
@@ -194,22 +284,25 @@
   </header>
 
   <div class="fab-im-toolbar">
-    <button
-      type="button"
-      class="fab-im-promote-toggle"
-      class:is-active={showPromote}
+    <!-- THE OPEN STATE RIDES `aria-expanded`, NOT A CLASS (issue 1520). `ManagerButton`'s role
+         vocabulary is about what a verb MEANS, not about whether its disclosure is open, so the
+         `is-active` accent edge this button drew is restated below against the attribute that
+         already announces the state — a hook that cannot drift from the behaviour it describes. -->
+    <ManagerButton
       aria-expanded={showPromote}
       onclick={() => (showPromote = !showPromote)}
+      data-interactable-manager-promote-toggle=""
     >
       <i class="fas fa-plus" aria-hidden="true"></i>
       <span>{text('FABRICATE.Canvas.Manage.PromoteToggle', 'Promote region to interactable')}</span>
-    </button>
+    </ManagerButton>
   </div>
 
   {#if showPromote}
-    <section
+    <InspectorCard
       class="fab-im-promote"
       aria-label={text('FABRICATE.Canvas.Manage.PromoteToggle', 'Promote region to interactable')}
+      data-interactable-manager-promote=""
     >
       <p class="fab-im-promote-hint">
         {text(
@@ -218,82 +311,61 @@
         )}
       </p>
 
-      <label class="fab-im-field">
-        <span class="fab-im-field-label"
-          >{text('FABRICATE.Canvas.Manage.PromoteRegion', 'Region')}</span
-        >
-        <select bind:value={selectedRegionId}>
-          <option value=""
-            >{text('FABRICATE.Canvas.Manage.PromoteRegionPlaceholder', 'Choose a region…')}</option
-          >
-          {#each regions as region (region.id)}
-            <option value={region.id}>
-              {region.name || region.id}{region.hasInteractable
-                ? ' (' +
-                  text(
-                    'FABRICATE.Canvas.Manage.RegionAlreadyInteractable',
-                    'already an interactable'
-                  ) +
-                  ')'
-                : ''}
-            </option>
-          {/each}
-        </select>
-      </label>
+      <Select
+        label={text('FABRICATE.Canvas.Manage.PromoteRegion', 'Region')}
+        value={selectedRegionId}
+        options={regionSelectOptions}
+        onChange={(next) => (selectedRegionId = next)}
+        triggerData={{ 'data-interactable-manager-region': '' }}
+      />
 
-      <label class="fab-im-field">
-        <span class="fab-im-field-label"
-          >{text('FABRICATE.Canvas.Manage.PromoteSystem', 'Crafting system')}</span
-        >
-        <select bind:value={selectedSystemId}>
-          {#each systems as system (system.id)}
-            <option value={system.id}>{systemDisplayLabel(system, systemLabels)}</option>
-          {/each}
-        </select>
-      </label>
+      <Select
+        label={text('FABRICATE.Canvas.Manage.PromoteSystem', 'Crafting system')}
+        value={selectedSystemId}
+        options={systemSelectOptions}
+        onChange={(next) => (selectedSystemId = next)}
+        triggerData={{ 'data-interactable-manager-system': '' }}
+      />
 
-      <fieldset class="fab-im-fieldset">
-        <legend class="fab-im-field-label"
-          >{text('FABRICATE.Canvas.Manage.PromoteSourceType', 'Source type')}</legend
-        >
-        <label class="fab-im-radio">
-          <input type="radio" name="fab-im-source-type" value="tool" bind:group={sourceType} />
-          <span>{text('FABRICATE.Canvas.Manage.TypeTool', 'Tool')}</span>
-        </label>
-        <label class="fab-im-radio">
-          <input
-            type="radio"
-            name="fab-im-source-type"
-            value="gatheringTask"
-            bind:group={sourceType}
-          />
-          <span>{text('FABRICATE.Canvas.Manage.TypeGatheringTask', 'Gathering task')}</span>
-        </label>
-      </fieldset>
+      <!-- THE THREE RADIO FIELDSETS ARE SEGMENTED TRACKS (issue 1520). Each is a closed set of
+           two NAMED alternatives with no sentence to explain either, which the library routes to
+           `Segmented` rather than to the option-card group — that entry's own canonical spec
+           requires a description per option, "one sentence, always present", and none of these
+           three has one.
 
-      <label class="fab-im-field">
-        <span class="fab-im-field-label"
-          >{text('FABRICATE.Canvas.Manage.PromoteSource', 'Source')}</span
-        >
-        <select bind:value={selectedReferenceId}>
-          {#if sources.length === 0}
-            <option value=""
-              >{text(
-                'FABRICATE.Canvas.Manage.PromoteNoSources',
-                'No sources in this system.'
-              )}</option
-            >
-          {/if}
-          {#each sources as source (source.id)}
-            <option value={source.id}>{source.name}</option>
-          {/each}
-        </select>
-      </label>
+           `<Field as="div">` supplies the visible caption the `<legend>` carried. The control
+           names ITSELF through `ariaLabel`, so the field is a `div` rather than a `label`: a
+           `<label>` around a radiogroup names nothing, because a radiogroup is not a labelable
+           element.
 
-      <label class="fab-im-field">
-        <span class="fab-im-field-label"
-          >{text('FABRICATE.Canvas.Manage.PromoteName', 'Name (optional)')}</span
-        >
+           The `name` attributes are carried across byte for byte — `fab-im-source-type`,
+           `fab-im-visual-mode`, `fab-im-marker-kind` — because they are DOM group identities
+           rather than class names, and renaming them would move the Foundry smoke's own radio
+           locator for no gain. -->
+      <Field as="div">
+        <span>{text('FABRICATE.Canvas.Manage.PromoteSourceType', 'Source type')}</span>
+        <SegmentedControl
+          options={sourceTypeOptions}
+          value={sourceType}
+          onChange={(next) => (sourceType = next)}
+          groupName="fab-im-source-type"
+          ariaLabel={text('FABRICATE.Canvas.Manage.PromoteSourceType', 'Source type')}
+          fill
+          dataAttr="data-interactable-manager-source-type"
+          optionDataAttr="data-interactable-manager-source-type-option"
+        />
+      </Field>
+
+      <Select
+        label={text('FABRICATE.Canvas.Manage.PromoteSource', 'Source')}
+        value={selectedReferenceId}
+        options={sourceSelectOptions}
+        onChange={(next) => (selectedReferenceId = next)}
+        triggerData={{ 'data-interactable-manager-source': '' }}
+      />
+
+      <Field as="label">
+        <span>{text('FABRICATE.Canvas.Manage.PromoteName', 'Name (optional)')}</span>
         <input
           type="text"
           bind:value={promoteName}
@@ -301,54 +373,57 @@
             'FABRICATE.Canvas.Manage.PromoteNamePlaceholder',
             'Defaults to the source name'
           )}
+          data-interactable-manager-name
         />
-      </label>
+      </Field>
 
-      <fieldset class="fab-im-fieldset">
-        <legend class="fab-im-field-label"
-          >{text('FABRICATE.Canvas.Manage.PromoteMarker', 'Marker')}</legend
-        >
-        <label class="fab-im-radio">
-          <input type="radio" name="fab-im-visual-mode" value="marker" bind:group={visualMode} />
-          <span>{text('FABRICATE.Canvas.Manage.PromoteMarkerVisible', 'Visible marker')}</span>
-        </label>
-        <label class="fab-im-radio">
-          <input type="radio" name="fab-im-visual-mode" value="none" bind:group={visualMode} />
-          <span>{text('FABRICATE.Canvas.Manage.PromoteMarkerNone', 'Region only (no marker)')}</span
-          >
-        </label>
-      </fieldset>
+      <Field as="div">
+        <span>{text('FABRICATE.Canvas.Manage.PromoteMarker', 'Marker')}</span>
+        <SegmentedControl
+          options={visualModeOptions}
+          value={visualMode}
+          onChange={(next) => (visualMode = next)}
+          groupName="fab-im-visual-mode"
+          ariaLabel={text('FABRICATE.Canvas.Manage.PromoteMarker', 'Marker')}
+          fill
+          dataAttr="data-interactable-manager-visual-mode"
+          optionDataAttr="data-interactable-manager-visual-mode-option"
+        />
+      </Field>
 
       {#if visualMode === 'marker'}
-        <fieldset class="fab-im-fieldset">
-          <legend class="fab-im-field-label"
-            >{text('FABRICATE.Canvas.Manage.PromoteMarkerKind', 'Marker kind')}</legend
-          >
-          <label class="fab-im-radio">
-            <input type="radio" name="fab-im-marker-kind" value="Tile" bind:group={markerKind} />
-            <span>{text('FABRICATE.Canvas.Manage.MarkerTile', 'Tile')}</span>
-          </label>
-          <label class="fab-im-radio">
-            <input type="radio" name="fab-im-marker-kind" value="Drawing" bind:group={markerKind} />
-            <span>{text('FABRICATE.Canvas.Manage.MarkerDrawing', 'Drawing')}</span>
-          </label>
-        </fieldset>
+        <Field as="div">
+          <span>{text('FABRICATE.Canvas.Manage.PromoteMarkerKind', 'Marker kind')}</span>
+          <SegmentedControl
+            options={markerKindOptions}
+            value={markerKind}
+            onChange={(next) => (markerKind = next)}
+            groupName="fab-im-marker-kind"
+            ariaLabel={text('FABRICATE.Canvas.Manage.PromoteMarkerKind', 'Marker kind')}
+            fill
+            dataAttr="data-interactable-manager-marker-kind"
+            optionDataAttr="data-interactable-manager-marker-kind-option"
+          />
+        </Field>
       {/if}
 
       <div class="fab-im-promote-actions">
-        <button
-          type="button"
-          class="fab-im-promote-confirm"
+        <ManagerButton
+          role="primary"
           disabled={!canPromote}
           onclick={confirmPromote}
+          data-interactable-manager-promote-confirm=""
         >
           {text('FABRICATE.Canvas.Manage.PromoteConfirm', 'Promote region')}
-        </button>
-        <button type="button" class="fab-im-promote-cancel" onclick={() => (showPromote = false)}>
+        </ManagerButton>
+        <ManagerButton
+          onclick={() => (showPromote = false)}
+          data-interactable-manager-promote-cancel=""
+        >
           {text('FABRICATE.Canvas.Manage.PromoteCancel', 'Cancel')}
-        </button>
+        </ManagerButton>
       </div>
-    </section>
+    </InspectorCard>
   {/if}
 
   <section
@@ -369,48 +444,49 @@
             <div class="fab-im-row-main">
               <span class="fab-im-row-name">{row.name}</span>
               <div class="fab-im-row-meta">
-                <span class="fab-im-chip fab-im-chip-type">{typeLabel(row.interactableType)}</span>
-                <span class="fab-im-chip fab-im-chip-source">{row.sourceLabel}</span>
+                <Chip tone="secondary" data-interactable-manager-chip-type=""
+                  >{typeLabel(row.interactableType)}</Chip
+                >
+                <Chip tone="neutral" data-interactable-manager-chip-source=""
+                  >{row.sourceLabel}</Chip
+                >
                 {#each stateBadges(row.state) as badge (badge)}
-                  <span class="fab-im-chip fab-im-chip-state">{badge}</span>
+                  <Chip tone="neutral" data-interactable-manager-chip-state="">{badge}</Chip>
                 {/each}
-                <span
-                  class="fab-im-chip fab-im-chip-marker"
-                  class:is-missing={row.markerStatus === 'missing'}
-                  class:is-region-only={row.markerStatus === 'region-only'}
+                <Chip
+                  tone={markerTone(row.markerStatus)}
+                  data-interactable-manager-chip-marker={row.markerStatus}
                 >
                   {markerLabel(row.markerStatus)}
-                </span>
+                </Chip>
               </div>
             </div>
             <div class="fab-im-row-actions">
-              <button
-                type="button"
-                class="fab-im-action"
-                onclick={() => openConfig(row.ref)}
+              <IconButton
+                ariaLabel={text('FABRICATE.Canvas.Manage.OpenConfig', 'Open configuration')}
                 title={text('FABRICATE.Canvas.Manage.OpenConfig', 'Open configuration')}
-                aria-label={text('FABRICATE.Canvas.Manage.OpenConfig', 'Open configuration')}
+                onclick={() => openConfig(row.ref)}
+                data-interactable-manager-open-config=""
               >
                 <i class="fas fa-sliders" aria-hidden="true"></i>
-              </button>
-              <button
-                type="button"
-                class="fab-im-action"
-                onclick={() => jump(row.ref)}
+              </IconButton>
+              <IconButton
+                ariaLabel={text('FABRICATE.Canvas.Manage.JumpToRegion', 'Jump to region')}
                 title={text('FABRICATE.Canvas.Manage.JumpToRegion', 'Jump to region')}
-                aria-label={text('FABRICATE.Canvas.Manage.JumpToRegion', 'Jump to region')}
+                onclick={() => jump(row.ref)}
+                data-interactable-manager-jump=""
               >
                 <i class="fas fa-location-crosshairs" aria-hidden="true"></i>
-              </button>
-              <button
-                type="button"
-                class="fab-im-action fab-im-action-delete"
-                onclick={() => remove(row.ref)}
+              </IconButton>
+              <IconButton
+                class="is-danger"
+                ariaLabel={text('FABRICATE.Canvas.Manage.Delete', 'Delete interactable')}
                 title={text('FABRICATE.Canvas.Manage.Delete', 'Delete interactable')}
-                aria-label={text('FABRICATE.Canvas.Manage.Delete', 'Delete interactable')}
+                onclick={() => remove(row.ref)}
+                data-interactable-manager-delete=""
               >
                 <i class="fas fa-trash" aria-hidden="true"></i>
-              </button>
+              </IconButton>
             </div>
           </li>
         {/each}
@@ -418,3 +494,145 @@
     {/if}
   </section>
 </div>
+
+<style>
+  /* THIS WINDOW'S LAYOUT MOVED HERE FROM THE GLOBAL SHEET (issue 1520).
+
+     Every CONTROL family the panel used to draw itself — the button, the field, the three radio
+     fieldsets, the row chips, the icon-only row actions and the promote card — is a shared
+     primitive's now, and the `.fab-im-*` rules that painted them are deleted. What is left is
+     this window's own LAYOUT, and it is written HERE rather than in `styles/fabricate.css`
+     because those rules were the only thing keeping the panel's appearance rooted at an
+     application class: a scoped block travels with the markup, which is what makes the window
+     host-independent in the same sense the config panel already is.
+
+     `.fabricate-interactables-manager-body`'s own scroll containment stays in the sheet, at
+     `.fabricate-interactables-manager .fabricate-interactables-manager-body`, because it is the
+     window's frame contract rather than its content layout — and deleting it would remove the
+     panel's scrolling.
+
+     Two rules below reach a CHILD COMPONENT's element and are therefore `:global(...)`, each
+     anchored on a class this file DOES write, so Svelte's `svelte-<hash>` lands on the ancestor
+     compound rather than on the primitive's element — where it would match nothing, silently,
+     with `css.code` byte-identical and no compiler warning. */
+  .fab-im-header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-1);
+  }
+
+  .fab-im-title {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+
+  /* THE MUTED READINGS ARE INKED, NOT FADED (issue 1520). Both of these dimmed their text with
+     `opacity`, which fades the WHOLE element — border and background with it — and produces a
+     different colour on every surface it is drawn over. `--fab-text-muted` is the published
+     recessive ink and is what the shared primitives this panel now renders already use. */
+  .fab-im-subtitle {
+    margin: 0;
+    color: var(--fab-text-muted);
+    font-size: 0.85rem;
+  }
+
+  .fab-im-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fab-space-2);
+  }
+
+  /* THE OPEN DISCLOSURE'S ACCENT EDGE, restated against `aria-expanded` (issue 1520). The
+     button's `is-active` class said the same thing twice — once to a reader of the markup and
+     once to assistive technology — and only the attribute is the behaviour's own. `:global(...)`
+     because the element is `ManagerButton`'s; anchored on `.fab-im-toolbar`, which this file
+     writes, so the hash lands there. */
+  .fab-im-toolbar :global(.fabricate-button[aria-expanded='true']) {
+    border-color: var(--fab-accent);
+  }
+
+  /* The promote card's contents are a column of labelled controls, which is the shell's own
+     `flex-direction: column` — so the card states nothing here. Only the hint's ink and the
+     action row's wrapping are this caller's. */
+  .fab-im-promote-hint {
+    margin: 0;
+    color: var(--fab-text-muted);
+    font-size: 0.85rem;
+  }
+
+  .fab-im-promote-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fab-space-2);
+    margin-top: var(--fab-space-1);
+  }
+
+  /* The action row is `flex-wrap: wrap` and the shared button declares `min-width: 0`, so
+     without this a converted button squashes below its own label instead of wrapping to the next
+     line. It is POSITION rather than appearance, which is the half a caller keeps. */
+  .fab-im-promote-actions :global(.fabricate-button) {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .fab-im-list-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+  }
+
+  .fab-im-empty {
+    margin: 0;
+    color: var(--fab-text-muted);
+    font-size: 0.85rem;
+  }
+
+  .fab-im-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-2);
+  }
+
+  /* 6px, not 4: 4 is off the radius ladder (0, 6, 7, 9, 11, 999, 50%) and this row is under the
+     24px band the 6px rung is published for. `--fab-border` replaces `--fab-overlay-light-16`,
+     which is the same hairline every shared primitive in this window now draws. */
+  .fab-im-row {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2) var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 6px;
+  }
+
+  .fab-im-row-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fab-space-1);
+  }
+
+  .fab-im-row-name {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .fab-im-row-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fab-space-1);
+  }
+
+  .fab-im-row-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-1);
+  }
+</style>
