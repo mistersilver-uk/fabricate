@@ -120,15 +120,32 @@ export function prefixedTokensIn(source, prefix) {
  *
  * `//` is stripped only at the head of a line, so a `https://` inside a string survives.
  *
+ * ── THE COMMENTS GO FIRST, AND THE BLOCK IS ANCHORED AT COLUMN 0 ──────────────────────────
+ * Both are corrections, and both were found by putting this reduction under the View Lab's own
+ * selector scan (issue 1520 review round 2). The style strip used to run FIRST, over the raw
+ * text, and it is non-greedy — so a docblock that merely NAMES `<style>` in prose opened the
+ * match there and closed it at the real block's `</style>`, taking every line of markup in
+ * between with it. Measured on `components/Chip.svelte`, whose header explains that its CSS
+ * lives in a scoped block: `data-chip-tint` is written on its root element and the reduction
+ * reported the file as emitting nothing at all.
+ *
+ * That direction FAILS CLOSED for the locator scan below — a hook that vanishes reds — so it
+ * had gone unnoticed. It does not fail closed for every consumer, and a reduction that deletes
+ * the markup it exists to isolate is wrong in either direction.
+ *
+ * So the comments are removed first, which also disposes of the two CSS comments inside a block
+ * that name `<style>`, and the block itself is then matched only where a Svelte component can
+ * actually write one: at the start of a line.
+ *
  * @param {string} rootSource A Svelte root's whole source text.
  * @returns {string} The part of it that can carry an attribute or a class.
  */
 export function emittingHalfOf(rootSource) {
   return rootSource
-    .replace(/<style[\s\S]*?<\/style>/g, '')
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^[ \t]*\/\/.*$/gm, '');
+    .replace(/^[ \t]*\/\/.*$/gm, '')
+    .replace(/^<style[^>]*>[\s\S]*?^<\/style>/gm, '');
 }
 
 /**

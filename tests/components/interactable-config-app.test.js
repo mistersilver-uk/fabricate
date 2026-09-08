@@ -22,6 +22,7 @@ import { planSetEnabled, planSetLocked } from '../../src/canvas/regions/interact
 import {
   SMOKE_SOURCE,
   assertLocatorsEmitted,
+  emittingHalfOf,
   prefixedTokensIn,
 } from '../helpers/interactablesSmokeLocators.js';
 import {
@@ -340,7 +341,12 @@ describe('InteractableConfigRoot body', () => {
       rootSource.includes('const OPTION_PANEL_MAX_WIDTH = 480'),
       "the cap is this window's declared width, so it never binds and the trigger decides"
     );
-    const selects = rootSource.match(/<Select\b[\s\S]*?\/>/g) ?? [];
+    // THE CORPUS IS THE EMITTING HALF, matching the sibling clause in
+    // `interactable-browser-app.test.js` (issue 1520 review round 2). Correct either way today —
+    // no comment in this root writes a `<Select …/>` tag — but an EXACT count over a whole-file
+    // corpus is a census a docblock example can move, and two clauses added in one change should
+    // not read the same file two ways.
+    const selects = emittingHalfOf(rootSource).match(/<Select\b[\s\S]*?\/>/g) ?? [];
     assert.equal(selects.length, 8, 'the panel renders eight shared selects');
     for (const tag of selects) {
       assert.ok(

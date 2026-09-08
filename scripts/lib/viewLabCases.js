@@ -1325,7 +1325,7 @@ const PLAYER_EXTENSION_SOURCES = Object.freeze([
  * frame, which draws no popover at all — and a regression in the pass that places every floating
  * surface in the product would have published one frame that could not contain it.
  *
- * THE SET IS EVERY FRAME THAT RESTS ON AN OPEN PANEL, and it is THIRTEEN — not the seven
+ * THE SET IS EVERY FRAME THAT RESTS ON AN OPEN PANEL, and it is FIFTEEN — not the seven
  * `SearchablePopover` frames alone. The seam is the positioning pass, so the component the panel
  * happens to be is not the question a frame answers; whether the frame's own `expectSelector`
  * requires a panel to be measured, placed and portaled is:
@@ -1344,12 +1344,25 @@ const PLAYER_EXTENSION_SOURCES = Object.freeze([
  *   `IconPicker`         `manager-system-edit-lists`, whose walk opens a modifier's icon picker
  *   `ActionMenu`         `manager-environment-edit-automatic-force-add`, whose last step opens the
  *                        row menu and whose selector names an item inside the portaled panel
+ *   `Select`, canvas     `interactables-config-source-open` and
+ *                        `interactables-manager-region-open` (issue 1520 review round 2) — the
+ *                        two GM canvas windows' open option panels, in a third and fourth
+ *                        application root the seam clamps against
  *
- * The last two are not reached by `BROAD_SIGNAL_CASE_OVERRIDES`. That map answers a DIFFERENT
- * question — which frames a change to `IconPicker.svelte` or `ActionMenu.svelte` publishes —
- * whereas this array is what a change to `anchoredPopover.js` publishes, and a broad-signal entry
- * for a component says nothing about a file that component imports. Reading the override as
- * cover for those two frames is a category error, and it left the seam publishing seven of ten.
+ * The `IconPicker` and `ActionMenu` frames are not reached by `BROAD_SIGNAL_CASE_OVERRIDES`. That
+ * map answers a DIFFERENT question — which frames a change to `IconPicker.svelte` or
+ * `ActionMenu.svelte` publishes — whereas this array is what a change to `anchoredPopover.js`
+ * publishes, and a broad-signal entry for a component says nothing about a file that component
+ * imports. Reading the override as cover for those two frames is a category error, and it left the
+ * seam publishing seven of ten.
+ *
+ * THE TWO CANVAS FRAMES WERE THE SAME ERROR THROUGH A DIFFERENT DOOR, and the round that found it
+ * found it by measuring one of them: `interactables-config-source-open` was already published, and
+ * its panel opened 110px narrower than the trigger it dropped from — a defect whose repair was in
+ * this seam, in a frame this seam did not route to. The cover being read that time was the
+ * window's own two source patterns, which answer "what does a change to this window publish" and
+ * not "what does a change to the pass that places its panel publish". A frame that rests on an
+ * open panel and does not name the seam is a frame the seam can break without publishing.
  *
  * `manager-recipes-bulk-edit-picker` takes `[...RECIPE_BULK_EDIT_MATCHES, ...ANCHORED_POPOVER_SOURCES]`
  * rather than gaining the seam through the shared array: four other bulk-edit frames use
@@ -12991,9 +13004,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector:
       '.fabricate-interactable-config-app > .fabricate-select-popover [data-popover-option]',
     kinds: ['canvas', 'interactables'],
+    // THE POSITIONING SEAM BELONGS IN HERE, and its absence was a routing gap rather than a
+    // judgement (issue 1520 review round 2). This case rests on an OPEN, measured, clamped and
+    // portalled panel, which is exactly the membership rule `ANCHORED_POPOVER_SOURCES` documents
+    // — so a change to that pass could regress this frame while publishing thirteen others that
+    // could not show it. The width finding this round answers came from measuring THIS frame and
+    // was fixed in that seam, so the gap was load-bearing rather than tidy.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/InteractableConfigRoot\.svelte$/,
       /^src\/ui\/InteractableConfigApp\.svelte\.js$/,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   interactablesManagerCase({
@@ -13060,6 +13080,42 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/interactables\//,
       /^src\/ui\/InteractablesManagerApp\.svelte\.js$/,
+    ],
+  }),
+  interactablesManagerCase({
+    // THE WIDEST TRIGGER IN THE THREE WINDOWS, WITH ITS PANEL OPEN (issue 1520 review round 2).
+    //
+    // The Manage panel's promote card states `width: 100%` on its select triggers, and at this
+    // window's 560px that is a 508px control — the worst case of the three, and no frame in the
+    // registry reached it. `interactables-manager-promote` opens this same picker and CLICKS
+    // THROUGH it, so its frame rests on a closed control; the review round that measured a 340px
+    // panel under a 450px trigger had to measure it on the config window because this one could
+    // not be photographed at all.
+    //
+    // The steps are the promote case's own, minus its second: the toggle and the region trigger
+    // are both already proven to resolve there, so this case adds a state rather than a new
+    // locator. `expectSelector` names `deep-gate` for the same reason — it is the row that case
+    // clicks — and the `>` is the portal assertion the config window's open-panel frame carries,
+    // which is what makes a `<body>`-hosted fallback fail the capture rather than photograph as
+    // a healthy panel.
+    id: 'interactables-manager-region-open',
+    label: 'Manage Interactables — promote region picker open under a full-width trigger',
+    // `beyond`: the smoke opens the promote card but never rests on one of its panels, so there
+    // is no counterpart frame for this to fall short of and no label it could claim.
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '[data-interactable-manager-promote-toggle]' },
+      { selector: '[data-interactable-manager-region]' },
+    ],
+    expectSelector:
+      '.fabricate-interactables-manager > .fabricate-select-popover ' +
+      '[data-popover-option="deep-gate"]',
+    kinds: ['canvas', 'interactables'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/interactables\//,
+      /^src\/ui\/InteractablesManagerApp\.svelte\.js$/,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   interactablesManagerCase({

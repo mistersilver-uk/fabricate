@@ -49,6 +49,7 @@ import {
 } from '../src/ui/svelte/apps/manager/checks/checksNav.js';
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
+import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
 
@@ -207,6 +208,37 @@ function renderSources() {
         file === 'lang/en.json' ||
         (file.startsWith('src/ui/') && file.endsWith('.js'))
     )
+  );
+}
+
+/**
+ * The same corpus, reduced to the half of each file that can put a hook ON AN ELEMENT.
+ *
+ * WHY A WHOLE-FILE SCAN IS THE WRONG CORPUS FOR A SELECTOR (issue 1520 review round 2). A
+ * component's own class names are written TWICE — once on the element and once as the selector of
+ * the scoped rule that paints it — so "the file contains `fab-ib-row`" stays true after the
+ * `class="…"` attribute is deleted, and a `data-*` hook survives in any paragraph that names it.
+ * Measured on the interactable browser: with `floor: 0` the selector scan is the sole owner of
+ * `[data-interactable-browser-system]` and `[data-interactable-browser-search]`, deleting both
+ * from the markup reds it — and re-running with ONE added `//` comment naming the two hooks goes
+ * green over a tree that emits neither, at which point the `fill` step of
+ * `interactables-browser-filtered` throws twenty minutes into a capture run.
+ *
+ * `emittingHalfOf` is the reduction `tests/helpers/interactablesSmokeLocators.js` already applies
+ * to the smoke-locator scan for the same reason, shared rather than copied: two implementations of
+ * "the part that can carry an attribute" is two things to weaken.
+ *
+ * `lang/en.json` is passed through untouched — it carries no comments and no `<style>` block, and
+ * the label branch reads it for TEXT rather than for hooks.
+ *
+ * @returns {Map<string, string>} `path -> emitting half`, keyed as {@link renderSources}.
+ */
+function emittingSources() {
+  return new Map(
+    [...renderSources()].map(([file, text]) => [
+      file,
+      file === 'lang/en.json' ? text : emittingHalfOf(text),
+    ])
   );
 }
 
@@ -606,7 +638,7 @@ test('every interaction step names text that exists in the manager UI', () => {
   // the case would capture whichever screen happened to be showing.
   // Includes `src/ui/**/*.js`: the crafting sub-tab ids the selector steps target are declared in
   // `crafting/craftingNav.js`, not in any component file.
-  const sources = renderSources();
+  const sources = emittingSources();
   const haystack = [...sources.values()].join('\n');
 
   const missing = [];
@@ -755,7 +787,7 @@ test('every expectSelector names UI that still exists', () => {
   // is the normal shape for a case whose whole job is to assert a state — was guarded by
   // nothing. `data-world-modifier-roll-note` was exactly that: mutated to nonsense, every
   // guard passed and only a 20-minute capture run would have found it.
-  const sources = renderSources();
+  const sources = emittingSources();
   const haystack = [...sources.values()].join('\n');
   const missing = [];
   let checked = 0;
@@ -879,7 +911,7 @@ test('exactly the declared 1024px cases carry complete layout expectations', () 
 });
 
 test('layout expectation selectors name UI that still exists', () => {
-  const sources = renderSources();
+  const sources = emittingSources();
   const haystack = [...sources.values()].join('\n');
   const missing = [];
   for (const viewCase of VIEW_LAB_CASES.filter((entry) => entry.expectLayout)) {
@@ -1013,11 +1045,12 @@ test('the hooks the capture driver hard-codes still exist in the UI', () => {
   // what the new player attribute mirrors. Renaming the REAL attribute then left the guard green,
   // because the prose still matched. A check whose haystack includes its own documentation cannot
   // fail on a rename that only the documentation survives.
-  const haystack = [...renderSources().values()]
-    .join('\n')
-    .replaceAll(/<!--[\S\s]*?-->/g, '')
-    .replaceAll(/\/\*[\S\s]*?\*\//g, '')
-    .replaceAll(/^\s*\/\/.*$/gm, '');
+  //
+  // It used to strip comments HERE, in a third hand-rolled copy that left `<style>` blocks in — so
+  // `.manager-nav-button` would still have resolved out of the rule that paints it after the class
+  // came off the element. {@link emittingSources} is the shared reduction, and it removes the
+  // scoped block as well (issue 1520 review round 2).
+  const haystack = [...emittingSources().values()].join('\n');
   const absent = DRIVER_HOOKS.filter(
     (hook) => !new RegExp(String.raw`(?<![\w-])${hook}(?![\w-])`).test(haystack)
   );
@@ -2167,10 +2200,20 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   );
 });
 
-// The thirteen frames a change to the shared positioning seam must publish (issue 1500; the
-// eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, and the
+// The fifteen frames a change to the shared positioning seam must publish (issue 1500; the
+// eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the
 // twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
-// PLAYER window, which is a second application root for the seam to clamp against).
+// PLAYER window, which is a second application root for the seam to clamp against — and the
+// fourteenth and fifteenth at issue 1520's second review round, which is the two GM canvas
+// windows' open option panels).
+//
+// THOSE LAST TWO ARRIVED THE WAY THE THREE BEFORE THEM DID: a frame resting on an open panel that
+// did not name the seam. `interactables-config-source-open` was PUBLISHED, and it is the frame the
+// round measured a 340px option panel under a 450px trigger on — a defect whose repair was in this
+// seam, in a frame the seam did not route to. That is the same category error the paragraph below
+// records for `IconPicker` and `ActionMenu`, arriving by a different door: not "an override covers
+// it" this time, but "the window's own two source patterns cover it", which answers a different
+// question again.
 //
 // Written out rather than derived from `ANCHORED_POPOVER_SOURCES` itself: a pin that recomputed
 // the answer from the same array would agree with any wiring, including the one this list exists
@@ -2185,6 +2228,8 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
 // of them in a case's `sourceMatches` and dropped the other would publish a full-looking set for
 // half the seam.
 const ANCHORED_POPOVER_FRAMES = [
+  'interactables-config-source-open',
+  'interactables-manager-region-open',
   'manager-environment-edit-automatic-force-add',
   'manager-essences-source-picker',
   'manager-gathering-task-availability-menu',

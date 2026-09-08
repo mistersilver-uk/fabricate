@@ -22407,11 +22407,19 @@
   border-radius: 11px;
 }
 
-/* THE BAND IS RESTATED HERE BECAUSE THE PROP ALONE IS NOT ENOUGH. `anchoredPopover` writes the
-   panel's width as an inline style computed inside `[minWidth, maxWidth]`, and the shared
-   box's own `min-width: 240px` then FLOORS that result — so a 96px band would still open a
-   240px panel over a list of two-digit numbers. These figures mirror `SIZES` in
-   `Select.svelte`, and a mounted case reads both out of the two files and pins them equal. */
+/* THE BAND IS RESTATED HERE AS THE UNMEASURED FALLBACK, AND ONLY AS THAT. It used to be load
+   bearing: `anchoredPopover` wrote the panel's width as a bare inline `width` computed inside
+   `[minWidth, maxWidth]`, and the shared box's own bounds then clipped that result — a 96px
+   band opened a 240px panel over a list of two-digit numbers, and a caller raising its ceiling
+   past 340 got 340 anyway, because a `max-width` constrains a used width whatever its origin.
+   Since issue 1520's review the action writes the resolved width as a width AND as both of its
+   bounds, so a MEASURED panel takes the caller's figure and no rule here can clip it.
+
+   What is left for these three rules is the panel `clear()` leaves behind when the layout
+   declines to place it, which is a real state and wants a sane box rather than `max-content`.
+   The figures still mirror `SIZES` in `Select.svelte` and a mounted case still pins the two
+   files equal, so the fallback cannot drift away from the band it stands in for; the RENDERED
+   consequence is measured in `tests/components/select-popover-width.test.js`. */
 .fabricate-picker-popover.fabricate-select-popover-form {
   min-width: 240px;
   max-width: 340px;

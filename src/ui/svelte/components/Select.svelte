@@ -99,11 +99,14 @@
                  prop and not a constant.
     placeholder — the trigger's text while `value` is null.
     minWidth / maxWidth — the PANEL's width band in px, `0` for the rung's own default (240/340
-                 form, 96/240 inline, 160/320 toolbar). Both are needed AND not sufficient on
-                 their own: `.fabricate-picker-popover.manager-travel-popover` declares
-                 `min-width: 240px` in the sheet, which FLOORS the inline width the layout writes,
-                 so the per-rung panel rules below restate the band. {@link SIZES} is the single
-                 source of the numbers and a mounted case pins the CSS against it.
+                 form, 96/240 inline, 160/320 toolbar). Either DECIDES a measured panel's box:
+                 `anchoredPopover` resolves the band into one width and writes it as that width
+                 and as both of its bounds, so a caller raising `maxWidth` for a full-width
+                 trigger gets the wider panel. It did not until issue 1520's second review round
+                 — the sheet's own `max-width` clipped the inline width the layout wrote — and
+                 `tests/components/select-popover-width.test.js` measures the result in Chromium.
+                 {@link SIZES} is the single source of the numbers and a mounted case pins the
+                 per-rung fallback rules in the sheet against it.
     triggerData — a `data-*` map stamped verbatim on the trigger button, which is where every
                  converted call site's own stable hook goes. `data-select-size` is added to it.
     label / hint / error — present ⇒ the whole control renders inside `<Field as="label">`, with a
@@ -161,10 +164,16 @@
    * The three published rungs, and the PANEL band each one opens at.
    *
    * The band is here rather than only in the CSS because `SearchablePopover` needs it as PROPS:
-   * `actions/anchoredPopover.js` writes the panel's width as an inline style computed inside
-   * `[minWidth, maxWidth]`, while the sheet's own `min-width: 240px` then floors the result. So
-   * both halves are required, and the CSS half below is pinned against THIS table by a mounted
-   * case rather than left as a second copy free to drift.
+   * `actions/anchoredPopover.js` resolves the panel's width inside `[minWidth, maxWidth]` and
+   * writes it as a width AND as both of its bounds, so THIS table is what decides a measured
+   * panel's box. The sheet's per-rung rules mirror it for the unmeasured fallback alone, and a
+   * mounted case pins the two copies equal rather than leaving the second free to drift.
+   *
+   * A CALLER'S OWN `maxWidth` THEREFORE WINS OUTRIGHT (issue 1520 review round 2). It did not
+   * until the action wrote the ceiling: three windows raised it past 340 for a full-width
+   * trigger, the prop reached the element as a bare inline `width`, and the sheet's `max-width`
+   * clipped it back to 340 — a `max-width` constrains a used width whatever its origin, so that
+   * was never a contest an inline width could win.
    *
    * The numbers are starting values derived from the widest rendered option label at each
    * converting site: two-digit page sizes and a three-word category for `inline`, a lane-filter

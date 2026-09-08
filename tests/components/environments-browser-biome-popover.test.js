@@ -277,6 +277,12 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
   // popover opened". The CLAMP is not one of the terms this case can see — at a trigger 140px
   // from the left of a 1160px column, the column's boundary and the window's agree on the answer
   // — which is what the case below it exists for.
+  //
+  // The resolved width is now written as BOTH BOUNDS as well (issue 1520 review round 2), and this
+  // panel's box does not move: it asks for 220/220 against a rule that states `width: 220px` and
+  // no bounds at all, so the three declarations agree with each other and with the sheet. This
+  // suite and its sibling in `tests/actions/` are the two that pin the string, which is how the
+  // change's reach was measured rather than argued.
   it('positions the portaled panel where the deleted block would have', async () => {
     const target = await mountSettingsTab();
     const trigger = stageManagerShell(target);
@@ -287,7 +293,8 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
 
     assert.equal(
       opened.getAttribute('style'),
-      'left: 140px; right: auto; width: 220px; max-height: 380px; top: 136px; bottom: auto;'
+      'left: 140px; right: auto; width: 220px; min-width: 220px; max-width: 220px; ' +
+        'max-height: 380px; top: 136px; bottom: auto;'
     );
   });
 
@@ -315,7 +322,8 @@ describe('EnvironmentsBrowserView biome colour popover dismissal (issue 921)', (
 
     assert.equal(
       opened.getAttribute('style'),
-      'left: 984px; right: auto; width: 220px; max-height: 380px; top: 136px; bottom: auto;'
+      'left: 984px; right: auto; width: 220px; min-width: 220px; max-width: 220px; ' +
+        'max-height: 380px; top: 136px; bottom: auto;'
     );
   });
 

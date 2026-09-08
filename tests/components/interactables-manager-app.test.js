@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import {
   SMOKE_SOURCE,
   assertLocatorsEmitted,
+  emittingHalfOf,
   prefixedTokensIn,
 } from '../helpers/interactablesSmokeLocators.js';
 import {
@@ -343,7 +344,9 @@ describe('InteractablesManagerRoot body', () => {
       rootSource.includes('const OPTION_PANEL_MAX_WIDTH = 560'),
       "the panel cap is this window's declared width, so it never binds and the trigger decides"
     );
-    const selects = rootSource.match(/<Select\b[\s\S]*?\/>/g) ?? [];
+    // The emitting half, as its two sibling clauses read it (issue 1520 review round 2): an
+    // EXACT count is a census, and a census over prose is one docblock example away from moving.
+    const selects = emittingHalfOf(rootSource).match(/<Select\b[\s\S]*?\/>/g) ?? [];
     assert.equal(selects.length, 3, 'the promote card renders three shared selects');
     for (const tag of selects) {
       assert.ok(

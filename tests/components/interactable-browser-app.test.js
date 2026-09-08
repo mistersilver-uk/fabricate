@@ -534,4 +534,47 @@ describe('InteractableBrowserRoot body', () => {
         'it addresses so the loop stops being vacuous'
     );
   });
+
+  // THE REDUCTION EVERY SCAN ABOVE STANDS ON, PINNED AGAINST ITS OWN TWO FAILURE MODES
+  // (issue 1520 review round 2). `emittingHalfOf` is now the corpus for the View Lab's selector
+  // and driver-hook scans as well as this file's, so it is load-bearing for ~101 cases and has
+  // no test of its own — and it shipped with a defect in the direction that matters least here
+  // and most there: the style strip ran over the RAW text and is non-greedy, so a docblock that
+  // merely names `<style>` in prose opened the match and closed it at the real block, deleting
+  // every line of markup between them. `components/Chip.svelte` is the shipped case, and its
+  // `data-chip-tint` root attribute is what the View Lab scan reported as absent.
+  //
+  // Both polarities are asserted, because a reduction that returned the file unchanged would
+  // satisfy the first clause alone and is precisely the weakening this helper exists to prevent.
+  it('keeps markup after a prose mention of a style block, and still drops the real one', () => {
+    const source = [
+      '<!-- Its CSS lives in this scoped `<style>`, not the global sheet. -->',
+      '<script>',
+      "  // data-decoy-in-a-line-comment",
+      '</script>',
+      '',
+      '<span data-emitted-hook class="fab-emitted-class"></span>',
+      '',
+      '<style>',
+      '  /* a scoped `<style>` may reach no area token */',
+      '  .fab-styled-only { color: red; }',
+      '</style>',
+      '',
+    ].join('\n');
+
+    const emitting = emittingHalfOf(source);
+
+    assert.ok(
+      emitting.includes('data-emitted-hook') && emitting.includes('fab-emitted-class'),
+      'the element between the prose mention and the real block survives the reduction'
+    );
+    assert.ok(
+      !emitting.includes('fab-styled-only'),
+      'while a class named only by a scoped rule is not reported as emitted'
+    );
+    assert.ok(
+      !emitting.includes('data-decoy-in-a-line-comment'),
+      'and neither is a hook named only in a comment'
+    );
+  });
 });

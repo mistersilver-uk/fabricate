@@ -706,6 +706,13 @@ A caller's CLIPPING BOUNDARY reaches it only through `bounds` — a selector str
 Nor may a component under `src/ui/svelte/components/`: that directory's premise is that a component in it works wherever it is mounted, and `.manager-main` inside one of them is the same coupling as a hard-coded portal host in a quieter spelling.
 The shipped boundaries are values in `src/ui/svelte/util/overlayBounds.js`, which a shared component takes as its `bounds` default and a caller in another application overrides.
 
+The width that pass RESOLVES is the width the panel takes, so the action MUST write it as a `width` AND as both of that box's bounds, and a caller's own width band is therefore what decides a measured panel rather than any class rule.
+This is the per-window size floor recorded above, one layer in: a `max-width` constrains a used `width` regardless of where the width came from, so a stylesheet band silently overrides a measured one while the inline declaration sits on the element looking honoured.
+It has been paid for three times — a caller asking for a 150px menu that rendered at the shared 240px floor, three per-rung bands restated in the sheet to release that floor for narrow callers, and three windows raising a caller `maxWidth` for a full-width trigger and opening the primitive's 340px panel anyway.
+Restating a band in CSS answers one call site and leaves the next to rediscover it, which is what happened each time.
+A class rule MAY still state the band, but only as the box a panel takes when the layout DECLINES to place it and the action clears the style; where one does, the two copies are pinned equal by a test.
+Because neither happy-dom nor a source scan can see a used value, the guard for this is a RENDERED measurement: a panel carrying the style the action itself wrote, under the shipped sheet, in a real browser, with the pre-fix box measured beside it as the control.
+
 A primitive MUST set its own `height` and `min-height` on any button and its own width on any input, because Foundry's element rules otherwise crop or stretch it.
 A radio or checkbox MUST remove core's pseudo-element rendering in addition to setting `appearance: none`.
 A serif heading MUST name the element it renders on, because bare headings take core's colour and margins.
