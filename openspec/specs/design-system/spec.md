@@ -932,7 +932,8 @@ It has been adopted: the player window's `ActorSelectTopBar` renders its actor p
 
 `IconPicker` and `EssenceSourceSelector` render THROUGH the shared picker and are no longer look-alikes.
 Each keeps its own TRIGGER through a snippet and its own CLASS FAMILY through declared class props, and the family is preserved rather than folded for a measured reason: the View Lab case registry's own walk, the live Foundry smoke and about thirty assertions address those trigger classes by name, so a rename would edit all three to change nothing a GM sees and belongs to the family-rename change instead.
-Which specimen capabilities remain UNBUILT is recorded with the measurement that says so: an async source, its loading and error states, and multi-select have ZERO shipped callers, and the checklist that would use multi-select is already an adjudicated non-member above.
+Which specimen capabilities remain UNBUILT is recorded with the measurement that says so: an async source and its loading and error states have ZERO shipped callers, because no importer passes a promise.
+`multiple` is BUILT and no longer among them; it ships with the one caller that needed it, and the checklist family it serves is routed onto it rather than adjudicated out.
 A primitive that has cleared this bar BELONGS in the shared directory, and the picker was moved into `src/ui/svelte/components/` at issue 1500 to say so; a shared primitive left under one application's directory tells every reader, and the View Lab's broad-signal routing, that it is that application's component.
 The bar runs the other way too, and moved out of the same directory in the same change: a 506-line screen region with one caller is not a shared component, whichever primitives it reuses.
 

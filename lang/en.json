@@ -884,7 +884,8 @@
           "Add": "Add a component source",
           "Remove": "Remove {name} from component sources",
           "AlwaysIncluded": "always included",
-          "Empty": "No other owned characters to add."
+          "Empty": "No other owned characters to add.",
+          "SearchCharacters": "Search characters…"
         }
       },
       "Journal": {

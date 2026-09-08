@@ -2205,15 +2205,26 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
       'manager-gathering-task-availability-menu',
       'manager-recipe-edit-ingredients-or-menu',
       'manager-recipe-edit-tag-picker',
+      // THE NINTH AND TENTH OVERRIDES (issue 1513), and they are two capabilities rather than
+      // two more instances of one. `manager-recipe-item-contents-picker` is the only frame that
+      // draws the panel a choice does NOT close — `stayOpen`, which the book-contents picker
+      // needs without any selection semantics because a linked recipe leaves its option set —
+      // and `player-crafting-sources-picker` is the only one that draws `multiple`: a
+      // `role="listbox"` announcing `aria-multiselectable` over rows marked several at once, in
+      // the PLAYER window, with a caller's own `option` snippet inside the primitive's row. The
+      // eight above are all single-value panels that shut on choose, so a regression in the
+      // selection model or in the stay-open gate was in none of them.
+      'manager-recipe-item-contents-picker',
       'manager-world-parties-actor-picker',
       'manager-world-parties-realm-override-picker',
       'player-actor-picker',
+      'player-crafting-sources-picker',
       'world-tool-entry-on-break-repair-tag-picker-empty',
     ]
   );
 });
 
-// The sixteen frames a change to the shared positioning seam must publish (issue 1500; the
+// The seventeen frames a change to the shared positioning seam must publish (issue 1500; the
 // eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the
 // twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
 // PLAYER window, which is a second application root for the seam to clamp against — and the
@@ -2227,10 +2238,15 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
 // permits: the frame RESTS ON AN OPEN PANEL, which is the membership test itself, rather than
 // drawing a trigger closed.
 //
-// `player-crafting-sources-picker` lands in the same commit and is deliberately ABSENT here. Its
-// panel is a `position: absolute` child of `ComponentSourcesBar` that this seam does not place,
-// so naming the seam in that case would claim a regression the frame cannot show — the mirror
-// image of the closed-trigger error, and the reason that case's own comment states the omission.
+// THE SEVENTEENTH IS THE SAME FRAME THAT WAS DELIBERATELY ABSENT ONE COMMIT EARLIER.
+// `player-crafting-sources-picker` was registered against a panel this seam did not place — a
+// `position: absolute` child of `ComponentSourcesBar` — so naming the seam there would have
+// claimed a regression the frame could not show. The commit that routed that control onto
+// `SearchablePopover` is what changed the fact: the panel is portaled, measured and clamped by
+// this pass now, so the case took `...ANCHORED_POPOVER_SOURCES` in the same commit that made it
+// true. Growth in the permitted direction again — the frame RESTS ON AN OPEN PANEL — and the
+// two-step arrival is the point: the array's membership is a measurement of the tree, so it moved
+// when the tree did rather than in anticipation.
 //
 // THOSE LAST TWO ARRIVED THE WAY THE THREE BEFORE THEM DID: a frame resting on an open panel that
 // did not name the seam. `interactables-config-source-open` was PUBLISHED, and it is the frame the
@@ -2267,6 +2283,7 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-world-parties-actor-picker',
   'manager-world-parties-realm-override-picker',
   'player-actor-picker',
+  'player-crafting-sources-picker',
   'player-inventory-page-size',
   'world-tool-entry-on-break-repair-tag-picker-empty',
 ];

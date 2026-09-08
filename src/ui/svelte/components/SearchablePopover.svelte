@@ -80,7 +80,41 @@
                    to. Options with no `group` (or an unknown one) render last, without
                    a heading; a group whose options are all filtered out disappears.
                    Callers that pass no groups render exactly as before.
-    value        — id of the currently selected option (for aria-selected)
+    value        — id of the currently selected option (for aria-selected), or, in `multiple`
+                   mode, the ARRAY of selected ids. One prop rather than two because a
+                   picker has one selection whichever cardinality it has, and a second
+                   `selectedIds` beside it would be a second answer to the same question
+                   that a caller could contradict.
+                   THE SCALAR PATH IS UNTOUCHED and that is deliberate: `multiple` off
+                   compares `option.id === value` exactly as it always did, so all 23
+                   importers measured at issue 1513 render byte-identical rows. Only the
+                   `multiple` branch reads the array.
+    multiple     — OPTIONAL multi-select mode (default false, issue 1513). It turns on three
+                   things at once, because a panel with any two of them lies about itself:
+                   `aria-selected` is driven by MEMBERSHIP of `value` rather than by equality
+                   with it, the `role="listbox"` announces `aria-multiselectable="true"`, and
+                   the panel STAYS OPEN across choices (it implies `stayOpen` below).
+                   A single-value listbox cannot say that four source actors are selected —
+                   it says one is — and a multi-select that closes on choose costs four
+                   clicks to add four of them. The design-system spec records the checklist
+                   family as this picker's own MODE rather than a fourth widget, so a control
+                   of that shape is routed here instead of hand-rolled.
+                   COMMIT-ON-CHOOSE IS THE CALLER'S BUSINESS, not this prop's. The primitive
+                   still emits one `onChoose(id)` per click and holds no selection of its
+                   own; a caller that toggles a session scope writes through immediately and
+                   a caller that stages one accumulates. Nothing here decides which.
+    stayOpen     — OPTIONAL: do not close the panel when an option is chosen (default false,
+                   issue 1513). It is the gate ALONE, separable from `multiple` because a
+                   caller can need the panel to survive a choice while announcing NO
+                   selection at all: a picker whose chosen option LEAVES the option set has
+                   nothing left to mark, and announcing `aria-multiselectable` over a panel
+                   with an empty selection model is the class of lie the naming rules forbid.
+                   `multiple` implies it; passing it alone does not imply `multiple`.
+                   WHAT `close()` DOES THAT THIS SKIPS: it clears the query, drops the
+                   type-ahead prefix and returns focus to the trigger. Under this gate the
+                   GM keeps their query and their place, and the keyboard cursor is held
+                   safe by the generation stamp plus the range clamp on `activeIndex` below
+                   rather than by the close.
     triggerClass — class string for the trigger button (consumer-controlled)
     triggerChip  — render the trigger through the shared `Chip` primitive instead of a
                    bare `<button>` (issue 883). The recipe editor's "or…" control is a
@@ -448,8 +482,8 @@
    *
    * Every other label here arrives pre-localized from the call site, because every other label
    * is a fact about that surface — what the picker is for, what it is empty OF. `No matches` is
-   * a fact about this control's own search box and is the same sentence at all 23 sites, so a
-   * new required prop would have been 23 identical edits to say one thing once.
+   * a fact about this control's own search box and is the same sentence at all 24 sites, so a
+   * new required prop would have been 24 identical edits to say one thing once.
    *
    * @param {string} key
    * @param {string} fallback
@@ -484,6 +518,11 @@
     options = [],
     optionGroups = [],
     value = '',
+    // The multi-select mode and the stay-open gate (issue 1513), both additive and default-off.
+    // See the props block above for why `multiple` turns on three things at once and why the
+    // gate is separable from it.
+    multiple = false,
+    stayOpen = false,
     disabled = false,
     triggerClass = '',
     triggerChip = false,
@@ -661,6 +700,42 @@
     return Boolean(renderedOptions[index]?.disabled);
   }
 
+  // ── THE SELECTION MODEL (issue 1513) ──────────────────────────────────────────────────────
+  //
+  // TWO CARDINALITIES, ONE PROP. `value` is an id in the default mode and an ARRAY of ids in
+  // `multiple` mode, because a picker has one selection whichever cardinality it has; a second
+  // `selectedIds` prop beside it would be a second answer a caller could contradict.
+  //
+  // THE SCALAR PATH IS LITERALLY THE OLD EXPRESSION, and that is the whole reason this is a
+  // branch rather than a normalization. Coercing `value` into a set for every caller would
+  // change the answer for an option whose `id` is `''` against the `value = ''` default — a
+  // strict-equality TRUE today — so the 23 importers measured at this change would not be
+  // rendering exactly as they do. The array leg is reached only when `multiple` is on.
+  //
+  // The set is rebuilt per pass rather than mutated, because `value` is a plain prop: a caller
+  // that hands the same array back with one more entry pushed into it is not a state change
+  // Svelte can see, and rebuilding here at least keeps this component honest about what it was
+  // handed.
+  const selectedIdSet = $derived(
+    multiple ? new Set(Array.isArray(value) ? value : [value]) : new Set()
+  );
+
+  /**
+   * Whether an option row is marked selected.
+   *
+   * @param {{id: string}} option The row being drawn.
+   * @returns {boolean} True when the row is part of the current selection.
+   */
+  function optionIsSelected(option) {
+    return multiple ? selectedIdSet.has(option.id) : option.id === value;
+  }
+
+  // THE GATE, resolved once. `multiple` IMPLIES `stayOpen` — a multi-select that shuts on the
+  // first choice costs one reopen per additional choice and is the defect the register recorded
+  // against the hand-rolled checklist — while `stayOpen` alone does NOT imply `multiple`: a
+  // panel whose chosen option leaves the option set has no selection to announce.
+  const staysOpenOnChoose = $derived(multiple || stayOpen);
+
   const filteredCount = $derived(
     String(filteredCountTemplate)
       .replace('{matched}', String(filteredOptions.length))
@@ -733,7 +808,22 @@
   // `aria-activedescendant` name a position in the PREVIOUS list, and only a test that refuses to
   // flush can see it. Stamped, the stale cursor never renders at all: the generation it was
   // written under no longer matches, so it reads as the -1 sentinel in the same pass.
-  const activeIndex = $derived(cursor.generation === optionListGeneration ? cursor.index : -1);
+  //
+  // AND A RANGE CLAMP BESIDE THE STAMP (issue 1513), which the stay-open gate is what makes
+  // load-bearing. `close()` is what used to clear the cursor after every choice; under
+  // `stayOpen` the panel survives the choice and the option list may SHRINK under it — a caller
+  // whose options are "everything not yet linked" removes the row that was just chosen. The
+  // generation covers the ordinary shrink, because it reads `options.length` and both end ids.
+  // What it cannot see is a caller `filterOptions` seam that narrows the RENDERED list from
+  // state of its own while `options` is unmoved: the generation is unchanged and the index can
+  // then name a row past the end, which would emit an `aria-activedescendant` pointing at no
+  // element. The clamp answers with the same -1 sentinel the stamp does, so there is one
+  // "nothing is active" value rather than two.
+  const activeIndex = $derived(
+    cursor.generation === optionListGeneration && cursor.index < renderedOptions.length
+      ? cursor.index
+      : -1
+  );
 
   const listRendered = $derived(open && filteredOptions.length > 0);
   const controlledListId = $derived(listRendered ? listId : undefined);
@@ -1021,6 +1111,11 @@
 
   function choose(id) {
     onChoose(id);
+    // THE STAY-OPEN GATE (issue 1513). `close()` is not merely "hide the panel": it clears the
+    // query, drops the type-ahead prefix and pulls DOM focus back to the trigger. A control that
+    // edits several entries needs all three to survive the choice, so the gate is here — around
+    // the whole of `close()` — rather than a flag inside it.
+    if (staysOpenOnChoose) return;
     close();
   }
 
@@ -1351,7 +1446,7 @@
           id={activeOptionId(instanceId, index)}
           tabindex="-1"
           data-keyboard-focus="true"
-          aria-selected={option.id === value}
+          aria-selected={optionIsSelected(option)}
           aria-disabled={option.disabled ? 'true' : undefined}
           data-active-option={index === activeIndex ? 'true' : undefined}
           data-recipe-add={option.addMarker || undefined}
@@ -1455,6 +1550,7 @@
           id={listId}
           aria-label={dialogNameAttribute}
           aria-labelledby={dialogNamedBy}
+          aria-multiselectable={multiple ? 'true' : undefined}
           data-picker-as={as}
           data-picker-columns={isGrid ? String(gridColumns) : undefined}
         >

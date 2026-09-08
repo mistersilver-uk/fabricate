@@ -887,6 +887,156 @@ describe('1503 SearchablePopover — the capabilities its specimen names', () =>
     });
   });
 
+  /**
+   * THE MULTI-SELECT MODE AND THE STAY-OPEN GATE (issue 1513).
+   *
+   * Two props, both additive and both default-off, and the pair is deliberately not one prop.
+   * `multiple` turns on three things at once because a panel with any two of them lies about
+   * itself: membership-driven `aria-selected`, `aria-multiselectable` on the list, and a panel
+   * that survives a choice. `stayOpen` is the third of those ALONE, for a caller whose chosen
+   * option LEAVES the option set and therefore has no selection to announce.
+   *
+   * WHY THE `aria-selected` CLAUSE READS EXACT STRINGS. The attribute is emitted
+   * unconditionally on every row, so `hasAttribute` is true whatever the expression behind it
+   * is: a defect that marks one row instead of four passes a presence check and passes a
+   * truthiness check on the marked row. Only the whole row-by-row vector can see it.
+   */
+  describe('`multiple` and `stayOpen`', () => {
+    it('marks EVERY selected option, and announces the list as multi-selectable', async () => {
+      await mountPicker({ multiple: true, value: ['beaker', 'dagger'] });
+      const open = await openPanel();
+
+      assert.deepEqual(
+        optionRows(open).map((row) => row.getAttribute('aria-selected')),
+        ['false', 'true', 'false', 'true', 'false'],
+        'two of five are marked, at their own positions. A single-value listbox compares ' +
+          '`option.id === value` and can only ever mark ONE, which is what would silently tell ' +
+          'a screen-reader user that one source actor is selected when four are'
+      );
+      assert.equal(listOf(open).getAttribute('aria-multiselectable'), 'true');
+      harness.remount();
+    });
+
+    it('announces NOTHING multi-selectable in the default mode, and marks by equality there', async () => {
+      await mountPicker({ value: 'coin' });
+      const open = await openPanel();
+
+      assert.equal(
+        listOf(open).hasAttribute('aria-multiselectable'),
+        false,
+        'ABSENT rather than "false": `aria-multiselectable="false"` is a claim about a widget ' +
+          'that has no such axis, and all 23 importers measured at this change render the ' +
+          'single-value list'
+      );
+      assert.deepEqual(
+        optionRows(open).map((row) => row.getAttribute('aria-selected')),
+        ['false', 'false', 'true', 'false', 'false'],
+        'and the scalar path is the expression it always was, so those importers are unmoved'
+      );
+      harness.remount();
+    });
+
+    it('keeps the panel, the query and the focus holder across consecutive choices', async () => {
+      const chosenHere = [];
+      await mountPicker({ multiple: true, value: [], onChoose: (id) => chosenHere.push(id) });
+      const open = await openPanel();
+      search(open, 'a');
+      const holder = holderOf(open);
+
+      optionRows(panel())[0].click();
+      flushSync();
+      assert.ok(Boolean(panel()), 'the panel is still in the DOM after the first choice');
+      assert.equal(
+        holderOf(panel()).value,
+        'a',
+        'and the query is UNCLEARED. `close()` clears it, so the default mode loses the GM`s ' +
+          'filter on every choice — which is the whole cost of adding four entries to a set'
+      );
+      assert.equal(document.activeElement, holder, 'focus stays on the holder, not the trigger');
+
+      optionRows(panel())[1].click();
+      flushSync();
+      assert.deepEqual(
+        chosenHere,
+        ['anvil', 'beaker'],
+        'two consecutive choices reach the caller, from one open panel'
+      );
+      assert.ok(Boolean(panel()), 'and the panel is still open after the second');
+      harness.remount();
+    });
+
+    it('closes on choose under `stayOpen` off, which is every shipped caller today', async () => {
+      await mountPicker({ multiple: false });
+      const open = await openPanel();
+      optionRows(open)[0].click();
+      flushSync();
+      assert.ok(!panel(), 'the default is unchanged: one choice, one close');
+      harness.remount();
+    });
+
+    it('gates the close alone under `stayOpen`, without announcing a selection model', async () => {
+      await mountPicker({ stayOpen: true });
+      const open = await openPanel();
+      assert.equal(
+        listOf(open).hasAttribute('aria-multiselectable'),
+        false,
+        '`stayOpen` alone must NOT imply `multiple`: a picker whose chosen option leaves the ' +
+          'option set has nothing left to mark, and announcing a multi-selectable list over an ' +
+          'empty selection model is the class of lie the naming rules forbid'
+      );
+      optionRows(open)[0].click();
+      flushSync();
+      assert.ok(Boolean(panel()), 'and the panel survives the choice, which is the whole prop');
+      harness.remount();
+    });
+
+    /**
+     * THE CURSOR CANNOT OUTLIVE A LIST THAT SHRANK UNDER IT.
+     *
+     * `close()` is what used to clear the cursor after every choice; under the gate the panel
+     * survives and the rendered list may get SHORTER while it is open. Two mechanisms answer
+     * that and this clause exercises the second, because the first cannot reach it: the
+     * generation stamp reads `options.length` and both end ids, so it catches a caller that
+     * removes an option — but a caller `filterOptions` SEAM narrows the rendered list from
+     * state of its own with `options` unmoved, and the generation is byte-identical across it.
+     * The range clamp on `activeIndex` is what refuses the stale index there.
+     *
+     * A dangling `aria-activedescendant` is the visible defect: it names a DOM id that resolves
+     * to no element, which is exactly the state the primitive already refuses while its empty
+     * branch renders.
+     */
+    it('drops a cursor that would point past the end of a list narrowed under an open panel', async () => {
+      await mountPicker({ multiple: true, value: [] });
+      const open = await openPanel();
+      for (let step = 0; step < 5; step += 1) pressKey('ArrowDown');
+
+      const holder = holderOf(open);
+      const parked = activeDescendant(holder);
+      assert.equal(
+        parked,
+        optionRows(panel()).at(-1).getAttribute('id'),
+        'the cursor is parked on the LAST of five rows, which is the position a shorter list ' +
+          'cannot contain'
+      );
+
+      await harness.setProps({ filterOptions: (list) => list.slice(0, 2) });
+      assert.equal(optionRows(panel()).length, 2, 'the rendered list is shorter');
+      assert.equal(
+        activeDescendant(holderOf(panel())) ?? null,
+        null,
+        'and the cursor is GONE rather than naming row 4 of a two-row list. The generation is ' +
+          'unchanged here — same options, same query, same open state — so the stamp cannot ' +
+          'see this narrowing and the range clamp is what answers it'
+      );
+      assert.equal(
+        panel().querySelectorAll('[data-active-option]').length,
+        0,
+        'and no row paints the cursor either'
+      );
+      harness.remount();
+    });
+  });
+
   describe('`triggerOnKeydown`', () => {
     it('runs AFTER the primitive’s own handler, so a caller cannot delete the focus model', async () => {
       const seen = [];

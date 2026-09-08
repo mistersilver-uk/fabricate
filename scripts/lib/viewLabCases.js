@@ -825,6 +825,16 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     // primitive's own rows, so a change to the grid rung or to the snippet seam published nothing
     // that could contain it.
     'manager-essences-source-picker',
+    // A NINTH AND A TENTH, and they are the primitive's MULTI-SELECT mode and the one caller
+    // that stays open without it (issue 1513). `player-crafting-sources-picker` is the only
+    // frame in the registry that draws `aria-multiselectable` over rows marked several at once,
+    // and it is a PLAYER frame drawing a caller's `option` snippet inside the primitive's own
+    // row; `manager-recipe-item-contents-picker` is the only one that draws the panel a choice
+    // does not close. Neither state exists in any of the eight above, so a change to the
+    // selection model or to the stay-open gate published eight frames none of which could
+    // contain it.
+    'player-crafting-sources-picker',
+    'manager-recipe-item-contents-picker',
   ]),
   // THE APP'S OWN SELECT (issue 1504), whose panel is drawn by the primitive above and whose whole
   // subject — the option list — exists only while it is OPEN. Neither representative frame holds
@@ -11816,19 +11826,23 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: [],
     query: { tab: 'crafting' },
     steps: [{ selector: '[data-crafting-sources-add]' }],
-    // THE TREE AS IT STANDS, deliberately. This panel is NOT portaled and NOT anchored today: it
-    // is a `position: absolute` child of the bar itself, so the assertion is the IN-BAR shape —
-    // the bar, its own popover, its own listbox and a row in it. The phase that routes this
-    // control onto the shared picker rewrites this selector to the portaled form, and a frame
-    // that quietly stopped matching would fail the capture WHOLE rather than publish.
+    // THE PORTALED FORM, as of the phase that routed this control onto the shared picker. The
+    // panel was a `position: absolute` child of the bar and this selector began
+    // `[data-crafting-sources]`; it is now `SearchablePopover`'s panel, portaled to the
+    // application root and therefore OUTSIDE the bar's subtree entirely, so an ancestor-scoped
+    // assertion could not match it and would fail the capture WHOLE rather than publish. What
+    // survives the move is the caller's own two hooks: `popoverClass` puts
+    // `crafting-sources-popover` on the portaled panel and `optionClass` puts
+    // `crafting-source-option` on the primitive's row, so the frame still asserts THIS panel
+    // rather than whichever picker happens to be open.
     //
-    // It therefore does NOT take `...ANCHORED_POPOVER_SOURCES` here. That array's own failure text
-    // states the rule it would break: a longer list "means the seam was added to a frame that
-    // draws its trigger closed", and a frame whose panel the seam does not place is the same
-    // error read from the other end — the seam cannot regress in a panel it never touched.
+    // AND IT TAKES `...ANCHORED_POPOVER_SOURCES` NOW, which it deliberately did not before. The
+    // panel is measured, clamped and portaled by that seam from this commit forward, so a
+    // regression in the pass is visible here — which is the membership test the array's own
+    // failure text states, read the right way round.
     expectSelector:
-      '[data-crafting-sources] .crafting-sources-popover ' +
-      '.crafting-source-options .crafting-source-option',
+      '.fabricate-picker-popover.crafting-sources-popover ' +
+      '.manager-travel-popover-options .crafting-source-option',
     kinds: ['player', 'crafting'],
     // `apps/crafting/ComponentSourcesBar.svelte` NAMED EXPLICITLY rather than left to
     // `CRAFTING_SHARED`. The shared pattern already admits it, so this entry changes no selection
@@ -11837,6 +11851,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       CRAFTING_SHARED,
       /^src\/ui\/svelte\/apps\/crafting\/ComponentSourcesBar\.svelte$/,
+      ...ANCHORED_POPOVER_SOURCES,
     ],
   }),
   playerCase({
