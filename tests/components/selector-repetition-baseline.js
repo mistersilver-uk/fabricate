@@ -29,7 +29,7 @@
  * rather than these 119, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,120 `(at-context, selector)` keys, of which 3,001 appear exactly
+ * Unfiltered, the sheet holds 3,123 `(at-context, selector)` keys, of which 3,004 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -41,8 +41,45 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,610 rules at that head, 119 repeated keys and 243 appearances
+ * printed from. The sheet holds 2,619 rules at that head, 119 repeated keys and 243 appearances
  * between them; five keys appear three times and none appears four or more.
+ *
+ * ISSUE 1509 PHASE 4 IS THE FIRST OF THIS CHANGE'S PHASES TO RE-KEY A ROW, AND IT RE-KEYS EXACTLY
+ * ONE. Rooting `ToggleCard` at `fabricate-toggle-card` rewrites the leading compound of ten
+ * selectors and rooting `ItemDropZone` at `fabricate-link-field` rewrites fifteen more, and of
+ * those twenty-five exactly one is a repeated key: `.manager-item-drop-zone-copy small`, which the
+ * sheet writes once as a list member beside its `strong` sibling and once as a sole selector to
+ * give it a colour, a size and a leading. Both appearances re-root together, in the same commit,
+ * so the row keeps its count of 2 and `pinnedTotal` stays 243 across 119 rows. Nothing is added,
+ * split or deleted: the rule count stands at 2,619, the keyed and singleton figures at 3,123 and
+ * 3,004, and the phase writes no new rule at all — both families declare NO focus pair and NO font
+ * floor, and both refusals are asserted rather than merely absent.
+ *
+ * ISSUE 1509 PHASE 3 RE-KEYED NO ROW AND MOVED ONE CONTEXTUAL FIGURE, WHICH IS A SHAPE NEITHER
+ * EARLIER PHASE TOOK. Rooting `RadioCardGroup` rewrites the leading compound of 32 selectors, and
+ * not one of them is a repeated key — measured — so the repeated table is untouched and
+ * `pinnedTotal` stays 243 across 119 rows. What moves is the RULE COUNT alone, by six: six
+ * selector LISTS were SPLIT, each of them pairing a `manager-resolution-option` radio member that
+ * re-roots with a `manager-tool-bonus-row` one that must not. A split adds a rule without adding
+ * a key, because both members were already their own keys and each keeps exactly one appearance
+ * — so unlike phases 1 and 2 the key and singleton counts do not move at all, and 3,123 / 3,004
+ * stand. Phase 1 recorded that shape once as one third of its own change; here it is the whole of
+ * it, six times over, and the phase adds no rule of its own: the family's focus pair already
+ * existed and is re-rooted in place rather than written.
+ *
+ * ISSUE 1509 PHASE 1 RE-KEYED NO ROW AND MOVED THE THREE CONTEXTUAL FIGURES, which is issue 1508
+ * phase 3's shape again. Rooting `EditorTabs` rewrites the leading compound of eight selectors, and
+ * NOT ONE of them is a repeated key — measured — so the repeated table is untouched and
+ * `pinnedTotal` stays 243 across 119 rows. What moves is three RULES: the strip and repaint halves
+ * of the strip's new focus pair, and one half of a SPLIT. The split is the active count re-tone,
+ * whose two-member list paired a caller's `manager-environment-tab-button` leg with the primitive's
+ * own `manager-editor-tab-button` leg; a selector list's specificity is per member and only the
+ * second leg re-roots, so the rule is written as two adjacent rules with byte-identical
+ * declarations. That adds a RULE without adding a KEY — both members were already their own keys —
+ * which is the mirror image of the selector-leaving-a-group shape recorded above. The third new key
+ * is `.fabricate-tabs button`, a fifth selector joining the existing four-member font floor group
+ * rather than a rule of its own. So the rule count rises by three and the key and singleton counts
+ * rise by three as well: two from the pair, one from the floor member, none from the split.
  *
  * ISSUE 1508 RE-KEYED THREE ROWS AND MOVED THE THREE CONTEXTUAL FIGURES, and it did the two
  * things separately. RE-KEYED: rooting `Field` at the class it emits rewrites the leading compound

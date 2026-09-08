@@ -55,7 +55,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
-  import ArmedDangerButton from '../ArmedDangerButton.svelte';
+  import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
   import { scopedEnableable } from './scopedStudio.js';
 
   let {

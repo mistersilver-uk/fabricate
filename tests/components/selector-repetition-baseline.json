@@ -42,6 +42,10 @@
       "count": 2
     },
     {
+      "key": "(top level) | .fabricate-link-field .manager-item-drop-zone-copy small",
+      "count": 2
+    },
+    {
       "key": "(top level) | .fabricate-manager .form-group input",
       "count": 2
     },
@@ -203,10 +207,6 @@
     },
     {
       "key": "(top level) | .fabricate-manager .manager-inspector-name",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-item-drop-zone-copy small",
       "count": 2
     },
     {

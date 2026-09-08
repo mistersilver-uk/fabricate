@@ -24,9 +24,9 @@
   import ChanceSlider from '../../../components/ChanceSlider.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
-  import ArmedDangerButton from '../ArmedDangerButton.svelte';
+  import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
   import Chip from '../../../components/Chip.svelte';
-  import RadioCardGroup from '../RadioCardGroup.svelte';
+  import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ToolInheritCard from './ToolInheritCard.svelte';
   import ToolRepairRequirements from './ToolRepairRequirements.svelte';
   import ToolReplacementTarget from './ToolReplacementTarget.svelte';

@@ -60,7 +60,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import EditorValidationSurface from '../EditorValidationSurface.svelte';
+  import EditorValidationSurface from '../../../components/EditorValidationSurface.svelte';
 
   let {
     title = '',

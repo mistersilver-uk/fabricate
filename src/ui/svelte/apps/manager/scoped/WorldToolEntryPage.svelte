@@ -95,9 +95,9 @@
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import Chip from '../../../components/Chip.svelte';
-  import EditorTabs from '../EditorTabs.svelte';
-  import ItemDropZone from '../ItemDropZone.svelte';
-  import RadioCardGroup from '../RadioCardGroup.svelte';
+  import EditorTabs from '../../../components/EditorTabs.svelte';
+  import ItemDropZone from '../../../components/ItemDropZone.svelte';
+  import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ToolBehaviorPreview from '../tools/ToolBehaviorPreview.svelte';
   import ToolRepairRequirements from '../tools/ToolRepairRequirements.svelte';
   import ToolReplacementTarget from '../tools/ToolReplacementTarget.svelte';
@@ -1307,8 +1307,21 @@
               dropping onto the tile DOES. The uuid is still resolved here — `sourceMissing`
               reads it — it is simply not printed at a GM.
             -->
+            <!-- THE ONE SITE NAMING ALL FOUR HOOK REGIONS (issue 1509). `data-tool-source-layout`
+                 carries the STRING `'compact'` rather than `true`, and that is load-bearing
+                 rather than incidental: it is a layout id and not a presence flag.
+                 `data-tool-source-copy-uuid` is stated even though this site passes no `onCopy`
+                 and so never renders the copy action — the branch it replaces named the hook for
+                 the kind rather than for the rendered button, and three suites assert the
+                 action's ABSENCE by that selector. -->
             <ItemDropZone
               kind="tool-source"
+              hookAttrs={{
+                root: { 'data-tool-source-card': true, 'data-tool-source-layout': 'compact' },
+                hint: { 'data-tool-source-drop-hint': true },
+                copy: { 'data-tool-source-copy-uuid': true },
+                unlink: { 'data-tool-source-unlink': true },
+              }}
               item={sourceLinked ? source : null}
               state={sourceMissing ? 'missing' : 'linked'}
               title={entryName}

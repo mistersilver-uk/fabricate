@@ -45,6 +45,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { measureImporters } from '../scripts/lib/componentImporters.js';
 import {
   DESIGN_SYSTEM_PRIMITIVES,
   NOT_A_PRIMITIVE,
@@ -537,6 +538,164 @@ test('a recorded non-member carries no status, because it is not a member', () =
   }
 });
 
+/**
+ * The closed `scope` vocabulary, per spec.md requirement "A shared primitive's class family is
+ * rooted at the primitive, not at an app" and its scenario "A component that cannot leave its area
+ * keeps that area's root".
+ *
+ * Two words and no third, for the reason the status vocabulary is closed: a field whose values are
+ * open is a comment. `manager-only` is a DECISION about where a component may render, which is what
+ * makes the clauses below able to check it at all — an omission has nothing to disagree with.
+ */
+const SCOPES = ['shared', 'manager-only'];
+
+/** The area a `manager-only` row says its component cannot leave. */
+const MANAGER_DIRECTORY = 'src/ui/svelte/apps/manager/';
+
+/**
+ * The rows whose family this programme has RE-ROOTED at a class the primitive itself emits, and
+ * which therefore owe both a `shared` scope and an entry in the gate that proves the rooting.
+ *
+ * Hand-typed rather than derived, and the direction matters: this list is the CLAIM, and the two
+ * clauses below check it against the manifest and against the area-scope gate independently. Derive
+ * it from either one and the check becomes a tautology over that one.
+ *
+ * Three from issue 1502, six from issue 1508, five from issue 1509. `ArmedDangerButton` moved into
+ * the shared directory at issue 1509 and is deliberately ABSENT: it gained no root of its own,
+ * because the family it writes is `ManagerButton`'s and is already rooted, so it has no area-scope
+ * entry to find and a `fabricate-danger-button` would own no rule at all.
+ */
+const RE_ROOTED_ROWS = [
+  'src/ui/svelte/components/ChanceSlider.svelte',
+  'src/ui/svelte/components/EditorTabs.svelte',
+  'src/ui/svelte/components/EditorValidationSurface.svelte',
+  'src/ui/svelte/components/Field.svelte',
+  'src/ui/svelte/components/IconButton.svelte',
+  'src/ui/svelte/components/InspectorCard.svelte',
+  'src/ui/svelte/components/ItemDropZone.svelte',
+  'src/ui/svelte/components/ManagerButton.svelte',
+  'src/ui/svelte/components/ManagerSearchField.svelte',
+  'src/ui/svelte/components/ManagerToolbar.svelte',
+  'src/ui/svelte/components/Pagination.svelte',
+  'src/ui/svelte/components/RadioCardGroup.svelte',
+  'src/ui/svelte/components/StatusToggle.svelte',
+  'src/ui/svelte/components/ToggleCard.svelte',
+];
+
+/** The gate that PROVES a family is not application-rooted, read for its component paths only. */
+const AREA_SCOPE_GATE = 'tests/components/searchable-popover-area-scope.test.js';
+
+/**
+ * Every component path the area-scope gate holds an entry for.
+ *
+ * Read out of that file's `components:` fields rather than imported, because the entries are a
+ * local `const` in a test module and exporting them to satisfy this reader would put a second
+ * consumer on a list whose whole purpose is to be that gate's own. The slice is bounded by the
+ * `PRIMITIVES` literal so a path appearing in a comment or a mutation control cannot enter the set
+ * — `SearchablePopover` is written twice in that file and only one of the two is an entry.
+ */
+function areaScopeGateComponents() {
+  const source = readFileSync(path.join(REPO_ROOT, AREA_SCOPE_GATE), 'utf8');
+  const opener = 'const PRIMITIVES = Object.freeze([';
+  const start = source.indexOf(opener);
+  assert.notEqual(start, -1, `${AREA_SCOPE_GATE} no longer declares \`${opener}\``);
+  const end = source.indexOf('\n]);', start);
+  assert.notEqual(end, -1, `the \`PRIMITIVES\` literal in ${AREA_SCOPE_GATE} is unterminated`);
+
+  const region = source.slice(start, end);
+  const found = new Set();
+  for (const [, list] of region.matchAll(/components: Object\.freeze\(\[([^\]]*)\]\)/gu)) {
+    for (const [, file] of list.matchAll(/'([^']+)'/gu)) found.add(file);
+  }
+  return found;
+}
+
+test('every member row records a scope from the closed vocabulary, and no non-member does', () => {
+  assert.ok(DESIGN_SYSTEM_PRIMITIVES.length > 0, 'the member table is empty, so this is vacuous');
+  for (const row of DESIGN_SYSTEM_PRIMITIVES) {
+    assert.ok(
+      SCOPES.includes(row.scope),
+      `${row.path} carries scope ${JSON.stringify(row.scope)}, which is outside the ` +
+        `${JSON.stringify(SCOPES)} vocabulary. The field is universal on a member row: a row ` +
+        'without one leaves "can this leave the manager?" unanswered, which is the omission this ' +
+        'field exists to convert into a decision.'
+    );
+  }
+
+  assert.ok(NOT_A_PRIMITIVE.length > 0 && RULED_OUT.length > 0, 'a non-member table is empty');
+  for (const row of [...NOT_A_PRIMITIVE, ...RULED_OUT]) {
+    assert.ok(
+      !('scope' in row),
+      `${row.path ?? row.name} is a recorded NON-MEMBER and carries a scope. Scope answers where ` +
+        'a member of the vocabulary may render; on a row the register has adjudicated OUT of the ' +
+        'vocabulary it is a decision about a component the register says is not a member. This is ' +
+        'the same boundary the status clause above draws, for the same reason.'
+    );
+  }
+});
+
+test('a manager-only row states its reason, and no caller outside the manager contradicts it', () => {
+  const scoped = DESIGN_SYSTEM_PRIMITIVES.filter((row) => row.scope === 'manager-only');
+  assert.ok(scoped.length > 0, 'no row is manager-only, so both clauses below are vacuous');
+
+  const graph = measureImporters(REPO_ROOT);
+  assert.ok(
+    graph.importEdgeCount > 1000,
+    `the import graph resolved only ${graph.importEdgeCount} edges, so "no importer outside the ` +
+      'manager" is true of everything and the clause below measures nothing'
+  );
+
+  for (const row of scoped) {
+    assert.ok(
+      row.why.includes('manager-only'),
+      `${row.path} is scoped manager-only and its \`why\` never says so. The value is a decision, ` +
+        'and a decision whose reason is unwritten is indistinguishable from a default.'
+    );
+
+    const outside = graph
+      .importersOf(row.path)
+      .filter((importer) => !importer.startsWith(MANAGER_DIRECTORY));
+    assert.deepEqual(
+      outside,
+      [],
+      `${row.path} is scoped manager-only and is imported from outside ${MANAGER_DIRECTORY}. ` +
+        'The scope is then a false claim about a component another application already renders, ' +
+        'which is worse than no claim: the register would be recording a decision the tree has ' +
+        'already overruled. Either the scope is `shared` and the path is the debt, or the ' +
+        'importer is the defect.'
+    );
+  }
+});
+
+test('every re-rooted family carries a shared scope and an entry in the gate that proves it', () => {
+  const byPath = new Map(DESIGN_SYSTEM_PRIMITIVES.map((row) => [row.path, row]));
+  const entries = areaScopeGateComponents();
+  assert.ok(
+    entries.size >= 20,
+    `the area-scope gate reader found only ${entries.size} component paths, against the 21 that ` +
+      'file holds across 20 entries. The reader has stopped matching and the clause below passes ' +
+      'on nothing.'
+  );
+
+  for (const componentPath of RE_ROOTED_ROWS) {
+    const row = byPath.get(componentPath);
+    assert.ok(Boolean(row), `${componentPath} is recorded as re-rooted and has no manifest row`);
+    assert.equal(
+      row.scope,
+      'shared',
+      `${componentPath} had its family re-rooted at a class it emits and is scoped ` +
+        `${JSON.stringify(row.scope)}. Re-rooting is exactly what makes a component renderable ` +
+        'outside the manager, so a `manager-only` scope on one contradicts the work that landed it.'
+    );
+    assert.ok(
+      entries.has(componentPath),
+      `${componentPath} is scoped shared as a re-rooted family and ${AREA_SCOPE_GATE} holds no ` +
+        'entry for it. The register records the decision and the gate proves the rooting; without ' +
+        'the entry the claim is unmeasured, which is the state this pairing exists to prevent.'
+    );
+  }
+});
+
 test('every entry recorded as specified-but-unbuilt is declared a target', () => {
   // DERIVED from the register above rather than restated. That quadrant is already pinned by
   // exact equality there, so a second hand-typed list of the same names would be a copy free to
@@ -644,25 +803,25 @@ const UNDOCUMENTED_ROWS = [
   // `components/` to `apps/`, which changes where it sorts and nothing about its adjudication.
   'src/ui/svelte/apps/ActorSelectTopBar.svelte',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
-  'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
   'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
   'src/ui/svelte/apps/manager/BulkEditSection.svelte',
   'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
   'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte',
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   // The world modifier library's entry row (issue 1373, maintainer round 4). Genuinely
   // undocumented rather than an adjudicated non-member: it is a MEMBER at two callers, and
-  // `library.html` specifies no row for a library entry at all — `:626`'s `<OptionCards>` is the
+  // `library.html` specifies no row for a library entry at all — `:646`'s `<OptionCards>` is the
   // card group this row replaced at one of the two call sites, which is the opposite treatment.
+  // That citation read `:626` until issue 1509 re-derived it: issue 1508's five `library.html`
+  // insertions moved the `<OptionCards>` spec-head by twenty lines, and the SECOND copy of the
+  // stale number was in the manifest row, so repairing one and leaving the other would have been
+  // worse than either alone.
   'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
-  'src/ui/svelte/apps/manager/ResolutionModeCard.svelte',
   'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
   'src/ui/svelte/apps/manager/SystemOverviewView.svelte',
-  'src/ui/svelte/apps/manager/ToggleCard.svelte',
   // Promoted at issue 1392 and the ORDINARY kind of growth: a member of the set that no
   // `library.html` specimen names. Its row adjudicates `<SetPicker>`, the nearest entry, and
   // records why the correspondence is not made — a vocabulary editor is not one record's
@@ -673,15 +832,18 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',
   'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
   'src/ui/svelte/components/ActionMenu.svelte',
+  'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/DropZone.svelte',
+  'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/FillBar.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/ManagerColorPicker.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
+  'src/ui/svelte/components/ToggleCard.svelte',
 ];
 
 test('the shipped rows the library does not name are exactly the known set', () => {

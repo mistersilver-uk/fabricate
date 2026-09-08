@@ -70,7 +70,7 @@ const SCOPED_RAW_MODULES = [
 const SHELL_MODULES = [
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
-  'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+  'src/ui/svelte/components/ArmedDangerButton.svelte',
   // The catalogue inspector's pinned foot action (issue 1372). A missing entry here does not
   // FAIL the suite, it HANGS it and reports `# cancelled` — see
   // `mounted-harness-primitive-allowlist.test.js`, which is what caught this one.
@@ -153,10 +153,10 @@ const entryHarness = createMountedComponentHarness({
   compiledModules: [
     ...SHELL_MODULES,
     ...SELECT_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/EditorTabs.svelte',
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
+    'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
-    'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+    'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceBehaviorPreview.svelte',
     'src/ui/svelte/apps/inventory/InventoryItemCard.svelte',
     'src/ui/svelte/components/IconPicker.svelte',

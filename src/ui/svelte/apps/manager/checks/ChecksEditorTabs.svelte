@@ -45,7 +45,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import EditorTabs from '../EditorTabs.svelte';
+  import EditorTabs from '../../../components/EditorTabs.svelte';
 
   let { sections = [], activeSection = 'roll', onSelect = () => {} } = $props();
 

@@ -79,15 +79,15 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/CopyRulesCard.svelte',
     'src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
-    'src/ui/svelte/apps/manager/ToggleCard.svelte',
-    'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+    'src/ui/svelte/components/ItemDropZone.svelte',
+    'src/ui/svelte/components/ToggleCard.svelte',
+    'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/components/Field.svelte',
     // THE manager's labelled push-button (issue 1118). `ExplainerCard`'s docs link and
     // `EditorValidationSurface`'s View action both render through the primitive, so it is a
@@ -105,7 +105,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/EssenceSourceSelector.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceEditorTabs.svelte',
-    'src/ui/svelte/apps/manager/EditorTabs.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceIdentityTab.svelte',
     'src/ui/svelte/apps/manager/essences/EssenceOnCraftTab.svelte',
     // The shared scoped validation shell (issue 1362).

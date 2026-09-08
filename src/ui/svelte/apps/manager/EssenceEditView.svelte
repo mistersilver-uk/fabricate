@@ -74,7 +74,7 @@
     essenceOnCraftCount,
   } from './essences/essenceStudio.js';
   import Callout from './Callout.svelte';
-  import ToggleCard from './ToggleCard.svelte';
+  import ToggleCard from '../../components/ToggleCard.svelte';
   import CopyRulesCard from './scoped/CopyRulesCard.svelte';
   import MembershipActions from './scoped/MembershipActions.svelte';
   import SharedDefinitionCallout from './scoped/SharedDefinitionCallout.svelte';

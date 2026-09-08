@@ -57,7 +57,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     ...TOOL_TREE_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
     // THE BULK PANEL AND THE SHARED CHROME IT COMPOSES (issue 1373, maintainer feedback round 2).
     // The page IMPORTS the panel, so all three are in this tree's static graph whether or not a
@@ -68,7 +68,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/ToolCatalogueBulkPanel.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityCatalogueShell.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',

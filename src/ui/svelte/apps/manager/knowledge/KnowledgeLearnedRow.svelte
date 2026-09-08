@@ -38,7 +38,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Medallion from '../../../components/Medallion.svelte';
-  import ArmedDangerButton from '../ArmedDangerButton.svelte';
+  import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
   import Chip from '../../../components/Chip.svelte';
   import { getRecipeCategoryLabel } from '../../../../../utils/recipeCategories.js';
   import {

@@ -56,7 +56,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     ...MARKS_AND_NOTICES_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     // InventoryDetail routes (issue 675) rather than rendering both bodies itself. The
     // preview only ever reaches the BOOK branch, but module resolution is not rendering:
@@ -87,7 +87,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte',
     'src/ui/svelte/apps/inventory/InventoryDetail.svelte',
     // The promoted tab-strip primitive (issue 1362), a dependency of the tab strip below.
-    'src/ui/svelte/apps/manager/EditorTabs.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemOverviewTab.svelte',
     // The Contents tab's Link-recipe menu is a `SearchablePopover` (issue 1458).
@@ -99,7 +99,7 @@ const harness = createMountedComponentHarness({
     // Validation tab hands the surface its checks and renders no markup itself, so omitting
     // either HANGS this suite (# cancelled) rather than failing it. `ManagerButton` is already
     // listed above via the `SELECT_COMPILED_MODULES` spread.
-    'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+    'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',
     'src/ui/svelte/apps/manager/RecipeItemEditor.svelte',
   ],

@@ -1441,9 +1441,14 @@
 
 /* THE FONT FLOOR FOR THE FAMILIES WHOSE ROOT IS NOT THEIR CONTROL (issue 1508).
 
-   `Field`, `ManagerSearchField` and `ChanceSlider` are rooted at the class each of them emits, so
-   all three now render in hosts carrying no `.fabricate-manager` — and the control each owns is a
-   bare `<input>`, `<select>` or `<textarea>` that would otherwise take Foundry's own font there.
+   `Field`, `ManagerSearchField`, `ChanceSlider` and — since issue 1509 — `EditorTabs` are rooted
+   at the class each of them emits, so all four now render in hosts carrying no
+   `.fabricate-manager`, and the control each owns is a bare `<input>`, `<select>`, `<textarea>` or
+   `<button>` that would otherwise take Foundry's own font there. A `button` is among the controls
+   this group floors as of issue 1509: the tab strip's root is its `<div role="tablist">` and the
+   control it owns is the `<button role="tab">` inside it, so its member takes the (0,1,1) shape
+   rather than the (0,1,0) one.
+
    Where a family root IS the control the floor is written at that root alone, (0,1,0), as the two
    button families' and `StatusToggle`'s are; where the root is NOT the control it is written at
    the family root plus the bare element it owns, (0,1,1) — the SAME rank as the baseline above,
@@ -1451,6 +1456,8 @@
 
    The slider's member covers BOTH inputs it owns — the `type="number"` half and the `type="range"`
    track — because `input` names the element rather than a type, and both are the primitive's own.
+   The strip's member reaches every `<button>` inside a tablist, which is every button the strip
+   renders and no other: the primitive draws its own tabs and their marks and takes no children.
 
    `font: inherit` AND NOTHING ELSE, because a tie is not a loss: any declaration this rule
    carries that the baseline does not is a real move inside the manager. `appearance` and
@@ -1463,14 +1470,15 @@
    for a measured reason. `font` is a SHORTHAND and resets `line-height` with the rest, and at
    (0,1,1) this rule ties every LATER same-rank rule in the area as well. Two of those restate a
    `font` longhand for controls these floors reach: `.fabricate-manager textarea
-   { line-height: 1.4 }` at `styles/fabricate.css:1541-1545`, in the free-text baseline block just
-   below, and `.fabricate-manager select { line-height: 1 }` at `:1667-1674`, inside `@supports
+   { line-height: 1.4 }` at `styles/fabricate.css:1547-1551`, in the free-text baseline block just
+   below, and `.fabricate-manager select { line-height: 1 }` at `:1673-1680`, inside `@supports
    (appearance: base-select)`. Declared in a family block thousands of lines further down, this
    group would win both and silently re-type every manager textarea and select. Immediately below
    the baseline is the first position from which the interval walk comes back empty. */
 .fabricate-field :is(input, select, textarea),
 .fabricate-search input,
-.fabricate-slider input {
+.fabricate-slider input,
+.fabricate-tabs button {
   font: inherit;
 }
 
@@ -6452,7 +6460,25 @@
   gap: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-recipe-status-card {
+/* ROOTED AT `fabricate-toggle-card` (issue 1509), the class `ToggleCard` writes at the head of
+   its own root template. One class for one class, at the same sheet position, declarations
+   byte-identical: the card's class sits on the ROOT element, so its rules take the COMPOUND form
+   and its children's take the descendant chain, and every rank is what it was.
+
+   THE FAMILY IS THE FIVE `manager-recipe-status-{card,icon,copy,title,sub}` SUFFIXES AND NOTHING
+   ELSE. Bare `manager-recipe-status` — the recipe row's status slot, below in this file — is a
+   different thing that shares the prefix, and `.manager-recipe-*` occurs 461 times in this sheet
+   across 55 prefixes, so a loose family pattern here would have swallowed several hundred
+   unrelated selectors. It also stays OFF every `manager-status-toggle*` rule: the switch inside
+   this card is `StatusToggle`'s and is rooted at `fabricate-toggle`, and a
+   `.fabricate-toggle-card .manager-status-toggle-track` would be an APPLICATION root by name to
+   that primitive's own area-scope entry.
+
+   WHAT DID NOT TRAVEL: the twelve rules under `.manager-checks-flag-list`,
+   `.manager-checks-trigger-body` and `.manager-tool-system-enabled` are three CALLERS restating
+   this card's metrics inside containers of their own, so they stay application-rooted and
+   caller-owned. Issue 1507 retires the `manager-*` names. */
+.fabricate-toggle-card.manager-recipe-status-card {
   display: flex;
   align-items: center;
   gap: var(--fab-space-3);
@@ -6464,12 +6490,12 @@
 }
 
 /* The card's border + fill reflect its state. */
-.fabricate-manager .manager-recipe-status-card.is-enabled.is-on {
+.fabricate-toggle-card.manager-recipe-status-card.is-enabled.is-on {
   border-color: var(--fab-success-border);
   background: var(--fab-success-soft);
 }
 
-.fabricate-manager .manager-recipe-status-card.is-locked.is-on {
+.fabricate-toggle-card.manager-recipe-status-card.is-locked.is-on {
   border-color: var(--fab-accent-border);
   background: var(--fab-accent-soft);
 }
@@ -6481,16 +6507,16 @@
    semantics-inventing: `.is-enabled.is-on` is already exactly that, since
    `Recipe.enabled` also defaults true. The switch position and title carry the state;
    the tint is atmosphere. */
-.fabricate-manager .manager-recipe-status-card.is-info.is-on {
+.fabricate-toggle-card.manager-recipe-status-card.is-info.is-on {
   border-color: var(--fab-info-border);
   background: var(--fab-info-soft);
 }
 
-.fabricate-manager .manager-recipe-status-card.is-info.is-on .manager-recipe-status-icon {
+.fabricate-toggle-card.manager-recipe-status-card.is-info.is-on .manager-recipe-status-icon {
   color: var(--fab-info-text);
 }
 
-.fabricate-manager .manager-recipe-status-icon {
+.fabricate-toggle-card .manager-recipe-status-icon {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -6499,21 +6525,21 @@
   color: var(--fab-text-muted);
 }
 
-.fabricate-manager .manager-recipe-status-card.is-enabled.is-on .manager-recipe-status-icon {
+.fabricate-toggle-card.manager-recipe-status-card.is-enabled.is-on .manager-recipe-status-icon {
   color: var(--fab-success-text);
 }
 
-.fabricate-manager .manager-recipe-status-copy {
+.fabricate-toggle-card .manager-recipe-status-copy {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.fabricate-manager .manager-recipe-status-title {
+.fabricate-toggle-card .manager-recipe-status-title {
   margin: 0;
   font-weight: 600;
 }
 
-.fabricate-manager .manager-recipe-status-sub {
+.fabricate-toggle-card .manager-recipe-status-sub {
   margin: 2px 0 0;
   min-width: 0;
   line-height: 1.35;
@@ -10211,8 +10237,22 @@
 /* The resolution-mode card spans the full edit grid and is itself the selector: each mode is a
    selectable radio row with its name and one-line description, the active row highlighted. It sits
    beside the Identity / Optional Features cards, so it reuses their surface tokens, an uppercase
-   section kicker for the legend, and a top-of-card destructive-change note. */
-.fabricate-manager .manager-resolution-mode-card {
+   section kicker for the legend, and a top-of-card destructive-change note.
+
+   ROOTED AT `fabricate-option-cards` (issue 1509), the class `RadioCardGroup` writes at the head
+   of the `class` it hands to `Field`. One class for one class, at the same sheet position, with
+   declarations byte-identical: the card's own class sits on the ROOT element, so its rules take
+   the COMPOUND form `.fabricate-option-cards.manager-resolution-mode-card` at (0,2,0), while
+   every other family class is a DESCENDANT and takes the chain form. The `manager-*` classes stay
+   on the elements; issue 1507 retires them.
+
+   THE ROOT ELEMENT CARRIES TWO NAMESPACE ROOTS, because it is `Field`'s fieldset:
+   `fabricate-field` and `fabricate-option-cards` together. That is why this family declares no
+   font floor of its own — `.fabricate-field :is(input, select, textarea)` at (0,1,1) already
+   reaches every radio here in every host — and it is safe because the two families are
+   measurably disjoint: no selector in this sheet names a `manager-field`/`fabricate-field` class
+   together with a `manager-resolution-*` one. */
+.fabricate-option-cards.manager-resolution-mode-card {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
@@ -10224,7 +10264,7 @@
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-manager .manager-resolution-mode-legend {
+.fabricate-option-cards .manager-resolution-mode-legend {
   padding: 0;
   color: var(--fab-text-muted);
   font-size: 0.72rem;
@@ -10235,7 +10275,7 @@
 
 /* Destructive-change note, hoisted above the options so the warning reads before the GM picks a
    mode. Soft-warning surface keeps it integrated rather than alarming. */
-.fabricate-manager .manager-resolution-mode-note {
+.fabricate-option-cards .manager-resolution-mode-note {
   display: flex;
   gap: var(--fab-space-2);
   align-items: start;
@@ -10250,19 +10290,19 @@
   background: var(--fab-warning-soft);
 }
 
-.fabricate-manager .manager-resolution-mode-note i {
+.fabricate-option-cards .manager-resolution-mode-note i {
   margin-top: 0.1rem;
   color: var(--fab-warning);
 }
 
-.fabricate-manager .manager-resolution-mode-options {
+.fabricate-option-cards .manager-resolution-mode-options {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
-.fabricate-manager .manager-resolution-option {
+.fabricate-option-cards .manager-resolution-option {
   display: flex;
   gap: var(--fab-space-2);
   align-items: start;
@@ -10273,11 +10313,11 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-resolution-option:hover {
+.fabricate-option-cards .manager-resolution-option:hover {
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-manager .manager-resolution-option.is-active {
+.fabricate-option-cards .manager-resolution-option.is-active {
   border-color: var(--fab-border);
   background: var(--fab-accent-soft);
   box-shadow: inset 3px 0 0 var(--fab-accent);
@@ -10286,8 +10326,37 @@
 /* Custom radio: strip Foundry's orange native control and draw a circular, themed control. The
    unchecked state is a hollow ring on the border token; the checked state paints a green accent
    ring plus a filled centre dot via an inset box-shadow (no gradients, no orange anywhere). The
-   inset spread fills the inner circle to the accent colour while the border stays the ring. */
-.fabricate-manager .manager-resolution-option input[type='radio'],
+   inset spread fills the inner circle to the accent colour while the border stays the ring.
+
+   SIX TWO- AND FOUR-MEMBER LISTS ARE SPLIT HERE, ONCE EACH (issue 1509), and the split is forced
+   rather than tidy. Every one of them paired a `manager-resolution-option` radio member with a
+   `manager-tool-bonus-row` one, and the two are owned by different things: the option row is
+   `RadioCardGroup`'s own markup and re-roots at `.fabricate-option-cards`, while the Tool
+   Requirements bonus list was ruled OFF that primitive at issue 1373 round 4 and keeps its
+   manager root. A selector list's specificity is per MEMBER, so writing each list as two adjacent
+   rules at the original position with byte-identical declarations preserves every member's rank
+   and every member's source order — a list can be neither re-rooted whole, which would carry a
+   caller's class into the primitive's namespace, nor exempted whole, which would leave the
+   primitive's own radios rooted at the manager. Ranks, unchanged on both sides: (0,3,1) here,
+   (0,3,2) for the pseudo-element pair, (0,4,1) for `:checked`, `:focus` and `:focus-visible`, and
+   (0,5,1) for `:checked:focus`. */
+.fabricate-option-cards .manager-resolution-option input[type='radio'] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  min-width: 0;
+  margin: 0;
+  margin-top: 0.15rem;
+  padding: 0;
+  border: 1.5px solid var(--fab-border);
+  border-radius: 50%;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* The bonus row's own radios: the caller's leg of the split above (issue 1509). */
 .fabricate-manager .manager-tool-bonus-row input[type='radio'] {
   flex: 0 0 auto;
   width: 16px;
@@ -10308,20 +10377,34 @@
    appearance: none does NOT remove — so it bleeds through over our themed control. Hide those
    pseudo-elements here so only the themed ring + inset-box-shadow dot shows. Load-bearing: do not
    "clean up" this rule. Scoped to the resolution-mode radios only, never radios globally. */
-.fabricate-manager .manager-resolution-option input[type='radio']::before,
-.fabricate-manager .manager-resolution-option input[type='radio']::after,
+.fabricate-option-cards .manager-resolution-option input[type='radio']::before,
+.fabricate-option-cards .manager-resolution-option input[type='radio']::after {
+  display: none;
+}
+
+/* The bonus row's own radios, same reason, split leg (issue 1509). */
 .fabricate-manager .manager-tool-bonus-row input[type='radio']::before,
 .fabricate-manager .manager-tool-bonus-row input[type='radio']::after {
   display: none;
 }
 
-.fabricate-manager .manager-resolution-option input[type='radio']:checked,
+.fabricate-option-cards .manager-resolution-option input[type='radio']:checked {
+  border-color: var(--fab-accent);
+  box-shadow: inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent);
+}
+
+/* The bonus row's own radios: the caller's leg of the split above (issue 1509). */
 .fabricate-manager .manager-tool-bonus-row input[type='radio']:checked {
   border-color: var(--fab-accent);
   box-shadow: inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent);
 }
 
-.fabricate-manager .manager-resolution-option input[type='radio']:focus,
+.fabricate-option-cards .manager-resolution-option input[type='radio']:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* The bonus row's own radios: the caller's leg of the split above (issue 1509). */
 .fabricate-manager .manager-tool-bonus-row input[type='radio']:focus {
   outline: none;
   box-shadow: none;
@@ -10330,12 +10413,21 @@
 /* Keep the checked centre dot while the radio is focused — the bare :focus rule
    above zeroes box-shadow, which is also what paints the dot, so a checked radio
    loses its dot the moment it is clicked/focused without this restore. */
-.fabricate-manager .manager-resolution-option input[type='radio']:checked:focus,
+.fabricate-option-cards .manager-resolution-option input[type='radio']:checked:focus {
+  box-shadow: inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent);
+}
+
+/* The bonus row's own radios: the caller's leg of the split above (issue 1509). */
 .fabricate-manager .manager-tool-bonus-row input[type='radio']:checked:focus {
   box-shadow: inset 0 0 0 3px var(--fab-bg-1), inset 0 0 0 16px var(--fab-accent);
 }
 
-.fabricate-manager .manager-resolution-option input[type='radio']:focus-visible,
+.fabricate-option-cards .manager-resolution-option input[type='radio']:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
+/* The bonus row's own radios: the caller's leg of the split above (issue 1509). */
 .fabricate-manager .manager-tool-bonus-row input[type='radio']:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
@@ -10408,6 +10500,18 @@
   outline-offset: 2px;
 }
 
+/* THE SECOND RULE ON THIS SELECTOR, AND THE PAIR IS UNCHANGED BY ISSUE 1509 (see below).
+   The bonus row's radio takes the shared native-control reset above and then zeroes the
+   `margin-top: 0.15rem` that reset gives it, because this row's radio is centred on a row rather
+   than aligned to the top of a card's copy column. Both rules and both ranks are the same as they
+   have always been; what changed is only that the reset's bonus member is now its own rule
+   instead of the second member of a list, because its first member re-rooted at
+   `.fabricate-option-cards` and a selector list's specificity is per member. `no-duplicate-
+   selectors` runs with `disallowInList: false`, so it did not compare a list member against this
+   rule and does now; the duplication it reports is the authoring that was already here. Merging
+   the two would move a declaration through the cascade for a lint message, which is the wrong
+   trade in a change whose bar is that no frame moves. Issue 1507 owns this family's tidy-up. */
+/* stylelint-disable-next-line no-duplicate-selectors */
 .fabricate-manager .manager-tool-bonus-row input[type='radio'] {
   margin-top: 0;
 }
@@ -10418,7 +10522,7 @@
    fieldset legend is visually hidden (kept for the fieldset's accessible name).
    Opt-in only (variant="config-card"); the gathering surface keeps the compact
    default rows. Issue 511. */
-.fabricate-manager .manager-resolution-mode-card.is-config-cards {
+.fabricate-option-cards.manager-resolution-mode-card.is-config-cards {
   padding: 0;
   border: none;
   background: none;
@@ -10429,7 +10533,7 @@
    sheet, and the requirement that utility carries would have it adopt. It does not, because
    the paired un-hider below settles on the (0,5,0)-beats-(0,4,0) contract its own comment
    records, which a (0,2,0) utility class would rewrite. */
-.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-mode-legend {
+.fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-mode-legend {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -10451,8 +10555,7 @@
    is CHAINED onto the card, which makes it (0,5,0) and settles it on specificity. It restates
    every property the hiding rule sets, because a partially reset visually-hidden block is a
    1px-tall legend with its text clipped. */
-.fabricate-manager
-  .manager-resolution-mode-card.is-config-cards.is-legend-visible
+.fabricate-option-cards.manager-resolution-mode-card.is-config-cards.is-legend-visible
   .manager-resolution-mode-legend {
   position: static;
   width: auto;
@@ -10465,13 +10568,13 @@
   border: 0;
 }
 
-.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-mode-options {
+.fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-mode-options {
   display: grid;
   grid-template-columns: repeat(var(--manager-radio-card-columns, 2), minmax(0, 1fr));
   gap: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option {
+.fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option {
   align-items: flex-start;
   gap: var(--fab-space-3);
   padding: var(--fab-space-3);
@@ -10480,7 +10583,7 @@
   background: var(--fab-overlay-light-04);
 }
 
-.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option.is-active {
+.fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option.is-active {
   border-color: var(--fab-accent);
   background: var(--fab-overlay-light-08);
   box-shadow: none;
@@ -10501,7 +10604,7 @@
 /* skin census (issue 1523): not an adopter — this tile's fill and border were taken
    TOGETHER from the prototype under issue 1373 as a component treatment, not a shared
    field/well rung; its tuple joins the card-skin census as a deferral. */
-.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option-icon {
+.fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option-icon {
   order: 1;
   flex: 0 0 40px;
   display: flex;
@@ -10516,38 +10619,38 @@
   font-size: 0.95rem;
 }
 
-.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option-body {
+.fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option-body {
   order: 2;
   flex: 1 1 auto;
   gap: var(--fab-space-1);
 }
 
-.fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-option input[type='radio'] {
+.fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-option input[type='radio'] {
   order: 3;
   align-self: flex-start;
   margin-top: 0.1rem;
 }
 
 @container (max-width: 620px) {
-  .fabricate-manager .manager-resolution-mode-card.is-config-cards .manager-resolution-mode-options {
+  .fabricate-option-cards.manager-resolution-mode-card.is-config-cards .manager-resolution-mode-options {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-.fabricate-manager .manager-resolution-option-body {
+.fabricate-option-cards .manager-resolution-option-body {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2xs);
   min-width: 0;
 }
 
-.fabricate-manager .manager-resolution-option-name {
+.fabricate-option-cards .manager-resolution-option-name {
   color: var(--fab-text);
   font-size: 0.82rem;
   font-weight: 700;
 }
 
-.fabricate-manager .manager-resolution-option-desc {
+.fabricate-option-cards .manager-resolution-option-desc {
   color: var(--fab-text-muted);
   font-size: 0.76rem;
   font-weight: 500;
@@ -10557,20 +10660,20 @@
 /* A modelled-but-unimplemented option: dim the row and block the pointer while
    keeping the name legible. The real `disabled` attribute on the radio already
    removes it from the tab order; this is the visible affordance. */
-.fabricate-manager .manager-resolution-option.is-disabled {
+.fabricate-option-cards .manager-resolution-option.is-disabled {
   cursor: not-allowed;
 }
 
-.fabricate-manager .manager-resolution-option.is-disabled .manager-resolution-option-desc {
+.fabricate-option-cards .manager-resolution-option.is-disabled .manager-resolution-option-desc {
   opacity: 0.6;
 }
 
-.fabricate-manager .manager-resolution-option.is-disabled input[type='radio'] {
+.fabricate-option-cards .manager-resolution-option.is-disabled input[type='radio'] {
   cursor: not-allowed;
 }
 
 /* "Coming soon" badge inline with the option name. Theme tokens only. */
-.fabricate-manager .manager-resolution-option-badge {
+.fabricate-option-cards .manager-resolution-option-badge {
   display: inline-block;
   margin-left: var(--fab-space-2);
   padding: 0.05rem 0.4rem;
@@ -11195,20 +11298,25 @@
    drift unmeasured. The `manager-recipe-rail-*` class names are kept verbatim so nothing
    already reading this surface has to learn a new name.
 
+   ROOTED AT `fabricate-validation` SINCE ISSUE 1509, so this family paints wherever the surface
+   is mounted rather than only inside the manager window. `manager-recipe-tab` is NOT in it —
+   six other recipe tabs write that class, and its rules, with `-tab-intro` and `-tab-title`
+   under them, stay rooted at `.fabricate-manager` (residue, issue 1507).
+
    The rail's VALUES are carried over unchanged; only the LAYOUT changes, because the
    surface did: the rail stacked medallion-over-copy-over-counts in a 300px column, and a
    tab panel is ~1060px. Here the summary and the counts sit side by side, and the
    summary's own medallion+copy runs as a row rather than a centred stack — a centred
    52px medallion with centred copy under it, stretched across a full-width tab, reads as
    a hero banner rather than a status line. */
-.fabricate-manager .manager-recipe-validation-summary-row {
+.fabricate-validation .manager-recipe-validation-summary-row {
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
   gap: var(--fab-space-3);
 }
 
-.fabricate-manager .manager-recipe-rail-summary {
+.fabricate-validation .manager-recipe-rail-summary {
   display: flex;
   flex: 1 1 320px;
   align-items: center;
@@ -11219,7 +11327,7 @@
   border-radius: 12px;
 }
 
-.fabricate-manager .manager-recipe-rail-summary-medallion {
+.fabricate-validation .manager-recipe-rail-summary-medallion {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -11230,7 +11338,7 @@
   font-size: 1.35rem;
 }
 
-.fabricate-manager .manager-recipe-rail-summary-copy {
+.fabricate-validation .manager-recipe-rail-summary-copy {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-1);
@@ -11246,34 +11354,34 @@
    three; `SUMMARY_STATUS_ALIASES` in that component records the whole reconciliation, and
    `tests/components/manager-layout.test.js` pins the two sets against each other in both
    directions so neither half can move alone. */
-.fabricate-manager .manager-recipe-rail-summary.is-pass .manager-recipe-rail-summary-medallion {
+.fabricate-validation .manager-recipe-rail-summary.is-pass .manager-recipe-rail-summary-medallion {
   color: var(--fab-success);
   background: var(--fab-success-soft);
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-warn .manager-recipe-rail-summary-medallion {
+.fabricate-validation .manager-recipe-rail-summary.is-warn .manager-recipe-rail-summary-medallion {
   color: var(--fab-warning);
   background: var(--fab-warning-soft);
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-block .manager-recipe-rail-summary-medallion {
+.fabricate-validation .manager-recipe-rail-summary.is-block .manager-recipe-rail-summary-medallion {
   color: var(--fab-danger);
   background: var(--fab-danger-soft);
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-pass {
+.fabricate-validation .manager-recipe-rail-summary.is-pass {
   border-color: var(--fab-success-border);
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-warn {
+.fabricate-validation .manager-recipe-rail-summary.is-warn {
   border-color: var(--fab-warning-border);
 }
 
-.fabricate-manager .manager-recipe-rail-summary.is-block {
+.fabricate-validation .manager-recipe-rail-summary.is-block {
   border-color: var(--fab-danger-border);
 }
 
-.fabricate-manager .manager-recipe-rail-summary-title {
+.fabricate-validation .manager-recipe-rail-summary-title {
   font-family: var(--fab-font-serif);
   font-size: 1rem;
   font-weight: 600;
@@ -11284,12 +11392,12 @@
    The rail out-specified that for free via Svelte's scoping hash; in the global sheet a
    (0,2,0) rule silently LOSES and the sub-line renders 10.24px instead of the rail's
    committed 11.52px. `recipe-studio-font-size.test.js` catches exactly this. */
-.fabricate-manager .manager-recipe-rail-summary .manager-recipe-rail-summary-sub {
+.fabricate-validation .manager-recipe-rail-summary .manager-recipe-rail-summary-sub {
   font-size: 0.72rem;
 }
 
 /* The Passing / Warnings / Blocking count table (three mono counts). */
-.fabricate-manager .manager-recipe-rail-counts {
+.fabricate-validation .manager-recipe-rail-counts {
   display: flex;
   flex: 0 1 260px;
   flex-direction: column;
@@ -11299,7 +11407,7 @@
   list-style: none;
 }
 
-.fabricate-manager .manager-recipe-rail-count {
+.fabricate-validation .manager-recipe-rail-count {
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
@@ -11309,43 +11417,43 @@
   font-size: 0.78rem;
 }
 
-.fabricate-manager .manager-recipe-rail-count-label {
+.fabricate-validation .manager-recipe-rail-count-label {
   flex: 1 1 auto;
 }
 
-.fabricate-manager .manager-recipe-rail-count-value {
+.fabricate-validation .manager-recipe-rail-count-value {
   flex: 0 0 auto;
   font-family: var(--fab-font-mono);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-.fabricate-manager .manager-recipe-rail-count.is-passing > i {
+.fabricate-validation .manager-recipe-rail-count.is-passing > i {
   color: var(--fab-success);
 }
 
-.fabricate-manager .manager-recipe-rail-count.is-warning > i {
+.fabricate-validation .manager-recipe-rail-count.is-warning > i {
   color: var(--fab-warning);
 }
 
-.fabricate-manager .manager-recipe-rail-count.is-blocking > i {
+.fabricate-validation .manager-recipe-rail-count.is-blocking > i {
   color: var(--fab-danger);
 }
 
 /* ── Rebuilt Validation tab (issue 643 §E): grouped, bordered, tagged row stack ─ */
-.fabricate-manager .manager-recipe-validation {
+.fabricate-validation.manager-recipe-validation {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-4);
 }
 
-.fabricate-manager .manager-recipe-val-group {
+.fabricate-validation .manager-recipe-val-group {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
 }
 
-.fabricate-manager .manager-recipe-val-group-label {
+.fabricate-validation .manager-recipe-val-group-label {
   display: flex;
   align-items: center;
   gap: var(--fab-space-2);
@@ -11357,7 +11465,7 @@
   text-transform: uppercase;
 }
 
-.fabricate-manager .manager-recipe-val-rows {
+.fabricate-validation .manager-recipe-val-rows {
   display: flex;
   flex-direction: column;
   margin: 0;
@@ -11368,7 +11476,7 @@
   overflow: hidden;
 }
 
-.fabricate-manager .manager-recipe-val-row {
+.fabricate-validation .manager-recipe-val-row {
   display: flex;
   align-items: center;
   gap: var(--fab-space-3);
@@ -11376,27 +11484,27 @@
   border-top: 1px solid var(--fab-border);
 }
 
-.fabricate-manager .manager-recipe-val-row:first-child {
+.fabricate-validation .manager-recipe-val-row:first-child {
   border-top: 0;
 }
 
-.fabricate-manager .manager-recipe-val-status {
+.fabricate-validation .manager-recipe-val-status {
   flex: 0 0 auto;
 }
 
-.fabricate-manager .manager-recipe-val-row.is-pass .manager-recipe-val-status {
+.fabricate-validation .manager-recipe-val-row.is-pass .manager-recipe-val-status {
   color: var(--fab-success);
 }
 
-.fabricate-manager .manager-recipe-val-row.is-warn .manager-recipe-val-status {
+.fabricate-validation .manager-recipe-val-row.is-warn .manager-recipe-val-status {
   color: var(--fab-warning);
 }
 
-.fabricate-manager .manager-recipe-val-row.is-block .manager-recipe-val-status {
+.fabricate-validation .manager-recipe-val-row.is-block .manager-recipe-val-status {
   color: var(--fab-danger);
 }
 
-.fabricate-manager .manager-recipe-val-copy {
+.fabricate-validation .manager-recipe-val-copy {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
@@ -11404,36 +11512,36 @@
   gap: 1px;
 }
 
-.fabricate-manager .manager-recipe-val-title {
+.fabricate-validation .manager-recipe-val-title {
   font-weight: 600;
 }
 
-.fabricate-manager .manager-recipe-val-detail {
+.fabricate-validation .manager-recipe-val-detail {
   font-size: 0.74rem;
   line-height: 1.35;
 }
 
-.fabricate-manager .manager-recipe-val-view {
+.fabricate-validation .manager-recipe-val-view {
   flex: 0 0 auto;
 }
 
-.fabricate-manager .manager-recipe-val-pill {
+.fabricate-validation .manager-recipe-val-pill {
   flex: 0 0 auto;
 }
 
-.fabricate-manager .manager-recipe-val-pill.is-pass {
+.fabricate-validation .manager-recipe-val-pill.is-pass {
   border-color: var(--fab-success-border);
   color: var(--fab-success-text);
   background: var(--fab-success-soft);
 }
 
-.fabricate-manager .manager-recipe-val-pill.is-warn {
+.fabricate-validation .manager-recipe-val-pill.is-warn {
   border-color: var(--fab-warning-border);
   color: var(--fab-warning-text);
   background: var(--fab-warning-soft);
 }
 
-.fabricate-manager .manager-recipe-val-pill.is-block {
+.fabricate-validation .manager-recipe-val-pill.is-block {
   border-color: var(--fab-danger-border);
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
@@ -13714,8 +13822,17 @@
   (`manager-environment-tab-button` on the Checks strip, `manager-editor-tab-button`
   elsewhere) and a re-tone that named one of them would make the mark's ACTIVE drawing
   depend on which strip it sits in, which is the same divergence one selector down.
+
+  THE ACTIVE RE-TONE IS TWO RULES RATHER THAN ONE TWO-MEMBER LIST (issue 1509). A selector
+  list's specificity is per member, and these two members are owned by different things: the
+  environment stem is a value a CALLER passes to `EditorTabs`, so its rule stays rooted at the
+  manager, while the editor stem is the primitive's own default and its rule roots at
+  `.fabricate-tabs`. Split into two adjacent rules at the original position with byte-identical
+  declarations, every member keeps its (0,4,0) rank and its source order, so nothing the strip
+  draws moves. The one thing the split does NOT change is what the comment above says: both
+  stems are still re-toned, by the same declaration, at the same rank.
 */
-.fabricate-manager .manager-editor-tab-count {
+.fabricate-tabs .manager-editor-tab-count {
   flex: 0 0 auto;
   color: var(--fab-text-muted);
   font-family: var(--fab-font-mono);
@@ -13724,8 +13841,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-.fabricate-manager .manager-environment-tab-button.is-active .manager-editor-tab-count,
-.fabricate-manager .manager-editor-tab-button.is-active .manager-editor-tab-count {
+.fabricate-manager .manager-environment-tab-button.is-active .manager-editor-tab-count {
+  color: var(--fab-accent);
+}
+
+.fabricate-tabs .manager-editor-tab-button.is-active .manager-editor-tab-count {
   color: var(--fab-accent);
 }
 
@@ -13767,7 +13887,7 @@
   color: var(--fab-text);
 }
 
-.fabricate-manager .manager-editor-tab-dot {
+.fabricate-tabs .manager-editor-tab-dot {
   flex: 0 0 auto;
   display: inline-block;
   width: 6px;
@@ -18111,7 +18231,21 @@
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-item-drop-zone {
+/* ROOTED AT `fabricate-link-field` (issue 1509), the class `ItemDropZone` writes at the head of
+   its root element's class attribute. One class for one class, at the same sheet position,
+   declarations byte-identical: the family class sits on the ROOT, so the zone's own rules take
+   the COMPOUND form and its children's take the descendant chain, and every rank is unchanged.
+
+   NO FONT FLOOR AND NO FOCUS PAIR, and both are REFUSALS rather than absences. This family owns
+   no control of its own: the two action buttons are `IconButton`s. A pair here would be actively
+   WRONG rather than merely redundant — `.fabricate-link-field button:focus-visible` is (0,2,1)
+   and OUT-RANKS `IconButton`'s own `.fabricate-icon-button:focus-visible` ring at (0,2,0) further
+   up this file, so it would REPLACE that ring on both actions.
+
+   ONE RESIDUE, NAMED: `.fabricate-manager [data-tool-create-card]` further down is a STYLING hook
+   rather than a test hook, it is application-rooted and it is outside this family — so the Tools
+   catalogue's create prompt keeps its `flex`/`width` only inside the manager. Issue 1507's. */
+.fabricate-link-field.manager-item-drop-zone {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) max-content;
   align-items: center;
@@ -18131,7 +18265,7 @@
    44px art column and `max-content` action column are exactly what must not be here — see the
    component's own note for why this is a different claim rather than a density knob.
    Radius 9 rather than the default 10: `design-system/spec.md:218` puts a well on 9. */
-.fabricate-manager .manager-item-drop-zone.is-compact {
+.fabricate-link-field.manager-item-drop-zone.is-compact {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -18144,14 +18278,14 @@
   text-align: center;
 }
 
-.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-icon {
+.fabricate-link-field.manager-item-drop-zone.is-compact .manager-item-drop-zone-icon {
   width: auto;
   height: auto;
   font-size: 0.82rem;
   color: var(--fab-text-subtle);
 }
 
-.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-copy {
+.fabricate-link-field.manager-item-drop-zone.is-compact .manager-item-drop-zone-copy {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -18159,26 +18293,26 @@
   text-align: center;
 }
 
-.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-copy strong {
+.fabricate-link-field.manager-item-drop-zone.is-compact .manager-item-drop-zone-copy strong {
   font-size: 0.63rem;
   font-weight: 500;
   line-height: 1.4;
   color: var(--fab-text-subtle);
 }
 
-.fabricate-manager .manager-item-drop-zone.is-compact .manager-item-drop-zone-copy small {
+.fabricate-link-field.manager-item-drop-zone.is-compact .manager-item-drop-zone-copy small {
   font-size: 0.59rem;
   line-height: 1.45;
   color: var(--fab-text-subtle);
 }
 
-.fabricate-manager .manager-item-drop-zone.is-drop-active {
+.fabricate-link-field.manager-item-drop-zone.is-drop-active {
   border-color: var(--fab-accent);
   background: var(--fab-accent-soft);
   box-shadow: inset 0 0 0 1px var(--fab-accent);
 }
 
-.fabricate-manager .manager-item-drop-zone.is-disabled {
+.fabricate-link-field.manager-item-drop-zone.is-disabled {
   opacity: 0.55;
 }
 
@@ -18192,7 +18326,7 @@
    var(--border)` beside the fill, and both now draw it. This one does not: `proto:1981` states
    `background: var(--surface-soft)` and no border at all, because the tile is already inside a
    dashed edge of its own and a second edge 12px in would draw the empty zone twice. */
-.fabricate-manager .manager-item-drop-zone-icon {
+.fabricate-link-field .manager-item-drop-zone-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -18204,31 +18338,31 @@
   color: var(--fab-accent);
 }
 
-.fabricate-manager .manager-item-drop-zone-icon img {
+.fabricate-link-field .manager-item-drop-zone-icon img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.fabricate-manager .manager-item-drop-zone-copy {
+.fabricate-link-field .manager-item-drop-zone-copy {
   display: grid;
   gap: var(--fab-space-1);
   min-width: 0;
 }
 
-.fabricate-manager .manager-item-drop-zone-copy strong,
-.fabricate-manager .manager-item-drop-zone-copy small {
+.fabricate-link-field .manager-item-drop-zone-copy strong,
+.fabricate-link-field .manager-item-drop-zone-copy small {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.fabricate-manager .manager-item-drop-zone-copy small {
+.fabricate-link-field .manager-item-drop-zone-copy small {
   color: var(--fab-text-muted);
   font-size: 0.68rem;
   line-height: 1.35;
 }
 
-.fabricate-manager .manager-item-drop-zone-actions {
+.fabricate-link-field .manager-item-drop-zone-actions {
   display: flex;
   gap: var(--fab-space-1);
 }
@@ -19307,7 +19441,7 @@
 /* Shared editor tab + validation primitives. Generic so the recipe editor reuses
    the same tab strip and readiness/issue layout the environment editor pioneered
    without duplicating the rules per editor. */
-.fabricate-manager .manager-editor-tabs {
+.fabricate-tabs.manager-editor-tabs {
   display: flex;
   align-items: stretch;
   gap: var(--fab-space-1);
@@ -19316,7 +19450,7 @@
   border-bottom: 1px solid var(--fab-border);
 }
 
-.fabricate-manager .manager-editor-tab-button {
+.fabricate-tabs .manager-editor-tab-button {
   appearance: none;
   -webkit-appearance: none;
   display: inline-flex;
@@ -19338,13 +19472,34 @@
   cursor: pointer;
 }
 
-.fabricate-manager .manager-editor-tab-button:hover {
+.fabricate-tabs .manager-editor-tab-button:hover {
   color: var(--fab-text);
 }
 
-.fabricate-manager .manager-editor-tab-button.is-active {
+.fabricate-tabs .manager-editor-tab-button.is-active {
   color: var(--fab-text);
   border-bottom-color: var(--fab-accent);
+}
+
+/* THE STRIP'S STRIP HALF (issue 1509), on the precedent `.fabricate-pagination button:focus`
+   set and for its reason: Foundry core's `a.button:focus, button:focus` paints an orange
+   outline and a 4px glow, the module reset removes it only inside `.fabricate`, and this
+   family now renders in hosts carrying no Fabricate root at all — where the repaint below
+   would lay the accent ring OVER core's treatment instead of replacing it. Written above the
+   repaint because the two tie at (0,2,1), and BUTTONS ONLY because the tablist renders its own
+   `<button role="tab">`s and nothing else focusable. */
+.fabricate-tabs button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* AND THE STRIP'S OWN KEYBOARD RING, the module ring's declarations verbatim (`.fabricate
+   <element>:focus-visible`, issue 1501) so nothing moves where that ring already reaches. It
+   ties the module pair at (0,2,1) and sits later, so inside a Fabricate window the two resolve
+   to the same two declarations; outside one it is the whole of the tab's focus chrome. */
+.fabricate-tabs button:focus-visible {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
 }
 
 /* Editor tab badges are counts — issue counts, item counts — so they take the mono
@@ -19353,12 +19508,24 @@
    (against the inherited chip min-height) keeps a single digit reading as a small
    pill with centred text rather than a circle. */
 
-/* Written at THREE classes on purpose (issue 883). The chip's own rules now live in
-   `Chip.svelte`'s scoped block as `.manager-chip.svelte-<hash>` — two classes — injected
-   after the global sheet, so the old two-class form of this selector would have tied and
-   lost on source order, silently restoring the chip scale over this deliberately smaller
-   tab badge. Every tab badge is a chip, so qualifying on `.manager-chip` costs nothing. */
-.fabricate-manager .manager-chip.manager-editor-tab-badge {
+/* Written at THREE classes, and issue 1509 keeps all three rather than restating the reason
+   issue 883 gave for them, because that reason is FALSE and the correction belongs beside the
+   rule it was written on.
+
+   The claim was that three classes out-rank `Chip.svelte`'s own scoped `.manager-chip.svelte-
+   <hash>` block, so this deliberately smaller badge survives the chip's scale. Specificity
+   never decides that contest. Foundry loads this sheet into `layer(modules)` and a Svelte
+   scoped block is injected UNLAYERED, and an unlayered declaration beats a layered one at ANY
+   specificity — so the chip's block wins every property it declares, at two classes or at ten,
+   and only the properties `Chip` does NOT declare land from here. The rendering consequence is
+   real and is filed to issue 1507; this rule is not the place it is fixed.
+
+   So the three classes stay for a different and smaller reason: CHANGING THE CLASS COUNT IS A
+   CHANGE, and issue 1509 re-roots this family without moving a frame. Every property resolves
+   here exactly as it did before, because the rank, the layer, the position and the declarations
+   are all unchanged and only the leading compound was rewritten. Every tab badge is a chip, so
+   qualifying on `.manager-chip` still costs nothing. */
+.fabricate-tabs .manager-chip.manager-editor-tab-badge {
   margin-left: var(--fab-space-2xs);
   min-width: 1.4rem;
   min-height: 18px;
@@ -24770,13 +24937,22 @@
    and essence editors each have reference frames of their own, and this is the one that was
    read against its own.
 
+   NAMED BY THE CALLER'S OWN CONTAINER CLASS, not by its hook attribute (issue 1509). These four
+   rules put the family compound THIRD, behind an ancestor that is not the application root, so
+   neither re-rooting form exists for them: the surface's own root sits on the family element
+   itself. `ToolValidationTab` passes `stackClass="manager-scoped-tab-stack manager-tool-tab-stack"`
+   and `hookAttribute="data-tool-validation-tab"` to the SAME `<div>`, so `.manager-tool-tab-stack`
+   names that element by class rather than by hook. Rank is unchanged in all four, and so is the
+   descendant match set: the only other carrier of that class, `ToolBreakageTab`, renders no
+   `.manager-recipe-rail-*` anywhere in its subtree.
+
    ONE ICON TREATMENT IN THE REGION. The summary card led with a 52px medallion filled in the
    success family — a filled disc — over a column of count rows whose marks are bare glyphs and
    a stack of check rows whose marks are bare glyphs too, so one region drew the same idea three
    sizes and two ways. The reference draws a 34px SQUARE tile one rung under the card, in the
    tone's ink, and leaves every other mark bare. The card's own tinted fill and edge are the
    reference's and stay. */
-.fabricate-manager [data-tool-validation-tab] .manager-recipe-rail-summary-medallion {
+.fabricate-manager .manager-tool-tab-stack .manager-recipe-rail-summary-medallion {
   width: 34px;
   height: 34px;
   border-radius: 9px;
@@ -24789,15 +24965,15 @@
    matched nothing on this tab — which is the same defect the global block carried, arriving
    here as a tile that kept whichever fill the rule above gave it. */
 .fabricate-manager
-  [data-tool-validation-tab]
+  .manager-tool-tab-stack
   .manager-recipe-rail-summary.is-pass
   .manager-recipe-rail-summary-medallion,
 .fabricate-manager
-  [data-tool-validation-tab]
+  .manager-tool-tab-stack
   .manager-recipe-rail-summary.is-warn
   .manager-recipe-rail-summary-medallion,
 .fabricate-manager
-  [data-tool-validation-tab]
+  .manager-tool-tab-stack
   .manager-recipe-rail-summary.is-block
   .manager-recipe-rail-summary-medallion {
   background: var(--fab-bg-1);

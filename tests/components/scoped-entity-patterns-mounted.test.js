@@ -82,7 +82,7 @@ const membershipHarness = createMountedComponentHarness({
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/scoped/MembershipActions.svelte',

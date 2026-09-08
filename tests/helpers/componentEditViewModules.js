@@ -109,7 +109,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // The shared no-state primitive (issue 785).
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   // Rendered by the salvage block.
-  'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  'src/ui/svelte/components/ToggleCard.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   // The salvage result quantity + the progressive DC are the shared Stepper (issue 676).
   // Import-free leaf, so it needs no `rawModules` entry — but omit it HERE and the suite
@@ -145,7 +145,7 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ComplicationEffectRow.svelte',
   'src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte',
-  'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+  'src/ui/svelte/components/ItemDropZone.svelte',
   // The product's ONE row disclosure, back in a shipped tree: `ComplicationSummaryRow` is
   // the summary row its own docblock named as the site that would adopt it.
   'src/ui/svelte/components/RowDisclosure.svelte',
@@ -155,8 +155,8 @@ export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
   // `How players see it` rail — and the rail brings two leaves of its own. Every one is a STATIC
   // import of `ComponentEditView`, so an omission here HANGS every suite built on this list and
   // is reported as `# cancelled` rather than `# fail`.
-  'src/ui/svelte/apps/manager/EditorTabs.svelte',
-  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+  'src/ui/svelte/components/EditorTabs.svelte',
+  'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   // `ExplainerCard`'s own card shell, two rungs down from this tree's root.

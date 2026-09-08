@@ -52,7 +52,7 @@
    - onSelect(tabId).
 -->
 <script>
-  import EditorTabs from './EditorTabs.svelte';
+  import EditorTabs from '../../components/EditorTabs.svelte';
 
   let {
     activeTab = 'recipe',

@@ -85,7 +85,7 @@ const gatheringTasksBrowserPath = resolve(
 const knowledgePath = resolve(repoRoot, 'src/ui/svelte/apps/manager/KnowledgeView.svelte');
 const armedDangerButtonPath = resolve(
   repoRoot,
-  'src/ui/svelte/apps/manager/ArmedDangerButton.svelte'
+  'src/ui/svelte/components/ArmedDangerButton.svelte'
 );
 const knowledgeComponentDir = resolve(repoRoot, 'src/ui/svelte/apps/manager/knowledge');
 const toolsBrowserPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
@@ -1519,8 +1519,12 @@ describe('CraftingSystemManager source contract', () => {
     // The recipe card legend is renamed; its consumer is now the Crafting Settings
     // page (issue 511 moved the resolution cards off System Overview).
     assert.equal(lang.FABRICATE.Admin.SystemSettings.ResolutionMode, 'Recipe resolution mode');
+    // `legend=` since issue 1509 phase 3, which deleted the `ResolutionModeCard` shim and had
+    // these call sites render `RadioCardGroup` directly. The shim's `legendFallback` was its
+    // rename of the primitive's own `legend`, and no alias prop was kept: this is the SAME
+    // fallback string on the SAME control, under the name the primitive has always used.
     assert.ok(
-      craftingSettingsSource.includes('legendFallback="Recipe resolution mode"'),
+      craftingSettingsSource.includes('legend="Recipe resolution mode"'),
       'crafting settings inline fallback should match the renamed value'
     );
 

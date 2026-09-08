@@ -38,7 +38,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/IconButton.svelte',
     ...CHECKS_TREE_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     // The three cards issue 1096 split out of the editors this route mounts.
     'src/ui/svelte/apps/manager/checks/CheckModeCallout.svelte',

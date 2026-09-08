@@ -34,7 +34,7 @@
   tab at all, so on that set the entry is simply never matched to a tab.
 -->
 <script>
-  import EditorTabs from '../EditorTabs.svelte';
+  import EditorTabs from '../../../components/EditorTabs.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { ESSENCE_EDITOR_TABS } from './essenceStudio.js';
 

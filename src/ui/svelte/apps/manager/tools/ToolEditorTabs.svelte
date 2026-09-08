@@ -30,7 +30,7 @@
   markup in a conversion whose whole claim is that it changes none.
 -->
 <script>
-  import EditorTabs from '../EditorTabs.svelte';
+  import EditorTabs from '../../../components/EditorTabs.svelte';
   import { localize } from '../../../util/foundryBridge.js';
 
   let {

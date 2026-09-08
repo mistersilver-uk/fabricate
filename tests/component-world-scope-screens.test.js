@@ -66,6 +66,14 @@ describe('requirement 7 correction — the reopened gateways grew seams, not scr
         '../../../../utils/componentBrowserModel.js',
         '../../../../utils/componentBulkEditModel.js',
         '../../../../utils/componentCategories.js',
+        // DRAGGED IN BY ISSUE 1509's FILE MOVE, on exactly the `Chip` precedent recorded below.
+        // The armed two-step Delete was always imported here; it moved from
+        // `apps/manager/ArmedDangerButton.svelte` to `components/ArmedDangerButton.svelte` once
+        // its family turned out to be `ManagerButton`'s already-rooted one, and this clause
+        // selects on the specifier TEXT matching /component/i — so a directory move is enough to
+        // enter the set. The gateway imports the same module it did before, mints no route with
+        // it, and a row action is not a screen.
+        '../../components/ArmedDangerButton.svelte',
         '../../components/ChanceSlider.svelte',
         // DRAGGED IN BY ISSUE 1506's FILE MOVE, and it is neither a screen nor a new
         // dependency. `Chip` was always imported here; it moved from `apps/manager/Chip.svelte`

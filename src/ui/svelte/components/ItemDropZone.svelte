@@ -3,15 +3,46 @@
   The manager's ONE document drop target: a dashed empty prompt that becomes a linked card
   once the caller resolves a document, with optional copy-uuid and unlink actions.
 
-  ── THE UNLINK HOOK IS A PROP, NOT A FOURTH `kind ===` BRANCH (issue 1372) ──────
-  Three consumers name their unlink hook through a `kind` test below, and a fourth would have
-  been a fourth special case in a shared primitive — which `essence-studio-fidelity.test.js`
-  bans by name, correctly: a primitive that grows a branch per caller is a union of its callers.
-  `unlinkAttr` is the generalisation instead, and it is this repository's own idiom for exactly
-  this — `BulkSelectionToolbar` and `EditorTabs` both take their hook attribute NAMES as props,
-  for the same reason. Defaulting to `''` renders nothing extra, so no shipped consumer's output
-  moves; the three `kind` tests stay as they are rather than being converted, because converting
-  a shipped site changes ids at a site this change has no reason to touch.
+  ── THE THIRTEEN `kind ===` BRANCHES ARE GONE (2026-09-07, issue 1509) ──────────
+  Issue 1372 generalised the UNLINK hook to `unlinkAttr` for the reason
+  `essence-studio-fidelity.test.js` bans by name — a primitive that grows a branch per caller is
+  a union of its callers — and then declined to convert the branches already shipped, "because
+  converting a shipped site changes ids at a site this change has no reason to touch". That
+  objection is discharged rather than contradicted: issue 1509 edits every one of these call
+  sites anyway, to root this family at `fabricate-link-field`, so the conversion costs nothing it
+  was declining to spend. The thirteen tests — seven on the root, one on the hint, two on the
+  copy action and three on the unlink action — are now ONE `hookAttrs` bag, in the shape
+  `EditorValidationSurface` already ships, keyed by the CLOSED region set `root`, `hint`, `copy`,
+  `unlink`. `item-drop-zone-source-contract.test.js` reads those names out of this file's own
+  `hooksFor('…')` calls and refuses a call site naming anything else, because a bag keyed by name
+  is otherwise SILENT about a name it does not recognise: `hookAttrs={{ rooot: … }}` spreads
+  nothing and renders exactly like a site that passed no hook at all.
+
+  `unlinkAttr` STAYS, and is not folded into the bag. It names ONE attribute rather than supplying
+  a set, three callers pass it, and a caller passing both gets both — the world tool entry's
+  source card is the shipped instance, carrying `data-tool-source-unlink` from its bag and
+  `data-world-tool-entry-source-unlink` from this prop.
+
+  ONE OF THE THIRTEEN WAS A STYLING HOOK RATHER THAN A TEST HOOK, and it is why a bag that
+  normalised its values to booleans would have been wrong twice over. `styles/fabricate.css`
+  declares `.fabricate-manager [data-tool-create-card] { flex: 0 0 auto; width: 100% }`, so
+  dropping or renaming that attribute narrows the Tools catalogue's create prompt VISIBLY. It is
+  also application-rooted and outside the `manager-item-drop-zone*` family, which is what leaves
+  `fabricate-link-field` HOST-DEPENDENT for that one caller: a named residue owned by issue 1507,
+  and a named exclusion from this primitive's host-independence set. The second half of the same
+  trap is `data-tool-source-layout`, whose value is the STRING `'compact'` and not `true`.
+
+  ONE MEASURED RENDERED RESIDUE, from the mechanism rather than from the bag. An element carrying a
+  SPREAD is one whose class the compiler cannot know at build time, so it stamps this component's
+  scope hash on it defensively — which means the hint `<small>` now renders `class="svelte-…"`
+  where it previously carried no `class` attribute at all. The compiled CSS is byte-identical
+  before and after (three rules, none of which names `small`), so the token matches nothing in the
+  scoped block and nothing in the global sheet, and no pixel moves. The root and both actions are
+  unaffected: the root already carried a class, and the two actions are `IconButton` COMPONENT
+  tags whose rest spread lands inside that primitive. The same mechanism is why
+  `data-manager-item-drop-zone` is written `=""` here rather than bare — a bare attribute on an
+  element that has grown a spread arrives as boolean `true` and renders `="true"`, which is the
+  defect `editor-validation-surface-source-contract.test.js` records its own surface hitting.
 
   WHY A CALLER WANTS ONE: the system-scope essence editor LOCKS a section's value card read-only
   while the section is inherited, and the whole observable consequence of that lock is that this
@@ -56,9 +87,9 @@
   Two callers, which is the extend-before-add bar in `design-system/spec.md:25-69`.
 -->
 <script>
-  import { dragDrop } from '../../actions/dragDrop.js';
-  import { resolveDropUuid } from '../../util/dropUtils.js';
-  import IconButton from '../../components/IconButton.svelte';
+  import { dragDrop } from '../actions/dragDrop.js';
+  import { resolveDropUuid } from '../util/dropUtils.js';
+  import IconButton from './IconButton.svelte';
 
   let {
     item = null,
@@ -75,6 +106,8 @@
     // PROMPT-ONLY. See the note above: this is not a density variant, it is a different claim
     // about what the zone is for. `false` by default, so every shipped caller is byte-identical.
     compact = false,
+    // WHAT THE ZONE IS FOR, as a per-site id on `data-item-drop-zone`. It is NO LONGER a branch
+    // selector: every attribute it used to switch on is now a caller's own `hookAttrs` entry.
     kind = '',
     documentType = 'Item',
     state = 'linked',
@@ -82,6 +115,15 @@
     copyLabel = '',
     unlinkLabel = '',
     unlinkAttr = '',
+    // THE TEST AND STYLING HOOKS, one bag over a CLOSED region set — `root`, `hint`, `copy`,
+    // `unlink` — each an object of attribute name to value, spread onto that region. `{}` for an
+    // absent region, so a caller naming none renders byte-identically to one that passed no bag.
+    //
+    // A CALLER'S BAG IS NOT NECESSARILY STATIC, and the recipe-item overview is the shipped proof:
+    // its `data-recipe-item-link` and `data-recipe-item-dropzone` are two faces of ONE state and
+    // were conditioned on `item` rather than on the caller's id, so that site derives its bag from
+    // its own link state. A static object there would render both attributes or neither.
+    hookAttrs = {},
     onDrop = () => {},
     onCopy = null,
     onUnlink = null,
@@ -91,6 +133,16 @@
   // `{}` when unnamed, so the spread adds nothing and every shipped consumer's rendered output
   // is byte-identical.
   const unlinkAttrs = $derived(unlinkAttr ? { [unlinkAttr]: true } : {});
+  /**
+   * One region's hooks, or `{}`.
+   *
+   * `EditorValidationSurface`'s own `hooksFor` verbatim, so the two bags in this repository read
+   * the same way and one source-contract shape guards both.
+   *
+   * @param {'root'|'hint'|'copy'|'unlink'} region One of the closed region set.
+   * @returns {Record<string, unknown>} The attributes to spread onto that region.
+   */
+  const hooksFor = (region) => hookAttrs?.[region] ?? {};
 
   function handleDrop(data) {
     if (data?.type !== documentType) return;
@@ -104,21 +156,15 @@
 </script>
 
 <div
-  class="manager-item-drop-zone"
+  class="fabricate-link-field manager-item-drop-zone"
   class:is-compact={compact}
   class:is-linked={Boolean(item) && !compact}
   class:is-missing={isMissing}
   class:is-disabled={disabled}
-  data-manager-item-drop-zone
+  data-manager-item-drop-zone=""
   data-item-drop-zone={kind || undefined}
   data-item-drop-state={isMissing ? 'missing' : undefined}
-  data-tool-source-card={kind === 'tool-source' ? true : undefined}
-  data-tool-create-card={kind === 'tool-create' ? true : undefined}
-  data-tool-create-drop-prompt={kind === 'tool-create' ? true : undefined}
-  data-tool-source-layout={kind === 'tool-source' ? 'compact' : undefined}
-  data-recipe-item-link={kind === 'recipe-item' && item ? true : undefined}
-  data-recipe-item-dropzone={kind === 'recipe-item' && !item ? true : undefined}
-  data-check-macro-dropzone={kind === 'check-macro' ? true : undefined}
+  {...hooksFor('root')}
   use:dragDrop={{ onDrop: handleDrop, activeClass: 'is-drop-active', disabled }}
 >
   <span class="manager-item-drop-zone-icon" aria-hidden="true">
@@ -132,9 +178,7 @@
     {#if uuid && !compact}<code class="manager-item-drop-zone-uuid" data-item-drop-zone-uuid
         >{uuid}</code
       >{/if}
-    {#if hint}<small data-tool-source-drop-hint={kind === 'tool-source' ? true : undefined}
-        >{hint}</small
-      >{/if}
+    {#if hint}<small {...hooksFor('hint')}>{hint}</small>{/if}
     {#if subline}<small data-item-drop-zone-subline>{subline}</small>{/if}
   </span>
   {#if item && !compact && (onCopy || onUnlink)}
@@ -143,8 +187,7 @@
         <IconButton
           ariaLabel={copyLabel}
           title={copyLabel}
-          data-tool-source-copy-uuid={kind === 'tool-source' ? true : undefined}
-          data-recipe-item-copy-uuid={kind === 'recipe-item' ? true : undefined}
+          {...hooksFor('copy')}
           onclick={() => onCopy(item)}
         >
           <i class="fas fa-copy" aria-hidden="true"></i>
@@ -155,9 +198,7 @@
           class="is-danger"
           ariaLabel={unlinkLabel}
           title={unlinkLabel}
-          data-tool-source-unlink={kind === 'tool-source' ? true : undefined}
-          data-recipe-item-unlink={kind === 'recipe-item' ? true : undefined}
-          data-unlink-macro={kind === 'check-macro' ? true : undefined}
+          {...hooksFor('unlink')}
           {...unlinkAttrs}
           onclick={onUnlink}
         >
@@ -176,8 +217,18 @@
 
      Scoped rather than global on purpose: a global-sheet edit matches the broad
      `theme-or-global-ui` screenshot recipe and would demand a wide frame set for a
-     one-state addition. Written at two classes so it beats the base
-     `.fabricate-manager .manager-item-drop-zone` rule it overrides. */
+     one-state addition.
+
+     "Written at two classes so it beats the base rule it overrides" was the recorded reason and
+     it is FALSE (2026-09-07, issue 1509). `styles/fabricate.css` is loaded into `layer(modules)`
+     and a Svelte scoped block is injected UNLAYERED (`svelte.config.js:11` is `css: 'injected'`),
+     so an unlayered declaration beats a layered one at ANY specificity and this rule would win
+     written at one class. The two classes are KEPT because changing the class count is a change
+     and this commit ships none it has not measured; the rule it overrides is now
+     `.fabricate-link-field.manager-item-drop-zone`, at the same (0,2,0) it always had. The
+     repository's computed-CSS harness (`tests/helpers/scoped-component-css.js`) models injection
+     order and specificity and no layers at all, so it cannot see this either; that blind spot is
+     issue 1507's. */
   .manager-item-drop-zone.is-missing {
     border-color: var(--fab-danger-border);
     color: var(--fab-danger-text);

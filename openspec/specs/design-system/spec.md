@@ -129,10 +129,18 @@ The prose above already covers such a rule — it can only ever match inside tha
 The resolution is to name the caller's container by a class the caller writes ON THAT SAME ELEMENT, at the same rank and the same position, leaving the rule app-rooted and exempt.
 That is not the "second ancestor picked for reach" this requirement forbids above: it is the SAME ancestor named a different way, and the change that does it MUST publish the measured match set of both forms.
 Where the caller writes no such class, the rule is a named residue recorded with the change that retires the family.
+The SECOND instance of that case is what makes it a rule rather than one change's episode, and it adds a discipline the first did not need.
+Where a caller writes SEVERAL classes on that element, the change picks the NARROWEST one whose carriers it has MEASURED, and records the wider candidates it refused.
+Naming a shared default instead of a per-site class widens the rule onto surfaces it has never painted, which is the same defect as picking a second ancestor for reach, arriving through a class rather than through a combinator.
+The measurement of an alternative ancestor's carriers is TRANSITIVE, and stating that is what keeps it honest: a carrier's own file does not bound what its subtree renders, so the predicate walks that component's static import graph to its leaves before concluding that the descendant match set is unchanged.
 
 How many namespace roots a primitive needs is a property of its PORTAL SHAPE rather than a count to copy.
 A component that portals a panel out of its own root needs one class on each, because those two nodes end up in different subtrees; a component that portals nothing, or whose root element IS the panel it portals, needs one.
 Where two components render one class family between them, the family's roots are the union of theirs, and a class both of them paint is written at both roots.
+TWO ROOTS ON ONE ELEMENT is a third case, and it arises from composition rather than from portalling.
+A primitive that renders THROUGH another primitive's root element writes its own root BESIDE the composed one, so a single element carries both: `RadioCardGroup` renders a `Field` as its fieldset, and that element carries `fabricate-field` and `fabricate-option-cards` together.
+The two families must then be measurably DISJOINT, because the gate tells a namespace root from an application root BY NAME and by exact membership, so each root is an APPLICATION root to the other's entry and a rule naming both would be gated on both.
+A change that creates such a pair publishes the measured count of selectors naming both classes, and asserts it as a standing invariant rather than leaving it as a property that happens to hold.
 
 Every shared picker satisfies this requirement: `SearchablePopover` emits `fabricate-picker` and `fabricate-picker-popover`, `IconPicker` emits `fabricate-icon-picker` and `fabricate-icon-picker-popover`, `EssenceSourceSelector` emits `fabricate-source-picker` and `fabricate-source-picker-popover`, `Select` emits the `fabricate-select` family, and `ManagerColorPicker` and `ManagerColorPopover` emit `fabricate-color-picker` and `fabricate-color-picker-popover` between them.
 
@@ -166,11 +174,20 @@ All six are pure CAPABILITIES today in the sense stated below, and that is measu
 `Pagination.svelte:262-270` renders `<Select size="inline">` with no `label`, `hint` or `error`, so `Select.svelte:220` computes `labelled` false and the `<Field as="label">` at `Select.svelte:442-451` never renders.
 That CHAIN, rather than the importer list alone, is what makes the new `.fabricate-field` floor and chrome unreachable in the player application today.
 Issue 1518 and issue 1520 are the changes that turn all six from claims into facts.
+Five more satisfy it as of issue 1509: `EditorTabs` emits `fabricate-tabs`, `EditorValidationSurface` emits `fabricate-validation`, `RadioCardGroup` emits `fabricate-option-cards`, `ToggleCard` emits `fabricate-toggle-card` and `ItemDropZone` emits `fabricate-link-field`.
+None of the five portals anything either, so each needs exactly one root, and each declares one `mirrored` fixture pair.
+All five are pure CAPABILITIES today, and that is measured rather than assumed: every importer of every one of them lies under `src/ui/svelte/apps/manager/`, so no surface outside the manager renders one yet.
+Issue 1518 is the change that turns them into facts.
 `tests/components/searchable-popover-area-scope.test.js` derives each class set from the components' own markup and fails when a rule a primitive owns is rooted at an application, is rooted at nothing, or names a root the component has stopped writing.
 It reads a composed class list as well as a written one, because a primitive that builds its classes in `<script>` writes no `class="…"` attribute at all and a markup-only extractor would report such a family clean while measuring nothing.
 It reads a declared class MAP as well.
 A family class a component chooses PER HOST lives in a frozen map in `<script>` rather than in the class array or in the markup, and a reader that stops at the array reports the family clean while rules naming that class stay application-rooted and unseen: `StatusToggle`'s `HOST_CLASSES` is what puts `manager-tool-setting-toggle` into the DOM, and two shipped rules name it.
 The composed reader takes the array's FIRST literal, so a primitive's root belongs at the head of that array — a root written below the first interpolated member is a root the gate reports as unemitted while every re-rooted rule in the sheet goes on matching.
+A third place a family class hides is the PROP DEFAULT, and it is the one a reader stopping at the array and the markup cannot see at all.
+A family class a component takes as a PROP with a DEFAULT lives in that default: not in the class array, not in a class map, and not in the markup, because the markup writes only the interpolated binding.
+`EditorTabs` is the shipped instance, with three vocabulary props whose defaults name eleven of its family's thirteen selectors — and a reader that stopped there would report the family clean while every one of those selectors stayed application-rooted and unseen.
+The mechanical form is the FROZEN MAP the class-map reader already reads, so the DEFAULT is credited as emission with no new extractor.
+That also draws the boundary the mechanism needs: a value a CALLER passes stays the caller's, never enters the primitive's written set, and its rules stay caller-owned — which is what keeps a per-site vocabulary such as a caller's own tab class out of the primitive's family until a change deliberately folds it in.
 
 A re-rooted family is a CAPABILITY until a caller outside the original application uses it, and a capability nothing exercises is a claim rather than a fact.
 `SearchablePopover` has such a caller: the player window's `ActorSelectTopBar` renders its actor picker through the primitive, which makes the player window the second application the family paints in and this requirement satisfied by a shipped surface rather than by a fixture.
@@ -185,6 +202,13 @@ A capability that nothing exercises is still worth having, and is not debt: it i
 The corollary is that a component OUTSIDE the shared directory may keep an area-scoped family, and doing so is correct rather than debt.
 Its markup cannot appear outside that area, so the ancestor is free, and unscoping it would spend specificity and widen the rule's blast radius for no reachable benefit.
 `RecipeDurationEditor`, `EnvironmentsBrowserView` and the manager modal keep `.fabricate-manager`-rooted overlay rules on exactly that basis.
+The CONVERSE belongs with it, and issue 1509 is the first change to exercise it.
+A recorded decision to LOCATE a component outside the shared directory rests on that area-scoping, so when a later change RE-ROOTS the family the component wears, it retires the premise of the location decision in the same commit.
+The component then moves, rather than keeping a location whose stated reason no longer holds, and the docblock that recorded the premise is restated rather than left to contradict the tree.
+`ToggleCard` recorded exactly that premise — that it wears classes styled only under `.fabricate-manager` and would render as an unstyled div anywhere else — and the change that rooted those classes at `fabricate-toggle-card` is the change that moved it.
+A component may also be MOVED into the shared directory WITHOUT gaining a root of its own, when the family it writes is ANOTHER primitive's already-rooted one.
+`ArmedDangerButton` writes `fabricate-button manager-button is-danger` and nothing else, so the `ManagerButton` entry already roots every rule that paints it.
+Giving such a component a root would create a class owning NO rule, which the gate's family and owned floors correctly refuse, and which is an application root BY NAME to the entry that does own them.
 The ASYMMETRY belongs beside that corollary, because the two are related without being converse: one is about a component's LOCATION, the other about a family's OWNERSHIP AT SCALE despite partial primitive authorship.
 A class family WRITTEN BY a shared primitive is still not the primitive's to root while hand-written callers carry the same family at scale.
 `manager-availability-*` is written by `ModifierPillSelect` and by six manager views at 37 further sites, one of which renders the family's pill row outside any `ModifierPillSelect` at all, so rooting those rules at a class only the primitive emits would un-style every one of them.
@@ -215,6 +239,12 @@ That is the (0,1,0) case, where the two ranks differ and specificity settles it.
 Where the ranks TIE, position carries the same duty on its own, and the floor must be declared where no same-rank restatement of a `font` longhand is left below it.
 `box-sizing` needed nothing, because that same block already declared it.
 
+A family that owns a control declares NO SECOND floor for it when that control is already floored by a family CO-ROOTED on the same element.
+`fabricate-option-cards` owns the radios it renders, and its root element IS the `fabricate-field` fieldset it composes, so `Field`'s (0,1,1) floor reaches every one of those radios in every host already.
+A second floor there would restate the same property at the same rank rather than establish one, which is a duplicate declaration and not a floor.
+The test is CO-ROOTING and not composition, and the difference is load-bearing: a primitive that merely renders another primitive as a CHILD gains nothing from this, because the composed family's root sits BELOW its own and its floor cannot reach the composing family's own controls.
+A change refusing a floor on this ground proves it, by watching the control take the co-rooted family's face in a host that carries no application root at all.
+
 The same argument owns the FOCUS RING, and it is the reason a ring is a primitive's business rather than an area's.
 The module ring is a bare-element selector a Fabricate root declares for itself, so a re-rooted control keeps its paint and loses its ring the moment it renders in a host carrying no Fabricate root at all — a control that is styled and unfocusable-looking, which is worse than one that is neither.
 `ManagerButton` and `IconButton` therefore declare their own `:focus-visible` ring, and `Pagination` declares one for the BUTTONS it contains only.
@@ -236,6 +266,31 @@ A re-rooted family that owns NO control of its own declares NEITHER a floor nor 
 A family rule that nonetheless REACHES a caller's control travels with the family: the toolbar's `select.is-size-38` rung re-roots with the rest of its family and paints a caller's select in a bare host with no floor beneath it.
 That is a recorded residue, and not a licence to declare a floor for a control the family does not own.
 
+The PAIR half of that sentence is a RULE rather than three case-by-case calls, and stating it that way is what stops a later change reading a refusal as an oversight.
+A family declares a focus pair ONLY for a control it renders ITSELF.
+The reason is not that there would be nothing to paint: a pair would be actively WRONG, because `<root> <element>:focus-visible` is (0,2,1) and OUT-RANKS a composed primitive's own `<root>:focus-visible` at (0,2,0), so it REPLACES that primitive's ring on every control the composing family contains.
+`fabricate-link-field` is the measured instance — a pair there would have displaced `IconButton`'s ring on both of the link field's action buttons, and `fabricate-validation`'s would have done the same to the `ManagerButton` its row composes.
+THE RANK ARITHMETIC IS NOT THE RULE, and a change refusing a pair must not generalise it.
+`fabricate-toggle-card` composes a `StatusToggle` whose repaint is written at THREE classes, (0,3,0), so the hypothetical pair there would LOSE rather than displace — and the refusal still stands, on OWNERSHIP alone, because the one control that card contains belongs to another primitive either way.
+A rank argument that happens to hold today would silently become false the day the composed primitive wrote its pair at two classes rather than three.
+A change that refuses a pair therefore publishes the two ranks it measured and names the rules a pair would have met, so a reader can see which of the two cases it is.
+
+A family that ALREADY declares its own pair is the second shape, and it re-roots that pair in place rather than gaining a new one.
+`fabricate-option-cards` is the second instance after `StatusToggle`, and it adds a condition the first did not expose: its strip becomes RECOGNISABLE as a primitive focus strip only once the selector list it shared with a caller's own control has been SPLIT, because the recogniser reads one compound and a list is not that shape.
+`fabricate-tabs` is the third shape and the simplest: it renders the `button`s it declares chrome for, so it gains both halves new.
+
+A member row of the shared register RECORDS ITS SCOPE, and `manager-only` is a decision rather than an omission.
+Every row carries `shared` or `manager-only`; a `manager-only` row states its reason, and where a named change would flip it, that change.
+`ModifierPillSelect` is the shipped instance of both halves: it sits in the shared directory and is still `manager-only`, because the family it writes is hand-written by manager views at 37 further sites and cannot be re-rooted until issue 1515 converts them.
+Scope is MEASURED against the import graph rather than read off the directory, and the difference is not academic: a component under an application's own directory that another application already imports cannot honestly be recorded as unable to leave, and the reading is TRANSITIVE, so a component reached only through a shared primitive another application renders is reached all the same.
+Where the two disagree, the PATH is the debt and the scope is the fact.
+
+State also what the field is NOT.
+The gate that PROVES a family is not application-rooted keeps its own hand-authored entries, because a register row carries none of the family pattern, roots, anchors, floors or mirrored pairs such an entry needs, and a register-driven sweep would red on rows whose rooting has never been measured at all.
+The register records the DECISION; the gate proves the ROOTING.
+Conflating the two would make an unmeasured row look like a passing proof, which is worse than either artefact alone.
+The two do meet at one place, and that place is asserted: a row whose family THIS PROGRAMME re-rooted carries `shared` and has an entry in that gate, so neither half can land without the other.
+
 #### Scenario: A primitive is adopted by a second application
 
 - **WHEN** a surface outside a primitive's original app imports that primitive
@@ -254,6 +309,35 @@ That is a recorded residue, and not a licence to declare a floor for a control t
 - **WHEN** a caller outside that root proposes to adopt the primitive
 - **THEN** the family is re-rooted first, in its own change
 - **AND** the adoption is not landed on top of a family that only paints on one screen
+
+#### Scenario: A member row records whether its component may leave the manager
+
+- **WHEN** a component is a member of the shared vocabulary
+- **THEN** its register row carries `shared` or `manager-only`
+- **AND** a `manager-only` row states its reason, and names the change that would flip it where one exists
+- **AND** the scope is measured against the import graph rather than read off the directory, so a component another application already renders cannot be recorded as unable to leave
+
+### Requirement: A selector list that mixes ownership is split before either member is re-rooted
+
+A rule may carry a SELECTOR LIST, and its members can differ in who owns them: one names a class the primitive writes and another names a class a caller writes.
+Such a rule can be neither re-rooted whole, which would carry the caller's class into the primitive's namespace and un-style every site the caller renders, nor exempted whole, which would leave the primitive's own rules application-rooted and the family half-adoptable.
+So a rule whose selector list mixes gate-owned and caller-owned members MUST be SPLIT into two adjacent rules at the original position, with byte-identical declarations, BEFORE either is re-rooted.
+
+A selector list's specificity is per MEMBER rather than per rule, so the split preserves every member's rank exactly, and placing the two rules adjacently at the original position preserves every member's source order.
+Nothing in the cascade can tell the split form from the list form, which is what makes it available under a bar that says no frame moves.
+
+A split is a THIRD category beside a re-root and an exemption, and a change publishes it as one, with each split's before and after text and its per-member ranks.
+A reader reconciling a family's counts otherwise cannot: a split adds a RULE without adding a selector, and where both members were already distinct keys it adds no key either, so a rule total moves while a selector total does not.
+Two consequences follow, and they are recorded rather than left to be discovered.
+A ledger keyed by a WHOLE selector list turns one row into two, adding nothing and changing no declaration.
+And a duplicate-selector lint configured to skip list members begins comparing a member that has become a sole selector, which surfaces authoring duplication that already existed; the answer is to record it, not to merge the rules, because merging moves a declaration through the cascade to satisfy a lint message.
+
+#### Scenario: A rule's selector list mixes a primitive's class with a caller's
+
+- **WHEN** a change re-roots a family and one of its rules lists a member naming a class the primitive does not write
+- **THEN** the rule is split into two adjacent rules at its original position with byte-identical declarations
+- **AND** only the gate-owned rule is re-rooted, while the caller-owned one stays application-rooted
+- **AND** the change publishes the split with both members' ranks, as a split rather than as a re-root or an exemption
 
 ### Requirement: A cross-cutting utility or skin is declared once, at the module root
 
@@ -1044,7 +1128,7 @@ Each issue offers an action that moves focus to the offending control.
 
 The arrangement is fixed because validation is where a GM goes when something is wrong, which is the worst moment to make them learn a second layout.
 
-The arrangement has ONE implementation, `src/ui/svelte/apps/manager/EditorValidationSurface.svelte`, and an editor that draws it MUST render through that component rather than restate its markup.
+The arrangement has ONE implementation, `src/ui/svelte/components/EditorValidationSurface.svelte`, and an editor that draws it MUST render through that component rather than restate its markup.
 That is what makes the sentence above enforceable rather than aspirational: while a second copy of the markup exists, "the same arrangement" is a convention each copy is free to drift from, and the two class families the sheet paints it with have more than one writer.
 A site whose DOM hooks, root classes, status words or reported counts differ passes them as props, and a site needing something the surface does not draw extends the surface rather than forking it.
 The counts are a closed, ordered vocabulary the surface owns — pass, then warning, then blocking — and a site reports the subset it can answer rather than choosing an order or inventing a fourth.

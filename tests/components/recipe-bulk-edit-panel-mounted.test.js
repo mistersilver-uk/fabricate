@@ -72,7 +72,7 @@ const panel = createMountedComponentHarness({
     // The shared set-delete card and the armed control inside it (issue 1132). Both are
     // STATIC imports of the panel, so the closure validator throws on an omission.
     'src/ui/svelte/apps/manager/BulkDeleteCard.svelte',
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte'

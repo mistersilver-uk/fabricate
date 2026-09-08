@@ -72,7 +72,11 @@ const toolStudioFrame = (id, label, smokeLabel, matches) => ({
 // owned-copy and learned row; `styles/` is deliberately NOT, so a broad stylesheet
 // change keeps routing to the existing theme-or-global-ui fallback.
 const KNOWLEDGE_MATCHES = [
-  /^src\/ui\/svelte\/apps\/manager\/(?:KnowledgeView|ArmedDangerButton)\.svelte$/,
+  /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
+  // Issue 1509 moved the armed control into `components/`, so it can no longer ride the
+  // manager-directory alternation above and takes a pattern of its own. The trigger set is
+  // unchanged: a change to this file still publishes both Knowledge frames.
+  /^src\/ui\/svelte\/components\/ArmedDangerButton\.svelte$/,
   /^src\/ui\/svelte\/apps\/manager\/knowledge\/.+\.svelte$/,
   // Every plain-JS module in the surface's own folder: the pure projection
   // (`knowledgeStudio.js`) and the mutation collaborator (`knowledgeMutations.js`)
@@ -524,7 +528,7 @@ export const VIEW_RECIPES = Object.freeze([
       // Naming them here is what makes a change to either republish the frame that DOES
       // exist, rather than publishing nothing at all for this screen.
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$/,
+      /^src\/ui\/svelte\/components\/ItemDropZone\.svelte$/,
     ],
   },
   {

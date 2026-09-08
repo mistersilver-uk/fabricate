@@ -109,20 +109,33 @@ const CLASS_PROPS = Object.freeze([
 ]);
 
 /**
- * Fifteen shared primitives, each with the namespace roots it writes and the class family it owns.
+ * Eighteen shared primitives, each with the namespace roots it writes and the class family it owns.
  *
  * The first five PORTAL a panel and so need one root on each side of the portal; the rest COMPOSE
  * their family in `<script>` rather than writing it in markup, or write it inline, and carry one
  * root each — `ManagerButton`, `IconButton` and `Pagination` (issue 1502), then `Field`,
  * `ManagerSearchField`, `ManagerToolbar`, `InspectorCard`, `StatusToggle` and `ChanceSlider`
  * (issue 1508). NONE of the issue-1508 families portals anything, so one
- * root each is the whole requirement. A `composesClasses: true` entry
+ * root each is the whole requirement, and neither do `EditorTabs`, `EditorValidationSurface` or
+ * `RadioCardGroup` (issue 1509).
+ *
+ * `RadioCardGroup` is the first entry whose root element is ANOTHER ENTRY'S: it renders a `Field`
+ * as its fieldset, so that one element carries `fabricate-field` and `fabricate-option-cards`
+ * together. Each root is an APPLICATION root by name to the other's entry — `isApplicationRoot`
+ * decides by exact membership in the entry's own `roots` — so a rule naming both would be gated
+ * on both. The two families are measurably disjoint and that disjointness is asserted below.
+ * A `composesClasses: true` entry
  * opts into reading the `const classes = $derived([…])` array literal (`composedClassRegion`)
  * ALONGSIDE the ordinary markup region, because `class={classes}` is an identifier rather than a
  * `class="…"` string or a `` class={`…`} `` template, so the ordinary markup-only extractors find
- * nothing for either button primitive on their own. A `classMaps` entry opts into a THIRD reader
+ * nothing for either button primitive on their own — nor for `EditorValidationSurface`, whose
+ * root `<section>` is written the same way and whose local was RENAMED to `classes` so this
+ * reader can find it at all. A `classMaps` entry opts into a THIRD reader
  * (`classMapRegion`) for a family class the component chooses per host out of a frozen map in
- * `<script>`, which neither of the other two regions covers; only `StatusToggle` declares one.
+ * `<script>`, which neither of the other two regions covers. TWO entries declare one, and for two
+ * different reasons: `StatusToggle` picks its host's class out of `HOST_CLASSES` at render time,
+ * while `EditorTabs` DEFAULTS three class PROPS to its own family and a default lives in neither
+ * of the other regions — the markup writes only the binding.
  *
  * `family` is a PREFIX pattern rather than a class list because the list is derived from markup:
  * it decides which of the component's classes belong to the primitive's own family, so that
@@ -711,6 +724,277 @@ const PRIMITIVES = Object.freeze([
     // that class re-roots to a DESCENDANT chain that a token on the element itself never matches.
     mirrored: Object.freeze([
       Object.freeze({ anchor: 'manager-chance-slider', root: 'fabricate-slider' }),
+    ]),
+  }),
+  Object.freeze({
+    // ── EDITORTABS (issue 1509). The manager's editor tab strip, rooted at the class it emits.
+    //
+    // ITS FAMILY LIVES IN PROP DEFAULTS, which is why this entry declares a class map. The
+    // component takes `containerClass`, `buttonClass` and `badgeClass` as props and DEFAULTS them
+    // to its own family; the markup writes `class={containerClass}` (a bare identifier the
+    // attribute reader cannot match at all) and `` class={`${buttonClass} …`} `` (all
+    // interpolated), so only the count and the dot survive as literals. Without the map `written`
+    // is 2 and eleven of the family's thirteen selectors read CALLER-owned — gate-inert, left
+    // application-rooted, with this gate reporting the family clean. The three defaults are frozen
+    // into `DEFAULT_CLASSES` so `classMapRegion` reads them, and `written` is 5.
+    //
+    // The ROOT does NOT ride the map, deliberately: the tablist writes
+    // `` class={`fabricate-tabs ${containerClass}`} ``, a literal the markup reader already sees,
+    // which is what keeps the emission clause reading an element the component actually writes.
+    name: 'EditorTabs',
+    components: Object.freeze(['src/ui/svelte/components/EditorTabs.svelte']),
+    roots: Object.freeze(['fabricate-tabs']),
+    // ONE prefix, token-terminated, with a lookahead that refuses `manager-editor-table*`. The
+    // sheet holds no such class today; the guard is written anyway because the FIXTURE census this
+    // pattern also feeds does hit `-table-head` spellings elsewhere in `tests/`.
+    family: 'manager-editor-tab(?!le)[\\w-]*',
+    anchors: Object.freeze([
+      'manager-editor-tabs',
+      'manager-editor-tab-button',
+      'manager-editor-tab-badge',
+      'manager-editor-tab-count',
+      'manager-editor-tab-dot',
+    ]),
+    classMaps: Object.freeze(['DEFAULT_CLASSES']),
+    // Measured at this commit: 5 written, 12 family selectors, 7 owned — 4 exempt (the
+    // environment stem's leg of the split active re-tone, the Tool Studio's badge override and the
+    // component-entry column's two strip overrides) and 1 caller-CLASS compound, the badge's own
+    // `.manager-chip` qualification. EIGHT are re-rooted: the 7 owned plus that compound, which is
+    // the strip's own chrome under a composed primitive's class and would be split from its family
+    // if it stayed behind.
+    //
+    // `.fabricate-manager .manager-editor-tab-panel` is NOT in these figures and is not exempt
+    // either: `manager-editor-tab-panel` is a CALLER class that happens to fall inside the family
+    // PREFIX, no name in `written` matches it, so the rule never enters `pickerSelectors`'
+    // population at all. Three callers write it on a SIBLING of the tablist, so re-rooting it
+    // would cost every editor panel its overflow, its scrollbar gutter and both `min-*: 0`.
+    writtenFloor: 4,
+    familyFloor: 10,
+    ownedFloor: 6,
+    // The ROOT-ELEMENT anchor. `manager-editor-tab-button` has the larger fixture population
+    // (7 elements over 3 files against this one's 4 attributes over 3) and is REFUSED all the
+    // same: it is the BUTTON, a descendant of the root, so a fixture carrying it satisfies this
+    // clause by stamping a root onto an element no rule in the sheet roots at.
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'manager-editor-tabs', root: 'fabricate-tabs' }),
+    ]),
+  }),
+  Object.freeze({
+    // ── EDITORVALIDATIONSURFACE (issue 1509). The aggregate validation header over a grouped,
+    // bordered, tagged row stack, rooted at the class it emits.
+    //
+    // COMPOSES its family, and the local had to be RENAMED for that to be readable.
+    // `composedClassRegion` locates its region by the exact opener `const classes = $derived(`, so
+    // the component's own `rootClass` was invisible to it and `composesClasses: true` would have
+    // red with the reader's own named error rather than reading the array. The root is the array's
+    // FIRST literal because that is the position the composed reader takes as the namespace class.
+    name: 'EditorValidationSurface',
+    components: Object.freeze(['src/ui/svelte/components/EditorValidationSurface.svelte']),
+    roots: Object.freeze(['fabricate-validation']),
+    // TWO prefixes and one exact name, and the EXCLUSIONS are the load-bearing part. This
+    // namespace is crowded: measured on this sheet, `.manager-recipe-*` occurs 457 times across
+    // 55 distinct `manager-recipe-<word>` prefixes, and `manager-recipe[\w-]*` matches 427
+    // selectors against this pattern's 46 — so a loose pattern would have swallowed
+    // `ToggleCard`'s own family and some three hundred and eighty unrelated selectors.
+    //
+    // `manager-recipe-tab` is EXCLUDED BY NAME even though this surface writes it on its own
+    // root: six other recipe tabs write it too (`recipe/RecipeAccessTab`,
+    // `RecipeBooksScrollsTab`, `RecipeIngredientsTab`, `RecipeOverviewTab`, `RecipeResultsTab`,
+    // `RecipeToolsTab`), so re-rooting the five `manager-recipe-tab(?!le)*` selectors would have
+    // un-styled six tabs. `manager-editor-validation-surface` is excluded for the plainer reason
+    // that no rule in the sheet names it.
+    family: 'manager-recipe-(val|rail)[\\w-]*',
+    anchors: Object.freeze([
+      'manager-recipe-validation',
+      'manager-recipe-validation-summary-row',
+      'manager-recipe-rail-summary',
+      'manager-recipe-rail-summary-medallion',
+      'manager-recipe-rail-summary-copy',
+      'manager-recipe-rail-summary-title',
+      'manager-recipe-rail-summary-sub',
+      'manager-recipe-rail-counts',
+      'manager-recipe-rail-count',
+      'manager-recipe-rail-count-label',
+      'manager-recipe-rail-count-value',
+      'manager-recipe-val-group',
+      'manager-recipe-val-group-label',
+      'manager-recipe-val-rows',
+      'manager-recipe-val-row',
+      'manager-recipe-val-status',
+      'manager-recipe-val-copy',
+      'manager-recipe-val-title',
+      'manager-recipe-val-detail',
+      'manager-recipe-val-view',
+      'manager-recipe-val-pill',
+    ]),
+    composesClasses: true,
+    // Measured at this commit: 21 written, 46 family selectors, 37 owned — 9 exempt and 0
+    // caller-CLASS compounds, so 37 re-rooted and the two counts agree for the first family in
+    // this table. The 9 are the Checks Studio route's five `.manager-checks-validation-route`
+    // chains and the Tool rules editor's four medallion overrides, which are exempt for two
+    // DIFFERENT reasons: the first five name a caller's own container and always did, while the
+    // four put the family compound THIRD behind an ancestor that is not the application root, so
+    // neither re-rooting form exists for them. Those four were rewritten to name that ancestor by
+    // the class its caller writes on the same element (`.manager-tool-tab-stack`) rather than by
+    // its hook attribute, at unchanged rank, position and declarations — which is what moved them
+    // out of `owned` and into the exempt set.
+    writtenFloor: 18,
+    familyFloor: 41,
+    ownedFloor: 33,
+    // The ROOT-ELEMENT anchor, and it matches ZERO fixture attributes today — measured, and
+    // recorded rather than swapped for a populated descendant. `manager-recipe-rail-summary` has
+    // one attribute in one file and is REFUSED: it is the medallion ROW, a descendant of the
+    // root, so a fixture carrying it satisfies the attribute clause by stamping a root onto an
+    // element no rule in the sheet roots at — which is why that file's ten offenders are repaired
+    // by WRAPPING the row in the root element instead. `manager-recipe-tab` is refused for the
+    // family's own reason: six other components write it, so it would report their fixtures as
+    // this family's offenders.
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'manager-recipe-validation', root: 'fabricate-validation' }),
+    ]),
+  }),
+  Object.freeze({
+    // ── RADIOCARDGROUP (issue 1509). The manager's radio-card group, rooted at the class it emits.
+    //
+    // ITS ROOT ELEMENT IS ANOTHER PRIMITIVE'S. The component renders `<Field as="fieldset">`
+    // unconditionally and hands it a `class`, so the fieldset carries `fabricate-field`,
+    // `manager-field` and then this family's root together — TWO namespace roots on ONE element.
+    // The root leads this component's own template, which is the position `classAttributeValues`
+    // reads it from, and `Field` appends rather than replaces.
+    //
+    // IT DECLARES NO `classProps`, AND THAT IS A DECISION WITH A MEASURED REASON. `classPropValues`
+    // builds ``new RegExp(`\b${name}=(?:"([^"]*)"|\{`([^`]*)`\})`)``, so a
+    // `classProps: ['class']` entry matches EVERY class attribute in this markup — measured, TWELVE
+    // of them, at `RadioCardGroup.svelte:90, 95, 97, 98, 102, 105, 120, 124, 125, 127, 131, 137` —
+    // and the class-prop floor above requires exactly `classProps.length * components.length`, so
+    // it would red at 12 against 1. What that field would have bought — a guard on `Field` renaming
+    // or dropping its `class` prop — is bought instead by the mounted root-emission assertion in
+    // `tests/components/field-mounted.test.js`, which reads the RENDERED `className` off the
+    // fieldset, and by that suite's own mutation control.
+    name: 'RadioCardGroup',
+    components: Object.freeze(['src/ui/svelte/components/RadioCardGroup.svelte']),
+    roots: Object.freeze(['fabricate-option-cards']),
+    // ONE prefix and one exact name. `manager-radio-card-group` is the component's own hook class
+    // and owns no rule in the sheet; it is in the pattern because the component writes it and a
+    // family read out of markup should not silently drop a class the component emits.
+    // `manager-tool-bonus-row` is NOT in this family and must never be: the Tool Requirements
+    // bonus list was ruled OFF this primitive at issue 1373 round 4, and it is the class that
+    // forced the six selector-list SPLITS this change makes.
+    family: 'manager-resolution[\\w-]*|manager-radio-card-group',
+    anchors: Object.freeze([
+      'manager-resolution-mode-card',
+      'manager-resolution-mode-legend',
+      'manager-resolution-mode-note',
+      'manager-resolution-mode-options',
+      'manager-resolution-option',
+      'manager-resolution-option-icon',
+      'manager-resolution-option-body',
+      'manager-resolution-option-name',
+      'manager-resolution-option-desc',
+      'manager-resolution-option-badge',
+      'manager-radio-card-group',
+    ]),
+    // Measured at this commit: 12 written, 47 family selectors, 31 owned — 16 exempt and 0
+    // caller-CLASS compounds. The 16 are the Checks Studio card's eight overrides and the Tool
+    // editor's eight `[data-manager-view]`-qualified ones, both of them a caller naming its own
+    // container. THIRTY-TWO are re-rooted, one more than the gate can see: the extra is
+    // `.fabricate-option-cards.manager-resolution-mode-card.is-config-cards
+    // .manager-resolution-mode-options` inside an unnamed `@container (max-width: 620px)`, which
+    // `selectorsIn` cannot reach because its rule opens after a `{` rather than after a `}` or a
+    // `;`. It is re-rooted anyway, because leaving the narrow override at the manager root while
+    // its wide twin travels would collapse the grid to one column inside the manager only. The
+    // HELPER census (`censusRules`) sees all 48 selectors in 43 rules and is the figure the pull
+    // request publishes beside this one.
+    writtenFloor: 10,
+    familyFloor: 42,
+    ownedFloor: 27,
+    // The ROOT-ELEMENT anchor. `manager-resolution-option` has the larger fixture population
+    // (9 attributes over 3 files against this one's 4 over 2) and is REFUSED all the same: it is
+    // the option ROW, a descendant of the root, so a fixture carrying it satisfies the attribute
+    // clause by stamping a root onto an element no rule in the sheet roots at.
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'manager-resolution-mode-card', root: 'fabricate-option-cards' }),
+    ]),
+  }),
+  Object.freeze({
+    // ── TOGGLECARD (issue 1509). The manager's labelled status card — glyph, title, sub-line and
+    // an on/off switch — rooted at the class it emits on its own root `<div>`.
+    //
+    // THE ROOT IS THE TEMPLATE'S LEADING LITERAL. `classAttributeValues` reads BOTH `class="…"`
+    // and `` class={`…`} `` and returns the template's text verbatim, so the `${variant}` and
+    // `${on ? …}` spans survive whitespace-splitting as tokens that match no class in the sheet
+    // and the literals around them are credited.
+    name: 'ToggleCard',
+    components: Object.freeze(['src/ui/svelte/components/ToggleCard.svelte']),
+    roots: Object.freeze(['fabricate-toggle-card']),
+    // FIVE SUFFIXES, ENUMERATED, WITH BARE `manager-recipe-status` EXCLUDED BY SHAPE. This is the
+    // most crowded namespace in the sheet: `.manager-recipe-*` occurs 457 times in selector
+    // preludes across 55 distinct `manager-recipe-<word>` prefixes, and `manager-recipe[\w-]*`
+    // matches 424 selectors against this pattern's 22. Bare `manager-recipe-status` is the recipe
+    // ROW's status slot (`styles/fabricate.css` writes it under `.manager-recipe-row` and again on
+    // its own), a different thing that happens to be a prefix of these five, and the alternation
+    // is what keeps it out — a `manager-recipe-status[\w-]*` pattern would have taken it in.
+    family: 'manager-recipe-status-(card|icon|copy|title|sub)[\\w-]*',
+    anchors: Object.freeze([
+      'manager-recipe-status-card',
+      'manager-recipe-status-icon',
+      'manager-recipe-status-copy',
+      'manager-recipe-status-title',
+      'manager-recipe-status-sub',
+    ]),
+    // Measured at this commit: 5 written, 22 family selectors, 10 owned — 12 exempt and 0
+    // caller-CLASS compounds, so the owned and the re-rooted counts agree at 10. The 12 are three
+    // CALLERS restating this card's metrics inside containers of their own: the Checks Studio's
+    // `.manager-checks-flag-list` (five), its `.manager-checks-trigger-body` (four) and the Tool
+    // rules editor's `.manager-tool-system-enabled` (three). They stay application-rooted, which
+    // is what makes this family a capability with a stated edge rather than an unqualified one.
+    writtenFloor: 4,
+    familyFloor: 19,
+    ownedFloor: 9,
+    // The ROOT-ELEMENT anchor, and it matches ZERO fixture attributes today — measured, and
+    // recorded rather than swapped for a populated descendant, because every OTHER class this
+    // family writes is a descendant of the root and a fixture carrying one would satisfy the
+    // attribute clause by stamping a root onto an element no rule in the sheet roots at. There is
+    // no populated candidate to refuse here: the whole family's fixture population was zero in
+    // BOTH clauses before this change, so this entry adds exactly the one attribute and the one
+    // element that `re-rooted-controls-host-independence.test.js` writes.
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'manager-recipe-status-card', root: 'fabricate-toggle-card' }),
+    ]),
+  }),
+  Object.freeze({
+    // ── ITEMDROPZONE (issue 1509). The manager's ONE document drop target — a dashed prompt that
+    // becomes a linked card — rooted at the class it emits on its own root `<div>`.
+    name: 'ItemDropZone',
+    components: Object.freeze(['src/ui/svelte/components/ItemDropZone.svelte']),
+    roots: Object.freeze(['fabricate-link-field']),
+    // ONE prefix, token-terminated. Nothing else in the sheet or in `src/` shares it.
+    family: 'manager-item-drop-zone[\\w-]*',
+    anchors: Object.freeze([
+      'manager-item-drop-zone',
+      'manager-item-drop-zone-icon',
+      'manager-item-drop-zone-copy',
+      'manager-item-drop-zone-actions',
+      // WRITTEN BUT UNRULED IN THIS SHEET: the address line is painted by the component's own
+      // scoped block and by nothing here. It is an anchor anyway, because the emission clause's
+      // job is to notice a class the component stops writing, and a class the global sheet does
+      // not name is exactly the one a reader would delete without consequence.
+      'manager-item-drop-zone-uuid',
+    ]),
+    // Measured at this commit: 5 written, 16 family selectors, 15 owned — 1 exempt and 0
+    // caller-CLASS compounds, so the owned and the re-rooted counts agree at 15. The one exempt
+    // is `.fabricate-manager .manager-component-entry-card .manager-item-drop-zone.is-compact`,
+    // the world component entry card's own transparent-prompt override, which names a caller's
+    // container and always did.
+    writtenFloor: 4,
+    familyFloor: 14,
+    ownedFloor: 13,
+    // The ROOT-ELEMENT anchor, measured at ZERO fixture attributes, with nothing to refuse: no
+    // file under `tests/` wrote any class of this family into fixture markup before this change,
+    // so both clauses' populations for it were zero and this entry adds only what
+    // `re-rooted-controls-host-independence.test.js` writes.
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'manager-item-drop-zone', root: 'fabricate-link-field' }),
     ]),
   }),
 ]);
@@ -1446,7 +1730,9 @@ test('the class-map reader is what puts the per-host class in the family, and it
   assert.deepEqual(
     toggle.classMaps,
     ['HOST_CLASSES'],
-    'StatusToggle is the one entry that declares a class map, and this clause is stated over it'
+    'StatusToggle declares exactly this one class map, and this clause is stated over it. It is ' +
+      'no longer the only entry that declares one — `EditorTabs` declares `DEFAULT_CLASSES` for a ' +
+      'different reason, and has its own controls below — so the two are proved separately.'
   );
 
   // POSITIVE CONTROL 1: the region really holds the string.
@@ -1506,6 +1792,232 @@ test('the class-map reader is what puts the per-host class in the family, and it
     2,
     'the class map must move exactly two selectors into the owned set — the checkbox host`s box ' +
       'and the `:has()` ring on it. Neither is re-rooted without it, and the sheet reports clean.'
+  );
+});
+
+test('the class-map reader is also what puts a PROP DEFAULT in the family, and it fires', () => {
+  // CLAUSE (d) A SECOND TIME, over the other shape a class map hides (issue 1509). `StatusToggle`
+  // chooses its host's class out of a map at render time; `EditorTabs` DEFAULTS three class PROPS
+  // to its own family, and a default is in neither of the other two regions — the markup writes
+  // `class={containerClass}`, a bare identifier `classAttributeValues` cannot match at all, and
+  // `` class={`${buttonClass} …`} ``, whose family tokens are all interpolated. So the two entries
+  // exercise the same reader against two different hiding places, and both are proved.
+  const tabs = PRIMITIVES.find((entry) => entry.name === 'EditorTabs');
+  assert.deepEqual(
+    tabs.classMaps,
+    ['DEFAULT_CLASSES'],
+    'EditorTabs declares exactly this one class map, and this clause is stated over it'
+  );
+
+  // POSITIVE CONTROL 1: the region really holds the strings.
+  const region = classMapRegion(tabs.components[0], 'DEFAULT_CLASSES');
+  assert.ok(
+    region.includes("'manager-editor-tab-button'"),
+    `${tabs.components[0]}'s DEFAULT_CLASSES no longer contains the button class this gate reads, ` +
+      'so a reader that stops finding the map would examine a family short by three classes ' +
+      'instead of reporting the regression'
+  );
+
+  // AND THE MARKUP REGION CANNOT SEE IT, which is the whole reason the reader is consulted here.
+  // The button class reaches the DOM through an interpolated binding, so the text
+  // `manager-editor-tab-button` appears nowhere after `</script>` except inside the scoped
+  // `<style>` block, which `markupRegion` excludes.
+  assert.ok(
+    !markupRegion(tabs.components[0]).includes('manager-editor-tab-button'),
+    'the button class has moved into the markup, so this reader is no longer the thing that ' +
+      'credits it and the control below proves nothing'
+  );
+
+  // POSITIVE CONTROL 2: dropping the field really costs the family five of its seven owned rules,
+  // stated as a measured DIFFERENCE over a copy of the entry with `classMaps` removed — the exact
+  // state this component was in before the defaults were frozen into a map. The figure is the one
+  // the GATE emits (`owned.length`), not the eight rules the change re-roots, because a control
+  // publishing a number the gate never produces cannot be checked against the gate.
+  const withoutMap = Object.freeze({ ...tabs, classMaps: undefined });
+  const withMap = classesWrittenBy(tabs);
+  const without = classesWrittenBy(withoutMap);
+  assert.equal(
+    withMap.size,
+    5,
+    'the map must credit all five family classes: the container, the button and the badge from ' +
+      'the defaults, the count and the dot from the markup'
+  );
+  assert.equal(
+    without.size,
+    2,
+    'without the map only the count and the dot are literals in the markup; a different number ' +
+      'means the family reaches this gate some other way and the control below measures nothing'
+  );
+
+  const ownedIn = (entry, written) =>
+    pickerSelectors(written, entry).filter((selector) => isPrimitiveOwned(selector, written, entry));
+  assert.equal(
+    ownedIn(tabs, withMap).length,
+    7,
+    'the strip owns seven of the twelve selectors that name a class it writes'
+  );
+  assert.equal(
+    ownedIn(withoutMap, without).length,
+    2,
+    'dropping the class map must take the gate-owned count from 7 to 2 — only the count rule and ' +
+      'the dot rule survive, and the strip`s own container, button, hover, active, active-count ' +
+      'and badge rules all read CALLER-owned, gate-inert, and would have been left rooted at ' +
+      '`.fabricate-manager` with this file reporting the family clean'
+  );
+});
+
+test('two namespace roots on one element stay disjoint families', () => {
+  // CLAUSE (e), NEW AT ISSUE 1509 PHASE 3, and it exists because `RadioCardGroup` is the first
+  // entry whose ROOT ELEMENT is another entry's. It renders `<Field as="fieldset">`
+  // unconditionally, so one element carries `fabricate-field` and `fabricate-option-cards`
+  // together.
+  //
+  // WHY THAT NEEDS AN INVARIANT RATHER THAN A NOTE. `isApplicationRoot` decides by NAME and by
+  // EXACT membership in the entry's own `roots`, so to the `Field` entry `fabricate-option-cards`
+  // is an application root and to this entry `fabricate-field` is one. A single selector naming
+  // BOTH would therefore be `gated` on both entries at once, and there is no form of it that
+  // satisfies either: dropping one root un-roots that family, keeping both gates it.
+  //
+  // The invariant that makes the pair safe is that no such selector exists, and it holds for a
+  // structural reason rather than by luck — the two family patterns cannot match the same class,
+  // so neither family's selectors can enter the other's population at all. Both halves are
+  // asserted: the measured ZERO, and the pattern disjointness that keeps it zero.
+  const field = PRIMITIVES.find((entry) => entry.name === 'Field');
+  const optionCards = PRIMITIVES.find((entry) => entry.name === 'RadioCardGroup');
+  assert.ok(field && optionCards, 'both entries must exist for this clause to mean anything');
+
+  const namesAny = (selector, entry) => {
+    const classes = classesOf(selector);
+    const family = new RegExp(`^(?:${entry.family})$`);
+    return classes.some((cls) => entry.roots.includes(cls) || family.test(cls));
+  };
+
+  // NON-VACUITY FIRST: each family must have a real population in the sheet, or the intersection
+  // below is empty because both sides are.
+  const fieldSelectors = allSelectors().filter((selector) => namesAny(selector, field));
+  const optionSelectors = allSelectors().filter((selector) => namesAny(selector, optionCards));
+  assert.ok(
+    fieldSelectors.length >= 20,
+    `only ${fieldSelectors.length} selectors name the field family, so the intersection below is ` +
+      'empty for the wrong reason'
+  );
+  assert.ok(
+    optionSelectors.length >= 40,
+    `only ${optionSelectors.length} selectors name the option-cards family, so the intersection ` +
+      'below is empty for the wrong reason'
+  );
+
+  assert.deepEqual(
+    allSelectors().filter(
+      (selector) => namesAny(selector, field) && namesAny(selector, optionCards)
+    ),
+    [],
+    'a selector names both `Field`s family and `RadioCardGroup`s. The two are co-rooted on ONE ' +
+      'element — the fieldset — and each root is an APPLICATION root by name to the other entry, ' +
+      'so this selector is `gated` on both of them and no re-rooting form of it exists. Write it ' +
+      'against whichever family actually owns the declaration.'
+  );
+
+  // AND THE PATTERNS THEMSELVES CANNOT OVERLAP, which is what keeps the zero above a property of
+  // the entries rather than of today's sheet.
+  const fieldFamily = new RegExp(`^(?:${field.family})$`);
+  const optionFamily = new RegExp(`^(?:${optionCards.family})$`);
+  for (const anchor of optionCards.anchors) {
+    assert.ok(
+      !fieldFamily.test(anchor),
+      `\`${anchor}\` matches the field family pattern, so an option-cards rule can enter the ` +
+        'field entry`s population and be judged by it'
+    );
+  }
+  for (const anchor of field.anchors) {
+    assert.ok(
+      !optionFamily.test(anchor),
+      `\`${anchor}\` matches the option-cards family pattern, so a field rule can enter this ` +
+        'entry`s population and be judged by it'
+    );
+  }
+});
+
+test('the status card`s root stays off every rule the switch owns', () => {
+  // CLAUSE (f), NEW AT ISSUE 1509 PHASE 4, and it is the pre-agreement issue 1508 recorded when
+  // it rooted `StatusToggle` at `fabricate-toggle`.
+  //
+  // `ToggleCard` COMPOSES that switch: the card owns its glyph, its title, its sub-line and its
+  // own state classes, and the switch owns the track, the knob and the reading. So the two
+  // families sit on NESTED elements rather than on one — which is the opposite of `Field` and
+  // `RadioCardGroup` above — and the hazard is the same one from the other direction.
+  // `isApplicationRoot` decides by NAME and by EXACT membership in the entry's own `roots`, so
+  // `.fabricate-toggle-card .manager-status-toggle-track` would be GATED on the `StatusToggle`
+  // entry: a rule about that primitive's chrome, rooted at a class that is an application root to
+  // it, with no re-rooting form that satisfies both entries.
+  //
+  // The invariant is that no such selector exists, and it is asserted in BOTH halves — the
+  // measured zero, and the pattern disjointness that keeps it zero. Deepening an override at the
+  // CARD's own root is the corollary `openspec/specs/design-system/spec.md` states for this case,
+  // and it is what the sheet does: the card's `.is-info.is-on .manager-recipe-status-icon` tone
+  // reaches the GLYPH, which is the card's own element, and never the switch.
+  const toggleCard = PRIMITIVES.find((entry) => entry.name === 'ToggleCard');
+  const statusToggle = PRIMITIVES.find((entry) => entry.name === 'StatusToggle');
+  assert.ok(toggleCard && statusToggle, 'both entries must exist for this clause to mean anything');
+
+  const namesAny = (selector, entry) => {
+    const classes = classesOf(selector);
+    const family = new RegExp(`^(?:${entry.family})$`);
+    return classes.some((cls) => entry.roots.includes(cls) || family.test(cls));
+  };
+
+  // NON-VACUITY FIRST, on both sides, or the intersection below is empty for the wrong reason.
+  const cardSelectors = allSelectors().filter((selector) => namesAny(selector, toggleCard));
+  const switchSelectors = allSelectors().filter((selector) => namesAny(selector, statusToggle));
+  assert.ok(
+    cardSelectors.length >= 20,
+    `only ${cardSelectors.length} selectors name the status-card family, so the intersection ` +
+      'below is empty for the wrong reason'
+  );
+  assert.ok(
+    switchSelectors.length >= 18,
+    `only ${switchSelectors.length} selectors name the switch family, so the intersection below ` +
+      'is empty for the wrong reason'
+  );
+
+  assert.deepEqual(
+    allSelectors().filter(
+      (selector) => namesAny(selector, toggleCard) && namesAny(selector, statusToggle)
+    ),
+    [],
+    'a selector names both `ToggleCard`s family and `StatusToggle`s. The switch is COMPOSED, so ' +
+      'its chrome is its own primitive`s: a rule rooted at `.fabricate-toggle-card` that reaches ' +
+      'a `manager-status-toggle*` class is gated on the Toggle entry, because that root is an ' +
+      'APPLICATION root by name to it. Deepen the override at the card`s own root instead.'
+  );
+
+  // AND THE PATTERNS THEMSELVES CANNOT OVERLAP, which is what makes the zero above a property of
+  // the entries rather than of today's sheet. Stated over the anchors of both, in both
+  // directions, exactly as the co-rooting clause above states it for `Field`.
+  const cardFamily = new RegExp(`^(?:${toggleCard.family})$`);
+  const switchFamily = new RegExp(`^(?:${statusToggle.family})$`);
+  for (const anchor of statusToggle.anchors) {
+    assert.ok(
+      !cardFamily.test(anchor),
+      `\`${anchor}\` matches the status-card family pattern, so a switch rule can enter this ` +
+        'entry`s population and be judged by it'
+    );
+  }
+  for (const anchor of toggleCard.anchors) {
+    assert.ok(
+      !switchFamily.test(anchor),
+      `\`${anchor}\` matches the switch family pattern, so a card rule can enter the Toggle ` +
+        'entry`s population and be judged by it'
+    );
+  }
+
+  // AND THE PATTERN REFUSES THE ROW SLOT IT IS A PREFIX OF. `manager-recipe-status` is the recipe
+  // ROW's own class and is written by no component in this family; the alternation of five
+  // suffixes is what excludes it, and a `manager-recipe-status[\w-]*` pattern would not.
+  assert.ok(
+    !cardFamily.test('manager-recipe-status'),
+    'the status-card family pattern matches bare `manager-recipe-status`, the recipe row`s slot, ' +
+      'which this primitive does not write and whose two rules must not be re-rooted at it'
   );
 });
 
@@ -1672,6 +2184,19 @@ const DETECTOR_FIXTURE_EXEMPTIONS = Object.freeze([
       '`file|primitive` because this one file holds a second family\'s detector too.',
   }),
   Object.freeze({
+    file: 'tests/components/editor-tabs-adoption-contract.test.js',
+    primitive: 'EditorTabs',
+    attributeCount: 1,
+    elementCount: 4,
+    why:
+      'the `DETECTOR_FIXTURE` and `detectorFixture.lowered` source strings, which exist to prove ' +
+      'the raw-site detector fires and to prove it counts a LOWERED corpus differently. Four of ' +
+      'their elements carry a family class on purpose — two raw tab buttons, the container the ' +
+      'token is deliberately NOT, and the lowered probe — and namespacing any of them would make ' +
+      'the fixture depict a CONVERTED site, at which point the contract counts 0 raw sites and ' +
+      'passes over a tree that could have any number.',
+  }),
+  Object.freeze({
     file: 'tests/components/manager-filter-bar-source-contract.test.js',
     primitive: 'ManagerToolbar',
     attributeCount: 1,
@@ -1805,10 +2330,36 @@ test('hand-built fixture markup carries the namespace roots the primitive writes
   }
 
   assert.ok(
-    attributes >= 163,
+    attributes >= 182,
     `only ${attributes} fixture class attributes copy a primitive's root markup, against a floor ` +
-      'of 163. A lower number means the scan is not reading the fixtures and the assertion below ' +
-      'holds over nothing. RE-MEASURED at issue 1508 phase 3: 181 today, against 169 before ' +
+      'of 182. A lower number means the scan is not reading the fixtures and the assertion below ' +
+      'holds over nothing. RE-MEASURED at issue 1509 phase 4: 203 today, against the 195 before ' +
+      '`ToggleCard` and `ItemDropZone` joined the array. EIGHT arrived and NOT ONE of them was ' +
+      'already in the tree: both families had a fixture population of ZERO in this clause and in ' +
+      'the ancestry clause alike before this change — measured, and published as the answer ' +
+      'rather than left as a repair task — so no shipped fixture needed repairing for either. ' +
+      'The eight are all in `re-rooted-controls-host-independence.test.js`: three status cards ' +
+      '(the enabled, locked and info variants, because the family`s ten rules are three variants ' +
+      'over a shared base), two link fields (the linked card and the compact prompt, which share ' +
+      'only their root class), the switch the card COMPOSES and the two `IconButton`s the link ' +
+      'field composes — and those last three count against `StatusToggle`s and `IconButton`s own ' +
+      'anchors rather than these two, because the fixtures render what the components render. ' +
+      'Before that: 195, against the 189 before ' +
+      '`RadioCardGroup` joined the array. SIX arrived, all of them copies of the card’s ROOT ' +
+      'element: three were already in `manager-layout.test.js` and two in ' +
+      '`resolution-mode-card-layout.test.js` and this change gave each of them the namespace ' +
+      'root the re-root put on the product, and the sixth is the card this change adds to ' +
+      '`re-rooted-controls-host-independence.test.js`. Before that: 189 against the 187 before ' +
+      '`EditorValidationSurface` joined the array. Exactly TWO arrived, and that thinness is the ' +
+      'entry’s own measurement rather than an oversight: the surface’s root anchor matched ZERO ' +
+      'fixture attributes before this change. The two are both root ELEMENTS — the one ' +
+      '`recipe-studio-font-size.test.js` gained so its five rail measurements keep reaching the ' +
+      'sheet, and the one this change’s host-independence fixture writes. ' +
+      'Before that: 187 against the 181 before ' +
+      '`EditorTabs` joined the array. SIX arrived there: four are the shipped fixtures that copy ' +
+      'the tab strip’s own root element, in three files, and two are the strip and the negative ' +
+      'control that change added to `re-rooted-controls-host-independence.test.js`. Before that: ' +
+      '181 against 169 before ' +
       '`StatusToggle` and `ChanceSlider` joined the array, 143 before `ManagerToolbar` and ' +
       '`InspectorCard` did and 113 before `Field` and ' +
       '`ManagerSearchField` did. The floor stood at 54 against a population that had already ' +
@@ -1924,10 +2475,41 @@ test('every fixture element in a picker’s family sits under one of its namespa
   }
 
   assert.ok(
-    elements >= 289,
-    `only ${elements} fixture elements copy a shared picker's markup, against a floor of 289. A ` +
+    elements >= 413,
+    `only ${elements} fixture elements copy a shared picker's markup, against a floor of 413. A ` +
       'lower number means the tag scanner has stopped reading the fixtures and the assertion ' +
-      'below holds over nothing. RE-MEASURED at issue 1508 phase 3: 321 today, against 270 ' +
+      'below holds over nothing. RE-MEASURED at issue 1509 phase 4: 459 today, against the 431 ' +
+      'before `ToggleCard` and `ItemDropZone` joined the array. TWENTY-EIGHT arrived against the ' +
+      'attribute clause’s EIGHT, and every one of them is NEW markup rather than a repair: both ' +
+      'families’ fixture population was ZERO in both clauses before this change. The gap is the ' +
+      'usual one — a status card brings a glyph column, a copy column and two lines with it and ' +
+      'only the card is an anchor; a link field brings an art tile, an address line, a name, a ' +
+      'note and an action cluster and only the zone is. Before that: 431, against the 368 ' +
+      'before `RadioCardGroup` joined the array. SIXTY-THREE arrived against the attribute ' +
+      'clause’s SIX, which is a wider gap again than the validation surface’s 29-to-2 and for ' +
+      'the same reason twice over: an option-card fixture brings a legend, a grid, two rows, two ' +
+      'tiles, two bodies and their names and descriptions with it, and only the FIELDSET is an ' +
+      'anchor. Forty-five were already in the tree and are repaired rather than added — 36 in ' +
+      '`manager-layout.test.js` under three fieldsets, eight in ' +
+      '`resolution-mode-card-layout.test.js` (written out where they render, because a helper’s ' +
+      '`<label>` sits lexically outside the fieldset the runtime nests it under) and one negative ' +
+      'control in `re-rooted-controls-host-independence.test.js` — and the rest are the ' +
+      'thirteen-element card this change adds to that same file and the five extra rows the ' +
+      'layout gate gained by being written out. Before that: 368 against the 339 ' +
+      'before `EditorValidationSurface` joined the array. TWENTY-NINE arrived against the ' +
+      'attribute clause’s TWO, and that 29-to-2 is the widest gap either clause has recorded: a ' +
+      'validation fixture brings a whole surface with it and only its ROOT is an anchor. Eleven ' +
+      'are `recipe-studio-font-size.test.js`’s — the summary row, its card, its medallion, its ' +
+      'copy, its two lines, its count list, its one count and that count’s two spans, under the ' +
+      'root element that file gained to put them beneath a rule — and eighteen are the ' +
+      'three-host fixture in `re-rooted-controls-host-independence.test.js`, which adds a row ' +
+      'stack and a group label to that set. Before that: 339 ' +
+      'against the 321 before ' +
+      '`EditorTabs` joined the array. THIRTEEN of the eighteen are the shipped fixtures’ own, ' +
+      'over three files, and five are that change’s two new host-independence fixtures. That ' +
+      'thirteen against the attribute clause’s four is the gap the two clauses exist to keep ' +
+      'apart: a strip fixture brings its buttons, its counts and its badges with it. Before ' +
+      'that: 321 against 270 ' +
       'before `StatusToggle` and `ChanceSlider` joined the array, 244 before `ManagerToolbar` and ' +
       '`InspectorCard` did and 214 before `Field` and ' +
       '`ManagerSearchField` did — the same drifted margin the attribute floor above records, ' +
@@ -2064,12 +2646,20 @@ test('each primitive’s own scoped styles name no application root either', () 
   }
 
   assert.ok(
-    blocks >= 2,
-    `only ${blocks} of the sixteen component files hold a REAL scoped \`<style>\` block — one ` +
-      'opened after `</script>`. Two do today, `SearchablePopover` and `ManagerColorPopover`; ' +
-      'the rest name a `<style>` only in DOCBLOCK PROSE, usually to say they deliberately have ' +
-      'none, and the `</script>` guard above is what keeps that prose out of this clause. A ' +
-      'lower number means the reader has stopped finding the real blocks and this clause ' +
-      'examined nothing.'
+    blocks >= 5,
+    `only ${blocks} of the twenty component files hold a REAL scoped \`<style>\` block — one ` +
+      'opened after `</script>`. FIVE do today: `SearchablePopover`, `ManagerColorPopover` and ' +
+      '— since issue 1509 put entries on them — `EditorTabs`, whose block is the two ' +
+      '`:global(.manager-editor-tab-button.is-danger)` rules that tint a failing validation ' +
+      'tab, `RadioCardGroup`, whose block is the one `.manager-resolution-option-meta` ' +
+      'rule that types the inline second datum on an option`s name line, and `ItemDropZone`, ' +
+      'whose block is the two-rule MISSING treatment for a link whose document has been deleted ' +
+      'and the mono address line under the name. All three blocks STAY ' +
+      'where they are: a scoped block is injected unlayered and this sheet is ' +
+      'loaded into `layer(modules)`, so moving those rules into the sheet would be a layer ' +
+      'change and would move a frame. The rest name a `<style>` only in DOCBLOCK PROSE, ' +
+      'usually to say they deliberately have none, and the `</script>` guard above is what ' +
+      'keeps that prose out of this clause. A lower number means the reader has stopped ' +
+      'finding the real blocks and this clause examined nothing.'
   );
 });

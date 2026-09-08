@@ -90,7 +90,7 @@
    - onArmDelete() / onDisarmDelete() / onDelete(ids).
 -->
 <script>
-  import ArmedDangerButton from '../ArmedDangerButton.svelte';
+  import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
   import BulkEditPanelShell from '../BulkEditPanelShell.svelte';
   import BulkEditSection from '../BulkEditSection.svelte';
   import BulkStagingInset from '../BulkStagingInset.svelte';

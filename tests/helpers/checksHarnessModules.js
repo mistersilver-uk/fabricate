@@ -175,7 +175,7 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/InspectorCard.svelte',
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/components/Chip.svelte',
-  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+  'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
   // `Chip.svelte` travels with it since issue 1371: `IconFactRow` renders the manager's ONE
   // chip for its trailing badge, so it is now in the row's STATIC closure. Omitting it does
@@ -184,7 +184,7 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/InspectorActionButton.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
-  'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
+  'src/ui/svelte/components/RadioCardGroup.svelte',
   'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
   // The manager's ONE searchable picker. The rail's "Preview as" actor control renders
   // through it rather than through a native `<select>`, so every checks suite that mounts
@@ -192,7 +192,7 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // Its own closure (`Chip`, `EmptyState`, `iconPickerPopover.js`, `dismissOnOutsideClick.js`,
   // `portal.js`) is already declared here for other reasons.
   'src/ui/svelte/components/SearchablePopover.svelte',
-  'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  'src/ui/svelte/components/ToggleCard.svelte',
   // The On-failure section's failure-result policy card (issue 1098), rendered by all
   // three activity routes and by the alchemy branch through one snippet in `ChecksView`.
   'src/ui/svelte/apps/manager/checks/CheckFailurePolicy.svelte',
@@ -201,7 +201,7 @@ export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
   // THE manager's editor tab strip (issue 1362). `ChecksEditorTabs` is a caller of it
   // since issue 1429 gave it the Rail Marker Family, so omitting it HANGS every checks
   // suite (`# cancelled`) rather than failing one.
-  'src/ui/svelte/apps/manager/EditorTabs.svelte',
+  'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksEditorTabs.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte',
   'src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte',

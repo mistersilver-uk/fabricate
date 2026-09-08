@@ -69,7 +69,7 @@ const harness = createMountedComponentHarness({
     // The strip, extracted from this view in issue 1429, and the primitive it wraps. Both are
     // rendered by the tree under test, and a rendered `.svelte` the harness omits HANGS the
     // suite (`# cancelled`) rather than failing it.
-    'src/ui/svelte/apps/manager/EditorTabs.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/VocabularyTabs.svelte',
     'src/ui/svelte/apps/manager/TagsCategoriesView.svelte',
   ],

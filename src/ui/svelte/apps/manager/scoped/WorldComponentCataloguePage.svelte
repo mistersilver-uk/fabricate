@@ -46,7 +46,7 @@
   import Chip from '../../../components/Chip.svelte';
   import EssenceChip from '../components/EssenceChip.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';
-  import ItemDropZone from '../ItemDropZone.svelte';
+  import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import EntityCatalogueShell from './EntityCatalogueShell.svelte';
   import ComponentCatalogueBulkPanel from './ComponentCatalogueBulkPanel.svelte';
   import {

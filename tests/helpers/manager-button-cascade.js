@@ -63,7 +63,7 @@ const APP_ROOT_CLASS = 'fabricate-manager';
 // models it that way. A rule chained above the primitive does not reach it, which is what makes
 // its two knowledge-row usages a real constraint on what may be re-chained rather than a
 // bookkeeping detail.
-const NON_CONVERTING_FILES = new Set(['src/ui/svelte/apps/manager/ArmedDangerButton.svelte']);
+const NON_CONVERTING_FILES = new Set(['src/ui/svelte/components/ArmedDangerButton.svelte']);
 // `SearchablePopover` takes a class STRING and renders the button itself, so these sites never
 // gain `fab-manager-button`. They are population B: enumerated, never converted.
 const TRIGGER_ATTRIBUTE = 'triggerClass';

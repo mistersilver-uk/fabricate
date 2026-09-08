@@ -59,13 +59,13 @@ const harness = createComponentScopeHarness({
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedEntityPreview.svelte',
     'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
-    'src/ui/svelte/apps/manager/EditorTabs.svelte',
-    'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
+    'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     'src/ui/svelte/apps/manager/IconFactRow.svelte',
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
   ],
@@ -86,7 +86,7 @@ const sourceCardHarness = createComponentScopeHarness({
   rawExtras: ['src/ui/svelte/actions/dragDrop.js', 'src/ui/svelte/util/dropUtils.js'],
   compiledExtras: [
     'src/ui/svelte/apps/manager/Callout.svelte',
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
   ],
 });
@@ -107,14 +107,14 @@ const sourceCardHarness = createComponentScopeHarness({
 const dropZoneHarness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-world-component-entry-drop-zone-',
-  componentPath: 'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+  componentPath: 'src/ui/svelte/components/ItemDropZone.svelte',
   rawModules: [
     'src/ui/svelte/actions/dragDrop.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/util/foundryBridge.js',
   ],
   compiledModules: [
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/IconButton.svelte',
   ],
 });

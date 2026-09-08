@@ -88,7 +88,7 @@ const harness = createMountedComponentHarness({
   compiledModules: [
     'src/ui/svelte/components/Chip.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
+    'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/components/SearchablePopover.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',
     'src/ui/svelte/apps/manager/ComplicationEffectRow.svelte',

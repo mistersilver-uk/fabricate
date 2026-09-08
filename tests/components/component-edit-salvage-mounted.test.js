@@ -53,9 +53,9 @@ const cardHarness = createMountedComponentHarness({
     // `ToggleCard` composes the shared switch (issue 1040), so this second harness needs it
     // too — omitting it HANGS this suite as `# cancelled` rather than failing it.
     'src/ui/svelte/components/StatusToggle.svelte',
-    'src/ui/svelte/apps/manager/ToggleCard.svelte',
+    'src/ui/svelte/components/ToggleCard.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  componentPath: 'src/ui/svelte/components/ToggleCard.svelte',
 });
 
 const COMPONENT_OPTIONS = [
@@ -158,6 +158,84 @@ describe('ToggleCard — the issue-658 retrofit seams (D9)', () => {
       [...sub.attributes].map((a) => a.name).sort(),
       ['class'],
       'the sub-line carries only its class'
+    );
+    cardHarness.remount();
+  });
+
+  /*
+   * THE ONE ASSERTION IN THIS REPOSITORY THAT READS THE STATUS CARD'S RENDERED ROOT (issue 1509).
+   *
+   * Every other guard on this family reads SOURCE TEXT: the area-scope gate reads the component's
+   * `` class={`…`} `` template, the sheet census reads the selectors, the fixture clauses read
+   * strings in `tests/`. All of them are satisfied by a component that WRITES
+   * `fabricate-toggle-card` in that template and stops rendering it on its root element -- at
+   * which point every one of the ten re-rooted rules in `styles/fabricate.css` matches nothing
+   * and the card draws as an unstyled div in every host, the manager included.
+   *
+   * THIS suite rather than one of the other seven callers', because this is the one that mounts
+   * `ToggleCard` DIRECTLY, so the reading is of the primitive's own output and not of a caller's.
+   */
+  it('writes `fabricate-toggle-card` first on its root div, ahead of its own card class', async () => {
+    const target = await mountCard({ variant: 'is-enabled' });
+    const card_ = target.querySelector('.manager-recipe-status-card');
+    assert.ok(Boolean(card_), 'the primitive must render its root at all');
+    assert.equal(card_.tagName.toLowerCase(), 'div');
+    assert.equal(
+      card_.className.replaceAll(/ ?svelte-[a-z0-9]+/g, ''),
+      'fabricate-toggle-card manager-recipe-status-card is-enabled is-on',
+      'the root must carry the primitive`s own namespace class FIRST -- every re-rooted rule in ' +
+        '`styles/fabricate.css` names it as the leading compound -- then the card`s own class, ' +
+        'then the caller`s variant, then the on/off state'
+    );
+    cardHarness.remount();
+  });
+
+  it('writes it on the ROOT div and not on the copy column inside it', async () => {
+    // THE MUTATION CONTROL'S TARGET, stated as an assertion so the control has something to flip.
+    // Moving the `fabricate-toggle-card` literal off the root template and into the copy column's
+    // class leaves it in the markup, so it stays in the area-scope gate's `written` set and
+    // `rootless`, `gated` and the emission clause all stay green. Only a reading of WHICH element
+    // carries it can see that move -- and it is the difference between a root that is an ancestor
+    // of the glyph, the copy and both lines and one that is a sibling of the glyph.
+    const target = await mountCard();
+    const copy = target.querySelector('.manager-recipe-status-copy');
+    assert.ok(Boolean(copy), 'the copy column must render, or this control has no subject');
+    assert.ok(
+      !copy.classList.contains('fabricate-toggle-card'),
+      'the copy column carries the family root, which belongs on the card`s own root div: every ' +
+        'rule in the sheet roots at it as an ancestor of this column, so a root here matches ' +
+        'nothing the column contains'
+    );
+    assert.ok(
+      Boolean(copy.closest('.fabricate-toggle-card')),
+      'and the column must still sit UNDER the root, which is the relationship the sheet encodes'
+    );
+    cardHarness.remount();
+  });
+
+  it('the switch it COMPOSES keeps its own root and takes none of this family`s', async () => {
+    // The card owns the glyph, the copy and the state class; `StatusToggle` owns the track, the
+    // knob and the reading. Both roots are on the page and neither is on the other's element,
+    // which is the rendered half of the standing invariant
+    // `searchable-popover-area-scope.test.js` asserts over the sheet: no selector may combine
+    // this family with `manager-status-toggle*`, because each root is an APPLICATION root by name
+    // to the other primitive's entry.
+    const target = await mountCard();
+    const button = target.querySelector('button.manager-status-toggle');
+    assert.ok(Boolean(button), 'the composed switch must render');
+    assert.ok(
+      button.classList.contains('fabricate-toggle'),
+      'the switch keeps `StatusToggle`s own namespace root'
+    );
+    assert.ok(
+      !button.classList.contains('fabricate-toggle-card'),
+      'and it must not gain this family`s: a rule reaching the switch from the card`s root is ' +
+        'gated on the Toggle entry and has no re-rooting form that satisfies both'
+    );
+    assert.ok(
+      Boolean(button.closest('.fabricate-toggle-card')),
+      'while still sitting under the card, which is what makes the two families NESTED rather ' +
+        'than co-rooted'
     );
     cardHarness.remount();
   });

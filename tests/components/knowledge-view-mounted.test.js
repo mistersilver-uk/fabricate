@@ -53,7 +53,7 @@ const harness = createMountedComponentHarness({
     // `Avatar` is NOT on `SHARED_PRIMITIVES` at two callers, so omitting it HANGS this suite
     // (# cancelled) rather than failing it by name.
     'src/ui/svelte/components/Avatar.svelte',
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/EmptyState.svelte',
     // The shared standing-statement strip both tab bodies render (issue 785).
     'src/ui/svelte/apps/manager/Callout.svelte',
@@ -62,7 +62,7 @@ const harness = createMountedComponentHarness({
     // THE manager's editor tab strip (issue 1362). `KnowledgeTabs` is a caller of it since
     // issue 1429 corrected its badge onto the Rail Marker Family's record-count vehicle, so
     // omitting it HANGS this suite (# cancelled) rather than failing it.
-    'src/ui/svelte/apps/manager/EditorTabs.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeTabs.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeRoster.svelte',
     'src/ui/svelte/apps/manager/knowledge/KnowledgeOwnedCopyRow.svelte',

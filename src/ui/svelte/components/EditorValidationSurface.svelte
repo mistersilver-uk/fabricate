@@ -44,10 +44,24 @@
    - class: an EXTRA class appended to this surface's own, never a replacement — the idiom
      `ManagerButton`, `Field` and `Chip` already use. It exists so a site whose root carried its
      own classes keeps them, so no shipped rule stops matching.
+
+  ── AND THE SURFACE IS ROOTED AT `fabricate-validation` (issue 1509) ───────────────────
+
+  The `<section>` writes `fabricate-validation` ahead of its own three classes, and every rule the
+  `manager-recipe-val-*` and `manager-recipe-rail-*` families own is anchored on that class instead
+  of on `.fabricate-manager`. So the summary card, its medallion, the count rail and the grouped row
+  stack draw wherever this component is mounted rather than only inside the manager window.
+
+  THREE THINGS ARE DELIBERATELY LEFT BEHIND, and they are the reason this surface is only PARTLY
+  host-independent: `manager-recipe-tab` on this root, and `manager-recipe-tab-intro` and
+  `manager-recipe-tab-title` on the head block. All three are the RECIPE EDITOR's tab vocabulary —
+  six other recipe tabs write `manager-recipe-tab` — so re-rooting their rules here would un-style
+  those six. In a bare host this surface therefore paints its body and leaves its heading, its
+  intro and the outer tab box's own layout unstyled. Retiring the `manager-*` names is issue 1507's.
 -->
 <script>
-  import Chip from '../../components/Chip.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
+  import Chip from './Chip.svelte';
+  import ManagerButton from './ManagerButton.svelte';
 
   let {
     title = 'Validation',
@@ -124,8 +138,29 @@
 
   const shownCounts = $derived(COUNT_ORDER.filter((count) => count in (counts ?? {})));
 
-  const rootClass = $derived(
-    ['manager-recipe-tab', 'manager-recipe-validation', 'manager-editor-validation-surface']
+  /*
+    THE SURFACE'S OWN CLASS LIST, AND `fabricate-validation` LEADS IT (issue 1509).
+
+    The local is named `classes` because the area-scope gate's composed-class reader locates the
+    region by the exact opener `const classes = $derived(`, and the root sits FIRST because that
+    reader takes the array's first literal as the namespace class the component emits. Neither is
+    a formatting preference: under any other name the reader reports a NAMED extractor failure,
+    and under any other order it credits the wrong class.
+
+    `fabricate-validation` is what the surface's family is now anchored on, so the medallion, the
+    counts and the row stack paint wherever this component is mounted rather than only inside the
+    manager window. The `manager-*` classes stay on the elements; retiring them is a later change.
+    `manager-recipe-tab` is deliberately NOT part of that family — six other recipe tabs write it
+    too, so its rules, and the `-tab-intro` and `-tab-title` rules under them, stay rooted at
+    `.fabricate-manager` and this surface's heading and outer tab box stay host-dependent.
+  */
+  const classes = $derived(
+    [
+      'fabricate-validation',
+      'manager-recipe-tab',
+      'manager-recipe-validation',
+      'manager-editor-validation-surface',
+    ]
       .concat(extraClass || [])
       .join(' ')
   );
@@ -169,7 +204,7 @@
   `tests/helpers/primitiveAdoptionContract.js`'s valueless-attribute clause exists to refuse.
 -->
 
-<section class={rootClass} data-editor-validation-surface="" {...hooksFor('root')}>
+<section class={classes} data-editor-validation-surface="" {...hooksFor('root')}>
   <!-- THE IN-PANE HEADING IS OPTIONAL (issue 1373). A tab reached through a labelled tab strip
        inside a titled editor is already named three times over, and the Tool rules editor's
        reference draws no heading on any of its three tabs. Every caller that passes a `title`

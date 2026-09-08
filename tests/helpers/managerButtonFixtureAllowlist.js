@@ -166,7 +166,7 @@ export const FIXTURE_ALLOWLIST = Object.freeze([
     // The provenance, READ rather than believed (issue 1371 r17-b, quality N7): the `why` above
     // claims the product writes this string, and the loop below checks it does.
     stillRenderedBy: Object.freeze({
-      file: 'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+      file: 'src/ui/svelte/components/ArmedDangerButton.svelte',
       literal: 'class="fabricate-button manager-button is-danger"',
     }),
   }),

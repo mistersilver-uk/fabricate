@@ -75,9 +75,9 @@ const radioHarness = createMountedComponentHarness({
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
   compiledModules: [
     'src/ui/svelte/components/Field.svelte',
-    'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
+    'src/ui/svelte/components/RadioCardGroup.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
+  componentPath: 'src/ui/svelte/components/RadioCardGroup.svelte',
 });
 
 const VOCABULARY_PROPS = Object.freeze({
@@ -102,6 +102,12 @@ const RADIO_OPTIONS = Object.freeze([
  * family at the class it emits — so the caller's own order survives behind them, and these two
  * constants are what say so out loud.
  *
+ * `fabricate-option-cards` JOINED BOTH STRINGS AT ISSUE 1509 PHASE 3, third rather than first,
+ * and the position is the whole shape of the thing: this element is `Field`'s root AND
+ * `RadioCardGroup`'s, so it carries two namespace roots at once. `Field` prepends its pair, the
+ * radio group's own template supplies its root at the head of what it hands over, and the
+ * caller's classes follow. The `manager-*` names are untouched; issue 1507 retires those.
+ *
  * THEY ARE ALSO THE FAMILY'S ROOT-EMISSION PROOF ON THE RENDERED DOM. Every other reader of
  * `fabricate-field` is SOURCE TEXT — the area-scope gate reads the `$derived` array, the
  * host-independence fixtures write the class as a literal — so a `Field` that declared the array
@@ -110,9 +116,9 @@ const RADIO_OPTIONS = Object.freeze([
  * compare the WHOLE string, which is the one reader that catches it.
  */
 const RADIO_CLASS_CONFIG_CARDS =
-  'fabricate-field manager-field is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards';
+  'fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards';
 const RADIO_CLASS_PLAIN =
-  'fabricate-field manager-field is-wide manager-resolution-mode-card manager-radio-card-group';
+  'fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group';
 
 before(async () => {
   await vocabularyHarness.setup();
@@ -125,6 +131,72 @@ after(() => {
 afterEach(() => {
   vocabularyHarness.remount();
   radioHarness.remount();
+});
+
+describe('RadioCardGroup emits the namespace root its rules are anchored on (issue 1509)', () => {
+  /*
+   * THE ONE ASSERTION IN THIS REPOSITORY THAT READS THE RADIO CARD'S RENDERED ROOT, and for this
+   * family it is load-bearing rather than ceremonial.
+   *
+   * `fabricate-option-cards` does not reach the DOM on an element `RadioCardGroup` writes. It is
+   * a string the component hands to `Field` as a `class` PROP, and `Field` is what renders it. So
+   * every source reader is satisfied by a tree in which `Field` has stopped forwarding that prop:
+   * the area-scope gate reads `RadioCardGroup`'s own markup and finds the literal, the sheet
+   * census reads the selectors, the fixture clauses read strings in `tests/`. All of them stay
+   * green while every re-rooted rule in `styles/fabricate.css` matches nothing and the card, its
+   * rows, its tiles and its radios draw unstyled in every host, the manager included.
+   *
+   * That gap is also exactly why the entry declares no `classProps`: a `classProps: ['class']`
+   * entry would match all twelve class attributes in this component's markup against a floor of
+   * one. The guard it would have bought is this assertion instead.
+   */
+  it('writes `fabricate-option-cards` on the fieldset `Field` renders for it', async () => {
+    const root = await radioHarness.mount({
+      legend: 'Resolution',
+      groupName: 'field-mounted-radio',
+      options: [...RADIO_OPTIONS],
+      selectedValue: 'simple',
+      dataGroup: 'field-mounted',
+    });
+    const group = root.querySelector('[data-radio-card-group="field-mounted"]');
+    assert.ok(Boolean(group), 'the radio card group must render at all');
+    assert.equal(group.tagName, 'FIELDSET');
+    assert.ok(
+      group.classList.contains('fabricate-option-cards'),
+      'the fieldset must carry this family`s namespace root: every re-rooted rule in ' +
+        '`styles/fabricate.css` names it as the leading compound, so a `Field` that stopped ' +
+        'forwarding its `class` prop would leave the whole family matching nothing while every ' +
+        'source-text reader in this repository stayed green'
+    );
+    assert.ok(
+      group.classList.contains('fabricate-field'),
+      'and `Field`s own root beside it: this one element is the root of BOTH families, which is ' +
+        'why the option-card family declares no font floor of its own'
+    );
+  });
+
+  it('writes the root on the FIELDSET and not on an option row inside it', async () => {
+    // WHICH ELEMENT carries it, not merely that some element does. Every rule in the sheet roots
+    // at this class as an ANCESTOR of the rows, so a root on a row would match nothing the row
+    // contains while still reading as present to a `querySelector`.
+    const root = await radioHarness.mount({
+      legend: 'Resolution',
+      groupName: 'field-mounted-radio',
+      options: [...RADIO_OPTIONS],
+      selectedValue: 'simple',
+      dataGroup: 'field-mounted',
+    });
+    const row = root.querySelector('.manager-resolution-option');
+    assert.ok(Boolean(row), 'an option row must render, or this assertion has no subject');
+    assert.ok(
+      !row.classList.contains('fabricate-option-cards'),
+      'an option row carries the family root, which belongs on the fieldset above it'
+    );
+    assert.ok(
+      Boolean(row.closest('.fabricate-option-cards')),
+      'and the row must sit UNDER the root, which is the relationship the sheet encodes'
+    );
+  });
 });
 
 describe('Field (mounted, through its real callers)', () => {

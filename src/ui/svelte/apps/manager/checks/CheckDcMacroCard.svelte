@@ -31,7 +31,7 @@
   // The shared macro-name resolver (issue 1036), which owns the `globalThis.fromUuid`
   // indirection and the stale-resolution latch.
   import { resolveMacroName } from '../../../../../utils/macroReference.js';
-  import ItemDropZone from '../ItemDropZone.svelte';
+  import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
 
   let { macroUuid = null, onChange = () => {} } = $props();
@@ -93,10 +93,17 @@
   <div class="manager-checks-card-body">
     <!-- The shared drop primitive (issue 1036), which brings the compendium-drag acceptance
          and the MISSING treatment a hand-rolled zone had neither of.
-         `data-check-macro-dropzone` and `data-unlink-macro` are preserved by the `kind`
-         mapping: the mounted suites and the View Lab checks case both select on the first. -->
+         `data-check-macro-dropzone` and `data-unlink-macro` are this site's own hooks, stated
+         here rather than switched on by a `kind ===` branch inside the primitive (issue 1509).
+         Both are load-bearing selectors: `manager-mounted`, this studio's characterization suite
+         and the View Lab's `manager-checks-crafting-dynamic-dc` case all select on them. `kind`
+         stays because it still ids the zone through `data-item-drop-zone`. -->
     <ItemDropZone
       kind="check-macro"
+      hookAttrs={{
+        root: { 'data-check-macro-dropzone': true },
+        unlink: { 'data-unlink-macro': true },
+      }}
       documentType="Macro"
       item={macroUuid ? { name: macroCardLabel } : null}
       state={resolvedMacroMissing ? 'missing' : 'linked'}

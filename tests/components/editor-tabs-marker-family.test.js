@@ -39,9 +39,9 @@ const harness = createMountedComponentHarness({
     // vehicle. A `.svelte` the tree renders but the harness omits HANGS the suite
     // (# cancelled) rather than failing it.
     'src/ui/svelte/components/Chip.svelte',
-    'src/ui/svelte/apps/manager/EditorTabs.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
   ],
-  componentPath: 'src/ui/svelte/apps/manager/EditorTabs.svelte',
+  componentPath: 'src/ui/svelte/components/EditorTabs.svelte',
 });
 
 before(() => harness.setup());
@@ -74,6 +74,68 @@ function marksOn(button) {
     })
   );
 }
+
+describe('EditorTabs emits the namespace root its rules are anchored on (issue 1509)', () => {
+  /*
+   * THE ONE ASSERTION IN THIS REPOSITORY THAT READS THE RENDERED ROOT.
+   *
+   * Every other guard on this family reads SOURCE TEXT: the area-scope gate reads the markup and
+   * the frozen class map, the sheet census reads the selectors, the fixture clauses read strings
+   * in `tests/`. All of them are satisfied by a component that DECLARES `fabricate-tabs` and
+   * stops rendering it on its root element — at which point every re-rooted rule in the sheet
+   * matches nothing and the strip draws unstyled in every host, including the manager.
+   *
+   * So this is read off the mounted DOM, in the shape `manager-button-mounted.test.js:83` uses,
+   * in the suite that already mounts this component.
+   */
+  it('writes `fabricate-tabs` on the tablist, ahead of the caller`s container class', async () => {
+    const root = await harness.mount({ tabs: TABS, activeTab: 'roll' });
+    const tablist = root.querySelector('[role="tablist"]');
+    assert.ok(Boolean(tablist), 'the component must render a tablist at all');
+    assert.equal(
+      tablist.className,
+      'fabricate-tabs manager-editor-tabs',
+      'the default render must carry the primitive`s own root and the family`s container class, ' +
+        'in that order — the root FIRST, because every re-rooted rule in `styles/fabricate.css` ' +
+        'names it as the leading compound'
+    );
+  });
+
+  it('keeps the root when a caller supplies its own container class', async () => {
+    // THE CALLER VOCABULARY IS THE POINT, not an extra case. Nine wrappers pass a
+    // `containerClass` of their own — `manager-environment-tabs`, `manager-tool-editor-tabs`,
+    // `manager-editor-tabs manager-knowledge-tabs` — and the root is written AHEAD of whatever
+    // they pass rather than as one of the values they could replace. A root a caller can drop is
+    // a root the sheet cannot rely on.
+    const root = await harness.mount({
+      tabs: TABS,
+      activeTab: 'roll',
+      containerClass: 'manager-environment-tabs manager-checks-sections',
+    });
+    assert.equal(
+      root.querySelector('[role="tablist"]').className,
+      'fabricate-tabs manager-environment-tabs manager-checks-sections',
+      'a caller`s container class replaces the family default and never the root'
+    );
+  });
+
+  it('writes the root on the TABLIST and not on the tab buttons', async () => {
+    // THE MUTATION CONTROL'S TARGET, stated as an assertion so the control has something to
+    // flip. Moving the `fabricate-tabs` literal from the container template onto the button
+    // template leaves it in the markup, leaves it in `written`, and leaves the area-scope gate`s
+    // `rootless` and `gated` clauses green — only this pair of assertions can see it, because
+    // only these read WHICH element carries it.
+    const root = await harness.mount({ tabs: TABS, activeTab: 'roll' });
+    for (const button of tabButtons(root)) {
+      assert.ok(
+        !button.classList.contains('fabricate-tabs'),
+        `${button.id} carries the family root, which belongs on the tablist: every rule in the ` +
+          'sheet roots at it as an ANCESTOR of the button, so a root on the button matches the ' +
+          'button`s own rules and nothing else'
+      );
+    }
+  });
+});
 
 describe('EditorTabs draws the Rail Marker Family (issue 1429)', () => {
   it('draws a record count as a bare numeral and NOT as a chip', async () => {

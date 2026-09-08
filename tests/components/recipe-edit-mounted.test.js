@@ -125,7 +125,7 @@ const RECIPE_COMPILED = [
   // The Results tab's progressive reorder-permission card (issue 651). A component the
   // mounted tree renders but the harness does not list HANGS the suite (# cancelled)
   // rather than failing it.
-  'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  'src/ui/svelte/components/ToggleCard.svelte',
   // The switch that card composes (issue 1040). Omitting it HANGS the suite.
   'src/ui/svelte/components/StatusToggle.svelte',
   // The resolution-mode banner heads every editor tab (issue 643 §5).
@@ -146,7 +146,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/components/RowDisclosure.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeToolsSection.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeEditorTabs.svelte',
-  'src/ui/svelte/apps/manager/EditorTabs.svelte',
+  'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte',
   // The Overview tab's eligible-modifier override renders the shared pill multi-select
   // (issue 770). A `.svelte` the tree renders but the harness omits HANGS the suite.
@@ -162,7 +162,7 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeBooksScrollsTab.svelte',
   // THE validation surface (issue 1444). The Validation tab hands it the readiness and
   // renders none of the markup itself, so omitting it CANCELS this suite.
-  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+  'src/ui/svelte/components/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',

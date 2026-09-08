@@ -79,8 +79,8 @@ const REPO_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 /**
  * The roots a diff can name that `BROAD_SIGNAL_PATTERN` can match. `styles/` is included because
  * `styles/fabricate.css` is a broad signal and is the most commonly touched UI file in the
- * repository: 13 of property (b)'s 21 baseline entries are patterns claiming it, so a walk that
- * missed this root would compute 8 where the baseline says 21.
+ * repository: 13 of property (b)'s 20 baseline entries are patterns claiming it, so a walk that
+ * missed this root would compute 7 where the baseline says 20.
  *
  * That fails the `deepEqual` loudly rather than silently — the reason to walk every root the
  * pattern can match is that the baseline only MEANS what it says if it was measured over the whole
@@ -141,7 +141,7 @@ const PUBLISHING_CASE_IDS = new Set(
  * sequences, and a pin that has to be hand-escaped to be written down is a pin that will be
  * updated by re-pasting whatever the code currently emits, which is not a pin at all.
  */
-const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(ArmedDangerButton|Callout|EditorValidationSurface|EmptyState|ExplainerCard|IconFactRow|ItemDropZone|ManagerModal|RadioCardGroup|SegmentedControl|ToggleCard)\.svelte$`;
+const EXPECTED_BROAD_SIGNAL_SOURCE = String.raw`^styles\/|^src\/ui\/svelte\/components\/|^src\/ui\/theme\.js$|^src\/ui\/svelte\/apps\/manager\/(Callout|EmptyState|ExplainerCard|IconFactRow|ManagerModal|SegmentedControl)\.svelte$`;
 
 /**
  * The keys `BROAD_SIGNAL_CASE_OVERRIDES` carries — the DOMAIN, pinned separately from the entries.
@@ -157,10 +157,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   // widening moved the neutral default in one window and the tinted title-bearing form in the
   // other. It leaves `PRIMITIVES_WITH_NO_FRAME` in the same change.
   'src/ui/svelte/apps/manager/Callout.svelte',
-  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
-  'src/ui/svelte/apps/manager/ItemDropZone.svelte',
-  'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
   // Issue 1477: the shared overflow action menu. Its entry names the one published frame that
   // OPENS a menu, which is the only state in which the primitive is visible at all.
   'src/ui/svelte/components/ActionMenu.svelte',
@@ -179,6 +176,15 @@ const EXPECTED_OVERRIDE_KEYS = [
   // mode rather than through a `sourceMatches` claim, and it leaves `PRIMITIVES_WITH_NO_FRAME`
   // in the same change.
   'src/ui/svelte/components/ChanceSlider.svelte',
+  // Issue 1509: the editor tab strip, and the third key gained by neither of the two routes above
+  // — the component did not acquire a state and it did not arrive. It MOVED. It was an
+  // `evidence: 'targeted'` row under `apps/manager/` with six cases claiming it by `sourceMatches`,
+  // and `components/` is a broad signal by DIRECTORY, so `selectRenderFileCases` stopped reading
+  // those six claims the moment the file landed. The move commit deleted them and re-expressed
+  // them here, which preserves the routing rather than inventing one — and is why this entry does
+  // not appear in `PRIMITIVES_WITH_NO_FRAME` even for a commit: it never spent one there.
+  'src/ui/svelte/components/EditorTabs.svelte',
+  'src/ui/svelte/components/EditorValidationSurface.svelte',
   // The player window's shared top bar was here until issue 1500, and its ABSENCE is the point.
   // Issue 1475 gave it an override because it sat under `components/`, where the directory leg
   // claims it; issue 1500 moved it to `apps/ActorSelectTopBar.svelte`, where it matches neither
@@ -195,6 +201,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/IconButton.svelte',
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/InspectorCard.svelte',
+  'src/ui/svelte/components/ItemDropZone.svelte',
   // Issue 1505: the uppercase micro-label, on sixteen converted eyebrow sites. Two frames, one
   // per window, because the conversion is a different act in each — a section title joining the
   // ladder in the crafting detail, and three field labels changing size, weight and tracking in
@@ -218,6 +225,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   // of its two callers is reachable — the alchemy brew banner is drawn by no case in the registry
   // and is held by its own mounted suite instead, which that entry records.
   'src/ui/svelte/components/Notice.svelte',
+  'src/ui/svelte/components/RadioCardGroup.svelte',
   // THE searchable picker. This list is compared against `Object.keys(...).sort()`, so the entry
   // sits here rather than four lines up because issue 1500 moved the file from
   // `apps/manager/SearchablePopover.svelte` into `components/` — which changes nothing about the
@@ -240,6 +248,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
+  'src/ui/svelte/components/ToggleCard.svelte',
 ];
 
 /**
@@ -249,21 +258,28 @@ const EXPECTED_OVERRIDE_KEYS = [
  * These can never be consulted. `selectRenderFileCases` `continue`s on a broad-signal file BEFORE
  * it reaches any case's `sourceMatches`, so each of these is a case declaring an interest the
  * router will not act on. Reporting them is the point of this baseline; it is NOT a clean-tree
- * assertion, because deleting 21 patterns across 17 case literals is unscoped work and each one
+ * assertion, because deleting 20 patterns across 16 case literals is unscoped work and each one
  * needs its own adjudication — several of these cases plainly DO want their `styles/fabricate.css`
  * claim honoured, and answering that is a routing decision, not a tidy-up.
  *
- * Thirteen of the 21 are `styles/fabricate.css` claimants, which is a historical accident of which
+ * Thirteen of the 20 are `styles/fabricate.css` claimants, which is a historical accident of which
  * cases pasted the pattern rather than an attribution anyone made.
  *
  * The only accepted edit to this list is a REMOVAL, with the reason in the commit that makes it.
+ *
+ * ONE REMOVAL SO FAR, and it is 21 → 20. `manager-checks-crafting-dynamic-dc` claimed
+ * `apps/manager/ItemDropZone.svelte`, and issue 1509 moved that file into `components/`. The move
+ * breaks the row either way — re-point it and it is still shadowed, leave it and it names a path
+ * that no longer exists — and this register accepts only a removal, so the pattern was DELETED at
+ * the case rather than re-pointed. The adjudication that had to accompany it is recorded beside
+ * the case: the primitive's four override frames already draw its closed `state` set, this frame
+ * draws one of them again, so it does not join the override.
  */
 const BROAD_SHADOWED_SOURCE_MATCHES = [
   String.raw`coverage-theme-light-manager :: ^src\/ui\/theme\.js$`,
   String.raw`coverage-theme-light-manager :: ^styles\/fabricate\.css$`,
   String.raw`coverage-theme-light-player :: ^src\/ui\/theme\.js$`,
   String.raw`coverage-theme-light-player :: ^styles\/fabricate\.css$`,
-  String.raw`manager-checks-crafting-dynamic-dc :: ^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$`,
   String.raw`manager-component-complications-empty :: ^src\/ui\/svelte\/apps\/manager\/EmptyState\.svelte$`,
   String.raw`manager-world-downtime-test-companion-chrome :: ^src\/ui\/svelte\/components\/Chip\.svelte$`,
   String.raw`manager-world-downtime-test-companion-chrome :: ^src\/ui\/svelte\/components\/Medallion\.svelte$`,
@@ -332,14 +348,25 @@ const BROAD_SHADOWED_SOURCE_MATCHES = [
  * frames that cannot contain one. Its override names `world-tool-entry`, chosen because that
  * case's tool fixture declares the `breakageChance` mode its walk then opens — the frame DRAWS
  * a slider, rather than claiming the file that renders one.
+ * `ToggleCard` left it at issue 1509, and it is the first to leave because a component MOVED: its
+ * routing did not change — broad through the manager-name alternation before, broad through the
+ * `components/` directory leg after — but the move commit is the one that had to state which
+ * frame draws it, since the two registers are read by one `deepEqual` and re-keying a path in
+ * this list without giving it an override would have been an unphotographed primitive at a new
+ * path. Its override names `manager-recipe-edit-normal`, whose walk lands on the recipe editor's
+ * Overview tab, where two of these cards render.
+ * `ArmedDangerButton` moved in the same change and STAYED, with its path re-keyed and its sort
+ * position moved with it — which is the counter-case that makes the rule above legible. Nothing
+ * about it acquired a state: it was neither re-rooted nor re-authored, because its family is
+ * already `ManagerButton`'s and rooted, so the change is a file relocation and a file relocation
+ * draws nothing. A re-key is not an entry, and it does not earn an override.
  */
 const PRIMITIVES_WITH_NO_FRAME = [
-  'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
   'src/ui/svelte/apps/manager/ExplainerCard.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/ManagerModal.svelte',
   'src/ui/svelte/apps/manager/SegmentedControl.svelte',
-  'src/ui/svelte/apps/manager/ToggleCard.svelte',
+  'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/components/CollapsibleGroupHeader.svelte',
   'src/ui/svelte/components/DropZone.svelte',
@@ -392,7 +419,18 @@ test('the inputs every property below quantifies over are alive', () => {
   // and ADDED `components/Avatar.svelte`'s when the actor portrait shipped, so the set is
   // net-neutral across the branch and this pin is deliberately not edited. Between those two
   // commits it is the one register red the change declares in advance.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 53, 'the shipped primitive set changed size');
+  // 52 as of issue 1509 phase 3, and it is the register's first NET REMOVAL: nothing was demoted
+  // and nothing promoted. `apps/manager/ResolutionModeCard.svelte` was a 65-line shim over
+  // `RadioCardGroup` that renamed three props, and rooting the radio-card family at the class the
+  // primitive emits made the indirection cost more than it bought — so the four call sites render
+  // `RadioCardGroup` directly and the shim's file, and therefore its row, are gone. The
+  // non-member set is unmoved at 12: a deleted component is not adjudicated OUT of the
+  // vocabulary, it stops existing, and `notAPrimitive` records decisions about files that do.
+  // NOT TO BE CONFUSED with the other 53 this file's siblings pin: `design-system-coverage.
+  // test.js:133` and `:136` pin `library.blockCount` and `library.headingCount`, which count
+  // `library.html`'s spec-head BLOCKS rather than manifest rows. That figure is unrelated to this
+  // one, is unchanged by this change, and the two agreeing at 53 today was a coincidence.
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 52, 'the shipped primitive set changed size');
   assert.equal(NOT_A_PRIMITIVE.length, 12, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
@@ -409,7 +447,7 @@ test('BROAD_SIGNAL_PATTERN emits exactly the pinned source', () => {
       "frames away from the cases that claim a file, narrowing it hands a primitive's evidence " +
       'to whichever cases happen to name its path. Accept it by updating this pin deliberately.'
   );
-  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 261);
+  assert.equal(BROAD_SIGNAL_PATTERN.source.length, 180);
 });
 
 test('(a) every override key is a broad-signal file that exists on disk', () => {
@@ -605,7 +643,7 @@ const BACKTICKED_COMPONENT = /`([^`]*\.svelte)`/g;
  * Whether `token` names `file`, anchored on the path separator.
  *
  * The anchor is the whole point and the register records why on its own `DropZone` row: a suffix
- * test without it accepts `DropZone.svelte` for `apps/manager/ItemDropZone.svelte` and credits a
+ * test without it accepts `DropZone.svelte` for `components/ItemDropZone.svelte` and credits a
  * dead component with seven importers. This is only ever asked against ONE row's own caller list,
  * so the ambiguity a bare basename would carry across the tree is not reintroduced.
  *
@@ -996,7 +1034,8 @@ test('(e) the register of unadjudicated shared components is exactly what is rec
   assert.ok(
     domain.length >= 60,
     `only ${domain.length} components outside ${PRIMITIVE_DIRECTORY} clear the ${MEMBERSHIP_BAR}-` +
-      `caller bar, against the 71 this tree holds. With none, the register below is empty and ` +
+      `caller bar, against the 64 this tree holds — 71 until issue 1509 moved six primitives out ` +
+      `of apps/ and Phase 3's shim deletion took the seventh. With none, the register is empty and ` +
       'this property is satisfied by a broken scan.'
   );
   assert.ok(

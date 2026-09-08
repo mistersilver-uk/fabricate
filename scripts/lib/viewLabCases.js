@@ -391,8 +391,8 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // side by side, and it is where four of this conversion's six `:global()` cascade repairs
   // landed, so a repair that reaches the element but loses the cascade shows up there.
   // `manager-system-edit-normal` is the frame that renders the corpus's ONE `<fieldset>` field:
-  // `RadioCardGroup` through `ResolutionModeCard`, which that component's own manifest row
-  // already names as its claiming frame.
+  // `RadioCardGroup`, which issue 1509 made a direct render when the `ResolutionModeCard` shim
+  // that used to stand between them was deleted.
   'src/ui/svelte/components/Field.svelte': Object.freeze([
     'manager-gathering-task-editor-normal',
     'manager-system-edit-normal',
@@ -560,6 +560,28 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // Foundry assigns default artwork on creation, so no lab character is art-less. It is held by
   // `tests/components/avatar-mounted.test.js` instead.
   'src/ui/svelte/components/Avatar.svelte': Object.freeze(['manager-knowledge-owned-copies']),
+  // THE editor tab strip (issue 1509), and the FIRST key this table gains because a component
+  // MOVED rather than because one acquired a state its frames could not reach. The strip was an
+  // `evidence: 'targeted'` row under `apps/manager/`, so the six cases that render it claimed it
+  // through their own `sourceMatches`; moving it into `components/` puts it behind the DIRECTORY
+  // leg of `BROAD_SIGNAL_PATTERN`, and `selectRenderFileCases` `continue`s on a broad-signal file
+  // BEFORE it reads any case's `sourceMatches`. Left where they were, those six claims would be
+  // silently unreachable and a change to the strip would publish the representative pair alone.
+  // So the six patterns were DELETED in the same commit and re-expressed here: this entry
+  // PRESERVES the routing that shipped rather than inventing one.
+  //
+  // Six, because between them they draw every vocabulary of the strip — the system editor's
+  // strip, the recipe-item editor's overview and validation tabs, the one Checks section tab
+  // wearing a count and a dot at once, the environment editor's Events tab, and the Knowledge
+  // editor's learned/lost counts in their active and inactive treatments together.
+  'src/ui/svelte/components/EditorTabs.svelte': Object.freeze([
+    'manager-system-edit-normal',
+    'manager-recipe-item-overview',
+    'manager-recipe-item-validation',
+    'manager-checks-section-badged-and-dotted',
+    'manager-environment-edit-events',
+    'manager-knowledge-learned-lost-copy',
+  ]),
   // THE editor validation surface (issue 1444), closed onto seven renderers. NEITHER
   // representative frame can contain one, and that is established from the static import
   // closure rather than from looking at a frame: walking every transitive `.svelte` import,
@@ -590,7 +612,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // and the Checks route's ISSUE rows rather than in every frame. Whether the lab world's
   // fixtures put either surface into a state that has one was not established here, so a
   // change to that button's treatment may publish two frames that do not contain it.
-  'src/ui/svelte/apps/manager/EditorValidationSurface.svelte': Object.freeze([
+  'src/ui/svelte/components/EditorValidationSurface.svelte': Object.freeze([
     'manager-checks-validation',
     'manager-recipe-item-validation-blocked',
   ]),
@@ -636,7 +658,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   //     linked Item has been deleted out from under the record. It is reachable only from a
   //     world entity whose `registeredItemUuid` resolves to nothing, which the lab corpus had
   //     none of until `lab-tool-warped-crucible` — see `labContent.js`.
-  'src/ui/svelte/apps/manager/ItemDropZone.svelte': Object.freeze([
+  'src/ui/svelte/components/ItemDropZone.svelte': Object.freeze([
     'world-tool-catalogue-list-head',
     'world-tool-entry-overview',
     'world-tool-entry-unlinked',
@@ -652,10 +674,26 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // above it and heads it with nothing, so the legend is screen-reader-only again at both scopes
   // and no frame in the corpus draws a visible one. The pair is kept because the two SCOPES still
   // differ around the group, which is what a change to it would show up differently in.
-  'src/ui/svelte/apps/manager/RadioCardGroup.svelte': Object.freeze([
+  'src/ui/svelte/components/RadioCardGroup.svelte': Object.freeze([
     'world-tool-entry-requirements',
     'manager-tool-parity-03-breakage-1280x720',
   ]),
+  // THE titled status card (issue 1509), and it GAINS an override in the same commit that MOVES
+  // it. It was a broad signal through the manager-name alternation and is one through the
+  // `components/` directory leg now, so its routing does not change — but a broad-signal
+  // `.svelte` with no override is a member of `PRIMITIVES_WITH_NO_FRAME`, and it LEAVES that
+  // list in this commit rather than a later one. The two registers are read by one `deepEqual`,
+  // so a commit that did either alone would be red.
+  //
+  // ONE frame, and it is chosen by the WALK rather than by a `sourceMatches` claim.
+  // `manager-recipe-edit-normal` opens the recipe editor and lands on `#recipe-tab-overview`,
+  // and `recipe/RecipeOverviewTab.svelte` renders TWO of these cards on that tab, so the frame
+  // draws the control rather than merely naming the file that renders one.
+  //
+  // `manager-tool-stress-long-name` is recorded as REFUSED. It claims `ToolSystemScopeCards`,
+  // which renders this card, but that case's own comment says its editor lands on the Breakage
+  // tab — so the card is not in the photograph, and a claim is not a drawing.
+  'src/ui/svelte/components/ToggleCard.svelte': Object.freeze(['manager-recipe-edit-normal']),
   //
   // A THIRD entry as of issue 1458, and it is a third MODE rather than a third instance. Both
   // parties pickers above render the search row; the three converted add menus render none, which
@@ -1447,14 +1485,16 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'system-edit',
     kinds: ['manager', 'system-edit'],
     sourceMatches: [
-      // The promoted editor tab strip (issue 1362). Claimed on the FIVE CONVERTED SITES'
-      // cases — environment-edit, system-edit, recipe-item-edit, and, since issue 1429 gave
-      // it the Rail Marker Family, the Checks section strip and the Knowledge tabs — and on
-      // no placeholder case: a regex pasted onto a page that renders no tabs is the
-      // unrelated-evidence exit the source-coverage gate exists to close.
-      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/(ResolutionModeCard|CraftingEffectPanel|ItemPageInspector)\.svelte$/,
+      // `ResolutionModeCard` LEFT this alternation at issue 1509, which deleted the file: the
+      // shim's four call sites render `RadioCardGroup` directly now. A dead branch of an
+      // alternation is exactly the failure `every knowledge render file the predicate probes
+      // is a real source file` records — the other branches keep resolving, so `every
+      // sourceMatches pattern resolves to at least one source file` stays green over a name
+      // that matches nothing. `RadioCardGroup` does NOT take its place: it is a broad-signal
+      // file routed by its own `BROAD_SIGNAL_CASE_OVERRIDES` entry, and `selectRenderFileCases`
+      // skips a broad-signal file before it reads any case's `sourceMatches` at all.
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingEffectPanel|ItemPageInspector)\.svelte$/,
     ],
   }),
   managerCase({
@@ -4884,7 +4924,6 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector: '[data-recipe-item-tab="overview"]',
     kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
-      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
     ],
@@ -4907,12 +4946,6 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'recipe-item-edit',
     kinds: ['manager', 'books-scrolls'],
     sourceMatches: [
-      // The promoted editor tab strip (issue 1362). Claimed on the FIVE CONVERTED SITES'
-      // cases — environment-edit, system-edit, recipe-item-edit, and, since issue 1429 gave
-      // it the Rail Marker Family, the Checks section strip and the Knowledge tabs — and on
-      // no placeholder case: a regex pasted onto a page that renders no tabs is the
-      // unrelated-evidence exit the source-coverage gate exists to close.
-      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
     ],
@@ -6646,11 +6679,6 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\//,
       /^src\/ui\/svelte\/apps\/manager\/.*Check/,
-      // The editor tab strip draws BOTH of this frame's markers since issue 1429, so a
-      // change to it must be photographed here. This is the only case in the registry that
-      // renders a tab wearing a count and a dot at once, which makes it the one frame where
-      // a regression in either drawing — or in how they share the slot — is visible.
-      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
     ],
     kinds: ['manager', 'checks'],
   }),
@@ -7947,12 +7975,6 @@ export const VIEW_LAB_CASES = Object.freeze([
       ' [data-record-inspector="event"]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
-      // The promoted editor tab strip (issue 1362). Claimed on the FIVE CONVERTED SITES'
-      // cases — environment-edit, system-edit, recipe-item-edit, and, since issue 1429 gave
-      // it the Rail Marker Family, the Checks section strip and the Knowledge tabs — and on
-      // no placeholder case: a regex pasted onto a page that renders no tabs is the
-      // unrelated-evidence exit the source-coverage gate exists to close.
-      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/environment\//,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/,
     ],
@@ -10149,11 +10171,6 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/KnowledgeView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/knowledge\//,
       /^src\/ui\/SvelteCraftingSystemManagerApp\.svelte\.js$/,
-      // The editor tab strip draws this surface's two tab counts since issue 1429, which
-      // moved them off the chip and onto the Rail Marker Family's record-count vehicle. This
-      // frame is the one that opens on the OTHER tab, so it is the case where the count's
-      // active and inactive treatments appear together.
-      /^src\/ui\/svelte\/apps\/manager\/EditorTabs\.svelte$/,
     ],
   }),
   managerCase({
@@ -12081,8 +12098,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'checks-crafting',
     kinds: ['manager', 'checks'],
     sourceMatches: [
+      // `ItemDropZone` is deliberately NOT claimed here (issue 1509), and the deletion changes no
+      // routing: the pattern that used to sit on this line was on the removal-only
+      // `BROAD_SHADOWED_SOURCE_MATCHES` register precisely because the file was already a broad
+      // signal, so `selectRenderFileCases` never read it. The move to `components/` keeps it
+      // broad, and the primitive's evidence comes from its own override.
+      //
+      // Whether this case should JOIN that override was adjudicated NO. The override's four
+      // frames already draw the primitive's closed `state` set — the create prompt, the linked
+      // tile, the unlinked prompt and the missing face — and the dynamic-DC card renders the
+      // unlinked prompt among them. A fifth frame of a face already photographed is cost without
+      // evidence.
       /^src\/ui\/svelte\/apps\/manager\/checks\/SimpleCraftingCheckEditor\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/ItemDropZone\.svelte$/,
       /^src\/utils\/macroReference\.js$/,
     ],
   }),

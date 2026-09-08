@@ -72,8 +72,8 @@
  *
  * ── ROW SHAPE ──────────────────────────────────────────────────────────────────────────────────
  *
- *   { path, library, status, evidence, why }      on {@link DESIGN_SYSTEM_PRIMITIVES}
- *   { path, library, evidence, callers, why }     on {@link NOT_A_PRIMITIVE}
+ *   { path, library, status, evidence, scope, why }   on {@link DESIGN_SYSTEM_PRIMITIVES}
+ *   { path, library, evidence, callers, why }         on {@link NOT_A_PRIMITIVE}
  *
  * `path`    Repository-relative POSIX path of the shipped implementation, exactly as a diff names
  *           it. Asserted to exist on disk.
@@ -94,6 +94,20 @@
  * `evidence` `'broad'` or `'targeted'`. See below — this is the field with consequences, and the
  *           integrity test asserts that EVERY row carries one of the two, so no row can be exempt
  *           from both clauses by a typo.
+ * `scope`   MEMBER ROWS ONLY. `'shared'` or `'manager-only'`: whether a surface outside the GM
+ *           manager may render this component, per spec.md requirement "A shared primitive's class
+ *           family is rooted at the primitive, not at an app" and its scenario "A component that
+ *           cannot leave its area keeps that area's root". `manager-only` is a DECISION rather than
+ *           an omission, so such a row states its reason in `why` and, where a named change would
+ *           flip it, names that change — `ModifierPillSelect` is the shipped instance of both, and
+ *           issue 1515 is the change. WHAT THE FIELD IS NOT: it is not a proof that a family is
+ *           primitive-rooted. That proof is the hand-authored entries in
+ *           `tests/components/searchable-popover-area-scope.test.js`, which carry a family pattern,
+ *           roots, anchors, three floors and mirrored fixture pairs that no row here holds. The
+ *           register records the decision; the gate proves the rooting. Two rows are `shared` from
+ *           an `apps/manager/` path, because a player-window importer is measured on each: a
+ *           location debt is not a scope, and recording it as one would make the register lie about
+ *           a component the player window already renders.
  * `callers` NON-MEMBER ROWS ONLY. Every file under `src/` that imports this one, as
  *           repository-relative POSIX paths in code-point order — the spec's "WITH ITS CALLERS
  *           NAMED", as data. Asserted EQUAL to what `scripts/lib/componentImporters.js` measures
@@ -337,7 +351,7 @@ function byCodePoint(left, right) {
  * first hand-added row appended in the wrong place would silently change what the derivation emits.
  *
  * @type {readonly {path: string, library: string|null, status: string, evidence: string,
- *   why: string}[]}
+ *   scope: string, why: string}[]}
  */
 export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimitives);
 

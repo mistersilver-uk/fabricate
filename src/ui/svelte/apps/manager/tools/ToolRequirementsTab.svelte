@@ -216,7 +216,7 @@
   import Field from '../../../components/Field.svelte';
   import SelectionCheckbox from '../../../components/SelectionCheckbox.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
-  import RadioCardGroup from '../RadioCardGroup.svelte';
+  import RadioCardGroup from '../../../components/RadioCardGroup.svelte';
   import ModifierLibraryRow from '../ModifierLibraryRow.svelte';
   import ToolInheritCard from './ToolInheritCard.svelte';
   import { toolWorldDefaultFact } from './toolStudio.js';

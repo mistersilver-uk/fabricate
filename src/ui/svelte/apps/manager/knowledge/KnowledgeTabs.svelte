@@ -34,7 +34,7 @@
    - onChange(tabId).
 -->
 <script>
-  import EditorTabs from '../EditorTabs.svelte';
+  import EditorTabs from '../../../components/EditorTabs.svelte';
   import { KNOWLEDGE_TAB_LEARNED_RECIPES, KNOWLEDGE_TAB_RECIPE_ITEMS } from './knowledgeStudio.js';
 
   let {

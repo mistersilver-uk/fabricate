@@ -52,7 +52,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/apps/manager/Callout.svelte',
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     // The shared bulk-delete card (issue 1132). The panel renders its delete block through it,
     // so it is a STATIC import of the component under test; omitting it HANGS this suite as
     // `# cancelled` rather than failing it.

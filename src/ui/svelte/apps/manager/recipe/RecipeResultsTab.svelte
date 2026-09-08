@@ -15,7 +15,7 @@
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
-  import ToggleCard from '../ToggleCard.svelte';
+  import ToggleCard from '../../../components/ToggleCard.svelte';
   import Callout from '../Callout.svelte';
   import RecipeStepAccordion from './RecipeStepAccordion.svelte';
   import RecipeResultsSection from './RecipeResultsSection.svelte';

@@ -2,7 +2,7 @@
  * Resolution-mode config-card layout gate.
  *
  * happy-dom cannot compute the CSS cascade, so a mounted test can never prove the
- * RENDERED box model. This gate renders the real `is-config-cards` ResolutionModeCard
+ * RENDERED box model. This gate renders the real `is-config-cards` RadioCardGroup
  * markup in Chromium under the same faithful Foundry V13 core stand-in the font-size
  * gate uses (tests/fixtures/foundry-core-min.css) plus the real styles/fabricate.css,
  * and pins the geometry that a regression once broke.
@@ -25,33 +25,47 @@ const repoRoot = resolve(import.meta.dirname, '../..');
 const foundryCss = readFileSync(resolve(repoRoot, 'tests/fixtures/foundry-core-min.css'), 'utf8');
 const fabricateCss = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
 
-// The exact DOM ResolutionModeCard.svelte emits for variant="config-card": a
+// The exact DOM RadioCardGroup.svelte emits with `configCards`: a
 // <fieldset class="… is-config-cards"> whose options each wrap a real radio, an icon
 // tile, and a body (name + description). Two options, one long description, so a
 // collapsed body would visibly wrap per-word. Wrapped in the .fabricate-manager
 // container (the container-query context) inside the Foundry app shell (14px base).
-function option(active, name, desc, icon) {
-  return `
-    <label class="manager-resolution-option ${active ? 'is-active' : ''}">
-      <input type="radio" name="rmode" value="${name}" ${active ? 'checked' : ''} />
-      <span class="manager-resolution-option-icon" aria-hidden="true"><i class="${icon}"></i></span>
-      <span class="manager-resolution-option-body">
-        <span class="manager-resolution-option-name">${name}</span>
-        <span class="manager-resolution-option-desc">${desc}</span>
-      </span>
-    </label>`;
-}
-
+//
+// THE FIELDSET CARRIES `fabricate-option-cards` (issue 1509), which is the class the
+// primitive now writes at the head of the `class` it hands to `Field` and the class
+// every rule this gate measures is rooted at. Without it this fixture matches none of
+// them and measures the browser's defaults while still reporting on the card by name.
+//
+// ONE TEMPLATE, TWO OPTIONS WRITTEN OUT, rather than a helper called twice. The
+// area-scope gate's ancestry clause is a TAG SCANNER over this file's source text: a
+// helper's `<label>` sits lexically outside the `<fieldset>` that the runtime nests it
+// under, so every element the helper emitted read as an element with no namespace root
+// above it. Writing the rows where they render is what makes the source say what the
+// DOM does.
 const FIXTURE = `
 <div class="application theme-dark">
   <section class="window-content">
     <div class="fabricate fabricate-manager" data-fabricate-theme="dark" data-manager-view="crafting-settings">
       <div style="grid-column: 1 / -1;">
-        <fieldset class="fabricate-field manager-field is-wide manager-resolution-mode-card is-config-cards">
+        <fieldset class="fabricate-field manager-field fabricate-option-cards is-wide manager-resolution-mode-card manager-radio-card-group is-config-cards">
           <legend class="manager-resolution-mode-legend">Recipe resolution</legend>
           <div class="manager-resolution-mode-options">
-            ${option(false, 'Simple', 'One ingredient set and one result group, with an optional pass/fail check.', 'fa-solid fa-wand-magic-sparkles')}
-            ${option(true, 'Routed by ingredients', 'Multiple ingredient sets and result groups; the chosen ingredient set selects which result group is produced. The crafting check is optional.', 'fa-solid fa-layer-group')}
+            <label class="manager-resolution-option">
+              <input type="radio" name="rmode" value="Simple" />
+              <span class="manager-resolution-option-icon" aria-hidden="true"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+              <span class="manager-resolution-option-body">
+                <span class="manager-resolution-option-name">Simple</span>
+                <span class="manager-resolution-option-desc">One ingredient set and one result group, with an optional pass/fail check.</span>
+              </span>
+            </label>
+            <label class="manager-resolution-option is-active">
+              <input type="radio" name="rmode" value="Routed by ingredients" checked />
+              <span class="manager-resolution-option-icon" aria-hidden="true"><i class="fa-solid fa-layer-group"></i></span>
+              <span class="manager-resolution-option-body">
+                <span class="manager-resolution-option-name">Routed by ingredients</span>
+                <span class="manager-resolution-option-desc">Multiple ingredient sets and result groups; the chosen ingredient set selects which result group is produced. The crafting check is optional.</span>
+              </span>
+            </label>
           </div>
         </fieldset>
       </div>

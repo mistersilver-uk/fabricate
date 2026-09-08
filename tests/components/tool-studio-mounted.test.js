@@ -81,16 +81,16 @@ const harness = createMountedComponentHarness({
     // The world modifier library's row, which the prerequisite list and the bonus list both
     // draw since issue 1373's round 5. Static in this tree, so omitting it HANGS the suite.
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
-    'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
-    'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
+    'src/ui/svelte/components/EditorValidationSurface.svelte',
+    'src/ui/svelte/components/ItemDropZone.svelte',
+    'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
-    'src/ui/svelte/apps/manager/ToggleCard.svelte',
+    'src/ui/svelte/components/ToggleCard.svelte',
     // THE FOUR NEW LEAVES OF THE RULES EDITOR (issue 1373): the armed remove-from-system
     // control, the routed identity notice on Validation, the inherit/override card every
     // behaviour section is drawn as, the system-scope band that opens Breakage, and the shared
     // inherit switch the card wraps. A rendered `.svelte` the harness omits HANGS this suite.
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     'src/ui/svelte/apps/manager/Callout.svelte',
     'src/ui/svelte/apps/manager/scoped/InheritRow.svelte',
     'src/ui/svelte/apps/manager/tools/ToolInheritCard.svelte',
@@ -118,7 +118,7 @@ const harness = createMountedComponentHarness({
     // `ToolEditorTabs` is a thin caller of the shared strip primitive (issue 1038), so it is in
     // this tree's static graph. `ToolOverviewTab` is NOT: issue 1373 retired the Overview tab
     // from the SYSTEM rules editor, because a crafting system authors no identity.
-    'src/ui/svelte/apps/manager/EditorTabs.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/tools/ToolRepairRequirements.svelte',
     // The shared `REPLACEMENT COMPONENT` card (issue 1373, maintainer round 2). The system
     // editor's own bespoke block became a caller of it, so it is in this tree's static graph

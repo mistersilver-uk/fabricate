@@ -142,9 +142,12 @@ function withHydrateSpy(card, requests) {
 
 function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
-  // Rendered by BOTH ComponentEditView (salvage) and RecipeResultsTab (issue 651).
-  // Omitting it here HANGS every mounted manager test rather than failing one.
-  writeCompiledSvelte('src/ui/svelte/apps/manager/ToggleCard.svelte');
+  // Rendered by BOTH ComponentEditView (salvage) and RecipeResultsTab (issue 651); under
+  // `components/` since issue 1509. Omitting it here does not hang this suite: the closure walk
+  // at the foot of this file THROWS for a `.svelte` the root renders and this list omits, and
+  // names the missing path. The `# cancelled` reading belongs to the mounted suites that carry
+  // no such validator.
+  writeCompiledSvelte('src/ui/svelte/components/ToggleCard.svelte');
   // The SHARED subject check-modifier picker (issue 1095), rendered by BOTH the salvage
   // block in ComponentEditView and the gathering task editor.
   writeCompiledSvelte('src/ui/svelte/apps/manager/SubjectModifierPicker.svelte');
@@ -279,13 +282,13 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/ToolEditView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/EditorValidationSurface.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/ItemDropZone.svelte');
+  writeCompiledSvelte('src/ui/svelte/components/EditorValidationSurface.svelte');
+  writeCompiledSvelte('src/ui/svelte/components/ItemDropZone.svelte');
   // THE right-inspector action button (issue 1036, maintainer round 2). The essence browser
   // inspector imports it statically, so it is in this root's static module graph; omitting it
   // HANGS every mounted manager test as `# cancelled`, it does not fail one.
   writeCompiledSvelte('src/ui/svelte/apps/manager/InspectorActionButton.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/RadioCardGroup.svelte');
+  writeCompiledSvelte('src/ui/svelte/components/RadioCardGroup.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/RollDataExpressionInput.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte');
   // The seven world scoped-entity routes and the shared placeholder body they all call
@@ -428,10 +431,12 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/BooksScrollsView.svelte');
   // The GM Knowledge surface (issue 785). Adding a `knowledge` branch to the root
   // puts this WHOLE subtree into the compiled root's STATIC module graph regardless
-  // of `{#if}`, so every child is enumerated by name: omitting one HANGS every
-  // mounted manager test as `# cancelled`, it does not fail one.
+  // of `{#if}`, so every child is enumerated by name — including the armed control
+  // below, which has lived under `components/` since issue 1509. Omitting one fails
+  // this suite BY NAME through the closure walk at the foot of the file; the
+  // `# cancelled` reading belongs to the suites that carry no such validator.
   writeCompiledSvelte('src/ui/svelte/apps/manager/KnowledgeView.svelte');
-  writeCompiledSvelte('src/ui/svelte/apps/manager/ArmedDangerButton.svelte');
+  writeCompiledSvelte('src/ui/svelte/components/ArmedDangerButton.svelte');
   // The shared bulk-delete card (issue 1132). All three bulk-edit panels render it, and all
   // three are in the root's static graph, so the same rule applies: omitting it HANGS every
   // mounted manager test as `# cancelled`, it does not fail one.
@@ -449,17 +454,22 @@ function compileManagerRoot() {
   // The shared chip (issue 883, already compiled above via `SELECT_COMPILED_MODULES`). The
   // root reaches it through the Tool Studio and Knowledge trees today, and through every
   // other manager screen as the conversion proceeds.
-  // THE manager's editor tab strip (issue 1362). The environment, system and recipe-item
-  // strips are callers of it now, and all three are in this root's static graph, so omitting
-  // it HANGS every mounted manager test as `# cancelled` rather than failing one.
-  writeCompiledSvelte('src/ui/svelte/apps/manager/EditorTabs.svelte');
+  // THE manager's editor tab strip (issue 1362, moved to `components/` at issue 1509). The
+  // environment, system and recipe-item strips are callers of it now, and all three are in this
+  // root's static graph. The hang model this comment carried is wrong for THIS suite and is
+  // corrected rather than copied on: `assertCompiledSvelteClosure` below walks the root's static
+  // `.svelte` graph and THROWS by name for a module the tree renders and this list omits, so an
+  // omission here fails with the missing path rather than cancelling the file. The `# cancelled`
+  // reading still holds for the mounted suites that have no such validator.
+  writeCompiledSvelte('src/ui/svelte/components/EditorTabs.svelte');
   // THE manager's labelled push-button (issue 1096, already compiled above via
   // `SELECT_COMPILED_MODULES`). The root reaches it through the Tool Studio header and the
   // System Overview Modifiers card, and through every other screen as the conversion proceeds.
   writeCompiledSvelte('src/ui/svelte/components/IconButton.svelte');
   // THE manager's on/off switch (issue 1040). The root reaches it from 25 components — every
   // browser, every studio overview tab, the Checks rail, the scoped-entity rows and
-  // `ToggleCard` — so omitting it HANGS every mounted manager test as `# cancelled`.
+  // `ToggleCard` — so omitting it fails this suite by name, through the closure walk, rather
+  // than cancelling it.
   writeCompiledSvelte('src/ui/svelte/components/StatusToggle.svelte');
   // THE manager's filter bar and its search field (issue 1039). The root reaches the pair
   // through every browse screen it routes to, and the field through four editors and two
@@ -612,7 +622,6 @@ function compileManagerRoot() {
       readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/recipe/${recipeModule}`), 'utf8')
     );
   }
-  writeCompiledSvelte('src/ui/svelte/apps/manager/ResolutionModeCard.svelte');
   // Plain module imported by CraftingSettingsView — copied raw (NOT compiled), the
   // same way recipe/recipeReadiness.js is, so the mounted import resolves.
   {
@@ -630,8 +639,9 @@ function compileManagerRoot() {
   writeCompiledSvelte('src/ui/svelte/apps/manager/SystemsBrowserView.svelte');
   writeCompiledSvelte('src/ui/svelte/apps/manager/TagsCategoriesView.svelte');
   // The vocabulary tab strip, extracted out of TagsCategoriesView in issue 1429 and now a thin
-  // caller of `EditorTabs` (compiled above). Omitting a rendered `.svelte` HANGS every mounted
-  // manager test as `# cancelled` rather than failing one.
+  // caller of `EditorTabs` (compiled above, from `components/` since issue 1509). Omitting a
+  // rendered `.svelte` is caught BY NAME here rather than by a cancelled run, for the reason
+  // recorded beside that compile line.
   writeCompiledSvelte('src/ui/svelte/apps/manager/VocabularyTabs.svelte');
   // The one vocabulary section TagsCategoriesView renders three times (recipe
   // categories, component categories, item tags — issue 676).
@@ -3590,7 +3600,7 @@ async function mountSystemOverviewPage(systemValidation) {
   return { calls };
 }
 
-// Shared assertion for a ResolutionModeCard's option list: the rows render in the
+// Shared assertion for a resolution-mode RadioCardGroup's option list: the rows render in the
 // expected order, each wraps a real radio in the named group, and each has a
 // non-empty description. Hoisted so the recipe/salvage tests stay DRY (Sonar gate).
 function assertResolutionCard(card, { optionAttr, groupName, expectedValues }) {

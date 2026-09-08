@@ -3,13 +3,13 @@
   import Field from '../../components/Field.svelte';
   import Chip from '../../components/Chip.svelte';
   import Callout from './Callout.svelte';
-  import EditorTabs from './EditorTabs.svelte';
-  import EditorValidationSurface from './EditorValidationSurface.svelte';
+  import EditorTabs from '../../components/EditorTabs.svelte';
+  import EditorValidationSurface from '../../components/EditorValidationSurface.svelte';
   import WorldComponentEntryPreviewRail from './scoped/WorldComponentEntryPreviewRail.svelte';
   import InheritRow from './scoped/InheritRow.svelte';
   import { componentRulesValidationPresentation } from './component/componentRulesValidation.js';
   import { localize } from '../../util/foundryBridge.js';
-  import ToggleCard from './ToggleCard.svelte';
+  import ToggleCard from '../../components/ToggleCard.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import SubjectModifierPicker from './SubjectModifierPicker.svelte';

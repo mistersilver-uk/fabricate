@@ -56,7 +56,7 @@ import {
 } from '../helpers/primitiveAdoptionContract.js';
 
 /** The primitive whose adoption this file pins. */
-const SURFACE_PATH = 'src/ui/svelte/apps/manager/EditorValidationSurface.svelte';
+const SURFACE_PATH = 'src/ui/svelte/components/EditorValidationSurface.svelte';
 
 const TAG = 'EditorValidationSurface';
 

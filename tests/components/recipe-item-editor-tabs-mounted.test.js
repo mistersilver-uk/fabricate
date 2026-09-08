@@ -17,7 +17,7 @@ const harness = createMountedComponentHarness({
     // an assertion: `RecipeItemEditorTabs` is a caller of it now, and the shared harness's
     // closure validator THROWS naming this file if it is omitted. Every assertion below is
     // unchanged, which is the mechanical tell that the promotion moved no rendered contract.
-    'src/ui/svelte/apps/manager/EditorTabs.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
     'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte',
   ],
   componentPath: 'src/ui/svelte/apps/manager/recipe-item/RecipeItemEditorTabs.svelte'

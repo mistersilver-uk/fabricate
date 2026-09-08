@@ -2,12 +2,26 @@
 <!--
   A labelled status card carrying an on/off switch: icon · title + sub-line · toggle.
 
-  LOCATION IS DELIBERATE (issue 651). This lives under `apps/manager/`, NOT under
+  THE LOCATION DECISION IS REVERSED, BY ITS OWN PREMISE (2026-09-07, issue 1509). It read:
+  "LOCATION IS DELIBERATE (issue 651). This lives under `apps/manager/`, NOT under
   `components/`, because it is NOT theme-agnostic: it wears `manager-recipe-status-card`
-  classes that are styled only under `.fabricate-manager`. Dropped into `.fabricate-app`
-  it renders as an unstyled div. Its siblings in `components/` (Stepper, Chip) carry no such
-  coupling; both of this card's call sites are manager surfaces, so the coupling is accepted
-  and the file is located where it cannot mislead.
+  classes that are styled only under `.fabricate-manager`. Dropped into `.fabricate-app` it
+  renders as an unstyled div." That premise is what this commit retired: the ten rules the
+  gate owns for the five `manager-recipe-status-{card,icon,copy,title,sub}` classes are now
+  rooted at `fabricate-toggle-card`, the class the root element below writes ahead of them,
+  so the card paints the same in a bare `<div>` as it does in the manager. A recorded
+  decision to stay here rested on a coupling that no longer exists, so the file MOVED to
+  `components/` — where you are reading it — rather than keeping a location whose stated
+  reason has gone.
+
+  WHAT DID NOT TRAVEL, so the claim is a measurement rather than a slogan: the twelve rules
+  under `.manager-checks-flag-list`, `.manager-checks-trigger-body` and
+  `.manager-tool-system-enabled` are three CALLERS restating this card's metrics inside
+  their own containers, and they stay application-rooted because they are the callers' and
+  not this component's. In a bare host the card draws its own box, glyph column, copy and
+  state tones; what it does not draw is the Checks Studio's 28px tile or the Tool editor's
+  collapsed glyph column, neither of which is this component's to promise. Issue 1507 owns
+  the `manager-*` names themselves, and issue 1518 turns this capability into a fact.
 
   The markup is a BYTE-FAITHFUL extraction of `RecipeOverviewTab`'s Enabled/Locked status
   cards (same element tree, same class names, same aria shape) so that retrofitting those
@@ -29,7 +43,7 @@
   i18n keys and their fallbacks, which keeps this component a presentational leaf.
 -->
 <script>
-  import StatusToggle from '../../components/StatusToggle.svelte';
+  import StatusToggle from './StatusToggle.svelte';
 
   let {
     // Visual variant appended to the card class (e.g. 'is-info'), toning it when on.
@@ -72,7 +86,7 @@
 </script>
 
 <div
-  class={`manager-recipe-status-card ${variant} ${on ? 'is-on' : 'is-off'}`}
+  class={`fabricate-toggle-card manager-recipe-status-card ${variant} ${on ? 'is-on' : 'is-off'}`}
   data-recipe-section={section || undefined}
 >
   {#if icon}

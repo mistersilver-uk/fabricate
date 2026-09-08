@@ -20,8 +20,17 @@
     renders as a bare Foundry `<button>`. One token, no composition, no new props.
     It does NOT emit `data-keyboard-focus`, which the two button primitives now do, so unlike a
     primitive-rendered danger button this one still lets Foundry's Space and arrow bindings fire
-    while it holds focus; issue 1508 closes that, and this component's row stays in the
-    formless-button ledger until it does.
+    while it holds focus. Issue 1508 was recorded here as closing that and DID NOT: it added the
+    attribute to `StatusToggle` and `ModifierPillSelect` only, and this component still does not
+    emit it. The emission is a real BEHAVIOUR change — it suppresses Foundry's Space and arrow
+    bindings while the control holds focus — so it does not belong inside a re-rooting or a file
+    move, and it is filed as a successor rather than claimed as landed. This component's row
+    stays in the formless-button ledger until that successor lands.
+  - It LIVES UNDER `components/` as of issue 1509, and it gained no root of its own in doing so.
+    It writes `fabricate-button manager-button is-danger`, a family the `ManagerButton` entry
+    already owns and roots, so a `fabricate-danger-button` would own zero rules and would read as
+    an APPLICATION root to the entry that owns them. A component may be shared without being the
+    root of a family; this is the shipped instance of that.
   - The caller keys the armed token on the TARGET DOCUMENT ID, never a row index.
     The Knowledge surface re-projects its rows asynchronously from actor/item
     hooks, so an index-keyed token is a destructive-misfire bug: arm row 2, let

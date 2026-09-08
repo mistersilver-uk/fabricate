@@ -83,7 +83,7 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     ...TOOL_TREE_COMPILED_MODULES,
-    'src/ui/svelte/apps/manager/ArmedDangerButton.svelte',
+    'src/ui/svelte/components/ArmedDangerButton.svelte',
     // The manager's standing-statement strip. `ToolRequirementsTab` imports it STATICALLY for
     // the system editor's opening info strip (issue 1373, `proto:2855`), and this page renders
     // that tab. World scope passes no `intro`, so the strip never appears here — but a static
@@ -93,14 +93,14 @@ const harness = createMountedComponentHarness({
     // The world modifier library's row. Since issue 1373's round 5 the prerequisite list
     // and the bonus list are both this one component, so omitting it HANGS the suite.
     'src/ui/svelte/apps/manager/ModifierLibraryRow.svelte',
-    'src/ui/svelte/apps/manager/EditorTabs.svelte',
-    'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+    'src/ui/svelte/components/EditorTabs.svelte',
+    'src/ui/svelte/components/EditorValidationSurface.svelte',
     'src/ui/svelte/apps/manager/ExplainerCard.svelte',
     // THE LINKED-ITEM CARD AND THE REQUIREMENTS TAB (issue 1373). Both are shipped components
     // this page now renders rather than second copies of them, so both join the manifest; a
     // rendered `.svelte` the harness omits HANGS this suite and reports `# cancelled`.
-    'src/ui/svelte/apps/manager/ItemDropZone.svelte',
-    'src/ui/svelte/apps/manager/RadioCardGroup.svelte',
+    'src/ui/svelte/components/ItemDropZone.svelte',
+    'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/apps/manager/RollDataExpressionInput.svelte',
     // The shared world-modifier ROW (issue 1373, maintainer round 4). Both the Tool bonus
     // list and the Checks Studio catalogue render it, so it is static in this tree's graph

@@ -132,11 +132,25 @@ export function knownDebt(gate) {
  * three OTHER strips that phase adds — the toggle's checkbox-host input, and `ChanceSlider`'s —
  * are new and exempt, so they add no row; a strip is required chrome and booking one here would
  * file a requirement as a defect.
+ *
+ * RE-MEASURED at 23 → 22 by issue 1509's third phase, which paid a second row down the same way
+ * and adds none. `.fabricate-manager .manager-resolution-option input[type='radio']:focus` was a
+ * booked bare `:focus` for a reason that had nothing to do with what it declares — it already
+ * carried exactly `outline: none; box-shadow: none` — but it SHARED a selector list with the Tool
+ * Requirements bonus row's radio, and `primitiveFocusStrip` accepts exactly one compound. Rooting
+ * the family at `fabricate-option-cards` forced that list to be SPLIT, and the split is what made
+ * the strip recognisable. The bonus row's two rows STAY: they are the caller's own control, rooted
+ * at the manager, and no primitive declares them.
+ *
+ * Its SIBLING does not leave and is re-keyed instead:
+ * `.fabricate-option-cards .manager-resolution-option input[type='radio']:checked:focus` declares
+ * an inset `box-shadow` that restores the checked dot, which is a strip that PAINTS — exactly the
+ * population this table is about — so it stays booked under its new key.
  */
 export const KNOWN_BARE_FOCUS_SELECTORS = knownDebt('bareFocusSelectors');
 
 /** @see KNOWN_BARE_FOCUS_SELECTORS */
-export const KNOWN_BARE_FOCUS_TOTAL = 23;
+export const KNOWN_BARE_FOCUS_TOTAL = 22;
 
 /**
  * An `@media` query that is not a user preference, keyed `file | query`.
@@ -198,9 +212,16 @@ export const KNOWN_OFF_TOKEN_SHADOWS = knownDebt('offTokenShadows');
  * take the shared panel's `var(--fab-shadow-lg)`, so the caller's own panel rule is deleted
  * rather than out-specified. Paid down by adoption, not by a sweep.
  *
+ * 25 → 27 with issue 1509's third phase, and NOTHING was added: two rows were SPLIT. The checked
+ * radio's inset ring and its focused restore were each written as one rule over a two-member list
+ * pairing the resolution option's radio with the Tool Requirements bonus row's, and this table
+ * keys a row by its whole selector list — so re-rooting the family, which a list cannot do by
+ * halves, turns each of those rows into two. Same declarations, same ranks, same source order, one
+ * more row apiece.
+ *
  * @see KNOWN_OFF_TOKEN_SHADOWS
  */
-export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 25;
+export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 27;
 
 /**
  * A native `<select>` rendered by a Svelte template, keyed `file`.

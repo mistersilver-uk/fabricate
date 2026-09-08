@@ -200,7 +200,7 @@ const CONVERTED_BATCHES = Object.freeze([
       Object.freeze({ file: 'src/ui/svelte/apps/manager/ItemPageInspector.svelte', sites: 1 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte', sites: 1 }),
       Object.freeze({
-        file: 'src/ui/svelte/apps/manager/EditorValidationSurface.svelte',
+        file: 'src/ui/svelte/components/EditorValidationSurface.svelte',
         sites: 1,
       }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/ExplainerCard.svelte', sites: 1 }),
@@ -575,7 +575,7 @@ const REVIEWED = [
   {
     id: globalRule('.fabricate-manager .manager-knowledge-row-actions .manager-button'),
     disposition: 'EXCLUDE',
-    stranding: ['src/ui/svelte/apps/manager/ArmedDangerButton.svelte:164'],
+    stranding: ['src/ui/svelte/components/ArmedDangerButton.svelte:173'],
     why:
       MOVED_POPULATION +
       'The move is unusually clean here, because this entry always rested on the site that ' +

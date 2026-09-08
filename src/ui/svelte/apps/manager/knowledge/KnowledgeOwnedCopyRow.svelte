@@ -29,7 +29,7 @@
   import { localize } from '../../../util/foundryBridge.js';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import Medallion from '../../../components/Medallion.svelte';
-  import ArmedDangerButton from '../ArmedDangerButton.svelte';
+  import ArmedDangerButton from '../../../components/ArmedDangerButton.svelte';
   import Chip from '../../../components/Chip.svelte';
   import { USES_CHIP_SPENT, USES_CHIP_UNLIMITED } from './knowledgeStudio.js';
 

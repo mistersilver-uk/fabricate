@@ -1102,7 +1102,8 @@ If `features.gathering === false`:
 The selected system's recipe visibility is authored on the Crafting group's **Settings** page (`crafting-settings`), in a **Recipe Visibility** section rendered below the resolution-mode card.
 It is no longer on the System Overview page, and it authors the flat `visibilityMode` enum rather than the legacy `listMode` + `knowledge.mode` pair.
 
-- A single radio-card selector (the shared `ResolutionModeCard` primitive) offers exactly four mutually-exclusive options: `global`, `restricted`, `item`, and `knowledge`.
+- A single radio-card selector (the shared `RadioCardGroup` primitive, rendered directly with `configCards` stated at the call site) offers exactly four mutually-exclusive options: `global`, `restricted`, `item`, and `knowledge`.
+  The `ResolutionModeCard` wrapper this control used to reach that primitive through was removed at issue 1509; the control, its four options and its `is-config-cards` face are unchanged.
   Each option carries a label and description; exactly one mode is active for the whole system.
 - **Alchemy relabel (reveal-not-gate).** When `resolutionMode === "alchemy"` the card keys a `$derived` option set that renders the `restricted` option as "Manual (GM-granted access)" and rewords the item/knowledge/global descriptions from _gating_ to _reveal_ language (per `recipe-visibility`), because brewing is never gated by visibility.
   A non-alchemy system renders "Restricted" with gating language.

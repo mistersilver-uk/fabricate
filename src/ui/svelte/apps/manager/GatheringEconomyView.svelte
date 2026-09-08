@@ -24,7 +24,7 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Stepper from '../../components/Stepper.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
-  import ResolutionModeCard from './ResolutionModeCard.svelte';
+  import RadioCardGroup from '../../components/RadioCardGroup.svelte';
   import IconButton from '../../components/IconButton.svelte';
 
   let { services = null, systemId = '' } = $props();
@@ -262,14 +262,22 @@
 
 <div class="manager-gathering-economy" data-gathering-economy-view>
   <section class="manager-economy-card" data-gathering-resolution-card>
-    <ResolutionModeCard
+    <!--
+      ISSUE 1509 FOLDED THE `ResolutionModeCard` SHIM AWAY. `configCards={false}` is EXPLICIT and
+      load-bearing: this site passed no `variant` at all, and the shim derived
+      `isConfigCard = variant === 'config-card'` and so handed the primitive FALSE, while
+      `RadioCardGroup`'s own default is TRUE. Dropping the shim and omitting the prop would flip
+      this card from its compact single-column rows to the two-column icon-tile config-card face.
+    -->
+    <RadioCardGroup
       legendKey="FABRICATE.Admin.Manager.Economy.GatheringResolutionMode"
-      legendFallback="Gathering resolution mode"
+      legend="Gathering resolution mode"
       options={gatheringResolutionModeOptions}
       selectedValue={economy.resolutionMode}
       groupName="manager-gathering-resolution-mode"
       dataAttr="data-gathering-resolution-mode"
       optionDataAttr="data-gathering-resolution-mode-option"
+      configCards={false}
       onChange={setResolutionMode}
     />
   </section>
