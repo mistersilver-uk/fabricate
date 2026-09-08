@@ -12,6 +12,8 @@
   Prop-driven so it can be mounted in isolation.
 -->
 <script>
+  import EmptyState from '../manager/EmptyState.svelte';
+  import Medallion from '../../components/Medallion.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import EssenceChips from './EssenceChips.svelte';
 
@@ -43,24 +45,43 @@
   </label>
 
   {#if components.length === 0 && !hasComponents}
-    <div class="alchemy-inventory-empty" data-alchemy-empty-inventory>
-      <i class="fas fa-box-open" aria-hidden="true"></i>
-      <p class="alchemy-inventory-empty-title">
-        {localize('FABRICATE.App.Alchemy.EmptyInventoryTitle')}
-      </p>
-      <p class="alchemy-inventory-empty-hint">
-        {localize('FABRICATE.App.Alchemy.EmptyInventoryHint')}
-      </p>
+    <!--
+      THE COLUMN'S FILL IS THE CALLER'S, THE PANEL IS THE PRIMITIVE'S (issue 1514). Both
+      branches stand in for the whole scrolling list, so each has to GROW into the column
+      the rows would have filled — `.alchemy-inventory-empty` measured `flex: 1 1 auto` in
+      the View Lab. `EmptyState` is padding-driven and declares no height, and its own fill
+      escape is `contextClass`, "whose rules live in the global sheet"
+      (`EmptyState.svelte:53-55`), which would put `styles/fabricate.css` on this change's
+      path. So the class survives as a caller-owned WRAPPER declaring the grow and the
+      centring alone, which is the answer `PlayerViewState` and `.gathering-env-empty` both
+      take for the same reason.
+    -->
+    <div class="alchemy-inventory-empty">
+      <EmptyState
+        icon="fas fa-box-open"
+        title={localize('FABRICATE.App.Alchemy.EmptyInventoryTitle')}
+        hint={localize('FABRICATE.App.Alchemy.EmptyInventoryHint')}
+        dataAttr="data-alchemy-empty-inventory"
+        dataValue=""
+      />
     </div>
   {:else if components.length === 0}
-    <div class="alchemy-inventory-empty" data-alchemy-inventory-no-matches>
-      <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-      <p class="alchemy-inventory-empty-title">
-        {localize('FABRICATE.App.Alchemy.NoComponentMatchesTitle')}
-      </p>
-      <p class="alchemy-inventory-empty-hint">
-        {localize('FABRICATE.App.Alchemy.NoComponentMatchesHint')}
-      </p>
+    <div class="alchemy-inventory-empty">
+      <!--
+        `filtered`, and it carries the HINT alone. Every shipped caller of this variant
+        passes one sentence and nothing else (`ComponentsBrowserView:918`,
+        `EssenceBrowserView:718`, `RecipesBrowserView:685`, `ToolsBrowserView:656`,
+        `GatheringPartiesTab:298`, `EntityListInspectorFrame:1221`), because the variant
+        "deliberately skips the icon/title apparatus" (`EmptyState.svelte:50-53`). The
+        dropped "No matches" title said nothing the retained sentence does not, and its key
+        is deleted from `lang/en.json` in the same commit so the orphan gate stays green.
+      -->
+      <EmptyState
+        filtered
+        hint={localize('FABRICATE.App.Alchemy.NoComponentMatchesHint')}
+        dataAttr="data-alchemy-inventory-no-matches"
+        dataValue=""
+      />
     </div>
   {:else}
     <ul class="alchemy-inventory-list">
@@ -80,13 +101,14 @@
             <span class="alchemy-inventory-grip" aria-hidden="true"
               ><i class="fas fa-grip-vertical"></i></span
             >
-            <span class="alchemy-inventory-icon">
-              {#if component.img}
-                <img src={component.img} alt="" />
-              {:else}
-                <i class="fas fa-flask" aria-hidden="true"></i>
-              {/if}
-            </span>
+            <Medallion
+              art={component.img}
+              alt=""
+              size={34}
+              glyph={14}
+              tint="peach"
+              icon="fas fa-flask"
+            />
             <span class="alchemy-inventory-meta">
               <span class="alchemy-inventory-name">{component.name}</span>
               <span class="alchemy-inventory-avail"
@@ -229,25 +251,6 @@
     cursor: grab;
   }
 
-  .alchemy-inventory-icon {
-    width: 34px;
-    height: 34px;
-    flex: 0 0 auto;
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--fab-tag-peach);
-    overflow: hidden;
-  }
-
-  .alchemy-inventory-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
   .alchemy-inventory-meta {
     flex: 1 1 auto;
     min-width: 0;
@@ -292,30 +295,12 @@
     color: var(--fab-text-disabled);
   }
 
+  /* THE WRAPPER ONLY: the grow and the centring the column needs, and nothing about the
+     panel's own box, type or ink — those belong to the primitive nested inside it now. */
   .alchemy-inventory-empty {
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
-    align-items: center;
     justify-content: center;
-    gap: 8px;
-    text-align: center;
-    padding: 32px 20px;
-    color: var(--fab-text-muted);
-    flex: 1 1 auto;
-  }
-
-  .alchemy-inventory-empty i {
-    font-size: 26px;
-  }
-
-  .alchemy-inventory-empty-title {
-    margin: 0;
-    font-weight: 600;
-    color: var(--fab-text-secondary);
-  }
-
-  .alchemy-inventory-empty-hint {
-    margin: 0;
-    font-size: 11px;
   }
 </style>

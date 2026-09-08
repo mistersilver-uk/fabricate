@@ -112,8 +112,18 @@ export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
  * declaration is gone because the primitive interpolates the box into a `style` attribute
  * instead. The size itself did not change; it moved to a place this text scan cannot see and is
  * banked instead on `offLadderArtSizes`, which is where a tile's geometry belongs.
+ *
+ * It was 70 until the SAME issue's third phase did the same thing to the alchemy and journal
+ * tabs' twelve thumbs, and three of those twelve had a row here for the same reason. Two go
+ * outright — `Workbench | height | 40` (the bench chip's tile) and `HistoryRow | height | 40`
+ * (the history row's) — and `KnownRecipesColumn | height | 36` falls 2 to 1, because the file's
+ * other 36 is the recipe card's `min-height` and is a real control. None of the three is a
+ * control reaching a rung either: each was a THUMBNAIL whose box moved into the primitive's
+ * `style` attribute, where this text scan cannot see it, and all three are banked on
+ * `offLadderArtSizes` instead. The nine remaining converted tiles never had a row here, because
+ * their sizes — 44, 34, 46, 28, 64, 24 — are not on the retired list this baseline scans for.
  */
-export const KNOWN_RETIRED_HEIGHT_TOTAL = 70;
+export const KNOWN_RETIRED_HEIGHT_TOTAL = 67;
 
 /**
  * The per-corpus height-declaration counts the floors were CHOSEN AGAINST, at the commit that
@@ -140,8 +150,7 @@ export const FLOOR_REFERENCE_SVELTE_DECLARATIONS = 440;
 
 /** `'file | property | value | count | raw => resolved [; …]'`, in code-point key order. */
 const ROWS = Object.freeze([
-  'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte | height | 36 | 2 | 36px => 36px',
-  'src/ui/svelte/apps/alchemy/Workbench.svelte | height | 40 | 1 | 40px => 40px',
+  'src/ui/svelte/apps/alchemy/KnownRecipesColumn.svelte | height | 36 | 1 | 36px => 36px',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte | height | 32 | 1 | 32px => 32px',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte | height | 40 | 2 | 40px => 40px',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte | min-height | 40 | 2 | 40px => 40px',
@@ -153,7 +162,6 @@ const ROWS = Object.freeze([
   'src/ui/svelte/apps/inventory/InventoryFilters.svelte | min-height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte | min-height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte | height | 40 | 1 | 40px => 40px',
-  'src/ui/svelte/apps/journal/HistoryRow.svelte | height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/manager/BooksScrollsView.svelte | height | 40 | 1 | 40px => 40px',
   'src/ui/svelte/apps/manager/BulkEditPanelShell.svelte | height | 36 | 1 | 36px => 36px',
   'src/ui/svelte/apps/manager/EmptyState.svelte | height | 32 | 1 | 32px => 32px',

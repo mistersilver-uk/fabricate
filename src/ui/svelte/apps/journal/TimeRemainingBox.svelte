@@ -9,6 +9,7 @@
   renders the clock form (no phase passed).
 -->
 <script>
+  import Callout from '../manager/Callout.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import { worldTimeLabel } from '../../util/worldTimeLabel.js';
 
@@ -28,48 +29,29 @@
   const whenLabel = $derived(worldTimeLabel(components, { localize }));
 </script>
 
-<div class="journal-time-remaining" data-journal-time-remaining>
-  <i class="fas fa-hourglass-half" aria-hidden="true"></i>
-  <div class="journal-time-remaining-copy">
-    {#if whenLabel !== ''}
-      <span class="journal-time-remaining-when">
-        {localize('FABRICATE.App.Journal.TimeRemaining.AvailableAt', { when: whenLabel })}
-      </span>
-    {/if}
-    <span class="journal-time-remaining-hint">{localize(hintKey)}</span>
-  </div>
-</div>
+<!--
+  THE WHOLE BOX IS THE PRIMITIVE'S (issue 1514). Everything this file's scoped block
+  declared, `Callout tone="warning"` already draws: the amber edge, fill and glyph, the
+  600-weight warning-toned lead line and the muted sentence under it, the flex-start
+  alignment and the 2px between the two lines. The rule carried no `margin`, no
+  `max-width` and no padding its parent depended on, so the sweep this change applies to
+  every converted banner found nothing that had to move to a caller-owned wrapper.
 
-<style>
-  .journal-time-remaining {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    padding: var(--fab-space-2) var(--fab-space-3);
-    border-radius: 8px;
-    font-size: 12px;
-    color: var(--fab-warning-text);
-    background: var(--fab-warning-soft);
-    border: 1px solid var(--fab-warning-border);
-  }
+  The gate's ABSOLUTE moment is the `title` and the "ready once time passes" line is the
+  `text`, which is the same split the hand-rolled markup drew with a 600-weight span over
+  a muted one. When `whenLabel` resolves to '' there is no title, so `Callout` renders its
+  unstructured `<p>` form and the hint stands alone — which is what the `{#if}` did.
 
-  .journal-time-remaining i {
-    margin-top: 2px;
-    font-size: 12px;
-  }
-
-  .journal-time-remaining-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .journal-time-remaining-when {
-    font-weight: 600;
-  }
-
-  .journal-time-remaining-hint {
-    color: var(--fab-text-muted);
-  }
-</style>
+  The one ADDITION is `role="note"`, which `Callout` emits whenever a title is set
+  (`Callout.svelte:122,131`). This box carried no role before.
+-->
+<Callout
+  tone="warning"
+  icon="fas fa-hourglass-half"
+  title={whenLabel !== ''
+    ? localize('FABRICATE.App.Journal.TimeRemaining.AvailableAt', { when: whenLabel })
+    : ''}
+  text={localize(hintKey)}
+  dataAttr="data-journal-time-remaining"
+  dataValue=""
+/>

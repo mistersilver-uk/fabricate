@@ -15,6 +15,8 @@
   import { localize } from '../../util/foundryBridge.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import Chip from '../../components/Chip.svelte';
+  import FillBar from '../../components/FillBar.svelte';
+  import Medallion from '../../components/Medallion.svelte';
   import { runStatusPresentation } from './journalRunStatus.js';
   import { formatDurationHMS } from '../../util/formatDuration.js';
 
@@ -78,7 +80,7 @@
   onkeydown={onKey}
 >
   <div class="journal-run-card-main">
-    <img class="journal-run-card-thumb" src={img} alt="" />
+    <Medallion art={img} alt="" size={64} />
     <div class="journal-run-card-copy">
       <span class="journal-run-card-name" {title}>{title}</span>
       {#if subtitle !== ''}
@@ -134,7 +136,7 @@
         aria-valuenow={progressPercent}
         data-run-progress={progressPercent}
       >
-        <span class="journal-run-card-progress-fill" style={`width: ${progressPercent}%`}></span>
+        <FillBar value={progressPercent} tone="accent" size="sm" />
       </div>
     {/if}
   {/if}
@@ -172,16 +174,6 @@
     align-items: center;
     gap: 10px;
     min-width: 0;
-  }
-
-  .journal-run-card-thumb {
-    display: block;
-    flex: 0 0 auto;
-    width: 64px;
-    height: 64px;
-    border-radius: 6px;
-    object-fit: cover;
-    background: var(--fab-surface-raised);
   }
 
   .journal-run-card-copy {
@@ -254,18 +246,13 @@
     color: var(--fab-text-muted);
   }
 
+  /* THE ARIA STAYS ON THE CALLER, THE TRACK BECOMES THE PRIMITIVE (issue 1514). `FillBar` is
+     a leaf with no `role` and no `aria-*` of its own, so the element that used to BE the
+     track survives as the wrapper carrying `role="progressbar"` and the three `aria-value*`
+     attributes. What it no longer declares is any geometry: the height, the corner, the
+     ground and the fill are all the primitive's now. Only the full width stays, because a
+     `FillBar` is `flex: 1 1 auto` and this wrapper is a plain block. */
   .journal-run-card-progress {
     width: 100%;
-    height: 6px;
-    border-radius: 999px;
-    overflow: hidden;
-    background: var(--fab-surface-raised);
-  }
-
-  .journal-run-card-progress-fill {
-    display: block;
-    height: 100%;
-    border-radius: 999px;
-    background: var(--fab-accent);
   }
 </style>

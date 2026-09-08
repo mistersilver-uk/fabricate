@@ -328,9 +328,24 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * border-radius | 10px` falls 13 → 12, because the deleted `[data-failure-salvage-note]`
  * override carried one of those thirteen. The key count falls 138 → 137 with the first.
  *
+ * 308 → 300 with issue 1514's alchemy-and-journal conversion, and every one of the eight is a
+ * snap of the same kind: a raw `<img>` thumbnail whose scoped rule carried the corner became a
+ * `<Medallion>`, whose fixed 9px IS the ladder's rung. Four rows fall by one —
+ * `alchemy/ComponentInventoryColumn.svelte | 8px` 2 → 1, `alchemy/KnownRecipesColumn.svelte |
+ * 8px` 3 → 2, `alchemy/Workbench.svelte | 10px` 4 → 3 and `journal/RunDetail.svelte | 8px`
+ * 2 → 1, because each file draws another off-ladder corner that is not a tile — and four rows at
+ * count 1 are DELETED outright, so the key count falls 137 → 133:
+ * `journal/RecentResults.svelte | 5px`, `journal/RunDetail.svelte | 5px`,
+ * `journal/StepDetails.svelte | 5px` and `journal/TimeRemainingBox.svelte | 8px`.
+ *
+ * The last of those four is the one that is NOT a tile: `TimeRemainingBox`'s whole scoped block
+ * went with the well it drew, and the `<Callout>` it became takes the specimen's r11. The two
+ * tiles at 6px — `journal/HistoryRow` and `journal/RunCard` — move nothing in either direction,
+ * because 6 is already on the ladder and neither ever had a row.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 308;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 300;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -613,8 +628,34 @@ export const KNOWN_OFF_LADDER_ART_SIZES = knownDebt('offLadderArtSizes');
  * Both are pre-existing geometry becoming VISIBLE rather than new geometry: each tile was
  * already that size as a raw `<img>`, and only the conversion puts it where this census can see
  * it. Issue 1519's sweep owns lowering them.
+ *
+ * 71 ACROSS 53 KEYS since the same issue's third phase moved the ALCHEMY and JOURNAL tabs' twelve
+ * raw thumbs onto the tile. Eleven new keys, twelve occurrences, and they fall into three groups
+ * rather than twelve separate decisions — the price the guidance above names, paid by group
+ * because the rejected rung is the same argument each time:
+ *
+ *  - THE FIVE ALCHEMY TILES — `AlchemyDisciplineChooser | 44`, `ComponentInventoryColumn | 34`,
+ *    `KnownRecipesColumn | 36`, `Workbench | 40` and `Workbench | 46`. Every one of the five sets
+ *    the height of the row or card it leads: the chooser card's head measured 44px, the inventory
+ *    row 60px around a 34px tile, the bench chip 107.55px around a 40px one. 38 is the only rung
+ *    at or below any of them and it is BELOW all five, so snapping would shrink five different
+ *    containers at once — a layout move in a commit whose rule is that a conversion preserves the
+ *    rendered size.
+ *  - THE FOUR JOURNAL RECORD TILES — `HistoryRow | 40`, `RecentResults | 28`, `RunCard | 64` and
+ *    `RunDetail | 64`. Each sets its row's or header's measured height (58px, 28px, 86px and 64px
+ *    respectively), and the two at 64 are the run's identity image at the size the gathering tab's
+ *    own detail tiles already draw. 38 was rejected for the 64s as a 26px cut to the largest image
+ *    in the tab, and 30 for the 28 as a 2px cut that buys nothing and moves a row.
+ *  - THE THREE 24px LEAF TILES — `RunDetail | 24` and `StepDetails | 24` (2x). These are the
+ *    smallest tiles in the tree and 22 is the nearest rung, 2px below. It was rejected because all
+ *    three sit in `font-size: 13px` list rows whose 24px height the tile sets, and because the
+ *    three are the same list drawn in two files: snapping one and not the others is exactly the
+ *    "decision about one tile in isolation" this pin exists to make visible.
+ *
+ * All twelve are pre-existing geometry becoming visible, on the same reading as the two above.
+ * Issue 1519's sweep owns lowering them.
  */
-export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 59;
+export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 71;
 
 export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredSharedComponents');
 

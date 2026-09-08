@@ -14,6 +14,8 @@
   import { localize } from '../../util/foundryBridge.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import Chip from '../../components/Chip.svelte';
+  import Medallion from '../../components/Medallion.svelte';
+  import EmptyState from '../manager/EmptyState.svelte';
   import { runStatusPresentation } from './journalRunStatus.js';
   import StepTimeline from './StepTimeline.svelte';
   import StepDetails from './StepDetails.svelte';
@@ -60,14 +62,29 @@
 </script>
 
 {#if run == null}
-  <div class="journal-detail-empty" data-journal-empty="detail">
-    <i class="fas fa-hand-pointer" aria-hidden="true"></i>
-    <p>{localize('FABRICATE.App.Journal.Empty.Detail')}</p>
+  <!--
+    THE FILL IS THE CALLER'S, THE PANEL IS THE PRIMITIVE'S (issue 1514). This branch stands
+    in for the whole centre column, so it is a `height: 100%` centred fill; `EmptyState` is
+    padding-driven and declares no height, and its own fill escape is `contextClass`, whose
+    rules "live in the global sheet" (`EmptyState.svelte:53-55`) — which would put
+    `styles/fabricate.css` on this change's path. So `.journal-detail-empty` survives as a
+    caller-owned WRAPPER declaring the fill and the centring alone.
+
+    The hook is an EXACT-VALUE one (`data-journal-empty="detail"`), and `EmptyState` renders
+    `dataValue || true`, so the value is passed explicitly rather than left bare.
+  -->
+  <div class="journal-detail-empty">
+    <EmptyState
+      icon="fas fa-hand-pointer"
+      hint={localize('FABRICATE.App.Journal.Empty.Detail')}
+      dataAttr="data-journal-empty"
+      dataValue="detail"
+    />
   </div>
 {:else}
   <article class="journal-detail" data-journal-detail data-run-id={run.id} data-run-type={runType}>
     <header class="journal-detail-header">
-      <img class="journal-detail-thumb" src={run.img || DEFAULT_RUN_IMAGE} alt="" />
+      <Medallion art={run.img || DEFAULT_RUN_IMAGE} alt="" size={64} />
       <div class="journal-detail-identity">
         <h2 class="journal-detail-title" title={run.names?.title ?? ''}>
           {run.names?.title ?? ''}
@@ -111,12 +128,20 @@
 
       {#if isSucceeded && createdResults.length > 0}
         <section class="journal-detail-results" data-journal-results>
+          <!--
+            DEFERRED, on ink (issue 1514; register entry for issue 1519). This heading paints
+            `var(--fab-success-text)` inside a success-soft well, which is the one thing on the
+            panel that says the run SUCCEEDED. `Kicker`'s tone set is `default` (subtle) and
+            `accent` (`Kicker.svelte:105`), so the conversion would turn the green grey. The
+            plan's kicker table asserts every candidate paints `--fab-text-muted`; measured in
+            the View Lab this one resolves to the success-text token instead.
+          -->
           <h3 class="journal-detail-results-title">{resultsTitle}</h3>
           <ul class="journal-detail-results-list">
             {#each createdResults as result, index (result.itemUuid ?? result.componentId ?? index)}
               <li class="journal-detail-result" data-journal-result>
                 {#if result.img}
-                  <img class="journal-detail-result-thumb" src={result.img} alt="" />
+                  <Medallion art={result.img} alt="" size={24} />
                 {/if}
                 <span class="journal-detail-result-name"
                   >{result.name ?? result.componentId ?? ''}</span
@@ -136,26 +161,13 @@
 {/if}
 
 <style>
+  /* THE WRAPPER ONLY: the fill and the centring the column needs. See the markup comment. */
   .journal-detail-empty {
     display: flex;
     flex-direction: column;
-    align-items: center;
     justify-content: center;
-    gap: 12px;
     height: 100%;
-    padding: var(--fab-space-4);
     box-sizing: border-box;
-    text-align: center;
-    color: var(--fab-text-muted);
-  }
-
-  .journal-detail-empty i {
-    font-size: 32px;
-  }
-
-  .journal-detail-empty p {
-    margin: 0;
-    font-size: 14px;
   }
 
   .journal-detail {
@@ -175,16 +187,6 @@
     display: flex;
     align-items: flex-start;
     gap: var(--fab-space-3);
-  }
-
-  .journal-detail-thumb {
-    display: block;
-    flex: 0 0 auto;
-    width: 64px;
-    height: 64px;
-    border-radius: 8px;
-    object-fit: cover;
-    background: var(--fab-surface-raised);
   }
 
   .journal-detail-identity {
@@ -284,15 +286,6 @@
     gap: 8px;
     min-width: 0;
     font-size: 13px;
-  }
-
-  .journal-detail-result-thumb {
-    display: block;
-    flex: 0 0 auto;
-    width: 24px;
-    height: 24px;
-    border-radius: 5px;
-    object-fit: cover;
   }
 
   .journal-detail-result-name {

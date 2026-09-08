@@ -11,6 +11,8 @@
   import { localize } from '../../util/foundryBridge.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import Chip from '../../components/Chip.svelte';
+  import Medallion from '../../components/Medallion.svelte';
+  import EmptyState from '../manager/EmptyState.svelte';
   import { runStatusPresentation } from './journalRunStatus.js';
   import JournalCard from './JournalCard.svelte';
 
@@ -28,14 +30,14 @@
 
 <JournalCard kind="recent" title={localize('FABRICATE.App.Journal.RecentResults.Title')}>
   {#if runs.length === 0}
-    <p class="journal-recent-empty">{localize('FABRICATE.App.Journal.RecentResults.Empty')}</p>
+    <EmptyState note hint={localize('FABRICATE.App.Journal.RecentResults.Empty')} />
   {:else}
     <ul class="journal-recent-list">
       {#each runs as run (run.id)}
         {@const status = String(run.derivedStatus ?? '')}
         {@const runStatus = runStatusPresentation(status)}
         <li class="journal-recent-item" data-recent-run-id={run.id}>
-          <img class="journal-recent-thumb" src={run.img || DEFAULT_RUN_IMAGE} alt="" />
+          <Medallion art={run.img || DEFAULT_RUN_IMAGE} alt="" size={28} />
           <span class="journal-recent-name" title={run.names?.title ?? ''}
             >{run.names?.title ?? ''}</span
           >
@@ -66,12 +68,6 @@
 </JournalCard>
 
 <style>
-  .journal-recent-empty {
-    margin: 0;
-    font-size: 12px;
-    color: var(--fab-text-muted);
-  }
-
   .journal-recent-list {
     list-style: none;
     margin: 0;
@@ -96,16 +92,6 @@
      name is there to absorb. */
   .journal-recent-item :global(.journal-run-status) {
     flex: 0 0 auto;
-  }
-
-  .journal-recent-thumb {
-    display: block;
-    flex: 0 0 auto;
-    width: 28px;
-    height: 28px;
-    border-radius: 5px;
-    object-fit: cover;
-    background: var(--fab-surface-raised);
   }
 
   .journal-recent-name {

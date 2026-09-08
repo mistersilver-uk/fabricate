@@ -11,6 +11,7 @@
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import Medallion from '../../components/Medallion.svelte';
   import { formatDurationHMS } from '../../util/formatDuration.js';
   import JournalCard from './JournalCard.svelte';
   import JournalFactRow from './JournalFactRow.svelte';
@@ -149,7 +150,7 @@
           {#each requirements as item, index (itemKey(item, index))}
             <li class="journal-step-item" data-journal-requirement>
               {#if item.img}
-                <img class="journal-step-item-thumb" src={item.img} alt="" />
+                <Medallion art={item.img} alt="" size={24} />
               {/if}
               <span class="journal-step-item-name">{item.name ?? item.componentId ?? ''}</span>
               {#if Number(item.quantity) > 1}
@@ -172,7 +173,7 @@
           {#each consumed as item, index (itemKey(item, index))}
             <li class="journal-step-item" data-journal-consumed-item>
               {#if item.img}
-                <img class="journal-step-item-thumb" src={item.img} alt="" />
+                <Medallion art={item.img} alt="" size={24} />
               {/if}
               <span class="journal-step-item-name">{item.name ?? item.componentId ?? ''}</span>
               {#if Number(item.quantity) > 1}
@@ -204,6 +205,10 @@
     min-width: 0;
   }
 
+  /* DEFERRED, on document outline (issue 1514; register entry for issue 1519). Both markup
+     sites are `<h4>`, and `Kicker`'s host set is `{p, span, h3}` with a SILENT `p` fallback
+     (`Kicker.svelte:93-99`) — so `as="h4"` would drop two headings out of the outline without
+     a word. These are two of the three `<h4>` kicker candidates the change defers. */
   .journal-step-items-title {
     margin: 0;
     font-size: 11px;
@@ -228,15 +233,6 @@
     gap: 8px;
     min-width: 0;
     font-size: 13px;
-  }
-
-  .journal-step-item-thumb {
-    display: block;
-    flex: 0 0 auto;
-    width: 24px;
-    height: 24px;
-    border-radius: 5px;
-    object-fit: cover;
   }
 
   .journal-step-item-name {

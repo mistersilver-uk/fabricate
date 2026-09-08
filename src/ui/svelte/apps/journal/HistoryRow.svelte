@@ -9,6 +9,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import Chip from '../../components/Chip.svelte';
+  import Medallion from '../../components/Medallion.svelte';
   import { runStatusPresentation } from './journalRunStatus.js';
 
   const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
@@ -51,7 +52,7 @@
   onclick={activate}
   onkeydown={onKey}
 >
-  <img class="journal-history-thumb" src={img} alt="" />
+  <Medallion art={img} alt="" size={40} />
   <div class="journal-history-copy">
     <span class="journal-history-name" {title}>{title}</span>
     <div class="journal-history-meta">
@@ -97,16 +98,6 @@
   .journal-history-row.is-selected {
     border-color: var(--fab-accent);
     background: var(--fab-success-soft);
-  }
-
-  .journal-history-thumb {
-    display: block;
-    flex: 0 0 auto;
-    width: 40px;
-    height: 40px;
-    border-radius: 6px;
-    object-fit: cover;
-    background: var(--fab-surface-raised);
   }
 
   .journal-history-copy {

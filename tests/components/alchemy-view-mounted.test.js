@@ -15,7 +15,10 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  createMountedComponentHarness,
+  PLAYER_APP_COMPILED_MODULES,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -24,14 +27,11 @@ const harness = createMountedComponentHarness({
   tmpPrefix: 'fabricate-alchemy-view-',
   rawModules: ['src/ui/svelte/util/foundryBridge.js'],
   compiledModules: [
-    // The shared not-yet-ready chrome and the two primitives it composes (issue 1514).
-    // `AlchemyView` renders the composition for every branch below, so an omission does not
-    // fail this suite — it CANCELS it.
-    'src/ui/svelte/apps/manager/Callout.svelte',
-    'src/ui/svelte/apps/manager/EmptyState.svelte',
-    'src/ui/svelte/apps/PlayerViewState.svelte',
-    // The standing statement the workbench composes, and the essence chip both columns draw.
-    'src/ui/svelte/components/Notice.svelte',
+    // The shared not-yet-ready chrome, the standing statement the workbench composes, and the
+    // tile, label and no-state panel the two columns draw — as ONE spread (issue 1514). Six
+    // hand-listed entries stood here before the third phase added three more to them; see
+    // `PLAYER_APP_COMPILED_MODULES` in the harness for why that became one roster.
+    ...PLAYER_APP_COMPILED_MODULES,
     'src/ui/svelte/apps/alchemy/EssenceChips.svelte',
     'src/ui/svelte/apps/alchemy/AlchemyDisciplineChooser.svelte',
     'src/ui/svelte/apps/alchemy/ComponentInventoryColumn.svelte',

@@ -240,7 +240,19 @@ export function isExemptSpacingPixels(pixels) {
 // same banners' `8px 10px`. Deleted rather than re-banked under `Notice`'s path: the primitive
 // declares `var(--fab-space-3)` throughout and owns no raw literal, so the seven occupancies are
 // paid rather than moved. Measured on the tree, not subtracted.
-export const KNOWN_RAW_SPACING_TOTAL = 877;
+// 877 -> 863 (issue 1514, phase 3): the alchemy and journal tabs' twelve raw thumbnails, seven
+// pane empties and two wells moved onto primitives that own their own geometry, and the rules
+// those markup blocks declared went with them. Six rows SHRINK by one occupancy each - the
+// `gap`s and `padding`s of `.alchemy-inventory-empty`, `.alchemy-known-empty` and
+// `.alchemy-known-footer` - and eight rows at one occupancy VANISH, five of them the whole of
+// `TimeRemainingBox` and `JournalListShell`'s and `RunDetail`'s deleted empty-state stacks. The
+// two caller-owned WRAPPERS this phase keeps bring nothing back: `.alchemy-known-footer-slot`
+// declares `margin-top: 12px` and `.alchemy-produces-slot` declares `margin: 18px 0 10px`, and
+// all three of those values were already banked rows on the rules they came from - 12 and 18 and
+// 10 are literals either way, so a wrapper carrying a margin verbatim moves no occupancy. What
+// the primitives absorb is `var(--fab-space-*)` throughout, so the fourteen occupancies are paid
+// rather than relocated. Measured on the tree, not subtracted.
+export const KNOWN_RAW_SPACING_TOTAL = 863;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

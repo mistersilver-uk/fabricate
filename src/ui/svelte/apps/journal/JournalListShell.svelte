@@ -8,6 +8,8 @@
   list body is supplied as children; the empty state replaces it when `isEmpty`.
 -->
 <script>
+  import EmptyState from '../manager/EmptyState.svelte';
+
   let {
     titleId = '',
     kind = '',
@@ -45,9 +47,24 @@
 
   <div class="journal-list-body" class:is-empty={isEmpty}>
     {#if isEmpty}
-      <div class="journal-list-empty" data-journal-empty={kind}>
-        <i class={`fas ${emptyIcon}`} aria-hidden="true"></i>
-        <p>{emptyText}</p>
+      <!--
+        `compact`, because this panel shares a half-height column with a sibling list: the
+        base variant's 44px hero inset would make an empty half taller than the rows it
+        stands in for. The wrapper survives carrying the ONE property the deleted rule had
+        that is the column's layout rather than the panel's box — `flex: 0 0 auto`, without
+        which `.journal-list-body`'s column flex could shrink the panel and clip it.
+
+        The hook value is DYNAMIC (`kind` is `active` or `history`) and `EmptyState` renders
+        `dataValue || true`, so it is forwarded as written rather than left bare.
+      -->
+      <div class="journal-list-empty">
+        <EmptyState
+          compact
+          icon={`fas ${emptyIcon}`}
+          hint={emptyText}
+          dataAttr="data-journal-empty"
+          dataValue={kind}
+        />
       </div>
     {:else}
       {@render children?.()}
@@ -114,23 +131,8 @@
   /* The closed/open select chrome is themed globally (.fabricate-app select +
      option) so every player-app dropdown is consistent. */
 
+  /* THE WRAPPER ONLY: the one property that is the column's layout. See the markup. */
   .journal-list-empty {
     flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    padding: var(--fab-space-4);
-    text-align: center;
-    color: var(--fab-text-muted);
-  }
-
-  .journal-list-empty i {
-    font-size: 22px;
-  }
-
-  .journal-list-empty p {
-    margin: 0;
-    font-size: 13px;
   }
 </style>
