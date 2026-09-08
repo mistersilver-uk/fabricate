@@ -20,6 +20,7 @@ import {
 } from '../scripts/lib/foundryChromeSpec.js';
 import {
   ACTOR_KNOWLEDGE_RENDER_FILES,
+  BROAD_SIGNAL_CASE_OVERRIDES,
   FALLBACK_CASE_ID,
   LAB_SURFACE_CASES,
   LAB_SURFACE_CASE_IDS,
@@ -50,7 +51,7 @@ import {
 import { MODIFIER_POLICIES } from '../src/systems/checkModifierResolver.js';
 
 import { emittingHalfOf } from './helpers/interactablesSmokeLocators.js';
-import { collectWorkingTreeSources } from './helpers/sourceScan.js';
+import { collectWorkingTreeSources, stripComments } from './helpers/sourceScan.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -4987,6 +4988,187 @@ test('a change confined to recipeReadiness.js selects the recipe-editor cases, n
     [FALLBACK_CASE_ID],
     'an unmatched UI path falls through to the fallback, which is what the probe rules out'
   );
+});
+
+// ── The environment editor's validation tab (issue 1517) ───────────────────────────────────
+//
+// THE DEFECT THIS PINS WAS A STALE CLAIM, NOT AN ABSENT ONE, and the difference is why it
+// survived a green tree for as long as it did. `EnvironmentValidationTab.svelte` sits in the
+// mounted closure, so `view-lab-source-coverage.test.js` has always required SOME case to claim
+// it — and four did, all four through the same `environment/` directory prefix, and not one of
+// them opens the validation tab: two stop on a Tasks tab, one on Events, one in the environments
+// browser. A change to that file therefore published four frames that structurally could not
+// contain it, every one of them reporting SATISFIED. Registering a fifth case does not retire
+// the four; the claims have to be narrowed as well, or the change publishes five frames of
+// which four are noise.
+//
+// BOTH DIRECTIONS ARE ASSERTED, because a narrowing has two ways to be wrong and only one of
+// them is loud. Excluding too little leaves the noise, which nothing else in the suite sees.
+// Excluding too much drops a sibling's claim — the SAME defect pointed at a different file —
+// and `view-lab-source-coverage.test.js` reds on that one; it is restated here anyway so this
+// file is discriminating when it is run alone, which is how a chunked run runs it.
+const ENVIRONMENT_DIR = 'src/ui/svelte/apps/manager/environment/';
+
+/** The four cases whose `environment/` prefix claimed the validation tab without opening it. */
+const ENVIRONMENT_DIRECTORY_CLAIMANTS = Object.freeze([
+  'manager-environments-browse-normal',
+  'manager-environment-edit-events',
+  'manager-environment-edit-blind-weights',
+  'manager-environment-edit-automatic-force-add',
+]);
+
+test('the environment validation tab selects the frame that opens it, and only that frame', () => {
+  const selected = mapChangedFilesToCases([
+    `${ENVIRONMENT_DIR}EnvironmentValidationTab.svelte`,
+  ]).map((viewCase) => viewCase.id);
+
+  assert.deepEqual(
+    selected,
+    ['manager-environment-validation'],
+    'a change to the environment validation tab must select the one frame that opens that tab, ' +
+      'and none of the four frames that merely live in its directory'
+  );
+});
+
+test('narrowing the environment claim leaves every sibling in that directory claimed', () => {
+  // Named files rather than a directory walk, because the assertion has to fail when a pattern
+  // stops matching a file that still exists — a walk over whatever is on disk cannot tell that
+  // from a file that was deleted.
+  for (const sibling of [
+    'EnvironmentEventsTab.svelte',
+    'EnvironmentTasksTab.svelte',
+    'EnvironmentOverviewTab.svelte',
+    'CompositionList.svelte',
+    'EnvironmentSummaryInspector.svelte',
+  ]) {
+    const selected = mapChangedFilesToCases([`${ENVIRONMENT_DIR}${sibling}`]).map(
+      (viewCase) => viewCase.id
+    );
+    for (const claimant of ENVIRONMENT_DIRECTORY_CLAIMANTS) {
+      assert.ok(
+        selected.includes(claimant),
+        `${sibling} lost its claim on ${claimant}; the exclusion is too wide and now takes ` +
+          `siblings with it. It selected ${JSON.stringify(selected)}`
+      );
+    }
+    assert.ok(
+      !selected.includes(FALLBACK_CASE_ID),
+      `${sibling} fell through to the app-shell fallback, which publishes a frame of a window ` +
+        'that cannot contain it'
+    );
+  }
+});
+
+test('the environment readiness module selects the validation frame AND the badge frames', () => {
+  // It is the producer of both: the tab strip's badge counts and the validation tab's own rows
+  // and verdict read the same evaluator. Narrowing the tab's claim must not narrow the module's,
+  // and registering the tab's case must not leave the module claiming only the old four.
+  const selected = mapChangedFilesToCases([`${ENVIRONMENT_DIR}environmentReadiness.js`]).map(
+    (viewCase) => viewCase.id
+  );
+  assert.ok(
+    selected.includes('manager-environment-validation'),
+    `a readiness change must select the frame that draws its verdict; it selected ${JSON.stringify(selected)}`
+  );
+  for (const claimant of ENVIRONMENT_DIRECTORY_CLAIMANTS) {
+    assert.ok(
+      selected.includes(claimant),
+      `a readiness change must keep selecting ${claimant}, which draws its badge counts`
+    );
+  }
+});
+
+test('the validation surface is represented by a frame that can draw its View deep link', () => {
+  // `EditorValidationSurface`'s representative pair photographs the surface's two rail arities and
+  // NEITHER can contain the row's View button: it renders only where a row carries a route, and
+  // the two frames the pair names are a Checks tick list and a recipe-item tab whose producer
+  // emits none. The registry recorded that gap in its own prose and left it open. A third member
+  // closes it, and it is pinned by ID rather than by count so that dropping it and adding some
+  // other frame is a visible edit rather than an arithmetic one.
+  const members =
+    BROAD_SIGNAL_CASE_OVERRIDES['src/ui/svelte/components/EditorValidationSurface.svelte'];
+  assert.ok(
+    members.includes('manager-recipe-edit-validation'),
+    `the surface's representative set must include the recipe editor's validation frame; it is ` +
+      JSON.stringify(members)
+  );
+
+  // And that frame has to prove it drew the surface. `expectView` gates the ROUTE, and a route
+  // survives a tab click that did nothing — so without this the case publishes whatever tab the
+  // recipe editor opened on and reports SATISFIED for a change about validation rows.
+  const recipeFrame = getCaseById('manager-recipe-edit-validation');
+  assert.equal(
+    typeof recipeFrame.expectSelector,
+    'string',
+    'manager-recipe-edit-validation must assert the surface it represents is on screen'
+  );
+  assert.ok(
+    recipeFrame.expectSelector.includes('manager-recipe-val-row'),
+    `it must name a ROW of the surface, not just its container, or an empty row stack passes: ` +
+      `got "${recipeFrame.expectSelector}"`
+  );
+
+  const environmentFrame = getCaseById('manager-environment-validation');
+  assert.equal(
+    typeof environmentFrame?.expectSelector,
+    'string',
+    'manager-environment-validation must assert its own tab panel is on screen'
+  );
+});
+
+test('each validation frame names a hook the component it opens actually writes', () => {
+  // THE SUITE-WIDE `expectSelector` CHECK CANNOT DO THIS, and the gap is measured rather than
+  // assumed. That check tokenizes the selector against a whole-tree haystack and strips attribute
+  // VALUES first, so `[data-environment-tab="validation"]` is satisfied by the Events tab writing
+  // `data-environment-tab="events"` in a different file. Proved by mutation: renaming the
+  // attribute on the validation tab alone, and on the recipe validation tab alone, left that
+  // check green in both cases. What a capture actually resolves is the attribute on THAT
+  // component, so that is what this pins — one file, one hook, per frame.
+  //
+  // It is also the contract a later adoption of `EditorValidationSurface` has to keep. The
+  // surface preserves a site's own hooks through `hookAttrs`, so both spellings are admitted:
+  // the markup form `data-environment-tab="validation"` and the hook-bag form
+  // `'data-environment-tab': 'validation'`. A conversion that drops the hook rather than passing
+  // it through reds here — which is the only warning available before the capture job fails
+  // WHOLE and publishes nothing for every case in the run.
+  //
+  // COMMENTS ARE STRIPPED FIRST, including Svelte's `<!-- -->` form, which `stripComments` does
+  // not touch. These three files all describe their own hooks in prose — naming the literal is
+  // how the contract is documented — so a scan over the raw text would be answered by the
+  // docblock recording that the hook exists rather than by the hook.
+  const pins = [
+    [
+      'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',
+      /data-environment-tab["']?\s*[:=]\s*["']validation["']/u,
+      'manager-environment-validation',
+    ],
+    [
+      'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
+      /data-recipe-tab["']?\s*[:=]\s*["']validation["']/u,
+      'manager-recipe-edit-validation',
+    ],
+    [
+      // BOUNDED, because the surface writes `manager-recipe-val-rows` on the list one line above
+      // the row's own class. An unbounded match reads the plural and passes on a tree where the
+      // row class has been renamed — the prefix coincidence this file's token check records
+      // having been bitten by twice.
+      'src/ui/svelte/components/EditorValidationSurface.svelte',
+      /manager-recipe-val-row(?![\w-])/u,
+      'manager-recipe-edit-validation',
+    ],
+  ];
+
+  for (const [file, hook, caseId] of pins) {
+    const source = stripComments(readFileSync(resolve(ROOT, file), 'utf8')).replaceAll(
+      /<!--[\s\S]*?-->/gu,
+      ' '
+    );
+    assert.ok(
+      hook.test(source),
+      `${file} no longer writes the hook ${hook}, which ${caseId}'s expectSelector names. The ` +
+        'capture job would fail whole and publish nothing.'
+    );
+  }
 });
 
 // ── The world-tool capture cases and the lab fixture that feeds them (issue 1373) ──────────
