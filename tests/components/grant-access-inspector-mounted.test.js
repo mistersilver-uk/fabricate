@@ -8,6 +8,10 @@ import {
   createMountedComponentHarness
 } from '../helpers/svelte-component-harness.js';
 import { itResolvesTheRecipesOwnImage } from '../helpers/recipeOwnImageCases.js';
+import {
+  ACCESS_ROSTER_SEARCH_MISS_TERM,
+  getCaseById
+} from '../../scripts/lib/viewLabCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -383,6 +387,75 @@ describe('GrantAccessInspector (mounted)', () => {
     assert.ok(
       Boolean(root.querySelector('[data-access-roster-search="characters"]')),
       'a query that matched nothing keeps its own field, or the term cannot be cleared'
+    );
+  });
+
+  // THE TWO VIEW LAB CASES' OWN SELECTORS, RESOLVED AGAINST THE RENDERED COMPONENT (issue 1515).
+  //
+  // A capture case declares a CSS selector as its proof that the frame reached the state it is
+  // named for, and nothing checks that selector against the markup until the capture runs — at
+  // which point one bad selector fails the whole capture and publishes NO frames at all. So the
+  // two frames added for this inspector's crowded roster are proved here instead, on the real
+  // component, at the roster size the lab fixture seeds.
+  //
+  // The selectors are READ FROM THE CASES rather than restated: a copy would keep passing after
+  // the case it mirrors started naming something else, which is the drift this pair exists to
+  // stop. Only the area root is stripped, because a mounted component has no manager shell
+  // around it and that prefix is the one part of each selector this harness cannot supply.
+  it('resolves both crowded-roster capture selectors against the rendered rosters', async () => {
+    const withoutArea = (selector) => selector.replace('.fabricate-manager ', '');
+    const root = await harness.mount({
+      recipe: makeRecipe(),
+      characters: makeCharacters(3),
+      // Eight, which is what `installFoundryShim.js` seeds under `manyPlayers` and what
+      // `tests/view-lab-cases.test.js` holds that fixture to.
+      players: makePlayers(8)
+    });
+
+    const paged = withoutArea(getCaseById('manager-access-recipe-roster-paged').expectSelector);
+    assert.ok(
+      Boolean(root.querySelector(paged)),
+      `the paged frame's selector matched nothing: ${paged}`
+    );
+
+    // NEGATIVE CONTROL, because a selector naming a sixth row is only evidence of a PAGED roster
+    // if it fails on a roster that does not fill a page. Remounted rather than re-propped: the
+    // page index and both queries are lifted state this component keeps across a prop change.
+    harness.remount();
+    const oneRow = await harness.mount({
+      recipe: makeRecipe(),
+      characters: makeCharacters(3),
+      players: makePlayers(1)
+    });
+    assert.ok(
+      !oneRow.querySelector(paged),
+      'the resting one-player roster satisfies the paged selector, so the frame proves nothing'
+    );
+
+    harness.remount();
+    const missed = await harness.mount({
+      recipe: makeRecipe(),
+      characters: makeCharacters(3),
+      players: makePlayers(8)
+    });
+    const noMatch = withoutArea(
+      getCaseById('manager-access-recipe-roster-no-match').expectSelector
+    );
+    assert.ok(
+      !missed.querySelector(noMatch),
+      'the unfiltered roster already satisfies the no-match selector, so the term proves nothing'
+    );
+
+    // The step the case runs, on the hook the case names.
+    const search = missed.querySelector('[data-access-roster-search="players"]');
+    assert.ok(Boolean(search), 'the players roster draws no search field at eight users');
+    search.value = ACCESS_ROSTER_SEARCH_MISS_TERM;
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+
+    assert.ok(
+      Boolean(missed.querySelector(noMatch)),
+      `the no-match frame's selector matched nothing: ${noMatch}`
     );
   });
 

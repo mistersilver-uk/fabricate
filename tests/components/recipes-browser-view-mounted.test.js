@@ -29,6 +29,10 @@ import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCas
 import { chooseSelectOption } from '../helpers/select-control.js';
 // Issue 1506: the row and inspector states are chips, so the tone is the chip's own class.
 import { chipToneOf } from '../helpers/chipTone.js';
+// Issue 1515: the blocked-enable strip is a `<Notice>`, and the View Lab case that photographs
+// it names the primitive's own class and dismiss hook. Reading the case's selector here is what
+// makes that declaration a tested claim rather than one the capture discovers.
+import { getCaseById } from '../../scripts/lib/viewLabCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -917,6 +921,20 @@ describe('RecipesBrowserView lifted browser state', () => {
     assert.ok(flash, 'the refusal renders in-window, not as a Foundry toast');
     assert.equal(flash.getAttribute('role'), 'alert');
     assert.match(flash.textContent, /This recipe has no result groups\./);
+
+    // THE CAPTURE CASE'S OWN SELECTOR, resolved against the rendered strip. One bad
+    // `expectSelector` fails the WHOLE View Lab capture and publishes no frames at all, and
+    // nothing checks it until that run — so the frame's proof is proved here. It is READ from the
+    // case rather than restated: a copy would keep passing after the case started naming
+    // something else. Only the area root is stripped, which is the one part of it a mounted
+    // component has no shell to supply.
+    const captureSelector = getCaseById(
+      'manager-recipes-blocked-enable-flash'
+    ).expectSelector.replace('.fabricate-manager ', '');
+    assert.ok(
+      Boolean(root.querySelector(captureSelector)),
+      `the blocked-enable frame's selector matched nothing: ${captureSelector}`
+    );
 
     // `<Notice dismissable>` stamps no per-caller hook on the control it draws, so the dismiss
     // is addressed by the primitive's own `data-notice-dismiss` (issue 1515). What the caller
