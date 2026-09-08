@@ -123,6 +123,13 @@
          either flag, so the affordance is closed exactly as firmly; what changes is that the
          button stays focusable and keeps announcing why it will not open. -->
     <div class="manager-recipe-item-link-recipe">
+      <!-- THE CONTROL HALF of the validation row action (issue 1517): the `recipeLinked` blocker
+           is answered by linking a recipe, and this trigger is the one control that does it, so
+           `RecipeItemValidationTab` addresses it as `recipe-item-link-recipe` through
+           `triggerData`. A trigger is a real `<button>` and needs no tabindex — but it IS
+           disabled when every recipe is already linked, and `validationFocus.js` refuses a
+           disabled target rather than focusing a control the GM cannot use. The row still
+           changes tab. -->
       <SearchablePopover
         options={linkOptions}
         triggerChip
@@ -136,7 +143,10 @@
           'FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe',
           'Link recipe'
         )}
-        triggerData={{ 'data-recipe-item-link-recipe-toggle': '' }}
+        triggerData={{
+          'data-recipe-item-link-recipe-toggle': '',
+          'data-validation-target': 'recipe-item-link-recipe',
+        }}
         searchPlaceholder={text(
           'FABRICATE.Admin.Manager.RecipeItem.Contents.SearchRecipes',
           'Search recipes…'

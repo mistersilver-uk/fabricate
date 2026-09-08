@@ -334,10 +334,16 @@
                 <span class="manager-recipe-item-stepper-value" data-recipe-item-uses-value
                   >{maxUses}</span
                 >
+                <!-- THE CONTROL HALF of the validation row action (issue 1517). The
+                     `usesValid` blocker fires when limited use is on and the count is below
+                     one, so the control that ANSWERS it is the increment: a real `<button>`,
+                     which needs no tabindex. `RecipeItemValidationTab` addresses it as
+                     `recipe-item-uses`. -->
                 <button
                   type="button"
                   class="manager-recipe-item-stepper-button"
                   data-recipe-item-uses-inc
+                  data-validation-target="recipe-item-uses"
                   aria-label={text(
                     'FABRICATE.Admin.Manager.RecipeItem.Limits.Increment',
                     'Increase'
@@ -470,10 +476,14 @@
                   <span class="manager-recipe-item-stepper-value" data-recipe-item-learns-value
                     >{learnsAllowed}</span
                   >
+                  <!-- THE CONTROL HALF for the `learnsValid` blocker (issue 1517), on the
+                       same rule as the uses stepper above: the increment is what answers it.
+                       Addressed as `recipe-item-learns`. -->
                   <button
                     type="button"
                     class="manager-recipe-item-stepper-button"
                     data-recipe-item-learns-inc
+                    data-validation-target="recipe-item-learns"
                     aria-label={text(
                       'FABRICATE.Admin.Manager.RecipeItem.Limits.Increment',
                       'Increase'

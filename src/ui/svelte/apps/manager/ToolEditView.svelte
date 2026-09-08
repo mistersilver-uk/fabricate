@@ -9,6 +9,7 @@
   import ToolRequirementsTab from './tools/ToolRequirementsTab.svelte';
   import ToolValidationTab from './tools/ToolValidationTab.svelte';
   import { toolDisplayImage, toolDisplayName, toolEditorValidation } from './tools/toolStudio.js';
+  import { focusValidationTarget } from './validationFocus.js';
 
   let {
     tool = null,
@@ -209,9 +210,87 @@
   const member = $derived(systemRow?.member === true);
   const inherited = $derived(systemRow?.inherited ?? {});
   const worldDefaults = $derived(worldEntry?.defaults ?? null);
+
+  // ── THE VALIDATION ROW ACTION (issue 1517) ──────────────────────────────────────────────
+  // The two tabs a validation row may address, written once so the route guard below and the
+  // announcement's own label lookup cannot disagree about which tabs are reachable.
+  const ISSUE_TABS = {
+    breakage: { key: 'FABRICATE.Admin.Manager.Tools.Editor.TabBreakage', fallback: 'Breakage' },
+    requirements: {
+      key: 'FABRICATE.Admin.Manager.Tools.Editor.TabRequirements',
+      fallback: 'Requirements',
+    },
+  };
+
+  // This editor's own root, so `focusValidationTarget` resolves a `data-validation-target`
+  // inside THIS editor rather than anywhere in the manager window.
+  let editorRoot = $state(null);
+
+  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME, not a count. Activating a row action
+  // changes no tally, so a count-subjected region would recite an unchanged number at the
+  // moment a GM most needs to know where they landed.
+  let issueAnnouncement = $state('');
+
+  /**
+   * The focused control's own accessible name, read off the DOM. `aria-label` first, then the
+   * `<label for>` that names it, then `title`. A destination with none of the three — a
+   * requirements section, say — yields '' and the announcement names the route alone.
+   *
+   * @param {Element|null} element
+   * @returns {string}
+   */
+  function accessibleNameOf(element) {
+    if (!element) return '';
+    const label = element.getAttribute('aria-label');
+    if (label) return label.trim();
+    const id = element.getAttribute('id');
+    const labelling = id ? editorRoot?.querySelector(`label[for="${id}"]`) : null;
+    if (labelling) return (labelling.textContent || '').trim();
+    return (element.getAttribute('title') || '').trim();
+  }
+
+  /**
+   * Deep-link from a validation issue: switch to the tab that hosts the gap, THEN move focus to
+   * the offending control.
+   *
+   * THE ORDER IS THE MECHANISM, not a preference. The route is requested synchronously and
+   * first — `onTabChange` is the shell's own `$state` write, exactly as the tab strip's own
+   * click is — so Svelte has flushed it and the destination panel exists by the time the
+   * helper's `queueMicrotask` runs its query. And the announcement is derived FROM the element
+   * the helper resolves, so it cannot be written before focus moved: there is nothing to write
+   * it from. That is a property of the data flow rather than of a test.
+   *
+   * @param {string} targetTab the ROUTE the row carries.
+   * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
+   */
+  async function selectIssue(targetTab, focusTarget) {
+    const route = Object.hasOwn(ISSUE_TABS, targetTab) ? targetTab : null;
+    if (route) onTabChange(route);
+    const focused = await focusValidationTarget(editorRoot, focusTarget);
+    const routeLabel = route ? text(ISSUE_TABS[route].key, ISSUE_TABS[route].fallback) : '';
+    const controlName = accessibleNameOf(focused);
+    issueAnnouncement = controlName ? `${routeLabel} — ${controlName}` : routeLabel;
+  }
 </script>
 
-<main class="manager-main manager-tool-edit-main" data-tool-edit-view>
+<main class="manager-main manager-tool-edit-main" data-tool-edit-view bind:this={editorRoot}>
+  <!--
+    THE ROW ACTION'S LIVE REGION, and it is HOSTED HERE rather than in the validation surface
+    for a reason that is not stylistic (issue 1517). Activating a row action changes `activeTab`
+    to another value, which unmounts the whole validation panel — live region included — in the
+    same update that was supposed to announce. So the element carrying `aria-live` is ALWAYS in
+    the DOM, outside the `{#if activeTab}` chain below, with its own `{#if}` INSIDE it.
+
+    A THIRD CHILD OF THIS `<main>` IS SAFE HERE, which is worth saying because it is not safe
+    everywhere: `.visually-hidden` is `position: absolute`, so the element is out of flow and
+    takes no track in any grid or `display: contents` chain this route is laid out by.
+
+    It wears the shipped `.visually-hidden` utility, rooted at the MODULE, and is addressed by a
+    `data-` hook rather than a class, so it joins no pinned class family.
+  -->
+  <div class="visually-hidden" role="status" aria-live="polite" data-tool-issue-announcement>
+    {#if issueAnnouncement}{issueAnnouncement}{/if}
+  </div>
   <header class="manager-tool-edit-header" data-tool-editor-header>
     <nav
       class="manager-breadcrumbs"
@@ -353,6 +432,7 @@
           {focusValidationNonce}
           {worldRecordExists}
           {onEditWorldTool}
+          onSelectIssue={selectIssue}
         />
       {:else}
         <ToolBreakageTab

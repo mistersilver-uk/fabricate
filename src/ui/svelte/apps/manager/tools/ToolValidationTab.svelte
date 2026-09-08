@@ -47,6 +47,7 @@
   import {
     toolEditorValidation,
     toolHasLinkedSource,
+    toolIssueAddress,
     toolValidationPresentation,
   } from './toolStudio.js';
 
@@ -62,6 +63,10 @@
     // offers no route to a record that would open on nothing.
     worldRecordExists = false,
     onEditWorldTool = () => {},
+    // THE ROW ACTION (issue 1517). `(target, focusTarget)` — the tab the editor switches to,
+    // and the `data-validation-target` value of the control that is wrong. The editor owns both
+    // moves; this tab only carries the address the producer emitted.
+    onSelectIssue = () => {},
   } = $props();
 
   function text(key, fallback) {
@@ -144,6 +149,11 @@
           labels[check.id]
         ),
         detail: check.errors?.length ? validationErrorText(check.errors[0]) : '',
+        // The row's TWO addresses, spread so a check with no route adds no key at all
+        // (issue 1517). Threaded rather than derived here: `toolStudio.js` is the only thing
+        // that knows which control a projected failure names, and a row that dropped the
+        // address would render a View button that changes tab and focuses nothing.
+        ...toolIssueAddress(check),
       }));
   }
 
@@ -171,6 +181,10 @@
         id: 'general',
         label: text('FABRICATE.Common.General', 'General'),
         icon: 'fas fa-circle-exclamation',
+        // NO ADDRESS ON A GENERAL ROW, and the omission is the decision (issue 1517). These are
+        // the domain messages the projection could not place on any check, so there is no tab
+        // that is where they are fixed and no control that is the offender. They render with no
+        // View button, exactly as they did before the row action existed.
         rows: editorValidation.unknownErrors.map((_, index) => ({
           id: `unknown-${index}`,
           status: 'block',
@@ -199,14 +213,21 @@
   >
 {/snippet}
 
+<!-- TWO COUNT TILES, NOT THREE (issue 1517). Every Tool check is two-state — it passes or it
+     blocks — and the hard-coded `warnings: 0` that used to sit in `counts` drew a Warnings tile
+     this check set can never fill. `EditorValidationSurface` renders the tiles it is REPORTED,
+     so omitting the key is how a site says it cannot answer that question, exactly as
+     `recipe-item/RecipeItemValidationTab` already does. -->
 <ScopedValidationTab
   stackClass="manager-scoped-tab-stack manager-tool-tab-stack"
   hookAttribute="data-tool-validation-tab"
   focusNonce={focusValidationNonce}
   {summary}
-  counts={{ passing, warnings: 0, blocking }}
+  counts={{ passing, blocking }}
   {groups}
   rowDataAttr="data-tool-validation-check"
+  viewDataAttr="data-tool-validation-view"
+  {onSelectIssue}
   blockLabel={text('FABRICATE.Admin.Manager.Recipe.Validation.StatusBlock', 'BLOCKS ENABLE')}
 >
   {#if identityBroken}

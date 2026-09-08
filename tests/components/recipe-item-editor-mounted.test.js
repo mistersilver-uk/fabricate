@@ -22,6 +22,11 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
+    // RecipeItemEditor/ToolEditView/EssenceEditView resolve, focus and mark the control a
+    // validation row addresses through this pure leaf (issue 1517). This harness validates its
+    // dependency graph, so an omission throws a named "add it to rawModules" error rather than
+    // hanging — but the error arrives from `before()`, which reports as `# cancelled`.
+    'src/ui/svelte/apps/manager/validationFocus.js',
     'src/ui/svelte/util/recipeItemAccessBadge.js',
     // The Limits tab's character-prerequisite picker imports the pure engine (issue 544).
     'src/systems/characterPrerequisites.js',

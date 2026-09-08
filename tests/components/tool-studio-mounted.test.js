@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tick } from 'svelte';
+import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
   createMountedComponentHarness,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -42,6 +43,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/recipeCurrency.js',
     'src/ui/svelte/util/dropUtils.js',
     'src/ui/svelte/actions/dragDrop.js',
+    // RecipeItemEditor/ToolEditView/EssenceEditView resolve, focus and mark the control a
+    // validation row addresses through this pure leaf (issue 1517). This harness validates its
+    // dependency graph, so an omission throws a named "add it to rawModules" error rather than
+    // hanging — but the error arrives from `before()`, which reports as `# cancelled`.
+    'src/ui/svelte/apps/manager/validationFocus.js',
     'src/ui/svelte/apps/manager/tools/toolStudio.js',
     // The repair block's plain-language readback (issue 1373, maintainer round 5): a pure
     // module so the two scopes that render the block share one copy of the sentence.
@@ -2410,5 +2416,202 @@ describe('Tool Studio editor (mounted)', () => {
         `repair quantity ${JSON.stringify(quantity)} should match model validation`
       );
     }
+  });
+});
+
+// ── THE ROW ACTION MOVES FOCUS, AND SAYS SO (issue 1517) ────────────────────────────────────
+//
+// A validation row carries two independent addresses: `target`, the ROUTE, and `focusTarget`,
+// the CONTROL — the value of a `data-validation-target` attribute the offending control carries.
+// The editor requests the route synchronously and FIRST, then awaits `focusValidationTarget`,
+// then writes the announcement FROM the element that resolved.
+//
+// THIS EDITOR DOES NOT OWN ITS ROUTE, which is the one way it differs from the recipe and
+// essence editors: `activeTab` arrives as a prop and the change goes out as `onTabChange`. The
+// ordering claim is unchanged by that — the shell's own `$state` write is synchronous, exactly as
+// the tab strip's click is — and the harness stands in for the shell below.
+//
+// EVERY FOCUS ASSERTION ALSO READS THE FOCUSABILITY OFF THE DOM. happy-dom focuses ANYTHING —
+// `.focus()` on a bare `<div>` sets `document.activeElement` — so "the destination holds focus"
+// is vacuous on its own, with a named mutation: delete `tabindex="-1"` from a section and keep
+// `data-keyboard-focus`, and an `activeElement`-only assertion still passes while a real browser
+// focuses nothing. The attribute is read with `getAttribute` and the tag with `tagName`, NEVER by
+// calling `isFocusable` — re-using the helper as its own oracle would give the refusal path and
+// the assertion that proves it a single point of failure.
+describe('ToolEditView — the validation row action reaches the control (issue 1517)', () => {
+  // Identity, asserted as a BOOLEAN. Handing a live happy-dom element to `node:assert` renders
+  // its subtree, its parents and its owner document when the assertion fails, which takes the
+  // process out with a heap OOM — a real failure wearing a crash's costume.
+  const assertIs = (actual, expected, message) => assert.equal(actual === expected, true, message);
+
+  const announcement = (root) =>
+    root.querySelector('[data-tool-issue-announcement]').textContent.trim();
+
+  /** The shell's own route write, which this editor delegates to rather than owning. */
+  const routed = (overrides) =>
+    props({
+      activeTab: 'validation',
+      onTabChange: (tab) => harness.component.$set({ activeTab: tab }),
+      ...overrides,
+    });
+
+  async function activateIssueView(root, checkId) {
+    const button = root.querySelector(
+      `[data-tool-validation-check="${checkId}"] [data-tool-validation-view]`
+    );
+    assert.ok(Boolean(button), `the ${checkId} row renders a View button`);
+    button.click();
+    // NO `flushSync` BEFORE THE AWAIT, deliberately. The whole mechanism is that the route
+    // change's own flush is queued as a microtask BEFORE the helper's, so draining microtasks is
+    // what proves the ordering rather than a synchronous flush papering over it.
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    flushSync();
+    return button;
+  }
+
+  it('hosts the live region OUTSIDE the tab chain, so the route change cannot unmount it', async () => {
+    // The defect this shape exists to prevent: the validation surface is inside the tab chain, so
+    // activating a row action unmounts the region in the same update that was to announce.
+    const root = await harness.mount(props({ activeTab: 'breakage' }));
+    assert.ok(
+      Boolean(root.querySelector('[data-tool-issue-announcement]')),
+      'the region is in the DOM on the Breakage tab, before any validation row exists'
+    );
+    await harness.setProps({ activeTab: 'validation' });
+    assert.ok(
+      Boolean(root.querySelector('[data-tool-issue-announcement]')),
+      'and still on the Validation tab'
+    );
+    assert.equal(announcement(root), '', 'with nothing to say until an action is taken');
+  });
+
+  it('routes to Requirements and focuses the offending SECTION for the bonus row', async () => {
+    const root = await harness.mount(
+      routed({
+        tool: tool({ bonus: { enabled: true, expression: '' } }),
+        validation: { valid: false, errors: ['bonus.expression is required'] },
+      })
+    );
+
+    const button = await activateIssueView(root, 'bonus');
+    assert.equal(
+      button.getAttribute('data-tool-validation-view'),
+      'requirements',
+      'the row hook carries the ROUTE'
+    );
+
+    assert.equal(
+      root.querySelector('[data-tool-editor-panel]').getAttribute('data-tool-editor-panel'),
+      'requirements',
+      'the route changed'
+    );
+    const section = root.querySelector('[data-validation-target="tool-bonus"]');
+    assert.ok(Boolean(section), 'the Requirements tab carries the addressed section');
+    assertIs(document.activeElement, section, 'and it holds focus');
+    // Read off the DOM. A section is NOT natively focusable, so it must declare both — the
+    // tabindex that makes the focus real and the attribute that tells Foundry the window is
+    // focused, without which Space pauses the game and the arrows pan the canvas.
+    assert.equal(section.tagName, 'SECTION');
+    assert.equal(section.getAttribute('tabindex'), '-1');
+    assert.equal(section.getAttribute('data-keyboard-focus'), 'true');
+    assert.equal(
+      section.getAttribute('data-validation-focused'),
+      '',
+      'and it is marked, so a POINTER activation paints a ring the :focus reset would strip'
+    );
+    assert.equal(announcement(root), 'Requirements', 'the region names the destination');
+  });
+
+  it('focuses the breakage FORMULA field, a natively focusable control, for a formula failure', async () => {
+    const root = await harness.mount(
+      routed({
+        tool: tool({ breakage: { mode: 'diceExpression', formula: '', threshold: 3 } }),
+        validation: { valid: false, errors: ['breakage.formula must be a dice expression'] },
+      })
+    );
+
+    await activateIssueView(root, 'breakage');
+
+    const control = root.querySelector('[data-validation-target="tool-breakage-formula"]');
+    assert.ok(Boolean(control), 'the Breakage tab carries the addressed control');
+    assertIs(document.activeElement, control, 'and it holds focus');
+    assert.equal(control.tagName, 'INPUT');
+    assert.equal(control.getAttribute('tabindex'), null, 'natively focusable, no tabindex needed');
+    assert.equal(control.getAttribute('data-validation-focused'), '');
+  });
+
+  it('drops the mark once focus moves elsewhere', async () => {
+    // A LEAKED MARK IS THE DEFECT INVERTED: a permanent accent outline on the last-focused
+    // control, which outlives the interaction instead of merely missing during it.
+    const root = await harness.mount(
+      routed({
+        tool: tool({ breakage: { mode: 'diceExpression', formula: '', threshold: 3 } }),
+        validation: { valid: false, errors: ['breakage.formula must be a dice expression'] },
+      })
+    );
+    await activateIssueView(root, 'breakage');
+    const control = root.querySelector('[data-validation-target="tool-breakage-formula"]');
+    assert.equal(control.getAttribute('data-validation-focused'), '');
+
+    control.blur();
+    flushSync();
+
+    assert.equal(
+      control.getAttribute('data-validation-focused'),
+      null,
+      'the mark is gone from the control that lost focus'
+    );
+  });
+
+  it('changes route and moves NO focus for a ROUTE-ONLY row', async () => {
+    // ROUTE-ONLY IS A STATED OUTCOME, NOT A SILENT ONE. A `breakage.mode` failure names the
+    // MECHANIC CHOICE — a radio group, not one control — so the row emits a route and no
+    // control. This asserts WHICH of the two shapes the row is, so a `focusTarget` going missing
+    // from a row that should have one reds here rather than degrading into a tab switch that
+    // focuses nothing and that nobody notices.
+    const root = await harness.mount(
+      routed({ validation: { valid: false, errors: ['breakage.mode is not recognised'] } })
+    );
+
+    const button = await activateIssueView(root, 'breakage');
+    assert.equal(button.getAttribute('data-tool-validation-view'), 'breakage');
+
+    assert.equal(
+      root.querySelector('[data-tool-editor-panel]').getAttribute('data-tool-editor-panel'),
+      'breakage',
+      'the route still changed'
+    );
+    assert.ok(
+      !root.querySelector('[data-validation-focused]'),
+      'nothing in the editor is marked'
+    );
+    assert.equal(
+      announcement(root),
+      'Breakage',
+      'and the region names the destination alone, with no control'
+    );
+  });
+
+  it('gives a PASSING row no action at all', async () => {
+    const root = await harness.mount(props({ activeTab: 'validation' }));
+    const passing = root.querySelector('[data-tool-validation-check="onBreak"]');
+    assert.ok(Boolean(passing), 'the on-break row renders');
+    assert.ok(
+      !passing.querySelector('[data-tool-validation-view]'),
+      'and a passing check offers no route'
+    );
+  });
+
+  it('reports two count tiles, because every Tool check is two-state', async () => {
+    // The hard-coded `warnings: 0` this tab used to pass drew a Warnings tile its check set can
+    // never fill. `EditorValidationSurface` draws the tiles it is REPORTED, so the key's absence
+    // is how a site says it cannot answer that question.
+    const root = await harness.mount(props({ activeTab: 'validation' }));
+    assert.deepEqual(
+      [...root.querySelectorAll('[data-editor-validation-count]')].map((tile) =>
+        tile.getAttribute('data-editor-validation-count')
+      ),
+      ['passing', 'blocking']
+    );
   });
 });

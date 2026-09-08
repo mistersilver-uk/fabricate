@@ -53,6 +53,7 @@
 <script>
   import EssenceEditorTabs from './essences/EssenceEditorTabs.svelte';
   import EssenceIdentityTab from './essences/EssenceIdentityTab.svelte';
+  import { focusValidationTarget } from './validationFocus.js';
   import EssenceOnCraftTab from './essences/EssenceOnCraftTab.svelte';
   import EssenceValidationTab from './essences/EssenceValidationTab.svelte';
   import {
@@ -243,6 +244,7 @@
   // to edit and the rules screen is what renders.
   const rulesMode = $derived(scopedKnown && !isNew);
   const editorTabs = $derived(rulesMode ? ESSENCE_RULES_TABS : ESSENCE_EDITOR_TABS);
+  const editorTabIds = $derived(editorTabs.map((tab) => tab.id));
   const selectedSource = $derived(
     sourceComponentId
       ? managedItemOptions.find((item) => item.id === sourceComponentId) || null
@@ -335,6 +337,68 @@
     if (editorTabs.some((tab) => tab.id === activeTab)) return;
     activeTab = editorTabs[0].id;
   });
+
+  // ── THE VALIDATION ROW ACTION (issue 1517) ──────────────────────────────────────────────
+  // The tab labels the announcement names, by tab id. It covers BOTH tab sets, because a row's
+  // route is resolved against whichever set is live and either screen can be the destination.
+  const ISSUE_TAB_LABELS = {
+    identity: { key: 'FABRICATE.Admin.Manager.Essence.Tabs.Identity', fallback: 'Identity' },
+    oncraft: { key: 'FABRICATE.Admin.Manager.Essence.Tabs.OnCraft', fallback: 'On craft' },
+    rules: { key: 'FABRICATE.Admin.Manager.Essence.Tabs.Rules', fallback: 'Essence rules' },
+  };
+
+  // This editor's own root, so `focusValidationTarget` resolves a `data-validation-target`
+  // inside THIS editor rather than anywhere in the manager window.
+  let editorRoot = $state(null);
+
+  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME, not a count. Activating a row action
+  // changes no tally, so a count-subjected region would recite an unchanged number at the
+  // moment a GM most needs to know where they landed.
+  let issueAnnouncement = $state('');
+
+  /**
+   * The focused control's own accessible name, read off the DOM. `aria-label` first, then the
+   * `<label for>` that names it, then `title`. A destination with none of the three — a card
+   * addressed as a whole, say — yields '' and the announcement names the route alone.
+   *
+   * @param {Element|null} element
+   * @returns {string}
+   */
+  function accessibleNameOf(element) {
+    if (!element) return '';
+    const label = element.getAttribute('aria-label');
+    if (label) return label.trim();
+    const id = element.getAttribute('id');
+    const labelling = id ? editorRoot?.querySelector(`label[for="${id}"]`) : null;
+    if (labelling) return (labelling.textContent || '').trim();
+    return (element.getAttribute('title') || '').trim();
+  }
+
+  /**
+   * Deep-link from a validation issue: switch to the tab that hosts the gap, THEN move focus to
+   * the offending control.
+   *
+   * THE ORDER IS THE MECHANISM, not a preference. The route is set synchronously and first, so
+   * Svelte has flushed it and the destination panel exists by the time the helper's
+   * `queueMicrotask` runs its query. And the announcement is derived FROM the element the helper
+   * resolves, so it cannot be written before focus moved: there is nothing to write it from.
+   *
+   * The route is checked against the LIVE tab set rather than a fixed list, because this editor
+   * renders two — a stale route from the other set must not select a tab the strip does not
+   * contain, which is the state the reconciliation effect above exists to prevent.
+   *
+   * @param {string} targetTab the ROUTE the row carries.
+   * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
+   */
+  async function selectIssue(targetTab, focusTarget) {
+    const route = editorTabIds.includes(targetTab) ? targetTab : null;
+    if (route) activeTab = route;
+    const label = route ? ISSUE_TAB_LABELS[route] : null;
+    const focused = await focusValidationTarget(editorRoot, focusTarget);
+    const routeLabel = label ? text(label.key, label.fallback) : '';
+    const controlName = accessibleNameOf(focused);
+    issueAnnouncement = controlName ? `${routeLabel} — ${controlName}` : routeLabel;
+  }
 
   // The macro's display NAME, resolved cancellably. The `cancelled` latch inside
   // `resolveMacroName` is what stops a slow lookup of the OLD uuid landing after a fast
@@ -540,6 +604,7 @@
   aria-label={isNew
     ? text('FABRICATE.Admin.Manager.Essence.CreateTitle', 'Create essence')
     : text('FABRICATE.Admin.Manager.Essence.EditTitle', 'Edit essence')}
+  bind:this={editorRoot}
 >
   <!--
     ONE HEAD ELEMENT, AND IT IS LOAD-BEARING RATHER THAN TIDINESS.
@@ -551,6 +616,23 @@
     `<form id="manager-essence-edit-form">`, which is a screen a GM cannot change tabs on. The
     wrapper keeps the grid at two children whatever this head grows to carry.
   -->
+  <!--
+    THE ROW ACTION'S LIVE REGION, and it is HOSTED HERE rather than in the validation surface
+    for a reason that is not stylistic (issue 1517). Activating a row action sets `activeTab` to
+    another value, which unmounts the whole validation panel — live region included — in the
+    same update that was supposed to announce. So the element carrying `aria-live` is ALWAYS in
+    the DOM, outside the `{#if activeTab}` chain below, with its own `{#if}` INSIDE it.
+
+    A THIRD CHILD OF THIS `<main>` DOES NOT BREAK THE TWO-ROW GRID the note above describes:
+    `.visually-hidden` is `position: absolute`, so this element is out of flow and takes no grid
+    track. The head wrapper below is still what keeps the IN-FLOW children at two.
+
+    It wears the shipped `.visually-hidden` utility, rooted at the MODULE, and is addressed by a
+    `data-` hook rather than a class, so it joins no pinned class family.
+  -->
+  <div class="visually-hidden" role="status" aria-live="polite" data-essence-issue-announcement>
+    {#if issueAnnouncement}{issueAnnouncement}{/if}
+  </div>
   <div class="manager-essence-edit-head">
     <EssenceEditorTabs
       tabs={editorTabs}
@@ -572,7 +654,12 @@
       data-keyboard-focus="true"
     >
       {#if activeTab === 'validation'}
-        <EssenceValidationTab essence={draftSummary} context={validationContext} />
+        <EssenceValidationTab
+          essence={draftSummary}
+          context={validationContext}
+          tabIds={editorTabIds}
+          onSelectIssue={selectIssue}
+        />
       {:else if activeTab === 'identity'}
         <EssenceIdentityTab
           {name}

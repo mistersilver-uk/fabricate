@@ -1,5 +1,6 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 
@@ -175,5 +176,215 @@ describe('RecipeItemValidationTab (mounted)', () => {
     assert.equal(only.length, 1);
     assert.equal(only[0].getAttribute('data-ok'), 'true');
     assert.match(only[0].textContent, /Custom rule/);
+  });
+});
+
+// ── THE ROW ACTION'S TWO ADDRESSES (issue 1517) ─────────────────────────────────────────────
+//
+// A validation row carries `target` — the ROUTE, the editor tab that hosts the gap — and
+// `focusTarget` — the CONTROL, the value of the `data-validation-target` attribute the offending
+// control carries in that tab. `RecipeItemValidationTab` is the producer for this editor; the
+// three tab files below are the destinations; `RecipeItemEditor` is the host that resolves both.
+//
+// WHY THE HOST IS PROVEN FROM SOURCE HERE RATHER THAN MOUNTED. This suite's harness mounts the
+// VALIDATION TAB, which is what makes the producer half directly clickable — the tab takes
+// `onSelectIssue` as a prop, so the exact `(target, focusTarget)` pair a row hands the host is
+// read from a real click rather than inferred. Mounting `RecipeItemEditor` instead would need a
+// second harness carrying that editor's whole compiled closure — the embedded player inventory
+// detail, the salvage tree, the shared select and popover stacks — which
+// `recipe-item-editor-mounted.test.js` already declares, and a copy of it here is exactly the
+// near-identical block the new-code duplication gate refuses. So the host's three obligations are
+// read off its source, and the ADDRESSES are joined to the destinations that carry them below.
+describe('the recipe-item validation row action addresses a control (issue 1517)', () => {
+  const viewButton = (root, id) =>
+    root.querySelector(`[data-recipe-item-check="${id}"] [data-recipe-item-validation-view]`);
+
+  it('hands the host BOTH addresses, positionally, for every blocking row', async () => {
+    const calls = [];
+    const root = await harness.mount({
+      recipeItem: draft({ caps: { item: { limitUses: true, maxUses: 0 }, learn: {} } }),
+      linkedItem: null,
+      visibilityMode: 'item',
+      onSelectIssue: (target, focusTarget) => calls.push([target, focusTarget]),
+    });
+
+    for (const [id, route, control] of [
+      ['itemLinked', 'overview', 'recipe-item-source'],
+      ['recipeLinked', 'contents', 'recipe-item-link-recipe'],
+      ['usesValid', 'limits', 'recipe-item-uses'],
+    ]) {
+      const button = viewButton(root, id);
+      assert.ok(Boolean(button), `the ${id} row renders a View button`);
+      assert.equal(
+        button.getAttribute('data-recipe-item-validation-view'),
+        route,
+        `the ${id} row's hook carries its ROUTE`
+      );
+      button.click();
+    }
+
+    assert.deepEqual(calls, [
+      ['overview', 'recipe-item-source'],
+      ['contents', 'recipe-item-link-recipe'],
+      ['limits', 'recipe-item-uses'],
+    ]);
+  });
+
+  it('addresses the learning stepper in knowledge mode, where the uses row does not exist', async () => {
+    const calls = [];
+    const root = await harness.mount({
+      recipeItem: draft({
+        linkedRecipeIds: ['r1'],
+        caps: { item: {}, learn: { limitLearning: true, learningMode: 'ntimes', learnsAllowed: 0 } },
+      }),
+      linkedItem: { uuid: 'Item.a' },
+      visibilityMode: 'knowledge',
+      onSelectIssue: (target, focusTarget) => calls.push([target, focusTarget]),
+    });
+    viewButton(root, 'learnsValid').click();
+    assert.deepEqual(calls, [['limits', 'recipe-item-learns']]);
+  });
+
+  it('gives a PASSING row no action at all, so the button only ever reaches a defect', async () => {
+    // WHICH OF THE SHAPES A ROW IS, asserted rather than assumed. A row carrying neither address
+    // renders no button; a row carrying a route alone would render one that changes tab and
+    // focuses nothing; a row carrying both is the case above. This tab produces the first and
+    // the third — every check it renders names one control — so the route-only shape is proved
+    // where it actually occurs, on the Tool and essence surfaces, in their own suites.
+    const root = await harness.mount({
+      recipeItem: draft({ linkedRecipeIds: ['r1'] }),
+      linkedItem: { uuid: 'Item.a' },
+      visibilityMode: 'item',
+    });
+    for (const id of ['itemLinked', 'recipeLinked', 'usesValid']) {
+      assert.equal(check(root, id).getAttribute('data-ok'), 'true', `${id} passes in this state`);
+      assert.ok(!viewButton(root, id), `and the passing ${id} row renders no View button`);
+    }
+  });
+
+  it('gives a row whose check it cannot place no action either', async () => {
+    // The supplied-`validation` door. A caller may hand this tab a check id its address table
+    // does not know; the honest outcome is a row with no action, never a button that routes to
+    // `undefined`.
+    const root = await harness.mount({
+      recipeItem: draft(),
+      linkedItem: null,
+      visibilityMode: 'item',
+      validation: { checks: [{ id: 'unplaceable', ok: false, label: 'Something else' }] },
+    });
+    assert.ok(!root.querySelector('[data-recipe-item-validation-view]'));
+  });
+});
+
+// ── THE PAIR, AND THE HOST THAT JOINS IT (issue 1517) ───────────────────────────────────────
+//
+// THE HAYSTACK, STATED. Every scan below reads source text with its COMMENTS STRIPPED, and that
+// is not tidiness: this change documents each address in prose immediately above the code that
+// writes it, so an un-stripped scan would find `recipe-item-source` in the sentence explaining
+// it and report a destination as stamped when nothing stamps it. `stripComments` removes HTML
+// comment blocks and whole-line `//` comments; string literals are deliberately left in, because
+// the attribute values themselves ARE string literals and are what is being read.
+const SOURCE_ROOT = 'src/ui/svelte/apps/manager';
+
+function stripComments(source) {
+  return source.replaceAll(/<!--[\s\S]*?-->/gu, '').replaceAll(/^[ \t]*\/\/.*$/gmu, '');
+}
+
+function sourceOf(relativePath) {
+  return stripComments(readFileSync(resolve(repoRoot, `${SOURCE_ROOT}/${relativePath}`), 'utf8'));
+}
+
+describe('every recipe-item address the producer emits is carried by a real control', () => {
+  // The producer's own table, read out of its source rather than restated here. Restating it
+  // would make this gate agree with a copy of the thing it is checking.
+  const producer = sourceOf('recipe-item/RecipeItemValidationTab.svelte');
+  const table = /const CHECK_ADDRESSES = \{([\s\S]*?)\n {2}\};/u.exec(producer);
+  const emitted = table ? [...table[1].matchAll(/focusTarget: '([^']+)'/gu)].map((m) => m[1]) : [];
+
+  // WHICH FILE IS SUPPOSED TO CARRY WHICH ADDRESS. This is the half a producer cannot check: an
+  // address no control carries is a View button that changes tab and focuses nothing, and neither
+  // half alone can see it.
+  const DESTINATIONS = {
+    'recipe-item-source': 'recipe-item/RecipeItemOverviewTab.svelte',
+    'recipe-item-link-recipe': 'recipe-item/RecipeItemContentsTab.svelte',
+    'recipe-item-uses': 'recipe-item/RecipeItemLimitsTab.svelte',
+    'recipe-item-learns': 'recipe-item/RecipeItemLimitsTab.svelte',
+  };
+
+  it('reads a non-empty address table out of the producer, so the clauses below are not vacuous', () => {
+    assert.ok(Boolean(table), 'the `CHECK_ADDRESSES` table could not be located in the producer');
+    assert.equal(emitted.length, 4, `read ${emitted.length} addresses; expected the four checks`);
+  });
+
+  it('stamps every emitted focusTarget on a control in the tab its route names', () => {
+    const missing = [];
+    for (const address of emitted) {
+      const file = DESTINATIONS[address];
+      if (!file) {
+        missing.push(`${address}: no destination file is declared for it`);
+        continue;
+      }
+      const destination = sourceOf(file);
+      // BOTH SPELLINGS, because two of the four addresses ride a primitive's attribute bag — the
+      // Item drop zone's `hookAttrs.root` and the link-recipe popover's `triggerData` — and reach
+      // the DOM as an object key rather than as a written attribute.
+      const written = destination.includes(`data-validation-target="${address}"`);
+      const bagged = destination.includes(`'data-validation-target': '${address}'`);
+      if (!written && !bagged) missing.push(`${address}: ${file} carries no such control`);
+    }
+    assert.deepEqual(
+      missing,
+      [],
+      'these addresses are emitted by a validation row and carried by nothing, so the row ' +
+        'action would change tab and focus nothing:\n  ' + missing.join('\n  ')
+    );
+  });
+
+  it('declares no destination the producer never emits', () => {
+    assert.deepEqual(
+      Object.keys(DESTINATIONS).filter((address) => !emitted.includes(address)),
+      [],
+      'a destination is declared for an address no row carries; either the producer dropped it ' +
+        'or this list is stale'
+    );
+  });
+});
+
+describe('RecipeItemEditor wires the row action in the order the mechanism needs', () => {
+  const host = stripComments(
+    readFileSync(resolve(repoRoot, `${SOURCE_ROOT}/RecipeItemEditor.svelte`), 'utf8')
+  );
+
+  it('passes its own handler to the validation tab', () => {
+    assert.match(host, /<RecipeItemValidationTab[\s\S]*?onSelectIssue=\{selectIssue\}/u);
+  });
+
+  it('sets the route BEFORE it awaits the focus move, and announces only after', () => {
+    // THE ORDER IS THE MECHANISM. The helper defers with `queueMicrotask` so Svelte has flushed
+    // the route assignment and the destination panel exists when its query runs; awaiting the
+    // focus move first would query a panel that is not in the DOM. And the announcement is
+    // derived FROM the element the helper resolved, so it cannot be written before focus moved.
+    const body = /async function selectIssue\([\s\S]*?\n {2}\}/u.exec(host);
+    assert.ok(Boolean(body), 'the row-action handler could not be located');
+    const route = body[0].indexOf('onSelectTab(route)');
+    const focus = body[0].indexOf('await focusValidationTarget(');
+    const announce = body[0].indexOf('issueAnnouncement =');
+    assert.ok(route >= 0 && focus >= 0 && announce >= 0, 'all three steps must be present');
+    assert.ok(route < focus, 'the route must be set before the focus move is awaited');
+    assert.ok(focus < announce, 'the announcement must be written after the focus move resolved');
+  });
+
+  it('hosts the live region OUTSIDE the tab chain, so the route change cannot unmount it', () => {
+    // The defect this shape exists to prevent: the surface that would otherwise host the region
+    // is inside `{:else if activeTab === 'validation'}`, so activating a row action unmounts the
+    // region in the same update that was supposed to announce.
+    const region = host.indexOf('data-recipe-item-issue-announcement');
+    const guard = host.indexOf('{#if recipeItem}');
+    const chain = host.indexOf("{#if activeTab === 'overview'}");
+    assert.ok(region >= 0, 'the live region must exist');
+    assert.ok(guard >= 0 && chain >= 0, 'both enclosing blocks must exist');
+    assert.ok(region < guard, 'the region sits outside the record guard');
+    assert.ok(region < chain, 'and outside the tab chain');
+    assert.match(host, /data-recipe-item-issue-announcement[\s\S]{0,120}\{#if issueAnnouncement\}/u);
   });
 });

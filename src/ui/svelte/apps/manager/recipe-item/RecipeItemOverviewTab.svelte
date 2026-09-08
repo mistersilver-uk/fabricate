@@ -49,7 +49,18 @@
    * against in both directions.
    */
   const linkHooks = $derived({
-    root: hasLink ? { 'data-recipe-item-link': true } : { 'data-recipe-item-dropzone': true },
+    root: {
+      ...(hasLink ? { 'data-recipe-item-link': true } : { 'data-recipe-item-dropzone': true }),
+      // THE CONTROL HALF of the validation row action (issue 1517). The `itemLinked` blocker is
+      // about THIS zone — the drop target and its unlink action are both inside it, and the zone
+      // itself is what a GM drops onto — so `RecipeItemValidationTab` addresses it as
+      // `recipe-item-source`. The zone's root is a `<div>`, so it declares BOTH the tabindex
+      // that makes the focus real and the attribute that tells Foundry the window is focused;
+      // without the second, Space pauses the game and the arrows pan the canvas.
+      'data-validation-target': 'recipe-item-source',
+      tabindex: '-1',
+      'data-keyboard-focus': 'true',
+    },
     copy: { 'data-recipe-item-copy-uuid': true },
     unlink: { 'data-recipe-item-unlink': true },
   });

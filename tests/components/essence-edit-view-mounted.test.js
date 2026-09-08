@@ -40,6 +40,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/dragDrop.js',
     'src/utils/macroReference.js',
     'src/utils/essenceValidation.js',
+    // RecipeItemEditor/ToolEditView/EssenceEditView resolve, focus and mark the control a
+    // validation row addresses through this pure leaf (issue 1517). This harness validates its
+    // dependency graph, so an omission throws a named "add it to rawModules" error rather than
+    // hanging — but the error arrives from `before()`, which reports as `# cancelled`.
+    'src/ui/svelte/apps/manager/validationFocus.js',
     'src/ui/svelte/apps/manager/essences/essenceStudio.js',
     // The behaviour preview's "How players see it" card mounts the REAL player InventoryItemCard
     // (issue 1036, round 3), fed synthetic rows by the pure essencePreviewRow helper — both
@@ -962,6 +967,164 @@ describe('1372 EssenceEditView — the system Essence Rules screen', () => {
     );
     assert.ok(!root.querySelector('[data-scoped-inherit-toggle]'), 'and no inherit switch either');
     assert.ok(!root.querySelector('[data-scoped-copy-rules]'), 'and nothing to copy out');
+    harness.remount();
+  });
+});
+
+// ── THE ROW ACTION MOVES FOCUS, AND SAYS SO (issue 1517) ────────────────────────────────────
+//
+// A validation row carries two independent addresses: `target`, the ROUTE, and `focusTarget`,
+// the CONTROL — the value of a `data-validation-target` attribute the offending control carries.
+// The editor sets the route synchronously and FIRST, then awaits `focusValidationTarget`, then
+// writes the announcement FROM the element that resolved.
+//
+// EVERY FOCUS ASSERTION BELOW ALSO READS THE FOCUSABILITY OFF THE DOM, and that is not
+// belt-and-braces. happy-dom focuses ANYTHING — `.focus()` on a bare `<div>` sets
+// `document.activeElement` — so "the destination holds focus" is vacuous on its own, with a named
+// mutation: delete `tabindex="-1"` from a card root and keep `data-keyboard-focus`, and an
+// `activeElement`-only assertion still passes while a real browser focuses nothing. The attribute
+// is read with `getAttribute` and the tag with `tagName`, NEVER by calling `isFocusable` —
+// re-using the helper as its own oracle would give the refusal path and the assertion that proves
+// it a single point of failure.
+describe('EssenceEditView — the validation row action reaches the control (issue 1517)', () => {
+  // Blank description (a warning row whose control is one field) plus a source that names a
+  // component this system does not hold (a warning row whose control is a whole card). Two rows,
+  // two destination shapes, one fixture.
+  const BROKEN = makeEssenceRow({
+    id: 'e1',
+    name: 'Aether',
+    description: '',
+    sourceComponentId: 'gone',
+    sourceState: 'stale',
+  });
+
+  // Identity, asserted as a BOOLEAN. Handing a live happy-dom element to `node:assert` renders
+  // its subtree, its parents and its owner document when the assertion fails, which takes the
+  // process out with a heap OOM — a real failure wearing a crash's costume, at exactly the
+  // moment someone is reading it.
+  const assertIs = (actual, expected, message) => assert.equal(actual === expected, true, message);
+
+  const announcement = (root) =>
+    root.querySelector('[data-essence-issue-announcement]').textContent.trim();
+
+  async function activateIssueView(root, checkId) {
+    const button = root.querySelector(
+      `[data-essence-validation-check="${checkId}"] [data-essence-validation-view]`
+    );
+    assert.ok(Boolean(button), `the ${checkId} row renders a View button`);
+    button.click();
+    // NO `flushSync` BEFORE THE AWAIT, deliberately. The whole mechanism is that the route
+    // assignment's own flush is queued as a microtask BEFORE the helper's, so draining
+    // microtasks is what proves the ordering rather than a synchronous flush papering over it.
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+    flushSync();
+    return button;
+  }
+
+  it('hosts the live region OUTSIDE the tab chain, so the route change cannot unmount it', async () => {
+    // The defect this shape exists to prevent: the validation surface is inside the tab chain,
+    // so activating a row action unmounts the region in the same update that was to announce.
+    const root = await harness.mount(props({ essence: BROKEN }));
+    assert.ok(
+      Boolean(root.querySelector('[data-essence-issue-announcement]')),
+      'the region is in the DOM on the opening tab, before any validation row exists'
+    );
+    openTab(root, 'validation');
+    assert.ok(
+      Boolean(root.querySelector('[data-essence-issue-announcement]')),
+      'and still on the Validation tab'
+    );
+    assert.equal(announcement(root), '', 'with nothing to say until an action is taken');
+    harness.remount();
+  });
+
+  it('routes to Identity and focuses the description field for the description row', async () => {
+    const root = await harness.mount(props({ essence: BROKEN }));
+    openTab(root, 'validation');
+
+    const button = await activateIssueView(root, 'description');
+    assert.equal(
+      button.getAttribute('data-essence-validation-view'),
+      'identity',
+      'the row hook carries the ROUTE'
+    );
+
+    assert.ok(Boolean(root.querySelector('[data-essence-tab-panel="identity"]')), 'route changed');
+    const control = root.querySelector('[data-validation-target="essence-description"]');
+    assert.ok(Boolean(control), 'the Identity tab carries the addressed control');
+    assertIs(document.activeElement, control, 'and it holds focus');
+    // Read off the DOM: a natively focusable element, not a div wearing a tabindex.
+    assert.equal(control.tagName, 'TEXTAREA');
+    assert.equal(control.getAttribute('tabindex'), null, 'natively focusable, no tabindex needed');
+    assert.equal(
+      control.getAttribute('data-validation-focused'),
+      '',
+      'and it is marked, so a POINTER activation paints a ring the :focus reset would strip'
+    );
+    assert.equal(
+      announcement(root),
+      'Identity — Description',
+      'the region names the destination it reached'
+    );
+    harness.remount();
+  });
+
+  it('focuses the offending CARD, which declares itself focusable, for the source row', async () => {
+    const root = await harness.mount(props({ essence: BROKEN }));
+    openTab(root, 'validation');
+
+    await activateIssueView(root, 'source');
+
+    assert.ok(Boolean(root.querySelector('[data-essence-tab-panel="oncraft"]')), 'route changed');
+    const card = root.querySelector('[data-validation-target="essence-source"]');
+    assert.ok(Boolean(card), 'the effect-source card carries its own address');
+    assertIs(document.activeElement, card, 'and it holds focus');
+    // Read off the DOM. A card root is NOT natively focusable, so it must declare both — the
+    // tabindex that makes the focus real and the attribute that tells Foundry the window is
+    // focused, without which Space pauses the game and the arrows pan the canvas.
+    assert.equal(card.getAttribute('tabindex'), '-1');
+    assert.equal(card.getAttribute('data-keyboard-focus'), 'true');
+    assert.equal(card.getAttribute('data-validation-focused'), '');
+    assert.equal(
+      announcement(root),
+      'On craft',
+      'a card carries no accessible name of its own, so the region names the route alone'
+    );
+    harness.remount();
+  });
+
+  it('drops the mark once focus moves elsewhere', async () => {
+    // A LEAKED MARK IS THE DEFECT INVERTED: a permanent accent outline on the last-focused
+    // control, which outlives the interaction instead of merely missing during it.
+    const root = await harness.mount(props({ essence: BROKEN }));
+    openTab(root, 'validation');
+    await activateIssueView(root, 'description');
+    const control = root.querySelector('[data-validation-target="essence-description"]');
+    assert.equal(control.getAttribute('data-validation-focused'), '');
+
+    root.querySelector('#manager-essence-edit-name').focus();
+    flushSync();
+
+    assert.equal(
+      control.getAttribute('data-validation-focused'),
+      null,
+      'the mark is gone from the control that lost focus'
+    );
+    harness.remount();
+  });
+
+  it('gives a PASSING row no action at all', async () => {
+    // WHICH OF THE SHAPES A ROW IS, asserted rather than assumed. A healthy check has nothing
+    // to reach, so it renders no button; the route-only shape — a route with no control — is
+    // proved on the Tool editor, whose breakage-mechanic failure has no single control.
+    const root = await harness.mount(props({ essence: BROKEN }));
+    openTab(root, 'validation');
+    const passing = root.querySelector('[data-essence-validation-check="colour"]');
+    assert.ok(Boolean(passing), 'the colour row renders');
+    assert.ok(
+      !passing.querySelector('[data-essence-validation-view]'),
+      'and an informational pass offers no route'
+    );
     harness.remount();
   });
 });

@@ -23,9 +23,21 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import ScopedValidationTab from '../scoped/ScopedValidationTab.svelte';
-  import { essenceValidationPresentation } from './essenceStudio.js';
+  import { essenceIssueAddresses, essenceValidationPresentation } from './essenceStudio.js';
 
-  let { essence = null, context = {} } = $props();
+  let {
+    essence = null,
+    context = {},
+    // ── THE ROW ACTION (issue 1517) ─────────────────────────────────────────────────────
+    // `tabIds` is the tab set the EDITOR is rendering, and it is a prop rather than a constant
+    // because this editor has two: a create draft renders `identity | oncraft | validation`
+    // and every catalogued essence renders the rules screen's `rules | validation`. An address
+    // is attached only for a zone the live set can reach, so a row whose subject is edited on
+    // another screen draws no View button instead of one that routes to a tab that is not
+    // there. Defaulted to none, which is the shipped no-action behaviour.
+    tabIds = [],
+    onSelectIssue = () => {},
+  } = $props();
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -34,6 +46,25 @@
 
   const presentation = $derived(essenceValidationPresentation(essence, context, text));
   const counts = $derived(presentation.counts);
+
+  // The row's two addresses, attached HERE rather than inside `essenceValidationPresentation`
+  // (issue 1517). That function is also the world essence entry page's, and that page is a
+  // different host with different tabs and no row action — attaching there would give it a View
+  // button that changes nothing. Threading rather than deriving is the same rule the recipe
+  // editor's tab follows: `essenceStudio.js` owns which control a check is about, and a row that
+  // dropped the address would render an action that changes tab and focuses nothing.
+  const addresses = $derived(essenceIssueAddresses(tabIds));
+  const groups = $derived(
+    presentation.groups.map((group) => ({
+      ...group,
+      // A PASSING row gets no address, which is what keeps the View button off every row of a
+      // healthy essence: the action exists to reach a defect, and a tick has none.
+      rows: group.rows.map((row) => ({
+        ...row,
+        ...(row.status === 'pass' ? {} : (addresses[row.id] ?? {})),
+      })),
+    }))
+  );
   const summary = $derived(summaryFor(counts));
 
   function summaryFor(current) {
@@ -82,7 +113,9 @@
   )}
   {summary}
   {counts}
-  groups={presentation.groups}
+  {groups}
   rowDataAttr="data-essence-validation-check"
+  viewDataAttr="data-essence-validation-view"
+  {onSelectIssue}
   blockLabel={text('FABRICATE.Admin.Manager.Essence.Validation.StatusBlock', 'INCOMPLETE')}
 />
