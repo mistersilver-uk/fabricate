@@ -101,7 +101,9 @@ function clearValidationFocusMark(event) {
  * @returns {string}
  */
 function escapeAttributeValue(value) {
-  return value.replace(BACKSLASH_OR_QUOTE, '\\$&');
+  // `String.raw` rather than `'\\$&'`: the replacement is one literal backslash followed by the
+  // whole match, and the escaped spelling reads as two characters when it is one.
+  return value.replace(BACKSLASH_OR_QUOTE, String.raw`\$&`);
 }
 
 /**

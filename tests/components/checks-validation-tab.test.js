@@ -1,6 +1,5 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -8,6 +7,10 @@ import {
   CHECKS_TREE_RAW_MODULES,
 } from '../helpers/checksHarnessModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  describeValidationAddressPairing,
+  describeValidationHostContract,
+} from '../helpers/validationAddressContracts.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -22,6 +25,49 @@ const harness = createMountedComponentHarness({
   rawModules: CHECKS_TREE_RAW_MODULES,
   compiledModules: CHECKS_TREE_COMPILED_MODULES,
   componentPath: 'src/ui/svelte/apps/manager/checks/ChecksValidationTab.svelte',
+});
+
+// ── THE ROUTED FIXTURES, BUILT RATHER THAN RE-TYPED ─────────────────────────────────────────
+//
+// Six of the clauses below mount one of two routed checks, and typed out in full each time they
+// are a near-identical block — which the new-code duplication gate counts, and which hides the
+// one field that actually differs from clause to clause behind twenty that do not. Built here,
+// each call site reads as the STATE it needs: an unfinished tier, or a trigger naming a tier
+// target. Fresh objects per call, so no two mounts share a fixture by reference.
+
+/** A routed check whose only tier is unnamed and not a Success: raises both outcome issues. */
+const unfinishedRoutedSection = (subsystem, rollFormula, tierName) => ({
+  subsystem,
+  mode: 'routed',
+  check: {
+    type: 'relative',
+    rollFormula,
+    relativeOutcomes: [{ id: 'a', name: tierName, success: false, dc: 0 }],
+  },
+});
+
+/**
+ * A routed crafting check with a healthy Success tier whose breakage triggers name tier targets.
+ *
+ * @param {...[string, string, number, string]} targets `[trigger id, operator, value, tier id]`.
+ */
+const tierStepTargetSection = (...targets) => ({
+  subsystem: 'crafting',
+  mode: 'routed',
+  check: {
+    type: 'relative',
+    rollFormula: '1d20',
+    relativeOutcomes: [{ id: 'a', name: 'Success', success: true, dc: 0 }],
+    checkBreakage: {
+      triggers: targets.map(([id, operator, value, tierId]) => ({
+        id,
+        condition: { type: 'rollTotal', operator, value },
+        outcome: 'none',
+        breakTools: false,
+        tierStep: { mode: 'target', steps: 1, tierId },
+      })),
+    },
+  },
 });
 
 describe('ChecksValidationTab (mounted)', () => {
@@ -73,17 +119,7 @@ describe('ChecksValidationTab (mounted)', () => {
 
   it('lists routed outcome-tier issues (unnamed tier, no Success) as critical', async () => {
     const target = await harness.mount({
-      sections: [
-        {
-          subsystem: 'crafting',
-          mode: 'routed',
-          check: {
-            type: 'relative',
-            rollFormula: '1d20',
-            relativeOutcomes: [{ id: 'a', name: '  ', success: false, dc: 0 }],
-          },
-        },
-      ],
+      sections: [unfinishedRoutedSection('crafting', '1d20', '  ')],
     });
     assert.ok(target.querySelector('[data-issue="unnamedOutcome"]'), 'unnamed tier issue listed');
     assert.ok(target.querySelector('[data-issue="noSuccessOutcome"]'), 'no-Success issue listed');
@@ -104,17 +140,7 @@ describe('ChecksValidationTab (mounted)', () => {
     // Asserted on POSITION rather than on presence: `filter`/`some` over the same rows is what
     // every other clause in this file does, and not one of them can see an order.
     const target = await harness.mount({
-      sections: [
-        {
-          subsystem: 'crafting',
-          mode: 'routed',
-          check: {
-            type: 'relative',
-            rollFormula: '1d20',
-            relativeOutcomes: [{ id: 'a', name: '  ', success: false, dc: 0 }],
-          },
-        },
-      ],
+      sections: [unfinishedRoutedSection('crafting', '1d20', '  ')],
     });
     const rows = [
       ...target.querySelectorAll(
@@ -144,35 +170,7 @@ describe('ChecksValidationTab (mounted)', () => {
 
   it('renders the tier-step target issues and their shared green tick (issue 975)', async () => {
     const target = await harness.mount({
-      sections: [
-        {
-          subsystem: 'crafting',
-          mode: 'routed',
-          check: {
-            type: 'relative',
-            rollFormula: '1d20',
-            relativeOutcomes: [{ id: 'a', name: 'Success', success: true, dc: 0 }],
-            checkBreakage: {
-              triggers: [
-                {
-                  id: 't1',
-                  condition: { type: 'rollTotal', operator: '<=', value: 1 },
-                  outcome: 'none',
-                  breakTools: false,
-                  tierStep: { mode: 'target', steps: 1, tierId: 'gone' },
-                },
-                {
-                  id: 't2',
-                  condition: { type: 'rollTotal', operator: '>=', value: 20 },
-                  outcome: 'none',
-                  breakTools: false,
-                  tierStep: { mode: 'target', steps: 1, tierId: 'a' },
-                },
-              ],
-            },
-          },
-        },
-      ],
+      sections: [tierStepTargetSection(['t1', '<=', 1, 'gone'], ['t2', '>=', 20, 'a'])],
     });
     const tick = target.querySelector('[data-check="tierStepTargetsResolve"]');
     assert.ok(tick, 'the paired readiness check renders');
@@ -226,17 +224,7 @@ describe('ChecksValidationTab (mounted)', () => {
     // registry in `tests/checks-readiness.test.js`, so an id can never bucket nowhere.
     const selected = [];
     const target = await harness.mount({
-      sections: [
-        {
-          subsystem: 'salvage',
-          mode: 'routed',
-          check: {
-            type: 'relative',
-            rollFormula: '',
-            relativeOutcomes: [{ id: 'a', name: '', success: false, dc: 0 }],
-          },
-        },
-      ],
+      sections: [unfinishedRoutedSection('salvage', '', '')],
       onSelectIssue: (target_) => selected.push(target_),
     });
     const rows = [...target.querySelectorAll('[data-issue]')];
@@ -286,17 +274,7 @@ describe('ChecksValidationTab (mounted)', () => {
       // would otherwise degrade into exactly that, invisibly.
       const calls = [];
       const target = await harness.mount({
-        sections: [
-          {
-            subsystem: 'salvage',
-            mode: 'routed',
-            check: {
-              type: 'relative',
-              rollFormula: '',
-              relativeOutcomes: [{ id: 'a', name: '', success: false, dc: 0 }],
-            },
-          },
-        ],
+        sections: [unfinishedRoutedSection('salvage', '', '')],
         onSelectIssue: (route, focusTarget) => calls.push([route, focusTarget]),
       });
 
@@ -312,28 +290,7 @@ describe('ChecksValidationTab (mounted)', () => {
     it('addresses the trigger LIST for a tier-step issue, which is a set rather than one control', async () => {
       const calls = [];
       const target = await harness.mount({
-        sections: [
-          {
-            subsystem: 'crafting',
-            mode: 'routed',
-            check: {
-              type: 'relative',
-              rollFormula: '1d20',
-              relativeOutcomes: [{ id: 'a', name: 'Success', success: true, dc: 0 }],
-              checkBreakage: {
-                triggers: [
-                  {
-                    id: 't1',
-                    condition: { type: 'rollTotal', operator: '<=', value: 1 },
-                    outcome: 'none',
-                    breakTools: false,
-                    tierStep: { mode: 'target', steps: 1, tierId: 'gone' },
-                  },
-                ],
-              },
-            },
-          },
-        ],
+        sections: [tierStepTargetSection(['t1', '<=', 1, 'gone'])],
         onSelectIssue: (route, focusTarget) => calls.push([route, focusTarget]),
       });
       viewButton(target, 'danglingTierStepTarget').click();
@@ -358,164 +315,44 @@ describe('ChecksValidationTab (mounted)', () => {
 
 // ── THE PAIR, AND THE HOST THAT JOINS IT (issue 1517) ───────────────────────────────────────
 //
-// THE HAYSTACK, STATED. Every scan below reads source text with its COMMENTS STRIPPED, and that
-// is not tidiness: this change documents each address in prose immediately above the code that
-// writes it — the producer's table names `checks-roll-formula` and `checks-triggers` in a
-// docblock, and both destinations explain their stamp in an HTML comment — so an un-stripped
-// scan would find every address in the sentence explaining it and report a destination as
-// stamped when nothing stamps it. `stripComments` removes HTML comment blocks, block comments
-// and whole-line `//` comments; string literals are deliberately left in, because the attribute
-// values themselves ARE string literals and are what is being read.
-const SOURCE_ROOT = 'src/ui/svelte/apps/manager';
-
-function stripComments(source) {
-  return source
-    .replaceAll(/<!--[\s\S]*?-->/gu, '')
-    .replaceAll(/\/\*[\s\S]*?\*\//gu, '')
-    .replaceAll(/^[ \t]*\/\/.*$/gmu, '');
-}
-
-function sourceOf(relativePath) {
-  return stripComments(readFileSync(resolve(repoRoot, `${SOURCE_ROOT}/${relativePath}`), 'utf8'));
-}
-
-describe('every Checks address the producer emits is carried by a real control', () => {
-  // The producer's own table, read out of its source rather than restated here. Restating it
-  // would make this gate agree with a copy of the thing it is checking.
-  const producer = sourceOf('checks/ChecksValidationTab.svelte');
-  const table = /const CHECK_ISSUE_CONTROLS = Object\.freeze\(\{([\s\S]*?)\n {2}\}\);/u.exec(
-    producer
-  );
-  const emitted = table ? [...new Set([...table[1].matchAll(/'([^']+)',/gu)].map((m) => m[1]))] : [];
-
+// Both contracts below are registered from `tests/helpers/validationAddressContracts.js`, driven
+// by THIS route's facts: the producer's own table, the destination declared for each address it
+// emits, and the host's own route call. The machinery those facts feed — the comment stripping
+// that keeps a scan from finding an address in the sentence explaining it, both attribute
+// spellings, the focusability read that a mounted assertion cannot make, and the ordering — is
+// written once there and explained in its docblock. It was a per-suite copy until the SonarCloud
+// new-code duplication gate counted this file's copy and the recipe-item editor's as one shape.
+describeValidationAddressPairing({
+  title: 'every Checks address the producer emits is carried by a real control',
+  producerFile: 'checks/ChecksValidationTab.svelte',
+  tableName: 'CHECK_ISSUE_CONTROLS',
+  tablePattern: /const CHECK_ISSUE_CONTROLS = Object\.freeze\(\{([\s\S]*?)\n {2}\}\);/u,
+  addressPattern: /'([^']+)',/gu,
+  expectedAddressCount: 2,
+  expectation: 'the roll field and the trigger list',
   // WHICH FILE IS SUPPOSED TO CARRY WHICH ADDRESS. This is the half a producer cannot check: an
   // address no control carries is a View button that changes route and focuses nothing, and
   // neither half alone can see it.
-  const DESTINATIONS = {
+  destinations: {
     'checks-roll-formula': 'checks/CheckFormulaFields.svelte',
     'checks-triggers': 'checks/CheckTriggers.svelte',
-  };
-
-  it('reads a non-empty address table out of the producer, so the clauses below are not vacuous', () => {
-    assert.ok(
-      Boolean(table),
-      'the `CHECK_ISSUE_CONTROLS` table could not be located in the producer'
-    );
-    assert.equal(
-      emitted.length,
-      2,
-      `read ${emitted.length} distinct addresses; expected the roll field and the trigger list`
-    );
-  });
-
-  it('stamps every emitted focusTarget on a control in the section its route names', () => {
-    const missing = [];
-    for (const address of emitted) {
-      const file = DESTINATIONS[address];
-      if (!file) {
-        missing.push(`${address}: no destination file is declared for it`);
-        continue;
-      }
-      const destination = sourceOf(file);
-      // BOTH SPELLINGS, because an address may ride a primitive's attribute bag and reach the
-      // DOM as an object key rather than as a written attribute.
-      const written = destination.includes(`data-validation-target="${address}"`);
-      const bagged = destination.includes(`'data-validation-target': '${address}'`);
-      if (!written && !bagged) missing.push(`${address}: ${file} carries no such control`);
-    }
-    assert.deepEqual(
-      missing,
-      [],
-      'these addresses are emitted by a validation row and carried by nothing, so the row ' +
-        'action would change route and focus nothing:\n  ' +
-        missing.join('\n  ')
-    );
-  });
-
-  it('declares no destination the producer never emits', () => {
-    assert.deepEqual(
-      Object.keys(DESTINATIONS).filter((address) => !emitted.includes(address)),
-      [],
-      'a destination is declared for an address no row carries; either the producer dropped it ' +
-        'or this list is stale'
-    );
-  });
-
-  it('stamps every address on an element that can REALLY take focus', () => {
-    // THE MUTATION THIS EXISTS FOR, and it is the one a mounted assertion cannot see: happy-dom
-    // focuses anything — `.focus()` on a bare `<div>` sets `document.activeElement` — so moving
-    // a stamp off the field control and onto its wrapper leaves every mounted clause passing
-    // while a real browser focuses nothing and `focusValidationTarget` refuses the target. The
-    // element carrying each address is therefore read off the SOURCE: either it is one of the
-    // tags that take focus with no `tabindex` of their own, or it declares BOTH the `tabindex`
-    // that makes the focus real and the `data-keyboard-focus` that tells Foundry the window is
-    // focused — without the second, Space pauses the game and the arrows pan the canvas.
-    const NATIVELY_FOCUSABLE = new Set(['input', 'button', 'select', 'textarea']);
-    const offenders = [];
-    for (const [address, file] of Object.entries(DESTINATIONS)) {
-      const source = sourceOf(file);
-      const stamp = source.indexOf(`data-validation-target="${address}"`);
-      if (stamp === -1) {
-        offenders.push(`${address}: ${file} carries no such stamp`);
-        continue;
-      }
-      // The element the stamp rides: back to the nearest tag opening, forward to its close.
-      const opening = source.slice(0, stamp).lastIndexOf('<');
-      const element = source.slice(opening, source.indexOf('>', stamp) + 1);
-      const tag = (/^<([a-zA-Z][\w-]*)/u.exec(element) ?? [])[1] || '';
-      if (NATIVELY_FOCUSABLE.has(tag.toLowerCase())) continue;
-      if (!/tabindex="-1"/u.test(element)) {
-        offenders.push(`${address}: <${tag}> in ${file} takes focus from nothing — no tabindex`);
-        continue;
-      }
-      if (!/data-keyboard-focus="true"/u.test(element)) {
-        offenders.push(`${address}: <${tag}> in ${file} does not declare itself focused`);
-      }
-    }
-    assert.deepEqual(
-      offenders,
-      [],
-      'a validation row addresses one of these, and the element it resolves to cannot hold ' +
-        'focus, so the action would change route and focus nothing:\n  ' + offenders.join('\n  ')
-    );
-  });
+  },
+  routeNoun: 'route',
+  destinationNoun: 'section',
 });
 
-describe('ChecksView wires the row action in the order the mechanism needs', () => {
-  const host = stripComments(
-    readFileSync(resolve(repoRoot, `${SOURCE_ROOT}/checks/ChecksView.svelte`), 'utf8')
-  );
-
-  it('passes its own handler to the validation tab', () => {
-    assert.match(host, /<ChecksValidationTab[\s\S]*?onSelectIssue=\{selectIssue\}/u);
-  });
-
-  it('opens the route BEFORE it awaits the focus move, and announces only after', () => {
-    // THE ORDER IS THE MECHANISM. `onOpenActivity` is the router's synchronous state write, and
-    // the helper defers with `queueMicrotask` so Svelte has flushed it and the destination
-    // panel exists when the query runs; awaiting the focus move first would query a panel that
-    // is not in the DOM. And the announcement is derived FROM the element the helper resolved,
-    // so it cannot be written before focus moved.
-    const body = /async function selectIssue\([\s\S]*?\n {2}\}/u.exec(host);
-    assert.ok(Boolean(body), 'the row-action handler could not be located');
-    const route = body[0].indexOf('onOpenActivity(');
-    const focus = body[0].indexOf('await focusValidationTarget(');
-    const announce = body[0].indexOf('issueAnnouncement =');
-    assert.ok(route >= 0 && focus >= 0 && announce >= 0, 'all three steps must be present');
-    assert.ok(route < focus, 'the route must be opened before the focus move is awaited');
-    assert.ok(focus < announce, 'the announcement must be written after the focus move resolved');
-  });
-
-  it('hosts the live region OUTSIDE the route switch, so the route change cannot unmount it', () => {
-    // The defect this shape exists to prevent: the surface that would otherwise host the region
-    // is inside `{#if activity === 'validation'}`, and the row action's whole job is to leave
-    // that branch — so the region would be unmounted in the same update that was supposed to
-    // announce.
-    const region = host.indexOf('data-checks-issue-announcement');
-    const chain = host.indexOf("{#if activity === 'validation'}");
-    assert.ok(region >= 0, 'the live region must exist');
-    assert.ok(chain >= 0, 'the route switch must exist');
-    assert.ok(region < chain, 'the region sits outside the route switch');
-    assert.match(host, /data-checks-issue-announcement[\s\S]{0,120}\{#if issueAnnouncement\}/u);
-  });
+describeValidationHostContract({
+  title: 'ChecksView wires the row action in the order the mechanism needs',
+  hostFile: 'checks/ChecksView.svelte',
+  tabComponent: 'ChecksValidationTab',
+  routeCall: 'onOpenActivity(',
+  regionMarker: 'data-checks-issue-announcement',
+  regionOutsideNoun: 'route switch',
+  mustPrecede: [
+    {
+      marker: "{#if activity === 'validation'}",
+      present: 'the route switch must exist',
+      order: 'the region sits outside the route switch',
+    },
+  ],
 });
