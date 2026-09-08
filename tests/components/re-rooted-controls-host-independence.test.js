@@ -3468,15 +3468,25 @@ test('the option-card radio takes its type from the field floor it shares a root
  * would have met, because "there was nothing to floor" and "a floor here would have been wrong"
  * are two different claims and only the second is true.
  *
- * WHAT A FLOOR IS, STATED PRECISELY, because both these families DO type bare elements and none of
- * those rules is a floor. A floor is `<root> <bare element>` and nothing else — two compounds, the
- * first the namespace root alone, the second carrying no class, attribute or id — which is the
- * (0,1,1) shape every shipped member of the `fabricate.css` floor group takes. The link field's
- * `.fabricate-link-field .manager-item-drop-zone-copy small` is NOT that: it is (0,2,1), it types
- * a `<small>` inside a class the component itself writes, and it reaches no control anybody else
- * could put there. The predicate below is written to that shape and is proved to FIRE on the
- * shipped floor group, so its zero for these two families is a measurement rather than a filter
- * that stopped matching.
+ * WHAT A FLOOR IS, STATED PRECISELY, and the two families do NOT stand in the same place against
+ * it. A floor is `<root> <bare element>` and nothing else — two compounds, the first the namespace
+ * root alone, the second carrying no class, attribute or id — which is the (0,1,1) shape every
+ * shipped member of the `fabricate.css` floor group takes.
+ *
+ * THE LINK FIELD DOES TYPE BARE ELEMENTS: five of its fourteen rules end in one (`strong`, `small`
+ * and `img`, counting the grouped `strong, small` prelude once), and not one of them is a floor.
+ * `.fabricate-link-field .manager-item-drop-zone-copy small` is the closest of them and is still
+ * not that: it is (0,2,1), it types a `<small>` inside a class the component itself writes, and it
+ * reaches no control anybody else could put there. Its zero is a real discrimination.
+ *
+ * THE STATUS CARD TYPES NONE AT ALL: all ten of its rules name a class in every compound, so the
+ * floor predicate is quantifying over an empty domain and its zero would hold whatever the
+ * predicate said. What carries that clause is therefore not the zero but the two guards around it
+ * — `familyRootedAt`'s size floor, which proves the family is present and was not renamed away,
+ * and the predicate's own proof that it FIRES on the shipped `.fabricate-tabs button` — plus the
+ * published rank beside the refusal. Stated here because "no rule of this shape" and "no rule that
+ * could have had this shape" read identically in a passing run, and only the link field is the
+ * first one.
  */
 
 /**
@@ -3513,6 +3523,21 @@ function floorShaped(family, root) {
   });
 }
 
+/**
+ * The rules in `family` whose selector ENDS in a bare element, floor-shaped or not.
+ *
+ * This is the domain `floorShaped` discriminates within, and the two clauses below report it
+ * because a zero from `floorShaped` means two different things depending on it: over a non-empty
+ * domain it is a discrimination, and over an empty one it is a tautology (issue 1509 review r1).
+ * A grouped prelude counts ONCE — `.a .b strong, .a .b small` is one rule and one entry.
+ *
+ * @param {Array<{selectorText: string}>} family
+ * @returns {Array<{selectorText: string}>}
+ */
+function endingInBareElement(family) {
+  return family.filter((rule) => /(?:^|[\s>+~])[a-z][\w-]*$/u.test(rule.selectorText));
+}
+
 test('the status card family declares no font floor and no focus pair', async () => {
   const tab = await browser.newPage();
   try {
@@ -3541,6 +3566,22 @@ test('the status card family declares no font floor and no focus pair', async ()
         '— the switch inside the card is `StatusToggle`s, composed — so a floor here would type a ' +
         'bare element for a primitive that already floors its own, and would reach any element a ' +
         'CALLER put inside the card as well.'
+    );
+
+    // AND THE ZERO ABOVE IS A TAUTOLOGY HERE, SAID OUT LOUD (issue 1509 review r1). Every one of
+    // this family's rules names a class in every compound, so `floorShaped` is quantifying over an
+    // empty domain and would report a zero whatever it tested. What actually carries this refusal
+    // is the size floor in `familyRootedAt`, the predicate's proof that it fires on the shipped
+    // `.fabricate-tabs button`, and the rank published below. This assertion pins the emptiness
+    // itself, so the day the card starts typing a bare element the contrast drawn in the docblock
+    // — link field five, status card none — reds instead of quietly becoming false.
+    assert.deepEqual(
+      endingInBareElement(family).map((rule) => rule.selectorText),
+      [],
+      'the status card now ends a rule in a bare element. That is not a failure by itself, but ' +
+        'the refusal above was recorded over an EMPTY domain and is no longer the same claim: ' +
+        're-read whether a floor is now the right answer for this family rather than deleting ' +
+        'this line.'
     );
 
     // AND NO FOCUS PAIR, AND THE RANK IS PUBLISHED RATHER THAN ASSERTED. A pair would be
@@ -3600,15 +3641,26 @@ test('the link field family declares no font floor and no focus pair', async () 
         'floors at its own root.'
     );
 
-    // The family DOES type bare elements, five of them, and none is a floor. Asserted so the zero
-    // above cannot be mistaken for "this family types nothing" — the predicate is shape, not
-    // absence, and a reader reconciling the two needs the second number.
-    const typedBareElement = family.filter(
-      (rule) =>
-        /(?:^|[\s>+~])[a-z][\w-]*$/u.test(rule.selectorText) &&
-        rule.properties.some(
-          (property) => property.startsWith('font') || property === 'line-height'
-        )
+    // THE DOMAIN THE ZERO ABOVE WAS MEASURED OVER IS NOT EMPTY, which is what makes it a
+    // discrimination rather than a tautology, and is the half the status card cannot claim. Five
+    // of this family's rules end in a bare element — `img` under the icon, and `strong`/`small`
+    // under the copy in both faces, the grouped `strong, small` prelude counting once — and not
+    // one of them is floor-shaped.
+    assert.equal(
+      endingInBareElement(family).length,
+      5,
+      'the link field no longer ends five rules in a bare element, so `floorShaped`s zero above ' +
+        'has stopped discriminating and the docblock`s contrast with the status card is stale: ' +
+        endingInBareElement(family)
+          .map((rule) => rule.selectorText)
+          .join(', ')
+    );
+
+    // Of those five, the three that TYPE it. Asserted separately because the zero above cannot be
+    // mistaken for "this family types nothing" — the predicate is shape, not absence, and a
+    // reader reconciling the two needs the second number.
+    const typedBareElement = endingInBareElement(family).filter((rule) =>
+      rule.properties.some((property) => property.startsWith('font') || property === 'line-height')
     );
     assert.equal(
       typedBareElement.length,

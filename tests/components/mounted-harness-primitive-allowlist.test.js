@@ -232,6 +232,35 @@ const SHARED_PRIMITIVES = [
   // list's rule read the other way; the two rulings were taken as one question and the second is
   // recorded below rather than by silence.
   'src/ui/svelte/components/Medallion.svelte',
+  // THE FOUR THAT ARRIVED IN `components/` AT ISSUE 1509, adjudicated together because the change
+  // that moved them made no ruling either way and four unadjudicated arrivals in the directory
+  // this list quantifies over is the omission `Avatar` is recorded below to prevent.
+  //
+  // Measured against the bar the `Avatar` note states — a THIRD tree — by the walk this file
+  // already runs: the mounted suites whose named components' import closure reaches the
+  // primitive, this suite itself excluded. `RadioCardGroup` 14, `ToggleCard` 17, `ItemDropZone`
+  // 22, `ArmedDangerButton` 19, against `Avatar`'s 4 and `Medallion`'s 47. Every one of them
+  // clears the bar several times over, and their callers are spread across unrelated screen
+  // families rather than massed on one — which is the half of the bar a raw count hides. The
+  // radio group is rendered by the Checks Studio, the Tool Studio, the crafting settings pane,
+  // the gathering economy panel and the world tool entry; the drop zone by both world
+  // catalogues, the world tool and essence entries, the recipe-item editor, the component
+  // complications section and the Checks DC macro card; the danger button by every bulk panel,
+  // both Knowledge rows, the scoped membership actions and three world entry screens.
+  //
+  // WHAT MEMBERSHIP BUYS, stated over the population it is for. Two of the harnesses that mount
+  // these four are HAND-ROLLED — `gathering-economy-view-mounted` and `manager-mounted` both
+  // drive their own temp tree through `createSvelteCompiler`, so neither gets
+  // `validateMountedComponentDependencies`'s named `before()` throw and an omission costs a
+  // silent `# cancelled`. `manager-mounted` compiles all four; the economy view compiles the
+  // radio group, and it is the only place in the repository outside `manager-mounted` where a
+  // hand-rolled tree renders one. Each is compiled by its harness today, so these four entries
+  // pin a state that holds rather than repair a broken one — which is the useful case for a
+  // guard, not the trivial one.
+  'src/ui/svelte/components/RadioCardGroup.svelte',
+  'src/ui/svelte/components/ToggleCard.svelte',
+  'src/ui/svelte/components/ItemDropZone.svelte',
+  'src/ui/svelte/components/ArmedDangerButton.svelte',
 ];
 
 /**

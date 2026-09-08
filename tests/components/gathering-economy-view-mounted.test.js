@@ -171,6 +171,30 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     const resolutionCard = target.querySelector('[data-gathering-resolution-mode]');
     assert.ok(resolutionCard, 'gathering resolution-mode card should render');
 
+    // THE CARD WEARS ITS COMPACT FACE, and that is a PROP this view has to state (issue 1509).
+    // `RadioCardGroup.configCards` defaults to TRUE. This site reached the primitive through the
+    // deleted `ResolutionModeCard` shim, which derived `isConfigCard = variant === 'config-card'`
+    // and — because this call passes no `variant` — handed it FALSE, so the view now writes
+    // `configCards={false}` explicitly. Deleting that one prop flips a SHIPPED GM surface from
+    // these compact single-column rows to the two-column icon-tile config-card face:
+    // `.manager-resolution-mode-card.is-config-cards .manager-resolution-mode-options` is the
+    // `grid-template-columns: repeat(2, …)` rule, plus the per-row border, radius and fill. The
+    // class is the whole observable difference here — these three options carry no `icon`, so the
+    // `configCards && option.icon` branch renders nothing either way — which is why this assertion
+    // is the only thing standing between that flip and a green suite.
+    assert.ok(
+      !resolutionCard.classList.contains('is-config-cards'),
+      'the gathering resolution card is wearing the config-card face. `configCards={false}` has ' +
+        'been dropped from the `<RadioCardGroup>` call in `GatheringEconomyView.svelte` and the ' +
+        'primitive`s `true` default has taken over: this card is now a two-column grid of ' +
+        'bordered tiles instead of the compact rows it ships as.'
+    );
+    assert.ok(
+      !resolutionCard.closest('.is-config-cards'),
+      'and no ancestor supplies the class either, so the check above is reading the element the ' +
+        'rules actually select on'
+    );
+
     // The resolution card renders BEFORE the limitation-mode card in document order.
     const limitationCard = target.querySelector('[data-economy-mode-card]');
     assert.ok(limitationCard, 'limitation mode card should render');

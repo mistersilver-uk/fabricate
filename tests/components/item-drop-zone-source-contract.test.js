@@ -101,6 +101,77 @@ function callSites() {
     .map(([file]) => file);
 }
 
+/**
+ * Every element in the primitive's own template that carries a spread, with its bare attributes.
+ *
+ * @returns {{hosts: string[], bare: string[]}} `hosts` names every spread-carrying element,
+ *   `bare` every valueless attribute found on one, as `<element> name`.
+ */
+function spreadHosts() {
+  const source = SOURCES[ZONE_PATH];
+  assert.ok(source, `${ZONE_PATH} is no longer in the component corpus this gate reads`);
+  const hosts = [];
+  const bare = [];
+  walkTemplate(parse(source, { modern: true, filename: ZONE_PATH }).fragment, (node) => {
+    if (node.type !== 'RegularElement') return;
+    const attributes = node.attributes ?? [];
+    if (!attributes.some((attribute) => attribute.type === 'SpreadAttribute')) return;
+    hosts.push(node.name);
+    for (const attribute of attributes) {
+      // `value === true` is the AST's marker for a VALUELESS attribute — `data-x` rather than
+      // `data-x=""` or `{x}`, both of which carry a value node. Same test the shared factory's
+      // valueless clause uses on CALL SITES; this one turns it on the primitive itself.
+      if (attribute.type === 'Attribute' && attribute.value === true) {
+        bare.push(`<${node.name}> ${attribute.name}`);
+      }
+    }
+  });
+  return { hosts, bare };
+}
+
+test('no attribute on a spread-carrying element of the zone is written bare', () => {
+  // THE DEFECT THIS PINS SHIPPED GREEN ONCE ALREADY (issue 1509, deviation D12a). Converting the
+  // thirteen `kind ===` branches into `hookAttrs` gave the root element a spread, and Svelte
+  // collects every attribute on a spread element into ONE object where a bare attribute is the
+  // boolean `true` and `set_attribute` writes the string `"true"`. The root's
+  // `data-manager-item-drop-zone` therefore began rendering `="true"` rather than `=""` for every
+  // caller, and it was caught by a before/after render diff rather than by a test — because all
+  // ten of its consumers are PRESENCE selectors (`[data-manager-item-drop-zone]`), which resolve
+  // identically either way. Reverting the value to bare leaves the whole suite green without
+  // this clause, which is exactly why it exists.
+  //
+  // Stated over EVERY spread host rather than over the one attribute, because the hazard is the
+  // spread and the zone has four regions: the day the hint line or an action grows a bare hook
+  // beside its spread, the same silent flip happens there and no consumer notices.
+  const { hosts, bare } = spreadHosts();
+  assert.ok(
+    hosts.length > 0,
+    `${ZONE_PATH} has no spread-carrying element left, so this clause has no domain. Either the ` +
+      '`hookAttrs` bag is gone — which the region clause below would also report — or the walk ' +
+      'stopped reaching the template.'
+  );
+  assert.deepEqual(
+    bare,
+    [],
+    'an attribute on a spread-carrying element of the link field is written bare, so it renders ' +
+      '`="true"` rather than `=""`. Write `attribute=""`. Every consumer of these hooks is a ' +
+      'presence selector, so nothing else in the suite can see the difference.'
+  );
+});
+
+test('the root still carries its own presence hook, spelled with an explicit empty value', () => {
+  // AND THE ONE THAT MATTERS BY NAME, so the clause above cannot pass by the root losing the hook
+  // instead of fixing it. Ten consumers select `[data-manager-item-drop-zone]` — four mounted
+  // suites and the host-independence fixture, which reproduces this element's markup verbatim.
+  const root = /data-manager-item-drop-zone=""/.test(SOURCES[ZONE_PATH]);
+  assert.ok(
+    root,
+    'the link field root no longer writes `data-manager-item-drop-zone=""`. It is the hook every ' +
+      'consumer of this zone selects on, and the EXPLICIT empty value is load-bearing: the root ' +
+      'carries a spread, so a bare spelling renders `="true"`.'
+  );
+});
+
 test('the hook region set is the closed four, in the order the zone spreads them', () => {
   assert.deepEqual(
     declaredRegions(),

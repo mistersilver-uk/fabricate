@@ -150,9 +150,17 @@ definePrimitiveAdoptionContract({
  * domain by the primitive's own path keeps both the guard and the pinned set meaning what they
  * meant: everything in the manager, and the file that is supposed to write this.
  *
- * @returns {string[]} repo-relative paths, one entry per raw tablist element
+ * ONE WALK, TWO VIEWS, because the domain drifted once already. The `<div>`-host clause at the
+ * foot of this file used to run its own copy of this loop, and when the primitive left
+ * `apps/manager/` only ONE of the two copies was widened — so the host clause silently shrank to
+ * `WorldDowntimeTabs` alone while its `hosts.length > 0` vacuity guard still reported "alive" on
+ * that single survivor. Both readings are derived from this function now: a future move changes
+ * the domain in one place or in neither.
+ *
+ * @returns {{file: string, element: string}[]} one entry per raw tablist element, with the tag
+ *   name it is hosted on, in code-point order by path
  */
-function rawManagerTablists() {
+function rawTablistElements() {
   const found = [];
   for (const [file, source] of Object.entries(SOURCES)) {
     if (!file.startsWith(MANAGER_DIRECTORY) && file !== PRIMITIVE) continue;
@@ -162,7 +170,9 @@ function rawManagerTablists() {
         (attribute) => attribute.type === 'Attribute' && attribute.name === 'role'
       );
       if (!role) return;
-      if (/role=["']tablist["']/.test(source.slice(role.start, role.end))) found.push(file);
+      if (/role=["']tablist["']/.test(source.slice(role.start, role.end))) {
+        found.push({ file, element: node.name });
+      }
     });
   }
   // CODE POINT, never `localeCompare`. This list is compared by EQUALITY against a pinned one,
@@ -170,7 +180,12 @@ function rawManagerTablists() {
   // locale-dependent, so two machines can order the same set differently and one of them reds a
   // pin the other passes. It also orders `EditorTabs.svelte` after `downtime/…` where code point
   // orders it before, which is how this clause first failed.
-  return found.sort(byCodePoint);
+  return found.sort((left, right) => byCodePoint(left.file, right.file));
+}
+
+/** @returns {string[]} repo-relative paths, one entry per raw tablist element */
+function rawManagerTablists() {
+  return rawTablistElements().map((entry) => entry.file);
 }
 
 /**
@@ -232,21 +247,19 @@ test('every manager tablist element is a div, so no implicit landmark is overrid
   // reports it, while a `<div>` has no implicit role to conflict with. The reasoning outlived the
   // file that stated it because `EditorTabs` renders the same host, and it is asserted here so
   // the primitive cannot quietly change host and take every caller with it.
-  const hosts = [];
-  for (const [file, source] of Object.entries(SOURCES)) {
-    if (!file.startsWith(MANAGER_DIRECTORY)) continue;
-    walkTemplate(parse(source, { modern: true, filename: join(repoRoot, file) }).fragment, (node) => {
-      if (node.type === 'Component') return;
-      const role = (node.attributes ?? []).find(
-        (attribute) => attribute.type === 'Attribute' && attribute.name === 'role'
-      );
-      if (!role) return;
-      if (/role=["']tablist["']/.test(source.slice(role.start, role.end))) {
-        hosts.push(`${file} <${node.name}>`);
-      }
-    });
-  }
-  assert.ok(hosts.length > 0, 'no tablist host was found, so this clause has no domain');
+  //
+  // THE DOMAIN IS THE WIDENED ONE (issue 1509): `apps/manager/` PLUS the primitive's own path,
+  // because the primitive is the only file in it whose host this clause really guards. When the
+  // strip moved to `src/ui/svelte/components/` this clause kept its own `apps/manager/`-only copy
+  // of the walk, so its subject left the domain and hosting the strip on `<nav>` stayed green —
+  // `WorldDowntimeTabs` alone kept the `hosts.length > 0` guard reporting "alive" while the file
+  // that takes THIRTEEN rendering call sites with it was no longer read. Deriving both readings
+  // from `rawTablistElements` is what stops a future move from doing that again.
+  const hosts = rawTablistElements().map((entry) => `${entry.file} <${entry.element}>`);
+  assert.ok(
+    hosts.some((host) => host.startsWith(`${PRIMITIVE} `)),
+    'the primitive contributes no tablist host, so this clause is not reading the file it guards'
+  );
   assert.deepEqual(
     hosts.filter((host) => !host.endsWith('<div>')),
     [],
