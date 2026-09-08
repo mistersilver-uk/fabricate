@@ -161,11 +161,10 @@ const popover = definePrimitiveAdoptionContract({
     // The loop below still reads the primitive's own source and refuses a name it does not
     // declare with a `false` default, so this is a declaration being recorded, not a widening.
     'ignoreScrollWithin',
-    // Issue 1513's two, and `multiple` is the one a caller writes bare today
-    // (`ComponentSourcesBar`). `stayOpen` is recorded beside it although its first caller writes
-    // it bare as well, for the reason `ignoreScrollWithin` states above: a list of the
-    // primitive's boolean props that is missing one is a trap for the next caller, and the loop
-    // below re-reads the primitive's own source, so recording a name it does not declare with a
+    // Issue 1513's two, and they have DIFFERENT callers: `ComponentSourcesBar` writes
+    // `multiple` bare (which implies the gate), and `RecipeItemContentsTab` writes `stayOpen`
+    // bare without it — a single-value picker whose panel survives the choice. The loop below
+    // re-reads the primitive's own source, so recording a name it does not declare with a
     // `false` default reds here rather than widening anything.
     'multiple',
     'stayOpen',
@@ -248,7 +247,20 @@ function snippetTriggerName(site) {
  */
 const MULTI_SELECT_ADOPTERS = Object.freeze([
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
+  // The link-recipe picker, which takes the GATE ALONE (issue 1513, phase 4). Linking stays one
+  // choice at a time — no `multiple`, so the panel still announces a single-value listbox — but
+  // linking a second recipe is the common next action and each choice SHRINKS the option list it
+  // was made from, which is the case the gate's cursor clamp exists for.
+  'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte',
 ]);
+
+// THE TWO PROPS ARE READ THROUGH SEPARATE NON-VACUITY PROBES rather than through the adopter
+// list's first entry, because the entries no longer agree about which prop they pass. A single
+// probe against one file cannot see a reader that has stopped finding the other, and the
+// set-equality clause above passes either way: a pattern matching nothing makes it pass the day
+// both adopters are removed, which is the direction that hides.
+const MULTIPLE_ADOPTER = 'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte';
+const STAY_OPEN_ADOPTER = 'src/ui/svelte/apps/manager/recipe-item/RecipeItemContentsTab.svelte';
 
 test('`multiple` and `stayOpen` are passed by the adopters alone, so every other importer is unmoved', () => {
   const importers = measureImporters(repoRoot).importersOf(POPOVER_PATH);
@@ -271,13 +283,20 @@ test('`multiple` and `stayOpen` are passed by the adopters alone, so every other
 
   // NON-VACUITY, on the reader rather than on the result: a pattern that matched nothing would
   // make the deepEqual above pass the day the adopter list emptied, and a pattern that matched
-  // everything would fail loudly, which is the safe direction. This pins the first.
-  const adopterSource = readFileSync(join(repoRoot, MULTI_SELECT_ADOPTERS[0]), 'utf8');
+  // everything would fail loudly, which is the safe direction. This pins the first, once per
+  // prop, because the two adopters no longer both carry both names.
   assert.match(
-    adopterSource,
+    readFileSync(join(repoRoot, MULTIPLE_ADOPTER), 'utf8'),
     /(?<![\w-])multiple(?![\w-])/u,
-    'the reader must find the prop in the one file that passes it, or it is finding nothing ' +
+    'the reader must find `multiple` in the one file that passes it, or it is finding nothing ' +
       'anywhere and this clause is decorative'
+  );
+  assert.match(
+    readFileSync(join(repoRoot, STAY_OPEN_ADOPTER), 'utf8'),
+    /(?<![\w-])stayOpen(?![\w-])/u,
+    'the reader must find `stayOpen` in the one file that passes it WITHOUT `multiple`, or ' +
+      'the gate is being asserted through the prop that implies it and its own adoption is ' +
+      'unmeasured'
   );
 });
 

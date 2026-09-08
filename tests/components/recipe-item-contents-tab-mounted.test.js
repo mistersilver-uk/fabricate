@@ -51,6 +51,28 @@ const AVAILABLE = [
   { id: 'r3', name: 'Veil Powder', category: 'Alchemy' },
 ];
 
+// A library rather than a handful, because the search field and the matched-of-total count are
+// only meaningful over one — and because the two "Verd…" names are what let a typed query
+// narrow the list to more than one row, which is the state a choose has to survive.
+const LIBRARY = [
+  { id: 'r1', name: 'Alloy Bronze', category: 'Smithing' },
+  { id: 'r2', name: 'Refine Steel', category: 'Smithing' },
+  { id: 'r3', name: 'Veil Powder', category: 'Alchemy' },
+  { id: 'r4', name: 'Verdant Tonic', category: 'Alchemy' },
+  { id: 'r5', name: 'Verdigris Salve', category: 'Alchemy' },
+];
+
+function openPicker(root) {
+  root.querySelector('[data-recipe-item-link-recipe-toggle]').click();
+  flushSync();
+  return {
+    panel: () => root.querySelector('.manager-travel-popover'),
+    search: () => root.querySelector('.manager-travel-popover-search input'),
+    count: () => root.querySelector('[data-popover-filtered-count]'),
+    options: () => root.querySelectorAll('[data-recipe-item-link-recipe-option]'),
+  };
+}
+
 before(() => harness.setup());
 after(() => harness.teardown());
 afterEach(() => harness.remount());
@@ -135,6 +157,81 @@ describe('RecipeItemContentsTab (mounted)', () => {
     assert.equal(options[0].getAttribute('data-recipe-item-link-recipe-option'), 'r3');
     options[0].click();
     assert.deepEqual(calls, ['r3']);
+  });
+
+  // ── THE PICKER IS SEARCHABLE (issue 1513) ──────────────────────────────────────────────
+  // It passed `showSearch={false}` and announced `aria-haspopup="listbox"`, which is the shape
+  // of the four converted MENUS — a handful of fixed names. This panel offers every recipe in
+  // the world that is not already linked, so the field and the count come on and the truthful
+  // `dialog` default comes back with them.
+  it('renders a search field over the linkable library and states matched-of-total', async () => {
+    const root = await harness.mount({ linkedRecipes: [], availableRecipes: LIBRARY });
+    const picker = openPicker(root);
+
+    assert.ok(Boolean(picker.search()), 'the panel renders its search field');
+    assert.equal(picker.search().getAttribute('placeholder'), 'Search recipes…');
+    assert.equal(picker.search().getAttribute('aria-label'), 'Search recipes…');
+    assert.equal(picker.count().textContent.trim(), '5 of 5');
+
+    picker.search().value = 'Verd';
+    picker.search().dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+
+    assert.equal(picker.options().length, 2);
+    assert.equal(picker.count().textContent.trim(), '2 of 5');
+  });
+
+  // `triggerHasPopup` came off WITH `showSearch={false}`, because the two are one statement read
+  // from either end: with a query field in it the panel is a dialog that CONTAINS a listbox, and
+  // announcing a bare listbox promises a control the GM never gets. The source contract holds
+  // the rule; this holds the rendered attribute, which is the thing a screen reader reads.
+  it('announces the dialog it opens rather than a bare listbox', async () => {
+    const root = await harness.mount({ linkedRecipes: [], availableRecipes: LIBRARY });
+    assert.equal(
+      root.querySelector('[data-recipe-item-link-recipe-toggle]').getAttribute('aria-haspopup'),
+      'dialog'
+    );
+    // Single-select is UNCHANGED: `stayOpen` is the gate alone, so the list must not announce
+    // itself as multi-selectable.
+    const picker = openPicker(root);
+    assert.equal(
+      picker.panel().querySelector('[role="listbox"]').hasAttribute('aria-multiselectable'),
+      false,
+      'linking is one choice at a time, so the list is not multi-selectable'
+    );
+  });
+
+  // ── THE PANEL SURVIVES A CHOICE (issue 1513) ───────────────────────────────────────────
+  // Linking a second recipe was: re-open the trigger, re-type the query, re-find the place in
+  // the library. `stayOpen` is that whole cost, and the query surviving with it is half of the
+  // point — a panel that reopened empty-handed would still be closing the loop on the GM.
+  it('stays open across choices, keeping the typed query and the rows it matched', async () => {
+    const calls = [];
+    const root = await harness.mount({
+      linkedRecipes: [],
+      availableRecipes: LIBRARY,
+      onLinkRecipe: (id) => calls.push(id),
+    });
+    const picker = openPicker(root);
+
+    picker.search().value = 'Verd';
+    picker.search().dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    assert.equal(picker.options().length, 2);
+
+    picker.options()[0].click();
+    flushSync();
+
+    assert.deepEqual(calls, ['r4'], 'the first choice reaches the caller');
+    assert.ok(Boolean(picker.panel()), 'the panel is still open after a choice');
+    assert.equal(picker.search().value, 'Verd', 'the typed query survives the choice');
+    assert.equal(picker.options().length, 2, 'the matched rows survive the choice');
+
+    // THE SECOND LINK WITHOUT RE-OPENING, which is the whole capability. A gate that closed the
+    // panel would leave nothing here to click.
+    picker.options()[1].click();
+    flushSync();
+    assert.deepEqual(calls, ['r4', 'r5']);
   });
 
   it('disables the link affordance when nothing is linkable', async () => {

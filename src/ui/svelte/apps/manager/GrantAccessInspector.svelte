@@ -2,7 +2,7 @@
 <!--
   Grant-access inspector for the selected recipe (Books & Scrolls `restricted`
   visibility mode). Two independent rosters — Characters and Players — each with
-  its own search box and a fixed-size pager. Toggling any row grants or revokes
+  its own search box and the shared pagination bar. Toggling any row grants or revokes
   that character/player independently and persists the FULL access snapshot via
   onSaveAccess (characters and players are separate arrays). Grant state is read
   from `recipe.access`, so searching or paging never loses a grant.
@@ -21,12 +21,22 @@
   import { resolveRecipeImage } from '../../util/craftingImageDefaults.js';
   import { getRecipeCategoryLabel } from '../../../../utils/recipeCategories.js';
   import RosterRow from './RosterRow.svelte';
-  import IconButton from '../../components/IconButton.svelte';
+  import Pagination from '../../components/Pagination.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import { createRecipeAccessBrowserState } from '../../../../utils/managerBrowserViewState.js';
 
-  // Fixed roster page size (design: 6 per roster). A search box appears only when
-  // the roster is longer than one page.
+  // Fixed roster page size (design: 6 per roster).
+  //
+  // THE SEARCH FIELD IS UNCONDITIONAL (issue 1513). It used to render only where the roster
+  // was longer than one page, which withheld it from exactly the rosters a GM reads most: a
+  // world of six characters drew no way to find one by name at all, and a field that appears
+  // when a seventh actor joins reads as a layout glitch rather than as a capability. Nothing
+  // about finding a name by typing it depends on how many names there are.
+  //
+  // THE PAGER KEEPS ITS THRESHOLD, and that is not an inconsistency: a bar that can only say
+  // "Page 1 of 1" states nothing the list beneath it does not already show. The shared
+  // primitive computes it identically — with showPageSize={false} and this page size, its own
+  // totalCount > minPageSize gate is > 6, the same number the hand-rolled bar tested.
   const ROSTER_PAGE_SIZE = 6;
 
   let {
@@ -151,7 +161,6 @@
       key: 'characters',
       title: text('FABRICATE.Admin.Manager.Access.Characters', 'Characters'),
       icon: 'fas fa-user',
-      showSearch: characterRows.length > ROSTER_PAGE_SIZE,
       query: charQuery,
       searchPlaceholder: text(
         'FABRICATE.Admin.Manager.Access.SearchCharacters',
@@ -163,8 +172,7 @@
       },
       slice: charSlice,
       page: charPage,
-      onPrev: () => (ui.characterPageIndex = Math.max(0, charPage - 1)),
-      onNext: () => (ui.characterPageIndex = charPage + 1),
+      onPageChange: (index) => (ui.characterPageIndex = index),
       granted: grantedCharacterIds,
       onToggle: toggleCharacter,
       dataAttr: 'data-access-character-row',
@@ -173,7 +181,6 @@
       key: 'players',
       title: text('FABRICATE.Admin.Manager.Access.Players', 'Players'),
       icon: 'fas fa-user-group',
-      showSearch: playerRows.length > ROSTER_PAGE_SIZE,
       query: playerQuery,
       searchPlaceholder: text('FABRICATE.Admin.Manager.Access.SearchPlayers', 'Search players…'),
       onSearch: (value) => {
@@ -182,17 +189,12 @@
       },
       slice: playerSlice,
       page: playerPage,
-      onPrev: () => (ui.playerPageIndex = Math.max(0, playerPage - 1)),
-      onNext: () => (ui.playerPageIndex = playerPage + 1),
+      onPageChange: (index) => (ui.playerPageIndex = index),
       granted: grantedPlayerIds,
       onToggle: togglePlayer,
       dataAttr: 'data-access-player-row',
     },
   ]);
-
-  function totalPages(count) {
-    return Math.max(1, Math.ceil(count / ROSTER_PAGE_SIZE));
-  }
 </script>
 
 <div class="manager-access-inspector" data-access-inspector>
@@ -234,16 +236,14 @@
           <i class={section.icon} aria-hidden="true"></i>
           <span>{section.title}</span>
         </div>
-        {#if section.showSearch}
-          <ManagerSearchField
-            class="manager-access-roster-search"
-            value={section.query}
-            onInput={(next) => section.onSearch(next)}
-            placeholder={section.searchPlaceholder}
-            ariaLabel={section.searchPlaceholder}
-            inputAttrs={{ 'data-access-roster-search': section.key }}
-          />
-        {/if}
+        <ManagerSearchField
+          class="manager-access-roster-search"
+          value={section.query}
+          onInput={(next) => section.onSearch(next)}
+          placeholder={section.searchPlaceholder}
+          ariaLabel={section.searchPlaceholder}
+          inputAttrs={{ 'data-access-roster-search': section.key }}
+        />
         {#if section.slice.filtered.length === 0}
           <p class="manager-access-roster-empty" data-access-roster-empty={section.key}>
             {text('FABRICATE.Admin.Manager.Access.NoMatches', 'No matches')}
@@ -266,33 +266,25 @@
               />
             {/each}
           </div>
-          {#if section.slice.filtered.length > ROSTER_PAGE_SIZE}
-            <div class="manager-access-roster-pager" data-access-roster-pager={section.key}>
-              <span class="manager-access-roster-pager-label">
-                {text('FABRICATE.Admin.Manager.Pagination.PageOf', 'Page {page} of {total}')
-                  .replace('{page}', section.page + 1)
-                  .replace('{total}', totalPages(section.slice.filtered.length))}
-              </span>
-              <span class="manager-access-roster-pager-nav">
-                <IconButton
-                  data-access-roster-prev={section.key}
-                  ariaLabel={text('FABRICATE.Admin.Manager.Pagination.Previous', 'Previous page')}
-                  disabled={section.page === 0}
-                  onclick={section.onPrev}
-                >
-                  <i class="fas fa-chevron-left" aria-hidden="true"></i>
-                </IconButton>
-                <IconButton
-                  data-access-roster-next={section.key}
-                  ariaLabel={text('FABRICATE.Admin.Manager.Pagination.Next', 'Next page')}
-                  disabled={section.page >= totalPages(section.slice.filtered.length) - 1}
-                  onclick={section.onNext}
-                >
-                  <i class="fas fa-chevron-right" aria-hidden="true"></i>
-                </IconButton>
-              </span>
-            </div>
-          {/if}
+          <!-- THE SHARED PAGER (issue 1513), replacing a hand-rolled label-plus-two-arrows bar
+               that restated the primitive's own arithmetic, its own disabled rule and the same
+               three Pagination.* strings. It gains the range line — "Showing 7–8 of 8" — which
+               the hand-rolled bar never drew, and showPageSize={false} keeps a per-page selector
+               out of a 300px inspector column, which is the mode that prop exists for.
+
+               IT STAYS INSIDE [data-access-roster], and that placement is load-bearing: this
+               screen draws TWO of these bars and the primitive stamps a bare
+               data-pagination-prev/-next with no per-instance key, so the roster section is the
+               only thing that tells the two apart. The retired data-access-roster-prev/-next
+               hooks carried the key themselves; a reader of either addresses it by ancestor
+               now. -->
+          <Pagination
+            totalCount={section.slice.filtered.length}
+            pageSize={ROSTER_PAGE_SIZE}
+            pageIndex={section.page}
+            showPageSize={false}
+            onPageChange={section.onPageChange}
+          />
         {/if}
       </section>
     {/each}
@@ -343,22 +335,5 @@
     margin: 0;
     font-size: 0.74rem;
     color: var(--fab-text-subtle);
-  }
-
-  .manager-access-roster-pager {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--fab-space-2);
-  }
-
-  .manager-access-roster-pager-label {
-    font-size: 0.72rem;
-    color: var(--fab-text-subtle);
-  }
-
-  .manager-access-roster-pager-nav {
-    display: flex;
-    gap: var(--fab-space-2);
   }
 </style>

@@ -93,17 +93,33 @@
          `:global(...)` disabled rule below, which would otherwise stop reaching the chip.
 
          `is-neutral` rides `triggerClass` because the primitive renders the chip without a
-         `tone`, and that class is exactly what `tone="neutral"` emitted. `showSearch={false}`
-         keeps `triggerHasPopup="listbox"` truthful, and `showChevron={false}` keeps the trigger
-         an ADD control — its leading `fa-plus` says what it does, and a value chevron beside it
-         would imply it shows a current selection. -->
+         `tone`, and that class is exactly what `tone="neutral"` emitted. `showChevron={false}`
+         keeps the trigger an ADD control — its leading `fa-plus` says what it does, and a value
+         chevron beside it would imply it shows a current selection.
+
+         THE SEARCH FIELD IS ON, AND `triggerHasPopup` CAME OFF WITH IT (issue 1513). This panel
+         offers every recipe in the world that is not already linked, which on a real world is a
+         library rather than the handful of fixed names the four converted MENUS offer — and a
+         list you scroll to find a name in is the case the primitive's search exists for. The
+         two props move TOGETHER because they are one statement read from either end:
+         `aria-haspopup` says what activating the trigger OPENS, and with a query field in it
+         the panel is a dialog that CONTAINS a listbox rather than a bare listbox. Dropping the
+         prop takes the truthful `dialog` default, which is what
+         `searchable-popover-source-contract.test.js` holds in both directions.
+
+         `stayOpen` WITHOUT `multiple`, which is the separation issue 1513 built the gate for:
+         linking is still one choice at a time and the panel still announces a single-value
+         listbox, but linking a second recipe is the overwhelmingly common next action and
+         re-opening the trigger, re-typing the query and re-finding the place in the library
+         between each one is the whole cost. `showFilteredCount` states the matched-of-total the
+         field now makes reachable. -->
     <div class="manager-recipe-item-link-recipe">
       <SearchablePopover
         options={linkOptions}
         triggerChip
-        showSearch={false}
+        stayOpen
+        showFilteredCount
         showChevron={false}
-        triggerHasPopup="listbox"
         triggerClass="manager-recipe-item-link-recipe-toggle is-neutral"
         triggerIcon="fas fa-plus"
         triggerLabel={text('FABRICATE.Admin.Manager.RecipeItem.Contents.LinkRecipe', 'Link recipe')}
@@ -112,6 +128,14 @@
           'Link recipe'
         )}
         triggerData={{ 'data-recipe-item-link-recipe-toggle': '' }}
+        searchPlaceholder={text(
+          'FABRICATE.Admin.Manager.RecipeItem.Contents.SearchRecipes',
+          'Search recipes…'
+        )}
+        searchAriaLabel={text(
+          'FABRICATE.Admin.Manager.RecipeItem.Contents.SearchRecipes',
+          'Search recipes…'
+        )}
         disabled={linkable.length === 0}
         emptyHint={text(
           'FABRICATE.Admin.Manager.RecipeItem.Contents.NoneLinkable',
