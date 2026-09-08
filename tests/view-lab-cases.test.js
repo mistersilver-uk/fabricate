@@ -37,6 +37,7 @@ import {
   normalizePath,
   parseLabActorTableRegions,
   parseMountRegions,
+  partitionConsoleErrors,
   publishableCases,
   WORLD_PARTIES_SEARCH_TERM,
   WORLD_TOOL_SEARCH_MISS_TERM,
@@ -957,6 +958,164 @@ test('the capture runner threads and asserts declared layouts before taking a sc
   const screenshot = driver.indexOf('frame.screenshot(', assertion);
   assert.ok(assertion >= 0, 'the runner must invoke the generic layout assertion');
   assert.ok(screenshot > assertion, 'the layout assertion must run before frame.screenshot()');
+});
+
+// -- THE PER-CASE CONSOLE-ERROR ALLOWANCE (issue 1515) ------------------------------------------
+//
+// The capture driver fails a render on ANY console error, and that is why a lab frame is worth
+// looking at: a frame rendered over a thrown handler is indistinguishable from one rendered over a
+// working handler. Widening that gate is therefore the most dangerous edit in this harness, and
+// these three properties are what keep the widening narrow.
+//
+// The driver script itself cannot be imported - it dispatches on `process.argv` at module scope
+// and would launch a browser - so the decision is a pure function in the registry module and the
+// WIRING is asserted separately below, in the same shape as the layout-threading check above.
+test('an undeclared console error is still fatal, and a declared one is not', () => {
+  const allowance = [/Failed to toggle recipe enabled state/];
+
+  // (1) THE DEFAULT IS UNCHANGED. A case declaring nothing tolerates nothing.
+  assert.deepEqual(partitionConsoleErrors(['boom'], []), {
+    unmatched: ['boom'],
+    unusedAllowances: [],
+  });
+
+  // (2) A DECLARED ERROR PASSES, and only that one.
+  assert.deepEqual(
+    partitionConsoleErrors(['Fabricate | Failed to toggle recipe enabled state: refused'], allowance),
+    { unmatched: [], unusedAllowances: [] }
+  );
+
+  // (3) AND AN UNMATCHED ERROR BESIDE A MATCHED ONE IS STILL FATAL, which is the property that
+  // makes the allowance narrow rather than a mute button. A case that declares one refusal must
+  // not thereby tolerate a second, unrelated failure in the same render.
+  assert.deepEqual(
+    partitionConsoleErrors(
+      ['Fabricate | Failed to toggle recipe enabled state: refused', 'TypeError: x is undefined'],
+      allowance
+    ),
+    { unmatched: ['TypeError: x is undefined'], unusedAllowances: [] }
+  );
+});
+
+test('a declared console error that never arrives fails the case too', () => {
+  // The allowance is an ASSERTION, not a permission. A pattern that matches nothing means the
+  // case stopped reaching the refusal it is named for, and the frame it is about to publish is
+  // the resting screen - the "unreachable configuration looks identical to working configuration"
+  // failure this repository keeps meeting.
+  assert.deepEqual(partitionConsoleErrors([], [/never happens/]), {
+    unmatched: [],
+    unusedAllowances: ['/never happens/'],
+  });
+
+  // Reported per pattern, so a case declaring two learns WHICH one went stale.
+  assert.deepEqual(partitionConsoleErrors(['seen'], [/seen/, /unseen/]), {
+    unmatched: [],
+    unusedAllowances: ['/unseen/'],
+  });
+});
+
+test('a global-flagged allowance does not skip its second match', () => {
+  // `RegExp#test` advances `lastIndex` on a `g`-flagged pattern, so the second call against a
+  // fresh string starts from the first match's offset and can miss. The symptom would be an
+  // "unused allowance" failure on a case that DID produce the error twice, which reads as a
+  // fixture regression and is not one. `partitionConsoleErrors` strips the flag before it
+  // matches, so the pattern is stateless by the time it is used.
+  const sticky = /refused/g;
+  assert.deepEqual(partitionConsoleErrors(['refused once', 'refused twice'], [sticky]), {
+    unmatched: [],
+    unusedAllowances: [],
+  });
+});
+
+test('the capture runner threads the per-case console allowance into the render', () => {
+  // The same shape as the layout-threading check above, and for the same reason: the field is
+  // declarative data on a case, and a case field that the driver never reads is configuration
+  // that cannot fail. Asserted against the driver's SOURCE because the module cannot be imported.
+  const driver = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
+  assert.match(driver, /allowedConsoleErrors: viewCase\.allowedConsoleErrors \?\? \[\]/);
+  assert.match(driver, /partitionConsoleErrors\(\s*consoleErrors,\s*allowedConsoleErrors\s*\)/);
+
+  // BOTH halves of the rule reach a throw, and BOTH throws precede the return that hands the
+  // buffer back to the publisher.
+  //
+  // THE GUARD AND ITS THROW ARE PINNED AS ONE STATEMENT, not as two substrings that both occur
+  // somewhere. `driver.includes('unusedAllowances.length > 0')` is satisfied by
+  // `if (false && unusedAllowances.length > 0)` - measured, by mutating the driver to exactly
+  // that and watching an earlier draft of this test stay green over a gate that could no longer
+  // fire. A grep that cannot fail is the defect this whole file exists to catch, so the condition
+  // is matched verbatim and the `throw` is required to be the next thing inside the block.
+  assert.match(
+    driver,
+    /\n\s*if \(unmatched\.length > 0\) \{\n\s*throw new Error\(/,
+    'an unmatched console error must still throw, from an unguarded `if`'
+  );
+  assert.match(
+    driver,
+    /\n\s*if \(unusedAllowances\.length > 0\) \{\n\s*throw new Error\(/,
+    'an unused allowance must throw, from an unguarded `if`'
+  );
+  const partition = driver.indexOf('partitionConsoleErrors(');
+  const unusedThrow = driver.indexOf('unusedAllowances.length > 0', partition);
+  const handOff = driver.indexOf('return { buffer, box }', partition);
+  assert.ok(partition >= 0, 'the runner must consult the shared partition helper');
+  assert.ok(handOff > unusedThrow, 'both gates must run before the frame is returned');
+
+  // AND THE ALLOWANCE IS RARE BY CONSTRUCTION. The registry-wide count is asserted so that
+  // adopting this field becomes a visible edit rather than a habit: the gate is the reason the
+  // lab is trusted, and a second case wanting an allowance should have to argue for it here.
+  const declaring = VIEW_LAB_CASES.filter(
+    (viewCase) => (viewCase.allowedConsoleErrors ?? []).length > 0
+  ).map((viewCase) => viewCase.id);
+  assert.deepEqual(
+    declaring,
+    ['manager-recipes-blocked-enable-flash'],
+    'a case gained or lost a console-error allowance; the console gate is what makes a lab frame ' +
+      'evidence, so widening it is an accepted edit rather than an incidental one'
+  );
+});
+
+// -- AN ALERT FRAME HAS TO CONTAIN ITS ALERT (issue 1515, driver capture) ----------------------
+//
+// `manager-world-parties-pane-alert` PASSED its first real capture and did not depict the state
+// it is named for. The click that produces the alert auto-scrolls its own target into view, and
+// the alert renders above the card list, so the shutter opened on a pane with the refusal message
+// off the top edge. Every assertion the case carried was green: `expectSelector` resolves against
+// the DOM, and `expectVisible` asks about `display` and box size rather than about scroll offset.
+// A frame count is not the check.
+//
+// `expectContained` is the assertion that CAN see it, because it compares bounding boxes against
+// the element that clips them. So the two cases whose subject is a transient alert declare it,
+// and this pins the declaration: deleting an `expectContained` entry is otherwise silent, and
+// what it silently restores is a case that photographs the wrong part of the right screen.
+test('the two alert frames assert their alert is inside the box that clips it', () => {
+  const pinned = [
+    // The pane's own scroller - the element `GatheringPartiesTab.svelte` binds as `scroller` and
+    // gives `overflow` to. An alert scrolled above it has a box above the container's and fails.
+    [
+      'manager-world-parties-pane-alert',
+      '.manager-travel-parties-content',
+      '[data-manager-party-summary-error]',
+    ],
+    // The recipes flash is `position: absolute` against this route's `.manager-main`, so it does
+    // not ride the row list's scroll - but that is an argument about a stylesheet, and this makes
+    // it a measurement taken at capture time instead.
+    ['manager-recipes-blocked-enable-flash', '.manager-main', '[data-recipe-flash]'],
+  ];
+
+  for (const [caseId, container, target] of pinned) {
+    const declared = getCaseById(caseId).expectContained ?? [];
+    assert.ok(
+      declared.some((entry) => entry.container === container && entry.target === target),
+      `${caseId} no longer asserts ${target} is contained by ${container}, so it can publish a ` +
+        'frame that resolves every selector and shows none of the state it is named for'
+    );
+  }
+
+  // AND THE RUNNER STILL ENFORCES IT. A declaration the driver stopped reading is configuration
+  // that cannot fail, which is the same defect one level down.
+  const driver = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
+  assert.match(driver, /expectContained: viewCase\.expectContained \?\? \[\]/);
+  assert.match(driver, /for \(const expectation of expectContained\)/);
 });
 
 test('every combination-rule value the registry targets is a real MODIFIER_POLICIES member', () => {

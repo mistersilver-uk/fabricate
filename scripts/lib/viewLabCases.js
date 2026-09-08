@@ -4738,6 +4738,28 @@ export const VIEW_LAB_CASES = Object.freeze([
       '.fabricate-manager .manager-recipe-flash[data-recipe-flash][role="alert"]' +
       ':has(.manager-recipe-flash-message)' +
       ' [data-recipe-flash-dismiss]',
+    // THE REFUSAL IS LOGGED, AND THE LOG IS THE STATE WORKING (issue 1515, driver capture).
+    // `adminStore.js`'s `toggleRecipeEnabled` catch reports the rejected write with
+    // `console.error` BEFORE it hands the localized message to this view's `onBlocked` sink, and
+    // the capture driver fails a render on any console error. So the one case in the registry
+    // that presses a refused write cannot render without declaring it.
+    //
+    // THE CALL SITE, not the error class. `/RecipeActivationError/` would also match, and would
+    // additionally tolerate that error logged from anywhere else in the render — a create path, a
+    // signature re-check, a future caller — which is a wider licence than this case needs. The
+    // store's own message prefix is a string literal at exactly one site, so this pattern
+    // tolerates that site and nothing else.
+    //
+    // It is an ASSERTION as much as a tolerance: `partitionConsoleErrors` fails the case when a
+    // declared pattern matches NOTHING, so a fixture repair that lets the enable succeed reds here
+    // rather than publishing the resting recipe browser under a case named for the flash.
+    allowedConsoleErrors: [/Fabricate \| Failed to toggle recipe enabled state/],
+    // THE FLASH HAS TO BE IN THE PICTURE, not merely in the DOM. It is
+    // `position: absolute; bottom: 18px` against this route's `.manager-main`
+    // (`fabricate.css`), so it does not move with the row list — but the click that produces it
+    // auto-scrolls its target, and `expectSelector` cannot see where that left the frame. Stating
+    // the containment makes "the alert is in the photograph" a measurement.
+    expectContained: [{ container: '.manager-main', target: '[data-recipe-flash]' }],
     kinds: ['manager', 'recipes'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/Recipe/,
@@ -8813,6 +8835,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-world-nav-parties', press: 'Enter' },
       { selector: '[data-manager-party-enable="lab-party-emberwatch"]' },
+      // AND SCROLL BACK TO THE ALERT, which is the whole subject of the frame (issue 1515,
+      // driver capture). Playwright scrolls a click target into view, so pressing the third
+      // card's pill leaves the pane resting on that card — and the alert renders ABOVE the
+      // list, so the first capture of this case photographed a pane with the refusal message
+      // off the top edge. Every assertion passed: `expectSelector` resolves against the DOM and
+      // cannot see the scroll position.
+      //
+      // `world-component-catalogue-bulk` records the same defect from the other end and
+      // warns that `scroll` cannot fix it there, because `scrollIntoViewIfNeeded` is a no-op on
+      // an element already PARTLY in view. That is what makes it the right verb here and the
+      // wrong one there: this alert is entirely above the scroller's viewport, so the step is
+      // not a no-op, and scrolling minimally to it brings the pane's head into frame.
+      { selector: '[data-manager-party-summary-error]', scroll: true },
     ],
     expectView: 'world',
     // The alert INSIDE the parties pane, not merely somewhere in the window: the same refusal
@@ -8822,6 +8857,21 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectSelector:
       '[data-travel-panel="parties"]' +
       ' .manager-travel-parties-summary-error[data-manager-party-summary-error][role="alert"]',
+    // IN THE PICTURE, not merely in the DOM. The container is the pane's own SCROLLER — the
+    // element `GatheringPartiesTab.svelte` binds as `scroller` and clips with `overflow` — so an
+    // alert scrolled above its viewport has a bounding box above the container's and fails here.
+    // Neither `expectSelector` nor `expectVisible` can see that: `isVisible()` asks about
+    // `display` and box size, not about the scroll offset, and both were green on the frame that
+    // did not contain the alert.
+    //
+    // Paired with the `scroll` step above rather than replacing it: the step puts the alert in
+    // frame and this proves it is still there when the shutter opens.
+    expectContained: [
+      {
+        container: '.manager-travel-parties-content',
+        target: '[data-manager-party-summary-error]',
+      },
+    ],
     position: { width: 1330, height: 900 },
     kinds: ['manager', 'environments', 'world'],
     sourceMatches: [
@@ -13848,6 +13898,75 @@ export function hasUiChanges(files = []) {
     return true;
   }
   return false;
+}
+
+/**
+ * Split a render's console errors into the ones a case DECLARED it would produce and the ones it
+ * did not.
+ *
+ * ── WHY A CASE MAY DECLARE AN ERROR AT ALL ─────────────────────────────────────────────────────
+ *
+ * `view-lab-screenshots.mjs` fails a render on ANY console error, and that gate is why the lab is
+ * trusted: a frame rendered over a thrown handler looks exactly like a frame rendered over a
+ * working one, and one such frame published as evidence is worth less than no frame. It has to
+ * stay the default.
+ *
+ * But a handful of states this registry photographs ARE a refusal, and the refusal is the subject.
+ * `manager-recipes-blocked-enable-flash` presses a switch the activation gate rejects, and
+ * `adminStore.js` reports that rejection with `console.error` before it hands the message to the
+ * view's flash. The error is the state working correctly. Nothing is broken, nothing is being
+ * tolerated, and lowering the store's log level to accommodate a screenshot harness would be a
+ * production change made for the lab's convenience — exactly backwards.
+ *
+ * So a case may name what it expects, by pattern, and NOTHING else changes: an error no pattern
+ * names is fatal exactly as before.
+ *
+ * ── AND WHY AN UNUSED ALLOWANCE IS ALSO FATAL ──────────────────────────────────────────────────
+ *
+ * This returns `unusedAllowances` as well, and the caller throws on it. A declared pattern that
+ * matched nothing is not harmless: it means the case no longer reaches the refusal it is named
+ * for — the recipe was completed, the gate was moved, the message was reworded — and the frame it
+ * publishes is the resting screen under a case named for the alert. That is the failure mode
+ * `BROAD_SIGNAL_CASE_OVERRIDES` records above as the one this repository keeps meeting:
+ * unreachable configuration looks identical to working configuration.
+ *
+ * Requiring the match turns the allowance into an ASSERTION. The field does not merely permit the
+ * error, it demands it, which is the only form in which "this case photographs a refusal" is
+ * checkable at all.
+ *
+ * THE `g` FLAG IS STRIPPED BEFORE MATCHING, and that is a correctness fix rather than tidiness.
+ * `RegExp#test` on a global pattern advances `lastIndex` and resumes from it on the next call, so
+ * an allowance that matched the first message would start mid-string on the second and could miss
+ * — surfacing as an "unused allowance" failure on a case that did produce its error, which reads
+ * as a fixture regression and is not one. The original is kept for the message, so a report still
+ * names the pattern the case actually declared.
+ *
+ * @param {string[]} messages Console errors collected during the render, in order.
+ * @param {RegExp[]} [allowed] The case's `allowedConsoleErrors`.
+ * @returns {{unmatched: string[], unusedAllowances: string[]}} Fatal messages, and the declared
+ *   patterns nothing matched.
+ */
+export function partitionConsoleErrors(messages = [], allowed = []) {
+  const patterns = [...allowed].map((pattern) => ({
+    label: String(pattern),
+    matcher: pattern.global
+      ? new RegExp(pattern.source, pattern.flags.replaceAll('g', ''))
+      : pattern,
+  }));
+  const matchedPatterns = new Set();
+  const unmatched = [];
+  for (const message of messages) {
+    const text = String(message);
+    const index = patterns.findIndex(({ matcher }) => matcher.test(text));
+    if (index === -1) unmatched.push(text);
+    else matchedPatterns.add(index);
+  }
+  return {
+    unmatched,
+    unusedAllowances: patterns
+      .filter((_, index) => !matchedPatterns.has(index))
+      .map(({ label }) => label),
+  };
 }
 
 export const caseIds = Object.freeze(VIEW_LAB_CASES.map((viewCase) => viewCase.id));
