@@ -266,7 +266,9 @@ describe('EditorValidationSurface row action (mounted)', () => {
   // screen if the key reached `localize()`.
   const TRANSLATIONS = {
     'FABRICATE.Admin.Manager.Validation.View': 'Ver',
-    'FABRICATE.Admin.Manager.Validation.ViewNamed': 'Ver: {subject}',
+    // The SHIPPED shape: two tokens, and the verb is one of them. A pattern hard-coding the verb
+    // here would green a surface that hard-codes it too, which is the whole defect.
+    'FABRICATE.Admin.Manager.Validation.ViewNamed': '{action}: {subject}',
     'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewTask': 'Ver tarea'
   };
 
@@ -461,7 +463,14 @@ describe('EditorValidationSurface row action (mounted)', () => {
       groups: [
         groupOf('checks', [
           { id: 'noResultGroup', status: 'block', title: 'Add a result group', target: 'results' },
-          { id: 'noName', status: 'warn', title: 'Name this recipe', target: 'overview' }
+          { id: 'noName', status: 'warn', title: 'Name this recipe', target: 'overview' },
+          {
+            id: 'task',
+            status: 'warn',
+            title: 'Gather herbs',
+            target: 'tasks',
+            viewLabel: 'FABRICATE.Admin.Manager.EnvironmentEditor.Validation.ViewTask'
+          }
         ])
       ]
     });
@@ -485,6 +494,30 @@ describe('EditorValidationSurface row action (mounted)', () => {
         'phase needs for a two-verb list; naming the button is a different job and must not ' +
         'consume it'
     );
+
+    // THE OVERRIDDEN VERB, which is what makes this WCAG 2.5.3-safe rather than merely
+    // descriptive. A name hard-coding the default verb would read "Ver: Gather herbs" beside a
+    // visible "Ver tarea" — a visible label the accessible name does not contain, so a
+    // speech-input user saying the words on the button hits nothing. The pattern's `{action}` is
+    // fed from the same expression as the visible child, so containment holds by construction.
+    assert.equal(
+      action('task').textContent.trim(),
+      'Ver tarea',
+      'the row overrides its visible verb'
+    );
+    assert.equal(
+      action('task').getAttribute('aria-label'),
+      'Ver tarea: Gather herbs',
+      'and its accessible name leads with THAT verb, not the surface default'
+    );
+    for (const check of ['noResultGroup', 'noName', 'task']) {
+      assert.ok(
+        action(check).getAttribute('aria-label').includes(action(check).textContent.trim()),
+        `${check}: the accessible name must CONTAIN the visible label (WCAG 2.5.3). Asserted ` +
+          'over every row rather than only the overriding one, so the property is the invariant ' +
+          'rather than a fact about one fixture'
+      );
+    }
     surfaceHarness.remount();
   });
 });

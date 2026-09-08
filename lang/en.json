@@ -2146,7 +2146,7 @@
         },
         "Validation": {
           "View": "View",
-          "ViewNamed": "View: {subject}"
+          "ViewNamed": "{action}: {subject}"
         },
         "Recipe": {
           "Kicker": "Recipes View",

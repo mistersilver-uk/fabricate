@@ -79,14 +79,21 @@
   button…", with the row's SUBJECT in a sibling element a screen reader reaches only in linear
   reading mode. The `data-*` hook beside the button carries the route, not the subject, and is
   invisible to assistive technology either way. So the button carries an `aria-label` built from
-  {@link VIEW_NAMED_LABEL} and `row.title` — one shared default for every surface that renders
-  this component, installed here rather than left for each of them to rediscover.
+  {@link VIEW_NAMED_LABEL} — one shared default for every surface that renders this component,
+  installed here rather than left for each of them to rediscover.
 
-  The visible child is UNCHANGED and stays `row.viewLabel ?? viewLabel`: the override swaps the
-  visible VERB, not the context, and it is the seam a later phase's two-verb list needs. A row
-  whose verb differs from the default therefore has a name whose leading word is the default one;
-  no shipped producer overrides the verb today, and the surface says so here rather than encoding
-  a guess about what the first one will want.
+  IT COMPOSES THE RESOLVED VERB, NOT THE WORD "View", and that is a WCAG 2.5.3 obligation rather
+  than a nicety. The visible child is `localize(row.viewLabel ?? viewLabel)`, so a row that
+  overrides its verb reads "View task" on screen; a name hard-coding "View" would then be a
+  visible label the accessible name does not contain, which is a speech-input user saying what
+  they can see and hitting nothing. Feeding `{action}` from the SAME expression the child renders
+  makes containment true by construction instead of by coincidence: "View: Add a result group" by
+  default, "View task: Gather herbs" where a row overrides. `lang/en.json` owns the join, so a
+  language that puts the subject first or punctuates differently can.
+
+  The visible child is UNCHANGED: the override swaps the visible VERB, not the context, and it is
+  the seam a later phase's two-verb list needs. Nothing consumes that seam yet — this surface is
+  simply built so that the first thing which does cannot introduce the defect.
    - class: an EXTRA class appended to this surface's own, never a replacement — the idiom
      `ManagerButton`, `Field` and `Chip` already use. It exists so a site whose root carried its
      own classes keeps them, so no shipped rule stops matching.
@@ -132,7 +139,11 @@
    *
    * Not a prop, and not a `$props()` default: the visible verb is already caller-overridable per
    * row, and a second knob for the subject-bearing form would be a second place one accessible
-   * name lives. It takes one `{subject}`, which is the row's own title. See the header block.
+   * name lives — which is exactly how a name and the word beside it drift apart.
+   *
+   * TWO tokens. `{action}` is the row's own RESOLVED verb, the same string the visible child
+   * renders, so the accessible name always contains the visible label; `{subject}` is the row's
+   * title. See the header block for why the verb is composed rather than written in.
    */
   const VIEW_NAMED_LABEL = 'FABRICATE.Admin.Manager.Validation.ViewNamed';
 
@@ -387,7 +398,10 @@
               <ManagerButton
                 role="ghost"
                 class="manager-recipe-val-view"
-                aria-label={localize(VIEW_NAMED_LABEL, { subject: row.title })}
+                aria-label={localize(VIEW_NAMED_LABEL, {
+                  action: localize(row.viewLabel ?? viewLabel),
+                  subject: row.title,
+                })}
                 {...namedAttr(viewDataAttr, row.target)}
                 onclick={() => onSelectIssue(row.target, row.focusTarget)}
                 >{localize(row.viewLabel ?? viewLabel)}</ManagerButton

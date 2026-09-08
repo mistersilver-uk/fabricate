@@ -47,6 +47,8 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { parse } from 'svelte/compiler';
 
 import {
@@ -506,11 +508,18 @@ test("the View button's name is a translatable key, in a shared namespace, resol
   // a sibling element and the `data-*` hook holds the ROUTE, which assistive technology never
   // reads. One producer routes at eleven sites, and this is the one place a default name for
   // every surface that renders this primitive can be installed.
+  //
+  // WHITESPACE-NORMALISED, because the expression is wrapped by the formatter and its line breaks
+  // are Prettier's decision rather than a contract. The TOKENS are the contract.
   assert.equal(
-    expressionAttribute(button, 'aria-label', source),
-    'localize(VIEW_NAMED_LABEL, { subject: row.title })',
-    "the row action must name itself by its row's title. Composing the SUBJECT is the point: " +
-      'the verb alone is the same word on every button of the list.'
+    expressionAttribute(button, 'aria-label', source)?.replaceAll(/\s+/gu, ' '),
+    'localize(VIEW_NAMED_LABEL, { action: localize(row.viewLabel ?? viewLabel), subject: row.title, })',
+    "the row action must name itself by its row's title, AND by the verb it visibly renders. " +
+      '`action` is fed from the same expression as the visible child on purpose: hard-coding ' +
+      '"View" there makes the accessible name of an overriding row ("View: Gather herbs") one ' +
+      'that does not contain its visible label ("View task"), which is a WCAG 2.5.3 ' +
+      'label-in-name failure and is unreachable for a speech-input user. Composing the resolved ' +
+      'verb makes containment true by construction.'
   );
   const named = constants.get('VIEW_NAMED_LABEL');
   assert.match(
@@ -539,4 +548,36 @@ test('no call site restates a count label the surface would draw unlabelled', ()
     `the four call sites are ${[...files].join(', ')}; a missing one means the surface lost a ` +
       'renderer or the tag scan stopped resolving it'
   );
+});
+
+test('the shipped name pattern still has somewhere to put the visible verb', () => {
+  // THE OTHER HALF OF THE LABEL-IN-NAME CONTRACT, and the half no source pin above can see. The
+  // template passes `action` and `subject`; whether either reaches the screen is decided by the
+  // STRING, and `lang/en.json` is data rather than code. Edit that value back to a pattern with
+  // no `{action}` and `Localization#format` silently drops the argument — the button goes back to
+  // announcing "View: …" beside a visible "View task", which is the exact WCAG 2.5.3 failure the
+  // composition exists to make unrepresentable. Nothing else in the tree reads this key's shape.
+  //
+  // HAYSTACK: the parsed `lang/en.json` object, resolved by the key the surface declares rather
+  // than by a path re-typed here — so moving the key moves this clause with it.
+  const { constants } = surfaceRowAction();
+  const key = String(constants.get('VIEW_NAMED_LABEL'));
+  const english = JSON.parse(
+    readFileSync(resolve(import.meta.dirname, '../../lang/en.json'), 'utf8')
+  );
+  const pattern = key.split('.').reduce((node, part) => node?.[part], english);
+  assert.equal(
+    typeof pattern,
+    'string',
+    `${key} resolves to nothing in lang/en.json, so every row action is named by the dotted ` +
+      'path itself'
+  );
+  for (const token of ['{action}', '{subject}']) {
+    assert.ok(
+      pattern.includes(token),
+      `the shipped "${key}" pattern is "${pattern}", which drops ${token}. Both are passed by ` +
+        'the template and both are load-bearing: `{subject}` is what tells one row action from ' +
+        'another, and `{action}` is what keeps the accessible name containing the visible label.'
+    );
+  }
 });
