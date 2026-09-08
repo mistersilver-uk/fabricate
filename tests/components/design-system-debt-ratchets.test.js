@@ -1323,16 +1323,26 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
  * blocks — pinning them would pin the manager's whole widget inventory to this list. The shape is
  * named so the figure is checkable; an earlier reading published 30 under no stated shape.
  *
- * Derived from the sheet rather than asserted: 10 roots over 12 blocks, every one of them
+ * Derived from the sheet rather than asserted: 10 roots over 10 blocks, every one of them
  * legitimate today, which is exactly why an eleventh would not stand out to a reader. It was 9
  * over 10 until issue 1508 rooted `Field` and `ManagerSearchField` at the classes they emit and
- * each gained the ring half of its own pair, 11 over 13 until its third phase did the same
- * for `ChanceSlider`, 12 over 14 until issue 1509 rooted `EditorTabs` and its tab strip gained
+ * each gained the ring half of its own pair, and 11 over 12 until its third phase did the same
+ * for `ChanceSlider`. Issue 1509 rooted `EditorTabs` and its tab strip gained
  * `.fabricate-tabs button:focus-visible` — a `<root> <element>:focus-visible` block over a bare
  * `button`, which is exactly {@link RING_COMPOUND}'s shape and therefore exactly this population
- * — and 13 over 15 until issue 1520 deleted the interactable browser's, the interactable config
- * sheet's and the interactables manager's per-area rings: three roots over three blocks, each a
- * copy of the module ring reaching the same elements at the same rank.
+ * — taking it to 13 over 14. Issue 1520 then deleted the interactable browser's, the interactable
+ * config sheet's and the interactables manager's per-area rings, three roots over three blocks,
+ * each a copy of the module ring reaching the same elements at the same rank; and the roll-prompt
+ * dialog's `button, input` ring, a FOURTH block whose root stays. Three roots and four blocks, so
+ * 13 over 14 becomes 10 over 10.
+ *
+ * BOTH FIGURES ARE RE-MEASURED HERE RATHER THAN CARRIED FORWARD, and the block half needed it: the
+ * count published before this rebase read 15 where the walk over the same sheet produces 14, an
+ * off-by-one that had been restated across three changes because nothing derives it. Only the
+ * ROOT half is gated — the clause below asserts {@link RING_ROOTS} against the sheet — so the
+ * block figure is the one a reader has to re-run to trust, and the rungs above the last two
+ * restate what each change reported rather than a re-measurement of its head.
+ *
  * `.fabricate-roll-prompt-dialog` STAYS, and the asymmetry is the point of this population's own
  * keying: its reset half went with the other copies, so it left the exemption list in the same
  * commit, while its `select` ring paints an INSET `box-shadow` against the module's OUTSET
