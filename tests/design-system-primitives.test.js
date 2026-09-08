@@ -249,6 +249,18 @@ const EXPECTED_OVERRIDE_KEYS = [
   'src/ui/svelte/components/Stepper.svelte',
   'src/ui/svelte/components/ThresholdBandStrip.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
+  // Issue 1515: THE SHEET, and the first key here that is not a component path. It sorts last
+  // because this list is compared against `Object.keys(...).sort()` and `'src/'` < `'styles/'`.
+  //
+  // It is a legal key for the reason the entry itself records: `BROAD_SIGNAL_PATTERN`'s first
+  // alternative is `^styles/`, so the router reaches the override table for a stylesheet exactly
+  // as it does for a primitive. What made every earlier key a component was history.
+  //
+  // Its arrival is also why "the key list is pinned, not just the entries" earns its keep here:
+  // a table that had only ever held `components/` paths is one a later reader could narrow to
+  // them by accident, and this pin is what makes that a failing edit rather than a silent
+  // routing change for every UI PR that touches the sheet.
+  'styles/fabricate.css',
 ];
 
 /**

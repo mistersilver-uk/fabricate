@@ -1007,6 +1007,55 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-tool-parity-04-requirements-1280x720',
     'player-salvage',
   ]),
+  // THE SHEET ITSELF, and the first entry here whose key is not a component (issue 1515).
+  //
+  // It is legal, and by the same rule every other entry obeys: `BROAD_SIGNAL_PATTERN`'s first
+  // alternative is `^styles/`, so `selectRenderFileCases` reaches this table for a stylesheet
+  // exactly as it does for a primitive. What made every existing key a component path is
+  // history, not a constraint — the table was written when the only unphotographed things were
+  // components.
+  //
+  // ONE ENTRY, NECESSARILY. A JavaScript object holds a path once, so "a second override for
+  // the other phase" is not a shape this table can take: a sheet change that moves two
+  // unrelated surfaces widens this ARRAY, it does not add a key. That is the answer to the
+  // question issue 1515's plan asks of this phase, and it is structural rather than a
+  // preference.
+  //
+  // A `styles/`-only change selected exactly the representative pair — `fabricate-app-shell`,
+  // the PLAYER window, and `manager-components-normal`, one browse list. Between them they draw
+  // no availability pill, no rail marker beyond the plain nav row, and no Downtime group at all,
+  // so the two sheet sweeps this change makes would each have published two frames that
+  // structurally cannot contain what they moved.
+  //
+  // Three frames, one per surface the sweeps touch:
+  //
+  //  - `manager-gathering-task-editor-normal` is the `.manager-availability-*` family. The task
+  //    editor's availability card is where that family renders densest — biomes, time-of-day and
+  //    weather pills side by side under their pickers — and it is already this registry's
+  //    `Field.svelte` frame for the same density reason.
+  //  - `manager-world-downtime-tracking` is the rail marker family, EXPANDED. Its first step
+  //    clicks `#manager-world-nav-downtime`, and `openWorldDowntime` sets
+  //    `railGroupUserExpanded.worldDowntime`, so the frame carries the whole group at once: the
+  //    parent row's PREMIUM chip, the sub-items' padlocks, and the `.manager-nav-callout`
+  //    premium-preview note that renders only while the group is open and no companion holds the
+  //    surface. No other frame in the registry draws that callout.
+  //  - `manager-world-downtime-collapsed` is the same group under the 56px rail, which is a
+  //    different set of rules rather than a smaller view of the same one: the collapsed rail
+  //    hides the labels, the toggle and the submenu, so a change to the collapsed treatment is
+  //    invisible in the expanded frame and vice versa.
+  //
+  // ADDITIVE, like every entry here: the representative pair is still selected, so a sheet
+  // change still publishes the player window and a manager browse list beside these three.
+  //
+  // It does NOT settle the thirteen cases that name `^styles/fabricate\.css$` in their own
+  // `sourceMatches` and are shadowed by the broad signal (`tests/design-system-primitives.test.js`
+  // registers them). Those are a separate adjudication, one case at a time, and honouring them
+  // wholesale is what would take a sheet change from two frames to fifteen.
+  'styles/fabricate.css': Object.freeze([
+    'manager-gathering-task-editor-normal',
+    'manager-world-downtime-tracking',
+    'manager-world-downtime-collapsed',
+  ]),
 });
 
 /**
@@ -1554,7 +1603,19 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
-      /^src\/ui\/svelte\/apps\/manager\/Systems?(Browser|Overview)View\.svelte$/,
+      // `SystemsBrowserView` ALONE (issue 1515). This alternation used to read
+      // `Systems?(Browser|Overview)View`, which also claimed `SystemOverviewView.svelte` — and
+      // that component is the SYSTEM EDITOR'S VALIDATION TAB (`SystemEditView.svelte:569` is its
+      // only render site), not anything on the `systems` route. So the two cases carrying the
+      // alternation, this one and `manager-systems-empty`, were the frames an edit to the
+      // validation list published: both `expectView: 'systems'`, neither containing a single
+      // issue row. That is the failure this registry exists to prevent — a gate that reports
+      // SATISFIED on a photograph of the wrong screen — and it is worse than no claim at all,
+      // because a reader counting frames sees two.
+      //
+      // `manager-system-edit-validation` carries the `SystemOverviewView` claim now, and it is
+      // the one case that clicks `#system-tab-validation`.
+      /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
     ],
   }),
   managerCase({
@@ -1590,9 +1651,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     // entry would be unreachable. This case is reached instead through
     // `BROAD_SIGNAL_CASE_OVERRIDES`, which is the seam for exactly this condition: a primitive
     // whose changed presentation is absent from both representative frames.
+    // `SystemsBrowserView` alone, for the reason `manager-default-selection` records above: the
+    // retired `Systems?(Browser|Overview)View` alternation claimed the system editor's validation
+    // tab for a frame of the empty library, which cannot contain it.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/Systems?(Browser|Overview)View\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
     ],
   }),
   managerCase({
@@ -1697,6 +1761,44 @@ export const VIEW_LAB_CASES = Object.freeze([
       // file routed by its own `BROAD_SIGNAL_CASE_OVERRIDES` entry, and `selectRenderFileCases`
       // skips a broad-signal file before it reads any case's `sourceMatches` at all.
       /^src\/ui\/svelte\/apps\/manager\/(CraftingEffectPanel|ItemPageInspector)\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-system-edit-validation',
+    label: 'Manager — System edit validation tab',
+    // THE VALIDATION TAB, WHICH HAD NO FRAME AT ALL (issue 1515). `SystemOverviewView.svelte`
+    // renders in exactly one place — `SystemEditView.svelte:569`, the `validation` branch of this
+    // route's two-tab panel — and every other `system-edit` case clicks `#system-tab-settings`
+    // instead, so a change to the issue list published a frame of the settings form. Two cases
+    // DID claim the component, `manager-default-selection` and `manager-systems-empty`, and both
+    // are `expectView: 'systems'` frames that cannot contain it; their claims are split off in
+    // the same change and land here.
+    //
+    // `beyond`: the smoke never opens this tab, so there is no counterpart frame to fall short
+    // of and no label to name.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // `lab-smithing` STATED rather than inherited from the seeded default, because the frame's
+    // whole content is that system's validation report: `sm-r-runeplate-draft` contributes a
+    // critical `noResultGroup` and a `disabledIncomplete` warning, and `sm-r-deepbind` a
+    // `requirementOverlap` warning. `tests/view-lab-cases.test.js` derives that report from
+    // `evaluateSystemValidation` over the fixture, so a fixture repair that empties it fails
+    // there rather than publishing the empty-state panel under a case named for the list.
+    query: { system: 'lab-smithing' },
+    steps: ['System Overview', { selector: '#system-tab-validation' }],
+    expectView: 'system-edit',
+    // THREE claims in one selector, because each alone publishes something this case is not.
+    // The counts row alone is satisfied by a zero-issue report; the group alone is satisfied by
+    // a card with no rows in it; and neither says the tab is the one on screen. Together they
+    // say the validation panel rendered, kept its severity counts, and drew a populated
+    // kind-grouped list — which is the surface Phase 3 of this change reconciles.
+    expectSelector:
+      '.fabricate-manager [data-system-overview]:has([data-system-overview-counts])' +
+      ' [data-system-overview-group="recipe"] .manager-system-overview-row',
+    kinds: ['manager', 'system-edit'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/SystemOverviewView\.svelte$/,
     ],
   }),
   managerCase({
@@ -4596,6 +4698,53 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-recipes-blocked-enable-flash',
+    label: 'Manager — Recipes blocked-enable flash',
+    // THE FLASH, WHICH NO CASE REACHED (issue 1515). `RecipesBrowserView.svelte:654` renders a
+    // dismissible `role="alert"` that FLOATS over the list, and it exists only after a refusal:
+    // the view claims the store's blocked-enable message by handing it an `onBlocked` sink
+    // (`:124-130`), which SUPPRESSES the Foundry notification, so this element is the only place
+    // a GM is told why the switch did not move. Every other recipes frame is a resting browse
+    // surface and structurally cannot contain it.
+    //
+    // `beyond`: the smoke's recipe walk never presses a refused enable, so there is no
+    // counterpart frame and no label to name.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // `sm-r-runeplate-draft` is the lab's one OFF-and-un-enableable recipe — an incomplete
+    // shell with no result groups, which also requires the disabled `aether` essence — so its
+    // row's switch is the one gesture in the corpus that produces a refusal rather than a
+    // write. Clicking any other row's switch would DISABLE it, which is never gated, and the
+    // frame would be the plain browser under a case named for the alert.
+    //
+    // `tests/view-lab-cases.test.js` derives that premise from the fixture through
+    // `evaluateSystemValidation` rather than restating it, so a fixture repair that completes
+    // the recipe fails there instead of publishing a frame with no flash in it.
+    query: { system: 'lab-smithing' },
+    steps: [
+      'Crafting',
+      {
+        selector:
+          '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]' +
+          ' .manager-recipe-status .manager-status-toggle',
+      },
+    ],
+    expectView: 'recipes',
+    // The alert AND its dismiss control, because the flash is specified as dismissible and
+    // non-auto-hiding: an alert drawn without its control is a different contract from the one
+    // this frame is evidence for. The message span is required too — an empty flash is a lit
+    // container, and `flashMessage` is what gates the block at all.
+    expectSelector:
+      '.fabricate-manager .manager-recipe-flash[data-recipe-flash][role="alert"]' +
+      ':has(.manager-recipe-flash-message)' +
+      ' [data-recipe-flash-dismiss]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Recipe/,
+      /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
+    ],
+  }),
+  managerCase({
     id: 'manager-recipes-narrow',
     label: 'Manager — Recipes narrow',
     smokeLabels: ['manager-recipes-narrow'],
@@ -6128,6 +6277,45 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-access-recipe-selected',
+    label: 'Manager — Recipe access rosters for a selected recipe',
+    // THE POPULATED HALF OF THE ACCESS INSPECTOR (issue 1515). `manager-recipe-edit-access-rail`
+    // is the only other frame of this route, and it rests on the aside's `{#if !recipe}` branch
+    // — the `Select a recipe` `EmptyState` at `GrantAccessInspector.svelte:199-207`. So every
+    // component the inspector actually exists to draw (the identity strip, the access summary,
+    // and both name-sorted rosters with their per-row switches) was unphotographed while the
+    // route LOOKED covered, which is worse than uncovered: a reader counting frames finds one.
+    //
+    // `beyond`: the smoke's crafting walk does not enter the Access route at all, so there is
+    // no counterpart frame and no label to name.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // `lab-alchemy` is a `restricted` system, which is what makes the Access rail entry render
+    // at all; `al-r-elixir` is one of its five recipes, well inside the list's resting page size
+    // of ten, so the row is on screen without a filter or a pager step.
+    query: { system: 'lab-alchemy' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-access' },
+      { selector: '[data-access-row="al-r-elixir"]' },
+    ],
+    expectView: 'access',
+    // The inspector's POPULATED branch, proved by an element that exists only in it: the empty
+    // branch draws an `EmptyState` and nothing else, so `[data-access-inspector]` alone is
+    // satisfied by the frame this case exists to distinguish itself from. The summary line and
+    // a real roster row are both required — a roster head with no rows under it is the same
+    // silence in a different place.
+    expectSelector:
+      '.fabricate-manager [data-access-inspector]:has([data-access-summary])' +
+      ' [data-access-roster="characters"] [data-access-character-row]',
+    kinds: ['manager', 'access'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/RosterRow\.svelte$/,
     ],
   }),
   managerCase({
@@ -8594,6 +8782,51 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
       /^src\/ui\/svelte\/components\/Pagination\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-pane-alert',
+    label: 'Manager — World Parties refused enable',
+    // THE PANE ALERT, WHICH NO CASE REACHED (issue 1515). `GatheringPartiesTab.svelte:286-293`
+    // renders a `role="alert"` summary line, and it is the pane's ONLY channel for a travel
+    // write the store refused with no field to attach the reason to: `paneError` (`:138-140`)
+    // is `travelError` MINUS the two field errors the cards draw themselves, so a refusal
+    // routed to a card's own field renders there and never here.
+    //
+    // `setPartyEnabled` is the operation that produces it. `withSave` passes NO `fieldContext`
+    // for that call (`adminStore.js`), so `_travelErrorState` writes a summary and no field
+    // error at all — which is exactly the shape `paneError` is the only renderer of.
+    //
+    // `beyond`: no smoke walk presses a refused enable, so there is no counterpart frame and no
+    // label to name.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing' },
+    // `lab-party-emberwatch` is DISABLED and holds two of the three characters that the enabled
+    // `lab-party` already holds, so enabling it violates `GatheringPartyStore`'s composite
+    // uniqueness invariant and the write is refused. It is the third of five cards at a page
+    // size of three, so it is on the resting page and needs no pager step.
+    //
+    // `tests/view-lab-cases.test.js` derives that collision from the seeded party list rather
+    // than restating it, so a fixture edit that makes the enable SUCCEED fails there instead of
+    // publishing a pane with no alert in it under a case named for one.
+    steps: [
+      { selector: '#manager-world-nav-parties', press: 'Enter' },
+      { selector: '[data-manager-party-enable="lab-party-emberwatch"]' },
+    ],
+    expectView: 'world',
+    // The alert INSIDE the parties pane, not merely somewhere in the window: the same refusal
+    // reaches a card's own field error on a different operation, and that element is a
+    // different contract with a different owner. Scoping to the panel and naming the summary
+    // line's own hook is what keeps the two apart.
+    expectSelector:
+      '[data-travel-panel="parties"]' +
+      ' .manager-travel-parties-summary-error[data-manager-party-summary-error][role="alert"]',
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/Party/,
     ],
   }),
   managerCase({
