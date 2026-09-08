@@ -424,7 +424,9 @@ describe('GatheringDetail (center column) mounted behavior', () => {
     // control rather than stating something about the world — so it stays the bare line it has
     // always been while its `EventSafeHint` sibling converts. Converted, it measured
     // 432.3x44.39 against 432.3x15: a strip with an edge, a fill and a 12px inset drawn around
-    // a caption for a 6px track. Recorded for issue 1519.
+    // a caption for a 6px track. Recorded in the ruled-out register as a control caption —
+    // `openspec/specs/design-system/spec.md` and section 15 of `library.html` — rather than
+    // against issue 1519, which is the geometry sweep and never owned this deferral.
     assert.ok(
       Boolean(section.querySelector('.gathering-detail-event-hint')),
       'the chance caption keeps its own bare line'

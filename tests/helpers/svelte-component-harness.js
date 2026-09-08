@@ -623,15 +623,40 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   // THE REASON IT STAYS GREEN IS NOT AN EXEMPTION, and the sentence here used to say it was.
   // That guard's naming clause exempts nothing: it inspects every suite mentioning
   // `writeCompiledSvelte` or `compiledModules`, which every `createMountedComponentHarness`
-  // caller does. What it cannot READ is this roster's call shape. Its region matcher requires a
-  // bracket — `compiledModules: [ … ]` — and the crafting suites pass the bare identifier
+  // caller does. What it cannot READ is this roster's call shape. Its region matcher requires
+  // an inline array written out in place after `compiledModules:`, an opening bracket it can
+  // scan to a closing one, and the crafting suites pass the bare identifier
   // `compiledModules: CRAFTING_APP_COMPILED_MODULES`, so it resolves no path for them, holds
   // over an empty set and reports clean whatever they render. That is the same silent-vacuity
   // shape the guard's own `BARE_LOOP_COMPILE` note records for compile LOOPS, and its vacuity
   // ratchet cannot catch this instance because that ratchet skips
-  // `createMountedComponentHarness` suites by name. Recorded rather than fixed here: teaching
-  // the matcher the bare-identifier form was measured and reds 18 suites on pre-existing gaps,
-  // which is its own change. What makes an omission loud is
+  // `createMountedComponentHarness` suites by name — an exemption that sits on the RATCHET
+  // alone, never on the naming guard above it.
+  //
+  // NO BRACKET CHARACTER MAY APPEAR ANYWHERE IN THIS ARRAY'S COMMENTS, and that is a property
+  // of where the comment SITS rather than of the prose it carries. `importedArraysOf` in that
+  // same guard captures a roster body with a negated character class that stops at the FIRST
+  // closing bracket it meets, and a comment inside this array is inside that body — so an
+  // earlier draft of this very paragraph, which quoted the matcher's required shape literally,
+  // truncated the capture and silently dropped the last five entries below. Measured across
+  // refs: 35 of 35 own literals resolved on `origin/main`, 41 of 41 at `fda0e84f6`, and 36 of
+  // 41 once that draft landed — the losses being `EmptyState`, `Avatar`, `FillBar`, `Notice`
+  // and `CraftingView`, four of them the shared primitives that guard exists to police. It is
+  // a comment read AS code by a parser, which is the inverse of the scan-whose-haystack-holds
+  // -prose defect this file records elsewhere. Latent while no suite spreads this roster into a
+  // readable array and ARMED the moment one does, which is the repair the paragraph above
+  // recommends. `mounted-harness-primitive-allowlist.test.js` now holds a test that reds when
+  // any exported roster in this file stops resolving whole through that reader.
+  //
+  // RECORDED RATHER THAN FIXED: teaching the region matcher the bare-identifier form is not one
+  // change. Measured on a scratch copy of the guard, it reds 10 suites reporting 9 missing
+  // primitives each, and NONE of those 9 are pre-existing coverage gaps — they are artifacts of
+  // two FURTHER limits in the same parser, the capture truncation above and the absence of
+  // recursive spread expansion. Repairing both moves it to 23 suites, whose remainder is still
+  // un-expanded two-level nesting. So the parser repair is three changes, not one. The sentence
+  // this replaces said it "reds 18 suites on pre-existing gaps", which asserted an unverified
+  // cause as a measurement — the same failure the SEVEN/EIGHT correction in this commit spends
+  // twenty lines undoing. What makes an omission loud is
   // this harness's own up-front `validateMountedComponentDependencies`, which names the
   // importer, the missing module and this list. And the shape of that failure is not `# fail`:
   // measured, `crafting-view-mounted` reports `not ok 1 - CraftingView mounted behavior` with

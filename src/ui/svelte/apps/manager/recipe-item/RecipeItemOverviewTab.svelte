@@ -187,11 +187,22 @@
     gap: var(--fab-space-2);
   }
 
+  /* The tail nested INSIDE two of this tab's three kickers, which is why it overrides three of
+     the four things the mark declares and must not override the fourth. Weight, tracking and
+     case are deliberately released so "· from linked item" reads as an aside rather than as a
+     second label.
+
+     THE INK IS INHERITED, NOT RESTATED (issue 1514). This rule used to paint the subtle tone,
+     which was the same ink the kicker around it painted, so label and tail were one colour at
+     two weights. When the mark took the contrast correction to the muted tone, that stopped
+     being true and this declaration became the half left behind — a visible two-tone split
+     inside a single 8.5px line, with the FAILING half the one still showing. Deleting the
+     declaration is the fix rather than narrowing the primitive: the correction is right for all
+     37 of its render sites, and re-breaking them to spare these two would invert the trade. */
   .manager-recipe-item-label-note {
     font-weight: 500;
     letter-spacing: 0;
     text-transform: none;
-    color: var(--fab-text-subtle);
   }
 
   .manager-recipe-item-readonly {

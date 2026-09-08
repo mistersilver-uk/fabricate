@@ -1406,6 +1406,11 @@ The following are recorded as compositions and MUST NOT be reintroduced as compo
 A premium panel is recorded as out of scope rather than as a composition: its only original content is marketing copy, which is a product decision, and binding copy to a component makes the offer untranslatable against a codebase where every primitive takes pre-localized strings.
 A toast and a bespoke destructive-confirmation panel are recorded as surfaces Foundry already owns.
 
+A control caption — a one-line sentence documenting the control directly above it — is recorded as a shape the set does not name, and is neither the standing-statement callout nor a mark.
+The deciding question is whether the sentence states something about the WORLD or captions a CONTROL: a callout owns the standing statement, which is true whether or not anything is drawn beside it, while a caption documents a control and says nothing about the world.
+Measured at the gathering tab's event-chance hint: routed through the callout the line rendered 432.3x44.39 against the 432.3x15 its bare paragraph draws, wrapping a border, a soft fill and a 12px inset around a caption for the 6px track above it.
+It stays a bare line until a second independent caller justifies naming the shape.
+
 #### Scenario: A ruled-out candidate is re-proposed
 
 - **WHEN** a proposal names a candidate the register already declined

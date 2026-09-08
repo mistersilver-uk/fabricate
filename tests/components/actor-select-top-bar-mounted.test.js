@@ -48,10 +48,17 @@ const harness = createMountedComponentHarness({
     // The two the bar reaches as of issue 1514's crafting phase. `FillBar` is the stamina
     // track the bar draws directly; `Avatar` arrives through `ComponentSourcesBar` below, whose
     // two actor portraits are the shared tile now — so the bar pulls a portrait in without
-    // naming one. An omission is named by THIS HARNESS rather than by `SHARED_PRIMITIVES`:
-    // `mounted-harness-primitive-allowlist.test.js:506` exempts every
-    // `createMountedComponentHarness` suite, and this is one, so what reds is
-    // `validateMountedComponentDependencies` — as `not ok` on the suite, with `# fail 0`.
+    // naming one. AN OMISSION IS NAMED BY `SHARED_PRIMITIVES`, and the sentence here used to
+    // deny it on two counts, both false. The naming guard in
+    // `mounted-harness-primitive-allowlist.test.js` exempts nothing: its
+    // `createMountedComponentHarness` skip sits on the VACUITY RATCHET beside it, never on the
+    // guard itself. And this roster is a readable literal array, so that guard's region matcher
+    // reads it and the guard is not blind to it. Measured by dropping `Avatar` below: it reds
+    // BY NAME, `not ok 2 - every hand-rolled mount harness names the shared primitives its tree
+    // renders`, citing this file, that module and the tree that renders it.
+    // `validateMountedComponentDependencies` in this harness reds too, and earlier — in
+    // `before()`, as `not ok` on the suite with `# fail 0` — but it is the second line of
+    // defence here rather than the only one.
     'src/ui/svelte/components/Avatar.svelte',
     'src/ui/svelte/components/FillBar.svelte',
     'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',

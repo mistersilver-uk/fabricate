@@ -27,8 +27,11 @@
   muted tone reads 5.42:1 and 5.00:1 at those two grounds and clears the floor in all
   seven palettes, the worst being `ironblood-forge` at 5.19:1 and 4.77:1.
 
-  Four of the seven palettes hid it, which is why it survived the specimen: the opaque
-  `frostbound-hall` reads 5.28:1 from the SAME declaration. It is corrected on the
+  ONE palette in seven hid it, which is why it survived the specimen: `mythwright` alone
+  states `muted` and `subtle` as opaque hues rather than as alphas over the surface, and it is
+  the only palette of the seven in which the subtle tone clears the floor at all — 5.28:1 from
+  the SAME declaration. Six fail and one passes, so the specimen's figure was set from the
+  single outlier rather than from the set. It is corrected on the
   component rather than at a call site because the figure is wrong for every caller,
   and it moves the two sites this programme did not convert — the manager's recipe-item
   Overview tab and `StatBox`'s composed label — as well as the ones it did. `styles/fabricate.css` records the reference's own eyebrow at

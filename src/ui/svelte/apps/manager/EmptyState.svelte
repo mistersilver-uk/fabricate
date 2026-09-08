@@ -348,9 +348,13 @@
 
      It is corrected on the VARIANT rather than at a call site because the reference's figure is
      wrong for every caller of it, not for one: the alpha tokens are what make it wrong, and
-     five of the seven palettes declare all three text tones as alphas. The four opaque-token
-     themes were what hid it — `frostbound-hall` reads 5.28:1 at the SAME declaration.
-     `is-filtered` below is corrected on the same measurement and the same reasoning. */
+     SIX of the seven palettes state `muted` and `subtle` as alphas over the surface. ONE
+     palette hid it, not four — `mythwright` alone states those two tones as opaque hues, and
+     it is the only palette of the seven in which the subtle tone clears the floor at all,
+     reading 5.28:1 from the SAME declaration. A single passing outlier is what the specimen's
+     figure was set from. Every palette, that one included, states `disabled` as an alpha,
+     which is why `is-filtered` below fails the floor in all seven; it is corrected on the same
+     measurement and the same reasoning. */
   .manager-empty.is-note h3 {
     color: var(--fab-text-muted);
     font-family: var(--font-primary);

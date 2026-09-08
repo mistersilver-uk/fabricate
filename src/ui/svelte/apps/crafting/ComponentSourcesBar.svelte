@@ -304,8 +304,11 @@
   /* SUPPRESSED, not deleted. Without this the button still matches
      `.fabricate button:focus-visible` in `styles/fabricate.css`, which paints the same accent
      ring on the same element — inside the same filter — and the dimmed ring comes straight
-     back beside the wrapper's. Scoped, this is (0,2,0) against that rule's (0,2,1), and it
-     wins on LAYER: `styles/fabricate.css` ships in `@layer modules` and a scoped block is
+     back beside the wrapper's. Scoped, the compiler appends `.svelte-<hash>` to the selector,
+     so this is (0,3,0) — two classes and a pseudo-class — against that rule's (0,2,1), which
+     is the same shape and the same figure `ShoppingList.svelte` already records for
+     `.crafting-shopping-entry-main:focus-visible`. It wins on LAYER either way, and that is the
+     load-bearing half: `styles/fabricate.css` ships in `@layer modules` and a scoped block is
      emitted unlayered, which beats a layered rule whatever the specificity.
      `.crafting-shopping-entry-main:focus-visible` in `ShoppingList.svelte` is the same
      pattern for the same reason. */

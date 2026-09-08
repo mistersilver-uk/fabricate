@@ -650,9 +650,24 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // released the panel entirely for an empty inside an overlay the product has already drawn a
   // boundary around, and that treatment appears in no frame that draws a pane.
   // `world-tool-entry-on-break-repair-tag-picker-empty` is the one frame that draws it.
+  //
+  // A THIRD ENTRY as of issue 1514, and `filtered` IS A THIRD TREATMENT rather than a variant
+  // of either. The reasoning above stopped at "two treatments" and the table stopped with it,
+  // so the variant that centres its stack, keeps the dashed panel and deliberately skips the
+  // icon/title apparatus was selected by nothing. That mattered the moment this issue moved its
+  // ink: `filtered` took the largest single change in the round, 2.66:1 to 5.42:1, across nine
+  // render sites of which six are outside this issue entirely — and every frame the table
+  // selected drew one of the other two treatments, which is exactly the "publishes two frames
+  // that do not contain the change" failure this table exists to prevent.
+  // `world-tool-catalogue-filtered-empty` is the one frame that draws it: the World Tools
+  // Catalogue searched to nothing, with the `Clear filters` action the variant renders as its
+  // own `children`. `tests/design-system-primitives.test.js` asserts only that entries RESOLVE,
+  // so it could not have caught the omission; the miss is a reasoning gap and is fixed here as
+  // one.
   'src/ui/svelte/apps/manager/EmptyState.svelte': Object.freeze([
     'manager-systems-empty',
     'world-tool-entry-on-break-repair-tag-picker-empty',
+    'world-tool-catalogue-filtered-empty',
   ]),
   // BOTH parties pickers, because between them they are the primitive's two modes and
   // neither renders the other's chrome. `inlineSearchTrigger` (the actor picker) replaces
@@ -862,7 +877,11 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // ASSERTS contains one. `manager-recipe-item-overview` is the manager one, and it is where the
   // conversion moves the most: three field labels go from `0.66rem / .1em` to the ladder's
   // `8.5px / .11em`, and the nested "from linked item" note goes with them because it declares no
-  // size of its own.
+  // size of its own. THAT IS TRUE OF SIZE AND WAS NOT TRUE OF COLOUR (issue 1514): the note DID
+  // declare its own ink, so the mark's contrast correction reached the label and stopped at the
+  // tail, splitting one 8.5px line into two tones. The note's `color` was deleted rather than
+  // the correction narrowed, so it now inherits the mark's ink as it already inherited its size,
+  // and this frame is the one that shows both halves of that line agreeing.
   //
   // Still uncovered, and named rather than left to be discovered: `tone="accent"`. It is
   // specimen-mandated — `library.html` declares the rule, draws the example and states when to

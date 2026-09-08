@@ -32,9 +32,10 @@
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { relative, resolve, sep } from 'node:path';
 import test from 'node:test';
 
+import { listSvelteComponents } from '../scripts/lib/svelteComponentFiles.js';
 import { defineClosedTokenContract } from './helpers/primitiveSourceContract.js';
 
 /** The class only the primitive may write. A NEW token: nothing else in the tree writes it. */
@@ -133,16 +134,19 @@ test('the kicker renders one of three measured, non-interactive hosts, and nothi
  * THE INK, WHICH IS THE SECOND CORRECTION TO `library.html:120` AND THE ONE A PALETTE HID.
  *
  * The specimen states `--fab-text-subtle`, and this component shipped it. At 8.5px it is the
- * smallest type the product draws, and FIVE of the seven palettes declare their text tones as
- * ALPHAS over the surface rather than as opaque values — so on the default `fabricate` theme
+ * smallest type the product draws, and SIX of the seven palettes declare `muted` and `subtle`
+ * as ALPHAS over the surface rather than as opaque values — so on the default `fabricate` theme
  * the subtle tone composites to 3.69:1 on `--fab-surface` and 3.50:1 on `--fab-surface-soft`,
  * under the 4.5:1 small-text floor. `--fab-text-muted` reads 5.42:1 and 5.00:1 at those two
  * grounds and clears the floor in all seven, `ironblood-forge` worst at 5.19:1 and 4.77:1.
  *
- * Pinned here because the failure mode was a SILENT one: the opaque `frostbound-hall` reads
- * 5.28:1 from the same declaration, so four palettes' worth of inspection agree with the wrong
- * value. It is also the whole reason this component exists as a component — one ink correction
- * reaches 37 render sites, including the two the conversion never touched.
+ * Pinned here because the failure mode was a SILENT one, and because the palette that hid it
+ * is the ONE the register can be checked against: `mythwright` alone states those two tones as
+ * opaque hues, and its subtle tone reads 5.28:1 from the same declaration. Six of the seven
+ * fail and that one passes, so a single palette's worth of inspection agreed with the wrong
+ * value and the specimen was set from the outlier rather than from the set. It is also the
+ * whole reason this component exists as a component — one ink correction reaches 37 render
+ * sites, including the two the conversion never touched.
  */
 test('the kicker inks at the muted tone, which is the contrast correction the specimen carries too', () => {
   const source = readFileSync(resolve(import.meta.dirname, '..', PRIMITIVE), 'utf8');
@@ -153,7 +157,7 @@ test('the kicker inks at the muted tone, which is the contrast correction the sp
     body,
     /color:\s*var\(--fab-text-muted\)/,
     'the base kicker inks at `--fab-text-muted`: at 8.5px the specimen`s subtle tone is under ' +
-      'the small-text contrast floor on five of the seven palettes'
+      'the small-text contrast floor on six of the seven palettes, clearing it only on `mythwright`'
   );
   assert.ok(
     !body.includes('--fab-text-subtle'),
@@ -173,3 +177,80 @@ test('the kicker inks at the muted tone, which is the contrast correction the sp
   );
 });
 
+
+/**
+ * A NESTED CHILD MUST NOT RE-DECLARE THE MARK'S INK (issue 1514).
+ *
+ * The component takes no `class`, no `style` and no rest spread, so a caller that needs layout
+ * nests its own element INSIDE the kicker. That is the sanctioned shape and several callers use
+ * it. What it also does, silently, is give the caller a second place to declare `color` on the
+ * same line of text.
+ *
+ * While the mark and its callers both painted `--fab-text-subtle` this was invisible: label and
+ * tail were one ink at two weights, and the duplicate declaration read as harmless restatement.
+ * The contrast correction above is what separated them. `RecipeItemOverviewTab.svelte` nests a
+ * `.manager-recipe-item-label-note` inside two of its three kickers and that rule painted the
+ * subtle tone itself, so after the correction the label read 5.42:1 and the tail 3.69:1 — a
+ * two-tone split inside a single 8.5px line, with the FAILING half the one left showing. It was
+ * found by reading every `<Kicker>` in the tree by hand; this is that scan, mechanised, so the
+ * next such caller fails instead of shipping.
+ *
+ * The remedy is always to DELETE the child's `color`, never to narrow the primitive: the ink is
+ * right for all of its render sites, and re-breaking them to spare one caller inverts the trade.
+ * Weight, tracking and case overrides on such a child are legitimate and untouched — they are
+ * what makes an aside read as an aside — so this clause is about `color` alone.
+ *
+ * TWO WAYS THIS CLAUSE WENT VACUOUS BEFORE IT WENT GREEN, both found by mutating the known
+ * offender back in rather than by reading it, and both recorded because either would have left a
+ * guard that passes on a tree it is supposed to red. FIRST, the closing-tag matcher: Prettier
+ * writes these tags in the dangling-bracket style, `</Kicker` newline `>`, so a literal
+ * `</Kicker>` matched almost nothing and the blocks it did find had the wrong boundaries — hence
+ * `\s*` before the `>`. SECOND, and less visible, the per-class rule pattern was authored through
+ * a shell heredoc, which collapsed each doubled backslash to a single one — so the escaped dot
+ * arrived with one backslash, which a TEMPLATE LITERAL then reads as a bare `.`, and the escaped
+ * whitespace class arrived as a literal `s`. The pattern became
+ * `.<class>s*{`, matched nothing, and every file reported clean. It is built with `String.raw`
+ * now so the escaping is one level rather than two. A scan whose pattern cannot match is
+ * indistinguishable from a corpus with nothing to find; prove it FAILS before trusting a pass.
+ */
+const KICKER_BLOCK = /<Kicker\b[^>]*>([\s\S]*?)<\/Kicker\s*>/g;
+const NESTED_CLASS = /class="([\w\s-]+)"/g;
+
+test('no element nested inside a Kicker re-declares the mark`s ink', () => {
+  const repoRoot = resolve(import.meta.dirname, '..');
+  const offenders = [];
+
+  for (const file of listSvelteComponents(resolve(repoRoot, 'src'))) {
+    const source = readFileSync(file, 'utf8');
+    if (!source.includes('<Kicker')) continue;
+
+    const nestedClasses = new Set();
+    for (const [, inner] of source.matchAll(KICKER_BLOCK)) {
+      for (const [, value] of inner.matchAll(NESTED_CLASS)) {
+        for (const className of value.split(/\s+/).filter(Boolean)) nestedClasses.add(className);
+      }
+    }
+    if (nestedClasses.size === 0) continue;
+
+    for (const className of nestedClasses) {
+      // The class's OWN rule in this file's scoped block, matched as a whole selector so that
+      // `.a-note` does not answer for `.a-note-icon`, and read only as far as its closing brace.
+      const rule = new RegExp(String.raw`\.${className}\b[^{;}]*\{([^}]*)\}`);
+      const body = rule.exec(source)?.[1];
+      if (body && /(^|[\s;])color\s*:/.test(body)) {
+        offenders.push(
+          `${relative(repoRoot, file).split(sep).join('/')} declares \`color\` on ` +
+            `.${className}, which it nests INSIDE a <Kicker>`
+        );
+      }
+    }
+  }
+
+  assert.deepEqual(
+    offenders,
+    [],
+    'a nested child that declares its own `color` splits one line of text into two inks the ' +
+      'moment the mark`s ink moves; delete the child`s `color` and let it inherit:\n- ' +
+      offenders.join('\n- ')
+  );
+});

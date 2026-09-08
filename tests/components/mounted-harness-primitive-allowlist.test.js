@@ -604,3 +604,84 @@ test('the shared primitives are reachable from a declared application root, so t
     );
   }
 });
+
+// A COMMENT INSIDE A ROSTER IS INSIDE THAT ROSTER'S CAPTURED BODY (issue 1514).
+//
+// `importedArraysOf` above reads a backing array with `Object\.freeze\(\[([^\]]*)\]`, a negated
+// character class that stops at the FIRST closing bracket in the declaration. Every roster in
+// `tests/helpers/svelte-component-harness.js` carries per-entry prose explaining why each module
+// is there, and that prose sits INSIDE the body this pattern captures — so a comment that merely
+// QUOTES a bracketed call shape truncates the capture and silently deletes every entry after it
+// from this guard's view.
+//
+// That is not hypothetical. It happened in this change: a paragraph added to
+// `CRAFTING_APP_COMPILED_MODULES` quoted the region matcher's required form literally, and the
+// roster went from 41 of 41 own literals resolved to 36 of 41, dropping `EmptyState`, `Avatar`,
+// `FillBar`, `Notice` and `CraftingView` — four of them members of `SHARED_PRIMITIVES`, which is
+// the set the guard above exists to police. It was LATENT rather than red, because no suite
+// currently spreads that roster into a readable literal array; it would have armed the moment
+// one did, which is precisely the repair that roster's own docblock recommends.
+//
+// So the failure mode is a silent narrowing of another guard, discoverable only by measurement.
+// This test makes it loud. It drives the REAL `importedArraysOf`, so it also reds if that
+// reader's pattern is changed in a way that stops resolving the rosters whole.
+//
+// The declaration scan is anchored at column 0 so it reads only genuine exports: the note at
+// `svelte-component-harness.js:346` writes `export const NAME = Object.freeze([ … ])` inside a
+// comment to describe the very form this pattern matches, and the production reader does register
+// a bogus `NAME` binding from it. That one is harmless — no suite imports a binding by that name,
+// so its empty body is never consulted — and it is excluded here rather than left to fail.
+const HARNESS_ROSTER_SOURCE = 'tests/helpers/svelte-component-harness.js';
+
+test('every exported roster in the shared harness resolves whole through the guard reader', () => {
+  const source = readRepoFile(HARNESS_ROSTER_SOURCE);
+  const rosterNames = [...source.matchAll(/^export const (\w+) = Object\.freeze\(\[$/gm)].map(
+    ([, name]) => name
+  );
+  assert.ok(
+    rosterNames.length >= 8,
+    `expected the harness to export its module rosters as frozen arrays, found ${rosterNames.length}`
+  );
+
+  // Ground truth is one quoted path per line inside the declaration, which is how the file is
+  // written and how Prettier keeps it. Read to the closing `]);` rather than with the reader's
+  // own pattern, so the two disagree exactly when the reader is truncating.
+  const declaredPathsOf = (name) => {
+    const start = source.indexOf(`export const ${name} = Object.freeze([`);
+    const end = source.indexOf('\n]);', start);
+    assert.ok(end > start, `${name} is a frozen array literal closed by ']);'`);
+    return [...source.slice(start, end).matchAll(/^\s*'([\w./@-]+)',?\s*$/gm)].map(([, p]) => p);
+  };
+
+  // The real reader, driven through a synthetic suite that imports every roster by name.
+  const resolved = new Map(
+    importedArraysOf(
+      `import { ${rosterNames.join(', ')} } from '../helpers/svelte-component-harness.js';`
+    )
+  );
+
+  const truncated = [];
+  for (const name of rosterNames) {
+    const declared = declaredPathsOf(name);
+    const body = resolved.get(name);
+    if (body === undefined) {
+      truncated.push(`${name} was not resolved by importedArraysOf at all`);
+      continue;
+    }
+    const captured = [...body.matchAll(QUOTED)].map(([, value]) => value);
+    const missing = declared.filter((path) => !captured.includes(path));
+    if (missing.length) {
+      truncated.push(
+        `${name} resolves ${captured.length} of ${declared.length} declared paths; ` +
+          `a bracket character in its comments truncated the capture before ${missing.join(', ')}`
+      );
+    }
+  }
+
+  assert.deepEqual(
+    truncated,
+    [],
+    'a closing bracket inside a roster comment silently narrows the naming guard above:\n- ' +
+      truncated.join('\n- ')
+  );
+});

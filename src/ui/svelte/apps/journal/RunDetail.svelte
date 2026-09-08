@@ -135,7 +135,7 @@
       {#if isSucceeded && createdResults.length > 0}
         <section class="journal-detail-results" data-journal-results>
           <!--
-            DEFERRED, on ink (issue 1514; register entry for issue 1519). This heading paints
+            DEFERRED, on ink (issue 1514; recorded on this primitive's row in `scripts/lib/designSystemPrimitives.json`). This heading paints
             `var(--fab-success-text)` inside a success-soft well, which is the one thing on the
             panel that says the run SUCCEEDED. `Kicker`'s tone set is `default` (subtle) and
             `accent` (`Kicker.svelte:105`), so the conversion would turn the green grey. The

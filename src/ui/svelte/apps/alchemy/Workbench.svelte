@@ -201,7 +201,7 @@
     {#if benchEmpty}
       <!--
         THE BENCH'S OWN EMPTY IS DEFERRED, and this one was converted and then measured back
-        out (issue 1514; register entry for issue 1519).
+        out (issue 1514; recorded on this primitive's row in `scripts/lib/designSystemPrimitives.json`).
 
         The drop zone is ALREADY the dashed region: `.alchemy-bench` is `1.5px dashed
         var(--fab-border-strong)` at `border-radius: 14px`, and `.is-empty` insets it a
@@ -298,7 +298,7 @@
 
   <!--
     THE LIVE STATUS STRIP IS DEFERRED, and the reason is a measurement rather than a
-    preference (issue 1514; register entry for issue 1519).
+    preference (issue 1514; recorded on this primitive's row in `scripts/lib/designSystemPrimitives.json`).
 
     The plan routed it to a non-blocking `Notice`, "which is what preserves the `aria-live`
     region". `Notice`'s tone set is `{danger, warning, info, success, accent}`
@@ -358,8 +358,7 @@
   {/if}
 
   <!--
-    THE STILL-NEEDED WELL IS DEFERRED, on content model (issue 1514; register entry for
-    issue 1519). The plan routed it to `Callout`, and `Callout` has no children: its props
+    THE STILL-NEEDED WELL IS DEFERRED, on content model (issue 1514; recorded on this primitive's row in `scripts/lib/designSystemPrimitives.json`). The plan routed it to `Callout`, and `Callout` has no children: its props
     are `title` and `text` as STRINGS plus one `actions` snippet, and `.manager-callout-actions`
     is `flex: none; display: inline-flex; align-items: center` — a non-wrapping trailing
     cluster. This well's body is `.alchemy-missing-rows`, a `flex-wrap: wrap` row of N chips

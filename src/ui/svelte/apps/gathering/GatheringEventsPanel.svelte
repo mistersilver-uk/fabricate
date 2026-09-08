@@ -92,8 +92,14 @@
     rather than drawn two ways. "Your chance of encountering an event while gathering here" is
     a caption for the bar on the line directly above it: it documents a control, says nothing
     about the world, and reads as a label rather than as a strip. A caption is neither
-    primitive's, so it stays the bare 12px line it has always been and goes to the register
-    (issue 1519) as the shape the set does not name.
+    primitive's, so it stays the bare 12px line it has always been and is RECORDED as the shape
+    the set does not name — in the ruled-out register the specification actually maintains,
+    which is the "ruled-out register is part of the specification" requirement in
+    `openspec/specs/design-system/spec.md` and section 15 of
+    `openspec/specs/design-system/library.html`. An earlier draft sent it to "the register
+    (issue 1519)"; that number is the geometry sweep's, a different programme, and no entry ever
+    landed anywhere. A deferral that lives only in a `why` string and a source comment is not
+    recorded at all, which is the whole point of the register having a home.
 
     THE MEASUREMENT, so the deferral is not re-litigated: converted, this line rendered
     432.3x44.39 against the 432.3x15 its `<p>` draws — a +29.39px growth plus a 1px

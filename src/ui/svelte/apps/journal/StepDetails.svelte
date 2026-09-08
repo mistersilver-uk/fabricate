@@ -205,7 +205,7 @@
     min-width: 0;
   }
 
-  /* DEFERRED, on document outline (issue 1514; register entry for issue 1519). Both markup
+  /* DEFERRED, on document outline (issue 1514; recorded on this primitive's row in `scripts/lib/designSystemPrimitives.json`). Both markup
      sites are `<h4>`, and `Kicker`'s host set is `{p, span, h3}` with a SILENT `p` fallback
      (`Kicker.svelte:93-99`) — so `as="h4"` would drop two headings out of the outline without
      a word. These are two of the three `<h4>` kicker candidates the change defers. */

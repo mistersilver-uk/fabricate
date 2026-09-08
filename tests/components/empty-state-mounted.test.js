@@ -165,17 +165,21 @@ describe('1286 EmptyState — variant contract', () => {
    * REFERENCE'S THEY DO NOT TAKE (issue 1514).
    *
    * `proto:2262` inks the note line `var(--subtle)` and `proto:2545` inks the filtered
-   * sentence `var(--disabled)`, and both shipped that way. Five of the seven palettes declare
-   * their text tones as ALPHAS over the surface rather than as opaque values, so on the
+   * sentence `var(--disabled)`, and both shipped that way. SIX of the seven palettes declare
+   * `muted` and `subtle` as ALPHAS over the surface rather than as opaque values, and all
+   * seven declare `disabled` as one, so on the
    * default `fabricate` theme those composite to 3.69:1 and 2.66:1 on `--fab-surface` at 10px
    * and 11.5px — small text, under the 4.5:1 floor `spec.md` states. `--fab-text-muted` reads
    * 5.42:1 on `--fab-surface` and 5.00:1 on `--fab-surface-soft`, and clears the floor in all
    * seven palettes with `ironblood-forge` worst at 5.19:1 and 4.77:1.
    *
    * Pinned on the SOURCE rather than computed: happy-dom resolves no cascade, and the whole
-   * failure mode here was that four opaque-token palettes read the same declaration as
-   * passing — `frostbound-hall` measures 5.28:1 from the subtle tone. The variants are what
-   * carry it, so a caller cannot get it wrong and a revert cannot be silent.
+   * failure mode here was that ONE palette read the subtle declaration as passing —
+   * `mythwright`, the only one of the seven that states `muted` and `subtle` as opaque hues,
+   * measures 5.28:1 from the subtle tone. Six fail and one passes, so the reference was set
+   * from the single outlier; the `filtered` variant's 2.66:1 had no outlier at all and failed
+   * in all seven. The variants are what carry it, so a caller cannot get it wrong and a revert
+   * cannot be silent — which is the point of pinning a figure no palette but one agrees with.
    */
   it('inks the note and filtered variants at the MUTED tone, not the reference`s subtle/disabled', () => {
     for (const selector of ['.manager-empty.is-note h3', '.manager-empty.is-note p']) {
