@@ -6,8 +6,55 @@
  * with stable ids; the UI layer maps ids to localized copy. No Svelte, Foundry,
  * or store dependencies so it stays unit-testable.
  *
+ * AN ISSUE CARRIES TWO INDEPENDENT ADDRESSES, and they answer different questions
+ * (issue 1517). `target` is the ROUTE — the editor tab that hosts the gap — and every
+ * issue has one. `focusTarget` is the CONTROL: the value of the `data-validation-target`
+ * attribute the offending control carries in that tab, which the host resolves, focuses
+ * and marks. An issue emits `focusTarget` only when it can name ONE element that is the
+ * offending thing; an issue whose subject is the recipe as a whole, or a set that does not
+ * exist yet, emits `target` alone and its row action changes route without moving focus.
+ * That fallback is STATED rather than silent — the mounted tests assert which of the two a
+ * given row is, so a `focusTarget` going missing reds rather than quietly degrading into a
+ * tab switch that focuses nothing.
+ *
+ * The three addresses this file emits, and the files that carry them:
+ *
+ *  - `recipe-name`               → `RecipeOverviewTab.svelte`'s name input
+ *  - `ingredient-group-<id>`     → `RecipeIngredientGroupCard.svelte`'s requirement root
+ *  - `result-group-<id>`         → `RecipeResultGroupCard.svelte`'s result-set root
+ *
+ * The eleven issues this file emits, and which of the two each is:
+ *
+ *  - `noName`                 → overview,    `recipe-name`
+ *  - `duplicateAlternative`   → ingredients, the repeating requirement's card
+ *  - `duplicateRequirement`   → ingredients, the SECOND carrier of the repeated signature
+ *  - `requirementOverlap`     → ingredients, the LATER of the ambiguous pair
+ *  - `unroutedResultGroup`    → results,     the first unrouted result set's card
+ *  - `noIngredientSet`        → ingredients, ROUTE ONLY — the step has no set, so there is
+ *                               no card to address; the remedy is the tab's own adder
+ *  - `noResultGroup`          → results,     ROUTE ONLY, for the same reason
+ *  - `unproducedOutcomeTier`  → results,     ROUTE ONLY — the subject is a tier no set
+ *                               produces, so no ONE set is the offender
+ *  - `alchemyResultSelection` → results,     ROUTE ONLY — the subject is the CARDINALITY
+ *                               of the success sets, not any one of them
+ *  - `signatureCollision`     → ingredients, ROUTE ONLY — the subject is this recipe
+ *                               against another recipe, not a control in this editor
+ *  - `disabledIncomplete`     → overview,    ROUTE ONLY — its control is the enable toggle,
+ *                               which is DISABLED in exactly the state that raises this
+ *
+ * A card-addressed issue also falls back to route-only when its group carries no id.
+ *
+ * They are written as literals on both sides rather than shared through an import. Sharing
+ * them would put this module in the closure of every suite that mounts a card that reads it,
+ * and `RecipeIngredientGroupCard` alone is mounted by four whose module rosters this change
+ * does not own. What holds the two sides together instead is a pair of BEHAVIOURAL gates,
+ * one per half: `tests/components/recipe-validation-tab.test.js` reads the address this file
+ * hands the row action, and `tests/components/recipe-edit-mounted.test.js` mounts the editor
+ * and resolves that address onto a real control. Either half alone would pass while the
+ * other drifted, which is the null query this contract exists to prevent.
+ *
  * @typedef {{ id: string, satisfied: boolean }} ReadinessCheck
- * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info', blocks?: 'enable', target?: 'ingredients' | 'results' | 'overview', stepId?: string, stepName?: string }} ReadinessIssue
+ * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info', blocks?: 'enable', target?: 'ingredients' | 'results' | 'overview', focusTarget?: string, stepId?: string, stepName?: string }} ReadinessIssue
  * @typedef {{ id: string, name: string }} RoutedOutcomeTier
  */
 
@@ -79,6 +126,42 @@ function stepTag(step, isMultiStep) {
 }
 
 /**
+ * The `{ focusTarget }` spread, or nothing. An EMPTY address must produce NO key rather
+ * than an empty one: the host treats any non-empty string as a control it must resolve, so
+ * an id-less group emitting `focusTarget: ''` would ask the host to query for a control
+ * that cannot exist, and the row would report as focus-wired while focusing nothing.
+ *
+ * @param {string} address
+ * @returns {{ focusTarget: string } | {}}
+ */
+function focusTag(address) {
+  return address ? { focusTarget: address } : {};
+}
+
+/**
+ * The address of one requirement (OR group) card, or '' when the group carries no id — a
+ * draft group the store has not normalized yet, which no card can be addressed by.
+ *
+ * @param {object} group
+ * @returns {string}
+ */
+function ingredientGroupTarget(group) {
+  const id = trimmed(group?.id);
+  return id ? `ingredient-group-${id}` : '';
+}
+
+/**
+ * The address of one result-set card, or '' when the group carries no id.
+ *
+ * @param {object} group
+ * @returns {string}
+ */
+function resultGroupTarget(group) {
+  const id = trimmed(group?.id);
+  return id ? `result-group-${id}` : '';
+}
+
+/**
  * Missing-ingredient-set and missing-result-group issues, one per offending
  * step. Surfaced as blocking, critical issues against their editor tab.
  *
@@ -139,7 +222,11 @@ function requirementSignature(group) {
  */
 function collectSetDuplicateIssues(set, step, isMultiStep) {
   const issues = [];
-  const requirementSignatures = [];
+  const seenSignatures = new Set();
+  // The SECOND group to carry an already-seen signature, which is the one a GM would
+  // delete. The first carrier is the requirement they meant to author, so addressing it
+  // would land the GM on the row that is not the mistake.
+  let repeatedGroup = null;
 
   for (const group of asArray(set?.ingredientGroups)) {
     const signatures = asArray(group?.options).map(optionSignature).filter(Boolean);
@@ -151,23 +238,26 @@ function collectSetDuplicateIssues(set, step, isMultiStep) {
         severity: 'critical',
         blocks: 'enable',
         target: 'ingredients',
+        ...focusTag(ingredientGroupTarget(group)),
         ...stepTag(step, isMultiStep),
       });
     }
 
     const signature = requirementSignature(group);
     if (signature !== null) {
-      requirementSignatures.push(signature);
+      if (seenSignatures.has(signature) && repeatedGroup === null) repeatedGroup = group;
+      seenSignatures.add(signature);
     }
   }
 
   // Within a set: two requirements sharing a requirement signature duplicate.
-  if (new Set(requirementSignatures).size !== requirementSignatures.length) {
+  if (repeatedGroup !== null) {
     issues.push({
       id: 'duplicateRequirement',
       severity: 'critical',
       blocks: 'enable',
       target: 'ingredients',
+      ...focusTag(ingredientGroupTarget(repeatedGroup)),
       ...stepTag(step, isMultiStep),
     });
   }
@@ -225,7 +315,11 @@ function collectSetOverlapIssues(set, step, isMultiStep, systemComponents) {
   for (const group of asArray(set?.ingredientGroups)) {
     const ids = requirementComponentIds(group, systemComponents);
     if (ids.size === 0) continue;
-    groups.push({ ids, signature: requirementSignature(group) });
+    groups.push({
+      ids,
+      signature: requirementSignature(group),
+      address: ingredientGroupTarget(group),
+    });
   }
 
   for (let i = 0; i < groups.length; i += 1) {
@@ -239,6 +333,9 @@ function collectSetOverlapIssues(set, step, isMultiStep, systemComponents) {
             id: 'requirementOverlap',
             severity: 'warning',
             target: 'ingredients',
+            // The LATER of the ambiguous pair, for the reason the duplicate case gives:
+            // the earlier requirement is the one the GM authored deliberately.
+            ...focusTag(groups[j].address),
             ...stepTag(step, isMultiStep),
           },
         ];
@@ -329,16 +426,22 @@ function collectRoutedCheckIssues(executionSteps, isMultiStep, routedOutcomeTier
   let hasUnroutedGroup = false;
   for (const step of executionSteps) {
     if (!isMultiGroupStep(step)) continue;
-    const stepHasUnroutedGroup = asArray(step.resultGroups).some((group) => {
+    // `findIndex` rather than `some`, so the issue can address the FIRST group that is
+    // actually unrouted rather than merely report that one of them is. The INDEX and not
+    // the group, because a null entry in the list is unrouted too and `find` would report
+    // it as absent — `some` did not have that hole and this must not introduce one.
+    const stepResultGroups = asArray(step.resultGroups);
+    const unroutedIndex = stepResultGroups.findIndex((group) => {
       const assigned = asArray(group?.checkOutcomeIds).filter((id) => validTierIds.has(id));
       return assigned.length === 0;
     });
-    if (stepHasUnroutedGroup) {
+    if (unroutedIndex >= 0) {
       hasUnroutedGroup = true;
       issues.push({
         id: 'unroutedResultGroup',
         severity: 'warning',
         target: 'results',
+        ...focusTag(resultGroupTarget(stepResultGroups[unroutedIndex])),
         ...stepTag(step, isMultiStep),
       });
     }
@@ -498,7 +601,13 @@ export function evaluateRecipeReadiness(recipe = {}, options = {}) {
   const issues = [];
 
   if (!hasName) {
-    issues.push({ id: 'noName', severity: 'critical', blocks: 'enable', target: 'overview' });
+    issues.push({
+      id: 'noName',
+      severity: 'critical',
+      blocks: 'enable',
+      target: 'overview',
+      focusTarget: 'recipe-name',
+    });
   }
 
   issues.push(...collectMissingRequirementIssues(executionSteps, isMultiStep));

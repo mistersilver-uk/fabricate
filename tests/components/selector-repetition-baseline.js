@@ -186,6 +186,20 @@
  * table, and it did not, because a private per-window family is by construction not shared with
  * anything. It is re-derived by running the census, not predicted.
  *
+ * ISSUE 1517 PHASE 3 RE-KEYED NO ROW AND MOVED THE THREE CONTEXTUAL FIGURES, by adding ONE rule
+ * of six selectors and deleting none. The rule paints `[data-validation-focused]`, the transient
+ * mark a validation row's focus action stamps on the control it lands on, and it is written FLAT
+ * over the module focus pair's own element list — `a`, `button`, `input`, `select`, `textarea`
+ * each as `.fabricate <el>[data-validation-focused]`, plus `.fabricate [tabindex][…]` — because a
+ * single `.fabricate [data-validation-focused]` selector is (0,2,0) and would lose outright to the
+ * (0,2,1) and (0,3,0) `:focus` reset above it, painting nothing at all. So the six selectors are
+ * the point of the rule rather than a stylistic expansion of it.
+ *
+ * All six are singletons in both keyings — measured — because no other rule in the sheet names
+ * `[data-validation-focused]` at all, so the repeated table is untouched and `pinnedTotal` stays
+ * 243 across 119 rows. The rule count rises by one and the key and singleton counts each rise by
+ * six, which is the plain shape: one added rule, six added keys, none of them shared.
+ *
  * ISSUE 1509 PHASE 4 IS THE FIRST OF THIS CHANGE'S PHASES TO RE-KEY A ROW, AND IT RE-KEYS EXACTLY
  * ONE. Rooting `ToggleCard` at `fabricate-toggle-card` rewrites the leading compound of ten
  * selectors and rooting `ItemDropZone` at `fabricate-link-field` rewrites fifteen more, and of

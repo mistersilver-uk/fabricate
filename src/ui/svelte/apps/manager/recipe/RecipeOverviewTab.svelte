@@ -527,10 +527,16 @@
         <span class="manager-recipe-micro-label"
           >{text('FABRICATE.Admin.Manager.Recipe.NameLabel', 'Recipe name')}</span
         >
+        <!-- `data-validation-target` is the CONTROL half of the validation row action
+             (issue 1517): `recipeReadiness.js`'s `noName` blocker addresses this input by
+             this exact value, and `validationFocus.js` resolves, focuses and marks it. The
+             literal is written on both sides and held together behaviourally, by the pair of
+             gates named in `recipeReadiness.js`'s own header. -->
         <input
           id="manager-recipe-edit-name"
           class="manager-recipe-name-input"
           data-recipe-field="name"
+          data-validation-target="recipe-name"
           type="text"
           value={name}
           oninput={(event) => onNameInput(event.currentTarget.value)}

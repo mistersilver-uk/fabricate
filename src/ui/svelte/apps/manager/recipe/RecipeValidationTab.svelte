@@ -201,6 +201,11 @@
         detail: issue ? issueTitle(issue) : '',
         dataAttrs: rowAttrs(check.id, check.satisfied, issue ? issue.id : ''),
         target: issue ? issue.target || '' : '',
+        // The CONTROL half, forwarded verbatim from the owning issue (issue 1517). It is
+        // threaded here and not derived: `recipeReadiness.js` is the only thing that knows
+        // WHICH requirement or result set a failing check is about, and a row that dropped
+        // it would render a View button that changes route and focuses nothing.
+        focusTarget: issue ? issue.focusTarget || '' : '',
       };
     });
     // Any issue not attached to a check row (e.g. `disabledIncomplete`) becomes its
@@ -221,6 +226,7 @@
         detail: '',
         dataAttrs: rowAttrs('', false, issue.id),
         target: issue.target || '',
+        focusTarget: issue.focusTarget || '',
       }));
     return [...checkRows, ...orphanRows];
   });

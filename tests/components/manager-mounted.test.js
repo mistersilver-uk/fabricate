@@ -629,14 +629,17 @@ function compileManagerRoot() {
       readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/recipe/${recipeModule}`), 'utf8')
     );
   }
-  // Plain module imported by CraftingSettingsView — copied raw (NOT compiled), the
-  // same way recipe/recipeReadiness.js is, so the mounted import resolves.
-  {
-    const moduleDestination = join(tempRoot, 'src/ui/svelte/apps/manager/resolutionModeOptions.js');
+  // Plain modules under `manager/` itself — copied raw (NOT compiled), the same way
+  // recipe/recipeReadiness.js is, so the mounted imports resolve. `resolutionModeOptions.js`
+  // is CraftingSettingsView's; `validationFocus.js` is RecipeEditView's focus helper
+  // (issue 1517). This harness's list has NO validator, so an omission here HANGS every
+  // mounted manager test as `# cancelled` rather than failing one by name.
+  for (const managerModule of ['resolutionModeOptions.js', 'validationFocus.js']) {
+    const moduleDestination = join(tempRoot, `src/ui/svelte/apps/manager/${managerModule}`);
     mkdirSync(dirname(moduleDestination), { recursive: true });
     writeFileSync(
       moduleDestination,
-      readFileSync(resolve(repoRoot, 'src/ui/svelte/apps/manager/resolutionModeOptions.js'), 'utf8')
+      readFileSync(resolve(repoRoot, `src/ui/svelte/apps/manager/${managerModule}`), 'utf8')
     );
   }
   writeCompiledSvelte('src/ui/svelte/apps/manager/system/SystemEditorTabs.svelte');

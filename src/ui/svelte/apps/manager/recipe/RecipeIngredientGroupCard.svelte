@@ -70,6 +70,21 @@
     return translated && translated !== key ? translated : fallback;
   }
 
+  // THE CONTROL HALF of the validation row action (issue 1517). A duplicate-alternative,
+  // duplicate-requirement or requirement-overlap issue is about THIS requirement, not about
+  // one field inside it, so the card itself is the destination and `recipeReadiness.js`
+  // addresses it as `ingredient-group-<id>` — the same literal, written on both sides rather
+  // than shared through an import, because sharing it would put the producer in the closure
+  // of the four suites that mount this card, whose module rosters issue 1517 does not own.
+  // The pair is held together behaviourally instead: `recipe-validation-tab.test.js` reads
+  // the address the producer hands the row action, and `recipe-edit-mounted.test.js` mounts
+  // the editor and resolves that address onto this element.
+  //
+  // A group the store has not normalized yet carries no id, so it gets no address and the
+  // producer emits a route-only issue for it; `undefined` removes the attribute rather than
+  // writing an empty one that a query could still match.
+  const validationTarget = $derived(group?.id ? `ingredient-group-${group.id}` : undefined);
+
   const options = $derived(Array.isArray(group?.options) ? group.options : []);
   const hasAlternatives = $derived(options.length >= 2);
   const hasEssences = $derived((essenceOptions || []).length > 0);
@@ -211,6 +226,9 @@
   class:has-alternatives={hasAlternatives}
   data-recipe-group
   data-recipe-group-id={group?.id || ''}
+  data-validation-target={validationTarget}
+  tabindex="-1"
+  data-keyboard-focus="true"
 >
   {#if hasAlternatives}
     <!-- ANY ONE OF box (§B2): an accent-bordered container with a header pill + hint;

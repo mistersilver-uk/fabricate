@@ -83,6 +83,15 @@
     return result;
   }
 
+  // THE CONTROL HALF of the validation row action (issue 1517). An unrouted-result-set
+  // warning is about THIS set's routing, so the card is the destination and
+  // `recipeReadiness.js` addresses it as `result-group-<id>`. Same literal on both sides,
+  // held together behaviourally by the pair of gates named in `recipeReadiness.js`'s own
+  // header — `recipe-validation-tab.test.js` reads the address the `unroutedResultGroup`
+  // warning emits, and `recipe-edit-mounted.test.js` finds it on this element. An id-less
+  // draft group gets no address and the producer emits a route-only issue.
+  const validationTarget = $derived(group?.id ? `result-group-${group.id}` : undefined);
+
   const results = $derived(Array.isArray(group?.results) ? group.results : []);
 
   // Drag-reorder state (progressive only). Local so it survives the store refresh
@@ -240,6 +249,9 @@
   class={`manager-recipe-ingredient-set ${chromeless ? 'is-chromeless' : ''} ${reserved ? 'is-reserved' : ''}`}
   data-recipe-set
   data-recipe-result-set-id={group?.id || ''}
+  data-validation-target={validationTarget}
+  tabindex="-1"
+  data-keyboard-focus="true"
 >
   {#if !chromeless}
     <div class="manager-recipe-ingredient-set-head">

@@ -1104,6 +1104,42 @@
   outline-offset: 2px;
 }
 
+/* THE THIRD HALF OF THE PAIR ABOVE, and it exists because the pair has a hole a POINTER
+   falls through (issue 1517). A validation row's View action moves focus programmatically.
+   A programmatic `.focus()` following a pointer activation matches `:focus` and NOT
+   `:focus-visible`, so the reset above strips the ring and the repaint above never supplies
+   one: a GM who CLICKS the action sees the tab change and no mark whatsoever on the control
+   it landed on. `validationFocus.js` therefore stamps `data-validation-focused` on the
+   element it focuses and removes it on that element's next blur, and this block paints it.
+
+   WRITTEN FLAT, OVER THE RESET'S OWN ELEMENT LIST, and that is prescribed rather than
+   stylistic — for exactly the reason the pair's own comment gives, and the arithmetic is
+   easy to get wrong here. A single `.fabricate [data-validation-focused]` rule is (0,2,0);
+   `.fabricate button:focus` is (0,2,1) and `.fabricate [tabindex]:focus` is (0,3,0), and
+   specificity is compared BEFORE source order, so the reset would win outright and this
+   rule would paint nothing at all — on every destination, since the helper admits only
+   natively-focusable elements and `[tabindex]` carriers and every one of those is in the
+   reset's list. The five typed selectors below are (0,2,1) and the `[tabindex]` one is
+   (0,3,0), tying their `:focus` counterparts and winning by POSITION.
+
+   NO NEW RANK ENTERS THE SHEET — both ranks are ones the suppress/supply pair already
+   occupies for exactly these elements — so the invariant above, that a per-component focus
+   ring still wins, survives. The element list stays identical to both halves of the pair,
+   and the declarations are byte-identical to the repaint, so a GM cannot tell a pointer
+   activation from a keyboard one.
+
+   ROOTED AT `.fabricate`, never at `.fabricate-validation`. This adds no focus pseudo-class
+   rule anywhere, and nothing under that family, which is a REFUSED pair (issue 1509). */
+.fabricate a[data-validation-focused],
+.fabricate button[data-validation-focused],
+.fabricate input[data-validation-focused],
+.fabricate select[data-validation-focused],
+.fabricate textarea[data-validation-focused],
+.fabricate [tabindex][data-validation-focused] {
+  outline: 2px solid var(--fab-accent);
+  outline-offset: 2px;
+}
+
 /* ══════════════════════════════════════════
    MODULE UTILITIES (issue 1501)
    ══════════════════════════════════════════

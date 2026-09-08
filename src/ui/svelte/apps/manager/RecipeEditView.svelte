@@ -34,6 +34,7 @@
   import RecipeBooksScrollsTab from './recipe/RecipeBooksScrollsTab.svelte';
   import RecipeValidationTab from './recipe/RecipeValidationTab.svelte';
   import { evaluateRecipeReadiness, blocksEnable } from './recipe/recipeReadiness.js';
+  import { focusValidationTarget } from './validationFocus.js';
   import { resolutionModeOptions } from './resolutionModeOptions.js';
 
   let {
@@ -442,18 +443,86 @@
     if (!TAB_IDS.includes(activeTab)) activeTab = 'overview';
   });
 
-  // Deep-link from a validation issue: switch to the tab that hosts the gap.
-  function selectIssue(targetTab) {
-    if (['overview', 'ingredients', 'results', 'tools'].includes(targetTab)) {
-      activeTab = targetTab;
-    }
+  // The four routes a validation row may address. Written once so the guard below and the
+  // announcement's own label lookup cannot disagree about which tabs are reachable.
+  const ISSUE_TABS = {
+    overview: { key: 'FABRICATE.Admin.Manager.Recipe.Tabs.Overview', fallback: 'Overview' },
+    ingredients: {
+      key: 'FABRICATE.Admin.Manager.Recipe.Tabs.Ingredients',
+      fallback: 'Ingredients',
+    },
+    results: { key: 'FABRICATE.Admin.Manager.Recipe.Tabs.Results', fallback: 'Results' },
+    tools: { key: 'FABRICATE.Admin.Manager.Recipe.Tabs.Tools', fallback: 'Tools' },
+  };
+
+  // The editor's own root, so `focusValidationTarget` resolves a `data-validation-target`
+  // inside THIS editor rather than anywhere in the manager window.
+  let editorRoot = $state(null);
+
+  // WHAT THE LIVE REGION SAYS, and it is the ACTION'S OUTCOME rather than a count. Activating
+  // a row action changes no tally, so a count-subjected region would recite an unchanged
+  // number at the moment a GM most needs to know where they landed.
+  let issueAnnouncement = $state('');
+
+  /**
+   * The focused control's own accessible name, read off the DOM. `aria-label` first, then
+   * the `<label for>` that names it, then `title`. A destination with none of the three —
+   * a requirement card, say — yields '' and the announcement names the route alone.
+   *
+   * @param {Element|null} element
+   * @returns {string}
+   */
+  function accessibleNameOf(element) {
+    if (!element) return '';
+    const label = element.getAttribute('aria-label');
+    if (label) return label.trim();
+    const id = element.getAttribute('id');
+    const labelling = id ? editorRoot?.querySelector(`label[for="${id}"]`) : null;
+    if (labelling) return (labelling.textContent || '').trim();
+    return (element.getAttribute('title') || '').trim();
+  }
+
+  // Deep-link from a validation issue: switch to the tab that hosts the gap, THEN move focus
+  // to the offending control.
+  //
+  // THE ORDER IS THE MECHANISM, not a preference. The route is set synchronously and first,
+  // so Svelte has flushed it and the destination panel exists by the time the helper's
+  // `queueMicrotask` runs its query. And the announcement is derived FROM the element the
+  // helper resolves, so it cannot be written before focus moved — there is nothing to write
+  // it from. That is a property of the data flow rather than of a test.
+  async function selectIssue(targetTab, focusTarget) {
+    const route = Object.hasOwn(ISSUE_TABS, targetTab) ? targetTab : null;
+    if (route) activeTab = route;
+    const focused = await focusValidationTarget(editorRoot, focusTarget);
+    const routeLabel = route ? text(ISSUE_TABS[route].key, ISSUE_TABS[route].fallback) : '';
+    const controlName = accessibleNameOf(focused);
+    issueAnnouncement = controlName ? `${routeLabel} — ${controlName}` : routeLabel;
   }
 </script>
 
 <main
   class="manager-main manager-recipe-edit-main"
   aria-label={text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe')}
+  bind:this={editorRoot}
 >
+  <!--
+    THE ROW ACTION'S LIVE REGION, and it is HOSTED HERE rather than in the validation surface
+    for a reason that is not stylistic (issue 1517). Activating a row action sets `activeTab`
+    to another value, which unmounts the whole validation panel — live region included — in
+    the same update that was supposed to announce. So the element carrying `aria-live` is
+    ALWAYS in the DOM, outside both the `{#if recipe}` guard and the `{#if activeTab}` chain
+    below, with its own `{#if}` INSIDE it. That is the same idiom, and the same reason, as
+    `world/WorldCurrencyTab.svelte`'s currency report.
+
+    It wears the shipped `.visually-hidden` utility (`styles/fabricate.css`, rooted at the
+    MODULE) and is addressed by a `data-` hook. It carries NO `manager-recipe-*` class on
+    purpose: `manager-recipe-val*` and `manager-recipe-rail*` are a pinned family with an
+    explicit anchors list, so a natural name here would join that family and change its
+    census.
+  -->
+  <div class="visually-hidden" role="status" aria-live="polite" data-recipe-issue-announcement>
+    {#if issueAnnouncement}{issueAnnouncement}{/if}
+  </div>
   {#if recipe}
     <div class="fab-stack" data-gap="3" data-recipe-editor>
       <!-- Header → tabs → banner → content (§4.2): the banner sits BELOW the tab strip
