@@ -600,12 +600,11 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   'src/ui/svelte/apps/crafting/ShoppingList.svelte',
   'src/ui/svelte/apps/crafting/RunSummaryPanel.svelte',
   'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte',
-  // The ONE not-yet-ready chrome the five player views draw (issue 1514), and the strip its
-  // error branch composes. `CraftingView` below renders the composition, so this roster is
-  // where the crafting suites acquire it — and `Callout` arrives WITH it rather than through
-  // `MARKS_AND_NOTICES_COMPILED_MODULES`, because this list already carries `Kicker` and
-  // `StatBox` flat and spreading that roster here would name `Notice`, which this tree does
-  // not reach. Omitting either does not fail a crafting suite: it CANCELS it.
+  // The ONE not-yet-ready chrome the five player views draw (issue 1514). `CraftingView` below
+  // renders the composition, so this roster is where the crafting suites acquire it. Its error
+  // branch composes `Notice`, which this list already carries flat a few lines down; `Callout`
+  // is kept beside it because the crafting tree still reaches that strip through the recipe
+  // detail's own panels. Omitting either does not fail a crafting suite: it CANCELS it.
   'src/ui/svelte/apps/manager/Callout.svelte',
   'src/ui/svelte/apps/PlayerViewState.svelte',
   // The four the Crafting tab reaches as of issue 1514's crafting phase, each written FLAT for
@@ -618,9 +617,21 @@ export const CRAFTING_APP_COMPILED_MODULES = Object.freeze([
   //
   // WHAT AN OMISSION COSTS HERE, MEASURED RATHER THAN ASSUMED, because the obvious sentence is
   // wrong twice over. Dropping `Avatar` from this array leaves
-  // `mounted-harness-primitive-allowlist.test.js` GREEN — that guard exempts every
-  // `createMountedComponentHarness` suite by name (`:506`), and each crafting suite is one — so
-  // `SHARED_PRIMITIVES` membership is NOT what makes the omission loud. What makes it loud is
+  // `mounted-harness-primitive-allowlist.test.js` GREEN — so `SHARED_PRIMITIVES` membership is
+  // NOT what makes the omission loud.
+  //
+  // THE REASON IT STAYS GREEN IS NOT AN EXEMPTION, and the sentence here used to say it was.
+  // That guard's naming clause exempts nothing: it inspects every suite mentioning
+  // `writeCompiledSvelte` or `compiledModules`, which every `createMountedComponentHarness`
+  // caller does. What it cannot READ is this roster's call shape. Its region matcher requires a
+  // bracket — `compiledModules: [ … ]` — and the crafting suites pass the bare identifier
+  // `compiledModules: CRAFTING_APP_COMPILED_MODULES`, so it resolves no path for them, holds
+  // over an empty set and reports clean whatever they render. That is the same silent-vacuity
+  // shape the guard's own `BARE_LOOP_COMPILE` note records for compile LOOPS, and its vacuity
+  // ratchet cannot catch this instance because that ratchet skips
+  // `createMountedComponentHarness` suites by name. Recorded rather than fixed here: teaching
+  // the matcher the bare-identifier form was measured and reds 18 suites on pre-existing gaps,
+  // which is its own change. What makes an omission loud is
   // this harness's own up-front `validateMountedComponentDependencies`, which names the
   // importer, the missing module and this list. And the shape of that failure is not `# fail`:
   // measured, `crafting-view-mounted` reports `not ok 1 - CraftingView mounted behavior` with

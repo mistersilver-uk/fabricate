@@ -29,9 +29,22 @@
 
   Written as a spread so an unset hook is genuinely absent rather than an empty attribute a
   presence selector would still match, and so the VALUE reaches the DOM as written. `EmptyState`
-  (`EmptyState.svelte:84`) and `Callout` (`Callout.svelte:126`) both coerce a bare hook to
-  `data-x="true"` via `dataValue || true`; this one does not, because it carries the box these
-  hooks have always sat on and an exact-value reader must see what it saw before.
+  coerces a bare hook to `data-x="true"` via `dataValue || true`; this one does not, because it
+  carries the box these hooks have always sat on and an exact-value reader must see what it saw
+  before.
+
+  ── THE ERROR BRANCH IS A `Notice`, AND THE ROUTING RULE IS WHY ─────────────────────────────────
+  It was a `Callout` and that was the wrong primitive by the library's own rule
+  (`library.html:1058`): a callout is DOCUMENTATION — always true, stays put — and a notice is
+  STATE, something that just happened. "Couldn't load your inventory." is state. So is the
+  companion fault strip in `FabricateAppRoot.svelte`, which this same change routes to `Notice`
+  for the same reason; routing the two the same way is the point of having the rule.
+
+  It also closes a gap the callout could not: a load failure appears without a focus change, and
+  a non-blocking `Notice` carries `role="status"` with `aria-live="polite"`, where `Callout`
+  emits `role="note"` or — with neither title nor actions, which is how this branch called it —
+  nothing at all. `blocking` is deliberately NOT passed: it would take `role="alert"` and drop
+  the live region, and one failed view is not an interruption.
 
   ── THIS FILE OWNS THE WRAPPER, AND THE FILL WITH IT ────────────────────────────────────────────
   The five blocks are `height: 100%` centred fills. `EmptyState`'s panel is padding-driven and
@@ -45,7 +58,7 @@
   ── WHY THIS IS BANKED RATHER THAN REGISTERED ───────────────────────────────────────────────────
   It clears the two-caller membership bar five times over and is still not a primitive:
   `spec.md:43` says "a candidate that decomposes entirely into existing members is a COMPOSITION
-  and MUST NOT enter the set", and this decomposes into `EmptyState` and `Callout` plus one line of
+  and MUST NOT enter the set", and this decomposes into `EmptyState` and `Notice` plus one line of
   chrome. It cannot take a `notAPrimitive` row either — `tests/design-system-primitives.test.js`
   caps a recorded non-member at one caller. So it takes an `unregisteredSharedComponents` row in
   `tests/components/design-system-known-debt.json`, which is the register's answer for a
@@ -67,8 +80,8 @@
      scoped rules keep reaching their markup.
 -->
 <script>
-  import Callout from './manager/Callout.svelte';
   import EmptyState from './manager/EmptyState.svelte';
+  import Notice from '../components/Notice.svelte';
 
   let { branches = [], children = undefined } = $props();
 
@@ -93,7 +106,14 @@
       <i class={branch.icon} aria-hidden="true"></i>
       <p>{branch.message}</p>
     {:else if branch.kind === 'error'}
-      <Callout tone="danger" icon={branch.icon} text={branch.message} />
+      <!-- `Notice`, NOT `Callout` (issue 1514). The routing rule at `library.html:1058` is
+           meaning first: a CALLOUT is documentation, always true and stays put; a NOTICE is
+           STATE — it just happened. A view that failed to load is state, and it is the same
+           reading `FabricateAppRoot` already applies to the companion fault strip two files
+           over. The `role="status"` and `aria-live="polite"` a non-blocking notice carries are
+           what a load failure appearing without a focus change wants, and the callout this
+           replaces carried no role at all. -->
+      <Notice tone="danger" icon={branch.icon} title={branch.message} />
     {:else}
       <EmptyState icon={branch.icon} title={branch.message} />
     {/if}
@@ -118,7 +138,7 @@
   }
 
   /* The loading line only. Both selectors are scoped to markup authored in THIS file, so neither
-     reaches inside `EmptyState` or `Callout` — each of those keeps its own type, which is the
+     reaches inside `EmptyState` or `Notice` — each of those keeps its own type, which is the
      point of nesting a primitive rather than re-styling one from its host. */
   .fab-view-state i {
     font-size: 32px;

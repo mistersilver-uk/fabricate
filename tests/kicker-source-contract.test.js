@@ -31,6 +31,8 @@
  * are stated over and the ONE clause only this primitive raises: what it may render.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import test from 'node:test';
 
 import { defineClosedTokenContract } from './helpers/primitiveSourceContract.js';
@@ -71,7 +73,7 @@ const contract = defineClosedTokenContract({
 
   classOnlyRemedy:
     'an uppercase micro-label is a `<Kicker>`, never a hand-written `class="fab-kicker"` and ' +
-    'never a fresh scoped rule restating 8.5px / 700 / 0.11em / uppercase / --fab-text-subtle',
+    'never a fresh scoped rule restating 8.5px / 700 / 0.11em / uppercase / --fab-text-muted',
 
   keepInstead:
     'A site that needs a flex row, an ellipsis or a min-width keeps its OWN wrapper element ' +
@@ -127,3 +129,47 @@ test('the kicker renders one of three measured, non-interactive hosts, and nothi
       'rather than a feature'
   );
 });
+/**
+ * THE INK, WHICH IS THE SECOND CORRECTION TO `library.html:120` AND THE ONE A PALETTE HID.
+ *
+ * The specimen states `--fab-text-subtle`, and this component shipped it. At 8.5px it is the
+ * smallest type the product draws, and FIVE of the seven palettes declare their text tones as
+ * ALPHAS over the surface rather than as opaque values — so on the default `fabricate` theme
+ * the subtle tone composites to 3.69:1 on `--fab-surface` and 3.50:1 on `--fab-surface-soft`,
+ * under the 4.5:1 small-text floor. `--fab-text-muted` reads 5.42:1 and 5.00:1 at those two
+ * grounds and clears the floor in all seven, `ironblood-forge` worst at 5.19:1 and 4.77:1.
+ *
+ * Pinned here because the failure mode was a SILENT one: the opaque `frostbound-hall` reads
+ * 5.28:1 from the same declaration, so four palettes' worth of inspection agree with the wrong
+ * value. It is also the whole reason this component exists as a component — one ink correction
+ * reaches 37 render sites, including the two the conversion never touched.
+ */
+test('the kicker inks at the muted tone, which is the contrast correction the specimen carries too', () => {
+  const source = readFileSync(resolve(import.meta.dirname, '..', PRIMITIVE), 'utf8');
+  const base = source.slice(source.indexOf('.fab-kicker {'));
+  const body = base.slice(0, base.indexOf('}'));
+
+  assert.match(
+    body,
+    /color:\s*var\(--fab-text-muted\)/,
+    'the base kicker inks at `--fab-text-muted`: at 8.5px the specimen`s subtle tone is under ' +
+      'the small-text contrast floor on five of the seven palettes'
+  );
+  assert.ok(
+    !body.includes('--fab-text-subtle'),
+    'and the subtle tone is gone rather than left beside the correction'
+  );
+
+  const specimen = readFileSync(
+    resolve(import.meta.dirname, '../openspec/specs/design-system/library.html'),
+    'utf8'
+  );
+  const rule = specimen.slice(specimen.indexOf('.k-kicker{'));
+  assert.match(
+    rule.slice(0, rule.indexOf('}')),
+    /color:var\(--fab-text-muted\)/,
+    'and `library.html`s own specimen carries the correction, so the drawn example and the ' +
+      'shipped component do not disagree — the same way the `.11em` tracking correction was made'
+  );
+});
+

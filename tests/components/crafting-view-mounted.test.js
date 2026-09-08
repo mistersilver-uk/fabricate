@@ -15,6 +15,7 @@ import {
   listing,
   recipe
 } from '../helpers/crafting-fixtures.js';
+import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -66,6 +67,10 @@ describe('CraftingView mounted behavior', () => {
     const store = fakeCraftingStore({ error: 'boom', recipes: [] });
     const target = await harness.mount({ services: services(store) });
     assert.ok(target.querySelector('[data-crafting-state="error"]'), 'error state shown');
+    assertViewErrorTreatment(target.querySelector('[data-crafting-state="error"]'), {
+      view: 'crafting view',
+      message: 'FABRICATE.App.Crafting.Error'
+    });
   });
 
   it('renders the no-actor state when the listing has no selected actor', async () => {

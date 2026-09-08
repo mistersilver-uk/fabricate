@@ -82,16 +82,31 @@
   </div>
 
   <!--
-    CONVERTED WITH ITS TWIN IN `GatheringTasksPanel`, not separately (issue 1514). The delta
-    named only the tasks panel's pair, and converting one of the two would have left the SAME
-    sentence — `EventSafeHint`, in the same place under the same chance bar — drawn as a strip
-    at one event-visibility tier and as a bare line at another, which is worse than either
-    answer applied consistently. Both files declared the same `.gathering-detail-event-hint`
-    rule, and both rules are deleted here.
+    TWO SENTENCES, TWO ANSWERS, AND THE BRANCH IS WHAT SEPARATES THEM (issue 1514).
+
+    `EventSafeHint` converts and `EventChanceHint` does NOT, and the deciding question is the
+    routing rule's own: is this a statement about the WORLD, or a caption for a CONTROL?
+    "No events can occur here" is true of this environment whether or not anything is drawn
+    beside it, which is the standing statement `Callout` owns — and its twin renders the same
+    sentence in `GatheringTasksPanel` under the same tier, so the two are converted together
+    rather than drawn two ways. "Your chance of encountering an event while gathering here" is
+    a caption for the bar on the line directly above it: it documents a control, says nothing
+    about the world, and reads as a label rather than as a strip. A caption is neither
+    primitive's, so it stays the bare 12px line it has always been and goes to the register
+    (issue 1519) as the shape the set does not name.
+
+    THE MEASUREMENT, so the deferral is not re-litigated: converted, this line rendered
+    432.3x44.39 against the 432.3x15 its `<p>` draws — a +29.39px growth plus a 1px
+    `--fab-info-border` edge, an r11 corner, a `--fab-info-soft` fill and a 12px inset, all of
+    it around a caption for the 6px track above. `.gathering-detail-event-hint` therefore
+    survives in this file; its twin in `GatheringTasksPanel` does not, because both of that
+    file's sentences convert.
   -->
   {#if hasEvent}
     <ChanceBar value={eventChance} scale="event" />
-    <Callout tone="info" text={localize('FABRICATE.App.Gathering.Detail.EventChanceHint')} />
+    <p class="gathering-detail-event-hint">
+      {localize('FABRICATE.App.Gathering.Detail.EventChanceHint')}
+    </p>
   {:else}
     <Callout
       tone="info"
@@ -181,6 +196,15 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--fab-space-2);
+  }
+
+  /* The caption under the event chance bar. It survives the issue-1514 conversion because a
+     caption for a control is not a standing statement about the world — see the comment above
+     the branch that renders it. */
+  .gathering-detail-event-hint {
+    margin: 0;
+    font-size: 12px;
+    color: var(--fab-text-muted);
   }
 
   .gathering-detail-event-level {

@@ -19,6 +19,7 @@ import {
   createMountedComponentHarness,
   PLAYER_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
+import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -157,6 +158,7 @@ describe('AlchemyView mounted behavior', () => {
       root.textContent.includes('FABRICATE.App.Alchemy.Error'),
       'the error sentence is rendered'
     );
+    assertViewErrorTreatment(root, { view: 'alchemy view' });
   });
 
   it('renders the no-actor state when the listing resolves to no actor', async () => {

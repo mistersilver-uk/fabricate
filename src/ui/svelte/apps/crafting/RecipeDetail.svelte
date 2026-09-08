@@ -14,7 +14,7 @@
   import IngredientRoutedBody from './detail/IngredientRoutedBody.svelte';
   import RoutedByCheckBody from './detail/RoutedByCheckBody.svelte';
   import ProgressiveBody from './detail/ProgressiveBody.svelte';
-  import PlayerViewState from '../PlayerViewState.svelte';
+  import EmptyState from '../manager/EmptyState.svelte';
 
   let {
     recipe = null,
@@ -80,26 +80,34 @@
     progressive: ProgressiveBody,
   };
   const Body = $derived(BODIES[mode] ?? SimpleRecipeBody);
-
-  // THE SIXTH COPY of the player views' not-yet-ready chrome (issue 1514), and the one branch
-  // this pane can reach. It is a PANE state rather than a view root, so there is no loading
-  // branch and therefore no `aria-busy`: the composition sets that attribute only for
-  // `kind: 'loading'`, and a pane that can never be loading must not claim to be busy. The hook
-  // NAME and VALUE are this pane's own, forwarded verbatim — `data-crafting-detail-state` is
-  // read by the smoke's Playwright locators, which HANG rather than fail when a hook moves.
-  const viewStates = $derived([
-    {
-      when: !recipe,
-      kind: 'empty',
-      hook: 'data-crafting-detail-state',
-      value: 'empty',
-      icon: 'fas fa-hand-pointer',
-      message: localize('FABRICATE.App.Crafting.Detail.SelectHint'),
-    },
-  ]);
 </script>
 
-<PlayerViewState branches={viewStates}>
+{#if !recipe}
+  <!--
+    THE PANE KEEPS ITS OWN WRAPPER, AND THE FILL IS WHY (issue 1514).
+
+    This was the SIXTH caller of `PlayerViewState`, the composition the five player view ROOTS
+    draw. It is not a view root: it is the centre pane of the crafting view, and the two differ
+    in exactly the declaration that composition banks. Each of the five roots declared
+    `background: var(--fab-surface)` itself, so the composition carries it; `.crafting-detail-empty`
+    declared no background at all and a `var(--fab-space-4)` inset instead. Routed through the
+    composition, this pane filled its column edge-to-edge with the OPAQUE surface, inside a
+    centre column that is `--fab-surface-soft` with a border and `overflow: hidden`
+    (`CraftingView.svelte`) — visibly darker than the right column beside it, in the same frame.
+
+    So it takes the caller-owned WRAPPER instead, which is the answer five other sites in this
+    change already take: the wrapper declares the fill, the centring and the inset its own
+    container needs, `EmptyState` draws the panel, and neither reaches into the other. A
+    `background` prop on the composition was the alternative and is refused — one caller is not
+    a variant, and the five roots want the fill they declare.
+  -->
+  <div class="crafting-detail-empty" data-crafting-detail-state="empty">
+    <EmptyState
+      icon="fas fa-hand-pointer"
+      title={localize('FABRICATE.App.Crafting.Detail.SelectHint')}
+    />
+  </div>
+{:else}
   <div class="crafting-detail" data-crafting-detail-state="selected" data-recipe-detail-mode={mode}>
     <RecipeDetailHeader {recipe} />
     {#if !redacted}
@@ -127,7 +135,7 @@
       </div>
     {/if}
   </div>
-</PlayerViewState>
+{/if}
 
 <style>
   .crafting-detail {
@@ -154,5 +162,18 @@
     flex: 0 0 auto;
     padding-top: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
+  }
+
+  /* The caller-owned wrapper for the no-selection panel: the fill, the centring and the inset
+     the centre column needs, and NOTHING else. No `background` — the column's own
+     `--fab-surface-soft` tint shows through, which an opaque fill would replace; no colour and
+     no `text-align`, because `EmptyState` self-paints its title and centres its own stack. */
+  .crafting-detail-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: var(--fab-space-4);
   }
 </style>

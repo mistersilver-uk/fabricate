@@ -276,9 +276,41 @@
     cursor: default;
   }
 
-  .crafting-source-avatar:focus-visible {
+  /* THE ROW DRAWS THE RING, BECAUSE THE BUTTON IS INSIDE A FILTER (issue 1514).
+
+     The dim above is `filter: brightness(0.5)` on the BUTTON — it had to move there when the
+     `<img>` went inside `Avatar`, since a caller's scoped block cannot reach a child
+     component's element. A CSS `filter` renders its element as a group and dims everything the
+     group paints, the outline included: the accent ring measures 10.17:1 over `--fab-surface`
+     and 2.84:1 at half brightness, under the 3:1 SC 1.4.11 floor a focus indicator owes. This
+     is the only keyboard affordance on the row, and no View Lab case focuses it, so nothing
+     would have shown it.
+
+     The wrapper is OUTSIDE the filter, so its ring paints at full brightness over the
+     undimmed row. `:has()` is what lets it draw on the child's state, and both elements are in
+     THIS template, so the compiler keeps the rule (`ShoppingList.svelte` records the boundary
+     it would prune across). The corner matches the tile's own 9px so the ring traces the
+     portrait rather than a square around it.
+
+     `:not(:focus-visible)` on the filter was the other candidate and is refused: it would kill
+     the dim at exactly the moment the "×" becomes keyboard-reachable, which is the moment the
+     dim exists for. */
+  .crafting-source:has(.crafting-source-avatar:focus-visible) {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;
+    border-radius: 9px;
+  }
+
+  /* SUPPRESSED, not deleted. Without this the button still matches
+     `.fabricate button:focus-visible` in `styles/fabricate.css`, which paints the same accent
+     ring on the same element — inside the same filter — and the dimmed ring comes straight
+     back beside the wrapper's. Scoped, this is (0,2,0) against that rule's (0,2,1), and it
+     wins on LAYER: `styles/fabricate.css` ships in `@layer modules` and a scoped block is
+     emitted unlayered, which beats a layered rule whatever the specificity.
+     `.crafting-shopping-entry-main:focus-visible` in `ShoppingList.svelte` is the same
+     pattern for the same reason. */
+  .crafting-source-avatar:focus-visible {
+    outline: none;
   }
 
   .crafting-source-lock {

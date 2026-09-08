@@ -858,19 +858,36 @@ describe('RecipeDetail mounted behavior', () => {
     const target = await harness.mount({ recipe: null });
     const empty = target.querySelector('[data-crafting-detail-state="empty"]');
     assert.ok(Boolean(empty), 'empty hint rendered');
-    // THE SIXTH COPY, composed (issue 1514). This pane hand-rolled the same centred fill the
-    // five player VIEW roots drew, so it routes through the shared composition too — and the
-    // hook NAME and VALUE are forwarded verbatim, which is what the locator above still proves.
+    // A PANE, NOT A VIEW ROOT, AND THE FRAME MOVE IS PUBLISHED HERE (issue 1514).
+    //
+    // This pane hand-rolled the same centred fill the five player view ROOTS drew, so it was
+    // first routed through the shared composition as a sixth caller. It is not a sixth of the
+    // same thing: each of those five roots declared `background: var(--fab-surface)` for
+    // itself, and this pane declared `padding: var(--fab-space-4)` and NO background. Routed
+    // through the composition it filled the centre column — which is `--fab-surface-soft`
+    // with a border and `overflow: hidden` — edge to edge with the opaque surface, visibly
+    // darker than the tinted right column beside it in the same frame.
+    //
+    // So the pane keeps its own wrapper and nests the panel, which is the caller-owned answer
+    // five other sites in this change already take. TWO frame deltas remain and both are
+    // accepted rather than discovered: the bare 28px glyph over a 13px muted sentence becomes
+    // the shared panel's 46px tile over a 13px/600 serif title in `--fab-text-secondary`, and
+    // the panel is what the primitive draws rather than what this file drew. The fill and the
+    // inset are not among them any more.
     assert.ok(
       Boolean(empty.querySelector('.manager-empty')),
       'the pane draws the shared no-state panel rather than a bare glyph over a paragraph'
     );
+    assert.ok(
+      !empty.classList.contains('fab-view-state') && !empty.querySelector('.fab-view-state'),
+      'and it does NOT route through the view-state composition, which carries the opaque ' +
+        'view-ROOT fill and would paint over the centre column`s own soft tint'
+    );
     assert.equal(
       empty.getAttribute('aria-busy'),
       null,
-      'and it carries NO `aria-busy`: this is a PANE state with no loading branch, and the ' +
-        'composition sets that attribute only for `kind: "loading"`. A pane that can never be ' +
-        'loading must not claim to be busy'
+      'and it carries NO `aria-busy`: this is a PANE state with no loading branch at all, so ' +
+        'it must not claim to be busy'
     );
   });
 
@@ -896,7 +913,8 @@ describe('RecipeDetail mounted behavior', () => {
     assert.equal(
       blocking.getAttribute('aria-live'),
       'polite',
-      'and non-blocking adds the live region this hand-rolled well never had'
+      'and non-blocking KEEPS the polite live region the `role="status"` already implied — ' +
+        'the role carries the announcement, and the explicit attribute restates it'
     );
     assert.equal(
       blocking.getAttribute('data-recipe-blocking'),

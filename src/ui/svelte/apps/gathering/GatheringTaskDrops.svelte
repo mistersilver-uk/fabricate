@@ -86,9 +86,16 @@
 {:else if error}
   <div class="gathering-task-drops" data-gathering-drops data-gathering-drops-state="error">
     <Kicker as="p">{localize('FABRICATE.App.Gathering.Detail.WhatYouMightFind')}</Kicker>
+    <!-- TITLE AND DETAIL, not one string in `title` (issue 1514). `Notice`'s title is
+         12px/600 in the tone's ink with no declared `line-height`, which is a HEADING slot;
+         the whole 120-character two-sentence string handed to it rendered as a three-line
+         shouty heading. The sentences already split at the seam the primitive draws — what
+         went wrong, then what to do next — which is exactly `detail`'s stated job, and
+         `FabricateAppRoot`'s companion fault strip splits its own copy the same way. -->
     <Notice
       tone="danger"
       title={localize('FABRICATE.App.Gathering.Detail.DropsError')}
+      detail={localize('FABRICATE.App.Gathering.Detail.DropsErrorDetail')}
       dataAttr="data-gathering-drops-error"
       dataValue=""
     />

@@ -72,11 +72,17 @@
 
     The hook is an EXACT-VALUE one (`data-journal-empty="detail"`), and `EmptyState` renders
     `dataValue || true`, so the value is passed explicitly rather than left bare.
+
+    `title`, NOT `hint`, and the other four hero empties in this change already pass it: a
+    screen-level empty is what the base variant is for, and `hint` alone renders a 46px tile
+    over an 11px subtle line in a full-height fill with no statement above it. The objection to
+    `title` belongs to the 28 PANE one-liners — up to 28 headings into the outline — and here at
+    most one `<h3>` renders per screen, only in a not-yet-ready state.
   -->
   <div class="journal-detail-empty">
     <EmptyState
       icon="fas fa-hand-pointer"
-      hint={localize('FABRICATE.App.Journal.Empty.Detail')}
+      title={localize('FABRICATE.App.Journal.Empty.Detail')}
       dataAttr="data-journal-empty"
       dataValue="detail"
     />

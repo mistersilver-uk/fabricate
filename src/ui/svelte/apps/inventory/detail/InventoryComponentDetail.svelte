@@ -361,9 +361,12 @@
 
          THE SHARED `Notice`, NON-BLOCKING (issue 1514). The hand-rolled banner already carried
          `role="status"`, and a non-blocking notice is the only one of the two banner primitives
-         that can keep it: `Callout` emits `role="note"` or nothing. Non-blocking also adds
-         `aria-live="polite"`, which the strip did not have and which is what makes a banner that
-         appears when a tool breaks mid-session announce itself. No `action` and no `dismissable`,
+         that can keep it: `Callout` emits `role="note"` or nothing. The polite live region is
+         KEPT rather than gained — `role="status"` already carries an implicit
+         `aria-live="polite"` and `aria-atomic="true"`, so the attribute the primitive writes
+         restates what the role on this strip has always implied. What would have been LOST is
+         the announcement itself, which is what makes a banner appearing when a tool breaks
+         mid-session announce itself. No `action` and no `dismissable`,
          so it still offers nothing to press. The wrapper below is the caller's and declares only
          the `flex-shrink: 0` the deleted rule did — the panel is a flex column, and a notice that
          may shrink is a notice whose sentence is squeezed. -->

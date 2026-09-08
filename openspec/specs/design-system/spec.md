@@ -1273,7 +1273,9 @@ It does NOT satisfy the ARBITRATION clause, so a screen rendering standalone not
 
 A BANNER'S CURRENT ROLE DECIDES ITS PRIMITIVE, which is the routing rule a conversion needs and the one thing the pair of components did not state.
 A banner already carrying `role="status"` routes to a NON-BLOCKING notice and never to a callout, because a callout emits `role="note"` or nothing and cannot express a live status region; a banner carrying `role="alert"` routes to a BLOCKING notice, which is the only form that keeps the role.
-A ROLELESS standing strip routes to a callout, and gains `role="note"` only when it passes a title or actions — an addition the converting change records rather than absorbing.
+A ROLELESS strip is decided by its MEANING first and its role second, because rolelessness is the one reading that carries no information about which primitive the strip wants.
+A roleless STANDING statement — true of the surface before and after the reader acts — routes to a callout, and gains `role="note"` only when it passes a title or actions, an addition the converting change records rather than absorbing.
+A roleless strip reporting STATE — something that has just happened, such as a view that failed to load — routes to a NOTICE and GAINS the live-region role it lacked, because a strip that reports state and announces nothing is a defect the conversion repairs rather than a property it must preserve.
 A row that would have to LOSE its role does not convert.
 
 #### Scenario: Two independent problems are true at once
@@ -1346,6 +1348,19 @@ A screen-level view MUST render its not-yet-ready states through one shared comp
 The branch SET is the view's own — a view with no actor has a no-actor branch and a view that cannot have one does not — so the composition takes the set as data; a composition that hard-codes a branch count forces every view onto the widest one's vocabulary.
 The composition MUST forward each branch's existing test and screenshot hook by NAME and VALUE verbatim, because the name differs per view and at least one view spells a no-actor branch `empty`; normalising either is a silent break of readers that HANG rather than fail.
 It MUST declare its own fill in its own scoped block rather than through a global-sheet context class, so that adopting it does not put the module stylesheet on the change's path.
+
+THE ERROR BRANCH IS NOT DRAWN AS THE EMPTY ONE, and the composition owns the difference rather than leaving it to each view.
+A failed load is STATE, so the error branch MUST render a danger-toned notice carrying a live-region role, while the empty and no-actor branches render the no-state panel; a view whose failure reads quieter than its "select a character" prompt has told the reader the wrong thing about which of the two they can act on.
+
+The composition's FILL is banked with it and is not universal, because the composition is a view ROOT's chrome.
+A caller that is a PANE inside a tinted or bordered container MUST keep its own wrapper and nest the no-state panel directly rather than adopt the composition, since the composition carries the opaque view-root background and a pane that adopts it fills its container edge to edge in a colour that container did not choose.
+Widening the composition with a background prop for one such caller is not the answer; the caller-owned wrapper already is.
+
+#### Scenario: A view fails to load
+
+- **WHEN** a view root is in its error state
+- **THEN** the failure renders as a danger-toned notice with a live-region role
+- **AND** it is not drawn with the same treatment as the view's empty or no-actor state
 
 #### Scenario: Five views draw the same three rules
 

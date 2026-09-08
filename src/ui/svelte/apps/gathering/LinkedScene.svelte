@@ -121,13 +121,7 @@
       <i class="fas fa-location-dot" aria-hidden="true"></i>
       {localize('FABRICATE.App.Gathering.Detail.LinkedSceneHeading')}
     </span>
-    {#if sceneUnresolved}
-      <span class="gathering-linked-scene-name is-fault" data-gathering-scene-unresolved>
-        {localize('FABRICATE.App.Gathering.Detail.SceneUnresolved')}
-      </span>
-    {:else}
-      <span class="gathering-linked-scene-name" title={sceneName}>{sceneName}</span>
-    {/if}
+    <span class="gathering-linked-scene-name" title={sceneName}>{sceneName}</span>
   </span>
 
   {#if canView}
@@ -146,6 +140,26 @@
   {:else if permissionUnknown}
     <p class="gathering-linked-scene-wait is-fault" data-gathering-scene-permission-unknown>
       {localize('FABRICATE.App.Gathering.Detail.ScenePermissionUnknown')}
+    </p>
+  {:else if sceneUnresolved}
+    <!--
+      THE BROKEN-LINK SENTENCE LIVES IN THE WAIT SLOT, NOT THE NAME SLOT (issue 1514).
+
+      It was first written into `.gathering-linked-scene-name`, which is
+      `overflow:hidden; text-overflow:ellipsis; white-space:nowrap` in about 165px — so a
+      70-character sentence rendered as "This linked scene coul…", and unlike the name branch
+      beside it the fault carried no `title`, which put the actionable half of the sentence
+      out of reach of mouse and keyboard alike. This slot WRAPS, so the whole sentence renders
+      and no tooltip has to stand in for it.
+
+      IT IS ALSO A BRANCH OF THE SAME `{#if}` AS THE WAIT LINE, which is the second half of the
+      fix. `sceneUnresolved` leaves `canView` and `permissionUnknown` both false, so with the
+      fault in the copy column the `{:else}` below rendered TOO and the card read "This linked
+      scene coul… Wait until the GM activates the linked scene." — a broken link reported as a
+      scene the GM has not activated yet, which sends the player to the wrong action.
+    -->
+    <p class="gathering-linked-scene-wait is-fault" data-gathering-scene-unresolved>
+      {localize('FABRICATE.App.Gathering.Detail.SceneUnresolved')}
     </p>
   {:else}
     <p class="gathering-linked-scene-wait" data-gathering-scene-wait>
@@ -216,9 +230,14 @@
     font-weight: 600;
   }
 
-  /* The two surfaced faults (issue 1514) take the danger ink and nothing else: each replaces a
-     line that already exists in the row, so neither adds a box or moves the row's height. */
-  .gathering-linked-scene-name.is-fault,
+  /* The two surfaced faults (issue 1514) take the danger ink and nothing else: each renders in
+     the slot the ordinary line for that branch already occupies, so neither adds a box.
+
+     BOTH ARE IN THE WAIT SLOT, and that is the fix rather than an accident of grouping. The
+     unresolved sentence was first written into `.gathering-linked-scene-name` above, which is
+     `nowrap` with an ellipsis and no `title` on that branch — see the comment on the branch
+     itself. This slot wraps, so a fault sentence can grow the row by a line rather than being
+     clipped mid-word. */
   .gathering-linked-scene-wait.is-fault {
     color: var(--fab-danger-text);
   }

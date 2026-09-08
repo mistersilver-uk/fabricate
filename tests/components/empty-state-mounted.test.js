@@ -159,4 +159,45 @@ describe('1286 EmptyState — variant contract', () => {
       'and still a tile — the inline variant did not reach into it'
     );
   });
+
+  /**
+   * THE TWO SMALL-TEXT VARIANTS INK AT THE MUTED TONE, WHICH IS THE ONE FIGURE OF THE
+   * REFERENCE'S THEY DO NOT TAKE (issue 1514).
+   *
+   * `proto:2262` inks the note line `var(--subtle)` and `proto:2545` inks the filtered
+   * sentence `var(--disabled)`, and both shipped that way. Five of the seven palettes declare
+   * their text tones as ALPHAS over the surface rather than as opaque values, so on the
+   * default `fabricate` theme those composite to 3.69:1 and 2.66:1 on `--fab-surface` at 10px
+   * and 11.5px — small text, under the 4.5:1 floor `spec.md` states. `--fab-text-muted` reads
+   * 5.42:1 on `--fab-surface` and 5.00:1 on `--fab-surface-soft`, and clears the floor in all
+   * seven palettes with `ironblood-forge` worst at 5.19:1 and 4.77:1.
+   *
+   * Pinned on the SOURCE rather than computed: happy-dom resolves no cascade, and the whole
+   * failure mode here was that four opaque-token palettes read the same declaration as
+   * passing — `frostbound-hall` measures 5.28:1 from the subtle tone. The variants are what
+   * carry it, so a caller cannot get it wrong and a revert cannot be silent.
+   */
+  it('inks the note and filtered variants at the MUTED tone, not the reference`s subtle/disabled', () => {
+    for (const selector of ['.manager-empty.is-note h3', '.manager-empty.is-note p']) {
+      assert.match(
+        ruleBody(selector),
+        /color:\s*var\(--fab-text-muted\)/,
+        `${selector} inks at the muted tone: at 10px the subtle tone measures 3.69:1 on the ` +
+          'default theme, under the small-text floor'
+      );
+    }
+    for (const selector of ['.manager-empty.is-filtered', '.manager-empty.is-filtered p']) {
+      assert.match(
+        ruleBody(selector),
+        /color:\s*var\(--fab-text-muted\)/,
+        `${selector} inks at the muted tone: the disabled tone measures 2.66:1 on the default ` +
+          'theme, the worst reading in this family and the reference`s own value'
+      );
+    }
+    assert.ok(
+      !/--fab-text-disabled/.test(emptyStateSource.split('<style>')[1] ?? ''),
+      'and the disabled tone is gone from this component entirely, rather than left on one ' +
+        'of the two rules the filtered variant declares'
+    );
+  });
 });

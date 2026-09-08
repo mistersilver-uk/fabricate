@@ -129,8 +129,11 @@
       <!-- THE SHARED `Notice`, NON-BLOCKING (issue 1514). This well already carried
            `role="status"`, and `Notice` is the only primitive that can keep it: `Callout` emits
            `role="note"` or nothing (`Callout.svelte:131`) and cannot express a live status
-           region. Non-blocking is what preserves the role and adds the `aria-live="polite"` this
-           markup never had. The tone is the one this well already painted — the same
+           region. Non-blocking is what KEEPS the role — and with it the polite live region the
+           role already implied, since `role="status"` carries an implicit `aria-live="polite"`
+           and `aria-atomic="true"`. The explicit attribute the primitive writes changes nothing
+           here; it is the role, present before and after, that announces. The tone is the one
+           this well already painted — the same
            `--fab-warning-*` and `--fab-danger-*` triples, switched on the same `uncraftable`
            reading — so the conversion moves the frame, not the meaning.
 

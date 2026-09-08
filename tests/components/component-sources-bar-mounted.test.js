@@ -222,4 +222,48 @@ describe('ComponentSourcesBar mounted behavior', () => {
         'no "x" to reveal'
     );
   });
+
+  /**
+   * THE FOCUS RING IS DRAWN OUTSIDE THE FILTER, and this is the clause that keeps it there.
+   *
+   * The dim above is `filter: brightness(0.5)` on the BUTTON, which is where it had to move
+   * when the `<img>` went inside `Avatar`. A CSS `filter` renders its element as a GROUP and
+   * dims everything the group paints — content, background, border and OUTLINE alike — so a
+   * ring painted on that same button paints at half brightness. Measured on the default
+   * `fabricate` theme: the accent over the surface is 10.17:1, and at half brightness it is
+   * 2.84:1, under the 3:1 floor SC 1.4.11 sets for a focus indicator. It is the ONLY keyboard
+   * affordance on the row and NO View Lab case focuses it, so no frame can catch this.
+   *
+   * Asserted on the SOURCE, following `shopping-list-mounted`'s own ring clause, because
+   * happy-dom computes no cascade and cannot answer whether a filtered ancestor dims an
+   * outline. Both halves are required and the second is the one that is easy to lose: without
+   * the suppression the button still matches `.fabricate button:focus-visible` in
+   * `styles/fabricate.css`, which paints the same ring on the same filtered element.
+   */
+  it('draws the keyboard focus ring on the UNFILTERED row wrapper, not on the dimmed button', () => {
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/crafting/ComponentSourcesBar.svelte'),
+      'utf8'
+    )
+      .replaceAll(/<!--[\s\S]*?-->/gu, '')
+      .replaceAll(/\/\*[\s\S]*?\*\//gu, '');
+
+    assert.match(
+      source,
+      /\.crafting-source:has\(\.crafting-source-avatar:focus-visible\) \{[^}]*outline: 2px solid var\(--fab-accent\);/u,
+      'the WRAPPER draws the ring, through a `:has()` both of whose elements are in this ' +
+        'template, so the ring paints at full brightness over the undimmed row'
+    );
+    assert.match(
+      source,
+      /\.crafting-source-avatar:focus-visible \{\s*outline: none;\s*\}/u,
+      'and the button SUPPRESSES its own, or the module sheet`s `.fabricate ' +
+        'button:focus-visible` paints the dimmed ring straight back beside the wrapper`s'
+    );
+    assert.ok(
+      !/:not\(:focus-visible\)/u.test(source),
+      'the dim is NOT gated on `:not(:focus-visible)`, which would kill it at exactly the ' +
+        'moment the "x" becomes keyboard-reachable — the moment the dim exists for'
+    );
+  });
 });

@@ -13,6 +13,7 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { chipToneOf } from '../helpers/chipTone.js';
+import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
 import {
   SYS_A,
   SYS_B,
@@ -540,6 +541,21 @@ describe('InventoryView (mounted)', () => {
       'the ready view is populated'
     );
     assert.ok(!ready.querySelector('[aria-busy]'), 'nothing in the ready view claims to be busy');
+  });
+
+  it('draws a failed load as a danger notice rather than as the empty panel', async () => {
+    // THE ERROR BRANCH HAD NO TREATMENT ASSERTION IN ANY OF THE FIVE VIEWS before this clause,
+    // only the state hook — so deleting the composition's error arm, and letting a failure
+    // render the neutral no-state panel, was green in all five owning suites.
+    const { services, store } = makeServices(makeItem());
+    store.error = 'boom';
+    const target = await harness.mount({ services });
+    await settle();
+
+    assertViewErrorTreatment(target.querySelector('[data-inventory-state="error"]'), {
+      view: 'inventory view',
+      message: 'FABRICATE.App.Inventory.Error'
+    });
   });
 
   it('shows the empty state when the actor owns nothing', async () => {
@@ -2630,7 +2646,22 @@ describe('InventoryView (mounted) — bulk salvage and destroy (issue 859)', () 
       'empty',
       'nothing is queueable, so the panel is in its empty state'
     );
-    assert.ok(target.querySelector('[data-inventory-bulk-empty]'), 'with the shared empty note');
+    const bulkEmpty = target.querySelector('[data-inventory-bulk-empty]');
+    assert.ok(Boolean(bulkEmpty), 'with the shared empty note');
+    // THE HOOK'S VALUE, NOT JUST ITS PRESENCE (issue 1514), and the value is `"true"` rather
+    // than the `""` the deleted `<p>` wrote. `EmptyState.svelte`'s `dataValue || true` coerces
+    // it, and an explicit `dataValue=""` at the call site does NOT undo that — the empty
+    // string is falsy and takes the same branch. Measured across the tree: 61 hook-bearing
+    // `EmptyState`/`Callout` sites render `="true"`, 45 passing no value and 16 passing `""`.
+    // Nothing breaks because every shipped reader is a presence selector, which is exactly
+    // why the drift is invisible; this clause pins it so the next reader does not "fix" it at
+    // a call site, where it cannot be fixed. Closing it means changing the primitive, and
+    // that moves all 61 attributes at once.
+    assert.equal(
+      bulkEmpty.getAttribute('data-inventory-bulk-empty'),
+      'true',
+      'the primitive coerces a valueless hook to `="true"`, and only the primitive can change it'
+    );
   });
 
   it('renders the RUNNING state from its props — the state the lab cannot photograph', async () => {

@@ -9,6 +9,7 @@ import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/i
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { rewriteClientImports } from '../helpers/rewriteClientImports.js';
 import { chooseSelectOption, selectOptionValues } from '../helpers/select-control.js';
+import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
 // The raw `.js` closure of `SearchablePopover`, which the shared `<Select>` composes
 // (issue 1504). Spread from the harness's own roster rather than copied, so a module added
 // there cannot go missing here.
@@ -264,6 +265,10 @@ describe('GatheringView mounted behavior', () => {
     await mountView(makeServices(null, { reject: true }));
 
     assert.ok(target.querySelector('[data-gathering-state="error"]'), 'rejection renders error state');
+    assertViewErrorTreatment(target.querySelector('[data-gathering-state="error"]'), {
+      view: 'gathering view',
+      message: 'FABRICATE.App.Gathering.Error'
+    });
   });
 
   it('selects an available card on click and marks it selected', async () => {

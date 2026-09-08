@@ -257,6 +257,7 @@
       note
       hint={localize('FABRICATE.App.Inventory.Bulk.ReportCancelled')}
       dataAttr="data-inventory-bulk-cancelled"
+      dataValue=""
     />
   {/if}
   {#if runError}
@@ -310,6 +311,7 @@
       note
       hint={localize('FABRICATE.App.Inventory.Bulk.ReportNothingAdded')}
       dataAttr="data-inventory-bulk-nothing-added"
+      dataValue=""
     />
   {/if}
 

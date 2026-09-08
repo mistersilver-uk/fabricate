@@ -284,13 +284,25 @@ const SHARED_PRIMITIVES = [
   //
   // THE ENTRY IS LOAD-BEARING AND IT WAS MEASURED BOTH WAYS, because an addition to this list
   // that changes nothing is the shape of guard this file exists to prevent. Dropping the path
-  // from `PLAYER_APP_COMPILED_MODULES` reds the clause below by name against SEVEN hand-rolled
-  // suites — the alchemy view, the app root, two gathering suites, the gathering actor bar and
-  // both inventory suites. Dropping it from BOTH that roster and this list leaves the file
-  // GREEN. The pair is what proves the entry is doing the work rather than describing it. Note
-  // which suites those are: every one is hand-rolled, because `:506` exempts the
-  // `createMountedComponentHarness` ones, whose own dependency validation names an omission
-  // up front instead.
+  // from `PLAYER_APP_COMPILED_MODULES` reds the clause below by name against EIGHT suites —
+  // the alchemy view, the app root, the journal view, three gathering suites (the detail, the
+  // environments and the actor bar) and both inventory suites. Dropping it from BOTH that
+  // roster and this list leaves the file GREEN. The pair is what proves the entry is doing the
+  // work rather than describing it.
+  //
+  // WHICH SUITES THOSE ARE, RE-MEASURED, because the sentence here first said SEVEN and said
+  // they were all hand-rolled, and both halves were wrong. It is eight — `journal-view-mounted`
+  // was missing from the list — and FIVE of the eight are `createMountedComponentHarness`
+  // suites: the alchemy view, the app root, the journal view and both inventory suites. Only
+  // the three gathering suites are hand-rolled.
+  //
+  // The naming clause below exempts NOTHING. Its only filter is that a suite must mention
+  // `writeCompiledSvelte` or `compiledModules` at all, and a `createMountedComponentHarness`
+  // caller mentions the second — so those suites are inspected exactly like the hand-rolled
+  // ones. The exemption that does exist belongs to the VACUITY RATCHET further down, which
+  // skips them because their own `validateMountedComponentDependencies` throws by name in
+  // `before()`; that is a different test answering a different question, and reading its
+  // exemption onto this clause is what produced the false sentence.
   'src/ui/svelte/apps/PlayerViewState.svelte',
 ];
 

@@ -110,9 +110,9 @@
  *           a component the player window already renders. The figure is re-derived from the table
  *           here rather than incremented — it read `two` when issue 1509 shipped it and THREE rows
  *           already qualified, `Callout`, `ComplicationSummaryRow` and `EmptyState`. The fourth is
- *           `SegmentedControl`, which issue 1514 moved off `manager-only` because that row's own
- *           1509 clause named a player caller as the thing that would move it and issue 1514's
- *           inventory phase supplied one.
+ *           `SegmentedControl`, which issue 1514 moved off `manager-only` on the rule the gate
+ *           actually applies: the FIRST importer resolving outside `apps/manager/` falsifies the
+ *           scope, whatever audience that importer serves, because the assertion reads a PATH.
  * `callers` NON-MEMBER ROWS ONLY. Every file under `src/` that imports this one, as
  *           repository-relative POSIX paths in code-point order — the spec's "WITH ITS CALLERS
  *           NAMED", as data. Asserted EQUAL to what `scripts/lib/componentImporters.js` measures

@@ -18,6 +18,7 @@ import {
   PLAYER_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
+import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -150,6 +151,10 @@ describe('JournalView mounted behavior', () => {
     const { store } = makeJournal({ error: true });
     const target = await harness.mount({ services: makeServices(store) });
     assert.ok(target.querySelector('[data-journal-state="error"]'), 'error state shown');
+    assertViewErrorTreatment(target.querySelector('[data-journal-state="error"]'), {
+      view: 'journal view',
+      message: 'FABRICATE.App.Journal.Error'
+    });
   });
 
   it('renders the no-actor empty state', async () => {
@@ -457,6 +462,21 @@ describe('JournalView primitive adoption (issue 1514)', () => {
     assert.ok(
       detail.classList.contains('manager-empty'),
       'the centre column empty is the shared panel too, at its EXACT hook value'
+    );
+    // AND IT PASSES `title`, LIKE THE OTHER FOUR HERO EMPTIES (issue 1514). This is a
+    // screen-level empty standing in for the whole centre column, which is what the base
+    // variant is for; `hint` alone renders a 46px tile over an 11px subtle line in a
+    // full-height fill with no statement above it. The objection to `title` belongs to the
+    // pane one-liners, which take `note` and render no heading at all.
+    assert.ok(
+      Boolean(detail.querySelector('h3')),
+      'the centre-column hero empty states its sentence as the panel TITLE, not as the hint ' +
+        'line beneath a title that is not there'
+    );
+    assert.ok(
+      !detail.querySelector('p'),
+      'and it renders no second line, because the sentence is the statement rather than a ' +
+        'gloss on one'
     );
   });
 
