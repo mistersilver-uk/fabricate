@@ -30,6 +30,93 @@ const rootSource = readFileSync(
   'utf8'
 );
 
+/**
+ * The primitives this panel adopted (issue 1520), read so the clauses below can assert the
+ * WHOLE chain rather than one end of it.
+ *
+ * A source-shape suite that only checked what this root PASSES would pass just as happily if
+ * the primitive stopped honouring it, and one that only checked the primitive would say
+ * nothing about this window. Each retargeted clause therefore reads both: the prop this root
+ * writes, and the attribute, class or paint the primitive turns it into.
+ */
+const noticeSource = readFileSync(
+  resolve(__dirname, '../../src/ui/svelte/components/Notice.svelte'),
+  'utf8'
+);
+const statusToggleSource = readFileSync(
+  resolve(__dirname, '../../src/ui/svelte/components/StatusToggle.svelte'),
+  'utf8'
+);
+const sheetSource = readFileSync(resolve(__dirname, '../../styles/fabricate.css'), 'utf8');
+
+/**
+ * The Foundry smoke harness, read as the OTHER END of a hand-maintained mirror (issue 1520).
+ *
+ * Nothing statically tied a locator string in `scripts/foundry-test-run.mjs` to an attribute
+ * this root emits, and the smoke cannot run in CI - so a conversion that moved one of these
+ * hooks off the DOM would have been invisible to `npm test` and would have surfaced, weeks
+ * later, as a click timeout in a capture run. Converting nine controls to shared primitives is
+ * exactly the change that moves them: every one of these attributes now reaches the DOM through
+ * a primitive's rest spread, its `triggerData` map or its `dataAttr` prop rather than
+ * being written on the element beside it.
+ */
+const smokeSource = readFileSync(resolve(__dirname, '../../scripts/foundry-test-run.mjs'), 'utf8');
+
+/**
+ * Every control family this root imports from the shared library.
+ *
+ * `Stepper` is deliberately absent: it converted earlier, and its own contract - including
+ * the `<label>`-around-a-Stepper trap - lives in `tests/helpers/stepperSourceContract.js`.
+ */
+const ADOPTED_PRIMITIVES = Object.freeze([
+  'Chip',
+  'Field',
+  'ManagerButton',
+  'Notice',
+  'Select',
+  'StatusToggle',
+]);
+
+/**
+ * The `.fab-ic-*` names that survive the conversion, EXACTLY.
+ *
+ * Every one is this window's own LAYOUT or one of its status readings - the scroll column, the
+ * section rhythm, the facts grid, the node-state colours - which is the half a shared
+ * primitive cannot own. No control family is on this list, and that is the assertion: a
+ * hand-rolled button, field, chip or banner re-appearing adds a name, and a name deleted
+ * without its markup drops one.
+ *
+ * `fab-ic-toggle` is on it and is NOT an unconverted control: it is the `<label>` around
+ * the native "Hidden from players" checkbox, which carries no `aria-pressed` and is not a
+ * switch. `fab-ic-node-count-field` is on it because the stepper's width cap is layout the
+ * `<Field>` it now travels to does not own.
+ */
+const SURVIVING_LAYOUT_CLASSES = Object.freeze([
+  'fab-ic-actions',
+  'fab-ic-actions-inline',
+  'fab-ic-empty',
+  'fab-ic-fact',
+  'fab-ic-fact-id',
+  'fab-ic-fact-list',
+  'fab-ic-fact-muted',
+  'fab-ic-fact-name',
+  'fab-ic-facts',
+  'fab-ic-header',
+  'fab-ic-identity',
+  'fab-ic-identity-body',
+  'fab-ic-identity-head',
+  'fab-ic-node-count-field',
+  'fab-ic-node-depleted',
+  'fab-ic-node-exhausted',
+  'fab-ic-node-hint',
+  'fab-ic-node-state',
+  'fab-ic-section',
+  'fab-ic-section-title',
+  'fab-ic-title',
+  'fab-ic-toggle',
+  'fab-ic-visual-status',
+]);
+
 describe('InteractableConfigApp shell', () => {
   it('is an ApplicationV2 + SvelteApplicationMixin app keyed by a stable id', () => {
     assert.ok(appSource.includes('SvelteApplicationMixin('), 'uses the SvelteApplicationMixin');
@@ -252,20 +339,94 @@ describe('InteractableConfigRoot body', () => {
     assert.ok(rootSource.includes('FABRICATE.Canvas.Interactable.Config.'), 'uses Config-namespaced keys');
   });
 
-  it('namespaces its CSS under the .fabricate-interactable-config root', () => {
-    assert.ok(rootSource.includes('class="fabricate-interactable-config"'), 'root element carries the namespaced class');
-    assert.ok(rootSource.includes('.fab-ic-'), 'component classes are fab-ic-* scoped');
+  // EVERY LOCATOR THE SMOKE USES IS STILL EMITTED (issue 1520).
+  //
+  // Each of these attributes moved from an element this file writes onto a shared primitive's
+  // element - through a rest spread, a `triggerData` map or a `dataAttr` prop - and one
+  // of them (`data-interactable-needs-config`) had NO route at all until `Notice`'s
+  // declared hook prop was used, because that component takes no rest spread. The View Lab's
+  // two config cases select on three of them as well, and a lab selector that resolves nothing
+  // fails the WHOLE capture rather than one frame.
+  it('still emits every data-interactable-* locator the Foundry smoke drives', () => {
+    const located = [...new Set(smokeSource.match(/data-interactable-[a-z-]+/g) ?? [])].sort();
+    // A floor, so a harness rewrite that stopped locating anything cannot leave this vacuous.
+    assert.ok(located.length >= 9, `the smoke locates ${located.length} interactable hooks, expected at least 9`);
+    for (const hook of located) {
+      // `(?![a-z-])` rather than `includes`, and it is not pedantry: every hook here is a
+      // PREFIX of a longer name one edit away, so a substring test passes on a hook that has
+      // been renamed rather than kept. Proved by mutation - `data-interactable-node-respawn`
+      // renamed to `...-respawn-x` left the substring form green.
+      assert.ok(
+        new RegExp(`${hook}(?![a-z-])`).test(rootSource),
+        `${hook} is still written by the config root`
+      );
+    }
+    // The window's own root container, which the smoke waits on three times and which the
+    // conversion deliberately KEEPS: it is the scroll box, not a control family.
+    assert.ok(smokeSource.includes('.fabricate-interactable-config'), 'the smoke keys on the root container');
+    assert.ok(rootSource.includes('class="fabricate-interactable-config"'), 'and the root container is still emitted');
   });
 
-  it('shows the live disabled/locked state on the toggle buttons (aria-pressed + is-active)', () => {
-    assert.ok(rootSource.includes('fab-ic-btn-toggle'), 'toggle buttons carry a togglable class');
-    assert.ok(rootSource.includes('class:is-active={view.state.enabled === false}'), 'Disable button reads active when disabled');
-    assert.ok(rootSource.includes('class:is-active={view.state.locked === true}'), 'Lock button reads active when locked');
-    assert.ok(rootSource.includes('aria-pressed={view.state.enabled === false}'), 'Disable button exposes aria-pressed');
-    assert.ok(rootSource.includes('aria-pressed={view.state.locked === true}'), 'Lock button exposes aria-pressed');
-    // The active treatment uses theme tokens (no literal colours).
-    assert.ok(rootSource.includes('.fab-ic-btn-toggle.is-active'), 'styles the active toggle state');
-    assert.ok(/\.fab-ic-btn-toggle\.is-active\s*\{[^}]*var\(--fab-accent/.test(rootSource), 'active treatment uses themed accent token');
+  // THE PANEL'S STYLING CONTRACT, STATED FORWARD (issue 1520).
+  //
+  // This clause used to assert `rootSource.includes('.fab-ic-')` under the message "component
+  // classes are fab-ic-* scoped" - which asserted the PRESENCE of the exact debt issue 1520
+  // removes, and which would still pass today, because layout residue keeps the prefix alive.
+  // Deleting it would have left this suite saying nothing at all about how the window is
+  // painted, so it is inverted instead: every CONTROL family is a shared primitive imported
+  // from `src/ui/svelte/components/`, and the `.fab-ic-*` names that survive are an
+  // EXACT allow-list of this window's own layout.
+  it('renders the shared control primitives and keeps only its own layout classes', () => {
+    assert.ok(rootSource.includes('class="fabricate-interactable-config"'), 'root element carries the namespaced class');
+
+    for (const primitive of ADOPTED_PRIMITIVES) {
+      // The IMPORT PATH is asserted, not merely the identifier: an adoption that reached for a
+      // local copy, or for the manager's own directory, is not this window joining the library.
+      assert.ok(
+        rootSource.includes(`import ${primitive} from '../components/${primitive}.svelte'`),
+        `${primitive} is imported from src/ui/svelte/components/`
+      );
+      // ...and it is RENDERED, because an unused import adopts nothing.
+      assert.ok(
+        new RegExp(`<${primitive}[\\s/>]`).test(rootSource),
+        `${primitive} is rendered by the panel`
+      );
+    }
+
+    const residue = [...new Set(rootSource.match(/fab-ic-[a-z-]+/g) ?? [])].sort();
+    assert.deepEqual(
+      residue,
+      [...SURVIVING_LAYOUT_CLASSES],
+      "the surviving fab-ic-* names are exactly this window's own layout and status readings"
+    );
+  });
+
+  // THE LIVE STATE IS A SWITCH NOW, AND THE CHAIN IS ASSERTED END TO END (issue 1520).
+  //
+  // The three `aria-pressed` buttons this panel hand-rolled - the task-node link, Disable
+  // and Lock - are `<StatusToggle>`s. This root no longer writes `aria-pressed` or
+  // `is-active` itself, so pinning either string here would pin nothing; what it writes is
+  // `on`, and what makes `on` mean "pressed and accented" is the primitive plus one
+  // sheet rule. All three links are read, because any one of them alone would go green while
+  // the pair beside it was broken.
+  it('shows the live disabled/locked/linked state on the shared switch (on -> aria-pressed + is-on)', () => {
+    assert.ok(rootSource.includes('on={view.state.enabled === false}'), 'the Disable switch is on when the interactable is disabled');
+    assert.ok(rootSource.includes('on={view.state.locked === true}'), 'the Lock switch is on when the interactable is locked');
+    assert.ok(rootSource.includes('on={!isUnlinked}'), 'the task-node switch is on when the node is linked');
+
+    // The primitive's half: `on` becomes the announcement AND the drawn position. The Foundry
+    // smoke asserts `aria-pressed` on the node-link toggle and the View Lab's configured case
+    // selects on it, so this link is load-bearing well beyond this file.
+    assert.ok(statusToggleSource.includes('aria-pressed={on}'), 'StatusToggle announces `on` as aria-pressed');
+    assert.ok(statusToggleSource.includes('on ? STATE_CLASSES.on : STATE_CLASSES.off'), 'StatusToggle draws `on` as its state class');
+    assert.ok(statusToggleSource.includes("const STATE_CLASSES = Object.freeze({ on: 'is-on', off: 'is-off' })"), 'the state class is is-on/is-off');
+
+    // The sheet's half: the on position is a THEMED accent, never a literal colour - which is
+    // the substance the deleted `.fab-ic-btn-toggle.is-active` assertion carried.
+    assert.ok(
+      /\.fabricate-toggle\.manager-status-toggle\.is-on\s*\{[^}]*var\(--fab-accent\)/.test(sheetSource),
+      'the on position is painted with the themed accent token'
+    );
   });
 
   it('renders the read-only facts as an inline grid and labels the gate "Status"', () => {
@@ -294,8 +455,28 @@ describe('InteractableConfigRoot body', () => {
     assert.ok(rootSource.includes('services?.configureSource?.(selection)'), 'applies the selection through configureSource');
     // The Apply button is gated so an incomplete selection cannot be submitted.
     assert.ok(rootSource.includes('disabled={!canApplyIdentity}'), 'Apply is disabled until the selection is complete');
-    // The unconfigured state uses theme tokens only (no literal colours).
-    assert.ok(/\.fab-ic-identity\.is-unconfigured\s*\{[\s\S]*?var\(--fab-accent/.test(rootSource), 'unconfigured treatment uses themed accent token');
+    // THE PROMINENCE IS THE NOTICE'S WARNING TONE, AND IT IS PAINTED ONCE (issue 1520).
+    //
+    // This clause used to read the section's own `.fab-ic-identity.is-unconfigured` accent box.
+    // That class sat on the SECTION - around the banner AND the picker beneath it - so keeping
+    // it beside a toned `<Notice>` would have drawn two tinted, bordered boxes for one state,
+    // in two different colour families. The box is deleted and the tone is where the statement
+    // lives, so the assertion is a positive one about the tone reaching the bar.
+    assert.ok(rootSource.includes('tone="warning"'), 'the needs-configuration bar is a warning-toned Notice');
+    assert.ok(rootSource.includes('dataAttr="data-interactable-needs-config"'), 'the hook rides the declared prop, which is the only route Notice offers');
+    assert.ok(
+      /\.fab-notice\.is-warning\s*\{[^}]*var\(--fab-warning-border\)[^}]*var\(--fab-warning-soft\)/.test(noticeSource),
+      'the warning tone paints the bar with themed warning tokens'
+    );
+    assert.ok(
+      /warning:\s*'fas fa-triangle-exclamation'/.test(noticeSource),
+      'the warning tone supplies the same alert glyph the hand-rolled banner drew'
+    );
+    // The negative half is written as the RULE and the DIRECTIVE rather than as the bare token,
+    // because the comment above records why the box left and a bare-token check would be
+    // satisfied by deleting that explanation instead of by re-adding the box.
+    assert.ok(!/\.fab-ic-identity\.is-unconfigured\s*\{/.test(rootSource), 'the section-wide accent box rule is gone');
+    assert.ok(!rootSource.includes('class:is-unconfigured'), 'and nothing puts the class back on the section');
   });
 
   it('disambiguates same-named systems in the source picker (issue 346)', () => {
