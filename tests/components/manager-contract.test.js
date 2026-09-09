@@ -350,7 +350,7 @@ describe('CraftingSystemManager source contract', () => {
     // rather than as "the file contains both strings", which any two unrelated lines satisfy.
     assert.match(
       rootSource,
-      /\{#if !downtimeCoreFallback\}\s*\{@const badge = downtimeSubitemBadge\(item\)\}\s*\{#if badge\}\s*<span\s+class="manager-nav-count"\s+data-world-downtime-badge=\{item\.id\}/,
+      /\{#if !downtimeCoreFallback\}\s*\{@const badge = downtimeSubitemBadge\(item\)\}\s*\{#if badge\}\s*<span\s+class="manager-nav-issue-badge"\s+data-world-downtime-badge=\{item\.id\}/,
       'the sub-item badge renders inside `downtimeCoreFallback === false`, not beside it'
     );
     // The ROLLUP, the same way.
@@ -737,6 +737,10 @@ describe('CraftingSystemManager source contract', () => {
     // A rail count is a BARE NUMERAL, not a badge (issue 643). Borrowing `.manager-chip`
     // meant every nav row wore a bordered, 24px-tall, button-shaped pill that the CSS then
     // spent five declarations undoing; `.manager-nav-count` owns its own rule instead.
+    //
+    // And every mark still on that class is a numeral (issue 1515): the planned-view row's
+    // "Soon" was the one word drawn through the record-count vehicle, which made that
+    // vehicle's own definition false, and it has a name of its own now.
     assert.ok(
       rootSource.includes('<span class="manager-nav-count">{selectedCounts.components}</span>'),
       'a rail count should render as a bare numeral, not a chip'
@@ -748,9 +752,16 @@ describe('CraftingSystemManager source contract', () => {
     );
     assert.ok(
       rootSource.includes(
+        "<span class=\"manager-nav-planned\">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>"
+      ),
+      'the disabled placeholder should keep its plain Soon span, not gain a chip'
+    );
+    assert.equal(
+      rootSource.includes(
         "<span class=\"manager-nav-count\">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>"
       ),
-      'the disabled Graph placeholder should keep its plain Soon span, not gain a chip'
+      false,
+      'and it must not return to the record-count vehicle, which draws numerals'
     );
   });
 

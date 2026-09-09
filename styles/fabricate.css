@@ -2335,15 +2335,24 @@
 /*
   The 56px collapsed rail keeps ONLY the icon gutter. Every element the Studio rail
   adds has to opt out explicitly, or it blows the column out: the crafting-system card
-  content (above), the uppercase section label, and the mono count numerals. The scope
-  card's compact toggle remains so the rail can be expanded again.
+  content (above), the uppercase section label, and every trailing marker that reports on
+  the row's own contents rather than raising an alert. The scope card's compact toggle
+  remains so the rail can be expanded again.
+
+  The marker list names three classes rather than one because issue 1515 stopped the
+  planned-view word and the premium chip riding `.manager-nav-count` to inherit this hide.
+  Nothing about the collapsed rail changed; the hide simply names what it hides. The issue
+  summary is still deliberately absent — it is the only signal a collapsed parent has left —
+  and the dirty marker has its own rule beside its own vehicle.
 */
 .fabricate-manager .manager-body.is-rail-collapsed .manager-rail-title {
   display: none;
 }
 
 .fabricate-manager .manager-body.is-rail-collapsed .manager-nav-label,
-.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count {
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-planned,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-premium {
   display: none;
 }
 
@@ -13584,20 +13593,28 @@
 }
 
 /*
-  The premium badge on the Downtime parent row. It rides `.manager-nav-count` so the
-  collapsed 56px rail hides it with every other trailing marker — this rule declares no
-  `display`, so that hide still wins — and re-tones from a mono numeral to the gold chip the
-  design draws, whose colour pair is stated once beside `.manager-titlebar-badge` above.
+  The premium badge on the Downtime parent row — A VEHICLE OF ITS OWN (issue 1515).
 
-  It is selected through `.manager-nav-button` (0,4,0) rather than on its own, because a later
-  rule in this sheet re-tones a nav count at lower weight — `.manager-nav-count` itself
-  (0,2,0). It won on source order against a single-class version, and the chip drew in the
-  subtle text colour at weight 600: bare tan lettering, not a badge. (Issue 1304 removed a
-  second tied rule this comment used to name — `.manager-nav-button.is-active
-  .manager-nav-count` — because it restated the base rule byte-for-byte; the tie it broke no
-  longer exists.)
+  It used to be `.manager-nav-count.manager-nav-premium`: a tier gate drawn through the
+  RECORD-COUNT vehicle and then re-toning away almost everything that vehicle declares. The
+  Rail Marker Family exists to forbid exactly that substitution, and by the end the count
+  class was buying one thing — the collapsed-rail hide — which that rule now names directly.
+  So the chip states its own box here instead of overriding another mark's.
+
+  `min-width: 0` is the one declaration it genuinely inherited rather than overrode, restated
+  so the collapsed and narrow-rail geometry is unchanged. `.manager-nav-count`'s `flex` and
+  `overflow-wrap` are NOT restated: both hosts are grid rows, so `flex` never applied here,
+  and no ancestor of a rail row sets `overflow-wrap`, so `normal` was already the used value.
+  Nor is `font-variant-numeric`, because this mark carries a word.
+
+  The `.manager-nav-button` ancestor went with the borrowed class. It was there to outrank a
+  two-class `.manager-nav-count` re-tone on a mark that no longer carries
+  `.manager-nav-count`, so the tie it existed to win can no longer arise, and no other rule in
+  this sheet selects a descendant span of a rail row.
 */
-.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium {
+.fabricate-manager .manager-nav-premium {
+  min-width: 0;
+
   /*
     `2px 5px`, one pixel tighter each side than the design's `2px 6px`. The design's rail row
     ends in an inert chevron; this one ends in a real 28px expand/collapse BUTTON, so the same
@@ -13607,7 +13624,7 @@
   padding: 2px 5px;
   border-radius: 4px;
 
-  /* A lettered mark, not a numeral: drop `.manager-nav-count`'s mono face. */
+  /* A lettered mark, not a numeral, so it takes the body face rather than the mono one. */
   font-family: inherit;
   font-size: 7.5px;
   letter-spacing: 0.08em;
@@ -13688,8 +13705,10 @@
   every nav row still carried a button-shaped badge and stood taller than the numeral
   needed. Its own rule owes nothing to the chip, so nothing has to be undone.
 
-  The disabled Graph row's "Soon" span is the one non-numeric `.manager-nav-count`. It
-  is dead UI and this change does not elevate it, so it simply reads as quiet text.
+  EVERY MARK ON THIS RULE IS A NUMERAL (issue 1515). The disabled planned-view row's "Soon"
+  used to be the one exception, which made this vehicle's own definition false wherever a
+  reader checked it; it is `.manager-nav-planned` below now, at this rule's size, colour and
+  weight but in the body face, and claiming no membership of the family.
 
   `--fab-text-subtle` measured 3.70:1 on the idle rail and 3.16:1 on `--fab-surface-active`
   across the default theme (issue 1304) — a 10px/600 numeral needs 4.5:1, so both grounds
@@ -13718,6 +13737,36 @@
 }
 
 /*
+  THE PLANNED-VIEW WORD, and deliberately NOT a member of the Rail Marker Family (issue 1515).
+
+  A disabled placeholder row says "Soon" where a live row says how many records sit behind it.
+  That word rode `.manager-nav-count`, which made the record-count vehicle's own definition — a
+  bare mono NUMERAL — false on one of the few rows a reader would check it against. It is not
+  an issue summary, not a dirty marker and not a tier gate either, so it takes a name outside
+  the four-mark family rather than a fifth membership in it.
+
+  Size, colour and weight are the count rule's, so the mark stays the same quiet trailing text
+  at the same rung. Three of that rule's declarations are dropped rather than copied, each
+  because this mark does not meet the condition the count states them for:
+  `font-variant-numeric` has no digits to align, `flex` never applied because both rail row
+  types are grid, and `overflow-wrap: normal` is already the used value on a rail row.
+
+  THE MONO FACE IS THE ONE THING THAT DOES CHANGE, and it is a correction rather than a
+  re-skin. `styles/fabricate.css` ships its mono face at 400 and 500 only, so mono at 600 is a
+  SYNTHESISED bold — the browser smears the 500 glyphs sideways — and the repo ratchets against
+  exactly that. A record count pays that cost for tabular numerals it needs; a word has no
+  numerals to align, so it takes the body face instead, which is the same reading the premium
+  chip's `font-family: inherit` above records for the other lettered mark on this rail.
+*/
+.fabricate-manager .manager-nav-planned {
+  min-width: 0;
+  color: var(--fab-text-secondary);
+  font-family: inherit;
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+/*
   issue 1304 removed the active-row re-tone that used to sit here —
   `.manager-nav-button.is-active .manager-nav-count` and `.manager-nav-subitem.is-active
   .manager-nav-count` — because both restated this rule's `color`/`font-weight` byte-for-byte.
@@ -13738,22 +13787,21 @@
   copy is a second thing to keep in step across all seven palettes. Each chip's own rule owns
   only its SCALE; the pair is here.
 
-  IT SITS HERE, under the count rule, because it used to tie on specificity with the
-  active-row count re-tone `.manager-nav-button.is-active .manager-nav-count` (also four
-  classes) — the Downtime row is always the active row on its own route, so that tie decided
-  this exact badge. Declared earlier, this block lost the tie on source order and the chip
-  drew as subtle tan lettering at weight 600 — the reported defect. Issue 1304 removed that
-  tied rule as dead code, so today this position beats the surviving two-class
-  `.manager-nav-count` on specificity alone and does not depend on order — left here rather
-  than moved, since moving it changes nothing and touching cascade position for no
-  behavioural reason is its own risk.
+  IT USED TO SIT HERE FOR A CASCADE REASON, and no longer needs one. While the rail chip was
+  `.manager-nav-count.manager-nav-premium` it competed with the count rule above and with an
+  active-row re-tone since deleted (issue 1304), and declaring this block earlier lost that
+  tie on source order: the chip drew as subtle tan lettering at weight 600, which was the
+  reported defect. Issue 1515 took the count class off the chip, so nothing above claims its
+  colour any more and this position is now ordinary rather than load-bearing. Left where it
+  is, because moving it changes nothing and moving cascade position for no behavioural reason
+  is its own risk.
 
   Neither rule uppercases in CSS, and that is now a shared decision rather than a divergence:
   both sources are the literal localized string `PREMIUM`, and uppercasing an already-uppercase
   word is how a translation gets shouted twice.
 */
 .fabricate-manager .manager-titlebar-badge,
-.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium {
+.fabricate-manager .manager-nav-premium {
   color: var(--fab-on-badge-gold);
   background: var(--fab-badge-gold);
   font-weight: 700;
@@ -13769,12 +13817,12 @@
   So it steps down — accent lettering on the accent tint, one weight lighter — rather than
   disappearing: removing it would lose the answer to "which of these rows is the premium one".
 
-  Five classes, so it beats the four-class gold rule above on weight and does not depend on
+  Three classes, so it beats the two-class gold rule above on weight and does not depend on
   staying below it. It restates ONLY the three declarations it overrides; the chip's shape,
   scale, padding and radius still come from `.manager-nav-premium` above, which is what keeps
   the row's label on one line in both states.
 */
-.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium.is-installed {
+.fabricate-manager .manager-nav-premium.is-installed {
   color: var(--fab-accent);
   background: var(--fab-accent-soft);
   font-weight: 600;
@@ -13793,6 +13841,11 @@
 
   Distinguishing 2 from 3 by colour alone would fail every GM who cannot separate them, so
   the difference is carried by shape and by name and only reinforced by colour.
+
+  A COMPANION'S PER-TAB DOWNTIME BADGE IS VEHICLE 2 (issue 1515), not vehicle 1. The
+  discriminator is the one stated above: it carries a count AND names its unit in an
+  `aria-label`. It is also the addend of the Downtime parent's rollup, which has always drawn
+  through this rule, and a sum cannot be a different mark from the things it sums.
 */
 .fabricate-manager .manager-nav-issue-badge {
   flex: 0 0 auto;

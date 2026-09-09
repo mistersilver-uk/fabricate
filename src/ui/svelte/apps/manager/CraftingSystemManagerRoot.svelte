@@ -12089,7 +12089,14 @@
           >
             <i class={view.icon} aria-hidden="true"></i>
             <span class="manager-nav-label">{text(view.labelKey, view.fallback)}</span>
-            <span class="manager-nav-count">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>
+            <!-- NOT a rail marker. The Rail Marker Family is four marks and a record COUNT
+                 is one of them: a bare mono numeral standing for records behind the row. "Soon"
+                 is a word on a row that has no records and no route, so drawing it through the
+                 count vehicle made that vehicle's own definition false wherever a reader
+                 checked it. It gets `.manager-nav-planned` (issue 1515): the same quiet trailing
+                 text at the same rung, in the BODY face rather than the mono one, because a
+                 word has no numerals to align and this sheet ships no real mono 600. -->
+            <span class="manager-nav-planned">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>
           </button>
         {/each}
         <section
@@ -12129,8 +12136,10 @@
             into anything.
 
             EVERY LEAF CARRIES AN EXPLICIT `aria-label`, which is not belt-and-braces here. The
-            collapsed rail hides BOTH `.manager-nav-label` and `.manager-nav-count`
-            (`styles/fabricate.css`), leaving only an `aria-hidden` glyph — so without one the
+            collapsed rail hides `.manager-nav-label` and every trailing marker that reports on
+            the row's own contents — `.manager-nav-count`, `.manager-nav-planned` and
+            `.manager-nav-premium` (`styles/fabricate.css`) — so a collapsed leaf is left with
+            only an `aria-hidden` glyph, and without an explicit label the
             button's accessible name is EMPTY at 56px, which is a state this PR ships a frame
             of. Parties, Travel, Rules & Resources and Downtime all do the same.
           -->
@@ -12438,12 +12447,17 @@
             that Core's own tab strip offers, each carrying a premium padlock. The structure
             follows the shipped Travel group exactly — parent, disclosure toggle, submenu —
             so the collapsed 56px rail hides the labels, the toggle and the whole submenu
-            without a rule of its own, and the premium badge rides `.manager-nav-count` for
-            the same reason.
+            without a rule of its own.
+
+            THE PREMIUM CHIP HAS ITS OWN CLASS (issue 1515). It used to ride
+            `.manager-nav-count` — a tier gate drawn through the record-count vehicle, which is
+            the one substitution the Rail Marker Family forbids, and it rode it only to inherit
+            the collapsed-rail hide. The hide now names `.manager-nav-premium` directly, so the
+            chip keeps the behaviour without borrowing the vehicle.
 
             THE WHOLE GROUP IS EXPERIMENTAL-GATED (issue 1257), parent row, disclosure toggle
             and submenu alike, and everything premium that rides them goes with it: the
-            `.manager-nav-count` PREMIUM badge is a child of the parent button, the padlocks
+            `.manager-nav-premium` badge is a child of the parent button, the padlocks
             are children of the sub-items, and the PREMIUM PREVIEW callout is a child of the
             submenu. Nothing outside this group names Downtime — the title-bar badge answers
             "is a companion module registered at all" across BOTH registries and is not this
@@ -12492,7 +12506,7 @@
               -->
                 {#if !downtimeNavRollupVisible}
                   <span
-                    class={`manager-nav-count manager-nav-premium ${downtimeCoreFallback ? '' : 'is-installed'}`}
+                    class={`manager-nav-premium ${downtimeCoreFallback ? '' : 'is-installed'}`}
                     data-world-nav-premium
                     data-world-nav-premium-state={downtimeCoreFallback ? 'preview' : 'installed'}
                     >{text('FABRICATE.Admin.Manager.World.Downtime.Premium', 'PREMIUM')}</span
@@ -12583,6 +12597,14 @@
                         >{downtimeTabText(item, 'label')}</span
                       >
                       <!--
+                      IT IS THE ISSUE-SUMMARY VEHICLE, not the record count (issue 1515). The
+                      discriminator the family states is that this mark carries a count AND
+                      names its unit in an `aria-label`, which is what the rollup on the parent
+                      row above does; the rollup is literally the sum of these badges, so the
+                      sum and its addends have to be the same mark. A record count is a bare
+                      numeral standing for Fabricate records, and a companion's badge is not
+                      that.
+
                       A badge is a DESCRIPTION, never a name: it is a sibling of the label
                       span above, and it is never nested inside it, because that span names
                       the whole companion panel region (issue 1213) and a nested badge would
@@ -12593,7 +12615,7 @@
                         {@const badge = downtimeSubitemBadge(item)}
                         {#if badge}
                           <span
-                            class="manager-nav-count"
+                            class="manager-nav-issue-badge"
                             data-world-downtime-badge={item.id}
                             id={downtimeNavBadgeId(item.id)}
                             role="img"

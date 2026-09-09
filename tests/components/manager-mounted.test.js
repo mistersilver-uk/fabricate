@@ -7544,7 +7544,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     for (const label of ['Graph']) {
       const plannedNav = navButton(label);
       assert.equal(plannedNav.disabled, true);
-      assert.equal(plannedNav.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');
+      assert.equal(plannedNav.querySelector('.manager-nav-planned')?.textContent.trim(), 'Soon');
+      // The planned-view word is NOT the record-count vehicle (issue 1515): a bare mono
+      // numeral standing for records is what that class means, and this row has neither.
+      assert.ok(
+        !plannedNav.querySelector('.manager-nav-count'),
+        'a placeholder row draws no record count'
+      );
     }
 
     craftingParent().click();
@@ -13199,7 +13205,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     const graph = navButton('Graph');
     assert.ok(graph, 'Graph placeholder advertised when experimental on');
     assert.equal(graph.disabled, true, 'Graph is a disabled placeholder');
-    assert.equal(graph.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');
+    assert.equal(graph.querySelector('.manager-nav-planned')?.textContent.trim(), 'Soon');
+    assert.ok(
+      !graph.querySelector('.manager-nav-count'),
+      'and the placeholder word is not drawn through the record-count vehicle (issue 1515)'
+    );
   });
 
   it('exposes the Crafting group with Gathering-parity a11y and nested Settings + Recipes', async () => {
@@ -15767,8 +15777,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the premium mark is a WORD, not an icon a sighted reader loses'
     );
     assert.ok(
-      parent.querySelector('[data-world-nav-premium]').classList.contains('manager-nav-count'),
-      'the badge rides the count class so the collapsed 56px rail hides it with the rest'
+      parent.querySelector('[data-world-nav-premium]').classList.contains('manager-nav-premium'),
+      'the premium chip is a vehicle of its own (issue 1515), named by the collapsed-rail hide'
+    );
+    assert.ok(
+      !parent.querySelector('[data-world-nav-premium]').classList.contains('manager-nav-count'),
+      'and no longer borrows the record-count vehicle to inherit that hide'
     );
 
     parent.click();
@@ -17914,7 +17928,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     await settleRouteExit();
 
     const badge = downtimeBadge('ledger');
-    assert.equal(badge.getAttribute('role'), 'img', 'a bare numeral needs a name of its own');
+    assert.equal(badge.getAttribute('role'), 'img', 'a marker needs a name of its own');
+    // THE SAME VEHICLE AS ITS OWN SUM (issue 1515). The parent's rollup is `navTabBadgeTotal`
+    // over exactly these badges and has always drawn as the issue pill; drawing the addends as
+    // record counts made one fact two marks. The discriminator the Rail Marker Family states is
+    // that this mark carries a count AND names its unit, which the `aria-label` above is.
+    assert.ok(
+      badge.classList.contains('manager-nav-issue-badge'),
+      'a companion tab badge draws through the rail summary vehicle'
+    );
+    assert.ok(
+      !badge.classList.contains('manager-nav-count'),
+      'and not through the record-count vehicle, which is a bare numeral standing for records'
+    );
     assert.equal(
       badge.getAttribute('aria-label'),
       VERBATIM_KEY,
@@ -21537,7 +21563,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     for (const label of ['Graph']) {
       const plannedNav = navButton(label);
       assert.equal(plannedNav.disabled, true);
-      assert.equal(plannedNav.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');
+      assert.equal(plannedNav.querySelector('.manager-nav-planned')?.textContent.trim(), 'Soon');
+      // The planned-view word is NOT the record-count vehicle (issue 1515): a bare mono
+      // numeral standing for records is what that class means, and this row has neither.
+      assert.ok(
+        !plannedNav.querySelector('.manager-nav-count'),
+        'a placeholder row draws no record count'
+      );
     }
 
     craftingParent().click();

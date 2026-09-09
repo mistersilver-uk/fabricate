@@ -29,7 +29,7 @@
  * rather than these 112, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,049 `(at-context, selector)` keys, of which 2,937 appear exactly
+ * Unfiltered, the sheet holds 3,052 `(at-context, selector)` keys, of which 2,940 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -41,7 +41,7 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,570 rules at that head, 112 repeated keys and 229 appearances
+ * printed from. The sheet holds 2,571 rules at that head, 112 repeated keys and 229 appearances
  * between them; five keys appear three times and none appears four or more.
  *
  * ISSUE 1515 DELETED TWO ROWS, which is a shape none of the entries below took: every one of them
@@ -120,6 +120,20 @@
  * the four `> span` members had to be deleted rather than re-rooted. They select the primitive's
  * own track and knob at (0,2,1) and (0,2,2) against the family's (0,2,0), so leaving them would
  * have re-skinned a shared switch from one caller's block with every gate green.
+ *
+ * ISSUE 1515 PHASE 9 MOVES THE THREE CONTEXTUAL FIGURES AND RE-KEYS ONE REPEATED ROW, and the two
+ * halves are unrelated to one another. RE-KEYED: the rail's premium chip stops riding the
+ * record-count vehicle, so `.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium`
+ * becomes `.fabricate-manager .manager-nav-premium`. Both of its appearances re-key in the same
+ * commit — the rule that owns the chip's scale, and the gold pair it shares with the title-bar
+ * badge — so the row keeps its count of 2 and `pinnedTotal` stays 229 across 112 rows. MOVED: one
+ * rule ARRIVES, `.manager-nav-planned`, the vehicle the planned-view "Soon" word takes now that it
+ * is off the count class, and the collapsed-rail hide gains TWO selectors so that it names that
+ * word and the chip itself rather than reaching them through the class they used to borrow. All
+ * three are new singletons in both keyings, so the rule count rises by one to 2,571 while the key
+ * and singleton counts each rise by three, to 3,052 and 2,940. That is the two shapes recorded
+ * below arriving together: a whole block, and selectors joining an existing group. Re-derived by
+ * running the census twice, not subtracted.
  *
  * ISSUE 1515 PHASE 8 MOVES THE REPEATED TABLE DOWN AGAIN, BY TWO ROWS, AND ONE OF THEM VANISHES
  * FOR A REASON NO EARLIER ENTRY HERE HAS: a stylelint rule made the merge compulsory.
