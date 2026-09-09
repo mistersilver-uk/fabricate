@@ -2006,11 +2006,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Currency macro',
     smokeLabels: ['currency-macro'],
     reaches: 'exact',
-    // The macro branch is a `<select>` value, so `select` is the only verb that reaches it.
+    // The macro branch is chosen on the app's own option list (issue 1510): the strategy control
+    // is a `<Select>` now, so the native `select:` verb — which `view-lab-screenshots.mjs` turns
+    // into Playwright's `<select>`-only `selectOption` — would throw on its `<button>` trigger.
     steps: [
       { selector: '#manager-world-nav-rules', press: 'Enter' },
       { selector: '#manager-rules-nav-currency', press: 'Enter' },
-      { selector: '[data-world-currency-strategy-select]', select: 'macro' },
+      ...chooseSelectOption('[data-world-currency-strategy-select]', 'macro'),
       { selector: '[data-world-currency-units]', scroll: true },
     ],
     expectView: 'world-currency',
@@ -2029,7 +2031,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-world-nav-rules', press: 'Enter' },
       { selector: '#manager-rules-nav-currency', press: 'Enter' },
-      { selector: '[data-world-currency-strategy-select]', select: 'actorInventory' },
+      ...chooseSelectOption('[data-world-currency-strategy-select]', 'actorInventory'),
       { selector: '[data-world-currency-units]', scroll: true },
     ],
     expectView: 'world-currency',
@@ -2097,6 +2099,87 @@ export const VIEW_LAB_CASES = Object.freeze([
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldPrerequisitesTab\.svelte$/],
+  }),
+  // ── THE OPEN-PANEL FRAMES FOR ISSUE 1510'S FIRST PHASE ────────────────────────────────────
+  //
+  // Every converted control's OPEN state became photographable for the first time with the
+  // conversion — a native `<select>`'s popup is drawn by the operating system and does not appear
+  // in a screenshot at all — and an open-panel case cannot double as its view's closed-state
+  // frame, because the portal occludes the screen behind it. So these sit beside the closed
+  // frames rather than replacing them.
+  //
+  // The set is chosen by what can BREAK rather than by what changed: one case per tick polarity,
+  // the narrowest trigger in the phase (whose panel is the one overridden away from its rung's
+  // 240px floor), and the trailing-edge trigger of a two-column row, where a panel wider than its
+  // trigger is clipped by the window edge if it is clipped at all.
+  //
+  // TWO OF THE PHASE'S LISTS HAVE NO CASE, and the reason is the world rather than the plan. The
+  // currency PROVIDER roster renders only under the `actorInventory` strategy, and dnd5e
+  // registers no inventory provider — `currency-actor-inventory` above photographs the
+  // no-provider callout that appears in its place. The folder-import category list renders only
+  // inside a modal opened by a folder drop, which no case performs. Both are the genuinely
+  // data-driven lists this phase converted, and both are measured instead by
+  // `tests/components/manager-select-conversion-rendered.test.js`, which mounts their real
+  // components against the real sheet.
+  managerCase({
+    id: 'world-currency-strategy-list',
+    label: 'Manager — World Currency spend strategy list',
+    smokeLabels: [],
+    // `beyond`: the smoke walks THROUGH this control to the macro and inventory states and never
+    // rests on it open, so there is no counterpart frame to fall short of.
+    reaches: 'beyond',
+    // The closed-state case's own route, stopped at the trigger with no row click.
+    steps: [
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-currency', press: 'Enter' },
+      { selector: '[data-world-currency-strategy-select]' },
+    ],
+    expectView: 'world-currency',
+    // THREE claims, and a trigger-only frame satisfies none of them: the panel exists, it is a
+    // DIRECT child of the manager root (the portal, not the fallback that draws it in place), and
+    // it is the UNTICKED configuration. The rung is deliberately NOT compounded in: the class is
+    // composed as `fabricate-select-popover-${rung}` in a template literal, so a literal
+    // `fabricate-select-popover-form` appears nowhere in `src/` and the registry's own
+    // selector-liveness gate reads it as naming UI that does not exist. The rung is measured
+    // where it can be — the mounted and rendered suites. The `:not()` is the half that matters — a caller that lost `showTick={false}` draws a tick gutter with every other claim
+    // here still true.
+    expectSelector:
+      '.fabricate-manager > .fabricate-select-popover' +
+      ':not(.fabricate-select-popover-ticked) [data-popover-option="macro"]',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
+  }),
+  managerCase({
+    id: 'world-prerequisites-operator-list',
+    label: 'Manager — World Character prerequisite operator list',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // THE NARROWEST TRIGGER IN THE PHASE, and the one whose panel is overridden. The operator sits
+    // in a `flex: 1 1 160px` cell beside a wider path field and a narrow value field, so its
+    // column is the tightest box any converted control in this phase opens from — and the caller
+    // states `minWidth={160}` so the panel hugs that column instead of opening at the `form`
+    // rung's 240px floor and overhanging the cell it belongs to. It is also the phase's TICKED
+    // case: nine comparison operators are close cousins and the trigger shows one symbol.
+    steps: [
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-prerequisites', press: 'Enter' },
+      { selector: '.manager-prerequisite-item [data-toggle-prerequisite]' },
+      { selector: '[data-prerequisite-operator]' },
+    ],
+    expectView: 'world-prerequisites',
+    // The tick element on the row itself, not merely the ticked class on the panel: a run of
+    // single-line rows with an empty gutter is exactly the frame this one exists to be read
+    // against.
+    expectSelector:
+      '.fabricate-manager > .fabricate-select-popover.fabricate-select-popover-ticked ' +
+      '[data-popover-option="isTrue"]:has(.fabricate-select-tick)',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/system\/CharacterPrerequisitesCard\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/world\/WorldPrerequisitesTab\.svelte$/,
+    ],
   }),
   managerCase({
     id: 'world-modifiers',
@@ -9987,6 +10070,39 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
     ],
+  }),
+  managerCase({
+    id: 'manager-gathering-economy-regen-unit-list',
+    label: 'Manager — Gathering economy regeneration unit list',
+    smokeLabels: [],
+    // `beyond`: the live smoke never walks the Gathering Settings tab at all.
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism' },
+    // THE TRAILING-EDGE TRIGGER OF THE PHASE. The regeneration row is a two-column grid and the
+    // unit control is its right-hand cell, so its panel is the one that opens nearest the window
+    // edge — the case where a panel wider than its trigger is clipped if it is clipped at all.
+    // It is also the phase's second UNTICKED list, drawn from a caller that adopted the
+    // primitive's own labelled form rather than demoting a wrapper.
+    //
+    // THE STATE IS DRIVEN, on `manager-gathering-economy-actors`' own reasoning: the fixture world
+    // enables stamina on no system, and seeding one would put a stamina readout into the player
+    // gathering frames of whichever system it was seeded on. Four gestures reach it — enable the
+    // Stamina limitation, give it a max expression, switch regeneration to Over world time (which
+    // is what renders the unit cell at all), then open the unit list.
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      { selector: '[data-economy-mode-option="stamina"]' },
+      { selector: '[data-economy-stamina-max]', fill: '12' },
+      ...chooseSelectOption('[data-economy-regen-policy]', 'overTime'),
+      { selector: '[data-economy-regen-unit]' },
+    ],
+    expectView: 'environments',
+    expectSelector:
+      '.fabricate-manager > .fabricate-select-popover' +
+      ':not(.fabricate-select-popover-ticked) [data-popover-option="weeks"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/],
   }),
   managerCase({
     id: 'manager-environment-edit-blind-weights',

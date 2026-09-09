@@ -1062,6 +1062,15 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-crafting-system-filter',
   'data-inventory-sort',
   'data-inventory-page-size',
+  // ISSUE 1510 PHASE 1 — the manager's settings and tabs. `data-world-currency-strategy-select`
+  // is the one BOTH producers drive: the smoke walks it three times and the case registry twice,
+  // which is why the two `select:` steps and the three `selectOption` calls converted together.
+  'data-world-currency-strategy-select',
+  'data-world-currency-provider-select',
+  'data-import-mapping-category',
+  'data-prerequisite-operator',
+  'data-economy-regen-policy',
+  'data-economy-regen-unit',
 ]);
 
 test('no capture producer drives a converted select with Playwright’s <select>-only API', () => {
@@ -1113,10 +1122,12 @@ test('no capture producer drives a converted select with Playwright’s <select>
 // is what turns it into `await target.selectOption(step.select)` at run time. So the pre-1504
 // spelling of every converted step is a line the ban above reads and passes over, and reverting
 // one lands as a 30-second Playwright actionability throw inside the `capture` job that publishes
-// this PR's own screenshot evidence — not as a red unit test. Eleven steps converted here, and
-// issue 1511 then took the player app's six controls onto the same list, so every hook this
-// clause bans a native verb on is now either the manager's or the player app's — and issue 1510
-// will convert more, so the surface this covers is still growing rather than closing.
+// this PR's own screenshot evidence — not as a red unit test. Eleven steps converted at issue
+// 1504, the player app's six joined the hook list at issue 1511, and issue 1510 is converting the
+// manager's — its first phase took the two `[data-world-currency-strategy-select]` steps, leaving
+// THREE native `select:` steps in the registry: the recipe category filter, the system Component
+// Rules list's essence filter and the system Tool Rules list's sort. All three are issue 1510's
+// later phases to retire, so the surface this clause covers is still shrinking towards zero.
 test('no View Lab step drives a converted select with the registry’s native `select:` verb', () => {
   const registry = CAPTURE_PRODUCERS.find(
     ({ path }) => path === 'scripts/lib/viewLabCases.js'
@@ -1135,15 +1146,26 @@ test('no View Lab step drives a converted select with the registry’s native `s
       offenders.push(`scripts/lib/viewLabCases.js: \`${selector}\` is driven by a \`select:\` step`);
     }
   }
-  // NON-VACUITY, the same floor the ban above keeps: five `select:` steps survive on genuinely
-  // native selects (the recipe category filter, the world currency strategy twice, the system
-  // Component Rules list's essence filter and the system Tool Rules list's sort), and since
-  // issue 1511 converted the player app's six, all five are the MANAGER'S — so this floor is
-  // issue 1510's to retire, not this change's. At zero the clause quantifies over nothing.
+  // THE NON-VACUITY FLOOR IS THE CONVERTED SET, NOT THE SURVIVING NATIVE ONE (issue 1510).
+  //
+  // It used to be `steps.length >= 4`: five `select:` steps survived and the clause asserted that
+  // at least four still did. That floor was WRITTEN TO BE RETIRED — its own message says "if the
+  // last native select has converted, delete this clause rather than leaving it green" — and this
+  // phase's two conversions (`[data-world-currency-strategy-select]`, twice) drop the count to
+  // three, so it would have red on a change that improved exactly what it guards.
+  //
+  // A floor over the SURVIVING natives shrinks to zero as this conversion finishes and takes the
+  // ban with it. A floor over the REPLACEMENT grows instead, and it quantifies over the same
+  // question: is there still a live population of registry select drives for the ban above to be
+  // judging? 14 `chooseSelectOption(` call sites at this phase's base, 16 after it. The floor is
+  // the base figure so the clause cannot red on the phase that raises it, and it is never lowered
+  // by a later phase — every remaining phase converts more steps onto the same helper.
+  const replacements = [...registry.matchAll(/chooseSelectOption\(/gu)];
   assert.ok(
-    steps.length >= 4,
-    `only ${steps.length} \`select:\` steps remain in the registry, against a floor of 4. If the ` +
-      'last native select has converted, delete this clause rather than leaving it green.'
+    replacements.length >= 14,
+    `only ${replacements.length} \`chooseSelectOption(\` call sites remain in the registry, ` +
+      'against a floor of 14. Converted steps were reverted to the native `select:` verb, or the ' +
+      'helper was renamed and this clause is now judging an empty set.'
   );
   assert.deepEqual(
     offenders,
@@ -1153,6 +1175,101 @@ test('no View Lab step drives a converted select with the registry’s native `s
       '`selectOption` — and that throws on a `<button role="combobox">`. Use ' +
       '`chooseSelectOption(selector, value)`, which clicks the trigger and then the row by its ' +
       '`[data-popover-option="…"]` handle:\n  ' + offenders.join('\n  ')
+  );
+});
+
+// THE ELEMENT- AND ARIA-TYPED DRIVES THE BAN ABOVE CANNOT SEE (issue 1510).
+//
+// That ban is hook-adjacent and `.selectOption(`-only, and six of the nine manager selects the
+// smoke drives carry no `data-*` hook within its 400-character window at all: they are addressed
+// by element (`.manager-filter select`) or by aria (`select[aria-label="…"]`). Reverting one of
+// those to a converted control lands as a 30-second Playwright actionability timeout inside the
+// `capture` job that publishes a PR's own evidence, not as a red unit test.
+//
+// So the ban is extended the only way a static scan can be made falsifiable here: an ALLOWLIST of
+// the element-typed locators that still name a genuinely native `<select>`, shrink-only. A new
+// element-typed drive reds by construction, and each phase of this conversion DELETES the entries
+// it retires. When the list empties, this clause and its floor are deleted rather than left green.
+//
+// "SELECT-TYPED" MEANS A BARE `select` ELEMENT TOKEN, NEVER THE SUBSTRING.
+// `[data-manager-scope-select]`, `.manager-tools-sort-select` and `.manager-scope-select` all
+// contain the six letters and not one of them is a `<select>`; a substring test would ban three
+// locators the surviving native drives actually use. The token is matched with its own boundaries
+// and never after a `-` or a `_`.
+const NATIVE_SELECT_ELEMENT_TOKEN = /(?<![\w-])select(?![\w-])/u;
+
+// Every element- or aria-typed locator a capture producer still drives a NATIVE select through,
+// with the issue that retires it. Shrink-only: an entry leaves when its control converts.
+const NATIVE_ELEMENT_TYPED_SELECT_LOCATORS = Object.freeze([
+  // Issue 1510 Phase 3 — the browse toolbars' `.manager-filter` lane filters and the four
+  // environment browser filters, which carry their names in `aria-label` rather than in a hook.
+  '.fabricate-manager .manager-filter select',
+  '.fabricate-manager select[aria-label="Filter environments by status"]',
+  '.fabricate-manager select[aria-label="Filter environments by selection mode"]',
+]);
+
+test('no capture producer drives a converted select by an element-typed locator', () => {
+  const offenders = [];
+  let elementTyped = 0;
+  for (const producer of CAPTURE_PRODUCERS) {
+    for (const match of producer.source.matchAll(/\.selectOption\(/gu)) {
+      // The LOCATOR is the argument of the LAST `.locator(...)` before the call: a chain built
+      // from several hops still ends on the one that names the element being driven. Reading the
+      // last quoted STRING instead picks up a comment or a fragment of the surrounding source,
+      // because the window is a character window rather than a parse.
+      const chain = producer.source.slice(Math.max(0, match.index - 400), match.index);
+      const hops = [...chain.matchAll(/\.locator\((['"`])([^'"`]*)\1\)/gu)];
+      const locator = hops.at(-1)?.[2] ?? '';
+      if (!NATIVE_SELECT_ELEMENT_TOKEN.test(locator)) continue;
+      elementTyped += 1;
+      if (NATIVE_ELEMENT_TYPED_SELECT_LOCATORS.includes(locator)) continue;
+      offenders.push(`${producer.path}: \`${locator}\``);
+    }
+  }
+  assert.ok(
+    elementTyped > 0,
+    'no capture producer drives any select by an element-typed locator, so the `select` element ' +
+      'token test above is quantifying over nothing. If the last one has converted, delete this ' +
+      'clause and its allowlist rather than leaving them green.'
+  );
+  assert.deepEqual(
+    offenders,
+    [],
+    'these capture steps drive a `<select>` by an ELEMENT-TYPED locator that is not on the ' +
+      'shrink-only native allowlist. Either the control converted and the drive must become the ' +
+      "harness's own `chooseSelectOption(page, trigger, { value })` — Playwright's " +
+      '`selectOption` throws on a `<button role="combobox">` — or a new native select was added, ' +
+      'which the design-system ratchet forbids:\n  ' + offenders.join('\n  ')
+  );
+});
+
+test('no capture producer reads a converted select back with an <input>-only API', () => {
+  // `.inputValue()` is the same blind spot READ rather than driven: it is an `<input>`- and
+  // `<select>`-only API and throws on a `<button role="combobox">`, and the hook-adjacent ban
+  // above matches only `.selectOption(`. A converted control read this way fails inside the
+  // `capture` job rather than here.
+  const offenders = [];
+  let readBacks = 0;
+  for (const producer of CAPTURE_PRODUCERS) {
+    for (const match of producer.source.matchAll(/\.inputValue\(/gu)) {
+      readBacks += 1;
+      const chain = producer.source.slice(Math.max(0, match.index - 400), match.index);
+      for (const hook of CONVERTED_SELECT_HOOKS) {
+        if (!chain.includes(hook)) continue;
+        offenders.push(`${producer.path}: \`${hook}\` is read back with .inputValue()`);
+      }
+    }
+  }
+  assert.ok(
+    readBacks > 0,
+    'no capture producer calls `.inputValue()` at all, so this clause is judging an empty set'
+  );
+  assert.deepEqual(
+    offenders,
+    [],
+    'these capture steps read a CONVERTED control back with `.inputValue()`, which throws on the ' +
+      '`<button role="combobox">` it now is. Read the trigger`s rendered text, or assert the ' +
+      'state the choice produced:\n  ' + offenders.join('\n  ')
   );
 });
 
