@@ -301,6 +301,7 @@ test('CraftingRunManager leaves matured v1 gates untouched and lists only author
         runId: current.id,
         expectedRevision: 1,
         componentSourceActorUuids: [actor.uuid],
+        maximumAttempts: 1,
       },
     ]
   );
