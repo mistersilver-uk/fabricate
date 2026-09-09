@@ -1546,3 +1546,31 @@ The second difference is structural and smaller — `Kicker` forwards no `id` an
 - **WHEN** a proposal names a candidate the register already declined
 - **THEN** the proposal must address the recorded reasoning
 - **AND** absent new evidence, the composition in the register is used instead
+
+### Requirement: Run detail composes the specified run controls
+
+The player Journal MUST order the selected run's identity and actions before its notices, terminal verdict, progress, stage, yield evidence and run record.
+It MUST reuse the run-control contracts and geometry specified in `library.html`.
+`RunActionBar` MUST retain cancel, pause or resume, completion preference and primary action order.
+An armed cancellation decision MUST replace the other actions in that bar until confirmed or dismissed; this is the run bar's explicit carve-out from the default Foundry confirmation dialog.
+`WorldClockChip` MUST remain read-only and accept the application's calendar-formatted value.
+
+`RunProgress` and `StageNav` MUST keep the executable stage distinct from the stage being viewed.
+Past and future `StageCard` presentations MUST be inert; browsing them MUST NOT change persisted selections or the executable stage.
+`SlotRow`, `SlotTile` and `ChoiceOptionList` MUST expose the selected materials and held-versus-needed amounts without hiding unavailable choices.
+`EssencePool` MUST derive every threshold from one shared physical carrier allocation and place overshoot evidence below its source list.
+`YieldScale` MUST show one shared d100 cut against the item chances rather than implying separate item rolls.
+`OutcomeLadder` MUST display the complete routed outcome ladder as evidence, without making its outcomes selectable.
+
+#### Scenario: A player views another stage while allocating materials
+
+- **WHEN** a player browses a past or future stage
+- **THEN** the stage navigator identifies both the viewed and executable stages
+- **AND** material controls for the viewed stage cannot mutate the run
+- **AND** returning to the executable stage restores its persisted choices and shared essence allocation
+
+#### Scenario: A player arms cancellation
+
+- **WHEN** the player activates the run bar's cancel control
+- **THEN** the bar presents the cancellation consequence and confirm-or-keep actions
+- **AND** pause, completion preference and execution cannot be activated through the armed bar
