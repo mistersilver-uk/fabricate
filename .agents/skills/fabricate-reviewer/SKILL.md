@@ -63,6 +63,10 @@ The only other admissible first line is the non-verdict `ESCALATE_TIER: <reason>
 Return findings, the verdict, and any recommended issue or PR text to the workflow driver.
 Do not commit, push, merge, mutate GitHub, or inspect an ambient branch from this role.
 
+**Confirmation round (revision 2 or later, brief marked disposition-only).**
+Keep to your own prior findings: mark each `RESOLVED`, `RESOLVED-WITH-NIT` (give the exact text the driver applies) or `UNRESOLVED` (say what is still wrong), then add ONE section, "New, introduced by the revision", for defects the revision itself created; raise nothing else.
+The driver runs these rounds at model tier `medium`, because the scope is fixed by your own earlier verdict rather than by the change's path set.
+
 ## Review checklist
 
 - The change achieves its stated goal, and any artifact it produces is faithful to the real system.
