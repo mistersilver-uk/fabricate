@@ -564,6 +564,9 @@ export class CraftingEngine {
       activeCheck.slot && activeCheck.slot !== 'progressive'
         ? await this._resolveSimpleCheckDc(system, activeCheck.config, recipe, selectedSet, actor)
         : null;
+    const dcLabel = Number.isFinite(dc) ? ` (DC ${dc})` : '';
+    const flavor = `${recipe.name ? `${recipe.name} — ` : ''}Crafting check${dcLabel}`;
+    const speaker = cloneJsonValue(globalThis.ChatMessage?.getSpeaker?.({ actor })) ?? null;
     return {
       required: activeCheck.checkUsable || activeCheck.requiresCheck,
       publicPrompt: {
@@ -575,6 +578,8 @@ export class CraftingEngine {
       },
       privateEvaluation: {
         actorUuid: actor?.uuid ?? null,
+        flavor,
+        speaker,
         componentSourceActorUuids: (componentSourceActors || [])
           .map((source) => source?.uuid)
           .filter(Boolean),

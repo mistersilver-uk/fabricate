@@ -540,8 +540,9 @@ function validatedPreparedDecision(decision, modifierChoice) {
       .map((modifier) => modifier?.id)
       .filter((id) => typeof id === 'string')
   );
-  const selected = (Array.isArray(source.modifierIds) ? source.modifierIds : [])
-    .filter((id) => typeof id === 'string' && offered.has(id));
+  const selected = (Array.isArray(source.modifierIds) ? source.modifierIds : []).filter(
+    (id) => typeof id === 'string' && offered.has(id)
+  );
   const advantage = ['advantage', 'disadvantage'].includes(source.advantage)
     ? source.advantage
     : null;
@@ -604,12 +605,14 @@ export async function evaluatePreparedRunCheck(
   decision = {},
   { secret = false, failureMessage = 'Check failed' } = {}
 ) {
-  const checkConfig = preparation?.checkConfig && typeof preparation.checkConfig === 'object'
-    ? preparation.checkConfig
-    : {};
-  const decisionPolicy = preparation?.decisionPolicy && typeof preparation.decisionPolicy === 'object'
-    ? preparation.decisionPolicy
-    : {};
+  const checkConfig =
+    preparation?.checkConfig && typeof preparation.checkConfig === 'object'
+      ? preparation.checkConfig
+      : {};
+  const decisionPolicy =
+    preparation?.decisionPolicy && typeof preparation.decisionPolicy === 'object'
+      ? preparation.decisionPolicy
+      : {};
   const config = { ...checkConfig, ...decisionPolicy };
   const authoritativeDecision = {
     ...decision,
@@ -621,11 +624,15 @@ export async function evaluatePreparedRunCheck(
       formula: preparation?.rollFormula,
       secret,
       options: {
-        flavor: preparation?.publicPrompt?.label ?? config.label ?? 'Crafting check',
+        flavor:
+          preparation?.flavor ??
+          preparation?.publicPrompt?.label ??
+          config.label ??
+          'Crafting check',
         rollMode: secret ? 'gmroll' : (authoritativeDecision.rollMode ?? 'selfroll'),
         craftingModifier: config.craftingModifier ?? null,
         modifierChoice: config.modifierChoice ?? null,
-        speaker: config.speaker ?? null,
+        speaker: preparation?.speaker ?? config.speaker ?? null,
       },
     },
     actor,

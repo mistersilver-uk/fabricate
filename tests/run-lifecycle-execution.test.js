@@ -8,6 +8,10 @@ import {
 import { CraftingFizzleExecutor } from '../src/systems/CraftingFizzleExecutor.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
+import {
+  evaluatePreparedRunCheck,
+  postCheckRollHandoff,
+} from '../src/systems/checkRoll.js';
 import { transitionExecutionJournal } from '../src/systems/runExecutionJournal.js';
 
 function fakeRunManager(run, events) {
@@ -1378,7 +1382,23 @@ test('CraftingEngine records a non-consuming fizzle without touching submitted s
 test('CraftingEngine check preflight is read-only and a missing trusted result writes no journal', async () => {
   const { engine, runManager } = setupEngineFixture();
   const actor = new FakeActor('crafter');
+  actor.name = 'Tinker';
   const source = new FakeActor('source');
+  const expectedSpeaker = {
+    scene: 'scene-1',
+    token: 'token-crafter',
+    actor: actor.id,
+    alias: actor.name,
+  };
+  const originalChatMessage = globalThis.ChatMessage;
+  globalThis.ChatMessage = {
+    getSpeaker: ({ actor: speakerActor }) => ({
+      scene: 'scene-1',
+      token: 'token-crafter',
+      actor: speakerActor.id,
+      alias: speakerActor.name,
+    }),
+  };
   game.fabricate.getCraftingSystemManager = () => ({
     getSystem: () => ({
       resolutionMode: 'simple',
@@ -1400,22 +1420,67 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
     executionGrant: 'start-grant',
   });
 
-  const descriptor = await engine.describeVersionedStageCheck({
-    actor,
-    componentSourceActors: [source],
-    runId: started.runId,
-    preparationGrant: 'prepare-grant',
-  });
-  assert.deepEqual(descriptor.publicPrompt, {
-    label: 'Sun Tea',
-    mode: 'simple',
-    allowsSituationalModifier: true,
-    allowAdvantage: true,
-    modifierChoice: null,
-  });
-  assert.equal(descriptor.privateEvaluation.rollFormula, '1d20 + 3');
-  assert.equal(descriptor.privateEvaluation.actorUuid, actor.uuid);
-  assert.equal(descriptor.privateEvaluation.decisionPolicy.dc, 12);
+  try {
+    const descriptor = await engine.describeVersionedStageCheck({
+      actor,
+      componentSourceActors: [source],
+      runId: started.runId,
+      preparationGrant: 'prepare-grant',
+    });
+    assert.deepEqual(descriptor.publicPrompt, {
+      label: 'Sun Tea',
+      mode: 'simple',
+      allowsSituationalModifier: true,
+      allowAdvantage: true,
+      modifierChoice: null,
+    });
+    assert.equal(descriptor.privateEvaluation.rollFormula, '1d20 + 3');
+    assert.equal(descriptor.privateEvaluation.actorUuid, actor.uuid);
+    assert.equal(descriptor.privateEvaluation.decisionPolicy.dc, 12);
+    assert.deepEqual(descriptor.privateEvaluation.speaker, expectedSpeaker);
+    assert.equal(descriptor.privateEvaluation.flavor, 'Sun Tea — Crafting check (DC 12)');
+
+    const originalRoll = globalThis.Roll;
+    const posts = [];
+    class PreparedRoll {
+      constructor(formula) {
+        this.formula = formula;
+        this.total = 15;
+        this.dice = [];
+      }
+      async evaluate() {
+        return this;
+      }
+      toJSON() {
+        return { formula: this.formula, total: this.total, terms: [] };
+      }
+    }
+    class ReconstructedRoll {
+      static fromData(data) {
+        assert.equal(data.formula, '1d20 + 3');
+        return new ReconstructedRoll();
+      }
+      async toMessage(messageData, options) {
+        posts.push({ messageData, options });
+      }
+    }
+    globalThis.Roll = PreparedRoll;
+    try {
+      const privateEvaluation = JSON.parse(JSON.stringify(descriptor.privateEvaluation));
+      const evaluated = await evaluatePreparedRunCheck(privateEvaluation, actor);
+      const handoff = JSON.parse(JSON.stringify(evaluated.rollHandoff));
+      const posted = await postCheckRollHandoff(handoff, { Roll: ReconstructedRoll });
+      assert.equal(posted.success, true);
+      assert.deepEqual(posts[0].messageData.speaker, expectedSpeaker);
+      assert.equal(posts[0].messageData.flavor, 'Sun Tea — Crafting check (DC 12)');
+    } finally {
+      if (originalRoll === undefined) delete globalThis.Roll;
+      else globalThis.Roll = originalRoll;
+    }
+  } finally {
+    if (originalChatMessage === undefined) delete globalThis.ChatMessage;
+    else globalThis.ChatMessage = originalChatMessage;
+  }
 
   game.time.worldTime = 1120;
   await assert.rejects(
