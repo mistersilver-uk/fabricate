@@ -594,6 +594,7 @@ It joins a rule to a same-selector twin elsewhere in the same file, because the 
 
 `EmptyState` MUST offer an opt-in `field` presentation, defaulting to false, with full control width and a 34px border-box height using tokenized low padding.
 Gathering task and event editors MUST use it for empty Biome, Time of day and Weather selections, preserving the non-interactive dashed empty-state semantics and existing typography.
+Environment realm and biome membership selections MUST use the same presentation when empty, with their native add-selects at the matching 34px height.
 Ordinary empty panels retain their existing geometry.
 Required-tool membership chips MUST keep their thumbnail and name on one row, ellipsize long names with the full label available, and retain a visible, accessible remove control.
 
@@ -603,6 +604,13 @@ Required-tool membership chips MUST keep their thumbnail and name on one row, el
 - **THEN** its empty placeholder matches the dropdown above in width and 34px height
 - **AND** selecting a condition replaces the placeholder with a removable membership chip
 - **AND** removing the last condition restores the field-sized placeholder
+
+#### Scenario: An environment membership selection is empty
+
+- **WHEN** an environment has no selected realms or biomes and the associated add-select is available
+- **THEN** its empty placeholder matches that select in full width and 34px height
+- **AND** adding a member replaces the placeholder with a removable chip, and removing the last member restores it
+- **AND** the separate guidance shown when no realms exist retains its existing presentation without a dropdown
 
 ### Requirement: Every interactive primitive declares its full state set
 

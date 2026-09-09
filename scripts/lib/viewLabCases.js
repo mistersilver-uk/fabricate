@@ -9051,6 +9051,59 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/EnvironmentEditView\.svelte$/],
   }),
+  ...[
+    { suffix: 'normal', width: 1280, height: 820 },
+    { suffix: 'narrow', width: 1000, height: 720 },
+  ].map(({ suffix, width, height }) => {
+    const fields = [
+      '[data-environment-field="includedRealmIds"]',
+      '.manager-environment-context-biomes',
+    ];
+    const emptyFields = fields.map((field) => `${field} .manager-empty.is-field`);
+    const context = '[data-overview-section="context"]';
+    return managerCase({
+      id: `manager-environment-empty-membership-${suffix}`,
+      label: `Manager — Environment empty realms and biomes ${suffix}`,
+      reaches: 'beyond',
+      smokeLabels: [],
+      query: { system: 'lab-herbalism' },
+      position: { width, height },
+      // Herbalism opts out of realms; enable participation through the existing settings UI.
+      steps: [
+        'System Overview',
+        { selector: '#system-tab-settings' },
+        { selector: '[data-gathering-realm-toggle]', press: 'Space' },
+        'Gathering',
+        {
+          selector:
+            '.manager-environment-row[data-environment-id="hb-env-grove"] .manager-icon-button[aria-label^="Edit"]',
+        },
+        ...[
+          ['realm', 'hb-realm-verdant'],
+          ['biome', 'forest'],
+        ].flatMap(([kind, id], index) => {
+          const remove = `[data-environment-${kind}-pill="${id}"] [data-chip-remove]`;
+          return [
+            { selector: remove, press: 'Space' },
+            { selector: `${fields[index]} select`, select: id },
+            { selector: remove, press: 'Space' },
+          ];
+        }),
+        { selector: context, scroll: true },
+      ],
+      expectView: 'environment-edit',
+      expectSelector: `.fabricate-manager${emptyFields.map((selector) => `:has(${selector})`).join('')}`,
+      expectVisible: context,
+      expectNoHorizontalOverflow: context,
+      expectContained: [...emptyFields, ...fields.map((field) => `${field} select`)].map(
+        (target) => ({ container: '.manager-main', target })
+      ),
+      kinds: ['manager', 'environments', 'responsive'],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/manager\/environment\/EnvironmentOverviewTab\.svelte$/,
+      ],
+    });
+  }),
   managerCase({
     id: 'manager-environment-edit-events',
     label: 'Manager — Environment edit Events tab',

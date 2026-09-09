@@ -1196,6 +1196,36 @@ test('gathering feedback evidence reaches selected tools and all-empty fields at
   }
 });
 
+test('environment empty membership evidence clears the actual fixture and is selected by its caller', () => {
+  const selected = mapChangedFilesToCases([
+    'src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte',
+  ]).map((entry) => entry.id);
+  const grove = content.environments.find((entry) => entry.id === 'hb-env-grove');
+  assert.deepEqual(grove.includedRealmIds, ['hb-realm-verdant']);
+  assert.deepEqual(grove.biomes, ['forest']);
+  for (const [suffix, width, height] of [['normal', 1280, 820], ['narrow', 1000, 720]]) {
+    const id = `manager-environment-empty-membership-${suffix}`;
+    const viewCase = getCaseById(id);
+    assert.ok(selected.includes(id));
+    assert.deepEqual(viewCase.position, { width, height });
+    assert.equal(viewCase.query.system, 'lab-herbalism');
+    assert.equal(viewCase.expectView, 'environment-edit');
+    assert.ok(viewCase.steps.some((step) => step.selector === '[data-gathering-realm-toggle]'));
+    for (const [kind, member] of [['realm', grove.includedRealmIds[0]], ['biome', grove.biomes[0]]]) {
+      assert.equal(viewCase.steps.filter((step) =>
+        step.selector === `[data-environment-${kind}-pill="${member}"] [data-chip-remove]` &&
+        step.press === 'Space'
+      ).length, 2, `${id} clears, adds, then removes the last ${kind}`);
+      assert.ok(viewCase.steps.some((step) => step.select === member));
+    }
+    assert.equal(viewCase.expectContained.length, 4);
+    for (const entry of viewCase.expectContained.filter(({ target }) => target.includes('.manager-empty'))) {
+      assert.ok(viewCase.expectSelector.includes(entry.target));
+    }
+    assert.deepEqual(viewCase.steps.at(-1), { selector: '[data-overview-section="context"]', scroll: true });
+  }
+});
+
 test('every combination-rule value the registry targets is a real MODIFIER_POLICIES member', () => {
   // Ten selectors in this registry pin a rule option by its VALUE, and NOTHING else could
   // see them go stale. The token check above strips attribute values before extracting

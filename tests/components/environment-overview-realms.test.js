@@ -4,7 +4,8 @@ import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { flushSync, mount, tick, unmount } from '../../node_modules/svelte/src/index-client.js';
+import { flushSync, tick } from '../../node_modules/svelte/src/index-client.js';
+import { createClassComponent } from '../../node_modules/svelte/src/legacy/legacy-client.js';
 import { setupDOM, teardownDOM } from '../helpers/svelte-dom.js';
 import { createSvelteCompiler, installComponentTestGlobals } from '../helpers/svelte-component-harness.js';
 
@@ -35,14 +36,22 @@ function baseProps(overrides = {}) {
 async function mountTab(props) {
   target = document.createElement('div');
   document.body.appendChild(target);
-  mounted = mount(EnvironmentOverviewTab, { target, props });
+  let environment = props.environment;
+  mounted = createClassComponent({ component: EnvironmentOverviewTab, target, props: {
+    ...props,
+    onUpdate: (patch) => {
+      props.onUpdate(patch);
+      environment = { ...environment, ...patch };
+      mounted.$set({ environment });
+    }
+  } });
   flushSync();
   await tick();
   flushSync();
 }
 
 function remount() {
-  if (mounted) { unmount(mounted); mounted = null; }
+  if (mounted) { mounted.$destroy(); mounted = null; }
   target?.remove();
 }
 
@@ -71,7 +80,7 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
   });
 
   after(() => {
-    if (mounted) unmount(mounted);
+    if (mounted) mounted.$destroy();
     target?.remove();
     teardownDOM();
     if (tempRoot) rmSync(tempRoot, { recursive: true, force: true });
@@ -94,7 +103,10 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     remount();
   });
 
-  it('adds and removes realm chips bound to includedRealmIds', async () => {
+  for (const [kind, property, fieldSelector, options] of [
+    ['realm', 'includedRealmIds', '[data-environment-field="includedRealmIds"]', ['r1', 'r2']],
+    ['biome', 'biomes', '.manager-environment-context-biomes', ['forest', 'desert']]
+  ]) it(`reflects ${kind} additions and removals from empty to chips and back`, async () => {
     const updates = [];
     await mountTab(baseProps({
       realmsEnabled: true,
@@ -102,27 +114,39 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
         { id: 'r1', name: 'Verdant' },
         { id: 'r2', name: 'Dunes' }
       ],
-      environment: { id: 'env-1', name: 'Moonlit Forest', enabled: true, biomes: [], includedRealmIds: ['r1'] },
+      biomeOptions: [{ id: 'forest', label: 'Forest' }, { id: 'desert', label: 'Desert' }],
       onUpdate: (patch) => updates.push(patch)
     }));
 
-    const field = target.querySelector('[data-environment-field="includedRealmIds"]');
-    assert.ok(field, 'realm field renders');
-    // r1 already selected → its chip shows; only r2 remains in the add-select.
-    const options = Array.from(field.querySelectorAll('select option')).map(o => o.value).filter(Boolean);
-    assert.deepEqual(options, ['r2']);
-
-    const select = field.querySelector('select');
-    select.value = 'r2';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    await tick();
-    flushSync();
-    assert.deepEqual(updates.at(-1), { includedRealmIds: ['r1', 'r2'] });
-
-    field.querySelector('[data-environment-realm-pill] [data-chip-remove]').click();
-    await tick();
-    flushSync();
-    assert.deepEqual(updates.at(-1), { includedRealmIds: [] });
+    const field = target.querySelector(fieldSelector);
+    const empty = () => field.querySelector('.manager-empty.is-inline.is-field');
+    const pills = () => field.querySelectorAll(`[data-environment-${kind}-pill]`);
+    const available = () => Array.from(field.querySelectorAll('select option')).map(o => o.value).filter(Boolean);
+    assert.ok(empty(), 'starts with a field-sized empty state');
+    assert.equal(empty().textContent.trim(), `No ${kind}s selected`);
+    assert.deepEqual(available(), options);
+    for (const [index, id] of options.entries()) {
+      const select = field.querySelector('select');
+      select.value = id;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      await tick();
+      flushSync();
+      assert.deepEqual(updates.at(-1), { [property]: options.slice(0, index + 1) });
+      assert.equal(pills().length, index + 1);
+      assert.ok(!empty(), 'selection replaces the placeholder');
+      assert.deepEqual(available(), options.slice(index + 1));
+    }
+    for (const [index, id] of options.entries()) {
+      field.querySelector(`[data-environment-${kind}-pill="${id}"] [data-chip-remove]`).click();
+      await tick();
+      flushSync();
+      assert.deepEqual(updates.at(-1), { [property]: options.slice(index + 1) });
+      assert.equal(pills().length, options.length - index - 1);
+      assert.equal(Boolean(empty()), index === options.length - 1);
+    }
+    assert.deepEqual(available(), options);
+    assert.equal(empty().textContent.trim(), `No ${kind}s selected`);
+    assert.equal(field.querySelector(`[data-environment-${kind}-status]`).textContent.trim(), `No ${kind}s selected`);
     remount();
   });
 
