@@ -117,9 +117,10 @@
       <div class="journal-view-grid">
         <aside class="journal-browse" aria-label={localize('FABRICATE.App.Journal.Browse.Label')}>
           <div class="journal-browse-controls">
-            <Field as="div" class="journal-search-field">
+            <div class="journal-search-field">
               <span>{localize('FABRICATE.App.Journal.Filters.SearchKicker')}</span>
               <ManagerSearchField
+                class="journal-search-control"
                 size="38"
                 value={journal?.search ?? ''}
                 onInput={(value) => journal?.setSearch?.(value)}
@@ -127,7 +128,7 @@
                 ariaLabel={localize('FABRICATE.App.Journal.Filters.SearchLabel')}
                 data-journal-search
               />
-            </Field>
+            </div>
             <Field as="div" class="journal-kind-field">
               <span>{localize('FABRICATE.App.Journal.Filters.Kind.Label')}</span>
               <Select
@@ -238,7 +239,17 @@
     align-items: end;
     gap: var(--fab-space-2);
   }
-  :global(.journal-search-field),
+  .journal-search-field {
+    display: grid;
+    gap: var(--fab-space-chip);
+    min-width: 0;
+    color: var(--fab-text);
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+  .journal-search-field > :global(.journal-search-control) {
+    min-width: 0;
+  }
   :global(.journal-kind-field) {
     min-width: 0;
   }

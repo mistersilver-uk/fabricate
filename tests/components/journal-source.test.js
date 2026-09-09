@@ -78,9 +78,26 @@ describe('JournalView layout + effects', () => {
   });
 
   it('composes the required shared search, kind, status, and independent pager controls', () => {
-    assert.ok(viewSource.includes('<Field as="div" class="journal-search-field">'));
+    assert.ok(viewSource.includes('<div class="journal-search-field">'));
+    assert.equal(
+      viewSource.includes('<Field as="div" class="journal-search-field">'),
+      false,
+      'the search primitive is not nested in Field, whose descendant input rules override its chrome'
+    );
+    assert.ok(
+      viewSource.includes('.journal-search-field {\n    display: grid;'),
+      'the search caption and primitive use grid so the primitive flex basis cannot grow the header'
+    );
+    assert.ok(
+      viewSource.includes(
+        '.journal-search-field > :global(.journal-search-control) {\n    min-width: 0;'
+      ),
+      'the search primitive can fit the compact search/kind grid without overlapping the kind control'
+    );
     assert.ok(viewSource.includes('<ManagerSearchField'));
+    assert.ok(viewSource.includes('class="journal-search-control"'));
     assert.ok(viewSource.includes('size="38"'));
+    assert.ok(viewSource.includes('<Field as="div" class="journal-kind-field">'));
     assert.ok(viewSource.includes('journal?.activePageItems'));
     assert.ok(viewSource.includes('onPageChange={(value) => journal?.setActivePage?.(value)}'));
     assert.ok(viewSource.includes('onPageChange={(value) => journal?.setHistoryPage?.(value)}'));
