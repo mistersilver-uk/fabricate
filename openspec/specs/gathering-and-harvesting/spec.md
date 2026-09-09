@@ -886,6 +886,24 @@ It normalizes to a trimmed string or `null` (empties dropped) in `adminStore._no
 It serves as the middle tier of **drop-time** environment resolution for a canvas Gathering-Task Interactable; a stale id (no matching environment) falls through to the GM dialog rather than throwing.
 It does **not** participate in environment composition and is unrelated to `environment.sceneUuid` (the runtime gathering gate).
 
+## Versioned Gathering Run Lifecycle
+
+New applicable gathering runs use lifecycle version 1 and the revision, pause, completion-preference and execution-journal contracts in `data-models/spec.md`.
+Missing-version records retain legacy automatic completion; unsupported present versions refuse mutation without being rewritten as legacy.
+
+- New runs default to manual collection when their time gate is ready.
+Eligible waiting stages may retain world-time completion, but player checks remain manual.
+Manual collection and automatic completion enter the same authoritative, revision-guarded operation.
+- Pause freezes remaining world time and retains the run's choices; resume reanchors readiness.
+Paused runs do not advance through world-time processing.
+- Stamina spending, node depletion and reservations, start-time runtime/economy snapshots, independent hazards, blind storage and Tool timing remain at their established lifecycle points.
+The lifecycle does not change the shared d100 item-drop resolver or independent event rolls.
+- The terminal history record, including its planned execution journal, is persisted before terminal side effects.
+Applying phases and actual receipts are updated in that same history record by run ID.
+Stale, duplicate or ambiguous operations cannot repeat spending or awards; uncertain writes require recovery.
+- Versioned cancellation forfeits elapsed time and retains costs already incurred and awards already delivered.
+It releases applicable reservations without refunding sunk costs or touching unconsumed materials.
+
 ## Straight Gathering Resolution
 
 ### Requirements
