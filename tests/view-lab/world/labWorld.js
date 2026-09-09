@@ -29,6 +29,33 @@ import { createLocalizer, toI18nStub } from '../labI18n.js';
 
 const FABRICATE_NAMESPACE = 'fabricate';
 
+// These variants change persisted authoring before the real services initialize. The default
+// world remains unchanged, including every existing d100 editor and gathering screenshot.
+function seedGatheringTaskMode(content, mode) {
+  if (!['straight', 'routed', 'routed-unmatched'].includes(mode)) return;
+  const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.HERBALISM);
+  const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.HERBALISM];
+  const task = structuredClone(slice.tasks.find((entry) => entry.id === 'hb-task-slowbloom'));
+  task.resolutionMode = mode === 'straight' ? 'straight' : 'routed';
+  task.resultGroups = [{
+    id: 'lab-gathering-yield',
+    name: mode === 'routed-unmatched' ? 'Old abundance name' : 'Abundant',
+    results: [{ id: 'lab-gathering-emberbloom', componentId: 'hb-emberbloom', quantity: 2 }],
+  }];
+  if (mode !== 'straight') {
+    system.gatheringCraftingCheck = { ...system.gatheringCraftingCheck, routed: {
+      rollFormula: '1d20',
+      dc: 15,
+      type: 'relative',
+      thresholdMode: 'meet',
+      relativeOutcomes: [{ id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 }],
+    } };
+  }
+  const replaceTask = (entry) => entry.id === task.id ? task : entry;
+  slice.tasks = slice.tasks.map(replaceTask);
+  content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(replaceTask);
+}
+
 /** 14 days into the world's calendar, so relative timestamps render as something. */
 export const LAB_WORLD_TIME = 1_209_600;
 
@@ -340,8 +367,10 @@ export async function buildLabWorld({
   noTools = false,
   noAuthoredWorldComponents = false,
   noInteractables = false,
+  gatheringTaskMode = null,
 } = {}) {
   const content = buildLabContent();
+  seedGatheringTaskMode(content, gatheringTaskMode);
   if (noTools) stripTools(content);
   if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);
   // A real Manager refresh resolves an empty selection to the first available crafting system.

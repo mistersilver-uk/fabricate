@@ -8953,6 +8953,72 @@ export const VIEW_LAB_CASES = Object.freeze([
     })
   ),
   managerCase({
+    id: 'manager-gathering-task-editor-straight',
+    label: 'Manager — Gathering task Direct yields',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism', gatheringTaskMode: 'straight' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-task-results]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector: '[data-gathering-task-results="straight"] [data-recipe-result-item]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringTaskEditView)\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-gathering-task-editor-routed',
+    label: 'Manager — Gathering task Matched check yields',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism', gatheringTaskMode: 'routed' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-task-results]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector: '[data-gathering-routed-tier-status="lab-abundant"][data-match-count="1"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringTaskEditView)\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-gathering-task-editor-routed-unmatched',
+    label: 'Manager — Gathering task Unmatched check yields',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism', gatheringTaskMode: 'routed-unmatched' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-task-results]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector: '[data-gathering-routed-tier-status="lab-abundant"][data-match-count="0"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringTaskEditView)\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-gathering-task-availability-menu',
     label: 'Manager — Gathering task availability menu open',
     // BEYOND the smoke: no smoke routine opens an availability menu, so there is no counterpart
@@ -10220,16 +10286,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     // DELIBERATELY not `manager-gathering-economy-actors`, which reaches the same tab. That case
     // enables the Stamina limitation, fills a maximum, rolls a pool and then scrolls the panel to
     // the actor table, so it shows a driven state of a region far below this one. A documentation
-    // frame of the resolution and limitation cards has to be the untouched page.
+    // frame of the limitation card has to be the untouched page.
     query: { system: 'lab-herbalism' },
     steps: ['Gathering', { selector: '#manager-gathering-nav-settings' }],
     expectView: 'environments',
-    // The resolution-mode card, which sits above the limitation card and is the top of the page
-    // this frame is framed on. Named rather than left to `expectView` because the route key is the
-    // environments route for every gathering sub-tab, so the view assertion alone cannot tell this
-    // tab from the browser it opens on.
-    expectSelector:
-      '.fabricate-manager [data-gathering-resolution-card] [data-gathering-resolution-mode]',
+    // Resolution belongs to each task; this page starts with its economy limitation controls.
+    // The route key alone cannot distinguish these settings from the environments browser.
+    expectSelector: '.fabricate-manager [data-economy-mode-card] [data-economy-mode-option]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/,
