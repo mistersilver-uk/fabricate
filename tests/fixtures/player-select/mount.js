@@ -16,9 +16,10 @@
  *   system    `InventorySystemSelector`, the one converted row that REFUSES a floor
  *   label     a bare `Select` re-wrapped in the `<label>` the conversion demotes
  *   span      the same control in the `<span>` the conversion demotes it to
- *   field     the primitive's OWN shipped labelled form (`Select label=`), which renders
- *             `<Field as="label">` around the trigger — a surviving `<label>` wrapper with
- *             twelve live callers, carried here as a REPORT-ONLY third subject for issue 1510
+ *   field     the primitive's OWN labelled form (`Select label=`), carried here as a third
+ *             subject. It rendered `<Field as="label">` around the trigger when this fixture
+ *             landed — a surviving `<label>` wrapper with twelve live callers — and issue 1510
+ *             repaired it onto `Field as="div"` on the report this subject produced
  *
  * `?value=` picks which option starts selected, so the same subject can be measured with its
  * shortest and its longest label without remounting into a different tree.

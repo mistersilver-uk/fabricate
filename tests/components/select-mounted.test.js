@@ -394,18 +394,30 @@ describe('1504 Select — the select every screen renders', () => {
       harness.remount();
     });
 
-    it('a label renders <Field as="label"> and points the trigger at its own caption', async () => {
+    it('a label renders <Field as="div"> and points the trigger at its own caption', async () => {
       await mountSelect({ label: 'Resolution', hint: 'Applies to every recipe here.' });
 
-      const field = harness.target.querySelector('label.manager-field');
-      assert.ok(Boolean(field), 'the labelled form is the shared Field column, on a <label> host');
+      // THE HOST IS A `<div>` SINCE ISSUE 1510, and the host is the assertion rather than an
+      // incidental detail: on a `<label>` host this form shipped the double-toggle defect at all
+      // twelve of its call sites, because a `<label>` forwards a caption click into a control
+      // whose panel is dismissed on `mousedown` while open. `tests/components/
+      // manager-select-conversion-rendered.test.js` measures that in a real browser; this clause
+      // is what stops the host silently reverting.
+      const field = harness.target.querySelector('div.manager-field');
+      assert.ok(Boolean(field), 'the labelled form is the shared Field column, on a <div> host');
+      assert.ok(
+        !harness.target.querySelector('label.manager-field'),
+        'and NOT on a <label> host: a label would forward a caption click into the trigger, ' +
+          'which cannot close a list dismissed on mousedown'
+      );
       const caption = field.querySelector('.fabricate-select-caption');
       assert.equal(caption.textContent.trim(), 'Resolution');
       assert.ok(caption.id.length > 0, 'the caption is addressable, per instance');
       assert.equal(
         trigger().getAttribute('aria-labelledby'),
         caption.id,
-        'a <label> does not name a <button> by containment, so the caption is POINTED at'
+        'the caption is POINTED at, because no id-bearing labelable element exists for a `for` ' +
+          'to address — not because a <label> could not have named the button, which it can'
       );
       assert.ok(
         !trigger().getAttribute('aria-label'),
@@ -501,7 +513,7 @@ describe('1504 Select — the select every screen renders', () => {
 
     it('an error replaces the hint rather than stacking under it', async () => {
       await mountSelect({ label: 'Resolution', hint: 'Applies here.', error: 'Pick a mode.' });
-      const field = harness.target.querySelector('label.manager-field');
+      const field = harness.target.querySelector('div.manager-field');
       assert.equal(
         field.querySelector('.fabricate-select-error').textContent.trim(),
         'Pick a mode.'

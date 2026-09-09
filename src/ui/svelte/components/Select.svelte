@@ -16,7 +16,7 @@
   already shipped by that primitive and by `util/listboxNavigation.js`. Nothing here rebuilds any
   of it. What this component owns is the SELECT'S OWN vocabulary — a `{value, label, hint, badge,
   group}` option shape rather than the primitive's `{id, dataId}` one, three published size rungs,
-  the tick column, and the `<Field as="label">` labelled form.
+  the tick column, and the `<Field as="div">` labelled form.
 
   It uses the primitive's OWN trigger rather than supplying a `trigger` snippet, which is what
   makes the combobox contract free: with `showSearch={false}` the primitive already puts
@@ -116,12 +116,23 @@
                  which is the defect issue 1511 shipped and corrected.
     triggerData — a `data-*` map stamped verbatim on the trigger button, which is where every
                  converted call site's own stable hook goes. `data-select-size` is added to it.
-    label / hint / error — present ⇒ the whole control renders inside `<Field as="label">`, with a
+                 It cannot carry a `title`, an `aria-label` or an `aria-labelledby`:
+                 `SearchablePopover` spreads it FIRST and then writes all three from its own
+                 props, so any of the three placed here is deleted. `triggerTitle` is the route
+                 for the first, `ariaLabel`/`ariaLabelledBy` for the other two.
+    triggerTitle — a native `title` tooltip on the trigger button, forwarded verbatim to
+                 `SearchablePopover`'s own prop of that name. It exists because that is the only
+                 route: a `title` inside `triggerData` is overwritten by the primitive's own
+                 write. Its callers are the two manager sites whose control already carried a
+                 tooltip as well as an accessible name, and it is not a substitute for either.
+    label / hint / error — present ⇒ the whole control renders inside `<Field as="div">`, with a
                  caption span before the trigger and the hint or error span after it. The caption is
                  given an id and pointed at with `aria-labelledby` because there is no `id`-bearing
                  labelable element for a `for` to address, NOT because a `<label>` cannot name a
-                 `<button>` — it can, and this form relies on it; the earlier wording was corrected
-                 at issue 1511. That is why the labelled form does not also need an `ariaLabel`.
+                 `<button>` — it can, and this form relied on exactly that containment until issue
+                 1510. The host is a `<div>` because a `<label>` ALSO forwards a caption click into
+                 the control, which cannot close a list dismissed on `mousedown`; see the note on
+                 the markup below. That is why the labelled form does not also need an `ariaLabel`.
     ariaLabel / ariaLabelledBy — the accessible name when there is no `label`. One of the three is
                  required. Never pass `ariaLabel` beside `ariaLabelledBy`: a labelledby WINS over
                  a label wherever both are present, so the string would be dead text free to drift
@@ -205,6 +216,7 @@
     minWidth = 0,
     maxWidth = 0,
     triggerData = {},
+    triggerTitle = '',
     label = '',
     hint = '',
     error = '',
@@ -443,6 +455,7 @@
     triggerLabel={triggerText}
     triggerIcon={icon}
     triggerData={triggerAttributeData}
+    {triggerTitle}
     triggerAriaLabel={labelTarget}
     triggerAriaLabelledBy={labelledByTarget}
     triggerAriaDisabled={readonly}
@@ -457,7 +470,24 @@
 {/snippet}
 
 {#if labelled}
-  <Field as="label" class={`fabricate-select-field ${extraClass}`} {...restTarget}>
+  <!-- A `<div>` RATHER THAN THE `<label>` THIS WAS (issue 1510, on the maintainer's ruling). The
+       host was `Field as="label"` and the containment named the trigger perfectly well — a
+       `<button>` is labelable — but a `<label>` also FORWARDS a caption click into the control it
+       wraps, and this control is a button toggling a portaled panel whose dismissal listens on
+       `mousedown` in the capture phase while the panel is open. So from open, the caption's own
+       mousedown dismissed the list and the forwarded click re-opened it: the list could never be
+       closed from its own caption, at every one of this form's shipped call sites. Measured on
+       `tests/fixtures/manager-select/`, and it is the same defect the caller-side demotion rule
+       in `openspec/specs/design-system/spec.md` removes at a wrapping `<label>`.
+
+       Nothing else moves. The caption keeps its class, its position and its layout, the trigger
+       is named by the `aria-labelledby` it already carried to that caption's id, and no announced
+       name changes anywhere. The ACCEPTED COST is the same one the caller-side rule accepts: the
+       caption stops being a hit target, so a GM who clicked the caption to open the list now
+       clicks the control. That is accepted because the alternative is a control the caption can
+       never close, and because the trigger is a full-width or rung-floored button rather than a
+       12px checkbox. -->
+  <Field as="div" class={`fabricate-select-field ${extraClass}`} {...restTarget}>
     <span class="fabricate-select-caption" id={captionId}>{label}</span>
     {@render control()}
     {#if error}
