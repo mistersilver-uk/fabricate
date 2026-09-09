@@ -10285,9 +10285,7 @@
 <div
   class="fabricate-manager"
   data-manager-view={currentView}
-  data-gathering-task-layout={fullWidthLayout?.id === 'gathering-task-edit'
-    ? 'results'
-    : undefined}
+  data-gathering-task-layout={fullWidthLayout?.id === 'gathering-task-edit' ? 'results' : undefined}
   data-world-travel-tab={worldTravelTabAttribute}
   data-world-rules-tab={isWorldRulesRoute ? worldRulesTab : undefined}
 >

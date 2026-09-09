@@ -1285,9 +1285,7 @@ export class RunJournalBuilder {
           : null,
       recipeId: null,
       environmentId:
-        runType === 'gathering' && gatheringContext?.task
-          ? stringOrNull(run.environmentId)
-          : null,
+        runType === 'gathering' && gatheringContext?.task ? stringOrNull(run.environmentId) : null,
       taskId: stringOrNull(run.taskId),
       // GM-only marker: this row names a task the acting player cannot see.
       blindSecretPreview,
