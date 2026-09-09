@@ -469,9 +469,50 @@ describe('WorldCurrencyTab validation copy (issue 1493)', () => {
       root.querySelector('[data-world-currency-strategy-hint]'),
       'and the strategy hint stays the caller`s own hooked element'
     );
-    assert.ok(
-      !root.querySelector(`${provider}`).closest('label'),
-      'no `<label>` survives around either trigger'
+    // AND BOTH HINTS ARE ANNOUNCED, not merely drawn. Each control lost its `<label>`
+    // containment, which is what used to fold the hint into the announced name — narrowing the
+    // name was the right repair, but it left two hints on screen that nothing read. The provider
+    // rides the primitive's own note through `hint=`; the strategy's is the caller's `<small>`,
+    // drawn here because its copy changes with the chosen strategy, and reached through
+    // `ariaDescribedBy`. Both are resolved to their rendered TEXT, because a pointer at a missing
+    // element is exactly the failure this clause exists to catch.
+    for (const [selector, expected] of [
+      [
+        provider,
+        'A preconfigured adapter that reads and spends coins from the actor inventory.',
+      ],
+      [
+        '[data-world-currency-strategy-select]',
+        'Use a preconfigured provider that reads and spends coins from the actor inventory (e.g. pf2e).',
+      ],
+    ]) {
+      const describedBy = root.querySelector(selector).getAttribute('aria-describedby');
+      assert.ok(Boolean(describedBy), `${selector} describes itself by the hint beside it`);
+      assert.equal(
+        root.querySelector(`#${describedBy}`)?.textContent.trim(),
+        expected,
+        `${selector}'s aria-describedby resolves to the hint the GM can see`
+      );
+    }
+    assert.equal(
+      root
+        .querySelector('[data-world-currency-strategy-select]')
+        .getAttribute('aria-describedby'),
+      root.querySelector('[data-world-currency-strategy-hint]').id,
+      'and the strategy points at the caller`s own hooked element, not at a note the primitive ' +
+        'would have drawn instead'
     );
+
+    // BOTH TRIGGERS, because "either" is what the message claims and one of them was never
+    // asked. The strategy is the demote-and-point site — the caller's own wrapper became a
+    // `Field as="div"` — and the provider is the primitive's own labelled form, whose host this
+    // change swapped inside `Select.svelte`; a regression in either place is a caption that
+    // forwards its click into a panel dismissed on `mousedown`.
+    for (const trigger of [provider, '[data-world-currency-strategy-select]']) {
+      assert.ok(
+        !root.querySelector(trigger).closest('label'),
+        `no \`<label>\` survives around ${trigger}`
+      );
+    }
   });
 });

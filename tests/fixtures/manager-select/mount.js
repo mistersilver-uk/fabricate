@@ -202,8 +202,35 @@ const SUBJECTS = {
     mount(WorldCurrencyTab, {
       target: mountPoint,
       props: {
+        // THREE UNITS, so the add-sub-unit control has something to offer and two labels of very
+        // different lengths to be measured on: `currencyUnitSubUnitOptions` offers every unit
+        // that is not the edited one and not already reachable from it, and its labels are
+        // `${label} (${abbreviation})`. One unit renders no builder at all.
         currencyUnits: [
-          { id: 'gp', name: 'Gold', abbreviation: 'gp', actorPath: 'currency.gp', subUnits: [] },
+          {
+            id: 'gp',
+            name: 'Gold',
+            label: 'Gold',
+            abbreviation: 'gp',
+            actorPath: 'currency.gp',
+            contains: [],
+          },
+          {
+            id: 'sp',
+            name: 'Silver',
+            label: 'Silver',
+            abbreviation: 'sp',
+            actorPath: 'currency.sp',
+            contains: [],
+          },
+          {
+            id: 'electrum',
+            name: 'Electrum piece',
+            label: 'Electrum piece',
+            abbreviation: 'ep',
+            actorPath: 'currency.ep',
+            contains: [],
+          },
         ],
         currencySpendStrategy: startValue || 'actorProperty',
         currencyProviderId: 'dnd5e-inventory',

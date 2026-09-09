@@ -57,7 +57,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 
-
 import { createViteFixtureServer, pressPointerOn } from '../helpers/vite-fixture-server.js';
 
 /** Sub-pixel slack for a rect comparison. Widths here differ by whole pixels or not at all. */
@@ -246,13 +245,22 @@ describe('a caption click cannot close a list it is wrapped in a <label> with (i
  * which is the one site whose row is `flex-wrap` rather than a column. `floor` is the figure that
  * site's own scoped rule declares, restated here so a failure says which number it is checking.
  *
- * THREE CONVERTED SITES ARE DELIBERATELY ABSENT and are named in this change's handoff rather
+ * A HUGGING SITE IS MEASURED ACROSS TWO ROWS RATHER THAN TWO VALUES (`secondHook`), because a
+ * hug is a per-row measurement and `?value=` does not reach it: `ImportFolderMappingModal` seeds
+ * each row's category from its own folder NAME, so the two rows already carry two different
+ * states — the name matcher pre-fills row 1 and leaves row 2 on the `__unchanged__` sentinel —
+ * and its widths are asserted against the floor rather than against each other. A hug that
+ * exceeded the floor would fail an equality assertion while being exactly what the row asks for:
+ * "Alchemical reagent" measures 152.08px in this fixture, above the 140px floor by design.
+ *
+ * TWO CONVERTED SITES ARE DELIBERATELY ABSENT and are named in this change's handoff rather
  * than left to be noticed: `WorldCurrencyTab`'s provider control is measured by the truncation
  * clause below but not by the width pair, because it renders only on the `actorInventory`
- * strategy and offers one roster; its add-sub-unit control renders only inside an EXPANDED
- * currency unit that already has assignable sub-units, two levels of state past anything this
- * fixture mounts; and `GatheringEconomyView`'s regeneration POLICY control changes the branch its
- * sibling renders in, so mounting it on its two values mounts two different trees.
+ * strategy and offers one roster; and `GatheringEconomyView`'s regeneration POLICY control
+ * changes the branch its sibling renders in, so mounting it on its two values mounts two
+ * different trees. The add-sub-unit control is two levels of state past `?value=` — an EXPANDED
+ * currency unit with assignable sub-units — so it has its own clause below rather than a row
+ * here.
  */
 const CONVERTED_SITES = Object.freeze([
   Object.freeze({
@@ -272,7 +280,8 @@ const CONVERTED_SITES = Object.freeze([
   Object.freeze({
     subject: 'import',
     name: 'the folder import category',
-    hook: '[data-import-mapping-category]',
+    hook: '[data-import-mapping-row="f1"] [data-import-mapping-category]',
+    secondHook: '[data-import-mapping-row="f2"] [data-import-mapping-category]',
     values: ['', ''],
     column: false,
     floor: 140,
@@ -357,18 +366,22 @@ describe('a converted manager trigger keeps the width its native select had (iss
   });
 
   for (const site of CONVERTED_SITES) {
-    it(`holds ${site.name} at one width across its option labels`, async () => {
-      const [shortest, longest] = await Promise.all(
-        site.values.map((value) => measureTrigger(site.subject, site.hook, value))
-      );
+    const claim = site.column
+      ? `holds ${site.name} at one width across its option labels`
+      : `holds ${site.name} at or above its ${site.floor}px floor across its rows`;
+    it(claim, async () => {
+      const [shortest, longest] = await Promise.all([
+        measureTrigger(site.subject, site.hook, site.values[0]),
+        measureTrigger(site.subject, site.secondHook ?? site.hook, site.values[1]),
+      ]);
 
-      assert.ok(
-        Math.abs(shortest.shipped - longest.shipped) < EPSILON,
-        `${site.name} measured ${shortest.shipped}px on its shortest option and ` +
-          `${longest.shipped}px on its longest, so its width counterpart is not absorbing the ` +
-          'difference and the row re-flows every time the GM changes the value'
-      );
       if (site.column) {
+        assert.ok(
+          Math.abs(shortest.shipped - longest.shipped) < EPSILON,
+          `${site.name} measured ${shortest.shipped}px on its shortest option and ` +
+            `${longest.shipped}px on its longest, so its width counterpart is not absorbing the ` +
+            'difference and the row re-flows every time the GM changes the value'
+        );
         assert.ok(
           Math.abs(shortest.shipped - shortest.column) < EPSILON,
           `${site.name} measured ${shortest.shipped}px inside a ${shortest.column}px field ` +
@@ -377,13 +390,81 @@ describe('a converted manager trigger keeps the width its native select had (iss
             'states the width itself.'
         );
       } else {
+        // A FLOOR, NOT AN EQUALITY. The row hugs its value by design, so the assertion is that
+        // no row falls BELOW the declared floor — the first row sits on it exactly, and a longer
+        // category legitimately sits above it.
         assert.ok(
           Math.abs(shortest.shipped - site.floor) < EPSILON,
-          `${site.name} measured ${shortest.shipped}px against a declared floor of ${site.floor}px`
+          `${site.name} measured ${shortest.shipped}px on its first row against a declared ` +
+            `floor of ${site.floor}px`
+        );
+        assert.ok(
+          longest.shipped >= site.floor - EPSILON,
+          `${site.name} measured ${longest.shipped}px on its second row, below the ` +
+            `${site.floor}px floor its own scoped rule declares`
         );
       }
     });
   }
+
+  it('holds the add-sub-unit control at its column width across its option labels', async () => {
+    // THE SITE THE CONVERSION REGRESSED, and the one `?value=` cannot reach: the add-sub-unit
+    // control renders only inside an EXPANDED currency unit that still has assignable sub-units,
+    // so it is driven here rather than mounted. Its native `<select>` filled the
+    // `minmax(0, 1fr)` track of `.manager-currency-subunit-builder`; the `<button>` measured
+    // 90.27px on "Silver (sp)" and 142.38px on "Electrum piece (ep)" in a 266px column until the
+    // caller stated the width, which is a control that changes size as the GM reads its list.
+    const page = await openFixture('currency');
+    const builderTrigger = '.manager-currency-subunit-builder .fabricate-select-trigger';
+    const read = () =>
+      page.evaluate((selector) => {
+        const trigger = document.querySelector(selector);
+        if (!trigger) return null;
+        const shipped = trigger.getBoundingClientRect().width;
+        const column = trigger.closest('.manager-field')?.getBoundingClientRect().width ?? 0;
+        return {
+          label: trigger.textContent.replaceAll(/\s+/gu, ' ').trim(),
+          shipped: Number(shipped.toFixed(2)),
+          column: Number(column.toFixed(2)),
+        };
+      }, builderTrigger);
+
+    try {
+      await pressPointerOn(page, '[data-world-currency-unit-expand="gp"]');
+      const shortest = await read();
+      assert.ok(
+        Boolean(shortest),
+        'expanding the gold unit rendered no add-sub-unit trigger to measure, so this clause is ' +
+          'quantifying over nothing'
+      );
+
+      await pressPointerOn(page, builderTrigger);
+      await pressPointerOn(page, '[data-popover-option="electrum"]');
+      const longest = await read();
+      assert.ok(
+        longest.label !== shortest.label,
+        `choosing the electrum option left the trigger reading "${longest.label}", so the two ` +
+          'measurements below are of the same rendered string and prove nothing'
+      );
+
+      for (const measurement of [shortest, longest]) {
+        assert.ok(
+          Math.abs(measurement.shipped - measurement.column) < EPSILON,
+          `the add-sub-unit trigger measured ${measurement.shipped}px reading ` +
+            `"${measurement.label}" inside a ${measurement.column}px field column, so it hugs ` +
+            'its value inside a full-width grid track instead of filling it'
+        );
+      }
+      assert.ok(
+        Math.abs(shortest.shipped - longest.shipped) < EPSILON,
+        `the add-sub-unit trigger measured ${shortest.shipped}px on "${shortest.label}" and ` +
+          `${longest.shipped}px on "${longest.label}", so it re-sizes as the GM changes the ` +
+          'sub-unit'
+      );
+    } finally {
+      await page.close();
+    }
+  });
 
   it('shows a converted trigger DOES resize with its value once its width rule is removed', async () => {
     // NON-VACUITY for every clause above. Without it, a width counterpart deleted from a
@@ -399,6 +480,51 @@ describe('a converted manager trigger keeps the width its native select had (iss
         `${longest.unfloored}px on "Actor data path" — if those are equal, the control is not ` +
         'content-sized and the width counterpart is proving nothing'
     );
+  });
+});
+
+describe('the two hints the currency card draws read in one treatment (issue 1510)', () => {
+  it('renders the caller-drawn strategy hint exactly as the primitive draws the provider hint', async () => {
+    // THE CARD HAS TWO HINTS AND ONE OF THEM IS THE PRIMITIVE'S. The provider adopted
+    // `Select hint=`, which draws `.fabricate-select-note`; the strategy line is drawn by the
+    // caller because its copy is conditional. Putting the class on the caller's `<small>` was
+    // INERT: `.fabricate-field.manager-field small` is ELEMENT-TYPED at (0,2,1) and the note
+    // class is (0,1,0), so the sheet's small print out-ranked it and the two hints went on
+    // rendering in two different faces with the class present. The caller writes the same
+    // ELEMENT the primitive does now. That is a cascade question and happy-dom computes no
+    // cascade, so it is measured here rather than read off the markup.
+    const page = await openFixture('currency', 'actorInventory');
+    try {
+      const [strategy, provider] = await page.evaluate(() => {
+        const read = (selector) => {
+          const element = document.querySelector(selector);
+          if (!element) return null;
+          const style = globalThis.getComputedStyle(element);
+          return {
+            color: style.color,
+            fontSize: style.fontSize,
+            fontWeight: style.fontWeight,
+            lineHeight: style.lineHeight,
+          };
+        };
+        return [
+          read('[data-world-currency-strategy-hint]'),
+          read('.fabricate-select-field .fabricate-select-note'),
+        ];
+      });
+      assert.ok(Boolean(provider), 'the provider control rendered no hint of its own to match');
+      assert.ok(Boolean(strategy), 'the spend-strategy control rendered no hint to compare');
+      assert.deepEqual(
+        strategy,
+        provider,
+        'the spend-strategy hint and the provider hint sit one above the other in the same card ' +
+          'and must read the same. The strategy line is drawn by the caller, so it carries the ' +
+          'note class itself — and on a `<small>` inside a `.manager-field` that class is ' +
+          'out-ranked by the sheet`s element-typed small print, which is why the element matters.'
+      );
+    } finally {
+      await page.close();
+    }
   });
 });
 

@@ -287,6 +287,11 @@
   const instanceId = $props.id();
   const strategyCaptionId = `${instanceId}-strategy-caption`;
 
+  // The hint's id, for the same reason as the caption's: the hint is DRAWN by this caller (its
+  // copy changes with the chosen strategy) rather than by the primitive's own labelled form, so
+  // the trigger reaches it through `ariaDescribedBy` and nothing else would announce it.
+  const strategyHintId = `${instanceId}-strategy-hint`;
+
   // The strategy select renders one shared hint that reflects the selected strategy, so the GM
   // sees the actor-data-path / actor-inventory / macro guidance inline as they switch.
   function currencySpendStrategyHint() {
@@ -484,10 +489,33 @@
             options={currencySpendStrategyOptions}
             showTick={false}
             ariaLabelledBy={strategyCaptionId}
+            ariaDescribedBy={strategyHintId}
             triggerData={{ 'data-world-currency-strategy-select': '' }}
             onChange={(next) => onSetCurrencySpendStrategy(next)}
           />
-          <small data-world-currency-strategy-hint>{currencySpendStrategyHint()}</small>
+          <!-- THE PRIMITIVE'S OWN NOTE, MARKUP AND ALL (issue 1510). The provider below renders
+               its hint through `hint=`, which draws a `<span class="fabricate-select-note">`;
+               this one is drawn here because its copy changes with the chosen strategy, so it
+               is written as the same element with the same class and the two hints in one card
+               read alike.
+
+               A `<span>` RATHER THAN THE `<small>` THIS WAS, and the element is the whole
+               mechanism. `.fabricate-field.manager-field small` (`styles/fabricate.css:13118`)
+               is ELEMENT-TYPED at (0,2,1) and `.fabricate-select-note` is (0,1,0), so on a
+               `<small>` the class is out-ranked and adding it changes nothing at all — measured
+               in Chromium on `tests/fixtures/manager-select/?subject=currency`, which is where
+               the sibling clause in `manager-select-conversion-rendered.test.js` compares the
+               two computed treatments. Changing the element is what lets the class win, and it
+               leaves the shared sheet alone.
+
+               The ACCEPTED COST is contrast: this line moves from `--fab-text-muted` at
+               12.16px/500 (5.38:1 on `--fab-bg-1`) to `--fab-text-subtle` at 10.5px/400
+               (3.71:1). The library's `k-hint` is the authority for that treatment and the token
+               question belongs to issue 1523's geometry and token sweep, not here —
+               consistency inside the card is what this change owes. -->
+          <span class="fabricate-select-note" id={strategyHintId} data-world-currency-strategy-hint
+            >{currencySpendStrategyHint()}</span
+          >
         </Field>
 
         {#if currencyShowProviderBranch}
@@ -1097,24 +1125,31 @@
     padding-inline-start: var(--fab-space-4);
   }
 
-  /* THE WIDTH THE ELEMENT-TYPED SHEET RULE NO LONGER SUPPLIES (issue 1510), for BOTH converted
-     controls in this block. `.fabricate-field.manager-field select { width: 100% }` painted them
-     until they became `<button>`s, and `.fabricate-select-trigger` declares no width at all — a
-     trigger's box belongs to the row it sits in. Without this rule the spend strategy measured
-     68.73px on "Macro" and 118.78px on "Actor data path" in a 654px column, and the provider
-     214.64px, so the two stacked controls in this card sat at three different widths depending
-     on what was chosen. Measured in Chromium against the fixture's declared Arial face.
+  /* THE WIDTH THE ELEMENT-TYPED SHEET RULE NO LONGER SUPPLIES (issue 1510), for EVERY converted
+     control in this component. `.fabricate-field.manager-field select { width: 100% }`
+     (`styles/fabricate.css:10839`) painted them until they became `<button>`s, and
+     `.fabricate-select-trigger` declares no width at all — a trigger's box belongs to the row it
+     sits in. Without this rule the spend strategy measured 68.73px on "Macro" and 118.78px on
+     "Actor data path" in a 654px column, the provider 214.64px, and the add-sub-unit control
+     90.27px on "Silver (sp)" and 142.38px on "Electrum piece (ep)" in a 266px column, so the
+     card's controls sat at whatever width the chosen value happened to need. Measured in Chromium
+     against the fixture's declared Arial face; with the rule the add-sub-unit trigger holds 266px
+     across both option labels.
 
-     ONE RULE FOR TWO SHAPES. The strategy field is the caller's own demoted `Field as="div"`
-     column; the provider is the primitive's own labelled form, whose `<Field>` emits
-     `.fabricate-select-field`. Both are `.manager-field` columns inside this block, so the
-     descendant selector reaches both without naming either shape. The `:global()` is anchored at
-     `.manager-currency-strategy`, which THIS component writes, so the rule keeps a scoping hash
-     rather than reaching every trigger in the document.
+     ONE RULE FOR THREE CONTROLS. The strategy field is the caller's own demoted `Field as="div"`
+     column; the provider and the add-sub-unit control are the primitive's own labelled form,
+     whose `<Field>` emits `.fabricate-select-field`. All three are `.manager-field` columns, so
+     the descendant selector reaches them without naming either shape. Two anchors are needed
+     because they sit in two blocks this component writes: `.manager-currency-strategy` holds the
+     first two, and `.manager-currency-subunit-builder` — a `minmax(0, 1fr) auto` grid
+     (`styles/fabricate.css:5209-5213`) whose first track is full width — holds the third, which
+     the strategy anchor cannot reach. Both `:global()`s are anchored at classes THIS component
+     writes, so the rules keep a scoping hash rather than reaching every trigger in the document.
 
      The shape is the shipped one: the three interactables roots state exactly this rule for the
      labelled form's trigger, and the player pagers state their own fills the same way. */
-  .manager-currency-strategy :global(.manager-field .fabricate-select-trigger) {
+  .manager-currency-strategy :global(.manager-field .fabricate-select-trigger),
+  .manager-currency-subunit-builder :global(.manager-field .fabricate-select-trigger) {
     width: 100%;
   }
 </style>
