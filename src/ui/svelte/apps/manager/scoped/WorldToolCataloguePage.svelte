@@ -66,6 +66,7 @@
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import Chip from '../../../components/Chip.svelte';
+  import StatusToggle from '../../../components/StatusToggle.svelte';
   import InspectorActionButton from '../InspectorActionButton.svelte';
   import ItemDropZone from '../../../components/ItemDropZone.svelte';
   import {
@@ -709,10 +710,6 @@
   Tool is off in every crafting system that has it, whatever each of them says, because
   `resolveScopedDefinition` ANDs the two flags and world off wins.
 
-  It is the compact pill the system Tool Rules row already wears, so a GM sees one shape for
-  "this Tool is on" across the two scopes. `.manager-tools-enabled-toggle` is a shipped
-  global-sheet class rather than one authored here.
-
   IT IS THE `rowTrailing` SNIPPET RATHER THAN PART OF `rowMeta`, and the split is structural
   rather than stylistic: the design puts the row's CHIPS under the name, which places `rowMeta`
   inside the identity `<button>`, and a `<button>` inside a `<button>` is invalid DOM the browser
@@ -720,12 +717,11 @@
 -->
 {#snippet rowTrailing(entry)}
   {#if scope?.worldEnableable}
-    <button
-      type="button"
-      class={`manager-tools-enabled-toggle ${entry.worldEnabled === false ? '' : 'is-on'}`}
+    <StatusToggle
+      class="manager-tools-enabled-toggle"
+      on={entry.worldEnabled !== false}
       data-world-tool-row-enabled={entry.id}
-      aria-pressed={entry.worldEnabled !== false}
-      aria-label={format(
+      ariaLabel={format(
         entry.worldEnabled === false
           ? 'FABRICATE.Admin.Manager.Tools.WorldEnableAria'
           : 'FABRICATE.Admin.Manager.Tools.WorldDisableAria',
@@ -735,9 +731,7 @@
         { name: entry.entity?.name || entry.id }
       )}
       onclick={() => actions?.setWorldEnabled?.(entry.id, entry.worldEnabled === false)}
-    >
-      <span aria-hidden="true"><span></span></span>
-    </button>
+    />
   {/if}
 {/snippet}
 

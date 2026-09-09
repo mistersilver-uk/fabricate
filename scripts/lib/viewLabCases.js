@@ -8844,6 +8844,44 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/Gathering(Economy|EventEditView|EventsBrowserView|MapLinksTab|PartiesTab|RealmsTab|TaskEditView|TasksBrowserView)/,
     ],
   }),
+  ...[
+    { suffix: 'normal', width: 1280, height: 820 },
+    { suffix: 'narrow', width: 1000, height: 720 },
+  ].map(({ suffix, width, height }) =>
+    managerCase({
+      id: `manager-gathering-task-node-interval-${suffix}`,
+      label: `Manager — Gathering resource node interval ${suffix}`,
+      reaches: 'beyond',
+      smokeLabels: [],
+      query: { system: 'lab-smithing' },
+      position: { width, height },
+      // Herbalism disables nodes. Prospecting reaches the actual paired-control layout (#1649).
+      steps: [
+        'Gathering',
+        { selector: '#manager-gathering-nav-tasks' },
+        {
+          selector:
+            '[data-gathering-task-id="sm-task-prospect"] .manager-icon-button[aria-label^="Edit"]',
+        },
+        { selector: '[data-gathering-task-node-respawn]', select: 'overTime' },
+        { selector: '[data-gathering-task-node-interval]', fill: '1440' },
+        { selector: '[data-gathering-task-nodes]', scroll: true },
+      ],
+      expectView: 'gathering-task-edit',
+      expectSelector: '[data-gathering-task-node-respawn] option[value="overTime"]:checked',
+      expectVisible: '[data-gathering-task-node-interval]',
+      expectCenterHit: '[data-gathering-task-node-interval]',
+      expectNoHorizontalOverflow: '[data-gathering-task-nodes]',
+      expectContained: [
+        '[data-gathering-task-node-count]',
+        '.manager-task-node-interval-row .fab-stepper',
+        '[data-gathering-task-node-interval]',
+        '[data-gathering-task-node-interval-unit]',
+      ].map((target) => ({ container: '[data-gathering-task-nodes]', target })),
+      kinds: ['manager', 'environments', 'responsive'],
+      sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/],
+    })
+  ),
   managerCase({
     id: 'manager-gathering-task-availability-menu',
     label: 'Manager — Gathering task availability menu open',

@@ -1119,6 +1119,43 @@ test('the two alert frames assert their alert is inside the box that clips it', 
   assert.match(driver, /for \(const expectation of expectContained\)/);
 });
 
+test('resource-node interval evidence reaches over-time controls at both required window sizes', () => {
+  const editorPath = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
+  const selected = mapChangedFilesToCases([editorPath]).map((viewCase) => viewCase.id);
+  for (const [suffix, width, height] of [['normal', 1280, 820], ['narrow', 1000, 720]]) {
+    const id = `manager-gathering-task-node-interval-${suffix}`;
+    const viewCase = getCaseById(id);
+    assert.ok(viewCase, `${id} must exercise the node-enabled system`);
+    assert.ok(selected.includes(id), `${id} must be selected when its editor changes`);
+    assert.equal(viewCase.query.system, 'lab-smithing');
+    assert.equal(viewCase.expectView, 'gathering-task-edit');
+    assert.deepEqual(viewCase.position, { width, height });
+    assert.ok(viewCase.steps.some((step) => step.selector?.includes('sm-task-prospect')));
+    assert.deepEqual(viewCase.steps.slice(-3), [
+      { selector: '[data-gathering-task-node-respawn]', select: 'overTime' },
+      { selector: '[data-gathering-task-node-interval]', fill: '1440' },
+      { selector: '[data-gathering-task-nodes]', scroll: true },
+    ]);
+    assert.equal(
+      viewCase.expectSelector,
+      '[data-gathering-task-node-respawn] option[value="overTime"]:checked'
+    );
+    assert.equal(viewCase.expectVisible, '[data-gathering-task-node-interval]');
+    assert.equal(viewCase.expectCenterHit, '[data-gathering-task-node-interval]');
+    assert.equal(viewCase.expectNoHorizontalOverflow, '[data-gathering-task-nodes]');
+    for (const target of [
+      '[data-gathering-task-node-count]',
+      '.manager-task-node-interval-row .fab-stepper',
+      '[data-gathering-task-node-interval]',
+      '[data-gathering-task-node-interval-unit]',
+    ]) {
+      assert.ok(viewCase.expectContained.some((entry) =>
+        entry.container === '[data-gathering-task-nodes]' && entry.target === target
+      ), `${id} must keep ${target} inside the node card`);
+    }
+  }
+});
+
 test('every combination-rule value the registry targets is a real MODIFIER_POLICIES member', () => {
   // Ten selectors in this registry pin a rule option by its VALUE, and NOTHING else could
   // see them go stale. The token check above strips attribute values before extracting

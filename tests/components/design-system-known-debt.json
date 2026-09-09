@@ -379,7 +379,6 @@
     "src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte | 4",
     "src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte | 3",
     "src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte | 1",
-    "src/ui/svelte/apps/manager/scoped/WorldToolCataloguePage.svelte | 1",
     "src/ui/svelte/apps/manager/system/CharacterPrerequisitesCard.svelte | 1",
     "src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte | 2",
     "src/ui/svelte/components/CollapsibleGroupHeader.svelte | 1",

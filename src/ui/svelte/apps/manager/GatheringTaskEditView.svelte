@@ -2344,7 +2344,7 @@
 
   .manager-task-nodes-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
     gap: var(--fab-space-3);
     align-items: end;
   }
@@ -2362,7 +2362,13 @@
     flex: 0 0 auto;
   }
 
-  .manager-task-node-interval-row,
+  .manager-task-node-interval-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--fab-space-2);
+  }
+
   .manager-task-node-chance-row {
     display: flex;
     align-items: center;
@@ -2372,14 +2378,8 @@
   /* Size the unit `<select>` to its content instead of letting it take `width: 100%` from
      the blanket `.fabricate-field.manager-field select` rule.
 
-     Both flex items are `width: 100%` otherwise — the filled stepper by the `fill` variant
-     and the select by that blanket rule — so they split a `minmax(160px, 1fr)` track 50/50
-     and the typeable half falls to ~22-42px. That is under half the 48px an UNFILLED
-     stepper gives and about a third of what the bare input this replaced had: "1440" would
-     not fit in it. The stepper is the control being constrained by the wrong sibling, so
-     the sibling is what gets pinned; `fill` stays, and the stepper takes the remaining
-     track. The chance row is deliberately not included — its sibling is a `%` caption that
-     already sizes to content.
+     The grid gives the filled Stepper a definite remaining-width track beside the unit.
+     The node grid's minimum leaves room for both controls and wraps fields when needed.
 
      The `[data-…-unit]` qualifier is LOAD-BEARING, not a second way of saying `select`.
      Svelte 5 emits its scoping class as `:where(.svelte-hash)` on every compound after the
@@ -2388,7 +2388,6 @@
      rule, resolving on the source order of two separately loaded stylesheets. The attribute
      lifts the class column to 3 and makes it win outright. */
   .manager-task-node-interval-row select[data-gathering-task-node-interval-unit] {
-    flex: 0 0 auto;
     width: auto;
   }
 

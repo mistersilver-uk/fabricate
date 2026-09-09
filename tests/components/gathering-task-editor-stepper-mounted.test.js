@@ -351,14 +351,35 @@ describe('Gathering task editor steppers (issue 1050)', () => {
     assert.equal(lastWrite(updates, (patch) => patch.dcOverride), 14, 'and commits that too');
   });
 
+  it('commits a four-digit interval, steps it and preserves the amount when its unit changes', async () => {
+    const { root, field, updates, sync } = await mountEditor();
+    const input = field('[data-gathering-task-node-interval]');
+    const read = (patch) => patch.nodes?.respawn;
+    input.value = '1440';
+    input.dispatchEvent(new globalThis.Event('input', { bubbles: true }));
+    await sync();
+    assert.equal(input.value, '1440');
+    assert.equal(lastWrite(updates, read).intervalAmount, 1440);
+
+    input.closest('.fab-stepper').querySelectorAll('button')[1].click();
+    await sync();
+    assert.equal(input.value, '1441');
+    assert.equal(lastWrite(updates, read).intervalAmount, 1441);
+    stepNativeNumberInput(input, 'down');
+    await sync();
+
+    const unit = root.querySelector('[data-gathering-task-node-interval-unit]');
+    assert.equal(unit.tagName, 'SELECT');
+    unit.value = 'minutes';
+    unit.dispatchEvent(new globalThis.Event('change', { bubbles: true }));
+    await sync();
+    assert.equal(lastWrite(updates, read).intervalUnit, 'minutes');
+    assert.equal(lastWrite(updates, read).intervalAmount, 1440);
+    assert.equal(input.value, '1440');
+    assert.equal(unit.value, 'minutes');
+  });
+
   it('lets the respawn unit select size to its content, on specificity not source order', () => {
-    // The interval row is `display: flex` with two `width: 100%` children — the filled stepper
-    // and the unit `<select>`, which takes its width from the blanket
-    // `.fabricate-field.manager-field select` rule (issue 1508 re-rooted it at the class `Field`
-    // emits, at unchanged (0,2,1)). They split the track 50/50, leaving the
-    // typeable half at ~22-42px: under half of what an unfilled stepper offers, and not enough
-    // for "1440". The remedy pins the SIBLING, so the stepper keeps `fill` and takes the rest.
-    //
     // The attribute qualifier in that rule is what makes it work, and it is easy to delete as
     // redundant because `select` alone reads like it says the same thing. It does not. Svelte 5
     // emits its scoping class as `:where(.svelte-hash)` on every compound after the first, and
