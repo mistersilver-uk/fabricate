@@ -29,20 +29,19 @@
   const currentIndex = $derived(Math.max(0, Number(run?.stepIndex) || 0));
   const viewedIndex = $derived(Math.max(0, Number(journal?.viewedStageIndex) || 0));
   const viewedStage = $derived(stages[viewedIndex] ?? run?.currentStep ?? null);
-  const gate = $derived(run?.timeGate ?? run?.currentStep?.timeGate ?? null);
-  const elapsed = $derived(
-    Number.isFinite(Number(gate?.requiredSeconds)) && Number(gate.requiredSeconds) > 0
-      ? Math.max(
-          0,
-          Math.min(
-            100,
-            ((now - Number(gate.initiatedAt ?? now)) / Number(gate.requiredSeconds)) * 100
-          )
-        )
-      : status === 'ready'
-        ? 100
-        : 0
-  );
+  const currentStage = $derived(run?.currentStep ?? stages[currentIndex] ?? null);
+  const currentGate = $derived(run?.timeGate ?? currentStage?.timeGate ?? null);
+  const viewedIsCurrent = $derived(stages.length === 0 || viewedIndex === currentIndex);
+  const summaryGate = $derived(viewedStage?.timeGate ?? (viewedIsCurrent ? currentGate : null));
+  const elapsed = $derived.by(() => {
+    const required = Number(currentGate?.requiredSeconds);
+    if (!(Number.isFinite(required) && required > 0)) return status === 'ready' ? 100 : 0;
+    const pausedRemaining = numberOrNaN(run?.pauseState?.remainingSeconds);
+    const elapsedSeconds = Number.isFinite(pausedRemaining)
+      ? required - pausedRemaining
+      : now - Number(currentGate?.initiatedAt ?? now);
+    return Math.max(0, Math.min(100, (elapsedSeconds / required) * 100));
+  });
   const progressBlocker = $derived(
     run?.pauseState ? localize('FABRICATE.App.Journal.Notice.PausedTitle') : ''
   );
@@ -74,27 +73,44 @@
     }))
   );
   const requiredSeconds = $derived(
-    Number(gate?.requiredSeconds ?? viewedStage?.detail?.requiredSeconds) || 0
+    Number(summaryGate?.requiredSeconds ?? viewedStage?.detail?.requiredSeconds) || 0
   );
-  const availableAt = $derived(Number(gate?.availableAt));
-  const remainingTime = $derived(
-    Number.isFinite(availableAt) && availableAt > now
+  const availableAt = $derived(Number(summaryGate?.availableAt));
+  const remainingTime = $derived.by(() => {
+    const pausedRemaining = viewedIsCurrent
+      ? numberOrNaN(run?.pauseState?.remainingSeconds)
+      : Number.NaN;
+    if (Number.isFinite(pausedRemaining)) return formatDurationHMS(pausedRemaining);
+    return Number.isFinite(availableAt) && availableAt > now
       ? formatDurationHMS(availableAt - now)
-      : localize('FABRICATE.App.Journal.Summary.None')
+      : localize('FABRICATE.App.Journal.Summary.None');
+  });
+  const readyAtLabel = $derived(
+    viewedIsCurrent && run?.pauseState ? '' : calendarLabel(summaryGate?.availableAt)
   );
-  const readyAtLabel = $derived(calendarLabel(gate?.availableAt));
   const checkLabel = $derived(
     String(
       viewedStage?.detail?.checkLabel ??
-        (['d100', 'routed'].includes(gatheringYield?.mode) ? resolutionModeLabel : '')
+        (viewedIsCurrent && ['d100', 'routed'].includes(gatheringYield?.mode)
+          ? resolutionModeLabel
+          : '')
     )
   );
   const checkOutcome = $derived(
     viewedStage?.lastCheckResult
       ? formatRoll(viewedStage.lastCheckResult)
-      : gatheringYield?.roll != null
+      : viewedIsCurrent && gatheringYield?.roll != null
         ? String(gatheringYield.roll)
         : ''
+  );
+  const runIdentity = $derived(
+    String(
+      run?.key ??
+        JSON.stringify([run?.actorUuid ?? null, run?.runType ?? 'crafting', run?.id ?? null])
+    )
+  );
+  const commandError = $derived(
+    journal?.commandError?.runKey === runIdentity ? journal.commandError : null
   );
 
   const showActions = $derived(
@@ -314,6 +330,20 @@
     />
   {/if}
 
+  {#if commandError}
+    <Notice
+      tone="danger"
+      title={commandError.message || localize('FABRICATE.App.Journal.CommandError.Fallback')}
+      detail={localize('FABRICATE.App.Journal.CommandError.Detail')}
+      action={{
+        label: localize('FABRICATE.App.Journal.Retry'),
+        onClick: () => journal?.retryCommandError?.(),
+      }}
+      dataAttr="data-journal-command-error"
+      dataValue="true"
+    />
+  {/if}
+
   {#if terminal}
     <Notice
       tone={status === 'succeeded' ? 'success' : status === 'failed' ? 'danger' : 'info'}
@@ -323,52 +353,6 @@
       dataValue={status}
     />
   {/if}
-
-  <div class="journal-detail-summary" data-journal-summary>
-    <InspectorCard class="journal-summary-card" data-journal-summary-card="time">
-      <h3>{localize('FABRICATE.App.Journal.Summary.Time')}</h3>
-      <JournalFactRow
-        icon="fa-clock"
-        label={localize('FABRICATE.App.Journal.Summary.Needs')}
-        value={requiredSeconds > 0
-          ? formatDurationHMS(requiredSeconds)
-          : localize('FABRICATE.App.Journal.Summary.None')}
-      />
-      <JournalFactRow
-        icon="fa-hourglass-half"
-        label={localize('FABRICATE.App.Journal.Summary.Left')}
-        value={remainingTime}
-      />
-      {#if readyAtLabel}<JournalFactRow
-          icon="fa-calendar"
-          label={localize('FABRICATE.App.Journal.Summary.ReadyAt')}
-          value={readyAtLabel}
-        />{/if}
-    </InspectorCard>
-    <InspectorCard class="journal-summary-card" data-journal-summary-card="check">
-      <h3>
-        {localize(
-          checkLabel
-            ? 'FABRICATE.App.Journal.Summary.Check'
-            : 'FABRICATE.App.Journal.Summary.NoCheck'
-        )}
-      </h3>
-      <JournalFactRow
-        icon={checkLabel ? 'fa-dice-d20' : 'fa-circle-check'}
-        label={localize(
-          checkLabel
-            ? 'FABRICATE.App.Journal.Summary.DecidedBy'
-            : 'FABRICATE.App.Journal.Summary.NothingToRoll'
-        )}
-        value={checkLabel || localize('FABRICATE.App.Journal.Summary.SimplyCompletes')}
-      />
-      {#if checkOutcome}<JournalFactRow
-          icon="fa-check"
-          label={localize('FABRICATE.App.Journal.Summary.Outcome')}
-          value={checkOutcome}
-        />{/if}
-    </InspectorCard>
-  </div>
 
   {#if stages.length > 0}
     <section class="journal-detail-stages" data-journal-stages>
@@ -429,8 +413,8 @@
     </section>
   {/if}
 
-  {#if gate && !terminal}<TimeRemainingBox
-      availableAt={gate.availableAt}
+  {#if currentGate && !terminal && !run?.pauseState}<TimeRemainingBox
+      availableAt={currentGate.availableAt}
       hintKey={run?.isFinalStep ? 'FABRICATE.App.Journal.TimeRemaining.WhenPassedFinal' : undefined}
       {services}
       {now}
@@ -487,6 +471,52 @@
       }}
     />
   {/if}
+
+  <div class="journal-detail-summary" data-journal-summary>
+    <InspectorCard class="journal-summary-card" data-journal-summary-card="time">
+      <h3>{localize('FABRICATE.App.Journal.Summary.Time')}</h3>
+      <JournalFactRow
+        icon="fa-clock"
+        label={localize('FABRICATE.App.Journal.Summary.Needs')}
+        value={requiredSeconds > 0
+          ? formatDurationHMS(requiredSeconds)
+          : localize('FABRICATE.App.Journal.Summary.None')}
+      />
+      <JournalFactRow
+        icon="fa-hourglass-half"
+        label={localize('FABRICATE.App.Journal.Summary.Left')}
+        value={remainingTime}
+      />
+      {#if readyAtLabel}<JournalFactRow
+          icon="fa-calendar"
+          label={localize('FABRICATE.App.Journal.Summary.ReadyAt')}
+          value={readyAtLabel}
+        />{/if}
+    </InspectorCard>
+    <InspectorCard class="journal-summary-card" data-journal-summary-card="check">
+      <h3>
+        {localize(
+          checkLabel
+            ? 'FABRICATE.App.Journal.Summary.Check'
+            : 'FABRICATE.App.Journal.Summary.NoCheck'
+        )}
+      </h3>
+      <JournalFactRow
+        icon={checkLabel ? 'fa-dice-d20' : 'fa-circle-check'}
+        label={localize(
+          checkLabel
+            ? 'FABRICATE.App.Journal.Summary.DecidedBy'
+            : 'FABRICATE.App.Journal.Summary.NothingToRoll'
+        )}
+        value={checkLabel || localize('FABRICATE.App.Journal.Summary.SimplyCompletes')}
+      />
+      {#if checkOutcome}<JournalFactRow
+          icon="fa-check"
+          label={localize('FABRICATE.App.Journal.Summary.Outcome')}
+          value={checkOutcome}
+        />{/if}
+    </InspectorCard>
+  </div>
 
   <section class="journal-detail-record" data-journal-record>
     <h3>{localize('FABRICATE.App.Journal.Record.Title')}</h3>

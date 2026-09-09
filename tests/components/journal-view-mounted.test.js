@@ -181,6 +181,7 @@ describe('JournalView mounted behavior', () => {
     assert.ok(!activeList.querySelector('[data-journal-list-scroll]').contains(activeList.querySelector('[data-pagination]')));
     assert.ok(!finishedList.querySelector('[data-journal-list-scroll]').contains(finishedList.querySelector('[data-pagination]')));
     assert.equal(target.querySelectorAll('.journal-list-footer .manager-pagination').length, 2);
+    assert.ok(target.querySelector('[data-journal-list="active"] [data-pagination-page]'));
     assert.ok(target.querySelector('[data-journal-detail]'));
     assert.ok(target.querySelector('[data-journal-time-remaining]'));
     assert.equal(target.querySelectorAll('[data-journal-summary-card]').length, 2);
@@ -555,6 +556,63 @@ describe('JournalView mounted behavior', () => {
     assert.ok(!target.querySelector('[data-journal-time-remaining]'));
     assert.equal(target.querySelectorAll('[data-journal-summary-card]').length, 2);
     assert.match(target.querySelector('[data-journal-summary-card="check"]').textContent, /NoCheck|No check/u);
+  });
+
+  it('freezes paused time and reads summary facts from the stage being viewed', async () => {
+    const base = makeCraftingRun();
+    const current = {
+      ...base.steps[0],
+      detail: { ...base.steps[0].detail, checkLabel: 'CURRENT CHECK' },
+      timeGate: { availableAt: 1000, initiatedAt: 0, requiredSeconds: 1000 },
+    };
+    const future = {
+      ...base.steps[1],
+      detail: { ...base.steps[1].detail, requiredSeconds: 7200, checkLabel: 'FUTURE CHECK' },
+      timeGate: null,
+    };
+    const paused = makeCraftingRun({
+      derivedStatus: 'paused',
+      pauseState: { pausedAt: 250, remainingSeconds: 750 },
+      steps: [current, future],
+      currentStep: current,
+      timeGate: current.timeGate,
+    });
+    const { store } = makeJournal({ worldTime: 500, selectedRun: paused, selectedRunKey: paused.key });
+    const currentTarget = await harness.mount({ services: makeServices(store) });
+    assert.match(currentTarget.querySelector('[data-journal-summary-card="time"]').textContent, /12m 30s/u);
+    assert.ok(!currentTarget.querySelector('[data-journal-time-remaining]'));
+
+    harness.remount();
+    store.viewedStageIndex = 1;
+    const futureTarget = await harness.mount({ services: makeServices(store) });
+    assert.match(futureTarget.querySelector('[data-journal-summary-card="time"]').textContent, /2h 0m 0s/u);
+    const check = futureTarget.querySelector('[data-journal-summary-card="check"]').textContent;
+    assert.match(check, /FUTURE CHECK/u);
+    assert.doesNotMatch(check, /CURRENT CHECK/u);
+  });
+
+  it('shows a run-scoped command failure and operates its retry action', async () => {
+    const run = makeCraftingRun({ lifecycleContract: 'current', lifecycleVersion: 1 });
+    const { store, calls } = makeJournal({
+      selectedRun: run,
+      selectedRunKey: run.key,
+      commandError: { runKey: run.key, actorUuid: run.actorUuid, message: 'The run changed.' },
+    });
+    store.retryCommandError = () => {
+      calls.execute.push('retry');
+      store.commandError = null;
+    };
+    const services = makeServices(store);
+    const target = await harness.mount({ services });
+    const notice = target.querySelector('[data-journal-command-error]');
+    assert.ok(notice, 'the command failure notice is visible for the selected run');
+    assert.match(notice.textContent, /The run changed\./u);
+    notice.querySelector('[data-notice-action]').click();
+    assert.deepEqual(calls.execute, ['retry']);
+
+    harness.remount();
+    const cleared = await harness.mount({ services });
+    assert.ok(!cleared.querySelector('[data-journal-command-error]'));
   });
 
   it('shows recovery evidence without disclosing selection internals on a redacted owner run', async () => {

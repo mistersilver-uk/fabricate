@@ -892,6 +892,10 @@
         "Loading": "Loading runs…",
         "Error": "Couldn't load your runs.",
         "Retry": "Try again",
+        "CommandError": {
+          "Fallback": "The run could not be updated.",
+          "Detail": "The run is still available. Try the action again."
+        },
         "Step": {
           "Label": "Step {index} of {count}",
           "LabelNamed": "Step {index} of {count} • {name}"

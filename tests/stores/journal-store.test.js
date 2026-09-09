@@ -392,6 +392,100 @@ describe('journalStore', () => {
     assert.equal(store.busyRunId, '');
     assert.deepEqual(setup.calls.notify, ['Crafting failed.']);
     assert.equal(setup.calls.list, 2, 'failure refreshes authoritative state');
+    assert.deepEqual(store.commandError, {
+      runKey: current.key,
+      actorUuid: current.actorUuid,
+      message: 'Crafting failed.',
+    });
+  });
+
+  it('keeps a safe run-scoped refusal through a failed refresh and clears it on retry', async () => {
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+    const setup = makeServices({
+      listing: baseListing({ activeRuns: [current], history: [] }),
+      commandResult: { success: false, message: 'The run changed. Try again.' },
+    });
+    const store = await loadedStore(setup);
+    store.select(current);
+    setup.services.listJournalForActor = async () => {
+      throw new Error('refresh failed');
+    };
+
+    await store.pause(current);
+    flushSync();
+    assert.deepEqual(store.commandError, {
+      runKey: current.key,
+      actorUuid: current.actorUuid,
+      message: 'The run changed. Try again.',
+    });
+    assert.deepEqual(setup.calls.notify, ['The run changed. Try again.']);
+    assert.equal(store.error, false, 'a quiet refresh failure keeps the populated Journal visible');
+
+    setup.services.executeJournalRunCommand = async (args) => {
+      setup.calls.command.push(args);
+      return { success: true, message: 'Updated' };
+    };
+    setup.services.listJournalForActor = async () => setup.state.listing;
+    await store.retryCommandError();
+    flushSync();
+    assert.equal(store.commandError, null);
+    assert.equal(setup.calls.command.length, 2);
+  });
+
+  it('treats a cancelled versioned command as a silent retryable-state clear', async () => {
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+    const setup = makeServices({
+      listing: baseListing({ activeRuns: [current], history: [] }),
+      commandResult: { success: false, message: 'The run changed. Try again.' },
+    });
+    const store = await loadedStore(setup);
+
+    await store.pause(current);
+    flushSync();
+    assert.ok(store.commandError);
+
+    setup.services.executeJournalRunCommand = async (args) => {
+      setup.calls.command.push(args);
+      return { success: false, cancelled: true, message: 'Roll cancelled.' };
+    };
+    await store.pause(current);
+    flushSync();
+
+    assert.equal(store.commandError, null);
+    assert.deepEqual(setup.calls.notify, ['The run changed. Try again.']);
+    assert.equal(setup.calls.list, 2, 'the cancelled command does not trigger another refresh');
+  });
+
+  it('clears a command failure when selection moves to another run', async () => {
+    const setup = makeServices({ commandResult: { success: false, message: 'Stale run.' } });
+    const store = await loadedStore(setup);
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+    await store.pause(current);
+    flushSync();
+    assert.equal(store.commandError?.runKey, current.key);
+
+    store.select(ACTIVE[1]);
+    flushSync();
+    assert.equal(store.commandError, null);
+  });
+
+  it('clears a command failure when the loaded actor changes', async () => {
+    const setup = makeServices({ commandResult: { success: false, message: 'Stale run.' } });
+    const store = await loadedStore(setup);
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+    await store.pause(current);
+    flushSync();
+    assert.equal(store.commandError?.actorUuid, 'Actor.actor-1');
+
+    setup.state.listing = baseListing({
+      selectedActorId: 'actor-2',
+      selectedActorUuid: 'Actor.actor-2',
+      activeRuns: [run({ id: 'other', actorUuid: 'Actor.actor-2' })],
+      history: [],
+    });
+    await store.load(true);
+    flushSync();
+    assert.equal(store.commandError, null);
   });
 
   it('shares one busy guard across competing actions for the same store', async () => {
