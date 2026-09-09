@@ -51,6 +51,8 @@ import { getRealmRevealMode, isGatheringRealmsEnabled } from './gatheringRealms.
 import { GatheringWorldTimeProcessor } from './GatheringWorldTimeProcessor.js';
 import { readStoredStackQuantity } from './itemStackQuantity.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
+import { getCommittedExecutionOutcome } from './runExecutionJournal.js';
+import { getRunLifecycleContract } from './runLifecycleState.js';
 import { resolvedComponentsFor } from './scopedEntityReads.js';
 import { computeSystemVisibility } from './systemValidation.js';
 
@@ -84,6 +86,14 @@ const DEFAULT_BLOCKED_REASON_KEYS = Object.freeze({
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
 const UNKNOWN_TOOL_LABEL_KEY = 'FABRICATE.App.Gathering.Detail.UnknownTool';
 const DEFAULT_TOOL_IMG = 'icons/svg/item-bag.svg';
+const VERSIONED_START_CONTEXT = Symbol('versionedGatheringStartContext');
+
+class GatheringLifecycleExecutionError extends Error {
+  constructor(message, code, cause) {
+    super(message, cause ? { cause } : {});
+    this.code = code;
+  }
+}
 const FAILURE_KEYWORDS = new Set([
   'f',
   'fail',
@@ -148,6 +158,9 @@ export class GatheringEngine {
    * @type {?{deliver: (args: object) => boolean}}
    */
   complicationDeliveryWriter = null;
+
+  /** @type {object|null} Authoritative command adapter for lifecycle-v1 mutations. */
+  versionedRunAuthority = null;
 
   constructor({
     environmentStore,
@@ -328,6 +341,11 @@ export class GatheringEngine {
     return this;
   }
 
+  installVersionedRunAuthority(authority = null) {
+    this.versionedRunAuthority = authority && typeof authority === 'object' ? authority : null;
+    return this;
+  }
+
   /**
    * Install the complication delivery writer (issue 1286).
    *
@@ -465,8 +483,322 @@ export class GatheringEngine {
    *   write replicates.
    */
   async requestStart(options = {}) {
+    if (Object.hasOwn(options, 'lifecycleVersion')) {
+      if (options.lifecycleVersion !== 1) {
+        return versionedGatheringFailure('The gathering run lifecycle version is unsupported.');
+      }
+      const requestStart = this.versionedRunAuthority?.requestStart;
+      if (typeof requestStart !== 'function') return gatheringAuthorityUnavailable();
+      return requestStart({
+        actor: options.actor,
+        environmentId: options.environmentId,
+        taskId: options.taskId,
+        rememberedActorId: options.rememberedActorId,
+        presentTools: options.presentTools,
+        interactableRef: options.interactableRef,
+        completionMode: options.completionMode || 'manual',
+      });
+    }
     const relayed = await this._relayBlindStartIfNeeded(options);
     return relayed ?? this.startAttempt(options);
+  }
+
+  async startVersionedRun({
+    viewer = null,
+    actor = null,
+    rememberedActorId = null,
+    environmentId = null,
+    taskId = null,
+    presentTools = null,
+    interactableRef = null,
+    completionMode = 'manual',
+    executionGrant,
+    requestId,
+  } = {}) {
+    const trusted = await this._consumeVersionedGrant(executionGrant, {
+      operation: 'start',
+      actor,
+      runId: null,
+      expectedRevision: null,
+      requestId,
+    });
+    if (!['manual', 'worldTime'].includes(completionMode)) {
+      return versionedGatheringFailure(
+        'The gathering completion mode is unsupported.',
+        'INVALID_COMPLETION_MODE'
+      );
+    }
+    const result = await this.startAttempt(
+      {
+        viewer,
+        actor,
+        rememberedActorId,
+        environmentId,
+        taskId,
+        presentTools,
+        interactableRef,
+        interactive: false,
+        lifecycleVersion: 1,
+      },
+      {
+        [VERSIONED_START_CONTEXT]: true,
+        operationId: trusted.operationId,
+        requestId,
+        completionMode,
+      }
+    );
+    return asVersionedGatheringResult(result);
+  }
+
+  async describeVersionedStageCheck({ actor, runId, preparationGrant, requestId } = {}) {
+    await this._consumeVersionedGrant(preparationGrant, {
+      operation: 'describeCheck',
+      actor,
+      runId,
+      expectedRevision: null,
+      requestId,
+    });
+    this.runManager?.invalidateCache?.(idOf(actor));
+    const run = this.runManager?.getActiveRun?.(actor, runId) ?? null;
+    this._assertVersionedRunExecutable(run, { requireReady: true });
+    const resolvedRun = this._hydrateBlindWaitingRun(run);
+    const resolved = this._resolveWaitingRunContext({ actor, run: resolvedRun });
+    if (resolved.missingReference) {
+      throw gatheringLifecycleError('The gathering references are stale', 'STALE_RUN_STAGE');
+    }
+    return this._versionedCheckDescriptor({ actor, run, ...resolved });
+  }
+
+  evaluatePreparedVersionedCheck({ actor, privateEvaluation, decision = {} } = {}) {
+    const evaluate = this.versionedRunAuthority?.evaluatePreparedRunCheck;
+    if (typeof evaluate !== 'function') {
+      throw gatheringLifecycleError(
+        'Versioned gathering check evaluation is unavailable',
+        'AUTHORITY_UNAVAILABLE'
+      );
+    }
+    return evaluate(privateEvaluation, actor, decision, {
+      secret: privateEvaluation?.secret === true,
+      failureMessage: 'Gathering check failed',
+    });
+  }
+
+  async executeVersionedStage({
+    actor,
+    runId,
+    expectedRevision,
+    executionGrant,
+    requestId,
+    trigger = 'manual',
+  } = {}) {
+    const trusted = await this._consumeVersionedGrant(executionGrant, {
+      operation: 'execute',
+      actor,
+      runId,
+      expectedRevision,
+      requestId,
+    });
+    this.runManager?.invalidateCache?.(idOf(actor));
+    const anyRun = this.runManager?.getRun?.(actor, runId) ?? null;
+    const committed = anyRun?.executionJournal
+      ? getCommittedExecutionOutcome(anyRun.executionJournal, requestId)
+      : null;
+    if (committed) return committed;
+
+    const run = this.runManager?.getActiveRun?.(actor, runId) ?? null;
+    this._assertVersionedRunExecutable(run, { expectedRevision, requireReady: true });
+    if (this._gamePaused()) {
+      return versionedGatheringFailure('Gathering cannot advance while the game is paused.');
+    }
+    if (trigger === 'worldTime' && run.completionMode !== 'worldTime') {
+      return versionedGatheringFailure('This gathering run is set to manual completion.');
+    }
+
+    const resolvedRun = this._hydrateBlindWaitingRun(run);
+    const resolved = this._resolveWaitingRunContext({ actor, run: resolvedRun });
+    if (resolved.missingReference) {
+      return versionedGatheringFailure('The gathering references are stale.');
+    }
+    const resolvedTools = this._resolveTaskTools({
+      environment: resolved.environment,
+      task: resolved.task,
+    });
+    if (this._hasBlockedToolReferences(resolvedTools)) {
+      return versionedGatheringFailure('The gathering tool references are stale.');
+    }
+    if (resolvedTools.tools.length > 0) {
+      const viewer = await this._viewerForRun({ actor, run: resolvedRun });
+      const availability = await this._checkTools({
+        actor,
+        viewer,
+        system: resolved.system,
+        environment: resolved.environment,
+        task: resolved.task,
+        tools: resolvedTools.tools,
+        presentTools: null,
+      });
+      if (availability.available !== true) {
+        return versionedGatheringFailure('The gathering tools are no longer available.');
+      }
+    }
+    if (trigger === 'worldTime' && gatheringTaskRequiresPlayerCheck(resolved.task)) {
+      return versionedGatheringFailure('This gathering run requires a player check.');
+    }
+    if (
+      gatheringTaskRequiresPlayerCheck(resolved.task) &&
+      (!trusted.resolvedCheckResult || typeof trusted.resolvedCheckResult !== 'object')
+    ) {
+      throw gatheringLifecycleError(
+        'A validated gathering check result is required',
+        'CHECK_RESULT_REQUIRED'
+      );
+    }
+
+    const result = await this._processMaturedWaitingRun({
+      actor,
+      run: resolvedRun,
+      versionedContext: {
+        operationId: trusted.operationId,
+        requestId,
+        expectedRevision,
+        resolvedCheckResult: trusted.resolvedCheckResult ?? null,
+        trigger,
+      },
+    });
+    return asVersionedGatheringResult(result);
+  }
+
+  async cancelVersionedRun({ actor, runId, expectedRevision, executionGrant, requestId } = {}) {
+    const trusted = await this._consumeVersionedGrant(executionGrant, {
+      operation: 'cancel',
+      actor,
+      runId,
+      expectedRevision,
+      requestId,
+    });
+    this.runManager?.invalidateCache?.(idOf(actor));
+    const run = this.runManager?.getActiveRun?.(actor, runId) ?? null;
+    this._assertVersionedRunExecutable(run, {
+      expectedRevision,
+      requireReady: false,
+      allowPaused: true,
+    });
+    const cancelled = await this.runManager.cancelRun(actor, runId, {
+      expectedRevision,
+      executionOperationId: trusted.operationId,
+    });
+    if (!cancelled) return versionedGatheringFailure('The gathering run is no longer active.');
+    await this._releaseBlindReservation(run);
+    return {
+      success: true,
+      accepted: true,
+      cancelled: true,
+      refunded: false,
+      restoredCount: 0,
+      run: stripRuntimeSnapshotFromRun(cancelled),
+      runId: cancelled.id,
+      state: 'cancelled',
+    };
+  }
+
+  _consumeVersionedGrant(executionGrant, context) {
+    const consume = this.versionedRunAuthority?.consumeExecutionGrant;
+    if (typeof consume !== 'function') {
+      throw gatheringLifecycleError(
+        'Versioned gathering authority is unavailable',
+        'AUTHORITY_UNAVAILABLE'
+      );
+    }
+    return Promise.resolve(consume(executionGrant, context)).then((trusted) => {
+      const operationId = stringOrNull(trusted?.operationId);
+      if (!operationId) {
+        throw gatheringLifecycleError(
+          'Versioned gathering authority is unavailable',
+          'AUTHORITY_UNAVAILABLE'
+        );
+      }
+      return { ...trusted, operationId };
+    });
+  }
+
+  _assertVersionedRunExecutable(
+    run,
+    { expectedRevision, requireReady = false, allowPaused = false } = {}
+  ) {
+    if (!run) throw gatheringLifecycleError('The gathering run is not active', 'RUN_NOT_FOUND');
+    const contract = getRunLifecycleContract(run);
+    if (contract !== 'current') {
+      throw gatheringLifecycleError(
+        contract === 'unsupported'
+          ? 'The gathering run lifecycle version is unsupported'
+          : 'The gathering run is not versioned',
+        contract === 'unsupported' ? 'UNSUPPORTED_RUN' : 'LEGACY_RUN'
+      );
+    }
+    if (!allowPaused && run.pauseState) {
+      throw gatheringLifecycleError('The gathering run is paused', 'RUN_PAUSED');
+    }
+    if (run.executionJournal?.status === 'recoveryRequired') {
+      throw gatheringLifecycleError('The gathering run requires recovery', 'RECOVERY_REQUIRED');
+    }
+    if (run.executionJournal?.effects?.some((effect) => effect?.phase === 'applying')) {
+      throw gatheringLifecycleError(
+        'The gathering run has an uncertain execution effect',
+        'RECOVERY_REQUIRED'
+      );
+    }
+    if (expectedRevision !== undefined && Number(expectedRevision) !== Number(run.runRevision)) {
+      throw gatheringLifecycleError('The gathering run revision is stale', 'STALE_RUN_REVISION');
+    }
+    if (requireReady && this.runManager?.canExecuteRun?.(run) !== true) {
+      throw gatheringLifecycleError('The gathering run is not ready', 'RUN_NOT_READY');
+    }
+    return run;
+  }
+
+  _versionedCheckDescriptor({ actor, run, system, environment, task }) {
+    const secret = isBlindWaitingTaskId(run?.taskId);
+    const mode = stringOrNull(task?.resolutionMode) || 'd100';
+    const config =
+      mode === 'routed'
+        ? plainObjectOrNull(system?.gatheringCraftingCheck?.routed)
+        : mode === 'progressive'
+          ? plainObjectOrNull(system?.gatheringCraftingCheck?.progressive)
+          : null;
+    const rollFormula = stringOrNull(config?.rollFormula);
+    const requiresCheck = gatheringTaskRequiresPlayerCheck(task);
+    const slot = mode === 'routed' ? 'routed' : mode === 'progressive' ? 'progressive' : null;
+    const checkMode = mode === 'routed' ? 'routedByCheck' : mode;
+    const dc = mode === 'routed' ? this._resolveGatheringRoutedDc(config, task) : null;
+    return {
+      required: requiresCheck,
+      publicPrompt: {
+        label: secret ? this.localize(BLIND_TASK_LABEL_KEY) : stringOrEmpty(task?.name),
+        mode: checkMode,
+        allowsSituationalModifier: Boolean(rollFormula),
+        allowAdvantage: Boolean(rollFormula && /(?:^|\W)d20(?:\W|$)/i.test(rollFormula)),
+      },
+      privateEvaluation: {
+        secret,
+        actorUuid: stringOrNull(actor?.uuid),
+        craftingSystemId: stringOrNull(system?.id),
+        environmentId: stringOrNull(environment?.id),
+        taskId: stringOrNull(task?.id),
+        mode: checkMode,
+        slot,
+        rollFormula,
+        checkConfig: config ? cloneJson(config) : null,
+        decisionPolicy: {
+          dc: Number.isFinite(dc) ? dc : null,
+          thresholdMode: stringOrNull(config?.thresholdMode),
+          type: stringOrNull(config?.type),
+          relativeOutcomes: cloneJson(normalizeList(config?.relativeOutcomes)),
+          fixedOutcomes: cloneJson(normalizeList(config?.fixedOutcomes)),
+          clampToNearest: mode === 'routed',
+          minOutcomeId: null,
+        },
+      },
+    };
   }
 
   /**
@@ -504,7 +836,10 @@ export class GatheringEngine {
       if (!actor || !run?.id || run.status !== 'waitingTime') continue;
 
       try {
-        const result = await this._processMaturedWaitingRun({ actor, run });
+        const result =
+          getRunLifecycleContract(run) === 'current'
+            ? await this._requestVersionedWorldTimeExecution({ actor, run })
+            : await this._processMaturedWaitingRun({ actor, run });
         if (!result) continue;
         processed.push(result);
         if (result.state === 'cancelled') cancelled.push(result);
@@ -544,6 +879,48 @@ export class GatheringEngine {
     };
   }
 
+  async _requestVersionedWorldTimeExecution({ actor, run }) {
+    if (this._gamePaused()) {
+      throw gatheringLifecycleError(
+        'Automatic gathering stopped while the game is paused',
+        'GAME_PAUSED'
+      );
+    }
+    const resolved = this._resolveWaitingRunContext({
+      actor,
+      run: this._hydrateBlindWaitingRun(run),
+    });
+    if (resolved.missingReference) {
+      throw gatheringLifecycleError('The gathering references are stale', 'STALE_RUN_STAGE');
+    }
+    if (gatheringTaskRequiresPlayerCheck(resolved.task)) {
+      throw gatheringLifecycleError(
+        'Automatic gathering stopped for a required player check',
+        'AUTOMATIC_CHECK_REQUIRED'
+      );
+    }
+    const requestExecute = this.versionedRunAuthority?.requestExecute;
+    if (typeof requestExecute !== 'function') {
+      throw gatheringLifecycleError(
+        'Versioned gathering authority is unavailable',
+        'AUTHORITY_UNAVAILABLE'
+      );
+    }
+    const result = await requestExecute({
+      actor,
+      runId: run.id,
+      expectedRevision: run.runRevision,
+      trigger: 'worldTime',
+    });
+    if (result?.success === false) {
+      throw gatheringLifecycleError(
+        stringOrNull(result.message) || 'Automatic gathering execution was refused',
+        stringOrNull(result.code) || 'AUTOMATIC_EXECUTION_REFUSED'
+      );
+    }
+    return result;
+  }
+
   /**
    * Thin delegate to the world-time processor's interactable-scoped node respawn
    * pass (issue 374). Kept so callers that drive the pass directly — notably the
@@ -556,26 +933,38 @@ export class GatheringEngine {
     return this.worldTimeProcessor._processInteractableNodeRespawn(...args);
   }
 
-  async startAttempt({
-    viewer = null,
-    actor = null,
-    rememberedActorId = null,
-    environmentId = null,
-    taskId = null,
-    // Virtual-present tools injected by an active canvas Tool station (Phase 4):
-    // a `{ systemId, componentIds }` payload whose componentIds satisfy a tool
-    // prerequisite WITHOUT an owned item (and are excluded from breakage/usage)
-    // ONLY for tasks in the matching crafting system — componentId is per-system.
-    presentTools = null,
-    // Optional scene-interactable ref ({sceneId, regionId, behaviorId}) when the
-    // attempt was opened against an interactable that owns its own scoped node
-    // pool (issue 302). Null for the default environment-scoped flow.
-    interactableRef = null,
-    // Opt-in interactive roll (UI-triggered attempt): surfaces the confirm-roll
-    // dialog + posts the roll to chat for the routed/progressive check paths.
-    // Defaults false so the programmatic API and timed maturation stay silent.
-    interactive = false,
-  } = {}) {
+  async startAttempt(
+    {
+      viewer = null,
+      actor = null,
+      rememberedActorId = null,
+      environmentId = null,
+      taskId = null,
+      // Virtual-present tools injected by an active canvas Tool station (Phase 4):
+      // a `{ systemId, componentIds }` payload whose componentIds satisfy a tool
+      // prerequisite WITHOUT an owned item (and are excluded from breakage/usage)
+      // ONLY for tasks in the matching crafting system — componentId is per-system.
+      presentTools = null,
+      // Optional scene-interactable ref ({sceneId, regionId, behaviorId}) when the
+      // attempt was opened against an interactable that owns its own scoped node
+      // pool (issue 302). Null for the default environment-scoped flow.
+      interactableRef = null,
+      // Opt-in interactive roll (UI-triggered attempt): surfaces the confirm-roll
+      // dialog + posts the roll to chat for the routed/progressive check paths.
+      // Defaults false so the programmatic API and timed maturation stay silent.
+      interactive = false,
+      lifecycleVersion,
+    } = {},
+    versionedContext = null
+  ) {
+    if (versionedContext && versionedContext[VERSIONED_START_CONTEXT] !== true) {
+      return gatheringAuthorityUnavailable();
+    }
+    if (lifecycleVersion !== undefined && !versionedContext) {
+      return lifecycleVersion === 1
+        ? gatheringAuthorityUnavailable()
+        : versionedGatheringFailure('The gathering run lifecycle version is unsupported.');
+    }
     const resolved = await this._resolveStartContext({
       viewer,
       actor,
@@ -804,6 +1193,20 @@ export class GatheringEngine {
         task,
         richAttempt,
         interactableRef,
+        versionedContext,
+      });
+    }
+
+    if (versionedContext) {
+      return this._startReadyVersionedAttempt({
+        viewer,
+        actor: selectedActor,
+        system,
+        environment,
+        task,
+        richAttempt,
+        interactableRef,
+        versionedContext,
       });
     }
 
@@ -820,7 +1223,13 @@ export class GatheringEngine {
     });
   }
 
-  async _processMaturedWaitingRun({ actor, run }) {
+  async _processMaturedWaitingRun({ actor, run, versionedContext = null }) {
+    if (getRunLifecycleContract(run) === 'current' && !versionedContext) {
+      throw gatheringLifecycleError(
+        'Versioned gathering execution requires authority',
+        'AUTHORITY_UNAVAILABLE'
+      );
+    }
     const viewer = await this._viewerForRun({ actor, run });
     // A blind run's task and start-time snapshot live in the GM-owned blind-run
     // store, not on the actor flag. Fold them back in here so the whole maturity
@@ -830,12 +1239,18 @@ export class GatheringEngine {
     const resolvedRun = this._hydrateBlindWaitingRun(run);
     const resolved = this._resolveWaitingRunContext({ actor, run: resolvedRun });
     if (resolved.missingReference) {
+      if (versionedContext) {
+        return versionedGatheringFailure('The gathering references are stale.');
+      }
       return this._cancelMissingReferenceRun({ viewer, actor, run: resolvedRun, resolved });
     }
 
     const { system, environment, task, interactableRef } = resolved;
     const configuration = this._validateStartTask(task, system);
     if (configuration.valid !== true) {
+      if (versionedContext) {
+        return versionedGatheringFailure('The gathering task configuration is invalid.');
+      }
       return this._clearMisconfiguredWaitingRun({
         viewer,
         actor,
@@ -852,8 +1267,12 @@ export class GatheringEngine {
       system,
       environment,
       task,
+      resolvedCheckResult: versionedContext?.resolvedCheckResult ?? null,
     });
     if (outcome.status === 'misconfigured') {
+      if (versionedContext) {
+        return versionedGatheringFailure('The gathering outcome could not be resolved.');
+      }
       return this._clearMisconfiguredWaitingRun({
         viewer,
         actor,
@@ -875,6 +1294,9 @@ export class GatheringEngine {
       checkResult,
     });
     if (plan.status === 'misconfigured') {
+      if (versionedContext) {
+        return versionedGatheringFailure('The gathering effects could not be planned.');
+      }
       return this._clearMisconfiguredWaitingRun({
         viewer,
         actor,
@@ -895,6 +1317,25 @@ export class GatheringEngine {
       checkResult,
       plan,
     });
+    if (versionedContext) {
+      return this._persistAndApplyVersionedTerminal({
+        viewer,
+        actor,
+        system,
+        environment,
+        task,
+        outcome,
+        checkResult,
+        plan,
+        runData,
+        payload,
+        activeRun: resolvedRun,
+        interactableRef,
+        versionedContext,
+        phase: maturityCommitPhase(run),
+        initiatedBy: 'timed',
+      });
+    }
     const completedRun = await this.runManager.completeRun(
       actor,
       resolvedRun,
@@ -2376,6 +2817,76 @@ export class GatheringEngine {
     };
   }
 
+  async _startReadyVersionedAttempt({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    richAttempt,
+    interactableRef,
+    versionedContext,
+  }) {
+    if (typeof this.runManager?.createRun !== 'function') {
+      return versionedGatheringFailure('Gathering runs are unavailable.');
+    }
+    const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
+    const runData = this._waitingRunData({
+      system,
+      environment,
+      task,
+      richAttempt,
+      viewer,
+      interactableRef,
+      opaqueBlind,
+      versionedContext,
+    });
+    const blindGuard = opaqueBlind
+      ? this._blindWaitingStartGuard({ viewer, actor, environment, task, runData })
+      : null;
+    if (blindGuard) return blindGuard;
+
+    try {
+      const run = await this.runManager.createRun(actor, runData);
+      const secret = await this._recordBlindRunSecret({
+        run,
+        actor,
+        system,
+        environment,
+        task,
+        interactableRef,
+        opaqueBlind,
+      });
+      if (secret === false) {
+        await this.runManager.clearActiveRun(actor, run.id);
+        return versionedGatheringFailure('The blind gathering run could not be recorded.');
+      }
+      const richEvidence = await this._commitRichAttempt({
+        actor,
+        system,
+        environment,
+        task: waitingStartCommitTask(task, opaqueBlind),
+        outcome: { status: 'inProgress' },
+        viewer,
+        interactableRef,
+        phase: 'waitingStart',
+      });
+      const readyRun = mergeRunEconomyEvidence(run, richEvidence);
+      return this._startedVersionedReadyStart({
+        viewer,
+        actor,
+        system,
+        environment,
+        task,
+        run: readyRun,
+      });
+    } catch (error) {
+      return versionedGatheringFailure(
+        stringOrNull(error?.message) || 'The gathering run could not be started.'
+      );
+    }
+  }
+
   async _startWaitingAttempt({
     viewer,
     actor,
@@ -2384,6 +2895,7 @@ export class GatheringEngine {
     task,
     richAttempt = null,
     interactableRef = null,
+    versionedContext = null,
   }) {
     if (typeof this.runManager?.createWaitingRun !== 'function') {
       return this._blockedStart({
@@ -2411,6 +2923,7 @@ export class GatheringEngine {
       viewer,
       interactableRef,
       opaqueBlind,
+      versionedContext,
     });
     const blindGuard = opaqueBlind
       ? this._blindWaitingStartGuard({ viewer, actor, environment, task, runData })
@@ -2546,6 +3059,7 @@ export class GatheringEngine {
     viewer = null,
     interactableRef = null,
     opaqueBlind = false,
+    versionedContext = null,
   }) {
     const runData = {
       craftingSystemId: stringOrNull(system.id),
@@ -2559,6 +3073,10 @@ export class GatheringEngine {
       // which is right for the direct in-session start that supplies no viewer.
       userId: idOf(viewer),
     };
+    if (versionedContext) {
+      runData.lifecycleVersion = 1;
+      runData.completionMode = versionedContext.completionMode || 'manual';
+    }
     // Persist the scene-interactable ref so a timed run that matures later
     // decrements the SAME scoped node it gated against (issue 302). Null/absent
     // for the environment-scoped flow (no behaviour stored).
@@ -2887,7 +3405,15 @@ export class GatheringEngine {
     });
   }
 
-  async _resolveTaskOutcome({ viewer, actor, system, environment, task, interactive = false }) {
+  async _resolveTaskOutcome({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    interactive = false,
+    resolvedCheckResult = null,
+  }) {
     let outcome;
     switch (task.resolutionMode) {
       case 'straight': {
@@ -2909,10 +3435,17 @@ export class GatheringEngine {
           environment,
           task,
           interactive,
+          resolvedCheckResult,
         });
       }
       default: {
-        outcome = await this._resolveRoutedOutcome({ actor, system, task, interactive });
+        outcome = await this._resolveRoutedOutcome({
+          actor,
+          system,
+          task,
+          interactive,
+          resolvedCheckResult,
+        });
       }
     }
     return this._resolveEnvironmentalEventsForOutcome({
@@ -3138,6 +3671,272 @@ export class GatheringEngine {
     });
   }
 
+  async _persistAndApplyVersionedTerminal({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    outcome,
+    checkResult,
+    plan,
+    runData,
+    payload,
+    activeRun,
+    interactableRef,
+    versionedContext,
+    phase,
+    initiatedBy,
+  }) {
+    const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
+    const state = { run: null, richEvidence: null, complications: [], response: null };
+    const definitions = this._versionedGatheringEffects({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      outcome,
+      checkResult,
+      plan,
+      activeRun,
+      interactableRef,
+      phase,
+      initiatedBy,
+      opaqueBlind,
+      state,
+    });
+    const executionPlan = {
+      operationId: versionedContext.operationId,
+      requestId: versionedContext.requestId,
+      baseRunRevision: activeRun.runRevision,
+      intent: {
+        activity: 'gathering',
+        trigger: versionedContext.trigger || 'manual',
+        status: outcome.status,
+        taskId: opaqueBlind ? 'blind' : stringOrNull(task.id),
+      },
+      effects: definitions.map(({ effectId, kind, planned }) => ({ effectId, kind, planned })),
+    };
+    state.run = await this.runManager.completeRun(actor, activeRun, outcome.status, payload, {
+      terminalRunData: runData,
+      executionPlan,
+      expectedRevision: activeRun.runRevision,
+      executionOperationId: versionedContext.operationId,
+    });
+    if (!state.run) {
+      throw gatheringLifecycleError(
+        'Gathering terminal history was not written',
+        'TERMINAL_HISTORY_NOT_WRITTEN'
+      );
+    }
+
+    for (const definition of definitions) {
+      await this._applyVersionedGatheringEffect({
+        actor,
+        definition,
+        operationId: versionedContext.operationId,
+        state,
+      });
+    }
+    state.run = await this.runManager.updateExecutionJournal(
+      actor,
+      state.run.id,
+      { type: 'commit', outcome: versionedJournalOutcome(state.response) },
+      {
+        expectedRevision: state.run.runRevision,
+        executionOperationId: versionedContext.operationId,
+      }
+    );
+    return refreshVersionedTerminalResponse(state.response, state.run, {
+      opaqueBlind,
+      createdResults: plan.createdResults,
+      usedTools: plan.usedTools ?? [],
+      checkResult,
+    });
+  }
+
+  _versionedGatheringEffects(context) {
+    const {
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      outcome,
+      checkResult,
+      plan,
+      activeRun,
+      interactableRef,
+      phase,
+      initiatedBy,
+      opaqueBlind,
+      state,
+    } = context;
+    const safeResults = opaqueBlind ? [] : plan.createdResults;
+    const safeTools = opaqueBlind ? [] : (plan.usedTools ?? []);
+    const effects = [
+      versionedEffect('economy', 'commitGatheringEconomy', { phase }, async () => {
+        state.richEvidence = await this._commitRichAttempt({
+          actor,
+          system,
+          environment,
+          task,
+          outcome,
+          viewer,
+          interactableRef,
+          phase,
+        });
+        return opaqueBlind ? { applied: true } : (cloneJson(state.richEvidence) ?? null);
+      }),
+    ];
+    if (awardsResultsFor(outcome, system)) {
+      effects.push(
+        versionedEffect('results', 'createGatheredResults', safeResults, async () => {
+          const created = await this._createGatheredResults({
+            viewer,
+            actor,
+            system,
+            environment,
+            task,
+            outcome,
+          });
+          const actual = normalizeRunItems(created, { actor });
+          return opaqueBlind ? { count: actual.length } : actual;
+        }),
+        versionedEffect('complications', 'fireGatheringComplications', null, async () => {
+          const fired = await this._fireGatheringComplications({ actor, system, task, outcome });
+          state.complications = publicComplications(fired?.fired);
+          return opaqueBlind ? { count: state.complications.length } : state.complications;
+        })
+      );
+    }
+    effects.push(
+      versionedEffect('tools', 'applyGatheringTools', safeTools, async () => {
+        const applied = await this._applyTerminalTools({
+          viewer,
+          actor,
+          system,
+          environment,
+          task,
+          outcome,
+        });
+        const actual = cloneJson(normalizeList(applied));
+        return opaqueBlind ? { count: actual.length } : actual;
+      })
+    );
+    if (outcome.status === 'failed') {
+      effects.push(
+        versionedEffect('failure', 'applyGatheringFailure', null, async () => {
+          const applied = await this._applyFailureFeedback({
+            viewer,
+            actor,
+            system,
+            environment,
+            task,
+            outcome,
+            checkResult,
+          });
+          return opaqueBlind ? { applied: true } : (cloneJson(applied) ?? { applied: true });
+        })
+      );
+    }
+    effects.push(
+      versionedEffect('events', 'applyGatheringEvents', null, async () => {
+        const applied = await this.eventSceneTrigger?.apply?.({
+          events: checkResult?.events,
+          viewer,
+          actor,
+          system,
+          environment,
+          task,
+        });
+        const receipt = {
+          applied: true,
+          eventCount: normalizeList(checkResult?.events).length,
+        };
+        if (!opaqueBlind && applied !== undefined) receipt.result = cloneJson(applied);
+        return receipt;
+      })
+    );
+    if (activeRun) {
+      effects.push(
+        versionedEffect('reservation', 'releaseGatheringReservation', null, async () => ({
+          released: Boolean(await this._releaseBlindReservation(activeRun)),
+        }))
+      );
+    }
+    effects.push(
+      versionedEffect('presentation', 'publishGatheringCompletion', null, async () => {
+        const displayRun = mergeRunEconomyEvidence(state.run, state.richEvidence);
+        state.response = await this._terminalStart({
+          viewer,
+          actor,
+          system,
+          environment,
+          task,
+          status: outcome.status,
+          run: displayRun,
+          createdResults: plan.createdResults,
+          usedTools: plan.usedTools ?? [],
+          checkResult,
+          complications: state.complications,
+          initiatedBy,
+        });
+        return versionedJournalOutcome(state.response);
+      })
+    );
+    return effects;
+  }
+
+  async _applyVersionedGatheringEffect({ actor, definition, operationId, state }) {
+    state.run = await this.runManager.updateExecutionJournal(
+      actor,
+      state.run.id,
+      { type: 'effectApplying', effectId: definition.effectId },
+      { expectedRevision: state.run.runRevision, executionOperationId: operationId }
+    );
+    let receipt;
+    try {
+      receipt = (await definition.apply()) ?? null;
+    } catch (error) {
+      await this._markVersionedGatheringRecovery(actor, state.run, operationId);
+      throw gatheringLifecycleError(
+        `Gathering effect "${definition.effectId}" requires recovery`,
+        'RECOVERY_REQUIRED',
+        error
+      );
+    }
+    try {
+      state.run = await this.runManager.updateExecutionJournal(
+        actor,
+        state.run.id,
+        { type: 'effectApplied', effectId: definition.effectId, receipt },
+        { expectedRevision: state.run.runRevision, executionOperationId: operationId }
+      );
+    } catch (error) {
+      await this._markVersionedGatheringRecovery(actor, state.run, operationId);
+      throw gatheringLifecycleError(
+        `Gathering effect "${definition.effectId}" receipt could not be persisted`,
+        'RECOVERY_REQUIRED',
+        error
+      );
+    }
+  }
+
+  async _markVersionedGatheringRecovery(actor, run, operationId) {
+    try {
+      await this.runManager.updateExecutionJournal(
+        actor,
+        run.id,
+        { type: 'recoveryRequired' },
+        { expectedRevision: run.runRevision, executionOperationId: operationId }
+      );
+    } catch {
+      // The persisted applying phase already prevents replay if recovery persistence fails.
+    }
+  }
+
   async _commitTerminalSideEffects({
     viewer,
     actor,
@@ -3199,7 +3998,13 @@ export class GatheringEngine {
     return { complications };
   }
 
-  async _resolveRoutedOutcome({ actor, system, task, interactive = false }) {
+  async _resolveRoutedOutcome({
+    actor,
+    system,
+    task,
+    interactive = false,
+    resolvedCheckResult = null,
+  }) {
     // Routed gathering resolves exclusively through the system-level gathering
     // check (Checks editor): roll the configured routed formula and map its total
     // onto a named outcome tier, then route that tier name to a result group by
@@ -3221,6 +4026,7 @@ export class GatheringEngine {
       system,
       task,
       interactive,
+      resolvedCheckResult,
     });
   }
 
@@ -3242,33 +4048,36 @@ export class GatheringEngine {
     system = null,
     task,
     interactive = false,
+    resolvedCheckResult = null,
   }) {
     const dc = this._resolveGatheringRoutedDc(routed, task);
     // Gathering has no tool-bonus seam, so nothing is appended before the modifier term.
     const craftingModifier = buildCheckModifierContext(system, 'gathering', task);
-    const rolled = await runFormulaRouted({
-      formula: rollFormula,
-      dc,
-      thresholdMode: routed.thresholdMode,
-      type: routed.type,
-      relativeOutcomes: routed.relativeOutcomes,
-      fixedOutcomes: routed.fixedOutcomes,
-      triggers: routed.checkBreakage?.triggers,
-      actor,
-      label: 'Gathering',
-      craftingModifier,
-      // Clamp a below-lowest relative total to the closest tier (as crafting/salvage);
-      // a per-task dcOverride never opens a null-outcome dead zone.
-      clampToNearest: true,
-      rollOptions: buildInteractiveRollOptions({
-        interactive,
-        actor,
-        name: task?.name,
-        activity: 'Gathering',
-        img: task?.img,
+    const rolled =
+      resolvedCheckResult ??
+      (await runFormulaRouted({
+        formula: rollFormula,
         dc,
-      }),
-    });
+        thresholdMode: routed.thresholdMode,
+        type: routed.type,
+        relativeOutcomes: routed.relativeOutcomes,
+        fixedOutcomes: routed.fixedOutcomes,
+        triggers: routed.checkBreakage?.triggers,
+        actor,
+        label: 'Gathering',
+        craftingModifier,
+        // Clamp a below-lowest relative total to the closest tier (as crafting/salvage);
+        // a per-task dcOverride never opens a null-outcome dead zone.
+        clampToNearest: true,
+        rollOptions: buildInteractiveRollOptions({
+          interactive,
+          actor,
+          name: task?.name,
+          activity: 'Gathering',
+          img: task?.img,
+          dc,
+        }),
+      }));
 
     // The player cancelled the interactive roll: propagate a cancelled outcome so
     // `_resolveImmediateAttempt` aborts with zero mutation.
@@ -3465,15 +4274,18 @@ export class GatheringEngine {
     environment,
     task,
     interactive = false,
+    resolvedCheckResult = null,
   }) {
-    const checkResult = await this._evaluateGatheringCheck({
-      actor,
-      viewer,
-      system,
-      environment,
-      task,
-      interactive,
-    });
+    const checkResult =
+      resolvedCheckResult ??
+      (await this._evaluateGatheringCheck({
+        actor,
+        viewer,
+        system,
+        environment,
+        task,
+        interactive,
+      }));
     // The player cancelled the interactive roll: propagate a cancelled outcome so
     // `_resolveImmediateAttempt` aborts with zero mutation (before normalization,
     // which does not model a cancel).
@@ -4182,6 +4994,24 @@ export class GatheringEngine {
       runStatus: stringOrNull(run?.status) || 'waitingTime',
       timeGate: plainObjectOrNull(run?.timeGate),
       run: publicRun,
+      blockedReasons: [],
+    };
+  }
+
+  _startedVersionedReadyStart({ viewer, actor, system, environment, task, run }) {
+    const opaqueBlind = this._isOpaqueBlindTask({ environment, viewer });
+    return {
+      accepted: true,
+      started: true,
+      state: 'ready',
+      viewerId: idOf(viewer),
+      actorId: idOf(actor),
+      craftingSystemId: stringOrNull(system.id),
+      environmentId: stringOrNull(environment.id),
+      taskId: opaqueBlind ? null : stringOrNull(task.id),
+      runId: stringOrNull(run?.id),
+      runStatus: stringOrNull(run?.status) || 'inProgress',
+      run: opaqueBlind ? redactBlindRun(run) : stripRuntimeSnapshotFromRun(run),
       blockedReasons: [],
     };
   }
@@ -4965,6 +5795,83 @@ function normalizeRunItems(items, { actor = null } = {}) {
       // pre-creation identity.
       .filter((item) => item.actorUuid && (item.itemUuid || item.componentId))
   );
+}
+
+function gatheringTaskRequiresPlayerCheck(task) {
+  return ['routed', 'progressive'].includes(stringOrNull(task?.resolutionMode));
+}
+
+function versionedEffect(effectId, kind, planned, apply) {
+  return { effectId, kind, planned: cloneJson(planned) ?? null, apply };
+}
+
+function mergeRunEconomyEvidence(run, richEvidence) {
+  if (!richEvidence || typeof richEvidence !== 'object') return run;
+  return {
+    ...run,
+    economyEvidence: {
+      ...plainObjectOrNull(run?.economyEvidence),
+      ...richEvidence,
+    },
+  };
+}
+
+function versionedJournalOutcome(response) {
+  if (!response || typeof response !== 'object') return null;
+  const outcome = { ...response };
+  delete outcome.run;
+  outcome.success ??= outcome.accepted === true;
+  return cloneJson(outcome);
+}
+
+function refreshVersionedTerminalResponse(
+  response,
+  run,
+  { opaqueBlind, createdResults, usedTools, checkResult }
+) {
+  if (!response || typeof response !== 'object') return asVersionedGatheringResult(response);
+  const publicRun = opaqueBlind
+    ? redactBlindTerminalRun(run)
+    : enrichPublicTerminalRun(stripRuntimeSnapshotFromRun(run), {
+        createdResults,
+        usedTools,
+        checkResult,
+      });
+  return {
+    ...response,
+    success: true,
+    runStatus: run?.status ?? response.runStatus,
+    run: publicRun,
+  };
+}
+
+function asVersionedGatheringResult(result) {
+  if (!result || typeof result !== 'object') return versionedGatheringFailure('Gathering failed.');
+  if (Object.hasOwn(result, 'success')) return result;
+  return { ...result, success: result.accepted === true };
+}
+
+function versionedGatheringFailure(message, code = 'GATHERING_EXECUTION_REFUSED') {
+  return {
+    success: false,
+    accepted: false,
+    started: false,
+    state: 'blocked',
+    code,
+    message,
+    blockedReasons: [],
+  };
+}
+
+function gatheringAuthorityUnavailable() {
+  return versionedGatheringFailure(
+    'Versioned gathering authority is unavailable.',
+    'AUTHORITY_UNAVAILABLE'
+  );
+}
+
+function gatheringLifecycleError(message, code, cause = null) {
+  return new GatheringLifecycleExecutionError(message, code, cause);
 }
 
 function normalizeOutcomeText(value) {

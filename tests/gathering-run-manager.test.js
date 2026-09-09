@@ -236,6 +236,32 @@ test('GatheringRunManager preserves explicit lifecycle v1 state and pause prefer
   assert.equal(manual.runRevision, 3);
 });
 
+test('GatheringRunManager exposes only legacy and opted-in world-time runs for automatic completion', async () => {
+  const actor = new FakeActor();
+  const runs = manager({ getActors: () => [actor], nowWorldTime: () => 1000 });
+  await runs.createWaitingRun(actor, runData({ taskId: 'legacy' }), {
+    requiredSeconds: 10,
+    initiatedAt: 0,
+    availableAt: 10,
+  });
+  await runs.createWaitingRun(
+    actor,
+    runData({ taskId: 'manual', lifecycleVersion: 1, completionMode: 'manual' }),
+    { requiredSeconds: 10, initiatedAt: 0, availableAt: 10 }
+  );
+  const automatic = await runs.createWaitingRun(
+    actor,
+    runData({ taskId: 'automatic', lifecycleVersion: 1, completionMode: 'worldTime' }),
+    { requiredSeconds: 10, initiatedAt: 0, availableAt: 10 }
+  );
+
+  assert.deepEqual(
+    runs.getMaturedWaitingRuns(10).map(({ run }) => run.taskId).sort(),
+    ['automatic', 'legacy']
+  );
+  assert.equal(runs.canExecuteRun(automatic, 10), true);
+});
+
 test('GatheringRunManager allows a paused v1 run to be cancelled', async () => {
   const actor = new FakeActor();
   const runs = manager();
@@ -294,20 +320,27 @@ test('GatheringRunManager updates execution evidence in terminal history by run 
   await runs.updateExecutionJournal(terminal.actorUuid && actor, terminal.id, {
     type: 'plan',
     plan,
-  });
+  }, { expectedRevision: 0 });
+  await assert.rejects(
+    () => runs.updateExecutionJournal(actor, terminal.id, {
+      type: 'effectApplying',
+      effectId: 'award',
+    }, { expectedRevision: 1, executionOperationId: 'wrong-operation' }),
+    (error) => error.code === 'EXECUTION_OPERATION_MISMATCH'
+  );
   await runs.updateExecutionJournal(actor, terminal.id, {
     type: 'effectApplying',
     effectId: 'award',
-  });
+  }, { expectedRevision: 1, executionOperationId: 'operation-1' });
   await runs.updateExecutionJournal(actor, terminal.id, {
     type: 'effectApplied',
     effectId: 'award',
     receipt: { itemUuid: 'Item.herb' },
-  });
+  }, { expectedRevision: 2, executionOperationId: 'operation-1' });
   const committed = await runs.updateExecutionJournal(actor, terminal.id, {
     type: 'commit',
     outcome: { status: 'succeeded' },
-  });
+  }, { expectedRevision: 3, executionOperationId: 'operation-1' });
 
   assert.equal(committed.executionJournal.status, 'committed');
   assert.deepEqual(committed.executionJournal.effects[0].receipt, { itemUuid: 'Item.herb' });
