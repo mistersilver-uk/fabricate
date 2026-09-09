@@ -335,13 +335,8 @@ export class GatheringEngine {
    * constructor already sits at the cognitive-complexity ceiling, and the repo's rule is
    * to extract rather than add one more branch to a giant.
    *
-   * DORMANT ON ARRIVAL, like the three seams already noted in this file. Progressive
-   * gathering is unreachable from any GM-selectable configuration —
-   * `_libraryTaskToRuntimeTask` hardcodes `resolutionMode: 'd100'` and
-   * `GatheringEconomyView` renders both formula-rolled modes disabled, pending issue 683
-   * — so nothing a GM can configure today reaches the firing site this writer serves. It
-   * lands anyway so the shape is complete on arrival rather than half-threaded, and so
-   * issue 683 flips one switch.
+   * Progressive gathering remains unavailable from the current authoring surface, so this
+   * writer is reached only through legacy or externally-authored progressive tasks for now.
    *
    * @param {object} deps
    * @param {?{deliver: (args: object) => boolean}} [deps.writer] The delivery writer
@@ -371,12 +366,10 @@ export class GatheringEngine {
    * FIRE the component complications a committed progressive gathering award earned
    * (issue 1286).
    *
-   * ## Ships dormant, and its test must drive this path DIRECTLY
+   * ## Progressive authoring remains dormant, and its test drives this path directly
    *
-   * `_resolveProgressiveOutcome` is unreachable from any GM-selectable configuration
-   * (see {@link installComplicationDelivery}), so an end-to-end gathering test of this
-   * would pass VACUOUSLY — it would assert that nothing fires on a d100 attempt, which
-   * is true whether or not any of this works. The suite therefore drives
+   * The current gathering authoring surface does not expose progressive tasks (see
+   * {@link installComplicationDelivery}). The suite therefore drives
    * `_resolveProgressiveOutcome` and `_commitTerminalSideEffects` directly, exactly as
    * the other dormant seams in this file are exercised.
    *
@@ -2571,7 +2564,7 @@ export class GatheringEngine {
     // for the environment-scoped flow (no behaviour stored).
     const persistedRef = normalizeInteractableRef(interactableRef);
     if (persistedRef) runData.interactableRef = persistedRef;
-    if (hasRichGatheringData(environment, task) || task.resolutionMode === 'd100') {
+    if (!opaqueBlind || hasRichGatheringData(environment, task) || task.resolutionMode === 'd100') {
       const richPayload = this._richHistoryPayload({ environment, task, richAttempt, viewer });
       if (opaqueBlind) {
         richPayload.riskLevel = stringOrNull(environment?.risk) || 'safe';
@@ -2895,27 +2888,86 @@ export class GatheringEngine {
   }
 
   async _resolveTaskOutcome({ viewer, actor, system, environment, task, interactive = false }) {
-    if (task.resolutionMode === 'straight') {
-      return {
-        status: 'succeeded',
-        resultGroups: normalizeList(task.resultGroups),
-        checkResult: null,
-      };
+    let outcome;
+    switch (task.resolutionMode) {
+      case 'straight': {
+        outcome = {
+          status: 'succeeded',
+          resultGroups: normalizeList(task.resultGroups),
+          checkResult: null,
+        };
+        break;
+      }
+      case 'd100': {
+        return this._resolveD100Outcome({ viewer, actor, system, environment, task, interactive });
+      }
+      case 'progressive': {
+        return this._resolveProgressiveOutcome({
+          viewer,
+          actor,
+          system,
+          environment,
+          task,
+          interactive,
+        });
+      }
+      default: {
+        outcome = await this._resolveRoutedOutcome({ actor, system, task, interactive });
+      }
     }
-    if (task.resolutionMode === 'd100') {
-      return this._resolveD100Outcome({ viewer, actor, system, environment, task, interactive });
-    }
-    if (task.resolutionMode === 'progressive') {
-      return this._resolveProgressiveOutcome({
-        viewer,
-        actor,
-        system,
-        environment,
-        task,
-        interactive,
+    return this._resolveEnvironmentalEventsForOutcome({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      outcome,
+    });
+  }
+
+  async _resolveEnvironmentalEventsForOutcome({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    outcome,
+  }) {
+    if (!['succeeded', 'failed'].includes(outcome?.status)) return outcome;
+    if (typeof this.richState?.resolveEnvironmentalEvents !== 'function') return outcome;
+    const eventModifier = Number(
+      environment?.eventModifier?.value ?? environment?.eventModifier ?? 0
+    );
+    const resolved = await this.richState.resolveEnvironmentalEvents({
+      task,
+      environment,
+      actor,
+      viewer,
+      system,
+      eventModifier: Number.isFinite(eventModifier) ? eventModifier : 0,
+    });
+    if (resolved?.status === 'misconfigured') {
+      return misconfiguredOutcome({
+        code: 'CHARACTER_MODIFIER_MISCONFIGURED',
+        diagnostics: normalizeList(resolved.diagnostics),
       });
     }
-    return this._resolveRoutedOutcome({ actor, system, task, interactive });
+
+    const characterModifierSnapshot = mergeCharacterModifierSnapshots(
+      outcome.characterModifierSnapshot,
+      resolved?.characterModifierSnapshot
+    );
+    return {
+      ...outcome,
+      status: resolved?.status === 'failed' ? 'failed' : outcome.status,
+      characterModifierSnapshot,
+      checkResult: {
+        ...plainObjectOrNull(outcome.checkResult),
+        events: normalizeList(resolved?.events),
+        eventPolicy: stringOrNull(resolved?.eventPolicy),
+        characterModifierSnapshot,
+      },
+    };
   }
 
   async _terminalSideEffectPlan({
@@ -3486,10 +3538,8 @@ export class GatheringEngine {
     const progressive = system?.gatheringCraftingCheck?.progressive;
     const rollFormula = stringOrNull(progressive?.rollFormula);
     if (rollFormula) {
-      // DORMANT, exactly as the routed seam above is (issue 1095, decision 8): progressive
-      // gathering is rendered `disabled` in the economy editor and no runtime task ever
-      // carries the mode, so this modifier context is unreachable pending issue 683. It
-      // lands now so the shape is complete on arrival rather than half-threaded.
+      // Progressive gathering remains unavailable from the current authoring surface, but
+      // legacy and externally-authored runtime tasks can still reach this compatibility path.
       const rolled = await runFormulaProgressive({
         formula: rollFormula,
         triggers: progressive.checkBreakage?.triggers,
@@ -4496,10 +4546,6 @@ function hasAwardedResults(resultGroups) {
  *    `normalizeTerminalOutcome` only for the routed failure seam, and d100 outcomes do
  *    not pass through it at all.
  *
- * THE WHOLE PATH SHIPS DORMANT pending issue 683 (decision 8): `_libraryTaskToRuntimeTask`
- * hardcodes `resolutionMode: 'd100'` and `GatheringEconomyView` renders both
- * formula-rolled modes disabled, so no configuration a GM can select reaches it today.
- *
  * @param {?{status?: string, resultGroups?: Array}} outcome
  * @param {?object} system
  * @returns {boolean}
@@ -4510,6 +4556,15 @@ function awardsResultsFor(outcome, system) {
   if (outcome?.failureAward !== true) return false;
   if (!activityPermitsFailureResults(system, 'gathering')) return false;
   return normalizeList(outcome?.resultGroups).length > 0;
+}
+
+function mergeCharacterModifierSnapshots(base, environmental) {
+  const baseSnapshot = plainObjectOrNull(base) ?? {};
+  const environmentalSnapshot = plainObjectOrNull(environmental) ?? {};
+  return {
+    rows: normalizeList(baseSnapshot.rows),
+    events: normalizeList(environmentalSnapshot.events),
+  };
 }
 
 function normalizeVisibilityResult(result) {
@@ -4562,6 +4617,9 @@ function validateTaskConfiguration(task, system = null) {
   }
   if (resolutionMode !== 'd100') {
     errors.push(...validateResultGroupNames(resultGroups));
+    if (hasInvalidFixedResultQuantity(resultGroups)) {
+      errors.push('Gathering results require finite positive numeric quantities');
+    }
   }
 
   if (resolutionMode === 'd100') {
@@ -4626,6 +4684,19 @@ function validateTaskConfiguration(task, system = null) {
   }
 
   return errors;
+}
+
+function hasInvalidFixedResultQuantity(resultGroups) {
+  return resultGroups.some((group) =>
+    normalizeList(group?.results).some((result) => {
+      if (!result || typeof result !== 'object' || !Object.hasOwn(result, 'quantity')) return false;
+      return (
+        typeof result.quantity !== 'number' ||
+        !Number.isFinite(result.quantity) ||
+        result.quantity <= 0
+      );
+    })
+  );
 }
 
 function validateFailureOutcome(failureOutcome) {
@@ -4847,6 +4918,7 @@ function hasRichGatheringData(environment, task) {
       stringOrNull(value)
     ) ||
     task?.nodes ||
+    normalizeList(environment?.events).length > 0 ||
     Number(task?.staminaCost || 0) > 0 ||
     stringOrNull(task?.riskOverride) ||
     task?.encounters ||

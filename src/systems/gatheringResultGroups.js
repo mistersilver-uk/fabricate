@@ -1,5 +1,13 @@
 import { Result } from '../models/Result.js';
 
+function normalizeResult(result, id) {
+  const normalized = Result.fromJSON({ ...result, id }).toJSON();
+  if (result && typeof result === 'object' && Object.hasOwn(result, 'quantity')) {
+    normalized.quantity = result.quantity;
+  }
+  return normalized;
+}
+
 /**
  * Normalize gathering result groups through the canonical Result serialization contract.
  * Callers own missing-id policy because persisted writes need random ids while read-time
@@ -21,7 +29,7 @@ export function normalizeGatheringResultGroups(
       typeof createId === 'function' ? String(createId(kind, groupIndex, resultIndex) || '') : '';
     if (supplied) return supplied;
     const suffix =
-      resultIndex === null ? `${groupIndex + 1}` : `${groupIndex + 1}-${resultIndex + 1}`;
+      resultIndex === null ? String(groupIndex + 1) : `${groupIndex + 1}-${resultIndex + 1}`;
     return `${fallbackPrefix}-${kind}-${suffix}`;
   };
 
@@ -35,10 +43,7 @@ export function normalizeGatheringResultGroups(
       ...(group?.role === 'failure' && { role: 'failure' }),
       ...(checkOutcomeIds.length > 0 && { checkOutcomeIds }),
       results: (Array.isArray(group?.results) ? group.results : []).map((result, resultIndex) =>
-        Result.fromJSON({
-          ...result,
-          id: result?.id || idFor('result', groupIndex, resultIndex),
-        }).toJSON()
+        normalizeResult(result, result?.id || idFor('result', groupIndex, resultIndex))
       ),
     };
   });

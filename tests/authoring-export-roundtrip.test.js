@@ -216,6 +216,22 @@ test('round-trip: importing keeps other systems’ environments (single-store)',
 
 test('copy-mode: id rebind is self-consistent (env→task linkage preserved)', () => {
   const fixture = buildFullAuthoringFixture();
+  const sourceTask = fixture.gatheringConfig.systems[FIXTURE_SYSTEM_ID].tasks[0];
+  sourceTask.resolutionMode = 'straight';
+  sourceTask.resultGroups = [
+    {
+      id: 'copy-result-group',
+      name: 'Direct yield',
+      results: [
+        {
+          id: 'copy-result',
+          componentId: 'comp-herb',
+          systemItemId: 'comp-herb',
+          quantity: 2
+        }
+      ]
+    }
+  ];
   const h = makeHarness(fixture);
   const first = exportCurrent(h, FIXTURE_SYSTEM_ID);
 
@@ -245,4 +261,10 @@ test('copy-mode: id rebind is self-consistent (env→task linkage preserved)', (
   const taskId = copy.gatheringConfig.system.tasks[0].id;
   const targeted = copy.gatheringEnvironments.find((e) => e.selectionMode === 'targeted');
   assert.ok(targeted.enabledTaskIds.includes(taskId), 'env still references the preserved task id');
+
+  const copiedHerb = copy.system.components.find((component) => component.name === 'Moonleaf');
+  const copiedResult = copy.gatheringConfig.system.tasks[0].resultGroups[0].results[0];
+  assert.notEqual(copiedHerb.id, 'comp-herb', 'copy mode regenerated the component id');
+  assert.equal(copiedResult.componentId, copiedHerb.id);
+  assert.equal(copiedResult.systemItemId, copiedHerb.id);
 });
