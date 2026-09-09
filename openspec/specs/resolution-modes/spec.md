@@ -258,7 +258,8 @@ The player-facing Journal screen (see `ui-integration/spec.md` *Journal App*) ma
 2. `straight` awards all Results in exactly one nonempty authored group without a yield or check roll.
 3. `d100` resolves only drop rows using the shared item-drop roll; hazard rolls remain independent.
 4. `routed` uses `gatheringCraftingCheck.routed` and the existing `failureResultPolicy`.
-An award route requires exactly one group whose trim-normalized, case-insensitive name matches the resolved tier name; missing or duplicate matches are misconfiguration.
+A succeeding tier requires exactly one group whose trim-normalized, case-insensitive name matches the resolved tier name; missing or duplicate matches are misconfiguration.
+A failing tier with no matching group has no authored failure output and awards nothing under every policy; one match is eligible only when the existing failure policy permits it, and multiple matches are misconfiguration.
 Gathering does not use recipe `checkOutcomeIds` as routing authority.
 5. `progressive` retains its distinct accumulated numeric-budget semantics; it is never an alias for routed resolution.
 6. Immediate and matured-waiting execution select the same active result source, and production/reference reporting follows that source.

@@ -1662,8 +1662,8 @@ threshold/outcome-tier configuration) drives resolution:
 4. A failing tier, or no tier name, takes the failure path.
 5. A succeeding tier name must match exactly one `ResultGroup.name` under
    trim-normalized, case-insensitive comparison; the matched group is awarded.
-6. If a succeeding tier name matches zero or multiple result groups, the attempt resolves to the
-   MISCONFIGURED disposition `ROUTED_TIER_UNROUTED`, not to a terminal failure.
+6. A succeeding tier with no match resolves to `ROUTED_TIER_UNROUTED`; more than one match resolves to `ROUTED_TIER_AMBIGUOUS`.
+   Both are misconfiguration, never terminal failure.
    Gathering routes by NAME, so renaming a tier on the system silently unroutes every
    task whose groups were named for the old tier; reporting it as misconfigured surfaces
    the drift on the first roll and — because a misconfigured outcome becomes a blocked
@@ -1711,7 +1711,8 @@ The Checks Studio's gathering On-failure section cross-references it read-only.
 The `d100` branch is untouched.
 
 Task normalization and composition preserve routed mode and authored result groups, so this path executes for routed tasks.
-A policy-permitted failure award requires exactly one normalized name match, just as a successful award does; missing or duplicate matches are misconfiguration.
+A policy-permitted failure result requires exactly one normalized-name match.
+No match means the record authors no failure output and produces nothing, including under `always`; multiple matches resolve to `ROUTED_TIER_AMBIGUOUS` misconfiguration.
 Gathering matches group names, never recipe `checkOutcomeIds`.
 The separate task-authoring controls remain owned by #1648.
 
