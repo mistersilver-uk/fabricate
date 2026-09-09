@@ -552,6 +552,111 @@ const CHECK_PRESENTATION = Object.freeze({
   ],
 });
 
+/**
+ * WHICH PART OF THE EDITOR EACH CHECK IS ABOUT — the ZONE half of a validation row's address
+ * (issue 1517).
+ *
+ * A ZONE rather than a tab id, because this editor has TWO tab sets and they do not share their
+ * spellings. A create draft renders `identity | oncraft | validation`; every essence the world
+ * catalogue holds renders the rules screen's `rules | validation`, where identity is not this
+ * screen's to edit at all and the on-craft cards live on the `rules` tab. Naming a tab here
+ * would be right on one of the two screens and silently wrong on the other.
+ *
+ * THE THREE WORLD-SCOPE CHECKS ARE ABSENT ON PURPOSE. They are answered on the world essence
+ * entry page, which renders this presentation through the same shell and is not this editor;
+ * giving them a zone here would route a GM to a tab that cannot fix them.
+ */
+const CHECK_ZONE = Object.freeze({
+  name: 'identity',
+  icon: 'identity',
+  colour: 'identity',
+  description: 'identity',
+  usage: 'identity',
+  macro: 'oncraft',
+  source: 'oncraft',
+  systemRules: 'oncraft',
+  systemEnabled: 'oncraft',
+  systemEffectSource: 'oncraft',
+  systemMacro: 'oncraft',
+  systemCarrier: 'oncraft',
+});
+
+/**
+ * WHICH CONTROL EACH CHECK NAMES — the `data-validation-target` half (issue 1517).
+ *
+ * The addresses, and the files that carry them:
+ *
+ *  - `essence-name`        -> `EssenceIdentityTab.svelte`, the name input
+ *  - `essence-description` -> `EssenceIdentityTab.svelte`, the description textarea
+ *  - `essence-icon`        -> `EssenceIdentityTab.svelte`, the icon tile and its picker
+ *  - `essence-colour`      -> `EssenceIdentityTab.svelte`, the colour card
+ *  - `essence-source`      -> `EssenceOnCraftTab.svelte`, the effect-source card
+ *  - `essence-macro`       -> `EssenceOnCraftTab.svelte`, the macro card
+ *
+ * ROUTE-ONLY IS A STATED OUTCOME, NOT A SILENT ONE. `usage`, `systemRules`, `systemEnabled` and
+ * `systemCarrier` are each about the RECORD rather than about one control — whether this system
+ * has rules for the essence at all, whether it is enabled here, whether anything carries it —
+ * so they emit a route and no control, and the row action changes tab without moving focus.
+ *
+ * `systemEffectSource` and `systemMacro` reuse the two on-craft addresses because they ARE those
+ * two cards, read at system scope: the same `EssenceOnCraftTab` renders them in both modes.
+ */
+const CHECK_CONTROL = Object.freeze({
+  name: 'essence-name',
+  description: 'essence-description',
+  icon: 'essence-icon',
+  colour: 'essence-colour',
+  macro: 'essence-macro',
+  source: 'essence-source',
+  systemEffectSource: 'essence-source',
+  systemMacro: 'essence-macro',
+});
+
+/**
+ * Resolve one zone onto a tab id THIS editor is actually rendering.
+ *
+ * `oncraft` falls back to `rules` because the rules screen's single authoring tab carries the
+ * on-craft cards; `identity` has NO fallback, because on the rules screen identity belongs to
+ * the world record and the route out to it is the shared-definition callout, not a tab.
+ *
+ * @param {string} zone
+ * @param {readonly string[]} tabIds the tab set the editor is currently rendering.
+ * @returns {string} a tab id, or '' when this screen cannot reach that zone.
+ */
+function zoneRoute(zone, tabIds) {
+  if (zone === 'identity') return tabIds.includes('identity') ? 'identity' : '';
+  if (zone !== 'oncraft') return '';
+  if (tabIds.includes('oncraft')) return 'oncraft';
+  return tabIds.includes('rules') ? 'rules' : '';
+}
+
+/**
+ * The validation row addresses this editor can honour, keyed by check id (issue 1517).
+ *
+ * Keyed by the tab set rather than fixed, because the same check is addressable on one of this
+ * editor's two screens and unreachable on the other. A check whose zone this screen does not
+ * render gets NO entry at all — so its row draws no View button rather than one that changes to
+ * a tab the strip does not contain.
+ *
+ * An empty address produces no key rather than an empty one: the host treats any non-empty
+ * `focusTarget` as a control it must resolve, so `focusTarget: ''` would ask it to query for
+ * something that cannot exist and the row would report as focus-wired while focusing nothing.
+ *
+ * @param {readonly string[]} [tabIds] the tab ids the editor is rendering.
+ * @returns {Record<string, {target: string, focusTarget?: string}>}
+ */
+export function essenceIssueAddresses(tabIds = []) {
+  const rendered = Array.isArray(tabIds) ? tabIds : [];
+  const addresses = {};
+  for (const [id, zone] of Object.entries(CHECK_ZONE)) {
+    const target = zoneRoute(zone, rendered);
+    if (!target) continue;
+    const control = CHECK_CONTROL[id];
+    addresses[id] = control ? { target, focusTarget: control } : { target };
+  }
+  return addresses;
+}
+
 const CHECK_GROUPS = Object.freeze([
   Object.freeze({
     id: 'identity',

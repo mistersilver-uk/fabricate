@@ -271,9 +271,19 @@ describe('design system: a programmatic focus target declares itself focused to 
   // ── THE TWO POPULATIONS THE `tabindex="-1"` CLAUSE NEVER REACHED ────────────────────────
   //
   // `tabindex="-1"` is only ONE of the three ways an element in this corpus can hold focus, and it
-  // is the rarest: 24 elements, all compliant. The other two are 21 role-bearing elements that put
-  // themselves IN the tab order, and 290 buttons with no ancestor form — and not one of the 301
+  // is the rarest: 42 elements, all compliant. The other two are 20 role-bearing elements that put
+  // themselves IN the tab order, and 272 buttons with no ancestor form — and not one of those 292
   // was looked at by anything until issue 1497.
+  //
+  // ALL FOUR FIGURES ARE RE-DERIVED AT ISSUE 1517's REVIEW ROUNDS, by printing the populations
+  // this file's own walk returns. They were 24 / 21 / 290 before the first of them and 41 / 20 /
+  // 273 after it — re-derived once and STILL one out on the largest population, which counts 272.
+  // That is the point: a count in prose is a measurement with no gate on it, and one pass of
+  // re-deriving it is not proof that it landed. The 42nd focus target is the environment editor's
+  // tab panel, declared at issue 1517's docs round when that editor became the sixth host of the
+  // validation row action. The clauses below assert FLOORS rather than these numbers, on purpose
+  // — a population is meant to shrink as the primitives absorb it — so the prose is what has to
+  // be re-measured rather than what fails.
   //
   // The consequence is identical in all three cases and is not about the element handling keys.
   // `KeyboardManager#hasFocus` returns false, so EVERY Foundry keybinding fires while the element
@@ -312,7 +322,7 @@ describe('design system: a programmatic focus target declares itself focused to 
     assert.ok(
       roleZero.length >= 15,
       `only ${roleZero.length} elements carry both a static \`tabindex="0"\` and an interactive ` +
-        'role, against the 20 this tree holds. An absence check over an empty population passes ' +
+        'role, against the 19 this tree holds. An absence check over an empty population passes ' +
         'forever.'
     );
 
@@ -339,7 +349,7 @@ describe('design system: a programmatic focus target declares itself focused to 
     // card action, every tab in a hand-rolled strip is therefore exactly as unrecognised as a bare
     // `div`, which is precisely why `SELF_DECLARING_TAGS` does not contain `button`.
     //
-    // Ten of the 290 already declare and are correctly absent from the baseline. `ActionMenu` is
+    // Thirty-one of the 272 already declare and are correctly absent from the baseline. `ActionMenu` is
     // the one worth naming: it emits the attribute on the trigger it opens with, so a gate keying
     // on the population rather than on the DEBT would have listed it as owing something it does
     // not. This is what a ratchet over compliant sites would get wrong, and it is why the rows are
@@ -352,7 +362,7 @@ describe('design system: a programmatic focus target declares itself focused to 
 
     assert.ok(
       formlessButtons.length >= 200,
-      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 290 ` +
+      `only ${formlessButtons.length} buttons outside a form reached the walk, against the 272 ` +
         'this tree holds'
     );
     assert.ok(

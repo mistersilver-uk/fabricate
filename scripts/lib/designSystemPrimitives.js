@@ -410,12 +410,16 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * under `src/ui/svelte/components/` — `DropZone`, `ImagePathPicker`, `ManagerColorPicker` and
  * `RowDisclosure` — are `'broad'` because that directory leg matches them today whatever anyone
  * thinks of them, which is the point issue 1378 makes: a directory cannot tell a primitive from a
- * component that merely lives there. The other EIGHT are `'targeted'`: the SIX under
+ * component that merely lives there. The other SEVEN are `'targeted'`: the FIVE under
  * `apps/manager/` because membership in the broad set there is by NAME and none of them is on a
  * name list, and `apps/ActorSelectTopBar` and `apps/crafting/ComponentSourcesBar` because the
  * pattern does not reach `apps/` at all — it names `styles/`, `src/ui/svelte/components/`,
  * `src/ui/theme.js` and a NAME LIST under `apps/manager/`, and nothing else.
  * Either way the frames that claim each by `sourceMatches` are reached.
+ *
+ * `environment/EnvironmentValidationTab` stood in that list until issue 1517 and is DELIBERATELY
+ * GONE, not lost: its row left when the tab adopted `EditorValidationSurface`. See the paragraph
+ * below, which records the adjudication that removal overturns.
  *
  * THE FOUR AND FIVE THIS PARAGRAPH USED TO COUNT WERE DRIFT, corrected at issue 1513 against
  * `NOT_A_PRIMITIVE.length`, which `tests/design-system-primitives.test.js` pins at 12. That
@@ -428,16 +432,16 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  *
  * ── THE ROWS THAT ARE NOT UNDER-CALLED CANDIDATES ──────────────────────────────────────────────
  *
- * `SystemOverviewView` and `environment/EnvironmentValidationTab` were added at issue 1444, and
- * `recipe-item/RecipeItemLimitsTab` at issue 1458. They are a different kind of non-member from
- * the caller-count rows: all three are plainly single-caller, but none was proposed as a primitive
- * in its own right. The first two were proposed as unconverted CALL SITES of
+ * `SystemOverviewView` was added at issue 1444, and `recipe-item/RecipeItemLimitsTab` at issue
+ * 1458. They are a different kind of non-member from the caller-count rows: both are plainly
+ * single-caller, but none was proposed as a primitive in its own right. The first was proposed as
+ * an unconverted CALL SITE of
  * `EditorValidationSurface` — the plan that change came from named four hand-rollers of the
- * validation surface and two of them render a different surface entirely — and the third as an
+ * validation surface and two of them render a different surface entirely — and the second as an
  * unconverted call site of `SearchablePopover`. So what each records is the measurement that
  * settles that, not a caller count. The distinction matters because the repair the register exists
  * to prevent is different in each case: for the caller-count rows it is "someone re-proposes
- * promoting this", and for these three it is "someone re-proposes converting this", which would be
+ * promoting this", and for these it is "someone re-proposes converting this", which would be
  * a visual redesign or a change of announced widget filed as an adoption.
  *
  * `apps/crafting/ComponentSourcesBar` WAS THE FOURTH MEMBER OF THIS GROUP AND HAS LEFT IT, at
@@ -452,6 +456,18 @@ export const DESIGN_SYSTEM_PRIMITIVES = frozenTable(MANIFEST.designSystemPrimiti
  * that size is not a shared primitive whichever primitives it reuses.
  * `recipe-item/RecipeItemLimitsTab` is now this group's ONLY member carrying a live
  * `SearchablePopover` adjudication.
+ *
+ * AND A FORMER MEMBER OF THIS GROUP IS AN OVERTURNED ADJUDICATION, WRITTEN OUT RATHER THAN DELETED.
+ * `environment/EnvironmentValidationTab` was recorded at issue 1444 as a DIFFERENT SURFACE rather
+ * than an unconverted one, measured: cards, a tick list and a `Chip` severity, with no status
+ * medallion, no counts rail and no grouped row stack. The measurement was right and the conclusion
+ * no longer follows. `spec.md` asks for ONE validation arrangement on every editor, so a tab that
+ * draws a second one is what that requirement forbids rather than a tab exempt from it — and issue
+ * 1517 converted it onto `EditorValidationSurface`, collapsing its `info` severity into `warn`
+ * because the row vocabulary has no third word. The row is therefore deleted rather than reworded.
+ * An audit that finds the 1444 ruling and re-proposes the conversion is re-proposing something
+ * that has landed; this paragraph is where it learns that, and it is the reason a row may be
+ * removed for being OVERTAKEN as well as for being wrong.
  *
  * `checks/ChecksEditorTabs` was recorded here too and is DELIBERATELY GONE, not lost. It was recorded here by
  * issue 1038 on the ground that its count is a bare mono numeral rather than a chip and "the two

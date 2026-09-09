@@ -19,6 +19,22 @@
   — so that one is a prop. Anything the sites genuinely disagree about is a prop; nothing
   they agree about is restated at a call site.
 
+  ── THE ROW ACTION PASSES STRAIGHT THROUGH (issue 1517) ─────────────────────────────────
+  `onSelectIssue` was already forwarded; `viewDataAttr` and `viewLabel` join it, and all three
+  are FORWARDED rather than owned. What a row action is called and which hook names its route are
+  properties of the CALLER's surface — the Tool editor's rows carry a Tool route and the world
+  entry pages carry none — whereas the count words and the pass/warn labels below genuinely are
+  this shell's, which is why those are localized here and these are not.
+
+  NEITHER IS DEFAULTED HERE. An unpassed prop forwards as `undefined`, so the surface applies its
+  own default — which is what keeps the row action's accessible name in exactly one place. A
+  caller that passes neither therefore reaches the surface with precisely what it reached it with
+  before; four of the five callers pass neither today.
+
+  `focusNonce` is DELIBERATELY UNTOUCHED by this. It scrolls the first BLOCKING row into view when
+  the tab OPENS, which is a property of arriving at the tab rather than of activating one row's
+  action, and exactly one of the five callers opts into it.
+
   ── THE TWO OPT-IN FACES (issue 1371 r11-entry, UX finding F-D) ──────────────────────────
   The world Component entry draws this tab the way the reference does, and the reference's tab
   differs from the four shipped ones in two ways that are NOT a caller's copy decision:
@@ -50,6 +66,9 @@
    - blockLabel: the block row's status word.
    - stackClass: the site's existing wrapper class, kept so no shipped rule stops matching.
    - rowDataAttr: the per-row hook the site's tests read.
+   - viewDataAttr / viewLabel: forwarded verbatim to `EditorValidationSurface`, WITHOUT defaults
+     of their own. See the block below.
+   - onSelectIssue: the row action's `(target, focusTarget)` callback, forwarded to the surface.
    - hookAttribute / hookValue: the wrapper's own `data-*` hook. `hookValue` may be `true`
      for a bare boolean attribute.
    - focusNonce: ticks to scroll the first BLOCKING row into view. It lives here rather than
@@ -74,6 +93,13 @@
     blockLabel = '',
     stackClass = 'manager-scoped-tab-stack',
     rowDataAttr = '',
+    // DECLARED WITHOUT DEFAULTS, deliberately. `EditorValidationSurface` owns both defaults —
+    // the empty hook name and the localization key the row action's name resolves from — and a
+    // default written here would be a SECOND place that name lives, which is how a name and the
+    // word beside it drift apart. An unpassed prop forwards as `undefined`, which is exactly
+    // what makes the surface apply its own.
+    viewDataAttr,
+    viewLabel,
     hookAttribute = '',
     hookValue = true,
     focusNonce = 0,
@@ -184,14 +210,20 @@
   const shownSummary = $derived(verdictSummary ? verdictOf(counts) : summary);
 
   const wrapperAttributes = $derived(hookAttribute ? { [hookAttribute]: hookValue } : {});
+  // THE SHARED VOCABULARY, UNDER ITS OWN NAME AND IN ONE CASING (issue 1517). These five words
+  // were read from the RECIPE editor's namespace by a tab that is not the recipe editor's, and
+  // their fallbacks were `PASS` and `WARNING` where the shipped English — and every other
+  // validation surface — says `Pass` and `Warning`. Both halves are the same defect: one
+  // vocabulary with more than one home drifts, and the fallback is the copy a reader of this file
+  // believes. `block` stays the caller's word: it is the only one a call site chooses.
   const countLabels = $derived({
-    passing: text('FABRICATE.Admin.Manager.Recipe.Validation.CountPassing', 'Passing'),
-    warnings: text('FABRICATE.Admin.Manager.Recipe.Validation.CountWarnings', 'Warnings'),
-    blocking: text('FABRICATE.Admin.Manager.Recipe.Validation.CountBlocking', 'Blocking'),
+    passing: text('FABRICATE.Admin.Manager.Validation.CountPassing', 'Passing'),
+    warnings: text('FABRICATE.Admin.Manager.Validation.CountWarnings', 'Warnings'),
+    blocking: text('FABRICATE.Admin.Manager.Validation.CountBlocking', 'Blocking'),
   });
   const statusLabels = $derived({
-    pass: text('FABRICATE.Admin.Manager.Recipe.Validation.StatusPass', 'PASS'),
-    warn: text('FABRICATE.Admin.Manager.Recipe.Validation.StatusWarn', 'WARNING'),
+    pass: text('FABRICATE.Admin.Manager.Validation.StatusPass', 'Pass'),
+    warn: text('FABRICATE.Admin.Manager.Validation.StatusWarn', 'Warning'),
     block: blockLabel,
   });
 </script>
@@ -205,6 +237,8 @@
     {countLabels}
     {groups}
     {rowDataAttr}
+    {viewDataAttr}
+    {viewLabel}
     {statusLabels}
     {onSelectIssue}
   />

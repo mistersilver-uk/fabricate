@@ -268,7 +268,19 @@
   {/if}
 
   {#if effectTransferEnabled}
-    <section class="manager-edit-card" data-essence-section="effect-source">
+    <!-- THE CONTROL HALF of the validation row action (issue 1517). The `source` warning — and
+         its system-scope twin — is about this card as a whole: the value is reached through a
+         drop zone, a picker or a locked read-only tile depending on state, and no one of the
+         three is present in every failing state. So the card is the destination and
+         `essenceStudio.js` addresses it as `essence-source`. It declares BOTH the tabindex that
+         makes the focus real and the attribute that tells Foundry the window is focused. -->
+    <section
+      class="manager-edit-card"
+      data-essence-section="effect-source"
+      data-validation-target="essence-source"
+      tabindex="-1"
+      data-keyboard-focus="true"
+    >
       <div class="manager-edit-card-heading">
         <h3 class="manager-card-title manager-essence-card-title">
           <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>
@@ -381,7 +393,15 @@
   {/if}
 
   {#if propertyMacrosEnabled}
-    <section class="manager-edit-card" data-essence-section="macro">
+    <!-- THE CONTROL HALF for the `macro` row and its system-scope twin (issue 1517). Same shape
+         and same reason as the effect-source card above; addressed as `essence-macro`. -->
+    <section
+      class="manager-edit-card"
+      data-essence-section="macro"
+      data-validation-target="essence-macro"
+      tabindex="-1"
+      data-keyboard-focus="true"
+    >
       <div class="manager-edit-card-heading">
         <h3 class="manager-card-title manager-essence-card-title">
           <i class="fas fa-code" aria-hidden="true"></i>

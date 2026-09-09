@@ -418,14 +418,14 @@ test('the inputs every property below quantifies over are alive', () => {
   // `library.html` specimen beside the icon chip's.
   // 50 as of issue 1504, which added `components/Select.svelte` — the app's one select, and the
   // first member admitted by BUILDING a library entry rather than by promoting a component that
-  // had quietly crossed the membership bar. The non-member set is unmoved at 12:
+  // had quietly crossed the membership bar. The non-member set was unmoved at 12 by that change:
   // `BulkEditSelect.svelte` stays in it, on issue 1371 r16-list's one-caller ground, and is now a
   // wrapper around the new member rather than around a native `<select>`.
   // 53 as of issue 1505, which added `components/{Kicker,Notice,StatBox}.svelte` — three more
   // members admitted the same way, by BUILDING a library entry rather than by promoting a
   // component that had quietly crossed the bar, and the first time three arrived together. The
-  // non-member set is unmoved at 12: this change promotes nothing out of it and demotes nothing
-  // into it.
+  // non-member set was unmoved at 12 there too: that change promotes nothing out of it and
+  // demotes nothing into it.
   // 53 UNMOVED as of issue 1506, and the stillness is the fact rather than the absence of one:
   // that change DELETED `components/StatusPill.svelte`'s row when the pill retired into the chip
   // and ADDED `components/Avatar.svelte`'s when the actor portrait shipped, so the set is
@@ -436,14 +436,25 @@ test('the inputs every property below quantifies over are alive', () => {
   // `RadioCardGroup` that renamed three props, and rooting the radio-card family at the class the
   // primitive emits made the indirection cost more than it bought — so the four call sites render
   // `RadioCardGroup` directly and the shim's file, and therefore its row, are gone. The
-  // non-member set is unmoved at 12: a deleted component is not adjudicated OUT of the
-  // vocabulary, it stops existing, and `notAPrimitive` records decisions about files that do.
+  // non-member set was unmoved at 12 by that change as well: a deleted component is not
+  // adjudicated OUT of the vocabulary, it stops existing, and `notAPrimitive` records decisions
+  // about files that do.
+  // 12 -> 11 AS OF ISSUE 1517, and it is the non-member set's first removal BY OVERTURN rather
+  // than by deletion. `environment/EnvironmentValidationTab.svelte` still exists and still has
+  // one caller; its row is gone because the ADJUDICATION the row recorded stopped holding.
+  // Issue 1444 ruled that tab a different surface from `EditorValidationSurface` and told the
+  // next audit not to re-propose converting it; issue 1517 converted it, so the row would now
+  // be warning a reader off something that has landed. The overturn is written into
+  // `scripts/lib/designSystemPrimitives.js`'s prose rather than left as an absence, because a
+  // row that vanishes with no record is how this register drifted in the first place. The
+  // MEMBER count does not move with it: nothing was promoted and nothing demoted, which is why
+  // 52 is unchanged while 12 is not.
   // NOT TO BE CONFUSED with the other 53 this file's siblings pin: `design-system-coverage.
   // test.js:133` and `:136` pin `library.blockCount` and `library.headingCount`, which count
   // `library.html`'s spec-head BLOCKS rather than manifest rows. That figure is unrelated to this
   // one, is unchanged by this change, and the two agreeing at 53 today was a coincidence.
   assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 52, 'the shipped primitive set changed size');
-  assert.equal(NOT_A_PRIMITIVE.length, 12, 'the recorded non-member set changed size');
+  assert.equal(NOT_A_PRIMITIVE.length, 11, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,

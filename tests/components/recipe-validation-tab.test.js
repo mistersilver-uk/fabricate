@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { describeValidationHostContract } from '../helpers/validationAddressContracts.js';
+import { railCounts, tallyMatchingRail } from '../helpers/validationSurfaceReadings.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -74,6 +76,57 @@ describe('RecipeValidationTab (mounted)', () => {
     assert.ok(
       target.querySelector('[data-issue="noName"].is-block'),
       'a blocking issue reads as a BLOCKS ENABLE row'
+    );
+    harness.remount();
+  });
+
+  // ── THE RAIL IS A TALLY OF THE ROWS (issue 1517, docs round) ─────────────────────────────
+  //
+  // `stepsNamed` is the one check in this tab with NO `CHECK_TO_ISSUES` entry, because nothing in
+  // `recipeReadiness.js` raises an issue for an unnamed step. The row builder does not need one —
+  // an unsatisfied check with no owning issue paints `warn` — but the rail used to count the
+  // ISSUES, so this recipe drew an amber row under "Warnings: 0" and a green "All clear" verdict
+  // above it. No fixture in this file reached the state: every other unsatisfied check here pairs
+  // with an issue, so the two readings agreed by accident.
+  const unnamedStepRecipe = {
+    name: 'Refine Ore',
+    enabled: true,
+    steps: [
+      { id: 'step-1', name: 'Crush', ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'r1' }] },
+      { id: 'step-2', name: '', ingredientSets: [{ id: 's2' }], resultGroups: [{ id: 'r2' }] }
+    ]
+  };
+
+  it('counts an unsatisfied check that raises NO issue, and does not call it all clear', async () => {
+    const target = await harness.mount({ recipe: unnamedStepRecipe });
+
+    assert.equal(
+      target.querySelectorAll('[data-issue]').length,
+      0,
+      'the fixture raises no issue at all, which is what makes the divergence visible'
+    );
+    const stepsRow = target.querySelector('[data-check="stepsNamed"]');
+    assert.ok(Boolean(stepsRow), 'the unnamed step draws its own row');
+    assert.ok(
+      stepsRow.classList.contains('is-warn'),
+      `an unsatisfied check with no owning issue paints amber, got ${stepsRow.className}`
+    );
+    assert.equal(railCounts(target).warnings, 1, 'and the rail counts it, where it read 0');
+    assert.deepEqual(
+      tallyMatchingRail(target),
+      railCounts(target),
+      'the rail is a TALLY OF THE ROWS, so the two cannot disagree - which is the whole defect: ' +
+        'a count is a reading of a result, and there were two readings'
+    );
+    assert.equal(
+      target
+        .querySelector('[data-editor-validation-summary]')
+        .getAttribute('data-editor-validation-summary'),
+      // The CALLER's own word, which this surface carries through verbatim on the hook while
+      // resolving it to `is-warn` for the class. The point of the assertion is that it is not
+      // `clear`.
+      'warning',
+      'and the verdict is not "All clear" over an amber row'
     );
     harness.remount();
   });
@@ -220,6 +273,70 @@ describe('RecipeValidationTab (mounted)', () => {
     harness.remount();
   });
 
+  // ── THE ROW ACTION'S SECOND ARGUMENT (issue 1517) ──────────────────────────────────────
+  //
+  // The surface calls `onSelectIssue(row.target, row.focusTarget)` — two positional
+  // arguments. `target` is the ROUTE and `focusTarget` is the CONTROL: the value of a
+  // `data-validation-target` attribute the offending control carries. This tab is the first
+  // producer-backed host of the pair, and the second argument has to survive TWO hops the
+  // route does not — `recipeReadiness` emitting it, and this tab threading it onto the row —
+  // so a row that quietly lost it would still deep-link and still look correct.
+  //
+  // The assertions read the ARGUMENTS the surface passed, not the markup, because the defect
+  // they exist to catch is an address that never leaves the producer.
+  const rowActionArgs = (calls) => calls.map((call) => call.slice(0, 2));
+
+  it('passes the offending result set’s own address alongside the route', async () => {
+    const calls = [];
+    const target = await harness.mount({
+      recipe: routedRecipe,
+      routingProvider: 'check',
+      routedOutcomeTierOptions,
+      onSelectIssue: (...args) => calls.push(args)
+    });
+    target.querySelector('[data-issue="unroutedResultGroup"] [data-recipe-issue-view]').click();
+    await flushRender();
+    assert.deepEqual(
+      rowActionArgs(calls),
+      [['results', 'result-group-g-orphan']],
+      'the address names the result set that is actually unrouted, not merely its tab'
+    );
+    harness.remount();
+  });
+
+  it('passes the name input’s address for the blocked-name row', async () => {
+    const calls = [];
+    const target = await harness.mount({
+      recipe: { ...routedRecipe, name: '' },
+      routingProvider: 'check',
+      routedOutcomeTierOptions,
+      onSelectIssue: (...args) => calls.push(args)
+    });
+    target.querySelector('[data-issue="noName"] [data-recipe-issue-view]').click();
+    await flushRender();
+    assert.deepEqual(rowActionArgs(calls), [['overview', 'recipe-name']]);
+    harness.remount();
+  });
+
+  it('passes an EMPTY second argument for a row with no addressable control', async () => {
+    // ROUTE-ONLY IS A STATED OUTCOME. `unproducedOutcomeTier`'s subject is a tier that NO
+    // result set produces, so no one set is the offender and there is nothing to focus. The
+    // row still renders its View button and still changes route; asserting which of the two
+    // it is means a `focusTarget` going missing from a row that should have one reds here,
+    // rather than degrading into a tab switch that focuses nothing.
+    const calls = [];
+    const target = await harness.mount({
+      recipe: routedRecipe,
+      routingProvider: 'check',
+      routedOutcomeTierOptions,
+      onSelectIssue: (...args) => calls.push(args)
+    });
+    target.querySelector('[data-issue="unproducedOutcomeTier"] [data-recipe-issue-view]').click();
+    await flushRender();
+    assert.deepEqual(rowActionArgs(calls), [['results', '']]);
+    harness.remount();
+  });
+
   it('does not list routed warnings off check-mode routing', async () => {
     const target = await harness.mount({
       recipe: routedRecipe,
@@ -237,11 +354,12 @@ describe('RecipeValidationTab (mounted)', () => {
  * THE SURFACE ITSELF, MOUNTED (issue 1517).
  *
  * The tab above is one of nine hosts, and it can only ever exercise the shapes ITS producer
- * emits: `recipeReadiness` gives every deep-linkable row a route and, today, no focus target,
- * and it gives no row its own verb. The row contract has three parts this tab cannot reach —
- * a row that carries only a focus target, a row that carries its own accessible name, and the
- * in-group order over a hand-authored mix of statuses — so they are driven against the
- * primitive directly, in the file that owns the pair.
+ * emits: `recipeReadiness` gives every deep-linkable row a route, gives SOME of them a focus
+ * target too (issue 1517), and gives no row its own verb. The row contract has three parts
+ * this tab cannot reach — a row that carries ONLY a focus target and no route, a row that
+ * carries its own accessible name, and the in-group order over a hand-authored mix of
+ * statuses — so they are driven against the primitive directly, in the file that owns the
+ * pair.
  *
  * Its own harness, per the two-harness idiom (`alchemy-columns-mounted.test.js`): a harness is
  * one temp tree and one `componentPath`, so a second component under test is a second harness
@@ -520,4 +638,30 @@ describe('EditorValidationSurface row action (mounted)', () => {
     }
     surfaceHarness.remount();
   });
+});
+
+// THE HOST HALF, WHICH NOTHING READ (issue 1517, review r2). Four of the five hosts registered
+// this contract and the recipe editor — the oldest of them, and the one every other conversion was
+// modelled on — did not, so its ordering was guarded by nothing: deferring `activeTab = route`
+// into a microtask, which is precisely the mistake the ordering exists to prevent, left the whole
+// suite green. The clauses are the same five, over this host's own facts.
+describeValidationHostContract({
+  title: 'RecipeEditView wires the row action in the order the mechanism needs',
+  hostFile: 'RecipeEditView.svelte',
+  tabComponent: 'RecipeValidationTab',
+  routeCall: 'activeTab = route',
+  regionMarker: 'data-recipe-issue-announcement',
+  regionOutsideNoun: 'record guard and tab chain',
+  mustPrecede: [
+    {
+      marker: '{#if recipe}',
+      present: 'the record guard must exist',
+      order: 'the region sits outside the record guard'
+    },
+    {
+      marker: "{#if activeTab === 'overview'}",
+      present: 'the tab chain must exist',
+      order: 'and outside the tab chain'
+    }
+  ]
 });

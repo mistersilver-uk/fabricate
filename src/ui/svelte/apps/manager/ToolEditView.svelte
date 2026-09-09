@@ -9,6 +9,8 @@
   import ToolRequirementsTab from './tools/ToolRequirementsTab.svelte';
   import ToolValidationTab from './tools/ToolValidationTab.svelte';
   import { toolDisplayImage, toolDisplayName, toolEditorValidation } from './tools/toolStudio.js';
+  import { focusValidationTarget } from './validationFocus.js';
+  import { announceValidationOutcome } from './validationAnnouncement.js';
 
   let {
     tool = null,
@@ -209,9 +211,78 @@
   const member = $derived(systemRow?.member === true);
   const inherited = $derived(systemRow?.inherited ?? {});
   const worldDefaults = $derived(worldEntry?.defaults ?? null);
+
+  // ── THE VALIDATION ROW ACTION (issue 1517) ──────────────────────────────────────────────
+  // The two tabs a validation row may address, written once so the route guard below and the
+  // announcement's own label lookup cannot disagree about which tabs are reachable.
+  const ISSUE_TABS = {
+    breakage: { key: 'FABRICATE.Admin.Manager.Tools.Editor.TabBreakage', fallback: 'Breakage' },
+    requirements: {
+      key: 'FABRICATE.Admin.Manager.Tools.Editor.TabRequirements',
+      fallback: 'Requirements',
+    },
+  };
+
+  // This editor's own root, so `focusValidationTarget` resolves a `data-validation-target`
+  // inside THIS editor rather than anywhere in the manager window.
+  let editorRoot = $state(null);
+
+  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME, not a count. Activating a row action
+  // changes no tally, so a count-subjected region would recite an unchanged number at the
+  // moment a GM most needs to know where they landed.
+  let issueAnnouncement = $state('');
+
+  // The destination TAB PANEL, and it is the focus fallback for a route-only row (issue 1517).
+  // Every `general` row this editor draws is route-only, so this is the majority path here.
+  let tabPanel = $state(null);
+
+  /**
+   * Deep-link from a validation issue: switch to the tab that hosts the gap, THEN move focus to
+   * the offending control.
+   *
+   * THE ORDER IS THE MECHANISM, not a preference. The route is requested synchronously and
+   * FIRST — `onTabChange` is the shell's own `$state` write, exactly as the tab strip's own
+   * click is — so Svelte has flushed it and the destination panel exists by the time the focus
+   * helper's `queueMicrotask` runs its query. Everything after that — the panel fallback for a
+   * route-only row, the sentence, and the delay that queues it behind the focus utterance —
+   * belongs to `validationAnnouncement.js`, which owns it for all five hosts.
+   *
+   * @param {string} targetTab the ROUTE the row carries.
+   * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
+   */
+  function selectIssue(targetTab, focusTarget) {
+    const route = Object.hasOwn(ISSUE_TABS, targetTab) ? targetTab : null;
+    if (route) onTabChange(route);
+    announceValidationOutcome({
+      root: editorRoot,
+      routeLabel: route ? text(ISSUE_TABS[route].key, ISSUE_TABS[route].fallback) : '',
+      focus: () => focusValidationTarget(editorRoot, focusTarget),
+      fallbackPanel: tabPanel,
+      announce: (sentence) => {
+        issueAnnouncement = sentence;
+      },
+    });
+  }
 </script>
 
-<main class="manager-main manager-tool-edit-main" data-tool-edit-view>
+<main class="manager-main manager-tool-edit-main" data-tool-edit-view bind:this={editorRoot}>
+  <!--
+    THE ROW ACTION'S LIVE REGION, and it is HOSTED HERE rather than in the validation surface
+    for a reason that is not stylistic (issue 1517). Activating a row action changes `activeTab`
+    to another value, which unmounts the whole validation panel — live region included — in the
+    same update that was supposed to announce. So the element carrying `aria-live` is ALWAYS in
+    the DOM, outside the `{#if activeTab}` chain below, with its own `{#if}` INSIDE it.
+
+    A THIRD CHILD OF THIS `<main>` IS SAFE HERE, which is worth saying because it is not safe
+    everywhere: `.visually-hidden` is `position: absolute`, so the element is out of flow and
+    takes no track in any grid or `display: contents` chain this route is laid out by.
+
+    It wears the shipped `.visually-hidden` utility, rooted at the MODULE, and is addressed by a
+    `data-` hook rather than a class, so it joins no pinned class family.
+  -->
+  <div class="visually-hidden" role="status" aria-live="polite" data-tool-issue-announcement>
+    {#if issueAnnouncement}{issueAnnouncement}{/if}
+  </div>
   <header class="manager-tool-edit-header" data-tool-editor-header>
     <nav
       class="manager-breadcrumbs"
@@ -322,13 +393,22 @@
   />
 
   <div class="manager-tool-edit-composition">
+    <!-- `tabindex="-1"`, WAS `0` (issue 1517). The panel is the ROUTE-ONLY row's focus
+         destination — a row that names a tab and no control leaves focus on a button this
+         update unmounts, and `<body>` is where every Foundry keybinding is live — so it must be
+         focusable programmatically. It is not a tab STOP: `0` put an empty scroll container in
+         the Tab order between the strip and the first field, which no other editor panel in the
+         manager does, and nothing reads it. `data-keyboard-focus="true"` is what tells Foundry
+         the window is focused once it lands. -->
     <div
       class="manager-tool-editor-panel"
       role="tabpanel"
       id={`tool-panel-${activeTab}`}
       aria-labelledby={`tool-tab-${activeTab}`}
       data-tool-editor-panel={activeTab}
-      tabindex="0"
+      tabindex="-1"
+      data-keyboard-focus="true"
+      bind:this={tabPanel}
     >
       {#if activeTab === 'requirements'}
         <ToolRequirementsTab
@@ -353,6 +433,7 @@
           {focusValidationNonce}
           {worldRecordExists}
           {onEditWorldTool}
+          onSelectIssue={selectIssue}
         />
       {:else}
         <ToolBreakageTab

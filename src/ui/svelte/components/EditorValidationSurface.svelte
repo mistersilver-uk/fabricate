@@ -34,7 +34,7 @@
      that constant for what the sheet actually painted and what a GM saw instead.
    - counts / countLabels: the count tiles. See {@link COUNT_ORDER} for which tiles are drawn.
    - groups: `{ id, icon, label, rows, dataAttrs? }[]`; each row is
-     `{ id, status, title, detail?, target?, focusTarget?, viewLabel?, dataAttrs? }`.
+     `{ id, status, title, detail?, target?, focusTarget?, recordId?, viewLabel?, dataAttrs? }`.
      ROWS ARE RE-ORDERED — blocking first, within each group — so a caller's authored sequence is
      a tiebreak rather than a guarantee, and a site that fixes its order on purpose (a named
      constant, a prerequisite chain, a lifecycle) keeps that order only among rows of equal rank.
@@ -47,9 +47,18 @@
 
   ── THE ROW ACTION IS A TWO-FIELD CONTRACT (issue 1517) ──────────────────────────────────────
   A row carries `target` — the ROUTE, whatever the host needs to bring the destination into the
-  DOM, opaque here — and `focusTarget` — the CONTROL, the value of the `data-validation-target`
-  attribute the offending control carries. The button renders when a row carries EITHER, and the
-  click passes both, positionally: `onSelectIssue(row.target, row.focusTarget)`.
+  DOM, opaque here — and ONE ADDRESS beside it, which the row names for what it holds: either
+  `focusTarget`, the value of the `data-validation-target` attribute the offending CONTROL
+  carries, or `recordId`, a RECORD the route selects. The button renders when a row carries any
+  of the three, and the click passes the route and whichever address the row named, positionally:
+  `onSelectIssue(row.target, row.focusTarget ?? row.recordId)`.
+
+  TWO NAMES FOR ONE ARGUMENT, and that is the point rather than an accident. Five of the six
+  producers address a control the host focuses; the environment editor's addresses a task or an
+  event the host SELECTS on another tab, and it spelt that `focusTarget` — which read as a sixth
+  focus wiring and is not one. A row addresses one destination and a host resolves exactly one
+  kind of address, so there is one argument; what changed is that the producer now says which
+  kind it emitted, in the field name, where a reader of the row sees it.
 
   Two positional arguments rather than one object, because both existing hosts read argument 0 as
   the route and keep their one-argument signatures compiling unchanged. `target` could not simply
@@ -57,7 +66,7 @@
   Checks studio it is an `{ activity, section }` object — neither is a control selector, and a
   host that never resolves its route renders no destination for the focus move to land in.
 
-  `viewDataAttr` carries `row.target`, so a row that carries ONLY a `focusTarget` renders the
+  `viewDataAttr` carries `row.target`, so a row that carries ONLY an address renders the
   button with no site hook on it. That is stated rather than silent: the hook names the ROUTE, and
   a row with no route has none to name. Its one caller's rows all carry a route.
 
@@ -117,14 +126,41 @@
   import ManagerButton from './ManagerButton.svelte';
   import { localize } from '../util/foundryBridge.js';
 
+  /*
+    THE TILE AND PILL WORDS DEFAULT TO KEYS THIS SURFACE RESOLVES, NOT TO ENGLISH (issue 1517).
+
+    Same rule, and the same reason, as `viewLabel` two blocks down: a raw English string written
+    into a `$props()` destructuring is a word `game.i18n` never sees, so a caller that omits the
+    prop ships an untranslatable count label and an untranslatable status pill in every world. And
+    the words themselves are one vocabulary — `Passing / Warnings / Blocking`, `Pass / Warning /
+    Blocks enable` — which four call sites had each written into their own namespace, byte for
+    byte. They live once, under the shared `Admin.Manager.Validation` home, and a site
+    with nothing of its own to say now passes nothing and gets them.
+
+    The two defaults that were `PASS` and `WARNING` in capitals are the shipped `Pass` and
+    `Warning`: one casing, chosen here because this is where the pill is drawn.
+
+    EVERY KEY IS WRITTEN OUT IN FULL, never composed from a shared prefix constant.
+    `tests/ui-lang-keys-resolve.test.js` resolves the complete literals it finds in `src/` against
+    `lang/en.json`; a `${base}.CountPassing` would leave it holding a NAMESPACE BASE it can only
+    check for existence, which is a check it has an explicit, counted list of exceptions for.
+  */
   let {
     title = 'Validation',
     intro = '',
     summary = {},
     counts = { passing: 0, warnings: 0, blocking: 0 },
-    countLabels = { passing: 'Passing', warnings: 'Warnings', blocking: 'Blocking' },
+    countLabels = {
+      passing: localize('FABRICATE.Admin.Manager.Validation.CountPassing'),
+      warnings: localize('FABRICATE.Admin.Manager.Validation.CountWarnings'),
+      blocking: localize('FABRICATE.Admin.Manager.Validation.CountBlocking'),
+    },
     groups = [],
-    statusLabels = { pass: 'PASS', warn: 'WARNING', block: 'BLOCKS ENABLE' },
+    statusLabels = {
+      pass: localize('FABRICATE.Admin.Manager.Validation.StatusPass'),
+      warn: localize('FABRICATE.Admin.Manager.Validation.StatusWarn'),
+      block: localize('FABRICATE.Admin.Manager.Validation.StatusBlock'),
+    },
     rowDataAttr = '',
     viewDataAttr = '',
     viewLabel = 'FABRICATE.Admin.Manager.Validation.View',
@@ -311,6 +347,17 @@
   function rowRank(row) {
     return row?.status === 'block' ? 0 : 1;
   }
+
+  /**
+   * The one address a row carries beside its route, under whichever of the two names its
+   * producer used. See the two-field contract in the header for why there are two names.
+   *
+   * @param {{focusTarget?: string, recordId?: string}} row
+   * @returns {string|undefined}
+   */
+  function rowAddress(row) {
+    return row?.focusTarget ?? row?.recordId;
+  }
 </script>
 
 <!--
@@ -394,7 +441,7 @@
                   >{row.detail}</span
                 >{/if}
             </div>
-            {#if row.target || row.focusTarget}
+            {#if row.target || rowAddress(row)}
               <ManagerButton
                 role="ghost"
                 class="manager-recipe-val-view"
@@ -403,7 +450,7 @@
                   subject: row.title,
                 })}
                 {...namedAttr(viewDataAttr, row.target)}
-                onclick={() => onSelectIssue(row.target, row.focusTarget)}
+                onclick={() => onSelectIssue(row.target, rowAddress(row))}
                 >{localize(row.viewLabel ?? viewLabel)}</ManagerButton
               >
             {/if}

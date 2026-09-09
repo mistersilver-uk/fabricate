@@ -563,7 +563,22 @@
      whole list was invented here: it gave the screen a title and a description the design never
      wrote, and the structural parity pass reported it as an EXTRA CARD for that reason. The
      section head above the pane already names the section and leads it. -->
-<div class="manager-checks-trigger-route" data-check-triggers>
+<!-- THE CONTROL HALF of the Validation route's row action, and it is SET-LEVEL (issue 1517).
+     Both trigger issues — a tier-step target that names no tier, and several triggers claiming
+     the same one — are about the tier targets across the WHOLE list rather than about one
+     control: the row carries no trigger id to single one out with, and each trigger's own tier
+     `<select>` sits inside a collapsed disclosure that is not in the DOM until the GM opens it.
+     So the list itself is the destination, addressed as `checks-triggers`. A `<div>` is not
+     natively focusable, so it declares BOTH the tabindex that makes the focus real and the
+     attribute that tells Foundry the window is focused; without the second, Space pauses the
+     game and the arrows pan the canvas behind the open application. -->
+<div
+  class="manager-checks-trigger-route"
+  data-check-triggers
+  data-validation-target="checks-triggers"
+  tabindex="-1"
+  data-keyboard-focus="true"
+>
   {#if triggers.length === 0}
     <p class="manager-muted" data-triggers-empty>
       {text(

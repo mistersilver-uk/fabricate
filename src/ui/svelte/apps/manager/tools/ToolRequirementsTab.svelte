@@ -469,7 +469,20 @@
     disabled={saving}
     onToggle={onToggleInherited}
   >
-    <section class="manager-tool-requirements-section fab-stack" data-gap="2">
+    <!-- THE CONTROL HALF of the validation row action (issue 1517). The `prerequisites` check
+         is about this SECTION's contents — "choose at least one prerequisite or turn
+         prerequisites off" — rather than about one field inside it, so the section itself is
+         the destination and `toolStudio.js` addresses it as `tool-prerequisites`. A section is
+         not natively focusable, so it declares BOTH the tabindex that makes the focus real and
+         the attribute that tells Foundry the window is focused; without the second, Space
+         pauses the game and the arrows pan the canvas. -->
+    <section
+      class="manager-tool-requirements-section fab-stack"
+      data-gap="2"
+      data-validation-target="tool-prerequisites"
+      tabindex="-1"
+      data-keyboard-focus="true"
+    >
       <!-- THE SUBORDINATE ROW SURVIVES AT SYSTEM SCOPE ONLY, because that is the only scope
            whose header row is already spent on a different question. See the file header. -->
       {#if member}
@@ -624,7 +637,15 @@
     disabled={saving}
     onToggle={onToggleInherited}
   >
-    <section class="manager-tool-requirements-section fab-stack" data-gap="2">
+    <!-- THE CONTROL HALF, for the `bonus` check (issue 1517). Same shape and same reason as the
+         prerequisites section above; `toolStudio.js` addresses it as `tool-bonus`. -->
+    <section
+      class="manager-tool-requirements-section fab-stack"
+      data-gap="2"
+      data-validation-target="tool-bonus"
+      tabindex="-1"
+      data-keyboard-focus="true"
+    >
       <!-- SAME SPLIT AS THE SECTION ABOVE, for the same reason. -->
       {#if member}
         <div class="manager-tool-setting-row">

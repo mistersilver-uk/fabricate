@@ -351,7 +351,7 @@ test('every call site that hooks a count also reports it', () => {
   );
 });
 
-test('the recipe editor is the only site hooking the row action, and none restates its name', () => {
+test('the sites hooking the row action are the two producers and the shell, and none restates its name', () => {
   // `viewDataAttr` is the surface's one-caller hook prop, and this is the clause that keeps
   // that honest rather than merely true. `viewLabel` USED to be its pair — a site hooking the
   // action also had to hand the surface a localized verb, and a site that hooked without
@@ -379,14 +379,29 @@ test('the recipe editor is the only site hooking the row action, and none restat
     .map(([file]) => file);
   assert.deepEqual(
     withHook,
-    ['src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte'],
-    'the set of sites hooking the row action changed. A second one is welcome and makes the ' +
-      'prop ordinary rather than single-caller; this pin is here so that arrival is a ' +
-      'deliberate edit rather than something a reviewer has to notice.'
+    [
+      'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',
+      'src/ui/svelte/apps/manager/recipe/RecipeValidationTab.svelte',
+      'src/ui/svelte/apps/manager/recipe-item/RecipeItemValidationTab.svelte',
+      'src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte',
+    ],
+    'the set of sites hooking the row action changed. THIS PIN MOVED DELIBERATELY at issue ' +
+      '1517, TWICE: first the recipe-item tab hooking its own route and `ScopedValidationTab` ' +
+      'FORWARDING the prop on behalf of the essence and Tool validation tabs, which reach the ' +
+      'surface only through it, and then the environment tab, whose adoption made this prop ' +
+      'ordinary rather than a recipe-editor habit. That last one is the ' +
+      'arrival the previous wording said was welcome; its hook value carries the `data-` prefix ' +
+      'because the surface uses the prop as the WHOLE attribute name. This pin is here so that ' +
+      'a further arrival is a deliberate edit rather than something a reviewer has to notice.'
   );
   assert.deepEqual(
     withLabel,
-    [],
+    // THE ONE FORWARDING SHELL, and it is not a call site (issue 1517). It declares `viewLabel`
+    // with NO default of its own and passes it straight through, so an essence or Tool tab that
+    // says nothing forwards `undefined` and the surface applies its own key. Nothing is restated
+    // and nothing is overridden; the shell exists so that a site which one day needs a different
+    // verb has somewhere to say so.
+    ['src/ui/svelte/apps/manager/scoped/ScopedValidationTab.svelte'],
     'a call site is passing `viewLabel` again. The surface defaults it to a localization key ' +
       'and resolves it, so a site that passes one is either restating that default — which is ' +
       'a second place the accessible name lives — or overriding it for EVERY row, which is not ' +

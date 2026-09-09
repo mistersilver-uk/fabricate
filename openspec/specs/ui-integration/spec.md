@@ -362,14 +362,18 @@ So the destination is a named region that says where the GM now is, leaves the s
 Focus is moved only when the re-render actually dropped it — when it rests on the document body, or on a node the re-render has detached.
 A GM who moved focus elsewhere while an awaited write was in flight keeps their place, and the same rule governs the delete card's own restore after a refused write.
 
+A bulk edit panel may render a sibling card after the shell.
+Apply's dock then clamps to the panel's own box rather than to the rail's bottom edge, and that is accepted.
+What is required is that Apply's border box stays wholly within the scrollport at every scroll offset; the guarantee holds while the sibling is shorter than the scrollport, and a sibling taller than it is a reachability failure rather than an accepted configuration.
+
+#### Announcing after a focus move
+
 The keyboard is moved FIRST and the sentence is announced BEHIND it, never the other way round and never in the same task.
 A polite announcement is queued speech and a focus change cancels queued speech, so a sentence written into the region before the hop is a sentence the GM may never hear — which is the original silence, with a working focus hop concealing it.
 When no focus move happens the sentence is announced immediately, since there is then nothing for it to queue behind.
 This ordering governs every live region paired with a focus move in this specification, including the delete card's own outcome.
-
-A bulk edit panel may render a sibling card after the shell.
-Apply's dock then clamps to the panel's own box rather than to the rail's bottom edge, and that is accepted.
-What is required is that Apply's border box stays wholly within the scrollport at every scroll offset; the guarantee holds while the sibling is shorter than the scrollport, and a sibling taller than it is a reachability failure rather than an accepted configuration.
+The validation surface's row action is a caller of this ordering too, and it has two destinations rather than one: the control the issue names, or — where the row named no control, or the one it named could not take the keyboard — the panel the route brought into view.
+The sentence names whichever it reached, and is announced behind that move like every other.
 
 #### Segmented controls
 

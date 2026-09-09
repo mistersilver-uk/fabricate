@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { evaluateEnvironmentReadiness, blocksEnable } from '../../src/ui/svelte/apps/manager/environment/environmentReadiness.js';
+import { describeValidationHostContract } from '../helpers/validationAddressContracts.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -130,8 +131,17 @@ describe('environment editor localization', () => {
       assert.equal(typeof editor[group]?.[key], 'string', `EnvironmentEditor.${group}.${key} should be a localized string`);
       assert.ok(editor[group][key].length > 0, `EnvironmentEditor.${group}.${key} should not be empty`);
     }
-    assert.equal(editor.Validation.Severity.critical, 'Critical');
     assert.equal(editor.Events.DangerTag.deadly, 'Deadly');
+    // THE SEVERITY WORDS ARE GONE, and pinned absent rather than merely unread (issue 1517).
+    // `Severity.critical` / `Severity.warning` named the summary inspector's two chips while
+    // those chips counted two of the three severities; the chips now report the same BLOCKING
+    // and WARNINGS numbers the Validation tab's rail and the tab strip's badge do, through one
+    // accessor, and take that vocabulary's shared words. A stale key left behind would be read
+    // by nothing and would invite the next reader to reintroduce a third answer.
+    assert.equal(editor.Validation.Severity, undefined, 'the severity chip words are retired');
+    const shared = lang.FABRICATE.Admin.Manager.Validation;
+    assert.equal(shared.CountBlocking, 'Blocking');
+    assert.equal(shared.CountWarnings, 'Warnings');
   });
 
   it('defines the new force-include and non-matching EnvironmentEditor copy', () => {
@@ -309,7 +319,14 @@ describe('environment composition editor structure', () => {
     assert.ok(shellSource.includes("class:is-inspector-hidden={activeTab === 'validation'}"), 'workspace collapses to one column on the validation tab');
     assert.ok(/<EnvironmentRightInspector[\s\S]*?\{activeTab\}/.test(shellSource), 'shell passes the active tab to the inspector');
     assert.ok(shellSource.includes('function selectValidationRecord'), 'validation issue actions route through a tab-switching selector');
-    assert.ok(shellSource.includes("activeTab = kind === 'event' ? 'events' : 'tasks'"), 'validation issue actions switch to the relevant Tasks/Events tab');
+    // THE ROUTE IS A TABLE NOW, not an inline ternary (issue 1517, docs round). The row action
+    // has to name the destination three times — the tab it opens, the word the announcement says
+    // and the composition list the record name is read from — so the pairing is written once and
+    // read three times. The clause reads the table rather than the ternary it replaced; the
+    // ORDER the route is written in is read by `describeValidationHostContract` below.
+    assert.ok(/task:\s*\{\s*tab: 'tasks'/.test(shellSource), 'a task issue routes to the Tasks tab');
+    assert.ok(/event:\s*\{\s*tab: 'events'/.test(shellSource), 'an event issue routes to the Events tab');
+    assert.ok(shellSource.includes('activeTab = route.tab'), 'validation issue actions switch to the relevant Tasks/Events tab');
     assert.ok(shellSource.includes('onSelectRecord={selectValidationRecord}'), 'validation tab uses the tab-switching selector');
   });
 
@@ -675,12 +692,19 @@ describe('environment composition editor structure', () => {
     assert.ok(SHARED_INCLUDED_STATES_IMPORT.test(shellSource), 'badge count imports the shared four-state included vocabulary');
     assert.ok(shellSource.includes('ENVIRONMENT_INCLUDED_COMPOSITION_STATES.has(entry?.compositionState)'), 'badge count filters composition records through that shared set');
     assert.ok(!shellSource.includes('const INCLUDED_COMPOSITION_STATES'), 'the shell no longer keeps a second copy of the included vocabulary');
-    assert.ok(shellSource.includes("issue.severity === 'critical'"), 'validation error badge should count critical issues');
-    assert.ok(shellSource.includes("issue.severity === 'warning'"), 'validation warning badge should count warning issues');
+    // THE BADGE READS THE ONE ACCESSOR, NOT SEVERITIES (issue 1517, review r1). It counted
+    // `severity === 'critical'` and `severity === 'warning'` here while the Validation tab it
+    // badges counted `!== 'critical'` inside — so an `info`-only environment showed NO badge over
+    // a rail reading "Warnings: 2", and an unsatisfied readiness check with no issue behind it
+    // was badged by nothing at all. The negatives are what make this a real swap rather than an
+    // addition: reintroducing either severity filter here reds this clause.
+    assert.ok(shellSource.includes('countReadiness(readiness)'), 'the badge reads the shared readiness accessor');
+    assert.ok(!shellSource.includes("issue.severity === 'critical'"), 'the badge no longer counts a severity of its own');
+    assert.ok(!shellSource.includes("issue.severity === 'warning'"), 'nor a second one beside it');
     assert.ok(shellSource.includes("tone: 'danger'"), 'validation errors should use danger badge tone');
     assert.ok(shellSource.includes("tone: 'warning'"), 'validation warnings should use warning badge tone');
-    assert.ok(shellSource.includes('label: String(errorCount)'), 'validation error badge should render only the numeric count');
-    assert.ok(shellSource.includes('label: String(warningCount)'), 'validation warning badge should render only the numeric count');
+    assert.ok(shellSource.includes('label: String(validationCounts.blocking)'), 'validation error badge should render only the numeric count');
+    assert.ok(shellSource.includes('label: String(validationCounts.warnings)'), 'validation warning badge should render only the numeric count');
     assert.ok(!shellSource.includes('BadgeError'), 'validation error badge should not use severity text');
     assert.ok(!shellSource.includes('BadgeWarning'), 'validation warning badge should not use severity text');
     assert.ok(shellSource.includes('validation: validationBadges'), 'validation badge prop should receive separate badge descriptors');
@@ -769,4 +793,39 @@ describe('evaluateEnvironmentReadiness', () => {
     assert.ok(!issues.some(issue => issue.id === 'hiddenNonMatching'), 'hidden non-matching records are surfaced in the Tasks/Events tabs, not as validation issues');
     assert.ok(issues.some(issue => issue.id === 'locallyExcluded' && issue.severity === 'info'));
   });
+});
+
+// THE SIXTH HOST OF THE VALIDATION ROW ACTION (issue 1517, docs round). This editor wired only
+// half of it: `selectValidationRecord` selected the record and switched the tab, and stopped —
+// no focus move, no live region, and a tab panel with no `tabindex`, so activating a row unmounted
+// the View button that was pressed and dropped focus onto `<body>`, where Space pauses the game
+// and the arrows pan the canvas behind the window.
+//
+// THE SHAPE IS READ FROM SOURCE, and the clauses are the same five the other five hosts satisfy —
+// written once in `tests/helpers/validationAddressContracts.js` and parameterised by this host's
+// own facts. There is no `describeValidationAddressPairing` beside it, and the absence is the
+// point: that guard resolves a producer's `focusTarget` against the control that carries it, and
+// this producer emits `recordId` — a record the route SELECTS — so there is no
+// `data-validation-target` anywhere to pair with. What the pairing gate proves for the other five
+// is proved here by the mounted clause in `manager-mounted.test.js` that activates a row and reads
+// the panel back off `document.activeElement`.
+//
+// `tabProp` is this editor's own spelling: the tab's callback takes `(kind, id)` and is named for
+// what it is handed, which is a record rather than an issue address.
+describeValidationHostContract({
+  title: 'EnvironmentEditView wires the row action in the order the mechanism needs',
+  hostFile: 'EnvironmentEditView.svelte',
+  tabComponent: 'EnvironmentValidationTab',
+  tabProp: 'onSelectRecord',
+  handler: 'selectValidationRecord',
+  routeCall: 'activeTab = route.tab',
+  regionMarker: 'data-environment-issue-announcement',
+  regionOutsideNoun: 'tab chain',
+  mustPrecede: [
+    {
+      marker: "{#if activeTab === 'overview'}",
+      present: 'the tab chain must exist',
+      order: 'the region sits outside the tab chain'
+    }
+  ]
 });

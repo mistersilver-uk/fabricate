@@ -409,7 +409,7 @@
               'FABRICATE.Admin.Manager.Tools.Editor.IncreaseUses',
               'Increase uses'
             )}
-            inputProps={{ 'data-tool-max-uses': '' }}
+            inputProps={{ 'data-tool-max-uses': '', 'data-validation-target': 'tool-max-uses' }}
             onChange={(maxUses) => patchBreakage({ maxUses })}
           />
         </div>
@@ -444,7 +444,10 @@
             resolveColor={toolBreakageChanceColor}
             trackGradient="var(--fab-tool-breakage-chance-track-gradient)"
             controlClass="manager-tool-breakage-chance-control"
-            numberInputProps={{ 'data-tool-breakage-chance-input': '' }}
+            numberInputProps={{
+              'data-tool-breakage-chance-input': '',
+              'data-validation-target': 'tool-breakage-chance',
+            }}
             rangeInputProps={{ 'data-tool-breakage-chance-range': '' }}
             onChange={(breakageChance) => patchBreakage({ breakageChance })}
           />
@@ -457,6 +460,7 @@
             ><input
               class="manager-recipe-name-input"
               data-tool-breakage-formula
+              data-validation-target="tool-breakage-formula"
               value={tool?.breakage?.formula || ''}
               oninput={(event) => patchBreakage({ formula: event.currentTarget.value })}
             /></label
@@ -475,7 +479,10 @@
               {...stepperLabels(
                 text('FABRICATE.Admin.Manager.Tools.BreakageThreshold', 'Break below')
               )}
-              inputProps={{ 'data-tool-breakage-threshold': '' }}
+              inputProps={{
+                'data-tool-breakage-threshold': '',
+                'data-validation-target': 'tool-breakage-threshold',
+              }}
               onChange={(threshold) => patchBreakage({ threshold })}
             />
           </div>
@@ -513,10 +520,23 @@
          `disabled` down three controls. The `Always fires` badge that used to caption its
          legend is GONE — the design uses that slot for the inheritance pill, which the card
          above now carries, and `Always fires` was never news. -->
+    <!-- THE CONTROL HALF of the validation row action (issue 1517). The `onBreak` and `repair`
+         checks are both about what is authored INSIDE this fieldset — the on-break mechanic, its
+         replacement target, and the repair requirement groups the `flagBroken` branch renders —
+         so the fieldset is the destination and `toolStudio.js` addresses both as `tool-on-break`.
+         A fieldset is not natively focusable, hence the tabindex, and it carries
+         `data-keyboard-focus` for the same reason every other declared `-1` here does.
+
+         IT CAN BE `disabled`, and that is deliberately left alone: an immune Tool runs no
+         on-break action, and `validationFocus.js` refuses a disabled target rather than moving
+         focus into a control the GM cannot use. The row still changes tab. -->
     <fieldset
       class="manager-tool-on-break fab-stack"
       data-gap="3"
       data-tool-on-break-controls
+      data-validation-target="tool-on-break"
+      tabindex="-1"
+      data-keyboard-focus="true"
       disabled={immune}
     >
       {#if immune}<p class="manager-tool-info-strip">

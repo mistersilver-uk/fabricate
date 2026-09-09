@@ -780,10 +780,17 @@ test('a divergent entry names the issue that decided it', () => {
  * so it is a CALLER rather than a recorded non-member, and a row asserting otherwise would be
  * false. A non-member row is a measurement of the tree, so it expires when the tree changes.
  *
- * `SystemOverviewView` and `environment/EnvironmentValidationTab` arrived the same way at issue
- * 1444 and are the same kind of growth: both were PROPOSED as unconverted call sites of
- * `EditorValidationSurface` and both measured as a different surface, so each is a recorded
- * adjudication rather than a primitive that shipped undocumented.
+ * `SystemOverviewView` arrived the same way at issue 1444 and is the same kind of growth: it was
+ * PROPOSED as an unconverted call site of `EditorValidationSurface` and measured as a different
+ * surface, so it is a recorded adjudication rather than a primitive that shipped undocumented.
+ *
+ * `environment/EnvironmentValidationTab` arrived beside it and LEFT at issue 1517, in a third
+ * direction this list can move that neither paragraph above describes. No library entry was
+ * written for it and its row did not expire against a changed tree: the ADJUDICATION was
+ * overturned. `spec.md` asks for one validation arrangement on every editor, so a tab measured as
+ * a second arrangement is what that requirement forbids rather than a tab exempt from it — and
+ * the conversion deleted the manifest row this list was reaching through. The entry goes with the
+ * row, so this list shrinks without anybody writing a specimen.
  *
  * `components/Medallion` LEFT at issue 1506, in the direction the failure message below calls the
  * right one: a library entry was written for it. It had been here since this register existed, on
@@ -840,7 +847,6 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/VocabularyPanel.svelte',
   'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
   'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
-  'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',
   'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
   'src/ui/svelte/components/ActionMenu.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',

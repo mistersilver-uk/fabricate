@@ -2,6 +2,10 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  describeValidationAddressPairing,
+  describeValidationHostContract,
+} from '../helpers/validationAddressContracts.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -176,4 +180,168 @@ describe('RecipeItemValidationTab (mounted)', () => {
     assert.equal(only[0].getAttribute('data-ok'), 'true');
     assert.match(only[0].textContent, /Custom rule/);
   });
+});
+
+// ── THE ROW ACTION'S TWO ADDRESSES (issue 1517) ─────────────────────────────────────────────
+//
+// A validation row carries `target` — the ROUTE, the editor tab that hosts the gap — and
+// `focusTarget` — the CONTROL, the value of the `data-validation-target` attribute the offending
+// control carries in that tab. `RecipeItemValidationTab` is the producer for this editor; the
+// three tab files below are the destinations; `RecipeItemEditor` is the host that resolves both.
+//
+// WHY THE HOST IS PROVEN FROM SOURCE HERE RATHER THAN MOUNTED. This suite's harness mounts the
+// VALIDATION TAB, which is what makes the producer half directly clickable — the tab takes
+// `onSelectIssue` as a prop, so the exact `(target, focusTarget)` pair a row hands the host is
+// read from a real click rather than inferred. Mounting `RecipeItemEditor` instead would need a
+// second harness carrying that editor's whole compiled closure — the embedded player inventory
+// detail, the salvage tree, the shared select and popover stacks — which
+// `recipe-item-editor-mounted.test.js` already declares, and a copy of it here is exactly the
+// near-identical block the new-code duplication gate refuses. So the host's three obligations are
+// read off its source, and the ADDRESSES are joined to the destinations that carry them below.
+describe('the recipe-item validation row action addresses a control (issue 1517)', () => {
+  const viewButton = (root, id) =>
+    root.querySelector(`[data-recipe-item-check="${id}"] [data-recipe-item-validation-view]`);
+
+  it('hands the host BOTH addresses, positionally, for every blocking row', async () => {
+    const calls = [];
+    const root = await harness.mount({
+      recipeItem: draft({ caps: { item: { limitUses: true, maxUses: 0 }, learn: {} } }),
+      linkedItem: null,
+      visibilityMode: 'item',
+      onSelectIssue: (target, focusTarget) => calls.push([target, focusTarget]),
+    });
+
+    for (const [id, route, control] of [
+      ['itemLinked', 'overview', 'recipe-item-source'],
+      ['recipeLinked', 'contents', 'recipe-item-link-recipe'],
+      ['usesValid', 'limits', 'recipe-item-uses'],
+    ]) {
+      const button = viewButton(root, id);
+      assert.ok(Boolean(button), `the ${id} row renders a View button`);
+      assert.equal(
+        button.getAttribute('data-recipe-item-validation-view'),
+        route,
+        `the ${id} row's hook carries its ROUTE`
+      );
+      button.click();
+    }
+
+    assert.deepEqual(calls, [
+      ['overview', 'recipe-item-source'],
+      ['contents', 'recipe-item-link-recipe'],
+      ['limits', 'recipe-item-uses'],
+    ]);
+  });
+
+  it('addresses the learning stepper in knowledge mode, where the uses row does not exist', async () => {
+    const calls = [];
+    const root = await harness.mount({
+      recipeItem: draft({
+        linkedRecipeIds: ['r1'],
+        caps: { item: {}, learn: { limitLearning: true, learningMode: 'ntimes', learnsAllowed: 0 } },
+      }),
+      linkedItem: { uuid: 'Item.a' },
+      visibilityMode: 'knowledge',
+      onSelectIssue: (target, focusTarget) => calls.push([target, focusTarget]),
+    });
+    viewButton(root, 'learnsValid').click();
+    assert.deepEqual(calls, [['limits', 'recipe-item-learns']]);
+  });
+
+  it('gives a PASSING row no action at all, so the button only ever reaches a defect', async () => {
+    // WHICH OF THE SHAPES A ROW IS, asserted rather than assumed. A row carrying neither address
+    // renders no button; a row carrying a route alone would render one that changes tab and
+    // focuses nothing; a row carrying both is the case above. This tab produces the first and
+    // the third — every check it renders names one control — so the route-only shape is proved
+    // where it actually occurs, on the Tool and essence surfaces, in their own suites.
+    const root = await harness.mount({
+      recipeItem: draft({ linkedRecipeIds: ['r1'] }),
+      linkedItem: { uuid: 'Item.a' },
+      visibilityMode: 'item',
+    });
+    for (const id of ['itemLinked', 'recipeLinked', 'usesValid']) {
+      assert.equal(check(root, id).getAttribute('data-ok'), 'true', `${id} passes in this state`);
+      assert.ok(!viewButton(root, id), `and the passing ${id} row renders no View button`);
+    }
+  });
+
+  it('gives a row whose check it cannot place no action either', async () => {
+    // The supplied-`validation` door. A caller may hand this tab a check id its address table
+    // does not know; the honest outcome is a row with no action, never a button that routes to
+    // `undefined`.
+    const root = await harness.mount({
+      recipeItem: draft(),
+      linkedItem: null,
+      visibilityMode: 'item',
+      validation: { checks: [{ id: 'unplaceable', ok: false, label: 'Something else' }] },
+    });
+    assert.ok(!root.querySelector('[data-recipe-item-validation-view]'));
+  });
+});
+
+// ── THE PAIR, AND THE HOST THAT JOINS IT (issue 1517) ───────────────────────────────────────
+//
+// Both contracts below are registered from `tests/helpers/validationAddressContracts.js`, driven
+// by THIS editor's facts: the producer's own table, the destination declared for each address it
+// emits, and the host's own route call. The machinery those facts feed — the comment stripping
+// that keeps a scan from finding an address in the sentence explaining it, both attribute
+// spellings, the focusability read that a mounted assertion cannot make, and the ordering — is
+// written once there and explained in its docblock. It was a per-suite copy until the SonarCloud
+// new-code duplication gate counted this file's copy and the Checks studio's as one shape.
+describeValidationAddressPairing({
+  title: 'every recipe-item address the producer emits is carried by a real control',
+  producerFile: 'recipe-item/RecipeItemValidationTab.svelte',
+  tableName: 'CHECK_ADDRESSES',
+  tablePattern: /const CHECK_ADDRESSES = \{([\s\S]*?)\n {2}\};/u,
+  addressPattern: /focusTarget: '([^']+)'/gu,
+  expectedAddressCount: 4,
+  expectation: 'the four checks',
+  // WHICH FILE IS SUPPOSED TO CARRY WHICH ADDRESS. This is the half a producer cannot check: an
+  // address no control carries is a View button that changes tab and focuses nothing, and neither
+  // half alone can see it.
+  destinations: {
+    'recipe-item-source': 'recipe-item/RecipeItemOverviewTab.svelte',
+    'recipe-item-link-recipe': 'recipe-item/RecipeItemContentsTab.svelte',
+    'recipe-item-uses': 'recipe-item/RecipeItemLimitsTab.svelte',
+    'recipe-item-learns': 'recipe-item/RecipeItemLimitsTab.svelte',
+  },
+  routeNoun: 'tab',
+  destinationNoun: 'tab',
+  // TWO OF THE FOUR RIDE AN ATTRIBUTE BAG — the Item drop zone's `hookAttrs.root` and the
+  // link-recipe popover's `triggerData` — so the element they land on belongs to a primitive and
+  // cannot be read from this tab's source. Declared here rather than skipped so that a stamp
+  // moving from a written attribute to a bag, which silently drops the static proof, has to be
+  // acknowledged.
+  //
+  // WHERE THE PROOF ACTUALLY IS, named because this list used to assert one that did not exist
+  // (issue 1517, review r1). `recipe-item-source` rides `linkHooks.root` with `tabindex: '-1'`
+  // and `'data-keyboard-focus': 'true'` as BAG KEYS — object properties, which
+  // `design-system-keyboard-focus`'s AST walk cannot see any more than this scan can — so
+  // deleting both left the whole repository green while a real browser focused nothing. It is now
+  // read off the RENDERED element by `RecipeItemEditor — the validation row action reaches the
+  // control` in `recipe-item-editor-mounted.test.js`, which is the only place those two
+  // attributes exist to be read. `recipe-item-link-recipe` is `SearchablePopover`'s trigger, a
+  // real `<button>`, which needs no tabindex to hold focus.
+  focusProvenElsewhere: ['recipe-item-link-recipe', 'recipe-item-source'],
+});
+
+describeValidationHostContract({
+  title: 'RecipeItemEditor wires the row action in the order the mechanism needs',
+  hostFile: 'RecipeItemEditor.svelte',
+  tabComponent: 'RecipeItemValidationTab',
+  routeCall: 'onSelectTab(route)',
+  regionMarker: 'data-recipe-item-issue-announcement',
+  regionOutsideNoun: 'tab chain',
+  mustPrecede: [
+    {
+      marker: '{#if recipeItem}',
+      present: 'the record guard must exist',
+      order: 'the region sits outside the record guard',
+    },
+    {
+      marker: "{#if activeTab === 'overview'}",
+      present: 'the tab chain must exist',
+      order: 'and outside the tab chain',
+    },
+  ],
 });

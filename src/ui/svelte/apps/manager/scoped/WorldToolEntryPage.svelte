@@ -1891,10 +1891,7 @@
                 rows: validationRows,
               },
             ]}
-            blockLabel={text(
-              'FABRICATE.Admin.Manager.Recipe.Validation.StatusBlock',
-              'BLOCKS ENABLE'
-            )}
+            blockLabel={text('FABRICATE.Admin.Manager.Validation.StatusBlock', 'Blocks enable')}
             rowDataAttr="data-world-tool-entry-check"
             hookAttribute="data-world-tool-entry-validation"
           />

@@ -55,7 +55,19 @@
 <div class="manager-essence-tab-stack" data-essence-tab-panel="identity">
   <section class="manager-edit-card">
     <div class="manager-essence-edit-grid">
-      <div class="manager-essence-icon-panel">
+      <!-- THE CONTROL HALF of the validation row action (issue 1517). The `icon` blocker is
+           about the chosen GLYPH, and the two controls that change it — the tile's reset overlay
+           and the picker beneath it — are this panel's, so the panel is the destination and
+           `essenceStudio.js` addresses it as `essence-icon`. A panel is not natively focusable,
+           so it declares BOTH the tabindex that makes the focus real and the attribute that
+           tells Foundry the window is focused; without the second, Space pauses the game and
+           the arrows pan the canvas. -->
+      <div
+        class="manager-essence-icon-panel"
+        data-validation-target="essence-icon"
+        tabindex="-1"
+        data-keyboard-focus="true"
+      >
         <span class="manager-essence-field-label"
           >{text('FABRICATE.Admin.Manager.Essence.Icon', 'Icon')}</span
         >
@@ -103,8 +115,12 @@
       <div class="manager-essence-core-fields">
         <Field as="label" for="manager-essence-edit-name">
           <span>{text('FABRICATE.Admin.Manager.Essence.Name', 'Name')}</span>
+          <!-- `data-validation-target` is the CONTROL half of the validation row action
+               (issue 1517): the `name` blocker addresses this input by this exact value, and
+               `validationFocus.js` resolves, focuses and marks it. -->
           <input
             id="manager-essence-edit-name"
+            data-validation-target="essence-name"
             type="text"
             value={name}
             oninput={(event) => onNameChange(event.currentTarget.value)}
@@ -118,6 +134,7 @@
           <span>{text('FABRICATE.Admin.Manager.Essence.Description', 'Description')}</span>
           <textarea
             id="manager-essence-edit-description"
+            data-validation-target="essence-description"
             rows="5"
             value={description}
             oninput={(event) => onDescriptionChange(event.currentTarget.value)}
@@ -131,7 +148,16 @@
     </div>
   </section>
 
-  <section class="manager-edit-card" data-manager-essence-colour>
+  <!-- THE CONTROL HALF for the `colour` row (issue 1517). The palette is an inline grid of
+       swatches rather than one control, so the CARD is the destination — the same set-level rule
+       the icon panel above follows — and `essenceStudio.js` addresses it as `essence-colour`. -->
+  <section
+    class="manager-edit-card"
+    data-manager-essence-colour
+    data-validation-target="essence-colour"
+    tabindex="-1"
+    data-keyboard-focus="true"
+  >
     <div class="manager-edit-card-heading">
       <h3 class="manager-card-title">
         {text('FABRICATE.Admin.Manager.Essence.Colour.Label', 'Colour')}

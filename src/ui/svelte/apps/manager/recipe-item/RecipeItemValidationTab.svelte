@@ -41,7 +41,54 @@
     linkedItem = null,
     visibilityMode = 'item',
     validation = null,
+    // THE ROW ACTION (issue 1517). `(target, focusTarget)` — the tab the editor switches to, and
+    // the `data-validation-target` value of the control that is wrong. The editor owns both
+    // moves; this tab only carries the address.
+    onSelectIssue = () => {},
   } = $props();
+
+  /**
+   * A FAILING CHECK'S TWO ADDRESSES (issue 1517).
+   *
+   * `target` is the ROUTE — the editor tab that hosts the gap — and `focusTarget` is the
+   * CONTROL, the value of the `data-validation-target` attribute the offending control carries
+   * in that tab. The four checks this tab renders each name one control, so there is no
+   * route-only row here today; the shape still spreads, so a fifth check that names none can be
+   * added as `{ target }` alone without changing anything else.
+   *
+   * The four addresses, and the files that carry them:
+   *
+   *  - `recipe-item-source`       -> `RecipeItemOverviewTab.svelte`, the Item drop zone
+   *  - `recipe-item-link-recipe`  -> `RecipeItemContentsTab.svelte`, the Link recipe trigger
+   *  - `recipe-item-uses`         -> `RecipeItemLimitsTab.svelte`, the uses-per-copy stepper
+   *  - `recipe-item-learns`       -> `RecipeItemLimitsTab.svelte`, the recipes-allowed stepper
+   *
+   * Written as literals on both sides rather than shared through an import, for the reason
+   * `recipe/recipeReadiness.js` gives: sharing them would put this module in the closure of
+   * every suite that mounts one of those three tabs. What holds the two sides together instead
+   * is `tests/components/recipe-item-validation-tab-mounted.test.js`, which reads the address
+   * this tab hands the row action AND resolves it against the destination files' own source.
+   */
+  const CHECK_ADDRESSES = {
+    itemLinked: { target: 'overview', focusTarget: 'recipe-item-source' },
+    recipeLinked: { target: 'contents', focusTarget: 'recipe-item-link-recipe' },
+    usesValid: { target: 'limits', focusTarget: 'recipe-item-uses' },
+    learnsValid: { target: 'limits', focusTarget: 'recipe-item-learns' },
+  };
+
+  /**
+   * The address bag for one row, or nothing.
+   *
+   * A PASSING check gets no address at all, which is what keeps the View button off every row
+   * of a healthy recipe item: the action exists to reach a defect, and a tick has none.
+   *
+   * @param {{id?: string, ok?: boolean}} check
+   * @returns {{target?: string, focusTarget?: string}}
+   */
+  function addressFor(check) {
+    if (!check || check.ok) return {};
+    return CHECK_ADDRESSES[check.id] ?? {};
+  }
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -119,7 +166,7 @@
         }
       : {
           icon: 'fas fa-circle-check',
-          title: text('FABRICATE.Admin.Manager.RecipeItem.Validation.SummaryAllClear', 'All clear'),
+          title: text('FABRICATE.Admin.Manager.Validation.SummaryAllClear', 'All clear'),
           sub: text(
             'FABRICATE.Admin.Manager.RecipeItem.Validation.SummaryAllClearSub',
             'Every check passes. This recipe item is ready to use.'
@@ -133,6 +180,7 @@
       status: check.ok ? 'pass' : 'block',
       title: check.label || checkLabel(check.id),
       dataAttrs: { 'data-ok': check.ok },
+      ...addressFor(check),
     }))
   );
 
@@ -140,15 +188,20 @@
     text('FABRICATE.Admin.Manager.RecipeItem.Validation.Title', 'Validation')
   );
 
-  // Two entries, not three: the surface draws the counts it is REPORTED, and this check set
-  // has no warning tier at all (issue 797, decision 1).
-  const countLabels = $derived({
-    passing: text('FABRICATE.Admin.Manager.RecipeItem.Validation.CountPassing', 'Passing'),
-    blocking: text('FABRICATE.Admin.Manager.RecipeItem.Validation.CountBlocking', 'Blocking'),
-  });
-
+  // THE COUNT WORDS ARE NOT PASSED AT ALL, and the STATUS WORDS ARE PASSED FOR ONE WORD
+  // (issue 1517, docs round). `Passing`, `Blocking` and `Pass` were byte-identical copies of the
+  // vocabulary `EditorValidationSurface` already defaults to, written into this namespace — the
+  // second home the design-system requirement's "lives once" sentence forbids. Two entries
+  // rather than three is still what this tab reports, because the surface draws the tiles it is
+  // given a COUNT for and this check set has no warning tier (issue 797, decision 1); dropping
+  // the labels changes nothing about that.
+  //
+  // `block` STAYS ITS OWN WORD, and that is the other half of the same rule. The shared default
+  // is the ENABLE-gated wording — `Blocks enable` — and a recipe item has no enable gate: it
+  // works for players or it does not, which is why its blocked verdict reads `Cannot be used`.
+  // So this surface localizes the one word that is genuinely its own and takes the rest.
   const statusLabels = $derived({
-    pass: text('FABRICATE.Admin.Manager.RecipeItem.Validation.StatusPass', 'Pass'),
+    pass: text('FABRICATE.Admin.Manager.Validation.StatusPass', 'Pass'),
     block: text('FABRICATE.Admin.Manager.RecipeItem.Validation.StatusBlock', 'Block'),
   });
 
@@ -180,10 +233,11 @@
     sub: summaryMeta.sub,
   }}
   counts={{ passing: passingCount, blocking: blockingCount }}
-  {countLabels}
   {groups}
   {statusLabels}
   rowDataAttr="data-recipe-item-check"
+  viewDataAttr="data-recipe-item-validation-view"
+  {onSelectIssue}
   hookAttrs={{
     root: { 'data-recipe-item-tab': 'validation', 'aria-label': tabTitle },
     summaryRow: { 'data-recipe-item-section': 'validation-summary' },

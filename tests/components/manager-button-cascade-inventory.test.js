@@ -305,9 +305,13 @@ const CONVERTED_BATCHES = Object.freeze([
       Object.freeze({ file: 'src/ui/svelte/apps/manager/ImportReportModal.svelte', sites: 1 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/InlineVocabularyAdd.svelte', sites: 1 }),
       Object.freeze({ file: 'src/ui/svelte/apps/manager/SystemOverviewView.svelte', sites: 1 }),
+      // REBOOKED AT 0 BY ISSUE 1517, not dropped. See the fifth licensed movement below: the
+      // environment editor's Validation tab adopted `EditorValidationSurface`, whose own row
+      // action renders the button now, so this file renders none directly. The row stays so it
+      // keeps answering the two ledger checks below.
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/environment/EnvironmentValidationTab.svelte',
-        sites: 1,
+        sites: 0,
       }),
       Object.freeze({
         file: 'src/ui/svelte/apps/manager/knowledge/KnowledgeOwnedCopyRow.svelte',
@@ -1467,11 +1471,21 @@ test('the corpus is not vacuous, so the assertions above cannot pass over nothin
   // screen, in a file the ledger already holds. The component COUNT does not move with them —
   // the file stays booked at 0 rather than being dropped, so it keeps answering the two ledger
   // checks below — which is why 41 is unchanged while 128 is not.
+  //
+  // AND 124 -> 123 AT ISSUE 1517, the fifth licensed movement and the same shape as the fourth:
+  // the environment editor's Validation tab was converted onto `EditorValidationSurface`, so its
+  // one deep-link site left the product on this screen by being ABSORBED into a shared
+  // primitive's own row action — one rendered button where there was one, drawn by a different
+  // file. That is the same cause issue 1444 booked for `recipe/RecipeValidationTab` and it is
+  // licensed for the same reason: the site left the SCREEN rather than leaving the
+  // instrument's view, in a file the ledger already holds. The component count stays 41,
+  // because the file is rebooked at 0 rather than dropped and so keeps answering the two ledger
+  // checks below.
   const converted = CONVERTED_BATCHES.flatMap((batch) => batch.files);
   assert.equal(
     cascade.convertingSites.length + converted.reduce((total, file) => total + file.sites, 0),
-    124,
-    'the conversion is 124 sites, whether or not a given one has been converted yet'
+    123,
+    'the conversion is 123 sites, whether or not a given one has been converted yet'
   );
   assert.equal(
     new Set(cascade.convertingSites.map((site) => site.file)).size + converted.length,

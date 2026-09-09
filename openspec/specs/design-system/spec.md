@@ -1236,20 +1236,36 @@ The manager's shell selects full width per VIEW rather than per tab, so an edito
 A passing group still renders, so a GM sees what was checked rather than inferring it from silence, and blocking issues sort above warnings inside a group.
 Each issue offers an action that moves focus to the offending control.
 
+- the action has ONE implementation, `src/ui/svelte/apps/manager/validationFocus.js`;
+- an issue names TWO things — the route that brings its subject into view, and the subject itself, which is EITHER a control carrying `data-validation-target` or a record the route selects; the route is applied first and the subject is resolved after the destination has rendered, because a validation surface and its destination are mutually exclusive branches of one tab chain;
+- where the action reaches no control — the row named none, the one it named resolved to nothing, or the resolved element was refused — the action still moves focus to the destination panel, which declares `tabindex="-1"` and `data-keyboard-focus="true"`, so no activation leaves focus on the document body;
+- the action refuses a destination it cannot, or must not, move the keyboard into rather than appearing to focus it; a disabled control is the one case this refusal reaches in ordinary use, so the row still changes route and simply leaves focus where it was;
+- the destination is marked visibly however it was reached: the module's `:focus-visible` repaint covers the keyboard path, and because a programmatic focus following a pointer activation matches `:focus` but not `:focus-visible` — and the module's `:focus` reset strips the platform ring — the action additionally marks the focused control for the pointer path.
+  That mark is rooted at the module, not at the validation family, which declares no focus rule of its own and must not begin to;
+- the action's OUTCOME — where the GM landed and what now holds focus — is announced through a polite live region hosted by the editor shell rather than by the validation surface, because the surface is unmounted by the very route change it would announce.
+  Focus moves first and the announcement follows.
+
 The arrangement is fixed because validation is where a GM goes when something is wrong, which is the worst moment to make them learn a second layout.
 
 The arrangement has ONE implementation, `src/ui/svelte/components/EditorValidationSurface.svelte`, and an editor that draws it MUST render through that component rather than restate its markup.
 That is what makes the sentence above enforceable rather than aspirational: while a second copy of the markup exists, "the same arrangement" is a convention each copy is free to drift from, and the two class families the sheet paints it with have more than one writer.
 A site whose DOM hooks, root classes, status words or reported counts differ passes them as props, and a site needing something the surface does not draw extends the surface rather than forking it.
+The shared count, status and verdict vocabulary lives once, under `FABRICATE.Admin.Manager.Validation.*`, and a surface localizes only the words that are genuinely its own.
+That shared wording is the ENABLE-GATED one — `Blocks enable`, `Cannot be enabled`, `Saves and enables` — because most of these records are things a GM enables.
+A surface whose record has no enable gate localizes the words that gate colours, and only those: a recipe item is used rather than enabled, so it says `Block` and `Cannot be used` and takes every other word from the shared home.
 The counts are a closed, ordered vocabulary the surface owns — pass, then warning, then blocking — and a site reports the subset it can answer rather than choosing an order or inventing a fourth.
+The count rail, the verdict and the rendered rows are one reading of one state.
+The surface is HANDED its counts, so the rule belongs to the site: the site derives the counts from the rows it renders, rather than reading the evaluation a second time, so a rail cannot report a state its own list contradicts.
 "The subset it can answer" bars inventing a FIGURE as surely as it bars inventing a word: a count a surface's own report cannot derive is omitted, never shown as a zero or against a denominator the report does not hold.
 The system overview route is the worked case — it reports warning and blocking, omits pass because its report counts ISSUES rather than checks run and so has nothing to derive one from, and gives a severity outside the three, such as `info`, no chip of its own.
 That route is outside this requirement's scope for the reason recorded below, and the subset rule still binds it, because it reaches the route through the VOCABULARY this paragraph closes rather than through the arrangement the requirement fixes — a closed vocabulary is closed wherever its words are used.
 
-One editor does not use the arrangement yet, and it is recorded here rather than left to be rediscovered: the environment editor's validation tab renders check and issue LISTS inside cards, carries severity on a chip, and has no verdict medallion, no counts rail and no grouped row stack.
-It writes none of the arrangement's classes, so it is a REDESIGN of that screen rather than an adoption, and it is outstanding conformance debt against this requirement rather than an exemption from it.
+The Component Rules tab and the three world scoped entry pages render the shared surface but their producers name no route, so they offer no focus action yet.
+That is outstanding debt against this requirement rather than an exemption, and a follow-up issue is owed under epic #1495 — owed rather than named, because none has been filed.
 The system overview route is NOT in this requirement's scope and is recorded alongside it so the two are not confused: it collects every issue across a whole crafting system, groups them by the entity that owns each one, and is a route rather than an editor's tab.
-Both measurements live in `scripts/lib/designSystemPrimitives.json` so that neither is re-proposed as an unconverted call site of the shared surface.
+The system overview measurement lives in `scripts/lib/designSystemPrimitives.json` so that it is not re-proposed as an unconverted call site of the shared surface.
+A site's `data-*-validation-summary` hook value is deliberately the CALLER's own word while the emitted CLASS is the surface's resolved one, so the divergence is not re-proposed as a defect.
+The environment editor's validation tab was ADJUDICATED a different surface at issue 1444, and issue 1517 OVERTURNED that ruling on the ground that this requirement admits no second renderer, so a future audit reading the 1444 reasoning finds the overturn rather than a contradiction.
 
 #### Scenario: A GM opens validation on a different editor
 
@@ -1261,6 +1277,25 @@ Both measurements live in `scripts/lib/designSystemPrimitives.json` so that neit
 - **WHEN** an editor's validation tab needs its own DOM hooks, root classes, status words or a count it does not report
 - **THEN** it renders the shared surface and passes them as props
 - **AND** it does not restate the surface's markup in its own template
+
+#### Scenario: A GM activates an issue's action
+
+- **WHEN** a GM activates the action on a validation issue
+- **THEN** the editor shows the part of the record the issue belongs to
+- **AND** focus lands on the offending control
+- **AND** the control is visibly marked whether the GM used a pointer or the keyboard
+- **AND** where they landed is announced after focus has moved
+
+#### Scenario: An issue names a control that cannot hold focus
+
+- **WHEN** the named control is neither natively focusable nor made focusable
+- **THEN** the editor still shows the part of the record the issue belongs to
+- **AND** it does not report a focus move it did not make
+
+#### Scenario: A GM opens the environment editor's validation tab
+
+- **WHEN** a GM opens it
+- **THEN** they see the same verdict, counts and grouped issues as every other editor
 
 ### Requirement: A player chooses the item, not just the requirement
 

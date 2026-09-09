@@ -60,6 +60,8 @@
   } from './checksReadiness.js';
   import Callout from '../Callout.svelte';
   import CheckModeCallout from './CheckModeCallout.svelte';
+  import { focusValidationTarget } from '../validationFocus.js';
+  import { announceValidationOutcome } from '../validationAnnouncement.js';
   import InspectorCard from '../../../components/InspectorCard.svelte';
   import { checkIssueCopy, interpolate } from './checksCopy.js';
   import {
@@ -755,10 +757,71 @@
     })
   );
 
-  /** Deep-link from the Validation route to the control that raised an issue. */
-  function selectIssue(target) {
+  // ── THE VALIDATION ROW ACTION (issue 1517) ──────────────────────────────────────────────
+  //
+  // This studio's own root, so `focusValidationTarget` resolves a `data-validation-target`
+  // inside THIS route rather than anywhere in the manager window.
+  let checksRoot = $state(null);
+
+  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME, not a count. Activating a row action
+  // changes no tally, so a count-subjected region would recite an unchanged number at the
+  // moment a GM most needs to know where they landed.
+  let issueAnnouncement = $state('');
+
+  // The destination SECTION PANEL, and it is the focus fallback for a route-only row
+  // (issue 1517). Eleven of the sixteen registered issues carry no control address, so this is
+  // the majority path here rather than an edge.
+  let sectionPanel = $state(null);
+
+  /** The activity's own name, from the rail's key, so one word is not spelt two ways. */
+  function activityLabel(id) {
+    const key = `FABRICATE.Admin.Manager.Checks.Tabs.${id[0].toUpperCase()}${id.slice(1)}`;
+    return text(key, id);
+  }
+
+  /** The section's own name, from the strip's table for the same reason. */
+  function sectionLabel(id) {
+    const meta = SECTION_META[id];
+    if (!meta) return '';
+    return text(`FABRICATE.Admin.Manager.Checks.Sections.${meta.labelKey}`, meta.labelFallback);
+  }
+
+  /**
+   * Deep-link from the Validation route to the control that raised an issue: open the ACTIVITY
+   * and the SECTION that own the gap, THEN move focus to the offending control.
+   *
+   * THE ORDER IS THE MECHANISM, not a preference. `onOpenActivity` is the router's own
+   * synchronous state write — the same one the rail's click makes — so Svelte has flushed the
+   * route change and the destination panel exists by the time the focus helper's
+   * `queueMicrotask` runs its query. Everything after that — the panel fallback, the sentence,
+   * and the delay that queues it behind the focus utterance — belongs to
+   * `validationAnnouncement.js`, which owns it for all five hosts.
+   *
+   * A ROUTE-ONLY ROW IS NORMAL HERE. Eleven of the sixteen registered issues carry no control
+   * address — see the table in `ChecksValidationTab.svelte` — so the focus helper resolves
+   * `null` and the SECTION PANEL takes the keyboard instead, with the announcement naming the
+   * route it opened. Leaving focus where it was is not the alternative: the row's own button is
+   * unmounted by the route change, so focus would fall to `<body>` and every Foundry keybinding
+   * would go live under a GM who is looking at an open window.
+   *
+   * @param {{activity?: string, section?: string}} target the ROUTE the row carries.
+   * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
+   */
+  function selectIssue(target, focusTarget) {
     if (!target?.activity) return;
-    onOpenActivity(target.activity, target.section || 'roll');
+    const section = target.section || 'roll';
+    onOpenActivity(target.activity, section);
+    announceValidationOutcome({
+      root: checksRoot,
+      routeLabel: [activityLabel(target.activity), sectionLabel(section)]
+        .filter(Boolean)
+        .join(' — '),
+      focus: () => focusValidationTarget(checksRoot, focusTarget),
+      fallbackPanel: sectionPanel,
+      announce: (sentence) => {
+        issueAnnouncement = sentence;
+      },
+    });
   }
 
   const configTitle = text('FABRICATE.Admin.Manager.Checks.Configuration', 'Configuration');
@@ -1547,7 +1610,30 @@
   />
 {/snippet}
 
-<div class="manager-environment-edit-view" data-environment-editor data-checks-editor>
+<div
+  class="manager-environment-edit-view"
+  data-environment-editor
+  data-checks-editor
+  bind:this={checksRoot}
+>
+  <!--
+    THE ROW ACTION'S LIVE REGION, and it is HOSTED HERE rather than in the validation surface
+    for a reason that is not stylistic (issue 1517). Activating a row action routes to another
+    ACTIVITY, which unmounts the whole validation panel — live region included — in the same
+    update that was supposed to announce. So the element carrying `aria-live` is ALWAYS in the
+    DOM, outside the `{#if activity === 'validation'}` chain below, with its own `{#if}` INSIDE
+    it.
+
+    A THIRD CHILD OF THIS TWO-ROW GRID IS SAFE, which is worth saying because it would not be
+    if the element were in flow: `.visually-hidden` is `position: absolute`, so it is not a
+    grid item at all and consumes no track of `grid-template-rows: auto minmax(0, 1fr)`.
+
+    It wears the shipped `.visually-hidden` utility, rooted at the MODULE, and is addressed by
+    a `data-` hook rather than a class, so it joins no pinned class family.
+  -->
+  <div class="visually-hidden" role="status" aria-live="polite" data-checks-issue-announcement>
+    {#if issueAnnouncement}{issueAnnouncement}{/if}
+  </div>
   {#if activity !== 'validation'}
     <ChecksEditorTabs
       {sections}
@@ -1559,11 +1645,19 @@
   {/if}
 
   <div class="manager-environment-workspace">
+    <!-- `tabindex="-1"` and `data-keyboard-focus="true"` are the ROUTE-ONLY row's focus
+         destination (issue 1517): eleven of the sixteen registered issues name a route and no
+         control, and the button they were activated from is unmounted by that route change, so
+         without this focus falls to `<body>` and every Foundry keybinding goes live. `-1`, not
+         `0`: the panel is a programmatic destination, not a tab stop. -->
     <div
       class="manager-environment-tab-panel"
       role="tabpanel"
       id={`checks-panel-${activity === 'validation' ? 'validation' : activeSection}`}
       aria-labelledby={activity === 'validation' ? undefined : `checks-section-${activeSection}`}
+      tabindex="-1"
+      data-keyboard-focus="true"
+      bind:this={sectionPanel}
     >
       {#if paneHead && !routeIsOff}
         <header class="manager-checks-pane-head" data-checks-pane-head={activeSection}>

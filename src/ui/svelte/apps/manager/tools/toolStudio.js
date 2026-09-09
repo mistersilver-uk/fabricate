@@ -281,6 +281,85 @@ const VALIDATION_CHECK_BY_ERROR = {
 };
 
 /**
+ * WHICH EDITOR TAB HOSTS EACH CHECK — the ROUTE half of a validation row's address
+ * (issue 1517).
+ *
+ * `general` is deliberately absent. Its rows are the errors the projection could not place at
+ * all, so there is no tab that is where they are fixed; a route invented for them would send a
+ * GM to a screen chosen at random.
+ */
+const CHECK_ROUTE = {
+  breakage: 'breakage',
+  onBreak: 'breakage',
+  repair: 'breakage',
+  prerequisites: 'requirements',
+  bonus: 'requirements',
+};
+
+/**
+ * WHICH CONTROL EACH FAILURE NAMES — the `data-validation-target` half, keyed by the projected
+ * error rather than by the check (issue 1517).
+ *
+ * Keyed by ERROR because the `breakage` check is five different controls depending on the
+ * breakage mechanic: `limitedUses` configures a uses stepper, `breakageChance` a percentage
+ * slider, `diceExpression` a formula field beside a threshold stepper. One address per CHECK
+ * would have to name one of them and be wrong in the other two states, and the state it is
+ * wrong in is the one the GM is looking at.
+ *
+ * The addresses, and the files that carry them:
+ *
+ *  - `tool-max-uses`            -> `ToolBreakageTab.svelte`, the limited-uses stepper input
+ *  - `tool-breakage-chance`     -> `ToolBreakageTab.svelte`, the chance slider's number input
+ *  - `tool-breakage-formula`    -> `ToolBreakageTab.svelte`, the dice formula field
+ *  - `tool-breakage-threshold`  -> `ToolBreakageTab.svelte`, the break-below stepper input
+ *  - `tool-on-break`            -> `ToolBreakageTab.svelte`, the on-break fieldset, which is
+ *                                  also where the repair requirements are authored
+ *  - `tool-prerequisites`       -> `ToolRequirementsTab.svelte`, the prerequisite section
+ *  - `tool-bonus`               -> `ToolRequirementsTab.svelte`, the bonus section
+ *
+ * ROUTE-ONLY IS A STATED OUTCOME. `ValidationErrorBreakageMode` names the mechanic CHOICE, which
+ * is a radio group rather than one control, so it emits a route and no control. So does any
+ * check the local predicate failed without the domain validator naming a field — there is a tab
+ * to open and nothing in it to point at — and so does every `general` row, which has neither.
+ */
+const CONTROL_BY_ERROR = {
+  ValidationErrorMaxUses: 'tool-max-uses',
+  ValidationErrorChance: 'tool-breakage-chance',
+  ValidationErrorFormula: 'tool-breakage-formula',
+  ValidationErrorThreshold: 'tool-breakage-threshold',
+  ValidationErrorOnBreakMode: 'tool-on-break',
+  ValidationErrorReplacement: 'tool-on-break',
+  ValidationErrorReplacementSame: 'tool-on-break',
+  ValidationErrorRepair: 'tool-on-break',
+  ValidationErrorPrerequisites: 'tool-prerequisites',
+  ValidationErrorBonus: 'tool-bonus',
+};
+
+/**
+ * The two addresses one Validation row carries, as a spreadable bag.
+ *
+ * `target` is the ROUTE — the editor tab the host switches to — and `focusTarget` is the
+ * CONTROL, the value of the `data-validation-target` attribute the offending control carries.
+ * An empty address produces NO key rather than an empty one: the host treats any non-empty
+ * string as a control it must resolve, so a `focusTarget: ''` would ask it to query for
+ * something that cannot exist and the row would report as focus-wired while focusing nothing.
+ *
+ * A PASSING check gets no address at all, which is what keeps the View button off the eight
+ * rows of a healthy Tool: the action exists to reach a defect, and a tick has none.
+ *
+ * @param {{id?: string, valid?: boolean, errors?: string[]}} check one row's check.
+ * @returns {{target?: string, focusTarget?: string}}
+ */
+export function toolIssueAddress(check) {
+  if (!check || check.valid) return {};
+  const route = CHECK_ROUTE[check.id];
+  if (!route) return {};
+  const firstError = Array.isArray(check.errors) ? check.errors[0] : undefined;
+  const control = firstError ? CONTROL_BY_ERROR[toolValidationPresentation(firstError).key] : '';
+  return control ? { target: route, focusTarget: control } : { target: route };
+}
+
+/**
  * Project model validation details onto stable presentation categories.
  * Unknown model or service details deliberately collapse to a safe generic
  * message instead of exposing field paths or implementation terminology.

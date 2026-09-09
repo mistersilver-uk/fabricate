@@ -33,7 +33,13 @@
   import RecipeAccessTab from './recipe/RecipeAccessTab.svelte';
   import RecipeBooksScrollsTab from './recipe/RecipeBooksScrollsTab.svelte';
   import RecipeValidationTab from './recipe/RecipeValidationTab.svelte';
-  import { evaluateRecipeReadiness, blocksEnable } from './recipe/recipeReadiness.js';
+  import {
+    blocksEnable,
+    countRecipeReadiness,
+    evaluateRecipeReadiness,
+  } from './recipe/recipeReadiness.js';
+  import { focusValidationTarget } from './validationFocus.js';
+  import { announceValidationOutcome } from './validationAnnouncement.js';
   import { resolutionModeOptions } from './resolutionModeOptions.js';
 
   let {
@@ -325,12 +331,14 @@
       }
     )
   );
-  const errorCount = $derived(
-    readiness.issues.filter((issue) => issue.severity === 'critical').length
-  );
-  const warningCount = $derived(
-    readiness.issues.filter((issue) => issue.severity === 'warning').length
-  );
+  // THE BADGE IS THE VALIDATION TAB'S OWN COUNTS, READ THROUGH THE SHARED TALLY (issue 1517,
+  // docs round). It used to count `critical` and `warning` ISSUES here while the tab it badges
+  // drew a row per readiness CHECK — so an unnamed step in a multi-step recipe, which raises no
+  // issue at all, painted an amber row inside a tab whose strip showed nothing. Two numbers
+  // describing one screen have to be one number.
+  const validationCounts = $derived(countRecipeReadiness(readiness));
+  const errorCount = $derived(validationCounts.blocking);
+  const warningCount = $derived(validationCounts.warnings);
 
   // Tab count badges (issue 643 §F1): Ingredients / Results / Tools carry a mono
   // count so the strip reads like the prototype. Multi-step recipes sum each tab's
@@ -442,18 +450,78 @@
     if (!TAB_IDS.includes(activeTab)) activeTab = 'overview';
   });
 
-  // Deep-link from a validation issue: switch to the tab that hosts the gap.
-  function selectIssue(targetTab) {
-    if (['overview', 'ingredients', 'results', 'tools'].includes(targetTab)) {
-      activeTab = targetTab;
-    }
+  // The four routes a validation row may address. Written once so the guard below and the
+  // announcement's own label lookup cannot disagree about which tabs are reachable.
+  const ISSUE_TABS = {
+    overview: { key: 'FABRICATE.Admin.Manager.Recipe.Tabs.Overview', fallback: 'Overview' },
+    ingredients: {
+      key: 'FABRICATE.Admin.Manager.Recipe.Tabs.Ingredients',
+      fallback: 'Ingredients',
+    },
+    results: { key: 'FABRICATE.Admin.Manager.Recipe.Tabs.Results', fallback: 'Results' },
+    tools: { key: 'FABRICATE.Admin.Manager.Recipe.Tabs.Tools', fallback: 'Tools' },
+  };
+
+  // The editor's own root, so `focusValidationTarget` resolves a `data-validation-target`
+  // inside THIS editor rather than anywhere in the manager window.
+  let editorRoot = $state(null);
+
+  // WHAT THE LIVE REGION SAYS, and it is the ACTION'S OUTCOME rather than a count. Activating
+  // a row action changes no tally, so a count-subjected region would recite an unchanged
+  // number at the moment a GM most needs to know where they landed.
+  let issueAnnouncement = $state('');
+
+  // The destination TAB PANEL, and it is the focus fallback for a route-only row (issue 1517).
+  // It is one element outside the tab chain rather than one per branch, so the reference stays
+  // valid across the route change the row action just made.
+  let tabPanel = $state(null);
+
+  // Deep-link from a validation issue: switch to the tab that hosts the gap, THEN move focus
+  // to the offending control.
+  //
+  // THE ORDER IS THE MECHANISM, not a preference. The route is set synchronously and FIRST, so
+  // Svelte has flushed it and the destination panel exists by the time the focus helper's
+  // `queueMicrotask` runs its query. Everything after that — the panel fallback for a
+  // route-only row, the sentence, and the delay that queues it behind the focus utterance —
+  // belongs to `validationAnnouncement.js`, which owns it for all five hosts.
+  function selectIssue(targetTab, focusTarget) {
+    const route = Object.hasOwn(ISSUE_TABS, targetTab) ? targetTab : null;
+    if (route) activeTab = route;
+    announceValidationOutcome({
+      root: editorRoot,
+      routeLabel: route ? text(ISSUE_TABS[route].key, ISSUE_TABS[route].fallback) : '',
+      focus: () => focusValidationTarget(editorRoot, focusTarget),
+      fallbackPanel: tabPanel,
+      announce: (sentence) => {
+        issueAnnouncement = sentence;
+      },
+    });
   }
 </script>
 
 <main
   class="manager-main manager-recipe-edit-main"
   aria-label={text('FABRICATE.Admin.Manager.Recipe.EditTitle', 'Edit recipe')}
+  bind:this={editorRoot}
 >
+  <!--
+    THE ROW ACTION'S LIVE REGION, and it is HOSTED HERE rather than in the validation surface
+    for a reason that is not stylistic (issue 1517). Activating a row action sets `activeTab`
+    to another value, which unmounts the whole validation panel — live region included — in
+    the same update that was supposed to announce. So the element carrying `aria-live` is
+    ALWAYS in the DOM, outside both the `{#if recipe}` guard and the `{#if activeTab}` chain
+    below, with its own `{#if}` INSIDE it. That is the same idiom, and the same reason, as
+    `world/WorldCurrencyTab.svelte`'s currency report.
+
+    It wears the shipped `.visually-hidden` utility (`styles/fabricate.css`, rooted at the
+    MODULE) and is addressed by a `data-` hook. It carries NO `manager-recipe-*` class on
+    purpose: `manager-recipe-val*` and `manager-recipe-rail*` are a pinned family with an
+    explicit anchors list, so a natural name here would join that family and change its
+    census.
+  -->
+  <div class="visually-hidden" role="status" aria-live="polite" data-recipe-issue-announcement>
+    {#if issueAnnouncement}{issueAnnouncement}{/if}
+  </div>
   {#if recipe}
     <div class="fab-stack" data-gap="3" data-recipe-editor>
       <!-- Header → tabs → banner → content (§4.2): the banner sits BELOW the tab strip
@@ -485,11 +553,18 @@
         onAction={onOpenCraftingSettings}
       />
 
+      <!-- `tabindex="-1"` and `data-keyboard-focus="true"` are the ROUTE-ONLY row's focus
+           destination (issue 1517): a row that names a tab and no control leaves focus on a
+           button this update unmounts, and `<body>` is where every Foundry keybinding is live.
+           `-1`, not `0`: the panel is a programmatic destination, not a tab stop. -->
       <div
         class="manager-editor-tab-panel"
         role="tabpanel"
         id={`recipe-panel-${activeTab}`}
         aria-labelledby={`recipe-tab-${activeTab}`}
+        tabindex="-1"
+        data-keyboard-focus="true"
+        bind:this={tabPanel}
       >
         {#if activeTab === 'overview'}
           <RecipeOverviewTab

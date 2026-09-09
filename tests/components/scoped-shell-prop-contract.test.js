@@ -1479,14 +1479,16 @@ describe('the shared validation tab states its entry face as an opt-in prop', ()
 
   it('the three row badges are the reference’s tone table in the shipped English', () => {
     // `proto:4573-4575` gives `Blocking` / `Warning` / `Pass`. The block word is the only one a
-    // call site chooses; the other two are shared recipe keys, and this pins that all three agree
-    // rather than leaving the run reading `Blocking / WARNING / PASS`.
+    // call site chooses; the other two come from the SHARED validation vocabulary — the recipe
+    // editor's namespace until issue 1517 moved it to `Admin.Manager.Validation`, which is where
+    // every validation surface now reads its tile and pill words from — and this pins that all
+    // three agree rather than leaving the run reading `Blocking / WARNING / PASS`.
     const lang = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
-    const recipe = lang.FABRICATE.Admin.Manager.Recipe.Validation;
+    const shared = lang.FABRICATE.Admin.Manager.Validation;
     const component = lang.FABRICATE.Admin.Manager.Scoped.Component;
     assert.equal(component.ValidationStatusBlock, 'Blocking');
-    assert.equal(recipe.StatusWarn, 'Warning');
-    assert.equal(recipe.StatusPass, 'Pass');
+    assert.equal(shared.StatusWarn, 'Warning');
+    assert.equal(shared.StatusPass, 'Pass');
   });
 
   it('the entry’s superseded hero keys are GONE, not merely unread', () => {

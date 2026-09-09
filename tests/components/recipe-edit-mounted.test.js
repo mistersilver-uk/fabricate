@@ -8,6 +8,7 @@ import {
   SEARCHABLE_POPOVER_RAW_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { Recipe } from '../../src/models/Recipe.js';
+import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
 import {
   TOOL_DISPLAY_PRECEDENCE_CASES,
   flattenToolForRecipeLibrary,
@@ -65,6 +66,16 @@ const RAW_MODULES = [
   'src/ui/svelte/apps/manager/recipe/ingredientKindMeta.js',
   // The validation tab consumes the pure readiness evaluator.
   'src/ui/svelte/apps/manager/recipe/recipeReadiness.js',
+  // RecipeEditView resolves, focuses and marks the control a validation row addresses
+  // through this pure leaf (issue 1517). This harness DOES validate its dependency graph,
+  // so omitting it throws a named "add it to rawModules" error rather than hanging.
+  'src/ui/svelte/apps/manager/validationFocus.js',
+  // …and the announcement half beside it (issue 1517, review r1): the panel fallback for a
+  // route-only row, the control's accessible name, and the handoff to the module's shared
+  // "move focus, then announce" ordering rule — which is why `util/announceAfterFocus.js` is
+  // a raw module here too. It was five copies inside five hosts before it was one leaf.
+  'src/ui/svelte/apps/manager/validationAnnouncement.js',
+  'src/ui/svelte/util/announceAfterFocus.js',
   // The validation tab localizes a signature-collision blocker row via this pure
   // leaf (issue 549).
   'src/utils/recipeActivationMessages.js',
@@ -6288,6 +6299,50 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     ],
   };
 
+  // ── THE STRIP'S BADGE AND THE TAB'S RAIL ARE ONE READING (issue 1517, docs round) ──────────
+  //
+  // They were two. The badge counted `critical` and `warning` ISSUES while the tab drew a row per
+  // readiness CHECK, and `stepsNamed` is the check nothing raises an issue for — so a multi-step
+  // recipe with one unnamed step painted an amber row inside a tab whose strip showed no badge at
+  // all. Both now read `countRecipeReadiness`, which tallies the row states the list itself is
+  // built from, so this fixture is the state where the old pair disagreed.
+  const UNNAMED_STEP_RECIPE = {
+    ...COMPLETE_RECIPE,
+    steps: [
+      {
+        id: 'step-1',
+        name: 'Crush',
+        ingredientSets: COMPLETE_RECIPE.ingredientSets,
+        resultGroups: COMPLETE_RECIPE.resultGroups,
+      },
+      {
+        id: 'step-2',
+        name: '',
+        ingredientSets: COMPLETE_RECIPE.ingredientSets,
+        resultGroups: COMPLETE_RECIPE.resultGroups,
+      },
+    ],
+  };
+
+  it('badges an unnamed step with the same warnings count its own rail shows', async () => {
+    const target = await openValidation(UNNAMED_STEP_RECIPE);
+
+    assert.equal(
+      target.querySelectorAll('[data-issue]').length,
+      0,
+      'the fixture raises no issue at all, which is what made the two numbers part'
+    );
+    assert.equal(counts(target).warnings, 1, 'the rail counts the unnamed step');
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-recipe-tab-button="validation"] .manager-editor-tab-badge')].map(
+        (node) => node.textContent.trim()
+      ),
+      ['1'],
+      'and so does the strip badge, which showed nothing here'
+    );
+    editHarness.remount();
+  });
+
   it('renders the aggregate summary + count table as a header on the Validation tab', async () => {
     const target = await openValidation(COMPLETE_RECIPE);
     assert.ok(
@@ -6375,6 +6430,254 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
       assert.equal(summaryStatus(target), expected, 'the status matches the rows below it');
       editHarness.remount();
     }
+  });
+
+  // ── THE ROW ACTION MOVES FOCUS, AND SAYS SO (issue 1517) ────────────────────────────────
+  //
+  // A validation row carries two independent addresses: `target`, the ROUTE, and
+  // `focusTarget`, the CONTROL — the value of a `data-validation-target` attribute the
+  // offending control carries. The editor sets the route synchronously and FIRST, then awaits
+  // `focusValidationTarget`, then writes the announcement FROM the element that resolved.
+  //
+  // EVERY FOCUS ASSERTION BELOW ALSO READS THE FOCUSABILITY OFF THE DOM, and that is not
+  // belt-and-braces. happy-dom focuses ANYTHING — `.focus()` on a bare `<div>` sets
+  // `document.activeElement` — so "the destination holds focus" is vacuous on its own, with a
+  // named mutation: delete `tabindex="-1"` from a card root and keep `data-keyboard-focus`,
+  // and an `activeElement`-only assertion still passes while a real browser focuses nothing.
+  // The attribute is read with `getAttribute` and the tag with `tagName`, NEVER by calling
+  // `isFocusable` — re-using the helper as its own oracle would give the refusal path and the
+  // assertion that proves it a single point of failure.
+  //
+  // The REFUSAL branch itself is proved in `tests/components/validation-focus.test.js`, on a
+  // constructed unfocusable destination: every destination the recipe editor actually stamps
+  // is focusable, so the refusal cannot be reached from this tree without breaking one.
+  const NAMELESS_RECIPE = { ...COMPLETE_RECIPE, name: '' };
+
+  const RESULTLESS_RECIPE = { ...COMPLETE_RECIPE, resultGroups: [] };
+
+  // Two alternatives inside ONE requirement that expand to the same component: the
+  // `duplicateAlternative` blocker, whose subject is that requirement's own card.
+  const DUPLICATE_ALTERNATIVE_RECIPE = {
+    ...COMPLETE_RECIPE,
+    ingredientSets: [
+      {
+        id: 'set-1',
+        name: 'Set 1',
+        ingredientGroups: [
+          {
+            id: 'grp-dup',
+            options: [
+              { id: 'o1', match: { type: 'component', componentId: 'cmp-herb' }, quantity: 1 },
+              { id: 'o2', match: { type: 'component', componentId: 'cmp-herb' }, quantity: 1 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  // Identity, asserted as a BOOLEAN. Handing a live happy-dom element to `node:assert`
+  // renders its subtree, its parents and its owner document when the assertion fails, which
+  // takes the process out with a heap OOM — a real failure wearing a crash's costume, at
+  // exactly the moment someone is reading it.
+  function assertIs(actual, expected, message) {
+    assert.equal(actual === expected, true, message);
+  }
+
+  function announcement(target) {
+    return target.querySelector('[data-recipe-issue-announcement]').textContent.trim();
+  }
+
+  /**
+   * Wait for a sentence that is QUEUED BEHIND A FOCUS UTTERANCE (issue 1157, adopted here at
+   * 1517's review round).
+   *
+   * A `polite` region is queued speech and a focus change CANCELS queued speech, so the
+   * announcement is written after the move rather than with it — the rule
+   * `src/ui/svelte/util/announceAfterFocus.js` owns for the whole module, and which this row
+   * action now goes through instead of holding a third policy of its own. The delay is IMPORTED:
+   * a local copy of the number would silently start asserting the un-delayed state the moment the
+   * rule changed it.
+   */
+  async function flushAnnouncement() {
+    await new Promise((resolve) => setTimeout(resolve, ANNOUNCE_AFTER_FOCUS_MS + 40));
+    await flushRender();
+  }
+
+  function tabPanel(target) {
+    return target.querySelector('.manager-editor-tab-panel');
+  }
+
+  async function activateIssueView(target, issueId) {
+    const button = target.querySelector(`[data-issue="${issueId}"] [data-recipe-issue-view]`);
+    assert.ok(button, `the ${issueId} row renders a View button`);
+    button.click();
+    await flushRender();
+    return button;
+  }
+
+  it('hosts the live region OUTSIDE the tab chain, so the route change cannot unmount it', async () => {
+    // The defect this shape exists to prevent: the surface that would otherwise host the
+    // region is inside the `{:else if activeTab === "validation"}` branch, so activating a row
+    // action unmounts the region in the same update that was supposed to announce.
+    const target = await editHarness.mount(identityProps({ recipe: NAMELESS_RECIPE }));
+    assert.ok(
+      target.querySelector('[data-recipe-issue-announcement]'),
+      'the region is in the DOM on the Overview tab, before any validation row exists'
+    );
+    await openTab(target, 'validation');
+    assert.ok(
+      target.querySelector('[data-recipe-issue-announcement]'),
+      'and still on the Validation tab'
+    );
+    assert.equal(announcement(target), '', 'with nothing to say until an action is taken');
+    editHarness.remount();
+  });
+
+  it('routes to Overview and focuses the name input for the blocked-name row', async () => {
+    const target = await openValidation(NAMELESS_RECIPE);
+
+    await activateIssueView(target, 'noName');
+
+    assert.ok(target.querySelector('[data-recipe-tab="overview"]'), 'the route changed');
+    const control = target.querySelector('[data-validation-target="recipe-name"]');
+    assert.ok(control, 'the Overview tab carries the addressed control');
+    assertIs(document.activeElement, control, 'and it holds focus');
+    // Read off the DOM: a natively focusable element, not a div wearing a tabindex.
+    assert.equal(control.tagName, 'INPUT');
+    assert.equal(control.getAttribute('tabindex'), null, 'natively focusable, no tabindex needed');
+    assert.equal(
+      control.getAttribute('data-validation-focused'),
+      '',
+      'and it is marked, so a POINTER activation paints a ring the :focus reset would strip'
+    );
+    assert.equal(
+      announcement(target),
+      '',
+      'and the region is EMPTY while the move is in flight — it is cleared before the move and ' +
+        'written after it, which is what makes a REPEAT activation of the same row a change the ' +
+        'live region announces rather than an identical string reassigned in silence'
+    );
+
+    await flushAnnouncement();
+    assert.equal(
+      announcement(target),
+      'Overview — Recipe name',
+      'the region names the destination it reached, once the focus utterance has had its turn'
+    );
+    editHarness.remount();
+  });
+
+  it('announces AGAIN when the same row is activated a second time', async () => {
+    // THE STATE A GM REACHES BY PRESSING AGAIN because they are not sure it worked. A live region
+    // announces a CHANGE of text, and the second activation composes the same sentence, so
+    // assigning it was a no-op and the second press was silent. The region is cleared first, so
+    // the same sentence arrives as two changes rather than one assignment. Asserting the EMPTY
+    // intermediate is what makes this real: "the sentence is there afterwards" passes either way.
+    const target = await openValidation(NAMELESS_RECIPE);
+    await activateIssueView(target, 'noName');
+    await flushAnnouncement();
+    assert.equal(announcement(target), 'Overview — Recipe name');
+
+    await openTab(target, 'validation');
+    await activateIssueView(target, 'noName');
+    assert.equal(announcement(target), '', 'the second activation clears the region first');
+
+    await flushAnnouncement();
+    assert.equal(announcement(target), 'Overview — Recipe name', 'and writes it again');
+    editHarness.remount();
+  });
+
+  it('drops the mark once focus moves elsewhere', async () => {
+    // A LEAKED MARK IS THE DEFECT INVERTED: a permanent accent outline on the last-focused
+    // control, which outlives the interaction instead of merely missing during it.
+    const target = await openValidation(NAMELESS_RECIPE);
+    await activateIssueView(target, 'noName');
+    const control = target.querySelector('[data-validation-target="recipe-name"]');
+    assert.equal(control.getAttribute('data-validation-focused'), '');
+
+    target.querySelector('[data-recipe-field="description"]').focus();
+    await flushRender();
+
+    assert.equal(
+      control.getAttribute('data-validation-focused'),
+      null,
+      'the mark is gone from the control that lost focus'
+    );
+    editHarness.remount();
+  });
+
+  it('focuses the offending REQUIREMENT card, which declares itself focusable', async () => {
+    const target = await openValidation(DUPLICATE_ALTERNATIVE_RECIPE);
+
+    await activateIssueView(target, 'duplicateAlternative');
+
+    assert.ok(target.querySelector('[data-recipe-tab="ingredients"]'), 'the route changed');
+    const card = target.querySelector('[data-validation-target="ingredient-group-grp-dup"]');
+    assert.ok(card, 'the requirement card carries its own address');
+    assertIs(document.activeElement, card, 'and it holds focus');
+    // Read off the DOM. A card root is NOT natively focusable, so it must declare both — the
+    // tabindex that makes the focus real and the attribute that tells Foundry the window is
+    // focused, without which Space pauses the game and the arrows pan the canvas.
+    assert.equal(card.getAttribute('tabindex'), '-1');
+    assert.equal(card.getAttribute('data-keyboard-focus'), 'true');
+    assert.equal(card.getAttribute('data-validation-focused'), '');
+    editHarness.remount();
+  });
+
+  it('stamps every RESULT SET card with its own address, so its producer resolves', async () => {
+    // The DESTINATION half of the `result-group-<id>` pair. Its producer half — the
+    // `unroutedResultGroup` warning emitting that exact address — is asserted in
+    // `tests/components/recipe-validation-tab.test.js`, which can drive the routed check-mode
+    // recipe that raises it. Together they close the loop the row action depends on: a
+    // producer emitting an address no control carries is the null query this contract exists
+    // to prevent, and neither half alone can see it.
+    const target = await editHarness.mount(identityProps({ recipe: COMPLETE_RECIPE }));
+    await openTab(target, 'results');
+    const card = target.querySelector('[data-validation-target="result-group-grp-1"]');
+    assert.ok(card, 'the result set card carries the address its producer emits');
+    assert.equal(card.getAttribute('tabindex'), '-1');
+    assert.equal(card.getAttribute('data-keyboard-focus'), 'true');
+    editHarness.remount();
+  });
+
+  it('changes route and focuses the destination PANEL for a row that carries no focusTarget', async () => {
+    // ROUTE-ONLY IS A STATED OUTCOME, NOT A SILENT ONE. `noResultGroup` fires when the step
+    // has no result set at all, so there is no card to address; the remedy is the tab's own
+    // adder. This asserts WHICH of the two the row is, so a `focusTarget` going missing from
+    // a row that should have one reds here rather than degrading into a tab switch that
+    // focuses nothing and that nobody notices.
+    //
+    // AND FOCUS STILL MOVES. Activating the row unmounts the Validation panel the View button
+    // was in, so "no control to focus" used to mean focus fell to `<body>` — where every Foundry
+    // keybinding is live: Space pauses the game, the arrows pan the canvas behind the window and
+    // Tab walks out of the application. The destination TAB PANEL takes it instead.
+    const target = await openValidation(RESULTLESS_RECIPE);
+
+    await activateIssueView(target, 'noResultGroup');
+
+    assert.ok(target.querySelector('[data-recipe-tab="results"]'), 'the route still changed');
+    const panel = tabPanel(target);
+    assert.ok(Boolean(panel), 'the editor renders its tab panel');
+    assertIs(document.activeElement, panel, 'and the panel holds focus, not `<body>`');
+    // Read off the DOM, never through `isFocusable`: happy-dom focuses anything, so the
+    // attributes are what make the assertion above mean something in a real browser.
+    assert.equal(panel.getAttribute('tabindex'), '-1', 'a programmatic destination, not a tab stop');
+    assert.equal(panel.getAttribute('data-keyboard-focus'), 'true', 'and it declares itself focused');
+    assertIs(
+      target.querySelector('[data-validation-focused]')?.tagName ?? null,
+      null,
+      'nothing is MARKED: the accent ring names the control a row addressed, and this row ' +
+        'addressed none — the panel is where focus went, not what the row was about'
+    );
+
+    await flushAnnouncement();
+    assert.equal(
+      announcement(target),
+      'Results',
+      'and the region names the destination alone, with no control — the panel is not one'
+    );
+    editHarness.remount();
   });
 
   // The mini-list is NOT coming back: the grouped rows below ARE the list, and the rail

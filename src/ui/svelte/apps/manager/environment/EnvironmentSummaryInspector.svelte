@@ -6,7 +6,7 @@
   import { dragDrop } from '../../../actions/dragDrop.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
   import { sceneDocumentImage } from '../../../util/sceneImages.js';
-  import { evaluateEnvironmentReadiness } from './environmentReadiness.js';
+  import { countReadiness, evaluateEnvironmentReadiness } from './environmentReadiness.js';
   import IconButton from '../../../components/IconButton.svelte';
 
   let { environment = null, composition = { counts: {} }, onUpdate = () => {} } = $props();
@@ -23,10 +23,12 @@
     environment?.compositionMode === 'manual' ? 'manual' : 'automatic'
   );
   const readiness = $derived(evaluateEnvironmentReadiness(environment || {}, composition || {}));
-  const critical = $derived(
-    readiness.issues.filter((issue) => issue.severity === 'critical').length
-  );
-  const warning = $derived(readiness.issues.filter((issue) => issue.severity === 'warning').length);
+  // THE SAME TWO NUMBERS THE VALIDATION TAB AND THE TAB BADGE REPORT (issue 1517), through the
+  // one accessor all three read. Counting severities here made this card the third answer to one
+  // question: an `info` note appeared in the tab's Warnings tile and nowhere on this chip.
+  const validationCounts = $derived(countReadiness(readiness));
+  const critical = $derived(validationCounts.blocking);
+  const warning = $derived(validationCounts.warnings);
 
   const sceneUuid = $derived(String(environment?.sceneUuid || ''));
   let sceneThumb = $state('');
@@ -175,12 +177,18 @@
       'Validation summary'
     )}
   </h3>
+  <!-- THE CHIPS NAME THE POPULATION THEY COUNT (issue 1517). They read `Critical` and `Warning`,
+       the domain's SEVERITY words, while counting two severities out of three — so an `info` note
+       appeared in neither chip and the Validation tab's own rail contradicted this card. They now
+       report the same two numbers the rail and the tab badge do, through the one accessor, and
+       take that vocabulary's words: what a GM is being told is how many things BLOCK enabling and
+       how many are worth a look, which is not a severity ranking. -->
   <div class="manager-chip-row">
     <Chip tone={critical > 0 ? 'danger' : 'positive'}
-      >{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity.critical', 'Critical')}: {critical}</Chip
+      >{text('FABRICATE.Admin.Manager.Validation.CountBlocking', 'Blocking')}: {critical}</Chip
     >
     <Chip tone={warning > 0 ? 'warning' : 'neutral'}
-      >{text('FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity.warning', 'Warning')}: {warning}</Chip
+      >{text('FABRICATE.Admin.Manager.Validation.CountWarnings', 'Warnings')}: {warning}</Chip
     >
   </div>
 </InspectorCard>
