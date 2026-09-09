@@ -79,7 +79,7 @@ export function normalizeJournalRunDismissals(value) {
 }
 
 function terminalRun(run) {
-  return ['complete', 'completed', 'cancelled', 'failed', 'archived'].includes(
+  return ['succeeded', 'complete', 'completed', 'cancelled', 'failed', 'archived'].includes(
     String(run?.status ?? '').toLowerCase()
   );
 }
