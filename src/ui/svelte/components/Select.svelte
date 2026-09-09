@@ -119,12 +119,15 @@
                  It cannot carry a `title`, an `aria-label` or an `aria-labelledby`:
                  `SearchablePopover` spreads it FIRST and then writes all three from its own
                  props, so any of the three placed here is deleted. `triggerTitle` is the route
-                 for the first, `ariaLabel`/`ariaLabelledBy` for the other two.
+                 for the first, `ariaLabel`/`ariaLabelledBy` for the other two. `aria-describedby`
+                 rides `ariaDescribedBy` for the same reason and not this map.
     triggerTitle — a native `title` tooltip on the trigger button, forwarded verbatim to
                  `SearchablePopover`'s own prop of that name. It exists because that is the only
                  route: a `title` inside `triggerData` is overwritten by the primitive's own
-                 write. Its callers are the two manager sites whose control already carried a
-                 tooltip as well as an accessible name, and it is not a substitute for either.
+                 write. It has NO caller on this commit: the two
+                 manager sites whose control carries a tooltip as well as an accessible name
+                 (`recipe/RecipeOverviewTab.svelte` and `recipe/RecipeIngredientOption.svelte`)
+                 convert at issue 1510's second phase. It is not a substitute for either name.
     label / hint / error — present ⇒ the whole control renders inside `<Field as="div">`, with a
                  caption span before the trigger and the hint or error span after it. The caption is
                  given an id and pointed at with `aria-labelledby` because there is no `id`-bearing
@@ -140,6 +143,14 @@
                  trigger: `label`/`ariaLabel` reach it as the primitive's `dialogAriaLabel` and
                  `ariaLabelledBy` as its `dialogAriaLabelledBy`, so a control named by a caption
                  it already renders no longer opens a dialog and a listbox with no name at all.
+    ariaDescribedBy — the trigger's `aria-describedby`, for a CALLER that renders its own hint or
+                 error beside the control. It overrides the default, which is this component's own
+                 `hint`/`error` span in the labelled form: that span is drawn AFTER the trigger and
+                 the trigger is a `<button>` with no containment, so without a describedby the
+                 hint was on screen and announced by nothing. A caller passing this points at its
+                 own element instead — the currency card's spend-strategy hint, which the caller
+                 draws because it is conditional on the chosen strategy. Never routed through
+                 `triggerData`; see the note there.
     id / name  — the specimen marks both required because a `<label for>` and an error message
                  reference them. Neither is required here and the reason is structural: the
                  labelled form names its trigger with `aria-labelledby`, so there is no `for`/`id`
@@ -222,6 +233,7 @@
     error = '',
     ariaLabel = '',
     ariaLabelledBy = '',
+    ariaDescribedBy = '',
     id = '',
     name = '',
     readonly = false,
@@ -238,6 +250,7 @@
   // their trigger at the same caption.
   const instanceId = $props.id();
   const captionId = `${instanceId}-caption`;
+  const noteId = `${instanceId}-note`;
 
   const rung = $derived(Object.hasOwn(SIZES, size) ? size : FALLBACK_SIZE);
   const band = $derived(SIZES[rung]);
@@ -254,6 +267,15 @@
   // no label at all.
   const labelledByTarget = $derived(ariaLabelledBy || (label ? captionId : ''));
   const labelTarget = $derived(labelledByTarget ? '' : ariaLabel);
+
+  // THE DESCRIPTION IS THE SPAN THIS COMPONENT ALREADY DRAWS, unless the caller names its own.
+  // The labelled form renders the hint or the error AFTER the trigger with nothing pointing at
+  // it, and a `<button>` has no containment that would announce it — so the note was visible and
+  // silent. A caller's own `ariaDescribedBy` wins because a caller that draws the hint itself
+  // (a conditional one, say) has the id the trigger must point at and this component does not.
+  const describedByTarget = $derived(
+    ariaDescribedBy || (labelled && (error || hint) ? noteId : '')
+  );
 
   /**
    * The primitive's option array, built at the ONE point where the two vocabularies meet.
@@ -458,6 +480,7 @@
     {triggerTitle}
     triggerAriaLabel={labelTarget}
     triggerAriaLabelledBy={labelledByTarget}
+    triggerAriaDescribedBy={describedByTarget}
     triggerAriaDisabled={readonly}
     dialogAriaLabel={label || ariaLabel}
     dialogAriaLabelledBy={ariaLabelledBy}
@@ -491,9 +514,9 @@
     <span class="fabricate-select-caption" id={captionId}>{label}</span>
     {@render control()}
     {#if error}
-      <span class="fabricate-select-error">{error}</span>
+      <span class="fabricate-select-error" id={noteId}>{error}</span>
     {:else if hint}
-      <span class="fabricate-select-note">{hint}</span>
+      <span class="fabricate-select-note" id={noteId}>{hint}</span>
     {/if}
   </Field>
 {:else}

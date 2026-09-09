@@ -432,6 +432,74 @@ describe('1504 Select — the select every screen renders', () => {
       harness.remount();
     });
 
+    it('points the trigger at the note it draws, so a hint is announced as well as visible', async () => {
+      // THE HINT WAS ON SCREEN AND READ BY NOTHING. The labelled form draws its note AFTER the
+      // trigger and the trigger is a `<button>`, so there is no containment to announce it and
+      // no `for`/`id` pair to complete — exactly the structural gap `aria-labelledby` already
+      // answers for the NAME. `aria-describedby` is the description's counterpart, and the
+      // assertion resolves the pointer to the rendered TEXT rather than to an id, because an id
+      // that points at nothing is the failure this exists to catch.
+      await mountSelect({ label: 'Resolution', hint: 'Applies to every recipe here.' });
+      const describedBy = trigger().getAttribute('aria-describedby');
+      assert.ok(Boolean(describedBy), 'the labelled form describes its trigger by its own note');
+      assert.equal(
+        harness.target.querySelector(`#${describedBy}`)?.textContent.trim(),
+        'Applies to every recipe here.',
+        'and the pointer resolves to the hint the GM can see'
+      );
+      harness.remount();
+
+      // THE ERROR TAKES THE SAME POINTER, because the two spans are one slot: the form renders
+      // the error INSTEAD of the hint, so a control in an error state must describe itself by the
+      // line it is actually drawing.
+      await mountSelect({
+        label: 'Resolution',
+        hint: 'Applies to every recipe here.',
+        error: 'Pick a resolution mode.',
+      });
+      const errorPointer = trigger().getAttribute('aria-describedby');
+      assert.equal(
+        harness.target.querySelector(`#${errorPointer}`)?.textContent.trim(),
+        'Pick a resolution mode.',
+        'the error replaces the hint in the column, so it replaces it in the announcement too'
+      );
+      harness.remount();
+
+      // A CALLER'S OWN ELEMENT WINS. A caller whose hint is conditional draws it itself — the
+      // world currency spend strategy is the shipped case — and then the primitive has no id to
+      // offer and the caller does.
+      const external = document.createElement('span');
+      external.id = 'select-described-by-probe';
+      external.textContent = 'Drawn by the caller.';
+      document.body.append(external);
+      try {
+        await mountSelect({ label: 'Resolution', hint: 'Ignored.', ariaDescribedBy: external.id });
+        assert.equal(
+          trigger().getAttribute('aria-describedby'),
+          external.id,
+          'a caller that states the pointer owns it, because it owns the element'
+        );
+        harness.remount();
+      } finally {
+        external.remove();
+      }
+
+      // AND NOTHING TO DESCRIBE MEANS NO ATTRIBUTE, rather than one pointing at no element.
+      await mountSelect({ label: 'Resolution' });
+      assert.ok(
+        !trigger().getAttribute('aria-describedby'),
+        'a labelled form with no hint and no error describes nothing'
+      );
+      harness.remount();
+
+      await mountSelect({ ariaLabel: 'Resolution' });
+      assert.ok(
+        !trigger().getAttribute('aria-describedby'),
+        'and the bare form draws no note at all, so it points at none'
+      );
+      harness.remount();
+    });
+
     /**
      * THE PANEL IS A SECOND NAMED SURFACE, and the source-reading gate structurally cannot see it.
      *
@@ -1078,6 +1146,39 @@ describe('1504 Select — the select every screen renders', () => {
       assert.ok(
         !trigger().getAttribute('aria-invalid'),
         'and a valid select carries no aria-invalid at all, rather than "false"'
+      );
+      harness.remount();
+    });
+
+    it('forwards triggerTitle onto the trigger, and drops a title placed in triggerData', async () => {
+      // THE PROP EXISTS BECAUSE `triggerData` CANNOT CARRY A TITLE, and that claim is what this
+      // pins. `SearchablePopover` spreads `triggerData` FIRST and then writes `title` from its
+      // own prop, so a caller's `triggerData.title` is deleted rather than merged — silently, and
+      // in the direction where the tooltip simply never appears. Both halves are asserted: the
+      // forwarded title WINS, and the map's is gone even when it is the only one passed.
+      await mountSelect({
+        triggerTitle: 'System actions',
+        triggerData: { title: 'ignored' },
+      });
+      assert.equal(
+        trigger().getAttribute('title'),
+        'System actions',
+        'the prop is the route, and it beats a title placed in triggerData'
+      );
+      harness.remount();
+
+      await mountSelect({ triggerData: { title: 'ignored' } });
+      assert.ok(
+        !trigger().getAttribute('title'),
+        'and a title in triggerData alone reaches the trigger not at all — which is why the ' +
+          'prop had to exist, rather than being a convenience beside a working route'
+      );
+      harness.remount();
+
+      await mountSelect({});
+      assert.ok(
+        !trigger().getAttribute('title'),
+        'and a select with no tooltip carries no empty title attribute'
       );
       harness.remount();
     });
