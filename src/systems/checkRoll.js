@@ -567,11 +567,14 @@ export async function evaluatePreparedCheck(preparation, actor, decision = {}) {
   const source = preparation && typeof preparation === 'object' ? preparation : {};
   const options = source.options && typeof source.options === 'object' ? source.options : {};
   const secret = source.secret === true;
+  const rollDecision = validatedPreparedDecision(decision, options.modifierChoice);
+  // Secrecy is authoritative, not a default that the player's roll-mode choice may override.
+  if (secret) rollDecision.rollMode = 'gmroll';
   const result = await evaluateCheckRoll(source.formula, actor, {
     ...options,
     interactive: true,
     prompt: null,
-    rollDecision: validatedPreparedDecision(decision, options.modifierChoice),
+    rollDecision,
     post: secret,
     includeRollHandoff: !secret,
   });
