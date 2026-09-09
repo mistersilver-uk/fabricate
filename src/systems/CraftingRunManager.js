@@ -139,19 +139,22 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return run;
   }
 
-  async updateRun(actor, run, { expectedRevision = undefined } = {}) {
+  async updateRun(actor, run, { expectedRevision = undefined, executionOperationId = null } = {}) {
     const isCurrentLifecycle = getRunLifecycleContract(run) === 'current';
     if (isCurrentLifecycle) this.invalidateCache(actor.id);
     const container = this._getContainer(actor);
     const persistedRun = container.active[run.id];
     if (!persistedRun) return null;
     if (isCurrentLifecycle) {
-      this._assertRunMutation(persistedRun, { expectedRevision: run.runRevision });
+      this._assertRunMutation(persistedRun, {
+        expectedRevision: run.runRevision,
+        executionOperationId,
+      });
       if (expectedRevision !== undefined) {
-        this._assertRunMutation(persistedRun, { expectedRevision });
+        this._assertRunMutation(persistedRun, { expectedRevision, executionOperationId });
       }
     }
-    this._assertRunMutation(run, { expectedRevision });
+    this._assertRunMutation(run, { expectedRevision, executionOperationId });
     incrementRunRevision(run);
     run.updatedAt = this._nowWorldTime();
     container.active[run.id] = run;
@@ -301,8 +304,8 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return Number(worldTime) >= Number(step.timeGate.availableAt || 0);
   }
 
-  async markStepInProgress(actor, run, stepIndex) {
-    this._assertRunMutation(run);
+  async markStepInProgress(actor, run, stepIndex, options = {}) {
+    this._assertRunMutation(run, options);
     const worldTime = this._nowWorldTime();
     const step = run.steps?.[stepIndex];
     if (!step) return run;
@@ -311,12 +314,12 @@ export class CraftingRunManager extends RunContainerManagerBase {
     step.status = 'inProgress';
     step.startedAt ??= worldTime;
     step.updatedAt = worldTime;
-    await this.updateRun(actor, run);
+    await this.updateRun(actor, run, options);
     return run;
   }
 
-  async completeStepSuccess(actor, run, stepIndex, payload = {}) {
-    this._assertRunMutation(run);
+  async completeStepSuccess(actor, run, stepIndex, payload = {}, options = {}) {
+    this._assertRunMutation(run, options);
     const worldTime = this._nowWorldTime();
     const step = run.steps?.[stepIndex];
     if (!step) return run;
@@ -332,7 +335,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
 
     const nextIndex = stepIndex + 1;
     if (nextIndex >= (run.steps?.length || 0)) {
-      return this.completeRun(actor, run, 'succeeded');
+      return this.completeRun(actor, run, 'succeeded', options);
     }
 
     run.currentStepIndex = nextIndex;
@@ -343,12 +346,19 @@ export class CraftingRunManager extends RunContainerManagerBase {
       nextStep.startedAt ??= worldTime;
       nextStep.updatedAt = worldTime;
     }
-    await this.updateRun(actor, run);
+    await this.updateRun(actor, run, options);
     return run;
   }
 
-  async completeStepFailure(actor, run, stepIndex, reason = 'Crafting check failed', payload = {}) {
-    this._assertRunMutation(run);
+  async completeStepFailure(
+    actor,
+    run,
+    stepIndex,
+    reason = 'Crafting check failed',
+    payload = {},
+    options = {}
+  ) {
+    this._assertRunMutation(run, options);
     const worldTime = this._nowWorldTime();
     const step = run.steps?.[stepIndex];
     if (!step) return run;
@@ -363,13 +373,24 @@ export class CraftingRunManager extends RunContainerManagerBase {
     step.usedTools = payload.usedTools || step.usedTools || [];
     step.createdResults = payload.createdResults || step.createdResults || [];
 
-    return this.completeRun(actor, run, 'failed');
+    return this.completeRun(actor, run, 'failed', options);
   }
 
-  async completeRun(actor, run, status = 'succeeded') {
+  async completeRun(actor, run, status = 'succeeded', options = {}) {
+    if (options.executionOperationId) this.invalidateCache(actor.id);
     const container = this._getContainer(actor);
-    if (!container.active?.[run.id]) return run;
-    this._assertRunMutation(run, { allowPaused: status === 'cancelled' });
+    const persistedRun = container.active?.[run.id];
+    if (!persistedRun) return run;
+    if (options.executionOperationId) {
+      this._assertRunMutation(persistedRun, {
+        ...options,
+        expectedRevision: options.expectedRevision ?? run.runRevision,
+      });
+    }
+    this._assertRunMutation(run, {
+      ...options,
+      allowPaused: status === 'cancelled',
+    });
 
     run.status = status;
     run.currentStepIndex = null;
@@ -583,11 +604,21 @@ export class CraftingRunManager extends RunContainerManagerBase {
     };
   }
 
-  _assertRunMutation(run, { allowExecutionJournal = false, ...options } = {}) {
+  _assertRunMutation(
+    run,
+    { allowExecutionJournal = false, executionOperationId = null, ...options } = {}
+  ) {
     assertRunLifecycleMutation(run, options);
     if (!run?.executionJournal) return;
     const journal = observeExecutionJournal(run.executionJournal);
     if (!allowExecutionJournal && journal.status === 'planned') {
+      if (executionOperationId) {
+        if (journal.operationId === String(executionOperationId)) return;
+        throw new RunLifecycleError(
+          'The execution operation does not own this run',
+          'EXECUTION_OPERATION_MISMATCH'
+        );
+      }
       throw new RunLifecycleError(
         'The run already has an execution in progress',
         'EXECUTION_IN_PROGRESS'
