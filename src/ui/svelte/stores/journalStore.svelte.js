@@ -29,6 +29,8 @@ export function createJournalStore({ services } = {}) {
   let historyPageSize = $state(PAGE_SIZES[0]);
   let busyRunId = $state('');
   let busyRunKey = $state('');
+  let commandError = $state(null);
+  let commandRetry = null;
   let worldTimeTick = $state(0);
   let loadedOnce = $state(false);
   let viewedStageByRunKey = $state({});
@@ -110,10 +112,11 @@ export function createJournalStore({ services } = {}) {
       });
       listing = next ?? null;
       error = !next;
+      reconcileCommandError();
       reconcileSelection();
       clampPages();
     } catch {
-      error = true;
+      if (!quiet || !listing) error = true;
     } finally {
       loading = false;
       loadedOnce = true;
@@ -131,6 +134,15 @@ export function createJournalStore({ services } = {}) {
     selectedRunId = '';
   }
 
+  function reconcileCommandError() {
+    if (!commandError) return;
+    const actorUuid = listing?.selectedActorUuid ?? listing?.selectedActorId ?? null;
+    const all = [...(listing?.activeRuns ?? []), ...(listing?.history ?? [])];
+    const sameActor = commandError.actorUuid === actorUuid;
+    const runExists = all.some((run) => runKey(run, listing) === commandError.runKey);
+    if (!sameActor || !runExists) clearCommandError();
+  }
+
   function clampPages() {
     activePage = clampPage(activePage, activePageSize, activeRuns.length);
     historyPage = clampPage(historyPage, historyPageSize, sortedHistory.length);
@@ -140,6 +152,7 @@ export function createJournalStore({ services } = {}) {
     const run = resolveRun(runOrId, runType, listing);
     selectedRunId = run?.id ?? (typeof runOrId === 'string' ? runOrId : '');
     selectedRunKey = run ? runKey(run, listing) : '';
+    if (commandError && commandError.runKey !== selectedRunKey) clearCommandError();
   }
 
   function setSearch(next) {
@@ -238,11 +251,18 @@ export function createJournalStore({ services } = {}) {
       run?.actions?.[action] !== true
     )
       return;
+    clearCommandError();
     busyRunId = run.id;
     busyRunKey = runKey(run, listing);
+    const request = {
+      runKey: busyRunKey,
+      actorUuid: run.actorUuid ?? listing?.selectedActorUuid ?? null,
+      action,
+      payload: payload ?? {},
+    };
     try {
       const result = await services?.executeJournalRunCommand?.({
-        actorUuid: run.actorUuid ?? listing?.selectedActorUuid ?? null,
+        actorUuid: request.actorUuid,
         runType: run.runType,
         runId: run.id,
         expectedRevision: normalizeRevision(run.runRevision),
@@ -250,16 +270,54 @@ export function createJournalStore({ services } = {}) {
         payload: payload ?? {},
       });
       if (result?.cancelled === true) return;
-      if (result?.message) services?.notify?.(result.message);
+      const message = safeCommandMessage(result?.message);
+      if (result?.success === false) setCommandError(request, message);
+      if (message) services?.notify?.(message);
       await load(true);
     } catch (err) {
       console.error(`Fabricate | Error running Journal ${action} command:`, err);
-      services?.notify?.(services?.craftErrorMessage?.() ?? '');
+      const message = safeCommandMessage(services?.craftErrorMessage?.());
+      setCommandError(request, message);
+      services?.notify?.(message);
       await load(true);
     } finally {
       busyRunId = '';
       busyRunKey = '';
     }
+  }
+
+  function setCommandError(request, message) {
+    commandError = {
+      runKey: request.runKey,
+      actorUuid: request.actorUuid,
+      message,
+    };
+    commandRetry = request;
+  }
+
+  function clearCommandError() {
+    commandError = null;
+    commandRetry = null;
+  }
+
+  async function retryCommandError() {
+    const request = commandRetry;
+    if (!request) return;
+    const all = [...allActiveRuns, ...allHistoryRuns];
+    const run = all.find((candidate) => runKey(candidate, listing) === request.runKey);
+    if (
+      !run ||
+      run.lifecycleContract !== 'current' ||
+      run.actions?.[request.action] !== true
+    ) {
+      clearCommandError();
+      return;
+    }
+    return runCommand(run, request.action, request.payload);
+  }
+
+  function safeCommandMessage(value) {
+    return typeof value === 'string' ? value.trim() : '';
   }
 
   async function advanceLegacy(run) {
@@ -386,6 +444,9 @@ export function createJournalStore({ services } = {}) {
     get busyRunKey() {
       return busyRunKey;
     },
+    get commandError() {
+      return commandError;
+    },
     get loadedOnce() {
       return loadedOnce;
     },
@@ -438,6 +499,7 @@ export function createJournalStore({ services } = {}) {
     setHistoryPageSize,
     viewStage,
     returnToCurrentStage,
+    retryCommandError,
     execute,
     pause,
     resume,
