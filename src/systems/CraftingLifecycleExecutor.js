@@ -1,8 +1,8 @@
-import { getCommittedExecutionOutcome } from './runExecutionJournal.js';
+import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
 
 export class CraftingLifecycleExecutionError extends Error {
-  constructor(message, code, cause = undefined) {
+  constructor(message, code, cause) {
     super(message, cause ? { cause } : undefined);
     this.name = 'CraftingLifecycleExecutionError';
     this.code = code;
@@ -39,44 +39,66 @@ export class CraftingLifecycleExecutor {
       requestId,
       executionGrant,
     });
+    const persisted = this._currentRunAnyStatus(actor, runId);
+    const committed = persisted.executionJournal
+      ? getCommittedExecutionOutcome(persisted.executionJournal, requestId)
+      : null;
+    if (committed) return { run: persisted, outcome: committed, receipts: {} };
     const run = this._currentRun(actor, runId);
     this._assertExecutable(run, expectedRevision);
 
-    const committed = run.executionJournal
-      ? getCommittedExecutionOutcome(run.executionJournal, requestId)
-      : null;
-    if (committed) return { run, outcome: committed, receipts: {} };
-
-    const executable = normalizeOperation(operation);
+    const resolvedOperation =
+      typeof operation === 'function' ? await operation({ actor, run, trusted }) : operation;
+    const executable = normalizeOperation(resolvedOperation);
     await executable.validateTrusted?.(trusted);
     let current = run;
-    if (selectionPlan) {
-      current = await this.runManager.setStepSelectionPlan(
-        actor,
-        runId,
-        current.currentStepIndex,
-        selectionPlan,
-        { expectedRevision: current.runRevision }
+    const existingJournal = current.executionJournal
+      ? observeExecutionJournal(current.executionJournal)
+      : null;
+    let receipts = {};
+    if (existingJournal?.status === 'planned') {
+      assertResumableOperation(existingJournal, executable, trusted.operationId, requestId);
+      if (existingJournal.effects.some((effect) => effect.phase === 'applying')) {
+        await this._markRecoveryRequired(actor, current);
+        throw executionError('The crafting stage requires recovery', 'RECOVERY_REQUIRED');
+      }
+      receipts = Object.fromEntries(
+        existingJournal.effects
+          .filter((effect) => effect.phase === 'applied')
+          .map((effect) => [effect.effectId, effect.receipt])
       );
+    } else {
+      if (selectionPlan) {
+        current = await this.runManager.setStepSelectionPlan(
+          actor,
+          runId,
+          current.currentStepIndex,
+          selectionPlan,
+          { expectedRevision: current.runRevision }
+        );
+      }
+
+      current = await this._transition(actor, current, {
+        type: 'plan',
+        plan: {
+          operationId: trusted.operationId,
+          requestId,
+          baseRunRevision: current.runRevision,
+          intent: executable.intent,
+          effects: executable.effects.map(({ effectId, kind, planned }) => ({
+            effectId,
+            kind,
+            planned,
+          })),
+        },
+      });
     }
 
-    current = await this._transition(actor, current, {
-      type: 'plan',
-      plan: {
-        operationId: trusted.operationId,
-        requestId,
-        baseRunRevision: current.runRevision,
-        intent: executable.intent,
-        effects: executable.effects.map(({ effectId, kind, planned }) => ({
-          effectId,
-          kind,
-          planned,
-        })),
-      },
-    });
-
-    const receipts = {};
     for (const effect of executable.effects) {
+      const persisted = observeExecutionJournal(current.executionJournal).effects.find(
+        (entry) => entry.effectId === effect.effectId
+      );
+      if (persisted?.phase === 'applied') continue;
       current = await this._transition(actor, current, {
         type: 'effectApplying',
         effectId: effect.effectId,
@@ -84,12 +106,12 @@ export class CraftingLifecycleExecutor {
       let receipt;
       try {
         receipt = await effect.apply({ actor, run: current, trusted, receipts: { ...receipts } });
-      } catch (cause) {
+      } catch (error) {
         await this._markRecoveryRequired(actor, current);
         throw new CraftingLifecycleExecutionError(
           `Crafting effect "${effect.effectId}" requires recovery`,
           'RECOVERY_REQUIRED',
-          cause
+          error
         );
       }
       receipts[effect.effectId] = receipt ?? null;
@@ -100,12 +122,12 @@ export class CraftingLifecycleExecutor {
           effectId: effect.effectId,
           receipt: receipts[effect.effectId],
         });
-      } catch (cause) {
+      } catch (error) {
         await this._markRecoveryRequired(actor, current);
         throw new CraftingLifecycleExecutionError(
           `Crafting effect "${effect.effectId}" receipt could not be persisted`,
           'RECOVERY_REQUIRED',
-          cause
+          error
         );
       }
     }
@@ -180,11 +202,33 @@ export class CraftingLifecycleExecutor {
 
   async _markRecoveryRequired(actor, run) {
     try {
-      await this._transition(actor, run, { type: 'recoveryRequired' });
+      const current = this._currentRunAnyStatus(actor, run.id);
+      await this._transition(actor, current, { type: 'recoveryRequired' });
     } catch {
       // The applying record already makes replay unsafe. A second persistence failure
       // cannot be repaired here and must not obscure the original ambiguous effect.
     }
+  }
+}
+
+function assertResumableOperation(journal, executable, operationId, requestId) {
+  const expected = {
+    operationId: String(operationId ?? '').trim(),
+    requestId: String(requestId ?? '').trim(),
+    intent: executable.intent,
+    effects: executable.effects.map(({ effectId, kind, planned }) => ({ effectId, kind, planned })),
+  };
+  const persisted = {
+    operationId: journal.operationId,
+    requestId: journal.requestId,
+    intent: journal.intent,
+    effects: journal.effects.map(({ effectId, kind, planned }) => ({ effectId, kind, planned })),
+  };
+  if (JSON.stringify(persisted) !== JSON.stringify(expected)) {
+    throw executionError(
+      'The persisted crafting plan does not match this operation',
+      'PLAN_MISMATCH'
+    );
   }
 }
 
@@ -235,6 +279,6 @@ function executionError(message, code) {
 }
 
 function cloneJson(value) {
-  if (value === undefined) return undefined;
+  if (value === undefined) return;
   return JSON.parse(JSON.stringify(value));
 }

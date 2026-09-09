@@ -5,6 +5,7 @@ import {
   CraftingLifecycleExecutionError,
   CraftingLifecycleExecutor,
 } from '../src/systems/CraftingLifecycleExecutor.js';
+import { CraftingFizzleExecutor } from '../src/systems/CraftingFizzleExecutor.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { transitionExecutionJournal } from '../src/systems/runExecutionJournal.js';
@@ -96,6 +97,72 @@ test('CraftingLifecycleExecutor persists each journal phase around its effect se
   assert.equal(run.runRevision, 5);
 });
 
+test('CraftingLifecycleExecutor resumes an applied prefix without invoking it twice', async () => {
+  const events = [];
+  const plan = {
+    operationId: 'operation-resume',
+    requestId: 'request-resume',
+    baseRunRevision: 0,
+    intent: { stepIndex: 0 },
+    effects: [
+      { effectId: 'consume', kind: 'consumeIngredients', planned: { quantity: 2 } },
+      { effectId: 'award', kind: 'awardResults', planned: { quantity: 1 } },
+    ],
+  };
+  let journal = transitionExecutionJournal(null, { type: 'plan', plan });
+  journal = transitionExecutionJournal(journal, {
+    type: 'effectApplying',
+    effectId: 'consume',
+  });
+  journal = transitionExecutionJournal(journal, {
+    type: 'effectApplied',
+    effectId: 'consume',
+    receipt: { consumed: 2 },
+  });
+  const run = versionedRun({ runRevision: 3, executionJournal: journal });
+  const executor = new CraftingLifecycleExecutor({
+    runManager: fakeRunManager(run, events),
+    consumeExecutionGrant: async () => ({ operationId: 'operation-resume' }),
+  });
+
+  const result = await executor.execute({
+    actor: { id: 'actor-1' },
+    runId: run.id,
+    expectedRevision: 3,
+    requestId: 'request-resume',
+    executionGrant: 'private-grant',
+    operation: {
+      intent: plan.intent,
+      effects: [
+        {
+          ...plan.effects[0],
+          apply: async () => {
+            events.push('effect:consume-must-not-repeat');
+          },
+        },
+        {
+          ...plan.effects[1],
+          apply: async ({ receipts }) => {
+            assert.deepEqual(receipts.consume, { consumed: 2 });
+            events.push('effect:award');
+            return { created: 1 };
+          },
+        },
+      ],
+      outcome: ({ receipts }) => ({ success: true, created: receipts.award.created }),
+    },
+  });
+
+  assert.deepEqual(events, [
+    'journal:effectApplying:award',
+    'effect:award',
+    'journal:effectApplied:award',
+    'journal:commit',
+  ]);
+  assert.deepEqual(result.outcome, { success: true, created: 1 });
+  assert.equal(run.executionJournal.status, 'committed');
+});
+
 test('CraftingLifecycleExecutor marks an invoked ambiguous effect for recovery and never advances', async () => {
   const events = [];
   const run = versionedRun();
@@ -142,6 +209,53 @@ test('CraftingLifecycleExecutor marks an invoked ambiguous effect for recovery a
   assert.equal(run.executionJournal.effects[0].phase, 'applying');
 });
 
+test('CraftingLifecycleExecutor preserves prior receipts and refreshes before recovery after inner persistence', async () => {
+  const events = [];
+  const run = versionedRun();
+  const manager = fakeRunManager(run, events);
+  const executor = new CraftingLifecycleExecutor({
+    runManager: manager,
+    consumeExecutionGrant: async () => ({ operationId: 'operation-recovery' }),
+  });
+
+  await assert.rejects(
+    () =>
+      executor.execute({
+        actor: { id: 'actor-1' },
+        runId: run.id,
+        expectedRevision: 0,
+        requestId: 'request-recovery',
+        executionGrant: 'private-grant',
+        operation: {
+          intent: { stepIndex: 0 },
+          effects: [
+            {
+              effectId: 'consume',
+              kind: 'consumeIngredients',
+              planned: { quantity: 2 },
+              apply: async () => ({ consumed: 2 }),
+            },
+            {
+              effectId: 'award',
+              kind: 'awardResults',
+              planned: { quantity: 1 },
+              apply: async () => {
+                run.runRevision += 1;
+                throw new Error('award acknowledgement lost');
+              },
+            },
+          ],
+          outcome: { success: true },
+        },
+      }),
+    (error) => error.code === 'RECOVERY_REQUIRED'
+  );
+
+  assert.equal(run.executionJournal.status, 'recoveryRequired');
+  assert.deepEqual(run.executionJournal.effects[0].receipt, { consumed: 2 });
+  assert.equal(run.executionJournal.effects[1].phase, 'applying');
+});
+
 test('CraftingLifecycleExecutor refuses missing grants and paused or stale runs before effects', async () => {
   for (const scenario of [
     { run: versionedRun(), grant: null, code: 'AUTHORITY_UNAVAILABLE' },
@@ -176,6 +290,58 @@ test('CraftingLifecycleExecutor refuses missing grants and paused or stale runs 
     );
     assert.deepEqual(events, []);
   }
+});
+
+test('CraftingFizzleExecutor plans history before consumption and retains receipts on later ambiguity', async () => {
+  setupEngineFixture();
+  const actor = new FakeActor('fizzle-crafter');
+  const manager = new CraftingRunManager();
+  const events = [];
+  const executor = new CraftingFizzleExecutor({
+    runManager: manager,
+    consumeExecutionGrant: async () => ({ operationId: 'fizzle-operation' }),
+  });
+
+  await assert.rejects(
+    () =>
+      executor.execute({
+        actor,
+        requestId: 'fizzle-request',
+        executionGrant: 'fizzle-grant',
+        details: { craftingSystemId: 'alchemy', componentSourceActorUuids: ['Actor.source'] },
+        effects: [
+          {
+            effectId: 'consume',
+            kind: 'consumeAlchemyItem',
+            planned: { itemUuid: 'Actor.source.Item.herb', quantity: 1 },
+            apply: async () => {
+              events.push('consume');
+              return { itemUuid: 'Actor.source.Item.herb', consumedQuantity: 1 };
+            },
+          },
+          {
+            effectId: 'dead-end',
+            kind: 'recordAlchemyDeadEnd',
+            planned: { key: 'herb:1' },
+            apply: async () => {
+              events.push('dead-end');
+              throw new Error('flag write acknowledgement lost');
+            },
+          },
+        ],
+        outcome: { success: false, disposition: 'no-match', consumed: true },
+      }),
+    (error) => error.code === 'RECOVERY_REQUIRED'
+  );
+
+  manager.invalidateCache(actor.id);
+  const history = manager.getRunHistory(actor);
+  assert.deepEqual(events, ['consume', 'dead-end']);
+  assert.equal(history[0].executionJournal.status, 'recoveryRequired');
+  assert.deepEqual(history[0].executionJournal.effects[0].receipt, {
+    itemUuid: 'Actor.source.Item.herb',
+    consumedQuantity: 1,
+  });
 });
 
 class FakeActor {
@@ -278,7 +444,7 @@ test('CraftingEngine versioned start arms a timed stage with exact intent and ze
   assert.equal(started.waiting, true);
   assert.equal(deletes, 0);
   runManager.invalidateCache();
-  const persisted = runManager.getActiveRun(actor, started.run.id);
+  const persisted = runManager.getActiveRun(actor, started.runId);
   assert.equal(persisted.lifecycleVersion, 1);
   assert.equal(persisted.completionMode, 'worldTime');
   assert.equal(persisted.steps[0].preparedConsumption, undefined);
@@ -322,11 +488,11 @@ test('CraftingEngine routes ordinary versioned entry and cancellation through au
     selectionPlan: { selectedIngredientSetId: 'set-1' },
     executionGrant: 'grant',
   });
-  const cancelled = await engine.cancelCraft(actor, [source], started.run.id);
+  const cancelled = await engine.cancelCraft(actor, [source], started.runId);
   assert.equal(cancelled.requested, true);
   assert.deepEqual(calls, [
     ['start', 'recipe-1'],
-    ['cancel', started.run.id, started.run.runRevision],
+    ['cancel', started.runId, started.runRevision],
   ]);
 });
 
@@ -426,8 +592,8 @@ test('CraftingEngine local v1 cancellation forfeits deferred work without revers
   const cancelled = await engine.cancelVersionedRun({
     actor,
     componentSourceActors: [source],
-    runId: started.run.id,
-    expectedRevision: started.run.runRevision,
+    runId: started.runId,
+    expectedRevision: started.runRevision,
     executionGrant: 'cancel-grant',
   });
 
@@ -464,20 +630,200 @@ test('CraftingEngine executes a matured v1 stage with only its trusted check res
   const result = await engine.executeVersionedStage({
     actor,
     componentSourceActors: [source],
-    runId: started.run.id,
-    expectedRevision: started.run.runRevision,
+    runId: started.runId,
+    expectedRevision: started.runRevision,
     requestId: 'request-execute',
     executionGrant: 'execute-grant',
   });
 
   assert.equal(result.success, false);
-  assert.equal(result.message, 'Trusted check failed');
+  assert.equal('message' in result, false);
+  assert.equal('results' in result, false);
+  assert.equal(result.disposition, 'failed');
   runManager.invalidateCache();
   const history = runManager.getRunHistory(actor);
   assert.equal(history[0].lastCheckResult, undefined);
   assert.equal(history[0].steps[0].lastCheckResult.value, 7);
   assert.equal(history[0].executionJournal.status, 'committed');
   assert.equal(history[0].executionJournal.operationId, 'execute-operation');
+  const committedRevision = history[0].runRevision;
+  const duplicate = await engine.executeVersionedStage({
+    actor,
+    componentSourceActors: [source],
+    runId: started.runId,
+    expectedRevision: started.runRevision,
+    requestId: 'request-execute',
+    executionGrant: 'duplicate-grant',
+  });
+  assert.equal(duplicate.runId, started.runId);
+  assert.equal(duplicate.runRevision, committedRevision);
+  runManager.invalidateCache();
+  assert.equal(runManager.getRunHistory(actor)[0].runRevision, committedRevision);
+});
+
+test('CraftingEngine persists successful spend receipts before a later award ambiguity', async () => {
+  const { engine, runManager } = setupEngineFixture();
+  const actor = new FakeActor('crafter');
+  const source = new FakeActor('source');
+  let spends = 0;
+  const originalPrepare = engine._prepareVersionedStage.bind(engine);
+  engine._prepareVersionedStage = async (args) => {
+    const prepared = await originalPrepare(args);
+    prepared.currencySpends = [{ unit: 'gp', amount: 5 }];
+    prepared.plan.currencySpends = prepared.currencySpends;
+    return prepared;
+  };
+  engine._spendCraftCurrencyVersioned = async () => {
+    spends += 1;
+    return {
+      valid: true,
+      groups: [{ unit: 'gp', spent: 5 }],
+      settledSpends: [{ unit: 'gp', amount: 5 }],
+    };
+  };
+  engine._createResultItems = async () => {
+    throw new Error('award acknowledgement lost');
+  };
+  engine.installVersionedRunAuthority({
+    consumeExecutionGrant: async (_grant, context) => ({
+      operationId: context.operation === 'start' ? 'start-operation' : 'execute-operation',
+      resolvedCheckResult: { success: true, outcome: null, value: null, data: {} },
+    }),
+  });
+  const started = await engine.startVersionedRun({
+    actor,
+    sourceActors: [source],
+    recipeId: 'recipe-1',
+    selectionPlan: { selectedIngredientSetId: 'set-1' },
+    executionGrant: 'start-grant',
+  });
+  game.time.worldTime = 1120;
+
+  await assert.rejects(
+    () =>
+      engine.executeVersionedStage({
+        actor,
+        componentSourceActors: [source],
+        runId: started.runId,
+        expectedRevision: started.runRevision,
+        requestId: 'request-spend',
+        executionGrant: 'execute-grant',
+      }),
+    (error) => error.code === 'RECOVERY_REQUIRED'
+  );
+
+  runManager.invalidateCache(actor.id);
+  const run = runManager.getActiveRun(actor, started.runId);
+  const spend = run.executionJournal.effects.find((effect) => effect.effectId === 'spend-currency');
+  const award = run.executionJournal.effects.find((effect) => effect.effectId === 'award-results');
+  assert.equal(spends, 1);
+  assert.deepEqual(spend.receipt.settledSpends, [{ unit: 'gp', amount: 5 }]);
+  assert.equal(award.phase, 'applying');
+  assert.equal(run.executionJournal.status, 'recoveryRequired');
+
+  await assert.rejects(
+    () =>
+      engine.executeVersionedStage({
+        actor,
+        componentSourceActors: [source],
+        runId: started.runId,
+        expectedRevision: run.runRevision,
+        requestId: 'request-spend',
+        executionGrant: 'retry-grant',
+      }),
+    (error) => error.code === 'RECOVERY_REQUIRED'
+  );
+  assert.equal(spends, 1);
+});
+
+test('CraftingEngine journals a recipe-less fizzle and does not consume it twice', async () => {
+  const { engine, runManager } = setupEngineFixture();
+  const actor = new FakeActor('alchemist');
+  const source = new FakeActor('source');
+  let deletes = 0;
+  const item = {
+    uuid: 'Actor.source.Item.herb',
+    parent: source,
+    system: { quantity: 1 },
+    delete: async () => {
+      deletes += 1;
+      source.items = [];
+    },
+  };
+  source.items = [item];
+  game.fabricate.getCraftingSystemManager = () => ({
+    getSystem: () => ({
+      id: 'alchemy-system',
+      resolutionMode: 'alchemy',
+      alchemy: { consumeOnFail: true, showAttemptHistoryToPlayers: false },
+      components: [],
+    }),
+  });
+  engine._matchAlchemySignature = () => ({ matched: false });
+  engine.installVersionedRunAuthority({
+    consumeExecutionGrant: async () => ({ operationId: 'fizzle-operation' }),
+  });
+  const request = {
+    actor,
+    sourceActors: [source],
+    craftingSystemId: 'alchemy-system',
+    submittedItems: [{ item, componentId: 'herb' }],
+    executionGrant: 'fizzle-grant',
+    requestId: 'fizzle-request',
+  };
+
+  const result = await engine.executeVersionedAlchemyFizzle(request);
+  const duplicate = await engine.executeVersionedAlchemyFizzle(request);
+
+  assert.equal(result.disposition, 'no-match');
+  assert.equal(result.consumed, true);
+  assert.equal(duplicate.runId, result.runId);
+  assert.equal(deletes, 1);
+  runManager.invalidateCache(actor.id);
+  assert.equal(runManager.getRunHistory(actor)[0].executionJournal.status, 'committed');
+});
+
+test('CraftingEngine records a non-consuming fizzle without touching submitted stock', async () => {
+  const { engine, runManager } = setupEngineFixture();
+  const actor = new FakeActor('careful-alchemist');
+  const source = new FakeActor('source');
+  let deletes = 0;
+  const item = {
+    uuid: 'Actor.source.Item.herb',
+    parent: source,
+    system: { quantity: 1 },
+    delete: async () => (deletes += 1),
+  };
+  source.items = [item];
+  game.fabricate.getCraftingSystemManager = () => ({
+    getSystem: () => ({
+      id: 'alchemy-system',
+      resolutionMode: 'alchemy',
+      alchemy: { consumeOnFail: false, showAttemptHistoryToPlayers: false },
+      components: [],
+    }),
+  });
+  engine._matchAlchemySignature = () => ({ matched: false });
+  engine.installVersionedRunAuthority({
+    consumeExecutionGrant: async () => ({ operationId: 'fizzle-operation' }),
+  });
+
+  const result = await engine.executeVersionedAlchemyFizzle({
+    actor,
+    sourceActors: [source],
+    craftingSystemId: 'alchemy-system',
+    submittedItems: [{ item, componentId: 'herb' }],
+    executionGrant: 'fizzle-grant',
+    requestId: 'non-consuming-fizzle',
+  });
+
+  assert.equal(result.consumed, false);
+  assert.equal(deletes, 0);
+  runManager.invalidateCache(actor.id);
+  assert.deepEqual(
+    runManager.getRunHistory(actor)[0].executionJournal.effects.map((effect) => effect.kind),
+    ['recordAlchemyDeadEnd']
+  );
 });
 
 test('CraftingEngine check preflight is read-only and a missing trusted result writes no journal', async () => {
@@ -507,7 +853,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
   const descriptor = await engine.describeVersionedStageCheck({
     actor,
     componentSourceActors: [source],
-    runId: started.run.id,
+    runId: started.runId,
     preparationGrant: 'prepare-grant',
   });
   assert.deepEqual(descriptor.publicPrompt, {
@@ -527,15 +873,15 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
       engine.executeVersionedStage({
         actor,
         componentSourceActors: [source],
-        runId: started.run.id,
-        expectedRevision: started.run.runRevision,
+        runId: started.runId,
+        expectedRevision: started.runRevision,
         executionGrant: 'execute-grant',
       }),
     (error) => error.code === 'CHECK_RESULT_REQUIRED'
   );
   runManager.invalidateCache();
-  const unchanged = runManager.getActiveRun(actor, started.run.id);
-  assert.equal(unchanged.runRevision, started.run.runRevision);
+  const unchanged = runManager.getActiveRun(actor, started.runId);
+  assert.equal(unchanged.runRevision, started.runRevision);
   assert.equal(unchanged.executionJournal, undefined);
 });
 
@@ -562,8 +908,8 @@ test('CraftingEngine world-time execution keeps an input stage blocked with zero
   const blocked = await engine.executeVersionedStage({
     actor,
     componentSourceActors: [source],
-    runId: started.run.id,
-    expectedRevision: started.run.runRevision,
+    runId: started.runId,
+    expectedRevision: started.runRevision,
     trigger: 'worldTime',
     executionGrant: 'execute-grant',
   });
@@ -571,5 +917,38 @@ test('CraftingEngine world-time execution keeps an input stage blocked with zero
   assert.equal(blocked.automaticBlocked, true);
   assert.equal(blocked.blocker, 'materials');
   runManager.invalidateCache();
-  assert.equal(runManager.getActiveRun(actor, started.run.id).executionJournal, undefined);
+  assert.equal(runManager.getActiveRun(actor, started.runId).executionJournal, undefined);
+});
+
+test('CraftingEngine delegates due world-time runs to authority without pre-mutating revisions', async () => {
+  const { engine, runManager } = setupEngineFixture();
+  const actor = new FakeActor('auto-crafter');
+  const source = new FakeActor('auto-source');
+  game.actors = [actor];
+  const requests = [];
+  engine.installVersionedRunAuthority({
+    consumeExecutionGrant: async () => ({ operationId: 'start-operation' }),
+    requestExecute: async (request) => {
+      requests.push(request);
+      return { queued: true };
+    },
+  });
+  const started = await engine.startVersionedRun({
+    actor,
+    sourceActors: [source],
+    recipeId: 'recipe-1',
+    completionMode: 'worldTime',
+    selectionPlan: { selectedIngredientSetId: 'set-1' },
+    executionGrant: 'start-grant',
+  });
+
+  const results = await engine.processVersionedWorldTime({ worldTime: 1120 });
+
+  assert.deepEqual(results, [{ queued: true }]);
+  assert.equal(requests[0].runId, started.runId);
+  assert.equal(requests[0].expectedRevision, started.runRevision);
+  assert.equal(requests[0].trigger, 'worldTime');
+  runManager.invalidateCache(actor.id);
+  assert.equal(runManager.getActiveRun(actor, started.runId).runRevision, started.runRevision);
+  assert.equal(runManager.getActiveRun(actor, started.runId).status, 'waitingTime');
 });
