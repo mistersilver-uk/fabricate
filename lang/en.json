@@ -3842,7 +3842,7 @@
             "Inspector": "Selected gathering task inspector",
             "InspectorHint": "The inspector shows gathering task availability, active environment matches, and drop summaries for the selected row.",
             "EditTitle": "Edit gathering task",
-            "EditSubtitle": "Edit availability, identity, and drop rules for the selected gathering task.",
+            "EditSubtitle": "Edit identity, availability, resolution, and results for the selected gathering task.",
             "EditBreadcrumb": "Edit gathering task",
             "BackToLibrary": "Back to task library",
             "Save": "Save task",

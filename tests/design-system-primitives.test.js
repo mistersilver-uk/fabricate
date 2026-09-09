@@ -453,8 +453,8 @@ test('the inputs every property below quantifies over are alive', () => {
   // test.js:133` and `:136` pin `library.blockCount` and `library.headingCount`, which count
   // `library.html`'s spec-head BLOCKS rather than manifest rows. That figure is unrelated to this
   // one, is unchanged by this change, and the two agreeing at 53 today was a coincidence.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 52, 'the shipped primitive set changed size');
-  assert.equal(NOT_A_PRIMITIVE.length, 11, 'the recorded non-member set changed size');
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 55, 'the shipped primitive set changed size');
+  assert.equal(NOT_A_PRIMITIVE.length, 21, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
