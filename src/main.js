@@ -593,7 +593,7 @@ function createJournalCommandsForFabricate(fabricate) {
     activeGM: () => game.users?.activeGM ?? null,
     getUser: (userId) => game.users?.get(userId) ?? null,
     resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
-    emit: (message) => game.socket?.emit(EVENT_SCENE_SOCKET, message),
+    emit: (message, options) => game.socket?.emit(EVENT_SCENE_SOCKET, message, options),
     randomId: () => foundry.utils.randomID(),
     promptCheck: (descriptor) => promptCheckRoll({
       name: descriptor?.label,
@@ -5729,12 +5729,16 @@ Hooks.once('ready', async () => {
   const refreshJournalRunAuthorityAvailability = () => {
     void fabricate.journalRunCommands?.refreshJournalRunAuthorityAvailability?.();
   };
+  const bootstrapJournalRunAuthority = () => {
+    void fabricate.journalRunCommands?.bootstrapJournalRunAuthority?.();
+  };
   Hooks.on('createJournalEntry', refreshJournalRunAuthorityAvailability);
   Hooks.on('updateJournalEntry', refreshJournalRunAuthorityAvailability);
   Hooks.on('deleteJournalEntry', refreshJournalRunAuthorityAvailability);
   Hooks.on('createJournalEntryPage', refreshJournalRunAuthorityAvailability);
   Hooks.on('deleteJournalEntryPage', refreshJournalRunAuthorityAvailability);
-  Hooks.on('updateUser', refreshJournalRunAuthorityAvailability);
+  Hooks.on('updateUser', bootstrapJournalRunAuthority);
+  Hooks.on('userConnected', bootstrapJournalRunAuthority);
   Hooks.on('canvasReady', () => {
     void runInteractableMarkerSync();
   });

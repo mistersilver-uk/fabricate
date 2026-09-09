@@ -17,11 +17,13 @@ function sharedAuthorityWorld() {
     userId = 'gm',
     {
       reconstructExecutions = async () => ({ success: true, reconstructed: 0 }),
+      getCurrentUser = () => ({ id: userId, isGM: userId === 'gm' }),
+      getActiveGM = () => ({ id: 'gm', active: true, isGM: true }),
     } = {}
   ) =>
     createJournalRunAuthority({
-      currentUser: () => ({ id: userId, isGM: userId === 'gm' }),
-      activeGM: () => ({ id: 'gm', active: true, isGM: true }),
+      currentUser: getCurrentUser,
+      activeGM: getActiveGM,
       listLedgers: async () => (ledger ? [ledger] : []),
       createLedger: async (source) => {
         ledger = { id: 'ledger', source, state: source.state, claim: null };
@@ -114,6 +116,81 @@ describe('journal run authority ledger', () => {
     const writeIndex = world.log.findLastIndex(([kind]) => kind === 'write');
     const releaseIndex = world.log.findLastIndex(([kind]) => kind === 'release');
     assert.ok(writeIndex > -1 && releaseIndex > writeIndex, 'settlement is durable before release');
+  });
+
+  it('bootstraps and executes when this realm becomes the elected GM', async () => {
+    const world = sharedAuthorityWorld();
+    await world.realm().setup();
+    let activeGmId = 'gm';
+    let reconstructions = 0;
+    let executions = 0;
+    const successor = world.realm('successor', {
+      getCurrentUser: () => ({ id: 'successor', isGM: true }),
+      getActiveGM: () => ({ id: activeGmId, active: true, isGM: true }),
+      reconstructExecutions: async (scope) => {
+        reconstructions += 1;
+        assert.deepEqual(scope, { operationId: null, orphaned: true });
+        return { success: true, reconstructed: 0 };
+      },
+    });
+
+    assert.equal(
+      (
+        await successor.run(
+          { requestId: 'before-election', senderId: 'player', sessionId: 'one' },
+          async () => (++executions, { success: true })
+        )
+      ).reason,
+      'active-gm-required'
+    );
+    activeGmId = 'successor';
+
+    assert.deepEqual(
+      await successor.run(
+        { requestId: 'after-election', senderId: 'player', sessionId: 'one' },
+        async () => (++executions, { success: true, executions })
+      ),
+      { success: true, executions: 1 }
+    );
+    assert.equal(reconstructions, 1);
+    assert.equal(world.ledger.claim, null);
+  });
+
+  it('lets a surviving same-user GM tab bootstrap on its next command', async () => {
+    const world = sharedAuthorityWorld();
+    let finishWinningBoot;
+    const winningBootHeld = new Promise((resolve) => (finishWinningBoot = resolve));
+    const bootWinner = world.realm('gm', {
+      reconstructExecutions: async () => {
+        await winningBootHeld;
+        return { success: true, reconstructed: 0 };
+      },
+    });
+    let reconstructions = 0;
+    const survivor = world.realm('gm', {
+      reconstructExecutions: async (scope) => {
+        reconstructions += 1;
+        assert.deepEqual(scope, { operationId: null, orphaned: true });
+        return { success: true, reconstructed: 0 };
+      },
+    });
+    const winnerSetup = bootWinner.setup();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal((await survivor.bootstrapRecovery()).reason, 'claim-held');
+    finishWinningBoot();
+    await winnerSetup;
+    let executions = 0;
+
+    assert.deepEqual(
+      await survivor.run(
+        { requestId: 'survivor-command', senderId: 'player', sessionId: 'one' },
+        async () => (++executions, { success: true })
+      ),
+      { success: true }
+    );
+    assert.equal(reconstructions, 1);
+    assert.equal(executions, 1);
+    assert.equal(world.ledger.claim, null);
   });
 
   it('releases the acquired claim and performs no work when the elected GM changes', async () => {
@@ -251,7 +328,21 @@ describe('journal run authority ledger', () => {
     assert.equal((await authority.refreshAvailability()).reason, 'claim-held');
     assert.equal((await authority.bootstrapRecovery()).reason, 'claim-held');
     assert.equal((await player.bootstrapRecovery()).reason, 'claim-held');
+    let handlerCalls = 0;
+    const pendingRealm = world.realm('gm', {
+      reconstructExecutions: async () => (++reconstructions, { success: true }),
+    });
+    assert.equal(
+      (
+        await pendingRealm.run(
+          { requestId: 'must-not-run', senderId: 'player', sessionId: 'one' },
+          async () => (++handlerCalls, { success: true })
+        )
+      ).reason,
+      'claim-held'
+    );
     assert.equal(reconstructions, 0);
+    assert.equal(handlerCalls, 0);
     assert.equal(world.ledger.claim.claimId, 'live-claim');
   });
 

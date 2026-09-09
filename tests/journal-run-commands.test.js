@@ -26,6 +26,7 @@ function commandHarness({
   authority = null,
 } = {}) {
   const emitted = [];
+  const emissionOptions = [];
   const users = new Map([
     ['player', { id: 'player', isGM: false }],
     ['other', { id: 'other', isGM: false }],
@@ -52,7 +53,10 @@ function commandHarness({
     activeGM: () => getActiveGM?.() ?? users.get(activeGMId) ?? null,
     getUser: (userId) => users.get(userId) ?? null,
     resolveUuid: async (uuid) => (uuid === actor.uuid ? actor : null),
-    emit: (message) => emitted.push(message),
+    emit: (message, options) => {
+      emitted.push(message);
+      emissionOptions.push(options);
+    },
     randomId: () => `id-${++id}`,
     timeoutMs,
     operations: operations ?? {
@@ -67,7 +71,7 @@ function commandHarness({
     promptCheck,
     postRollHandoff,
   });
-  return { service, emitted, actor };
+  return { service, emitted, emissionOptions, actor };
 }
 
 describe('journal run command protocol', () => {
@@ -576,7 +580,7 @@ describe('journal run command protocol', () => {
   });
 
   it('accepts a command only from the server-attested sender and re-resolves ownership', async () => {
-    const { service } = commandHarness({ currentUserId: 'gm' });
+    const { service, emitted, emissionOptions } = commandHarness({ currentUserId: 'gm' });
     const reply = await service.handleSocketMessage(
       {
         kind: JOURNAL_RUN_SOCKET_KIND.REQUEST,
@@ -593,6 +597,8 @@ describe('journal run command protocol', () => {
     );
     assert.equal(reply.response.success, true);
     assert.equal(reply.recipientId, 'player');
+    assert.equal(emitted[0], reply);
+    assert.deepEqual(emissionOptions[0], { recipients: ['player'] });
 
     const denied = await service.handleSocketMessage(
       {
@@ -608,6 +614,7 @@ describe('journal run command protocol', () => {
       'other'
     );
     assert.equal(denied.response.reason, 'owner-required');
+    assert.deepEqual(emissionOptions[1], { recipients: ['other'] });
   });
 
   it('passes the attested sender to a current-lifecycle start operation', async () => {
