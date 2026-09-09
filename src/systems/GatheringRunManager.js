@@ -2,6 +2,7 @@ import { reconcileAgainstDocument, runContainerBaseline } from './runContainerCo
 import {
   observeExecutionJournal,
   persistExecutionJournalTransition,
+  transitionExecutionJournal,
 } from './runExecutionJournal.js';
 import {
   assertRunLifecycleMutation,
@@ -160,7 +161,7 @@ export class GatheringRunManager {
     });
   }
 
-  async createTerminalRun(actor, runData = {}, status = 'succeeded', payload = {}) {
+  async createTerminalRun(actor, runData = {}, status = 'succeeded', payload = {}, options = {}) {
     this._assertActor(actor);
     this._assertRunReferences(runData);
     const lifecycleFields = buildNewRunLifecycleFields(runData);
@@ -175,21 +176,26 @@ export class GatheringRunManager {
     const container = cloneContainer(this._getContainer(actor));
     const now = this._now();
     const terminalPayload = this._terminalPayload(status, payload);
-    const run = this._normalizeRun(
-      {
-        actorUuid: actor.uuid,
-        userId: stringOrNull(runData.userId) || this.getUserId(),
-        ...pickRunPayload(runData),
-        ...lifecycleFields,
-        ...terminalPayload,
-        id: this.randomID(),
-        status,
-        startedAtWorldTime: now,
-        updatedAtWorldTime: now,
-        completedAtWorldTime: now,
-      },
-      { actor, terminal: true }
-    );
+    const terminalRecord = {
+      actorUuid: actor.uuid,
+      userId: stringOrNull(runData.userId) || this.getUserId(),
+      ...pickRunPayload(runData),
+      ...lifecycleFields,
+      ...terminalPayload,
+      id: this.randomID(),
+      status,
+      startedAtWorldTime: now,
+      updatedAtWorldTime: now,
+      completedAtWorldTime: now,
+    };
+    if (options.executionPlan) {
+      assertRunLifecycleMutation(terminalRecord, { currentOnly: true });
+      terminalRecord.executionJournal = transitionExecutionJournal(null, {
+        type: 'plan',
+        plan: options.executionPlan,
+      });
+    }
+    const run = this._normalizeRun(terminalRecord, { actor, terminal: true });
 
     container.history = [run, ...container.history].slice(0, HISTORY_LIMIT);
     await this._persist(actor, container);
@@ -203,11 +209,15 @@ export class GatheringRunManager {
     const readyRuns = [];
     for (const actor of normalizeActorList(this.getActors())) {
       for (const run of this.getActiveRuns(actor)) {
-        if (!isMaturedGatheringRun(run, readyAt)) continue;
+        if (!isAutomaticGatheringRun(run, readyAt)) continue;
         readyRuns.push({ actor, run: cloneJson(run) });
       }
     }
     return readyRuns;
+  }
+
+  canExecuteRun(run, worldTime = this._now()) {
+    return getRunLifecycleContract(run) === 'current' && isReadyGatheringRun(run, worldTime);
   }
 
   async completeRun(actor, run, status = 'succeeded', payload = {}, options = {}) {
@@ -220,10 +230,17 @@ export class GatheringRunManager {
       );
     }
 
+    if (options.expectedRevision !== undefined || options.executionOperationId) {
+      this.invalidateCache(actorKey(actor));
+    }
     const container = cloneContainer(this._getContainer(actor));
     const activeRun = container.active[String(run.id)];
     if (!activeRun) return null;
-    this._assertRunMutation(activeRun, { allowPaused: status === 'cancelled' });
+    this._assertRunMutation(activeRun, {
+      expectedRevision: options.expectedRevision,
+      executionOperationId: options.executionOperationId,
+      allowPaused: status === 'cancelled',
+    });
 
     const now = this._now();
     const completed = this._normalizeRun(
@@ -237,6 +254,12 @@ export class GatheringRunManager {
       },
       { actor, terminal: true }
     );
+    if (options.executionPlan) {
+      completed.executionJournal = transitionExecutionJournal(completed.executionJournal, {
+        type: 'plan',
+        plan: options.executionPlan,
+      });
+    }
     incrementRunRevision(completed);
 
     delete container.active[completed.id];
@@ -260,32 +283,42 @@ export class GatheringRunManager {
   }
 
   async cancelRun(actor, runId, options = {}) {
+    if (options.expectedRevision !== undefined || options.executionOperationId) {
+      this.invalidateCache(actorKey(actor));
+    }
     const run = this.getActiveRun(actor, runId);
     if (!run) return null;
     return this.completeRun(actor, run, 'cancelled', options.payload ?? {}, {
       terminalRunData: options.terminalRunData,
+      expectedRevision: options.expectedRevision,
+      executionOperationId: options.executionOperationId,
     });
   }
 
-  async setCompletionMode(actor, runId, completionMode, { expectedRevision = undefined } = {}) {
+  async setCompletionMode(actor, runId, completionMode, { expectedRevision } = {}) {
     return persistCompletionMode(this._locateRunPersistence(actor, runId), completionMode, {
       expectedRevision,
     });
   }
 
-  async pauseRun(actor, runId, { expectedRevision = undefined } = {}) {
+  async pauseRun(actor, runId, { expectedRevision } = {}) {
     return persistPausedRun(this._locateRunPersistence(actor, runId), { expectedRevision });
   }
 
-  async resumeRun(actor, runId, { expectedRevision = undefined } = {}) {
+  async resumeRun(actor, runId, { expectedRevision } = {}) {
     return persistResumedRun(this._locateRunPersistence(actor, runId), { expectedRevision });
   }
 
-  async updateExecutionJournal(actor, runId, transition, { expectedRevision = undefined } = {}) {
+  async updateExecutionJournal(
+    actor,
+    runId,
+    transition,
+    { expectedRevision, executionOperationId = null } = {}
+  ) {
     return persistExecutionJournalTransition(
       this._locateRunPersistence(actor, runId, { activeOnly: false }),
       transition,
-      { expectedRevision }
+      { expectedRevision, executionOperationId }
     );
   }
 
@@ -547,16 +580,27 @@ export class GatheringRunManager {
     return Number.isFinite(value) ? value : 0;
   }
 
-  _assertRunMutation(run, { allowExecutionJournal = false, ...options } = {}) {
+  _assertRunMutation(
+    run,
+    { allowExecutionJournal = false, executionOperationId = null, ...options } = {}
+  ) {
     assertRunLifecycleMutation(run, options);
     if (!run?.executionJournal) return;
     const journal = observeExecutionJournal(run.executionJournal);
-    if (!allowExecutionJournal && journal.status === 'planned') {
+    if (journal.status !== 'planned') return;
+    if (executionOperationId && journal.operationId === String(executionOperationId)) return;
+    if (executionOperationId) {
       throw new RunLifecycleError(
-        'The run already has an execution in progress',
-        'EXECUTION_IN_PROGRESS'
+        'The execution operation does not own this run',
+        'EXECUTION_OPERATION_MISMATCH'
       );
     }
+    throw new RunLifecycleError(
+      allowExecutionJournal
+        ? 'An execution operation id is required'
+        : 'The run already has an execution in progress',
+      allowExecutionJournal ? 'EXECUTION_OPERATION_REQUIRED' : 'EXECUTION_IN_PROGRESS'
+    );
   }
 }
 
@@ -773,13 +817,20 @@ function copyGatheringRunEvidence(run, record) {
   if (Array.isArray(record.revealEvents)) run.revealEvents = cloneJson(record.revealEvents);
 }
 
-function isMaturedGatheringRun(run, worldTime) {
-  if (run?.status !== 'waitingTime') return false;
+function isReadyGatheringRun(run, worldTime) {
+  if (!ACTIVE_STATUSES.has(run?.status)) return false;
   if (getRunLifecycleContract(run) === 'unsupported') return false;
   if (run.pauseState) return false;
   if (run.executionJournal && run.executionJournal.status !== 'committed') return false;
-  if (!run.timeGate) return false;
+  if (!run.timeGate) return run.status === 'inProgress';
   return worldTime >= Number(run.timeGate.availableAt || 0);
+}
+
+function isAutomaticGatheringRun(run, worldTime) {
+  if (!isReadyGatheringRun(run, worldTime)) return false;
+  if (run.status !== 'waitingTime') return false;
+  const contract = getRunLifecycleContract(run);
+  return contract === 'legacy' || run.completionMode === 'worldTime';
 }
 
 function findRun(container, runId, { activeOnly = false } = {}) {

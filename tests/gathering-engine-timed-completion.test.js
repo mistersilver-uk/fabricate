@@ -114,7 +114,10 @@ function makeEngine({
   richState = null,
   eventSceneTrigger = null,
   hookPublisher = null,
-  isPrimaryGM = null
+  isPrimaryGM = null,
+  versionedRunAuthority = null,
+  onCreateResults = null,
+  gamePaused = false
 } = {}) {
   calls.evaluateCheck = [];
   calls.planResults = [];
@@ -123,7 +126,7 @@ function makeEngine({
   calls.applyTools = [];
   calls.failureFeedback = [];
 
-  return new GatheringEngine({
+  const engine = new GatheringEngine({
     environmentStore: {
       list: () => environments,
       get: (environmentId) => environments.find(entry => entry.id === environmentId) ?? null
@@ -133,7 +136,7 @@ function makeEngine({
     getSystems: () => systems,
     getSelectableActors: () => [actingActor],
     isActorSelectable: ({ actor: candidate }) => candidate?.id === actingActor.id || candidate?.uuid === actingActor.uuid,
-    isGamePaused: () => false,
+    isGamePaused: () => gamePaused,
     getRunViewer,
     evaluator: {
       evaluateVisibility: async () => ({ visible: true, reasonCode: 'VISIBLE', diagnostic: null }),
@@ -158,6 +161,7 @@ function makeEngine({
       },
       create: async (payload) => {
         calls.createResults.push(payload);
+        await onCreateResults?.(payload);
         return createdResults;
       }
     },
@@ -182,6 +186,8 @@ function makeEngine({
     ...(isPrimaryGM ? { isPrimaryGM } : {}),
     localize: (key, data) => data ? `${key}:${JSON.stringify(data)}` : key
   });
+  if (versionedRunAuthority) engine.installVersionedRunAuthority(versionedRunAuthority);
+  return engine;
 }
 
 // A timed library task in nodes economy mode. Library tasks resolve as `d100`
@@ -290,6 +296,512 @@ test('processWorldTime resolves a matured straight task without a check or d100 
   assert.deepEqual(calls.createResults[0].resultGroups, task.resultGroups);
   assert.deepEqual(runManager.getRunHistory(actor)[0].createdResults, createdResults);
   assert.equal(runManager.getRunHistory(actor)[0].checkResult, undefined);
+});
+
+test('lifecycle-v1 gathering start routes through authority and defaults to a manual run', async () => {
+  resetActor();
+  const runManager = makeRunManager();
+  const task = timedTask({ resolutionMode: 'straight' });
+  const routedStarts = [];
+  const grantContexts = [];
+  const engine = makeEngine({
+    runManager,
+    environments: [environment(task)],
+    versionedRunAuthority: {
+      requestStart: async (payload) => {
+        routedStarts.push(payload);
+        return { success: true, relayed: true };
+      },
+      consumeExecutionGrant: async (_grant, context) => {
+        grantContexts.push(context);
+        return { operationId: 'start-operation' };
+      }
+    }
+  });
+
+  const routed = await engine.requestStart({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a',
+    lifecycleVersion: 1
+  });
+  assert.equal(routed.relayed, true);
+  assert.equal(routedStarts[0].completionMode, 'manual');
+  assert.deepEqual(runManager.getActiveRuns(actor), []);
+
+  const unsupported = await engine.requestStart({
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a',
+    lifecycleVersion: 2
+  });
+  const bypassed = await engine.startAttempt(
+    {
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a',
+      lifecycleVersion: 1
+    },
+    { operationId: 'forged-operation', completionMode: 'manual' }
+  );
+  assert.equal(unsupported.success, false);
+  assert.equal(bypassed.success, false);
+  assert.equal(bypassed.code, 'AUTHORITY_UNAVAILABLE');
+  assert.deepEqual(runManager.getActiveRuns(actor), []);
+
+  const invalidCompletion = await engine.startVersionedRun({
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a',
+    completionMode: 'whenever',
+    executionGrant: { token: 'invalid-start' },
+    requestId: 'request-invalid-start'
+  });
+  assert.equal(invalidCompletion.code, 'INVALID_COMPLETION_MODE');
+  assert.deepEqual(runManager.getActiveRuns(actor), []);
+
+  const started = await engine.startVersionedRun({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a',
+    executionGrant: { token: 'start' },
+    requestId: 'request-start'
+  });
+  const active = runManager.getActiveRuns(actor)[0];
+  assert.equal(started.success, true);
+  assert.equal(active.lifecycleVersion, 1);
+  assert.equal(active.completionMode, 'manual');
+  assert.equal(active.runRevision, 0);
+  assert.equal(grantContexts[0].operation, 'start');
+});
+
+test('lifecycle-v1 gathering without a time gate waits ready for manual collection', async () => {
+  resetActor();
+  const runManager = makeRunManager();
+  const task = timedTask({ resolutionMode: 'straight', timeRequirement: null });
+  const calls = {};
+  const engine = makeEngine({
+    runManager,
+    environments: [environment(task)],
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
+    calls,
+    getRunViewer: async () => viewer,
+    versionedRunAuthority: {
+      consumeExecutionGrant: async (_grant, context) => ({
+        operationId: `${context.operation}-operation`
+      })
+    }
+  });
+
+  const started = await engine.startVersionedRun({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a',
+    executionGrant: { token: 'start' },
+    requestId: 'request-start'
+  });
+  assert.equal(started.state, 'ready');
+  assert.equal(runManager.getActiveRuns(actor)[0].status, 'inProgress');
+  assert.deepEqual(calls.createResults, []);
+
+  const collected = await engine.executeVersionedStage({
+    actor,
+    runId: started.runId,
+    expectedRevision: 0,
+    executionGrant: { token: 'collect' },
+    requestId: 'request-collect'
+  });
+  assert.equal(collected.success, true);
+  assert.equal(calls.createResults.length, 1);
+});
+
+test('versioned world-time completion routes only eligible no-check runs through authority', async () => {
+  resetActor();
+  let worldTime = 1000;
+  const runManager = makeRunManager({ now: () => worldTime });
+  const task = timedTask({ resolutionMode: 'straight' });
+  await createWaitingRun(runManager, actor, {
+    lifecycleVersion: 1,
+    completionMode: 'worldTime'
+  });
+  worldTime = 1060;
+  const executions = [];
+  const calls = {};
+  const engine = makeEngine({
+    runManager,
+    environments: [environment(task)],
+    calls,
+    versionedRunAuthority: {
+      requestExecute: async (payload) => {
+        executions.push(payload);
+        return { success: true, state: 'succeeded', runId: payload.runId };
+      }
+    }
+  });
+
+  const result = await engine.processWorldTime(worldTime);
+
+  assert.equal(result.completed.length, 1);
+  assert.equal(executions.length, 1);
+  assert.equal(executions[0].trigger, 'worldTime');
+  assert.deepEqual(calls.createResults, [], 'the observing tick never applies effects locally');
+
+  resetActor();
+  worldTime = 1000;
+  const routedManager = makeRunManager({ now: () => worldTime });
+  await createWaitingRun(routedManager, actor, {
+    lifecycleVersion: 1,
+    completionMode: 'worldTime'
+  });
+  worldTime = 1060;
+  const routedExecutions = [];
+  const routedEngine = makeEngine({
+    runManager: routedManager,
+    versionedRunAuthority: {
+      requestExecute: async (payload) => routedExecutions.push(payload)
+    }
+  });
+  const blocked = await routedEngine.processWorldTime(worldTime);
+  assert.equal(blocked.errors[0].code, 'AUTOMATIC_CHECK_REQUIRED');
+  assert.deepEqual(routedExecutions, []);
+  assert.equal(routedManager.getActiveRuns(actor)[0].completionMode, 'worldTime');
+});
+
+test('authoritative manual collection persists and settles ordered gathering effects', async () => {
+  resetActor();
+  let worldTime = 1000;
+  const runManager = makeRunManager({ now: () => worldTime });
+  const task = timedTask({ resolutionMode: 'straight' });
+  const active = await createWaitingRun(runManager, actor, {
+    lifecycleVersion: 1,
+    completionMode: 'manual'
+  });
+  worldTime = 1060;
+  const createdResults = [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }];
+  const published = [];
+  const calls = {};
+  const engine = makeEngine({
+    runManager,
+    environments: [environment(task)],
+    createdResults,
+    calls,
+    getRunViewer: async () => viewer,
+    hookPublisher: { publishAttemptCompleted: (payload) => published.push(payload) },
+    isPrimaryGM: () => true,
+    onCreateResults: async () => {
+      const journal = runManager.getRunHistory(actor)[0].executionJournal;
+      assert.equal(journal.status, 'planned', 'terminal history precedes item creation');
+      assert.equal(journal.effects.find((effect) => effect.effectId === 'results').phase, 'applying');
+    },
+    versionedRunAuthority: {
+      consumeExecutionGrant: async (_grant, context) => {
+        assert.equal(context.operation, 'execute');
+        return { operationId: 'collect-operation' };
+      }
+    }
+  });
+
+  const result = await engine.executeVersionedStage({
+    actor,
+    runId: active.id,
+    expectedRevision: 0,
+    executionGrant: { token: 'collect' },
+    requestId: 'request-collect'
+  });
+
+  assert.equal(result.success, true);
+  assert.deepEqual(runManager.getActiveRuns(actor), []);
+  const terminal = runManager.getRunHistory(actor)[0];
+  assert.equal(terminal.status, 'succeeded');
+  assert.equal(terminal.executionJournal.status, 'committed');
+  assert.ok(terminal.executionJournal.effects.every((effect) => effect.phase === 'applied'));
+  assert.deepEqual(
+    terminal.executionJournal.effects.map((effect) => effect.effectId),
+    ['economy', 'results', 'complications', 'tools', 'events', 'reservation', 'presentation']
+  );
+  assert.equal(
+    terminal.executionJournal.effects.find((effect) => effect.effectId === 'results').receipt[0]
+      .itemUuid,
+    'Item.iron'
+  );
+  assert.deepEqual(terminal.createdResults, createdResults);
+  assert.equal(calls.createResults.length, 1);
+  assert.equal(published.length, 1);
+
+  const duplicate = await engine.executeVersionedStage({
+    actor,
+    runId: active.id,
+    expectedRevision: 0,
+    executionGrant: { token: 'collect-duplicate' },
+    requestId: 'request-collect'
+  });
+  assert.equal(duplicate.success, true);
+  assert.equal(calls.createResults.length, 1);
+  assert.equal(published.length, 1);
+});
+
+test('versioned routed collection describes and consumes only the GM-resolved check', async () => {
+  resetActor();
+  let worldTime = 1000;
+  const runManager = makeRunManager({ now: () => worldTime });
+  const active = await createWaitingRun(runManager, actor, {
+    lifecycleVersion: 1,
+    completionMode: 'manual'
+  });
+  worldTime = 1060;
+  const evaluations = [];
+  const engine = makeEngine({
+    runManager,
+    getRunViewer: async () => viewer,
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
+    versionedRunAuthority: {
+      consumeExecutionGrant: async (_grant, context) => ({
+        operationId: `${context.operation}-operation`,
+        ...(context.operation === 'execute'
+          ? { resolvedCheckResult: { success: true, outcome: 'Iron', value: 21, data: {} } }
+          : {})
+      }),
+      evaluatePreparedRunCheck: (...args) => {
+        evaluations.push(args);
+        return { engineEvaluated: true, success: true, outcome: 'Iron', value: 21, data: {} };
+      }
+    }
+  });
+
+  const descriptor = await engine.describeVersionedStageCheck({
+    actor,
+    runId: active.id,
+    preparationGrant: { token: 'prepare' },
+    requestId: 'request-prepare'
+  });
+  assert.equal(descriptor.required, true);
+  assert.equal(descriptor.publicPrompt.mode, 'routedByCheck');
+  assert.equal(descriptor.privateEvaluation.slot, 'routed');
+  assert.equal(descriptor.privateEvaluation.secret, false);
+
+  const evaluated = await engine.evaluatePreparedVersionedCheck({
+    actor,
+    privateEvaluation: descriptor.privateEvaluation,
+    decision: { situationalBonus: 1 }
+  });
+  assert.equal(evaluated.engineEvaluated, true);
+  assert.equal(evaluations[0][0].taskId, 'task-a');
+  assert.equal(evaluations[0][1], actor);
+
+  const result = await engine.executeVersionedStage({
+    actor,
+    runId: active.id,
+    expectedRevision: 0,
+    executionGrant: { token: 'execute' },
+    requestId: 'request-execute'
+  });
+  assert.equal(result.success, true);
+  assert.equal(result.checkResult.outcome, 'Iron');
+});
+
+test('versioned blind check preparation keeps task identity and roll terms private', async () => {
+  resetActor();
+  let worldTime = 1000;
+  const runManager = makeRunManager({ now: () => worldTime });
+  const active = await createWaitingRun(runManager, actor, {
+    taskId: 'blind:env-a',
+    lifecycleVersion: 1,
+    completionMode: 'manual'
+  });
+  const task = timedTask();
+  const env = environment(task, { selectionMode: 'blind' });
+  worldTime = 1060;
+  const engine = makeEngine({
+    runManager,
+    environments: [env],
+    versionedRunAuthority: {
+      consumeExecutionGrant: async () => ({ operationId: 'blind-prepare-operation' })
+    }
+  });
+  engine.installBlindRunRelay({
+    store: {
+      get: (runId) => runId === active.id
+        ? {
+            taskId: task.id,
+            snapshot: {
+              task,
+              events: [],
+              rules: {},
+              useLegacyTaskItemSelectionMode: false,
+              eventSelectionMode: null,
+              eventLimit: null,
+              eventPolicy: null,
+              conditions: {}
+            }
+          }
+        : null
+    }
+  });
+
+  const descriptor = await engine.describeVersionedStageCheck({
+    actor,
+    runId: active.id,
+    preparationGrant: { token: 'blind-prepare' },
+    requestId: 'request-blind-prepare'
+  });
+
+  assert.equal(descriptor.publicPrompt.label, 'FABRICATE.Gathering.BlindTaskLabel');
+  assert.equal(descriptor.publicPrompt.mode, 'routedByCheck');
+  assert.equal(descriptor.privateEvaluation.secret, true);
+  assert.equal(descriptor.privateEvaluation.taskId, task.id);
+  assert.equal('rollFormula' in descriptor.publicPrompt, false);
+});
+
+test('ambiguous versioned award requires recovery and is never replayed', async () => {
+  resetActor();
+  let worldTime = 1000;
+  const runManager = makeRunManager({ now: () => worldTime });
+  const task = timedTask({ resolutionMode: 'straight' });
+  const active = await createWaitingRun(runManager, actor, {
+    lifecycleVersion: 1,
+    completionMode: 'manual'
+  });
+  worldTime = 1060;
+  let awardCalls = 0;
+  const engine = makeEngine({
+    runManager,
+    environments: [environment(task)],
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }],
+    getRunViewer: async () => viewer,
+    onCreateResults: async () => {
+      awardCalls += 1;
+      throw new Error('lost item-create acknowledgement');
+    },
+    versionedRunAuthority: {
+      consumeExecutionGrant: async () => ({ operationId: 'uncertain-operation' })
+    }
+  });
+
+  await assert.rejects(
+    () => engine.executeVersionedStage({
+      actor,
+      runId: active.id,
+      expectedRevision: 0,
+      executionGrant: { token: 'collect' },
+      requestId: 'request-uncertain'
+    }),
+    (error) => error.code === 'RECOVERY_REQUIRED'
+  );
+  assert.equal(runManager.getRunHistory(actor)[0].executionJournal.status, 'recoveryRequired');
+
+  await assert.rejects(
+    () => engine.executeVersionedStage({
+      actor,
+      runId: active.id,
+      expectedRevision: 0,
+      executionGrant: { token: 'collect-again' },
+      requestId: 'request-uncertain'
+    }),
+    (error) => error.code === 'RUN_NOT_FOUND'
+  );
+  assert.equal(awardCalls, 1);
+});
+
+test('paused, stale, unsupported, and missing versioned executions have zero effects', async () => {
+  for (const scenario of ['paused', 'stale', 'unsupported', 'missing']) {
+    resetActor();
+    let worldTime = 1000;
+    const runManager = makeRunManager({ now: () => worldTime });
+    let runId = 'missing-run';
+    let expectedRevision = 0;
+    if (scenario === 'unsupported') {
+      actor.flags.fabricate.gatheringRuns = {
+        active: {
+          future: {
+            id: 'future',
+            lifecycleVersion: 2,
+            craftingSystemId: 'system-a',
+            environmentId: 'env-a',
+            taskId: 'task-a',
+            status: 'waitingTime',
+            startedAtWorldTime: 1000,
+            updatedAtWorldTime: 1000,
+            timeGate: { requiredSeconds: 60, initiatedAt: 1000, availableAt: 1060 }
+          }
+        },
+        history: []
+      };
+      runId = 'future';
+    } else if (scenario !== 'missing') {
+      const run = await createWaitingRun(runManager, actor, {
+        lifecycleVersion: 1,
+        completionMode: 'manual'
+      });
+      runId = run.id;
+      if (scenario === 'paused') {
+        await runManager.pauseRun(actor, run.id, { expectedRevision: 0 });
+        expectedRevision = 1;
+      } else {
+        expectedRevision = 99;
+      }
+    }
+    worldTime = 1060;
+    const calls = {};
+    const engine = makeEngine({
+      runManager,
+      calls,
+      versionedRunAuthority: {
+        consumeExecutionGrant: async () => ({ operationId: `${scenario}-operation` })
+      }
+    });
+
+    await assert.rejects(
+      () => engine.executeVersionedStage({
+        actor,
+        runId,
+        expectedRevision,
+        executionGrant: { token: scenario },
+        requestId: `request-${scenario}`
+      }),
+      (error) => ['RUN_PAUSED', 'STALE_RUN_REVISION', 'UNSUPPORTED_RUN', 'RUN_NOT_FOUND'].includes(error.code),
+      scenario
+    );
+    assert.deepEqual(calls.createResults, [], scenario);
+    assert.deepEqual(calls.applyTools, [], scenario);
+    assert.deepEqual(calls.failureFeedback, [], scenario);
+  }
+});
+
+test('versioned cancellation archives without refunding sunk gathering costs', async () => {
+  resetActor();
+  const runManager = makeRunManager();
+  const active = await createWaitingRun(runManager, actor, {
+    lifecycleVersion: 1,
+    completionMode: 'manual',
+    economyEvidence: { stamina: { spent: 3 } }
+  });
+  const engine = makeEngine({
+    runManager,
+    versionedRunAuthority: {
+      consumeExecutionGrant: async (_grant, context) => {
+        assert.equal(context.operation, 'cancel');
+        return { operationId: 'cancel-operation' };
+      }
+    }
+  });
+
+  const result = await engine.cancelVersionedRun({
+    actor,
+    runId: active.id,
+    expectedRevision: 0,
+    executionGrant: { token: 'cancel' },
+    requestId: 'request-cancel'
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.refunded, false);
+  assert.equal(runManager.getRunHistory(actor)[0].status, 'cancelled');
+  assert.deepEqual(runManager.getRunHistory(actor)[0].economyEvidence, {
+    stamina: { spent: 3 }
+  });
 });
 
 test('non-blind timed task resolves from its start-time mode and results after live edits', async () => {
