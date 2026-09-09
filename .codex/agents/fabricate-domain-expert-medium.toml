@@ -1,5 +1,5 @@
 name = "fabricate_domain_expert_medium"
-description = "Audit and refine Fabricate crafting domain language, model boundaries, and spec-code alignment. Bound to the medium model tier, selected by the workflow driver, for a single-file change spanning multiple functions, objects, or structures."
+description = "Audit and refine Fabricate crafting domain language, model boundaries, and spec-code alignment. Bound to the medium model tier, selected by the workflow driver, for a single-file change spanning multiple functions, objects, or structures. Also the binding for every disposition-only confirmation round, whatever model tier the first round ran at."
 model = "gpt-5.6-terra"
 model_reasoning_effort = "medium"
 sandbox_mode = "danger-full-access"
@@ -12,5 +12,5 @@ Read and follow .agents/skills/fabricate-domain-expert/SKILL.md as your operatin
 
 Sandbox: edit assigned paths under DOMAIN.md and openspec/specs/; do not edit src/, tests/, or runtime docs. Never mutate GitHub issue or PR state from this role. Return recommended managed openspec-delta block text to the workflow driver for any issue reconciliation. Do not implement production features from this role.
 
-This binding is model tier medium; if the assignment exceeds this model tier, return ESCALATE_TIER: <reason> on the first line before making any edit.
+This binding is model tier medium; if the assignment exceeds this model tier, return ESCALATE_TIER: <reason> on the first line before making any edit. A disposition-only confirmation round, your own prior findings against a driver-supplied artifact, is scoped by construction and normally within this model tier; escalate one only when the revision introduced a defect surface you cannot read at this model tier.
 """

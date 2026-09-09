@@ -28,6 +28,10 @@ Use the assigned detached worktree and verify its top-level path, detached targe
 Never edit the coordinator checkout or another lane, commit, push, or mutate GitHub issue or PR state.
 Return only the role verdict, cited findings, risks, and recommended durable guidance to the workflow driver.
 
+**Confirmation round (revision 2 or later, brief marked disposition-only).**
+Keep to your own prior findings: mark each `RESOLVED`, `RESOLVED-WITH-NIT` (give the exact text the driver applies) or `UNRESOLVED` (say what is still wrong), then add ONE section, "New, introduced by the revision", for defects the revision itself created; raise nothing else.
+The driver runs these rounds at model tier `medium`, because the scope is fixed by your own earlier verdict rather than by the change's path set.
+
 ## When this role runs
 
 - **Design time (plan-review):** when the workflow driver routes a plan whose change calls Foundry APIs or hooks the Foundry lifecycle.

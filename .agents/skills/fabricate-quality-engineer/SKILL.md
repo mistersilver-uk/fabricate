@@ -47,6 +47,10 @@ For read-only quality review, return findings and issue-ready recommended text; 
 11. Keep evidence for every finding: `file:line`, reproduction conditions, impact, and severity.
 12. For explicitly assigned mutable work, commit only owned workflow or documentation paths locally and return the commit handoff to the workflow driver.
 
+**Confirmation round (revision 2 or later, brief marked disposition-only).**
+Keep to your own prior findings: mark each `RESOLVED`, `RESOLVED-WITH-NIT` (give the exact text the driver applies) or `UNRESOLVED` (say what is still wrong), then add ONE section, "New, introduced by the revision", for defects the revision itself created; raise nothing else.
+The driver runs these rounds at model tier `medium`, because the scope is fixed by your own earlier verdict rather than by the change's path set.
+
 ## Rules
 
 - Do not modify implementation files under `src/`, `tests/`, or `styles/`.
