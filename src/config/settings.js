@@ -118,6 +118,7 @@ export const SETTING_KEYS = Object.freeze({
   MANAGER_RAIL_COLLAPSED: 'managerRailCollapsed',
   GATHERING_HIDE_UNAVAILABLE: 'gatheringHideUnavailableEnvironments',
   PROGRESSIVE_RESULT_ORDER: 'progressiveResultOrder',
+  JOURNAL_RUN_DISMISSALS: 'journalRunDismissals',
   MIGRATION_VERSION: 'migrationVersion',
   FAVOURITE_RECIPES: 'favouriteRecipes',
   LAST_ALCHEMY_SYSTEM: 'lastAlchemySystem',
@@ -404,6 +405,15 @@ const BASE_DEFINITIONS = Object.freeze({
     // also has no scope-migration facility (`ClientSettings#get` dispatches on scope
     // at read time), so any pre-existing localStorage key is orphaned in place —
     // never read, never deleted, never an error.
+    scope: 'user',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  [SETTING_KEYS.JOURNAL_RUN_DISMISSALS]: {
+    name: 'Journal Run Dismissals',
+    // Terminal-run hiding follows this user across their clients in this world. The actor
+    // history remains untouched; this setting contains only bounded composite identity keys.
     scope: 'user',
     config: false,
     type: Object,

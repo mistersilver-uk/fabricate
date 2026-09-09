@@ -331,7 +331,7 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   const useDeferredChoice =
     Boolean(modifierChoice) &&
     options?.interactive === true &&
-    typeof options.prompt === 'function';
+    (typeof options.prompt === 'function' || Boolean(options?.rollDecision));
   // Append the resolved check-modifier scalar (issues 770, 1094) BEFORE anything
   // downstream reads the formula, so the dialog, roll, and journal all agree
   // (eval == display). A zero scalar — or no modifier context at all — appends nothing.
@@ -501,7 +501,11 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
   // `toMessage` is the DSN trigger — no dice3d/game.dice3d code is needed. A chat
   // failure is logged and swallowed, never thrown (mirrors
   // `CraftingEngine._postCraftChatMessage`).
-  if (options?.interactive && typeof globalThis.ChatMessage?.create === 'function') {
+  if (
+    options?.interactive &&
+    options?.post !== false &&
+    typeof globalThis.ChatMessage?.create === 'function'
+  ) {
     try {
       await roll.toMessage(
         { speaker: options.speaker, flavor: effectiveFlavor },
@@ -512,12 +516,226 @@ export async function evaluateCheckRoll(formula, actor, options = {}) {
     }
   }
 
-  return {
+  const result = {
     engine: true,
     total,
     diceGroups: rolledDiceGroups(roll),
     resolvedFormula: resolved?.display ?? null,
   };
+  if (options?.includeRollHandoff === true && typeof roll?.toJSON === 'function') {
+    result.rollHandoff = {
+      serializedRoll: roll.toJSON(),
+      flavor: effectiveFlavor ?? null,
+      speaker: options?.speaker ?? null,
+      rollMode: effectiveRollMode ?? null,
+    };
+  }
+  return result;
+}
+
+function validatedPreparedDecision(decision, modifierChoice) {
+  const source = decision && typeof decision === 'object' ? decision : {};
+  const offered = new Set(
+    (Array.isArray(modifierChoice?.modifiers) ? modifierChoice.modifiers : [])
+      .map((modifier) => modifier?.id)
+      .filter((id) => typeof id === 'string')
+  );
+  const selected = (Array.isArray(source.modifierIds) ? source.modifierIds : [])
+    .filter((id) => typeof id === 'string' && offered.has(id));
+  const advantage = ['advantage', 'disadvantage'].includes(source.advantage)
+    ? source.advantage
+    : null;
+  const rollMode = ['publicroll', 'gmroll', 'blindroll', 'selfroll'].includes(source.rollMode)
+    ? source.rollMode
+    : null;
+  return {
+    bonus: typeof source.bonus === 'string' ? source.bonus : null,
+    advantage,
+    rollMode,
+    chosenModifierIds: selected,
+  };
+}
+
+/**
+ * Evaluate a GM-retained check plan from player decisions. Client totals, formulas and modifier
+ * values are absent from the accepted boundary; eligible modifier ids are revalidated here.
+ * Visible rolls are handed back as evaluated Roll data for player-authored chat/DSN posting.
+ * Secret rolls post privately in the GM realm and return no formula-bearing handoff.
+ */
+export async function evaluatePreparedCheck(preparation, actor, decision = {}) {
+  const source = preparation && typeof preparation === 'object' ? preparation : {};
+  const options = source.options && typeof source.options === 'object' ? source.options : {};
+  const secret = source.secret === true;
+  const result = await evaluateCheckRoll(source.formula, actor, {
+    ...options,
+    interactive: true,
+    prompt: null,
+    rollDecision: validatedPreparedDecision(decision, options.modifierChoice),
+    post: secret,
+    includeRollHandoff: !secret,
+  });
+  if (!secret) return result;
+  return {
+    engine: result.engine,
+    total: result.total,
+    diceGroups: result.diceGroups,
+    resolvedFormula: null,
+    secret: true,
+  };
+}
+
+function preparedCheckKind(preparation) {
+  const slot = String(preparation?.slot ?? '').toLowerCase();
+  const mode = String(preparation?.mode ?? '').toLowerCase();
+  if (slot.includes('progressive') || mode.includes('progressive')) return 'progressive';
+  if (slot.includes('routed') || mode.includes('routedbycheck') || mode.includes('tiered')) {
+    return 'routed';
+  }
+  return 'simple';
+}
+
+/**
+ * Evaluate and classify the private CraftingEngine check descriptor without accepting a client
+ * formula or total. This is the authority-side twin of the three existing formula runners.
+ */
+export async function evaluatePreparedRunCheck(
+  preparation,
+  actor,
+  decision = {},
+  { secret = false, failureMessage = 'Check failed' } = {}
+) {
+  const checkConfig = preparation?.checkConfig && typeof preparation.checkConfig === 'object'
+    ? preparation.checkConfig
+    : {};
+  const decisionPolicy = preparation?.decisionPolicy && typeof preparation.decisionPolicy === 'object'
+    ? preparation.decisionPolicy
+    : {};
+  const config = { ...checkConfig, ...decisionPolicy };
+  const authoritativeDecision = {
+    ...decision,
+    bonus: decision?.allowsSituationalModifier === true ? decision.bonus : null,
+    advantage: decision?.allowAdvantage === true ? decision.advantage : null,
+  };
+  const rolled = await evaluatePreparedCheck(
+    {
+      formula: preparation?.rollFormula,
+      secret,
+      options: {
+        flavor: preparation?.publicPrompt?.label ?? config.label ?? 'Crafting check',
+        rollMode: secret ? 'gmroll' : (authoritativeDecision.rollMode ?? 'selfroll'),
+        craftingModifier: config.craftingModifier ?? null,
+        modifierChoice: config.modifierChoice ?? null,
+        speaker: config.speaker ?? null,
+      },
+    },
+    actor,
+    authoritativeDecision
+  );
+  if (rolled.cancelled) {
+    return { success: false, cancelled: true, outcome: null, value: null, data: {} };
+  }
+  const kind = preparedCheckKind(preparation);
+  if (!rolled.engine) {
+    return {
+      success: true,
+      outcome: kind === 'simple' ? 'pass' : null,
+      value: kind === 'progressive' ? 0 : null,
+      data: { dc: config.resolvedDc ?? config.dc },
+      message: null,
+      engineEvaluated: true,
+      secret,
+    };
+  }
+  const total = Number(rolled.total) || 0;
+  const diceGroups = Array.isArray(rolled.diceGroups) ? rolled.diceGroups : [];
+  const triggers = config.checkBreakage?.triggers ?? config.triggers ?? [];
+  const forced = resolveForcedOutcome(triggers, { total, diceGroups });
+  const data = {
+    dc: config.resolvedDc ?? config.dc,
+    total,
+    diceGroups,
+  };
+  let success = true;
+  let outcome = null;
+  let value = total;
+  if (kind === 'progressive') {
+    if (forced?.disposition === 'success') value = Number.MAX_SAFE_INTEGER;
+    if (forced?.disposition === 'failure') value = 0;
+    data.value = value;
+  } else if (kind === 'routed') {
+    const classified = classifyCheckTotal({
+      type: config.type,
+      total,
+      dc: data.dc,
+      comparison: config.thresholdMode === 'exceed' ? 'exceed' : 'meet',
+      relativeOutcomes: config.relativeOutcomes,
+      fixedOutcomes: config.fixedOutcomes,
+      triggers,
+      diceGroups,
+      clampToNearest: config.clampToNearest !== false,
+      minOutcomeId: config.minOutcomeId ?? null,
+    });
+    success = classified.success;
+    outcome = classified.matched?.name ?? null;
+    data.type = config.type;
+    data.comparison = config.thresholdMode === 'exceed' ? 'exceed' : 'meet';
+    data.outcomeId = classified.matched?.id ?? null;
+    data.success = success;
+    data.breakTools = classified.breakTools;
+    if (classified.tierStepApplied) data.tierStepApplied = classified.tierStepApplied;
+    if (classified.minTierFailed) {
+      data.minTierFailed = true;
+      data.blockedOutcomeId = classified.blockedOutcomeId;
+    }
+  } else {
+    const comparison = config.thresholdMode === 'exceed' ? 'exceed' : 'meet';
+    success = forced
+      ? forced.disposition === 'success'
+      : comparison === 'exceed'
+        ? total > Number(data.dc)
+        : total >= Number(data.dc);
+    outcome = success ? 'pass' : 'fail';
+    data.comparison = comparison;
+  }
+  return {
+    success,
+    outcome,
+    value,
+    data,
+    message: success ? null : failureMessage,
+    engineEvaluated: true,
+    secret,
+    ...(rolled.rollHandoff && { rollHandoff: rolled.rollHandoff }),
+  };
+}
+
+/** Crafting-labelled compatibility wrapper over the shared authoritative run-check evaluator. */
+export function evaluatePreparedCraftingCheck(preparation, actor, decision = {}, options = {}) {
+  return evaluatePreparedRunCheck(preparation, actor, decision, {
+    failureMessage: 'Crafting check failed',
+    ...options,
+  });
+}
+
+/** Reconstruct and post a GM-evaluated roll in the entitled player's own Foundry session. */
+export async function postCheckRollHandoff(handoff, { Roll = globalThis.Roll } = {}) {
+  if (!handoff?.serializedRoll || typeof Roll?.fromData !== 'function') {
+    return { success: false, reason: 'invalid-roll-handoff' };
+  }
+  try {
+    const roll = Roll.fromData(handoff.serializedRoll);
+    if (!roll || typeof roll.toMessage !== 'function') {
+      return { success: false, reason: 'invalid-roll-handoff' };
+    }
+    await roll.toMessage(
+      { speaker: handoff.speaker ?? undefined, flavor: handoff.flavor ?? undefined },
+      { ...chatModeOption(handoff.rollMode), create: true }
+    );
+    return { success: true };
+  } catch (error) {
+    console.error('Fabricate | Failed to post authoritative check roll to chat:', error);
+    return { success: false, reason: 'chat-post-failed' };
+  }
 }
 
 /**

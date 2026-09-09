@@ -1,0 +1,231 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+
+import {
+  JOURNAL_RUN_CLAIM_PAGE_ID,
+  createJournalRunAuthority,
+} from '../src/systems/journalRunAuthority.js';
+
+function sharedAuthorityWorld() {
+  const records = [];
+  const log = [];
+  let ledger = null;
+  let nextId = 0;
+  let currentTime = 1000;
+
+  const realm = (userId = 'gm') =>
+    createJournalRunAuthority({
+      currentUser: () => ({ id: userId, isGM: userId === 'gm' }),
+      activeGM: () => ({ id: 'gm', active: true, isGM: true }),
+      listLedgers: async () => (ledger ? [ledger] : []),
+      createLedger: async (source) => {
+        ledger = { id: 'ledger', source, state: source.state, claim: null };
+        return ledger;
+      },
+      readState: async (entry) => structuredClone(entry.state),
+      writeState: async (entry, state) => {
+        log.push(['write', structuredClone(state)]);
+        entry.state = structuredClone(state);
+      },
+      createClaim: async (entry, source) => {
+        log.push(['claim', source.claimId]);
+        if (entry.claim) throw new Error('duplicate embedded id');
+        entry.claim = { id: JOURNAL_RUN_CLAIM_PAGE_ID, ...structuredClone(source) };
+        return entry.claim;
+      },
+      readClaim: async (entry) => entry.claim,
+      deleteClaim: async (entry, claimId) => {
+        log.push(['release', claimId]);
+        if (entry.claim?.claimId !== claimId) return false;
+        entry.claim = null;
+        return true;
+      },
+      randomId: () => `id-${++nextId}`,
+      now: () => currentTime,
+    });
+
+  return {
+    realm,
+    log,
+    records,
+    get ledger() {
+      return ledger;
+    },
+    setNow(value) {
+      currentTime = value;
+    },
+  };
+}
+
+describe('journal run authority ledger', () => {
+  it('uses the one global fixed 16-character embedded page id', () => {
+    assert.equal(JOURNAL_RUN_CLAIM_PAGE_ID.length, 16);
+  });
+
+  it('requires explicit active-GM setup and creates a private ledger once', async () => {
+    const world = sharedAuthorityWorld();
+    const player = world.realm('player');
+    assert.deepEqual(await player.setup(), {
+      success: false,
+      reason: 'active-gm-required',
+    });
+
+    const gm = world.realm();
+    assert.equal((await gm.availability()).reason, 'ledger-missing');
+    assert.equal((await gm.setup()).success, true);
+    assert.equal(world.ledger.source.ownership.default, 0);
+    assert.equal(world.ledger.source.flags.fabricate.journalRunAuthorityLedger, true);
+    assert.deepEqual(await gm.setup(), { success: false, reason: 'ledger-already-exists' });
+  });
+
+  it('arbitrates two independent realms through the shared embedded claim', async () => {
+    const world = sharedAuthorityWorld();
+    const first = world.realm();
+    const second = world.realm();
+    await first.setup();
+
+    let finish;
+    const held = new Promise((resolve) => (finish = resolve));
+    const firstRun = first.run(
+      { requestId: 'request-a', senderId: 'player', sessionId: 'one' },
+      async () => {
+        await held;
+        return { success: true, value: 'settled' };
+      }
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const competing = await second.run(
+      { requestId: 'request-b', senderId: 'player', sessionId: 'two' },
+      async () => ({ success: true, value: 'must-not-run' })
+    );
+    assert.equal(competing.success, false);
+    assert.equal(competing.reason, 'claim-held');
+
+    finish();
+    assert.deepEqual(await firstRun, { success: true, value: 'settled' });
+    assert.equal(world.ledger.claim, null);
+    const writeIndex = world.log.findLastIndex(([kind]) => kind === 'write');
+    const releaseIndex = world.log.findLastIndex(([kind]) => kind === 'release');
+    assert.ok(writeIndex > -1 && releaseIndex > writeIndex, 'settlement is durable before release');
+  });
+
+  it('returns a durable settled response for duplicate delivery without replay', async () => {
+    const world = sharedAuthorityWorld();
+    const authority = world.realm();
+    await authority.setup();
+    let calls = 0;
+    const request = { requestId: 'same-request', senderId: 'player', sessionId: 'one' };
+    const run = () =>
+      authority.run(request, async () => {
+        calls += 1;
+        return { success: true, receipt: calls };
+      });
+
+    assert.deepEqual(await run(), { success: true, receipt: 1 });
+    assert.deepEqual(await run(), { success: true, receipt: 1 });
+    assert.equal(calls, 1);
+    assert.deepEqual(
+      await authority.run(
+        { requestId: 'same-request', senderId: 'other', sessionId: 'two' },
+        async () => ({ success: true, receipt: 'must-not-run' })
+      ),
+      { success: false, reason: 'request-id-collision' }
+    );
+  });
+
+  it('retains an ambiguous claim and requires exact recorded reconciliation', async () => {
+    const world = sharedAuthorityWorld();
+    const authority = world.realm();
+    await authority.setup();
+
+    const result = await authority.run(
+      { requestId: 'uncertain', senderId: 'player', sessionId: 'one' },
+      async ({ createExecutionGrant }) => {
+        const grant = createExecutionGrant({ operation: 'execute', actorUuid: 'Actor.a' });
+        assert.ok(
+          authority.consumeExecutionGrant(grant, {
+            operation: 'execute',
+            actorUuid: 'Actor.a',
+            requestId: 'uncertain',
+          })
+        );
+        throw new Error('write acknowledgement lost');
+      }
+    );
+
+    assert.equal(result.recoveryRequired, true);
+    const claimId = world.ledger.claim.claimId;
+    assert.deepEqual(await authority.reconcile({ claimId: 'wrong', disposition: 'abandoned' }), {
+      success: false,
+      reason: 'claim-mismatch',
+    });
+    assert.equal(world.ledger.claim.claimId, claimId);
+    assert.equal((await authority.reconcile({ claimId, disposition: 'abandoned' })).success, true);
+    assert.equal(world.ledger.claim, null);
+    assert.equal(world.ledger.state.requests.uncertain.status, 'abandoned');
+  });
+
+  it('persists one-use prepare tokens and refuses release, replay, expiry, and binding mismatch', async () => {
+    const world = sharedAuthorityWorld();
+    const authority = world.realm();
+    await authority.setup();
+    const binding = {
+      senderId: 'player',
+      actorUuid: 'Actor.a',
+      runType: 'crafting',
+      runId: 'run-1',
+      expectedRevision: 2,
+    };
+
+    const prepared = await authority.run(
+      { requestId: 'prepare', senderId: 'player', sessionId: 'one' },
+      ({ issuePrepareToken }) => ({
+        success: true,
+        token: issuePrepareToken(binding, { expiresAt: 2000 }),
+      })
+    );
+    const resolve = (requestId, token, overrides = {}) =>
+      authority.run(
+        { requestId, senderId: 'player', sessionId: 'one' },
+        ({ consumePrepareToken }) => ({
+          success: consumePrepareToken(token, { ...binding, ...overrides }) !== null,
+        })
+      );
+    assert.deepEqual(await resolve('resolve', prepared.token), { success: true });
+    assert.deepEqual(await resolve('replay', prepared.token), { success: false });
+
+    const released = await authority.run(
+      { requestId: 'prepare-release', senderId: 'player', sessionId: 'one' },
+      ({ issuePrepareToken, releasePrepareToken }) => {
+        const token = issuePrepareToken(binding, { expiresAt: 2000 });
+        releasePrepareToken(token, binding);
+        return { success: true, token };
+      }
+    );
+    assert.deepEqual(await resolve('released', released.token), { success: false });
+    assert.deepEqual(await resolve('mismatch', 'unknown', { runId: 'other' }), { success: false });
+
+    const expires = await authority.run(
+      { requestId: 'prepare-expiry', senderId: 'player', sessionId: 'one' },
+      ({ issuePrepareToken }) => ({
+        success: true,
+        token: issuePrepareToken(binding, { expiresAt: 1500 }),
+      })
+    );
+    world.setNow(1501);
+    assert.deepEqual(await resolve('expired', expires.token), { success: false });
+
+    const senderBound = await authority.run(
+      { requestId: 'prepare-sender', senderId: 'player', sessionId: 'one' },
+      ({ issuePrepareToken }) => ({ success: true, token: issuePrepareToken(binding) })
+    );
+    const wrongSender = await authority.run(
+      { requestId: 'wrong-sender', senderId: 'other', sessionId: 'two' },
+      ({ consumePrepareToken }) => ({
+        success: consumePrepareToken(senderBound.token, binding) !== null,
+      })
+    );
+    assert.deepEqual(wrongSender, { success: false });
+  });
+});
