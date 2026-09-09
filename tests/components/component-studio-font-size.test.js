@@ -329,23 +329,35 @@ const FIXTURE = `
             </div>
             <div class="fabricate-field manager-field">
               <span class="manager-component-readonly-label" data-m="readonly-label"><span>Results</span></span>
-              <ul class="manager-salvage-stage-list">
-                <li class="manager-salvage-stage-row">
-                  <span class="manager-salvage-result-ordinal" data-m="stage-ordinal">1</span>
-                  <span class="manager-salvage-component-field">
-                    <span class="fabricate-picker manager-travel-picker manager-salvage-component-picker">
-                      <button type="button" class="fabricate-button manager-button manager-salvage-component-trigger" data-m="stage-picker">
-                        <span class="manager-travel-portrait"><img src="" alt=""></span>
-                        <span class="manager-travel-picker-value manager-salvage-component-name" data-m="stage-picker-name">Brass Casing</span>
-                        <i class="fas fa-chevron-down"></i>
-                      </button>
+              <!-- A COPY of the salvage stage row, so it drifts SILENTLY when the component
+                   stops emitting that shape. Issue 1512 converted this list to SortableList: the
+                   list, the row, the 22px ordinal badge and the chevron rocker are the
+                   primitive's, and this surface keeps its own picker, DC and Edit link inside the
+                   list's content slot. Updated in the same change, and the two measurements it
+                   moves are the ordinal badge and the rocker glyph, both at the specimen's sizes
+                   now under the maintainer's geometry ruling. -->
+              <ul class="fabricate-sortable-list">
+                <li class="fabricate-sortable-list-row manager-salvage-stage-row">
+                  <div class="fabricate-sortable-list-line">
+                    <button type="button" class="fabricate-icon-button manager-icon-button fabricate-sortable-list-grip" data-sortable-grip="res-1" data-keyboard-focus="true" aria-label="Reorder Brass Casing"><i class="fas fa-grip-vertical"></i></button>
+                    <span class="fabricate-sortable-list-ordinal" data-m="stage-ordinal">1</span>
+                    <div class="fabricate-sortable-list-content">
+                      <span class="manager-salvage-component-field">
+                        <span class="fabricate-picker manager-travel-picker manager-salvage-component-picker">
+                          <button type="button" class="fabricate-button manager-button manager-salvage-component-trigger" data-m="stage-picker">
+                            <span class="manager-travel-portrait"><img src="" alt=""></span>
+                            <span class="manager-travel-picker-value manager-salvage-component-name" data-m="stage-picker-name">Brass Casing</span>
+                            <i class="fas fa-chevron-down"></i>
+                          </button>
+                        </span>
+                      </span>
+                      <span class="manager-salvage-result-difficulty" data-m="stage-dc">DC 8</span>
+                      <button class="manager-salvage-stage-edit" data-m="stage-edit"><span>Edit</span></button>
+                    </div>
+                    <span class="fabricate-sortable-list-rocker">
+                      <button type="button" class="fabricate-icon-button manager-icon-button fabricate-sortable-list-move" data-sortable-move="up" data-keyboard-focus="true" aria-label="Move Brass Casing up"><i class="fas fa-chevron-up" data-m="stage-move"></i></button>
                     </span>
-                  </span>
-                  <span class="manager-salvage-result-difficulty" data-m="stage-dc">DC 8</span>
-                  <button class="manager-salvage-stage-edit" data-m="stage-edit"><span>Edit</span></button>
-                  <span class="manager-salvage-stage-reorder">
-                    <button class="manager-salvage-stage-move" data-m="stage-move"><i class="fas fa-chevron-up"></i></button>
-                  </span>
+                  </div>
                 </li>
               </ul>
             </div>
@@ -523,7 +535,11 @@ const EXPECTED = {
   // ── The salvage panel.
   'salvage-mode-pill': 9.92, // 0.62rem — prototype mode pill 9.5px sans (was 12)
   'micro-label': 8.48, // 0.53rem @ .08em — prototype "ENABLED" eyebrow 8.5px. Near-exact.
-  'stage-ordinal': 10.88, // 0.68rem mono — prototype order badge 11px mono. Near-exact.
+  // MOVED at issue 1512, under the maintainer's geometry ruling: the badge is the shared
+  // list's 22px r6 `--fab-surface-raised` box at the specimen's 10px, where this surface drew
+  // its own 22px badge at 0.68rem. 0.88px smaller, on one surface, and it is the SAME badge on
+  // every ordered row in the product now rather than two studios' copies of one.
+  'stage-ordinal': 10, // 10px mono — the specimen's order badge
   // The yield picker replaced the stage row's native <select> (issue 676). It measures the
   // SAME 13.12 the select did — the `.manager-field`'s 0.82rem, inherited — so swapping a
   // native control for a popover trigger re-typed nothing. That is the point of checking:
@@ -536,7 +552,10 @@ const EXPECTED = {
   // again from 0.72rem: it now MATCHES `stage-dc`, so the read-only fact and the control
   // that changes it read as one pair rather than a number with a speck beside it.
   'stage-edit': 13, // 0.8125rem — deliberately identical to stage-dc
-  'stage-move': 10.88, // 0.68rem — the reorder chevron glyph; reorder IS the authoring act
+  // MOVED at issue 1512 with the rocker itself: the specimen draws two 24x24 hit areas with a
+  // 9px glyph, where this surface drew a 30x18 pair at 0.68rem. The hit area GREW and the
+  // glyph inside it shrank, which is the specimen's reading of the same control.
+  'stage-move': 9, // 9px — the specimen's rocker chevron; reorder IS the authoring act
   // The editor's tag pill converged on the shared `Chip` (issue 772), so it MOVED from
   // 11.2 (its own 0.7rem, near-exact against the prototype's 11px pill) to the one chip
   // scale it now shares with every other chip on this screen. That is the declared cost of

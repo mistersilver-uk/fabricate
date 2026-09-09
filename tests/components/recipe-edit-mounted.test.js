@@ -149,6 +149,12 @@ const RECIPE_COMPILED = [
   'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte',
   'src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte',
+  // The progressive stage's complication band left the row at issue 1512 and is its own
+  // component, rendered as the shared list's body.
+  'src/ui/svelte/apps/manager/recipe/RecipeStageComplicationBand.svelte',
+  // THE ORDERED ROW (issue 1512), which the step accordion and the result group card both
+  // render. A `.svelte` the tree renders but this list omits HANGS the suite.
+  'src/ui/svelte/components/SortableList.svelte',
   // The ONE complication summary row, rendered by the progressive stage row's read-only
   // strip (issue 1286), and the disclosure it imports. A `.svelte` the tree renders but this
   // list omits HANGS the suite (`# cancelled`) rather than failing it — so both are listed
@@ -211,6 +217,12 @@ const stepsHarness = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeDurationEditor.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeDurationSteppers.svelte',
+    // THE ORDERED ROW and the disclosure it renders (issue 1512). `RecipeStepAccordion` is an
+    // ADAPTER over the shared list now, so both are leaves two rungs down of this harness's
+    // tree; a `.svelte` the tree renders but a list omits HANGS that harness's suite
+    // (# cancelled) rather than failing it, and this file declares two lists independently.
+    'src/ui/svelte/components/SortableList.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte',
     'src/ui/svelte/apps/manager/RecipeStepsCard.svelte',
   ],
@@ -2584,26 +2596,63 @@ describe('RecipeEditView (mounted)', () => {
       { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
       { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
     ]);
+    // THE GRIP AND THE BADGE ARE `SortableList`'S (issue 1512). Issue 676's decision — a grip
+    // and a SEPARATE order badge, rather than the order stacked under the grip inside one
+    // handle — is the primitive's shape now, so it is read through the list's hooks. What this
+    // surface still owns is `data-recipe-result-row`, which rides `rowData`.
     const rows = target.querySelectorAll('[data-recipe-result-row]');
     assert.equal(rows.length, 2, 'both result rows render reorderable wrappers');
     rows.forEach((row, index) => {
-      const grip = row.querySelector('.manager-recipe-stage-grip');
+      const grip = row.querySelector('[data-sortable-grip]');
       assert.ok(grip, `row ${index} renders the grip`);
       assert.equal(row.getAttribute('draggable'), 'true', `row ${index} card is the drag source`);
       assert.ok(grip.querySelector('.fa-grip-vertical'), `row ${index} renders the grip icon`);
-      const ordinal = row.querySelector('.manager-recipe-stage-ordinal');
+      const ordinal = row.querySelector('.fabricate-sortable-list-ordinal');
       assert.ok(ordinal, `row ${index} renders a separate order badge`);
       assert.equal(
-        ordinal.getAttribute('data-recipe-result-ordinal'),
+        ordinal.textContent.trim(),
         String(index + 1),
         `row ${index} renders its 1-based order`
       );
       assert.equal(
-        grip.querySelector('.manager-recipe-stage-ordinal'),
+        grip.querySelector('.fabricate-sortable-list-ordinal'),
         null,
         `row ${index} does not nest the order inside the grip`
       );
     });
+    editHarness.remount();
+  });
+
+  it('1512: the result adder is the list`s footer, and follows the empty panel at zero', async () => {
+    const populated = await mountProgressiveResults([
+      { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
+    ]);
+    assert.ok(
+      Boolean(
+        populated.target
+          .querySelector('[data-recipe-section="results"] [data-recipe-add="result-item"]')
+          .closest('.fabricate-sortable-list')
+      ),
+      'with stages, the adder is the list`s last child rather than a sibling of the list'
+    );
+    editHarness.remount();
+
+    // ZERO RESULTS. The set is replaced entirely by the danger-bordered empty panel, so there is
+    // no list for a footer to belong to — and an outcome that produces nothing, offering no way to
+    // say what it should produce, is the dead end the requirement's carve-out exists to prevent.
+    const empty = await mountProgressiveResults([]);
+    assert.ok(
+      Boolean(empty.target.querySelector('[data-recipe-result-empty]')),
+      'the empty panel renders'
+    );
+    const emptyAdd = empty.target.querySelector(
+      '[data-recipe-section="results"] [data-recipe-add="result-item"]'
+    );
+    assert.ok(Boolean(emptyAdd), 'and the adder is still reachable');
+    assert.ok(
+      !emptyAdd.closest('.fabricate-sortable-list'),
+      'following the message it now sits under'
+    );
     editHarness.remount();
   });
 
@@ -2715,11 +2764,13 @@ describe('RecipeEditView (mounted)', () => {
       { id: 'res-1', componentId: 'cmp-herb', quantity: 1 },
       { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
     ]);
+    // THE ROCKER IS `SortableList`'S (issue 1512). The hooks move with the control, because
+    // the control is the same one on every ordered row in the product now.
     const rows = target.querySelectorAll('[data-recipe-result-row]');
-    const firstUp = rows[0].querySelector('[data-recipe-result-move-up]');
-    const firstDown = rows[0].querySelector('[data-recipe-result-move-down]');
-    const lastUp = rows[1].querySelector('[data-recipe-result-move-up]');
-    const lastDown = rows[1].querySelector('[data-recipe-result-move-down]');
+    const firstUp = rows[0].querySelector('[data-sortable-move="up"]');
+    const firstDown = rows[0].querySelector('[data-sortable-move="down"]');
+    const lastUp = rows[1].querySelector('[data-sortable-move="up"]');
+    const lastDown = rows[1].querySelector('[data-sortable-move="down"]');
 
     assert.ok(firstUp && firstDown && lastUp && lastDown, 'both rows expose move buttons');
     assert.equal(firstUp.disabled, true, 'the first row cannot move up');
@@ -2730,28 +2781,31 @@ describe('RecipeEditView (mounted)', () => {
     // The accessible name NAMES the row, so a screen-reader user knows what moves.
     assert.match(
       firstDown.getAttribute('aria-label'),
-      /Move down .* Mountain Herb/,
+      /Mountain Herb/,
       'the move button names the result it moves'
     );
 
-    // Layout (issue 643): the reorder controls sit to the RIGHT of the component's DC —
-    // inside the row's controls cluster, after the difficulty badge and before the remove
-    // control — not as a separate column on the left.
+    // LAYOUT, RE-RULED (issue 1512). Issue 643 put the reorder controls inside the row's own
+    // trailing cluster, after the DC and before the remove. The maintainer's geometry ruling
+    // makes the specimen's row the authority: the rocker is the LIST's trailing cluster and sits
+    // after everything the row itself draws, with the disclosure leading so the two chevron
+    // pairs are never adjacent. What survives verbatim is the relation this test was written
+    // for — reorder is to the RIGHT of the component's DC, never a column on the left.
     const row = rows[0];
     const dc = row.querySelector('[data-recipe-result-difficulty]');
-    const move = row.querySelector('[data-recipe-result-move]');
+    const move = row.querySelector('.fabricate-sortable-list-rocker');
     const remove = row.querySelector('[data-recipe-remove="result-item"]');
     assert.ok(
-      move.closest('.manager-recipe-option-controls'),
-      'reorder lives in the row controls, right of the component'
+      move.closest('.fabricate-sortable-list-line'),
+      "reorder lives in the list's own line, right of everything the row draws"
     );
     assert.ok(
       dc.compareDocumentPosition(move) & Node.DOCUMENT_POSITION_FOLLOWING,
       'reorder follows the difficulty badge'
     );
     assert.ok(
-      move.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING,
-      'the remove control follows the reorder controls'
+      remove.compareDocumentPosition(move) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "the row's own remove control precedes the list's trailing cluster"
     );
     editHarness.remount();
   });
@@ -2762,7 +2816,7 @@ describe('RecipeEditView (mounted)', () => {
       { id: 'res-2', componentId: 'cmp-water', quantity: 1 },
     ]);
     const rows = target.querySelectorAll('[data-recipe-result-row]');
-    rows[1].querySelector('[data-recipe-result-move-up]').click();
+    rows[1].querySelector('[data-sortable-move="up"]').click();
     await flushRender();
 
     assert.deepEqual(
@@ -2770,13 +2824,25 @@ describe('RecipeEditView (mounted)', () => {
       ['res-2', 'res-1'],
       'moving the second row up reorders the group'
     );
-    const status = target.querySelector('[data-recipe-result-order-status]');
+    // THE REGION AND THE SENTENCE ARE THE LIST'S (issue 1512). This card composed its own
+    // `Recipe.ResultMoveAnnouncement` into `[data-recipe-result-order-status]`; both are
+    // RETIRED onto `reorderAnnouncementText` and the list's own region, so the product makes one
+    // statement about one interaction rather than a per-page one. The read-the-name-BEFORE-the-
+    // move rule this card established travelled with them and is what "Pure Water" proves: after
+    // the round trip, `results[1]` is a different record.
+    const status = target.querySelector('[data-sortable-list-status]');
     assert.equal(status.getAttribute('aria-live'), 'polite', 'the change is announced politely');
+    assert.match(status.textContent, /Pure Water/, 'and it names the row that moved');
+    // The SHARED sentence, through `reorderAnnouncementText`. This harness's `game.i18n.format`
+    // stub echoes the key and its data rather than rendering a string, so the position is read in
+    // either shape: the rendered sentence a world sees, or the stub's echo of the same three
+    // placeholders.
     assert.match(
       status.textContent,
-      /Pure Water moved to position 1 of 2/,
-      'and it names the move'
+      /(position 1 of 2|"position":"1")/,
+      'with the position it moved to'
     );
+    assert.match(status.textContent, /(of 2|"total":"2")/, 'and the size of the list it is in');
     editHarness.remount();
   });
 
@@ -2789,7 +2855,7 @@ describe('RecipeEditView (mounted)', () => {
       { progressive: false }
     );
     assert.equal(
-      target.querySelector('[data-recipe-result-move]'),
+      target.querySelector('[data-sortable-move]'),
       null,
       'only progressive results are ordered, so only they get move controls'
     );
@@ -3055,10 +3121,14 @@ describe('RecipeEditView (mounted)', () => {
     );
     assert.ok(Boolean(banded), 'the herb stage draws a band');
 
-    const line = banded.querySelector('.manager-recipe-stage-line');
+    // RE-EXPRESSED AGAINST THE PRIMITIVE (issue 1512). The shape issue 1286 hand-rolled — a
+    // column row whose LINE carries the padding, with the band as the line's sibling — is what
+    // `SortableList` draws for every row, so the band is what the list renders as this row's
+    // BODY and the two `display: contents` wrappers this file used to need are gone with it.
+    const line = banded.querySelector('.fabricate-sortable-list-line');
     assert.ok(Boolean(line), 'the row has a line of its own for the band to sit beneath');
-    assert.ok(line.querySelector('.manager-recipe-stage-grip'), 'the grip rides that line');
-    assert.ok(line.querySelector('.manager-recipe-stage-ordinal'), 'so does the ordinal');
+    assert.ok(line.querySelector('[data-sortable-grip]'), 'the grip rides that line');
+    assert.ok(line.querySelector('.fabricate-sortable-list-ordinal'), 'so does the ordinal');
     // The band is the LINE's sibling, never its child: nested inside it the band would be
     // inset by the line's padding and would still not reach the card's edges.
     assert.equal(
@@ -3066,18 +3136,21 @@ describe('RecipeEditView (mounted)', () => {
       null,
       'the band is a sibling of the line, not part of it'
     );
-    assert.equal(
-      banded.querySelector('[data-recipe-result-complications]').parentElement,
-      line.parentElement,
-      'both are children of the one wrapper, which is what makes the band full-width'
+    const body = banded.querySelector('.fabricate-sortable-list-body');
+    assert.ok(
+      body && body.querySelector('[data-recipe-result-complications]'),
+      "the band is the LIST's body, which is the line's sibling — that is what makes it full-width"
+    );
+    assert.ok(
+      body.parentElement === line.parentElement,
+      'and both are children of the one row element'
     );
 
-    // A row with no band keeps the OLD anatomy exactly: both wrappers are `display:
-    // contents`, so grip, ordinal and option row are the card's own flex items.
+    // A row with no band draws the same anatomy, because there is ONE markup tree.
     const plain = [...target.querySelectorAll('[data-recipe-result-row]')].find(
       (row) => !row.querySelector('[data-recipe-result-complications]')
     );
-    assert.ok(plain.querySelector('.manager-recipe-stage-grip'), 'an unbanded row still grips');
+    assert.ok(plain.querySelector('[data-sortable-grip]'), 'an unbanded row still grips');
     editHarness.remount();
   });
 
@@ -3086,14 +3159,37 @@ describe('RecipeEditView (mounted)', () => {
     // markup without `styles/fabricate.css`, and the visual-parity harness measures the
     // band's own box rather than the card's. `manager-layout.test.js` reads the sheet the
     // same way for the same reason.
+    //
+    // RE-KEYED ONTO THE PRIMITIVE (issue 1512). This was a `:has()` ADDITIVE to a joined stage-row
+    // rule, scoped so it could not re-shape a band-less row. `SortableList` gives EVERY row that
+    // shape unconditionally — the row is a column, it clips itself, and the LINE carries the
+    // padding — so the two declarations are read off the primitive's own blocks and the `:has()`
+    // is the one that gives the BODY its padding back when the body's whole content is a band.
     const sheet = readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8');
-    const selector =
-      '.fabricate-manager .manager-recipe-result-row.is-reorderable:has(.manager-recipe-stage-complications)';
-    const start = sheet.indexOf(`${selector} {`);
-    assert.notEqual(start, -1, 'the banded stage card is still scoped by `:has()`');
-    const block = sheet.slice(start, sheet.indexOf('}', start));
-    assert.match(block, /padding:\s*0/, 'the card hands its padding to the line inside it');
-    assert.match(block, /overflow:\s*hidden/, "so the band's fill stays inside the card radius");
+    const rowStart = sheet.indexOf('.fabricate-sortable-list-row {');
+    assert.notEqual(rowStart, -1, 'the shared ordered row still declares its own box');
+    const rowBlock = sheet.slice(rowStart, sheet.indexOf('}', rowStart));
+    assert.match(rowBlock, /overflow:\s*hidden/, "so the band's fill stays inside the row radius");
+    assert.ok(
+      !/\bpadding:/.test(rowBlock),
+      'and the row declares no padding of its own, which is what it hands to the line'
+    );
+
+    const lineStart = sheet.indexOf('.fabricate-sortable-list-line {');
+    assert.notEqual(lineStart, -1, 'the row still has a line');
+    assert.match(
+      sheet.slice(lineStart, sheet.indexOf('}', lineStart)),
+      /padding:\s*12px/,
+      'and the LINE is what carries it'
+    );
+
+    assert.ok(
+      sheet.includes(
+        '.fabricate-sortable-list-body:has(> .manager-recipe-stage-complications)'
+      ),
+      'a body whose whole content is the band gives its own padding back, so the band reaches ' +
+        'the row edges and its `border-top` reads as the card divider'
+    );
   });
 
   it('1286: the strip is fed the UNREDACTED authored list, so a gmOnly complication still shows', async () => {
@@ -3129,23 +3225,21 @@ describe('RecipeEditView (mounted)', () => {
     editHarness.remount();
   });
 
-  it('1286: a row with no strip is laid out exactly as before — the wrapper is display: contents', async () => {
-    // The strip renders INSIDE the stage card, so the row is wrapped. If that wrapper ever
-    // participated in layout unconditionally it would make the row a column item inside a
-    // card that is `display: flex; align-items: center`, moving EVERY progressive stage row
-    // in the Studio for a feature almost no recipe uses.
+  it('1286: a row with no strip draws the same anatomy, and only its body is empty', async () => {
+    // The claim this test was written for is UNCHANGED and its mechanism is gone (issue 1512).
+    // The `display: contents` wrapper existed so that a band-less row was laid out exactly as it
+    // had been before the band feature; `SortableList` draws ONE anatomy for every row — line,
+    // then body — so the honest form of the same claim is that the band-less row's body is empty.
     const { target } = await mountProgressiveResults(
       [{ id: 'res-1', componentId: 'cmp-water', quantity: 1 }],
       { props: { componentOptions: COMPLICATED_COMPONENT_OPTIONS } }
     );
     assert.equal(stageStrips(target).length, 0, 'no strip for a component authoring none');
-    const wrap = target.querySelector('.manager-recipe-stage-complications-wrap');
-    assert.ok(wrap, 'the wrapper is always present, so there is ONE row anatomy');
-    assert.equal(
-      wrap.classList.contains('has-complications'),
-      false,
-      'and it stays out of layout until there is something to draw'
-    );
+    const row = target.querySelector('[data-recipe-result-row]');
+    assert.ok(row.querySelector('.fabricate-sortable-list-line'), 'the row draws its line');
+    const body = row.querySelector('.fabricate-sortable-list-body');
+    assert.ok(body, 'and its body, because there is ONE row anatomy');
+    assert.equal(body.children.length, 0, 'which draws nothing until there is a band');
     editHarness.remount();
   });
 
@@ -3361,17 +3455,30 @@ describe('RecipeEditView (mounted)', () => {
       target.querySelector('[data-recipe-step-id="sb"]'),
       'second step accordion row renders'
     );
-    assert.equal(
-      target.querySelector('[data-recipe-section="step-sa-ingredients"]'),
-      null,
-      'collapsed step has no ingredients section'
+    // THE COLLAPSED BODY IS RETAINED (maintainer ruling, 2026-09-09), so this is a STATE
+    // assertion rather than an absence one: the section is in the DOM either way, and what
+    // changes is whether it is `hidden`, `inert` and out of the tab order.
+    const collapsed = target.querySelector(
+      '[data-recipe-step-id="sa"] .fabricate-sortable-list-body'
     );
-    target.querySelector('[data-recipe-step-id="sa"] .manager-recipe-steps-row-main').click();
-    await flushRender();
+    assert.ok(Boolean(collapsed), 'the body is retained rather than unmounted');
+    assert.ok(collapsed.hasAttribute('hidden'), 'and a collapsed body is hidden');
+    assert.ok(collapsed.hasAttribute('inert'), 'and its controls leave the tab order');
     assert.ok(
-      target.querySelector('[data-recipe-section="step-sa-ingredients"]'),
-      'expanding a step reveals its ingredients section (prefixed by step id)'
+      Boolean(collapsed.querySelector('[data-recipe-section="step-sa-ingredients"]')),
+      'the ingredients section is inside it, held rather than discarded'
     );
+    // THE CHEVRON IS THE SOLE OPENER (maintainer ruling M3, 2026-09-09). The step's name and
+    // description used to be a `role="button"` toggle; under the specimen the copy is inert and
+    // the leading `RowDisclosure` opens the row, because a whole-row toggle would have to nest
+    // the row's own grip, rocker and delete inside a button.
+    target.querySelector('[data-recipe-step-id="sa"] [data-sortable-disclosure]').click();
+    await flushRender();
+    const opened = target.querySelector(
+      '[data-recipe-step-id="sa"] .fabricate-sortable-list-body'
+    );
+    assert.ok(!opened.hasAttribute('hidden'), 'expanding a step reveals its ingredients section');
+    assert.ok(!opened.hasAttribute('inert'), 'and returns its controls to the tab order');
     editHarness.remount();
   });
 
@@ -3389,7 +3496,11 @@ describe('RecipeEditView (mounted)', () => {
     );
     clickTab(target, 'ingredients');
     await flushRender();
-    target.querySelector('[data-recipe-step-id="sa"] .manager-recipe-steps-row-main').click();
+    // THE CHEVRON IS THE SOLE OPENER (maintainer ruling M3, 2026-09-09). The step's name and
+    // description used to be a `role="button"` toggle; under the specimen the copy is inert and
+    // the leading `RowDisclosure` opens the row, because a whole-row toggle would have to nest
+    // the row's own grip, rocker and delete inside a button.
+    target.querySelector('[data-recipe-step-id="sa"] [data-sortable-disclosure]').click();
     await flushRender();
     target
       .querySelector(
@@ -5051,7 +5162,11 @@ describe('RecipeEditView (mounted)', () => {
     );
     clickTab(target, 'ingredients');
     await flushRender();
-    target.querySelector('[data-recipe-step-id="sa"] .manager-recipe-steps-row-main').click();
+    // THE CHEVRON IS THE SOLE OPENER (maintainer ruling M3, 2026-09-09). The step's name and
+    // description used to be a `role="button"` toggle; under the specimen the copy is inert and
+    // the leading `RowDisclosure` opens the row, because a whole-row toggle would have to nest
+    // the row's own grip, rocker and delete inside a button.
+    target.querySelector('[data-recipe-step-id="sa"] [data-sortable-disclosure]').click();
     await flushRender();
     target
       .querySelector(
@@ -5092,17 +5207,27 @@ describe('RecipeEditView (mounted)', () => {
     for (const tab of ['ingredients', 'results', 'tools']) {
       clickTab(target, tab);
       await flushRender();
-      const head = target.querySelector(
-        '[data-recipe-step-id="sa"] .manager-recipe-steps-row-head'
-      );
-      assert.ok(head, `${tab} tab shows step rows`);
+      // NEITHER AFFORDANCE (issue 1512). A list declared non-reorderable draws no grip and no
+      // rocker at all, rather than a handle that reorders nothing — a handle the surface does not
+      // honour is a promise it does not keep. The ROW is the drag source when the list orders, so
+      // that is what is asserted inert here rather than a header this component no longer draws.
+      const row = target.querySelector('[data-recipe-step-id="sa"]');
+      assert.ok(row, `${tab} tab shows step rows`);
       assert.notEqual(
-        head.getAttribute('draggable'),
+        row.getAttribute('draggable'),
         'true',
-        `${tab} tab step header is not a drag handle`
+        `${tab} tab step row is not a drag source`
+      );
+      assert.ok(
+        !row.querySelector('[data-sortable-grip]'),
+        `${tab} tab draws no grip, because the order is not authored there`
+      );
+      assert.ok(
+        !row.querySelector('[data-sortable-move]'),
+        `${tab} tab draws no chevron rocker either`
       );
       // A drag attempt is inert on these tabs.
-      head.dispatchEvent(new globalThis.window.Event('dragstart', { bubbles: true }));
+      row.dispatchEvent(new globalThis.window.Event('dragstart', { bubbles: true }));
       target
         .querySelector('[data-recipe-step-id="sb"]')
         .dispatchEvent(new globalThis.window.Event('drop', { bubbles: true, cancelable: true }));
@@ -6785,8 +6910,14 @@ describe('RecipeStepsCard (mounted)', () => {
     const triggers = target.querySelectorAll('[data-recipe-duration-trigger]');
     triggers[1].click();
     await flushRender();
+    // SCOPED TO THE POPOVER (issue 1512). The collapsed body stays in the DOM now, and it
+    // renders the step's five inline duration steppers — so a bare
+    // `[data-recipe-duration-unit="…"]` lookup matches EVERY row's body before it reaches the
+    // open popover, and the patch it drives names the wrong step. This is the exact hazard the
+    // retention ruling was recorded with: a body-scoped selector that used to match one open
+    // row now matches every row at once.
     const hoursInput = document.querySelector(
-      '[data-recipe-duration-unit="hours"] [data-stepper-input]'
+      '.manager-recipe-duration-popover [data-recipe-duration-unit="hours"] [data-stepper-input]'
     );
     assert.ok(hoursInput, 'the duration editor exposes a typeable hours input');
     hoursInput.value = '4';
@@ -6814,8 +6945,14 @@ describe('RecipeStepsCard (mounted)', () => {
     );
     target.querySelector('[data-recipe-duration-trigger]').click();
     await flushRender();
+    // SCOPED TO THE POPOVER (issue 1512). The collapsed body stays in the DOM now, and it
+    // renders the step's five inline duration steppers — so a bare
+    // `[data-recipe-duration-unit="…"]` lookup matches EVERY row's body before it reaches the
+    // open popover, and the patch it drives names the wrong step. This is the exact hazard the
+    // retention ruling was recorded with: a body-scoped selector that used to match one open
+    // row now matches every row at once.
     const daysInput = document.querySelector(
-      '[data-recipe-duration-unit="days"] [data-stepper-input]'
+      '.manager-recipe-duration-popover [data-recipe-duration-unit="days"] [data-stepper-input]'
     );
     daysInput.value = '0';
     daysInput.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
@@ -6829,24 +6966,62 @@ describe('RecipeStepsCard (mounted)', () => {
     const target = await stepsHarness.mount(
       stepsProps({ onUpdateStep: (id, patch) => updates.push([id, patch]) })
     );
-    assert.equal(
-      target.querySelector('[data-recipe-step-field="name"]'),
-      null,
-      'collapsed by default'
+    // THE COLLAPSED BODY IS RETAINED (maintainer ruling, 2026-09-09), so "collapsed by default"
+    // is a STATE about the body rather than an absence of the field. Asserted as a boolean, never
+    // `assert.equal(node, null)`: on failure `node:assert` serialises a mounted element's circular
+    // tree to build its diff and the heap dies as a `# cancelled` suite with no message.
+    const bodies = [...target.querySelectorAll('.fabricate-sortable-list-body')];
+    assert.equal(bodies.length, 2, 'every row renders its body, because there is ONE markup tree');
+    assert.ok(
+      bodies.every((body) => body.hasAttribute('hidden') && body.hasAttribute('inert')),
+      'and every one of them is collapsed by default'
     );
-    const main = target.querySelector(
-      '[data-recipe-step-id="step-1"] .manager-recipe-steps-row-main'
+    assert.ok(
+      Boolean(target.querySelector('[data-recipe-step-field="name"]')),
+      'the field is HELD rather than discarded, which is what retention buys'
     );
+    // THE CHEVRON IS THE SOLE OPENER (maintainer ruling M3, 2026-09-09).
+    const main = target.querySelector('[data-recipe-step-id="step-1"] [data-sortable-disclosure]');
     main.click();
     await flushRender();
-    const nameInput = target.querySelector('[data-recipe-step-field="name"]');
+    const nameInput = target.querySelector(
+      '[data-recipe-step-id="step-1"] [data-recipe-step-field="name"]'
+    );
     assert.ok(nameInput, 'name input visible when expanded');
+    assert.ok(
+      !nameInput.closest('.fabricate-sortable-list-body').hasAttribute('inert'),
+      'and reachable, because the row it belongs to is open'
+    );
     nameInput.value = 'Forage';
     nameInput.dispatchEvent(new globalThis.window.Event('change', { bubbles: true }));
     assert.deepEqual(
       updates,
       [['step-1', { name: 'Forage' }]],
       'onUpdateStep called with the new name'
+    );
+    stepsHarness.remount();
+  });
+
+  it('1512: the step adder is the list`s footer, and renders with no steps at all', async () => {
+    // THE ADDER IS THE LIST'S FOOTER (issue 1512), which is where the requirement puts it — and
+    // this card has no `{#if}` around it, so the zero case renders the list with no rows and the
+    // footer still draws. That is the carve-out satisfied by construction rather than by a branch.
+    const populated = await stepsHarness.mount(stepsProps());
+    assert.ok(
+      Boolean(populated.querySelector('[data-recipe-step-add]').closest('.fabricate-sortable-list')),
+      'the adder is the list`s last child rather than a sibling of the list'
+    );
+    stepsHarness.remount();
+
+    const empty = await stepsHarness.mount(stepsProps({ steps: [] }));
+    assert.ok(
+      Boolean(empty.querySelector('[data-recipe-step-add]')),
+      'and it is reachable with no steps at all, which is the only way to author the first one'
+    );
+    assert.equal(
+      empty.querySelectorAll('.fabricate-sortable-list-row').length,
+      0,
+      'with no rows above it'
     );
     stepsHarness.remount();
   });
@@ -6872,17 +7047,29 @@ describe('RecipeStepsCard (mounted)', () => {
     const target = await stepsHarness.mount(
       stepsProps({ onReorderSteps: (from, to) => moves.push([from, to]) })
     );
-    // Only the header is draggable; the row is the drop target.
-    const firstHeader = target.querySelector(
-      '[data-recipe-step-id="step-1"] .manager-recipe-steps-row-head'
+    // TWO SHIPPED DECISIONS ARE OVERTURNED HERE, and both are named rather than quietly
+    // rewritten (issue 1512).
+    //
+    // FIRST, "the header is the drag source". The `<li>` is, and always was in the specimen: the
+    // grip is the visible handle a pointer grabs the row by, and the row is what travels. The
+    // header this assertion addressed does not exist any more.
+    //
+    // SECOND, "the up/down arrows are gone" — the decision this component took when it dropped a
+    // rocker it once had. The maintainer's both-affordances ruling (M2, 2026-09-09) RETURNS them:
+    // a single-position nudge is faster than a drag, and the rocker is the only affordance a
+    // reader can see the range of.
+    const firstRow = target.querySelector('[data-recipe-step-id="step-1"]');
+    assert.equal(firstRow.getAttribute('draggable'), 'true', 'the row is the drag source');
+    assert.ok(
+      Boolean(firstRow.querySelector('[data-sortable-grip]')),
+      'and the grip is the visible handle it is grabbed by'
     );
-    assert.equal(firstHeader.getAttribute('draggable'), 'true', 'the header is the drag source');
-    assert.equal(
-      target.querySelector('[data-recipe-step-move]'),
-      null,
-      'the up/down arrows are gone'
+    assert.ok(
+      Boolean(firstRow.querySelector('[data-sortable-move="up"]')) &&
+        Boolean(firstRow.querySelector('[data-sortable-move="down"]')),
+      'the up/down arrows are BACK, on the maintainer ruling that both affordances always render'
     );
-    firstHeader.dispatchEvent(new globalThis.window.Event('dragstart', { bubbles: true }));
+    firstRow.dispatchEvent(new globalThis.window.Event('dragstart', { bubbles: true }));
     target
       .querySelector('[data-recipe-step-id="step-2"]')
       .dispatchEvent(new globalThis.window.Event('drop', { bubbles: true, cancelable: true }));
@@ -6892,14 +7079,17 @@ describe('RecipeStepsCard (mounted)', () => {
 
   it('edits only name and description inside an expanded step (no tools/ingredients/results)', async () => {
     const target = await stepsHarness.mount(stepsProps());
-    target.querySelector('[data-recipe-step-id="step-1"] .manager-recipe-steps-row-main').click();
+    // THE CHEVRON IS THE SOLE OPENER (maintainer ruling M3, 2026-09-09), and each field is
+    // re-scoped THROUGH ITS OWN ROW rather than loosened: the collapsed bodies are retained, so a
+    // bare `[data-recipe-step-field]` now matches every row's copy at once.
+    target.querySelector('[data-recipe-step-id="step-1"] [data-sortable-disclosure]').click();
     await flushRender();
     assert.ok(
-      target.querySelector('[data-recipe-step-field="name"]'),
+      target.querySelector('[data-recipe-step-id="step-1"] [data-recipe-step-field="name"]'),
       'name input renders when expanded'
     );
     assert.ok(
-      target.querySelector('[data-recipe-step-field="description"]'),
+      target.querySelector('[data-recipe-step-id="step-1"] [data-recipe-step-field="description"]'),
       'description input renders when expanded'
     );
     // Requirement sections live on their own tabs, never inside the Overview step card.

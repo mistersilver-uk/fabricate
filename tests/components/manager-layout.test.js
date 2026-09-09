@@ -2503,7 +2503,11 @@ test('the typographic contract sets names in the serif and numerics in the mono 
     // preserved because changing it would be a change, and issue 1509 re-roots this family
     // without moving a frame. The rendering defect the old reason implies is issue 1507's.
     '.fabricate-tabs .manager-chip.manager-editor-tab-badge',
-    '.fabricate-manager .manager-environment-comp-order',
+    // `.manager-environment-comp-order` left this list at issue 1512. The composition list's
+    // bare mono pip and the recipe step accordion's badge were its only two writers, and both
+    // rows are `SortableList`'s now — so the number is the shared list's ordinal badge, which
+    // states the mono face and tabular figures itself and is asserted below.
+    '.fabricate-sortable-list-ordinal',
     '.fabricate-manager .manager-nav-count',
   ];
   for (const selector of MONO) {
@@ -4203,11 +4207,28 @@ test('manager environments browser and edit route define compact responsive geom
     'and the note rule and its icon-column spacer are gone rather than left behind matching ' +
       'nothing, which is what a class that moves onto a component tag otherwise leaves in a sheet'
   );
+  // RE-EXPRESSED AGAINST THE PRIMITIVE (issue 1512). The ranked variant was a second grid
+  // template with a 30px lead track, written on both the column-header strip and the row. The
+  // rows are `SortableList`'s flex rows now, so the ROW half is the list's `reorderable` and what
+  // is left in the sheet is the strip's lead track — which has to be the width of what the list
+  // draws BEFORE the record's cells, or every label sits one cluster to the left of its column.
   assert.ok(
-    compBlock.includes('--fab-env-comp-grid-ranked: 30px minmax(0, 1fr) 92px 132px 92px;') &&
-      css.includes('.fabricate-manager .manager-environment-comp-head.has-rank-controls') &&
-      css.includes('.fabricate-manager .manager-environment-comp-row.has-rank-controls'),
-    'ranked events opt into a leading 30px handle column ahead of the task/override/runtime cells'
+    !css.includes('--fab-env-comp-grid-ranked'),
+    'the ranked grid template is retired rather than left matching a row nothing writes'
+  );
+  assert.ok(
+    compBlock.includes('--fab-env-comp-lead:') &&
+      compBlock.includes('--fab-env-comp-lead-ranked:'),
+    'the strip declares the lead track it has to reserve, in both its plain and ranked readings'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager .manager-environment-comp-head.has-rank-controls'),
+    'and an ordered strip takes the ranked one, which also reserves the trailing rocker'
+  );
+  assert.ok(
+    css.includes('.fabricate-manager .manager-environment-comp-cells'),
+    "the record's cells are a grid on the SAME template the strip reads, which is what makes a " +
+      'label sit over the column it names'
   );
   assert.ok(
     !compBlock.includes('minmax(150px'),
@@ -8039,32 +8060,51 @@ async function checksRollEdges(page, tiersWrapperClass) {
         </div>
       </div>
     </section>`;
+  // A COPY OF THE MARKUP, so it drifts SILENTLY when the component stops emitting that shape —
+  // which is exactly what issue 1512 did to it. `CheckRecipeTiers` renders through
+  // `SortableList` now: the list is the primitive's `<ul>`, the row is its `<li>` carrying this
+  // surface's own `manager-checks-tier-row` through `rowClass`, the grip and the chevron rocker
+  // are the list's `IconButton`s, and the adder is the list's own footer `<li>`. The fixture is
+  // updated in the same change, because the geometry it measures — the row's left and right
+  // edges against the radio column and the adder — is only evidence while the markup is the
+  // component's.
   const tiersCard = `
     <section class="${tiersWrapperClass}" data-routed-tiers>
       <div class="manager-checks-card-head">
         <div><h3 class="manager-checks-card-title">Recipe difficulty tiers</h3></div>
       </div>
       <div class="manager-checks-card-body is-stack">
-        <div class="manager-checks-tier-list" role="list" aria-label="Recipe difficulty tiers">
-          <div class="manager-checks-tier-row" role="listitem" data-tier-row="t1">
-            <button type="button" class="manager-checks-tier-grip"><i class="fas fa-grip-vertical"></i></button>
-            <input class="manager-checks-tier-name" data-tier-name value="Apprentice work">
-            <span class="manager-checks-tier-unit">DC</span>
-            <div class="manager-checks-tier-stepper is-narrow">
-              <div class="fab-stepper is-fill">
-                <button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button>
-                <input type="number" class="fab-stepper-input" data-tier-dc value="8">
-                <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
+        <ul class="fabricate-sortable-list">
+          <li class="fabricate-sortable-list-row manager-checks-tier-row" data-tier-row="t1">
+            <div class="fabricate-sortable-list-line">
+              <button type="button" class="fabricate-icon-button manager-icon-button fabricate-sortable-list-grip" data-sortable-grip="t1" data-keyboard-focus="true" aria-label="Reorder Apprentice work"><i class="fas fa-grip-vertical"></i></button>
+              <span class="fabricate-sortable-list-ordinal">1</span>
+              <div class="fabricate-sortable-list-content">
+                <input class="manager-checks-tier-name" data-tier-name value="Apprentice work">
+                <span class="manager-checks-tier-unit">DC</span>
+                <div class="manager-checks-tier-stepper is-narrow">
+                  <div class="fab-stepper is-fill">
+                    <button type="button" class="fab-stepper-adjunct"><i class="fas fa-minus"></i></button>
+                    <input type="number" class="fab-stepper-input" data-tier-dc value="8">
+                    <button type="button" class="fab-stepper-adjunct"><i class="fas fa-plus"></i></button>
+                  </div>
+                </div>
+                <button type="button" class="fabricate-button manager-button fab-manager-button is-danger manager-checks-tier-remove" data-remove-tier>
+                  <i class="fas fa-trash"></i>
+                </button>
               </div>
+              <span class="fabricate-sortable-list-rocker">
+                <button type="button" class="fabricate-icon-button manager-icon-button fabricate-sortable-list-move" data-sortable-move="up" data-keyboard-focus="true" aria-label="Move Apprentice work up" disabled><i class="fas fa-chevron-up"></i></button>
+                <button type="button" class="fabricate-icon-button manager-icon-button fabricate-sortable-list-move" data-sortable-move="down" data-keyboard-focus="true" aria-label="Move Apprentice work down" disabled><i class="fas fa-chevron-down"></i></button>
+              </span>
             </div>
-            <button type="button" class="fabricate-button manager-button fab-manager-button is-danger manager-checks-tier-remove" data-remove-tier>
-              <i class="fas fa-trash"></i>
+          </li>
+          <li class="manager-checks-tier-add">
+            <button type="button" class="fabricate-button manager-button fab-manager-button is-dashed" data-add-tier>
+              <i class="fas fa-plus"></i><span>Add difficulty tier</span>
             </button>
-          </div>
-        </div>
-        <button type="button" class="fabricate-button manager-button fab-manager-button is-dashed" data-add-tier>
-          <i class="fas fa-plus"></i><span>Add difficulty tier</span>
-        </button>
+          </li>
+        </ul>
       </div>
     </section>`;
   await page.setContent(

@@ -250,7 +250,7 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 28 library entries with no shipped implementation.
+ * The 27 library entries with no shipped implementation.
  *
  * Not a debt list to be paid down in one change and not a ceiling: it is the specified-but-unbuilt
  * quadrant of the conformance question, and it moves in BOTH directions — down when a primitive is
@@ -260,6 +260,12 @@ test('every manifest library name resolves to a library entry', () => {
  * `Kicker`, `Notice` and `StatBox` left it at issue 1505, which built all three. `InfoStrip` STAYS:
  * that change measured five candidate call sites for it and exactly one qualifies, which is below
  * the two-independent-importer membership bar, so it defers rather than shipping on one caller.
+ *
+ * `SortableList` left it at issue 1512, which built it: the recipe step accordion, the environment
+ * composition list, the recipe result stages, the salvage stages and the recipe difficulty tiers
+ * are five independent callers, all of which had hand-rolled the ordered-row pattern into five
+ * different geometries. `Well`, the other name in this register that shares a specimen block with
+ * a built one, STAYS — building one name in a multi-name block builds one name.
  *
  * `Avatar` left it at issue 1506, which built it: the GM Knowledge surface's roster row and its
  * detail header are two independent callers, which is the bar, and both were rendering the icon
@@ -272,7 +278,7 @@ const SPECIFIED_ONLY = [
   'ChoiceGroup', 'DataTable', 'InfoStrip', 'ListRow',
   'LogList', 'Menu', 'Meter', 'NavSidebar', 'PageHeader',
   'PickerRow', 'Rail', 'RequirementChooser', 'RuleRow',
-  'RuleSentence', 'Search', 'SetPicker', 'SortableList',
+  'RuleSentence', 'Search', 'SetPicker',
   'StageBars', 'TierTrack', 'ValidationList', 'ValidationSummary',
   'ViewToggle', 'Well', 'XrefList',
 ];
@@ -589,6 +595,12 @@ const RE_ROOTED_ROWS = [
   'src/ui/svelte/components/ModifierPillSelect.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
+  // Issue 1512, and the first row here that was ROOTED ON ARRIVAL rather than re-rooted from a
+  // manager family. `SortableList` never had an application-rooted family to move: it was written
+  // with its whole family in the sheet under `fabricate-sortable-list`, which is what the rooting
+  // requirement asks of a new shared primitive. The row is what enrols it in the clause below, so
+  // its `shared` scope is proved by the same gate every other family's is.
+  'src/ui/svelte/components/SortableList.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/ToggleCard.svelte',
 ];
@@ -682,9 +694,9 @@ test('every re-rooted family carries a shared scope and an entry in the gate tha
   const byPath = new Map(DESIGN_SYSTEM_PRIMITIVES.map((row) => [row.path, row]));
   const entries = areaScopeGateComponents();
   assert.ok(
-    entries.size >= 21,
-    `the area-scope gate reader found only ${entries.size} component paths, against the 22 that ` +
-      'file holds across 21 entries. The reader has stopped matching and the clause below passes ' +
+    entries.size >= 22,
+    `the area-scope gate reader found only ${entries.size} component paths, against the 23 that ` +
+      'file holds across 22 entries. The reader has stopped matching and the clause below passes ' +
       'on nothing.'
   );
 

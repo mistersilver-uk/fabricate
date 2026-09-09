@@ -25,8 +25,8 @@
  * all, and the chain joined by ` >> ` when a rule is nested. The at-context is part of the key
  * because two rules under different conditions are never the same rule: the same selector inside
  * a `@container` and at the top level is two different pieces of authoring, and merging them is
- * not a thing that can be done. Keyed on the selector ALONE the sheet holds 206 repeated selectors
- * rather than these 112, and both figures are published so a reader can tell which produced a pin.
+ * not a thing that can be done. Keyed on the selector ALONE the sheet holds 205 repeated selectors
+ * rather than these 111, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
  * Unfiltered, the sheet holds 3,043 `(at-context, selector)` keys, of which 2,931 appear exactly
@@ -85,9 +85,20 @@
  * `pinnedTotal` is untouched. Re-derived by running the census.
  *
  * RESTACKED ONTO ISSUE 1515 (PR 1634) BEFORE MERGE, and the three contextual figures were
- * RE-DERIVED at the restacked head rather than carried over: the sheet holds 2,565 rules, 3,046
+ * RE-DERIVED at the restacked head rather than carried over: the sheet held 2,565 rules, 3,046
  * keys and 2,934 singletons, with the repeated table exactly as issue 1515 left it — 112 rows and
- * a `pinnedTotal` of 229 — because none of the three entries above touches a repeated key. The
+ * a `pinnedTotal` of 229 — because none of the three entries above touches a repeated key.
+ *
+ * ISSUE 1512 RE-KEYED ONE ROW AND DELETED ANOTHER, and both moves are the same conversion. The
+ * progressive stage row is `SortableList`'s row now, so the two rows keyed on
+ * `.manager-recipe-result-row.is-reorderable` VANISH: the bare one was the joined geometry rule
+ * plus the row's own grab cursor, and the geometry is the primitive's while the cursor is its
+ * grip's, so the class is written at no markup site at all and both its rules go. Its trailing
+ * `.manager-recipe-option-controls` compound is RE-KEYED onto `manager-recipe-stage-row`, the
+ * caller class the card writes through `rowClass` — the rule still exists, still appears twice,
+ * and is still about the same cluster, so the row moves rather than being paid down. Net: 112 rows
+ * and 229 appearances become 111 and 227, and the contextual figures fall to 2,556 rules, 3,030
+ * keys and 2,919 singletons with the sheet's retired stage-row and step-accordion blocks. The
  * per-phase movements the three entries describe were measured on the pre-restack base and are
  * kept as the record of what each phase did; the figures the gate asserts are the ones here.
  *
@@ -438,6 +449,6 @@ export const SELECTOR_REPETITION_BASELINE = checkedRows(TABLE.rows);
  *
  * `assertRatchet` asserts exactly that and throws before any comparison if the two disagree, so
  * this is the one figure a reviewer can check against the issue without reading the table. At the
- * measured commit it is 229 across 112 rows.
+ * measured commit it is 227 across 111 rows.
  */
 export const SELECTOR_REPETITION_TOTAL = TABLE.pinnedTotal;

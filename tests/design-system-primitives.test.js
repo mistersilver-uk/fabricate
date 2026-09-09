@@ -226,6 +226,12 @@ const EXPECTED_OVERRIDE_KEYS = [
   // and is held by its own mounted suite instead, which that entry records.
   'src/ui/svelte/components/Notice.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
+  // Issue 1512: the row disclosure, PROMOTED into the member set when `SortableList` became
+  // its second importer. It is 24px of chevron and nothing else, so a frame that merely
+  // contains one proves very little; its entry names the frame where a row it controls is
+  // OPEN, and it leaves `PRIMITIVES_WITH_NO_FRAME` in the same change — which is the
+  // direction that list is meant to move.
+  'src/ui/svelte/components/RowDisclosure.svelte',
   // THE searchable picker. This list is compared against `Object.keys(...).sort()`, so the entry
   // sits here rather than four lines up because issue 1500 moved the file from
   // `apps/manager/SearchablePopover.svelte` into `components/` — which changes nothing about the
@@ -240,6 +246,12 @@ const EXPECTED_OVERRIDE_KEYS = [
   // Issue 1373, round 5: the box's `sm` SIZE has one caller — the Tool Studio's prerequisite row
   // — and neither representative frame draws it. Its override names the one frame that does.
   'src/ui/svelte/components/SelectionCheckbox.svelte',
+  // Issue 1512: the ORDERED ROW, and the second key this list gains by a primitive ARRIVING.
+  // A `components/` file is a broad signal the moment it is written, and both representative
+  // frames are BROWSE surfaces that draw no ordered list at all — so without this entry every
+  // change to the list would publish two frames that structurally cannot contain one. Its
+  // entry names the frame that draws a row OPEN, which is the state the primitive exists for.
+  'src/ui/svelte/components/SortableList.svelte',
   // Issue 1505: the at-a-glance figure. It sorts HERE rather than after `StatusToggle` because
   // this list is compared against `Object.keys(...).sort()` and `'B'` < `'u'`. ONE frame, for the
   // same reason as `Notice`: the manager caller's grid is drawn by no case, since nothing in the
@@ -388,7 +400,6 @@ const PRIMITIVES_WITH_NO_FRAME = [
   'src/ui/svelte/components/ManagerColorPicker.svelte',
   'src/ui/svelte/components/ManagerColorPopover.svelte',
   'src/ui/svelte/components/Pagination.svelte',
-  'src/ui/svelte/components/RowDisclosure.svelte',
 ];
 
 test('the inputs every property below quantifies over are alive', () => {
@@ -453,8 +464,8 @@ test('the inputs every property below quantifies over are alive', () => {
   // test.js:133` and `:136` pin `library.blockCount` and `library.headingCount`, which count
   // `library.html`'s spec-head BLOCKS rather than manifest rows. That figure is unrelated to this
   // one, is unchanged by this change, and the two agreeing at 53 today was a coincidence.
-  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 52, 'the shipped primitive set changed size');
-  assert.equal(NOT_A_PRIMITIVE.length, 11, 'the recorded non-member set changed size');
+  assert.equal(DESIGN_SYSTEM_PRIMITIVES.length, 54, 'the shipped primitive set changed size');
+  assert.equal(NOT_A_PRIMITIVE.length, 10, 'the recorded non-member set changed size');
   assert.ok(RULED_OUT.length > 0, 'the ruled-out register is empty');
   assert.ok(
     PUBLISHING_CASE_IDS.size > 0,
@@ -566,6 +577,22 @@ test('(a) the two older overrides still name the frame that renders their state'
       'world-tool-entry-on-break-repair-tag-picker-empty',
       'the one frame that draws the `note` variant — every other empty in the corpus is a ' +
         'bordered panel filling a region',
+    ],
+    // Issue 1512's two, pinned here for the reason the header states: a repoint at a case already
+    // in the representative pair changes nothing any other assertion can see, and the primitive
+    // silently goes back to publishing frames that do not contain it.
+    [
+      'src/ui/svelte/components/SortableList.svelte',
+      'manager-recipe-edit-step-open',
+      'the one frame that draws a row OPEN — every other frame in the registry draws this list ' +
+        'collapsed, and a collapsed row shows neither the disclosure state, the body containment ' +
+        'nor the footer adder in flow with the list',
+    ],
+    [
+      'src/ui/svelte/components/RowDisclosure.svelte',
+      'manager-component-complications-expanded',
+      'the one frame whose `expectSelector` asserts `aria-expanded="true"` on a disclosure — a ' +
+        'frame that merely contains a 24px chevron proves nothing about the control it is',
     ],
   ];
   for (const [file, caseId, because] of expectations) {

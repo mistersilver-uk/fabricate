@@ -1,5 +1,5 @@
 {
-  "pinnedTotal": 229,
+  "pinnedTotal": 227,
   "rows": [
     {
       "key": "(top level) | .fabricate-button.manager-button",
@@ -218,19 +218,15 @@
       "count": 2
     },
     {
-      "key": "(top level) | .fabricate-manager .manager-recipe-result-row.is-reorderable",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-option-controls",
-      "count": 2
-    },
-    {
       "key": "(top level) | .fabricate-manager .manager-recipe-row",
       "count": 2
     },
     {
       "key": "(top level) | .fabricate-manager .manager-recipe-row.is-selected",
+      "count": 2
+    },
+    {
+      "key": "(top level) | .fabricate-manager .manager-recipe-stage-row .manager-recipe-option-controls",
       "count": 2
     },
     {

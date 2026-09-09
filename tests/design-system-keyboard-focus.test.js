@@ -319,10 +319,14 @@ describe('design system: a programmatic focus target declares itself focused to 
     const { roleZero } = focusPopulations();
     const undeclared = undeclaredIn(roleZero);
 
+    // RE-MEASURED at issue 1512, which converted six of them: 13 today, against the 19 before the
+    // composition list's four record cells, the recipe step header and the drop table's row
+    // became real buttons or stopped holding focus at all. The floor moves with the measurement
+    // rather than being left where a shrinking population would trip it.
     assert.ok(
-      roleZero.length >= 15,
+      roleZero.length >= 10,
       `only ${roleZero.length} elements carry both a static \`tabindex="0"\` and an interactive ` +
-        'role, against the 19 this tree holds. An absence check over an empty population passes ' +
+        'role, against the 13 this tree holds. An absence check over an empty population passes ' +
         'forever.'
     );
 

@@ -17,6 +17,7 @@ import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import {
   COMPONENT_EDIT_VIEW_COMPILED_MODULES,
@@ -397,13 +398,93 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
   // ── D3's condition: ordinals + read-only difficulty badge ────────────────
 
   it('D3: progressive salvage result rows render ordinals', async () => {
-    // Without these the card governs a list whose order the GM cannot see.
+    // Without these the card governs a list whose order the GM cannot see. The badge is
+    // `SortableList`'s since issue 1512 — it is the same 22px mono badge on every ordered row in
+    // the product now — so it is read by the list's own class rather than by this surface's
+    // retired `data-salvage-result-ordinal` hook.
     const target = await harness.mount(props());
-    const ordinals = [...target.querySelectorAll('[data-salvage-result-ordinal]')];
+    const ordinals = [...target.querySelectorAll('.fabricate-sortable-list-ordinal')];
     assert.deepEqual(
       ordinals.map((node) => node.textContent.trim()),
       ['1', '2'],
       'stages are numbered in authored order'
+    );
+    harness.remount();
+  });
+
+  // ── ISSUE 1512: THE STAGE LIST IS THE SHARED ORDERED ROW ─────────────────────────
+  //
+  // The salvage stage list had NO coverage of its reorder at all: the chevrons it drew were
+  // asserted to exist by the frame gates and by nothing that pressed them, and it had no keyboard
+  // path whose focus or announcement anything read. It is `SortableList`'s list now, so the
+  // interaction is the primitive's — and this is the one converted site inside a `<form>`, which
+  // is a fact about THIS surface rather than about the primitive and is asserted here.
+
+  it('1512: reorders a stage from the rocker, and from the grip with the arrow keys', async () => {
+    const target = await harness.mount(props());
+    const rows = [...target.querySelectorAll('[data-salvage-result]')];
+    assert.equal(rows.length, 2, 'two stages, so a move has somewhere to go');
+
+    rows[1].querySelector('[data-sortable-move="up"]').click();
+    flushSync();
+    let stages = [...target.querySelectorAll('[data-salvage-result]')].map((row) =>
+      row.getAttribute('data-salvage-result')
+    );
+    assert.deepEqual(stages, ['res-2', 'res-1'], 'the rocker moves the stage it belongs to');
+
+    const grip = target.querySelector('[data-sortable-grip="res-1"]');
+    grip.dispatchEvent(
+      new globalThis.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true })
+    );
+    flushSync();
+    stages = [...target.querySelectorAll('[data-salvage-result]')].map((row) =>
+      row.getAttribute('data-salvage-result')
+    );
+    assert.deepEqual(stages, ['res-1', 'res-2'], 'and the arrow keys move it back');
+    harness.remount();
+  });
+
+  it('1512: every control the list draws is a `type="button"`, inside the editor`s form', async () => {
+    // THE FACT THAT IS THIS SURFACE'S RATHER THAN THE PRIMITIVE'S. The component editor renders a
+    // real `<form>`, so a control without an explicit type is a SUBMIT button: a keyboard move
+    // would submit the draft rather than reorder a stage.
+    const target = await harness.mount(props());
+    const form = target.querySelector('form');
+    assert.ok(Boolean(form), 'the editor renders a real form, which is what makes this sharp');
+
+    const row = target.querySelector('[data-salvage-result="res-1"]');
+    assert.ok(Boolean(row.closest('form')), 'and the stage list is inside it');
+    const controls = [
+      row.querySelector('[data-sortable-grip]'),
+      row.querySelector('[data-sortable-move="up"]'),
+      row.querySelector('[data-sortable-move="down"]'),
+      row.querySelector('[data-remove-salvage-result]'),
+    ];
+    assert.ok(controls.every(Boolean), 'the row draws a grip, both chevrons and a remove');
+    for (const control of controls) {
+      assert.equal(
+        control.getAttribute('type'),
+        'button',
+        `${control.getAttribute('aria-label')} must not submit the draft`
+      );
+    }
+    harness.remount();
+  });
+
+  it('1512: the adder is the list`s own footer, and follows the message at zero stages', async () => {
+    const populated = await harness.mount(props());
+    assert.ok(
+      Boolean(populated.querySelector('[data-add-salvage-result]').closest('.fabricate-sortable-list')),
+      'with stages, the adder is the list`s last child rather than a sibling of the list'
+    );
+    harness.remount();
+
+    const empty = await harness.mount(props({ component: { salvage: { enabled: true, resultGroups: [] } } }));
+    const emptyAdd = empty.querySelector('[data-add-salvage-result]');
+    assert.ok(Boolean(emptyAdd), 'and it is still reachable with no stages at all');
+    assert.ok(
+      !emptyAdd.closest('.fabricate-sortable-list'),
+      'following the empty message, because there is no list to be a footer of'
     );
     harness.remount();
   });
@@ -538,7 +619,7 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
 
   it('1286: a stage whose yield authors salvage complications grows a strip; one that does not, does not', async () => {
     const target = await harness.mount(complicatedProps());
-    const list = target.querySelector('.manager-salvage-stage-list');
+    const list = target.querySelector('.fabricate-sortable-list');
     const found = strips(target);
     assert.equal(found.length, 1, 'only the yield that authors one gets a strip');
     assert.equal(
@@ -550,33 +631,41 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     // THE PLACEMENT RULING (issue 1286): the band is INSIDE the stage row, so the two draw
     // as ONE card the way the Recipe Studio's do. It used to be the list's next sibling —
     // the Component Studio prototype's detached treatment — and the maintainer superseded
-    // that. What made the sibling shape attractive is still true and is still honoured:
-    // `.manager-salvage-stage-row` is JOINED with the Recipe Studio's
-    // `.manager-recipe-result-row.is-reorderable`, so nothing here relaxes that rule. The
-    // row turns into a column only under `:has(.manager-salvage-stage-complications)`, which
-    // a band-less row cannot match — the assertion below this one is what pins that.
+    // that.
+    //
+    // RE-EXPRESSED AGAINST THE PRIMITIVE (issue 1512). The shape that ruling needed is what
+    // `SortableList` draws for EVERY row: the row is a column, its LINE carries the padding and
+    // its BODY is the line's sibling. So the three scoped `:has()` rules this file used to carry
+    // are gone, the band is what the list renders as this row's body, and the assertions below
+    // read the list's structure rather than the hand-rolled one.
     const row = target.querySelector('[data-salvage-result="res-1"]');
     // `assert.ok` on the identity, never `assert.equal(node, node)`: on failure
     // `node:assert` serialises a mounted element's circular tree to build its diff and the
     // heap dies, which surfaces as a `# cancelled` suite with no message at all.
-    assert.ok(found[0].closest('.manager-salvage-stage-row') === row, 'the band is in the row');
+    assert.ok(found[0].closest('.fabricate-sortable-list-row') === row, 'the band is in the row');
     assert.ok(
-      [...list.children].every((child) => child.matches('.manager-salvage-stage-row')),
-      'and the list itself holds nothing but stage rows, so no band is a stage of its own'
+      row.classList.contains('manager-salvage-stage-row'),
+      "and the row still carries this surface's own class, through `rowClass`"
     );
-    // The row's own controls moved into `.manager-salvage-stage-line`, which is what lets the
-    // row shed its padding to the line and let the band bleed. The band is NOT in that line:
-    // it is the line's sibling, or its `border-top` could never be the card's divider.
-    const line = row.querySelector('.manager-salvage-stage-line');
-    assert.ok(line, 'the row wraps its own controls in a line');
+    assert.ok(
+      [...list.children].every((child) => child.matches('li')),
+      'and the list itself holds nothing but list items, so no band is a stage of its own'
+    );
+    const line = row.querySelector('.fabricate-sortable-list-line');
+    assert.ok(line, 'the row wraps its own controls in the list`s line');
     assert.ok(
       line.querySelector('[data-salvage-result-edit]') &&
         line.querySelector('[data-salvage-result-difficulty]'),
       "the row's picker cluster and its trailing controls are the LINE's children"
     );
     assert.ok(
-      found[0].parentElement === row,
-      "and the band is the row's own child, beside that line rather than inside it"
+      found[0].parentElement.matches('.fabricate-sortable-list-body'),
+      'and the band is the list`s BODY, the line`s sibling rather than its child — which is what ' +
+        'lets its `border-top` be the card`s divider'
+    );
+    assert.ok(
+      found[0].parentElement.parentElement === row,
+      'and that body is the row`s own child'
     );
     // Not a stage: it annotates the one above it, and announcing it as a stage would have a
     // screen reader count one more stage than the award loop ever spends down.
@@ -584,26 +673,26 @@ describe('ComponentEditView — salvage reorder permission (issue 651)', () => {
     harness.remount();
   });
 
-  it('1286: a stage row with no complications grows no wrapper state, so it is unchanged', async () => {
-    // The constraint the attached band had to respect: `.manager-salvage-stage-row` is JOINED
-    // with `.manager-recipe-result-row.is-reorderable` in styles/fabricate.css, so anything
-    // that re-shaped the row itself would have moved every progressive stage row in BOTH
-    // studios. Everything the band needs is scoped to `:has(.manager-salvage-stage-complications)`,
-    // and this pins the DOM half of that: the second stage draws no band, so it cannot match.
+  it('1286: a stage row with no complications draws one, and only its body is empty', async () => {
+    // ONE MARKUP TREE (issue 1512). The hand-rolled row grew its column shape only under a
+    // `:has()`, so a band-less row had to be proved unchanged. The list draws the SAME structure
+    // for every row — line, then body — so what is left to prove is that the band-less row's body
+    // holds nothing, which is the honest form of the same claim.
     const target = await harness.mount(complicatedProps());
     const plain = target.querySelector('[data-salvage-result="res-2"]');
     assert.ok(plain, 'the yield that authors no complication still renders its stage');
     assert.equal(
       plain.querySelectorAll('[data-salvage-stage-complications]').length,
       0,
-      'and draws no band, so the `:has()` that re-shapes the row cannot match it'
+      'and draws no band'
     );
-    // `display: contents` on the line is what keeps this row's flex items the ROW's own. The
-    // markup is identical for both rows; only the band's presence differs.
     assert.ok(
-      plain.querySelector('.manager-salvage-stage-line'),
+      plain.querySelector('.fabricate-sortable-list-line'),
       'the line wraps its controls exactly as the banded row does'
     );
+    const body = plain.querySelector('.fabricate-sortable-list-body');
+    assert.ok(body, 'and it renders the same body element, because there is one markup tree');
+    assert.equal(body.children.length, 0, 'which is empty, so nothing is drawn under the line');
     harness.remount();
   });
 

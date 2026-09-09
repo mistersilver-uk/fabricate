@@ -93,6 +93,10 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
  * omits does not fail — it HANGS, and is reported as `# cancelled`, never `# fail`.
  */
 export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
+  // THE ORDERED ROW (issue 1512): the salvage stage list renders through it, and it is a LEAF
+  // TWO RUNGS DOWN of this tree. A `.svelte` the tree renders but this list omits HANGS every
+  // suite built on it (`# cancelled`) rather than failing one.
+  'src/ui/svelte/components/SortableList.svelte',
   // The catalogue ATTRIBUTION BANNER and the shared inherit row (issue 1371), both composed by
   // the two system-scope component screens.
   'src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte',

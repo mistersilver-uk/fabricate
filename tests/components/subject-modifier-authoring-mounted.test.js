@@ -362,6 +362,11 @@ const gatheringHarness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/SubjectModifierPicker.svelte',
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/components/IconButton.svelte',
+    // THE ORDERED ROW and the disclosure it renders (issue 1512). Both are LEAVES TWO RUNGS
+    // DOWN of this tree, so a `.svelte` the tree renders but this list omits HANGS the suite
+    // (`# cancelled`) rather than failing it.
+    'src/ui/svelte/components/SortableList.svelte',
+    'src/ui/svelte/components/RowDisclosure.svelte',
     'src/ui/svelte/components/ModifierPillSelect.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     GATHERING_PATH,

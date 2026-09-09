@@ -210,6 +210,28 @@ describe('1286 ComponentComplicationsSection (mounted)', () => {
     );
   });
 
+  // THE ADDER IS THE LIST'S FOOTER, AND REACHABLE AT ZERO (issue 1512). The requirement puts
+  // the adder in flow with the collection it extends; the carve-out is that a footer of a list
+  // that is not rendered cannot render either, so where a surface replaces the list with an
+  // empty message the adder follows the message. Both halves are asserted, because a change
+  // that satisfies only the first ships an empty state saying "add one" with nothing to press.
+  it('renders the adder as the list`s own last child, and after the empty message at zero', async () => {
+    const populated = await mountSection({ complications: [complication()] });
+    const footerAdd = populated.target.querySelector('[data-complications-add]');
+    assert.ok(
+      Boolean(footerAdd.closest('.fab-complications-list')),
+      'with complications, the adder is in flow with the collection it extends'
+    );
+
+    const empty = await mountSection({ complications: [] });
+    const emptyAdd = empty.target.querySelector('[data-complications-add]');
+    assert.ok(Boolean(emptyAdd), 'and the adder is still reachable with none authored');
+    assert.ok(
+      !emptyAdd.closest('.fab-complications-list'),
+      'following the empty message, because the list it would foot is not rendered'
+    );
+  });
+
   it('mutes the n/a activity pill instead of routing it through the warning family', async () => {
     const { target } = await mountSection({
       activityProgressive: { crafting: true, salvage: false, gathering: false },
@@ -1140,8 +1162,12 @@ describe('1286 the complication row exposes its name treatment, and prose is not
     resolve(repoRoot, 'src/ui/svelte/apps/manager/ComponentEditView.svelte'),
     'utf8'
   );
+  // The Recipe Studio's stage strip left `RecipeResultItemRow` at issue 1512 and is its own
+  // component, because the shared ordered list renders it as the row's BODY rather than as part
+  // of the row's content — which is what keeps it full-bleed now the grip and the ordinal belong
+  // to the list. The call site moved with it; the claim is unchanged.
   const recipeResultRowSource = readFileSync(
-    resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte'),
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/recipe/RecipeStageComplicationBand.svelte'),
     'utf8'
   );
 

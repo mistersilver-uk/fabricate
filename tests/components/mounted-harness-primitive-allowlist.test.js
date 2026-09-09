@@ -313,6 +313,15 @@ const SHARED_PRIMITIVES = [
   // `before()`; that is a different test answering a different question, and reading its
   // exemption onto this clause is what produced the false sentence.
   'src/ui/svelte/apps/PlayerViewState.svelte',
+  // THE ORDERED ROW (issue 1512), and it arrives on this list with FIVE mounted trees already
+  // reaching it: the recipe editor through `RecipeStepAccordion` and `RecipeResultGroupCard`, the
+  // environment editor through `CompositionList`, the component editor through the salvage stage
+  // list, and the Checks Studio through `CheckRecipeTiers`. Every one of those is a LEAF TWO
+  // RUNGS DOWN — a suite mounts an editor, the editor renders an adapter, the adapter renders
+  // this list — which is the shape this list exists for. It also renders `RowDisclosure` and
+  // `IconButton`, both already here, so an omission cancels a suite for the reason a reader will
+  // not look for: a missing dependency of a dependency.
+  'src/ui/svelte/components/SortableList.svelte',
 ];
 
 /**
