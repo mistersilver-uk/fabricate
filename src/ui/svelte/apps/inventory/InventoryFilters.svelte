@@ -79,6 +79,24 @@
     SORTS.map((option) => ({ value: option.id, label: localize(option.labelKey) }))
   );
 
+  /**
+   * THE PANEL'S OWN FLOOR, WHICH IS NOT THE TRIGGER'S (issue 1511, review round 1).
+   *
+   * The rule is stated once in `Select.svelte`'s band docblock: an `inline` caller states a
+   * `minWidth` whenever its widest option label needs more than the panel's resolved width less
+   * the row's chrome. This site needs one, and the first shipping of this conversion did not have
+   * it — `Quantity` opened the list reading `Quanti…`.
+   *
+   * The two faces disagree on nothing that matters here, so the figure is the wider: measured in
+   * `tests/fixtures/player-select/` under Chromium, the `Quantity` ROW's label is 44.70px in
+   * Arial and 44.36px in Signika, at the panel's fixed 12px rather than the trigger's 11.5px. A
+   * ticked row spends 52px on chrome before the label gets any — 2px of panel border, 12px of
+   * panel padding, 2px of row border, 16px of row padding, the 12px tick gutter and the 8px row
+   * gap — so the panel needs 44.70 + 52 = 96.70px and takes the next whole pixel. The rung's own
+   * floor is 96px, which is why one pixel of shortfall was enough to ellipsise the label.
+   */
+  const SORT_PANEL_MIN_WIDTH = 97;
+
   function onInput(event) {
     onSearch?.(event.currentTarget.value);
   }
@@ -135,6 +153,7 @@
         value={sort}
         options={sortOptions}
         ariaLabelledBy={sortCaptionId}
+        minWidth={SORT_PANEL_MIN_WIDTH}
         triggerData={{ 'data-inventory-sort': '' }}
         onChange={(next) => onSort?.(next)}
       />
@@ -200,16 +219,29 @@
      the focus treatment are the `inline` rung's now; the one property left to this file is the
      width, because a `<select>` sized itself to its widest option while a `<button>` hugs the
      one it is showing - so choosing Type after Quantity would visibly shrink the control and
-     shuffle the pill run beside it. The floor is the measured width of the widest of the three
-     `SORTS` labels - `Quantity` - so every value renders at one width. MEASURED IN BOTH FACES
-     and floored at the wider: 86.58px under Foundry's own Signika at the `inline` rung's 11.5px,
-     88.33px under the Arial fallback the repository's Chromium gates render against.
+     shuffle the pill run beside it. The floor is the measured width of the TRIGGER showing the
+     widest of the three `SORTS` labels - `Quantity` - so every value renders at one width.
+     MEASURED IN BOTH FACES in `tests/fixtures/player-select/` under Chromium and floored at the
+     next whole pixel above the wider: 76.83px under the Arial fallback the repository's Chromium
+     gates render against, 76.52px under Foundry's own Signika, both at the `inline` rung's
+     11.5px.
+
+     RE-DERIVED AT REVIEW ROUND 1, and this floor MOVED: 90px stood on a recorded pair of 88.33
+     and 86.58 that the fixture does not reproduce. Both figures were 11.50px - one whole rung
+     font-size - above what the control measures, at all three floored sites alike, so they were
+     arithmetic rather than measurement. The floor now stands where its own sentence says it
+     does.
+
+     It is NOT the panel's floor, and the two are 20px apart: see `SORT_PANEL_MIN_WIDTH` above
+     for the 97px the open list needs, which is the same label read at the panel's 12px behind
+     52px of row chrome. Widening the trigger to cover the panel would be the wrong knob twice
+     over - it would move the closed control to fix an open one.
 
      The row is `flex-wrap: wrap` with `justify-content: space-between`, which is what makes an
      over-sized floor wrap the pill run rather than widen the control - so the figure is the
-     measured widest label and not a round number above it. Ancestor-qualified, because a leading
+     measured widest value and not a round number above it. Ancestor-qualified, because a leading
      bare `:global()` would reach every trigger in the document. */
   .inventory-sort :global(.fabricate-select-trigger) {
-    min-width: 90px;
+    min-width: 77px;
   }
 </style>

@@ -72,6 +72,14 @@
    * breakpoint a `1fr` column keeps growing with the window - a maximised ultra-wide frame puts
    * a 3376px container's left column at 946px - so the ceiling is set above BOTH rather than at
    * either, which is why it is one generous number and not a breakpoint-shaped pair.
+   *
+   * AND NO FLOOR, WHICH REVIEW ROUND 1 MADE WORTH SAYING. `Select.svelte`'s band docblock states
+   * when an `inline` caller owes its panel a `minWidth`: when the widest option label needs more
+   * than the panel's resolved width less the row's chrome. These two are the two call sites of
+   * the six that cannot owe one, because their trigger spans the browse column and the panel
+   * resolves from the trigger - at the 280px column minimum a ticked row still leaves 228px for a
+   * category or system name, against the 44px the inventory sort had. The sibling sorts each
+   * needed a floor and the participation selector needed a whole band.
    */
   const FILTER_PANEL_MAX_WIDTH = 1024;
 

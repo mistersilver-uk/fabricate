@@ -107,6 +107,13 @@
                  `tests/components/select-popover-width.test.js` measures the result in Chromium.
                  {@link SIZES} is the single source of the numbers and a mounted case pins the
                  per-rung fallback rules in the sheet against it.
+                 AN `inline` CALLER STATES `minWidth` WHENEVER ITS WIDEST OPTION LABEL NEEDS MORE
+                 THAN THE PANEL'S RESOLVED WIDTH LESS THE ROW'S CHROME — 52px with a tick, 32px
+                 without, measured — AND THE TRIGGER'S OWN FLOOR IS NOT THAT FIGURE, because the
+                 panel draws its labels at a fixed 12px while the rung's trigger reads at 11.5px
+                 and the row adds a tick gutter the trigger has no counterpart for. A trigger
+                 floor sized to the widest VALUE therefore leaves the widest OPTION ellipsised,
+                 which is the defect issue 1511 shipped and corrected.
     triggerData — a `data-*` map stamped verbatim on the trigger button, which is where every
                  converted call site's own stable hook goes. `data-select-size` is added to it.
     label / hint / error — present ⇒ the whole control renders inside `<Field as="label">`, with a

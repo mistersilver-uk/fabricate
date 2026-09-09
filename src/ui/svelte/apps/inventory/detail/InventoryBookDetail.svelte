@@ -679,13 +679,27 @@
      content-hugging `<button>` would be one digit narrower on two of them and would squeeze the
      pager beside it every time the value changed - this row is `justify-content: space-between`
      and declares no `flex-wrap`, so its risk is a squeezed sibling rather than a wrapped row.
-     The floor is the measured width of the trigger showing `12`, taken in both faces and set at
-     the wider: 56.48px under Foundry's own Signika at the `inline` rung's 11.5px, 58.30px under
-     the Arial fallback the repository's Chromium gates render against. Everything else about the
-     control - height, corner, fill, type, focus - is the `inline` rung's, against the 6px corner
-     and `--fab-surface` fill this block used to declare. Ancestor-qualified, because a leading
-     bare `:global()` reaches the whole document. */
+     The floor is the measured width of the trigger showing `12`, taken in both faces in
+     `tests/fixtures/player-select/` under Chromium and set at the next whole pixel above the
+     wider: 46.80px under the Arial fallback the repository's Chromium gates render against,
+     46.42px under Foundry's own Signika, both at the `inline` rung's 11.5px.
+
+     RE-DERIVED AT REVIEW ROUND 1, and this floor MOVED: 60px stood on a recorded pair of 58.30
+     and 56.48 that the fixture does not reproduce. The Arial figure was 11.50px - one whole rung
+     font-size - above what the control measures, as it was at both sibling floors, so it was
+     arithmetic rather than measurement. It was also unfalsifiable until now: the invariance
+     clause that guards it mounted the control twice on the SAME value, so a floor of any size
+     would have passed. It is driven through the option list now.
+
+     NO PANEL FLOOR HERE, and that is a measurement rather than an omission: the widest ROW label
+     is `12` at 13.36px, and this list is UNTICKED, so it spends 32px on chrome rather than a
+     ticked row's 52 and needs 45.36px against the `inline` rung's own 96px floor. The sibling
+     sort controls both needed one; see `Select.svelte`'s band docblock for when a caller does.
+
+     Everything else about the control - height, corner, fill, type, focus - is the `inline`
+     rung's, against the 6px corner and `--fab-surface` fill this block used to declare.
+     Ancestor-qualified, because a leading bare `:global()` reaches the whole document. */
   .inventory-detail-recipe-pagesize :global(.fabricate-select-trigger) {
-    min-width: 60px;
+    min-width: 47px;
   }
 </style>
