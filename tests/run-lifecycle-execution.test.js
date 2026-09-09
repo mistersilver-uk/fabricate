@@ -371,7 +371,13 @@ function setupEngineFixture() {
     user: { id: 'user-1' },
     time: { worldTime: 1000 },
     actors: [],
-    fabricate: {},
+    fabricate: {
+      getRecipeVisibilityService: () => ({
+        guardCraftStart: ({ viewer }) => ({ craftable: Boolean(viewer) }),
+        applyRecipeItemUseOnCraft: async () => {},
+        learnRecipeOnCraft: async () => {},
+      }),
+    },
   };
   const ingredientSet = {
     id: 'set-1',
@@ -423,6 +429,7 @@ test('CraftingEngine versioned start arms a timed stage with exact intent and ze
   });
 
   const started = await engine.startVersionedRun({
+    viewer: game.user,
     actor,
     sourceActors: [source],
     recipeId: 'recipe-1',
@@ -454,6 +461,85 @@ test('CraftingEngine versioned start arms a timed stage with exact intent and ze
   });
 });
 
+test('CraftingEngine refuses inaccessible normal starts before persistence without revealing why', async () => {
+  for (const reason of ['visibility', 'knowledge', 'locked']) {
+    const { engine, recipe, runManager } = setupEngineFixture();
+    const actor = new FakeActor(`guarded-${reason}`);
+    const source = new FakeActor(`source-${reason}`);
+    const viewer = { id: `viewer-${reason}` };
+    let guardedViewer = null;
+    let writes = 0;
+    actor.setFlag = async (...args) => {
+      writes += 1;
+      return FakeActor.prototype.setFlag.call(actor, ...args);
+    };
+    game.fabricate.getRecipeVisibilityService = () => ({
+      guardCraftStart(args) {
+        guardedViewer = args.viewer;
+        return { craftable: false, reason };
+      },
+    });
+    engine.installVersionedRunAuthority({
+      consumeExecutionGrant: async () => ({ operationId: `guard-${reason}` }),
+    });
+
+    const result = await engine.startVersionedRun({
+      viewer,
+      actor,
+      sourceActors: [source],
+      recipeId: recipe.id,
+      selectionPlan: { selectedIngredientSetId: 'set-1' },
+      executionGrant: 'start-grant',
+      requestId: `request-${reason}`,
+    });
+
+    assert.equal(guardedViewer, viewer);
+    assert.deepEqual(result, {
+      success: false,
+      results: null,
+      message: 'Crafting is unavailable.',
+    });
+    assert.equal(Object.hasOwn(result, 'reason'), false);
+    assert.equal(writes, 0);
+    assert.deepEqual(runManager.getActiveRuns(actor), []);
+    assert.deepEqual(runManager.getRunHistory(actor), []);
+  }
+});
+
+test('CraftingEngine preserves blind alchemy starts only for the grant-bound matched recipe', async () => {
+  const { engine, recipe, runManager } = setupEngineFixture();
+  const actor = new FakeActor('blind-alchemist');
+  const source = new FakeActor('blind-source');
+  let guardCalls = 0;
+  game.fabricate.getRecipeVisibilityService = () => ({
+    guardCraftStart: () => {
+      guardCalls += 1;
+      return { craftable: false, reason: 'visibility' };
+    },
+  });
+  engine.installVersionedRunAuthority({
+    consumeExecutionGrant: async () => ({
+      operationId: 'blind-match-operation',
+      matched: true,
+      activityKind: 'alchemy',
+      recipeId: recipe.id,
+    }),
+  });
+
+  const result = await engine.startVersionedRun({
+    actor,
+    sourceActors: [source],
+    recipeId: recipe.id,
+    selectionPlan: { selectedIngredientSetId: 'set-1' },
+    executionGrant: 'matched-alchemy-grant',
+    requestId: 'blind-match-request',
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(guardCalls, 0);
+  assert.equal(runManager.getActiveRuns(actor).length, 1);
+});
+
 test('CraftingEngine routes ordinary versioned entry and cancellation through authority adapters', async () => {
   const { engine, recipe, runManager } = setupEngineFixture();
   const actor = new FakeActor('crafter');
@@ -482,6 +568,7 @@ test('CraftingEngine routes ordinary versioned entry and cancellation through au
     true
   );
   const started = await engine.startVersionedRun({
+    viewer: game.user,
     actor,
     sourceActors: [source],
     recipeId: recipe.id,
@@ -582,6 +669,7 @@ test('CraftingEngine local v1 cancellation forfeits deferred work without revers
     consumeExecutionGrant: async () => ({ operationId: 'cancel-operation' }),
   });
   const started = await engine.startVersionedRun({
+    viewer: game.user,
     actor,
     sourceActors: [source],
     recipeId: 'recipe-1',
@@ -619,6 +707,7 @@ test('CraftingEngine executes a matured v1 stage with only its trusted check res
     }),
   });
   const started = await engine.startVersionedRun({
+    viewer: game.user,
     actor,
     sourceActors: [source],
     recipeId: 'recipe-1',
@@ -691,6 +780,7 @@ test('CraftingEngine persists successful spend receipts before a later award amb
     }),
   });
   const started = await engine.startVersionedRun({
+    viewer: game.user,
     actor,
     sourceActors: [source],
     recipeId: 'recipe-1',
@@ -734,6 +824,292 @@ test('CraftingEngine persists successful spend receipts before a later award amb
     (error) => error.code === 'RECOVERY_REQUIRED'
   );
   assert.equal(spends, 1);
+});
+
+test('CraftingEngine resumes a real persisted consumption prefix with hydrated production state', async () => {
+  const { engine, recipe, runManager } = setupEngineFixture();
+  const actor = new FakeActor('resume-crafter');
+  const source = new FakeActor('resume-source');
+  const consumedItem = {
+    id: 'herb-stack',
+    uuid: 'Actor.resume-source.Item.herb-stack',
+    name: 'Sun Herb',
+    img: 'sun-herb.webp',
+    type: 'loot',
+    system: { quantity: 2 },
+    flags: { fabricate: { source: 'test' } },
+    parent: source,
+    toObject() {
+      return {
+        _id: this.id,
+        name: this.name,
+        img: this.img,
+        type: this.type,
+        system: this.system,
+        flags: this.flags,
+      };
+    },
+  };
+  source.items = [consumedItem];
+  let consumeCalls = 0;
+  engine._consumeIngredients = async () => {
+    consumeCalls += 1;
+    return [
+      {
+        item: consumedItem,
+        quantity: 2,
+        ingredient: { componentId: 'herb', quantity: 2 },
+      },
+    ];
+  };
+  const selectedSet = recipe.getExecutionSteps()[0].ingredientSets[0];
+  const originalPrepare = engine._prepareVersionedStage.bind(engine);
+  engine._prepareVersionedStage = async (args) => {
+    const prepared = await originalPrepare(args);
+    prepared.craftSelection = {
+      plan: [
+        {
+          item: consumedItem,
+          quantity: 2,
+          ingredient: { componentId: 'herb', quantity: 2 },
+        },
+      ],
+    };
+    prepared.plan.items = [
+      {
+        actorUuid: source.uuid,
+        itemUuid: consumedItem.uuid,
+        quantity: 2,
+        ingredient: { componentId: 'herb', quantity: 2 },
+      },
+    ];
+    return prepared;
+  };
+  engine.installVersionedRunAuthority({
+    consumeExecutionGrant: async (_grant, context) => ({
+      operationId: context.operation === 'start' ? 'start-resume' : 'execute-resume',
+      resolvedCheckResult: { success: true, outcome: null, value: null, data: {} },
+    }),
+  });
+  const started = await engine.startVersionedRun({
+    viewer: game.user,
+    actor,
+    sourceActors: [source],
+    recipeId: recipe.id,
+    selectionPlan: { selectedIngredientSetId: selectedSet.id },
+    executionGrant: 'start-grant',
+    requestId: 'start-resume-request',
+  });
+  game.time.worldTime = 1120;
+  const updateJournal = runManager.updateExecutionJournal.bind(runManager);
+  let interrupted = false;
+  runManager.updateExecutionJournal = async (...args) => {
+    const transition = args[2];
+    if (
+      !interrupted &&
+      transition?.type === 'effectApplying' &&
+      transition.effectId === 'award-results'
+    ) {
+      interrupted = true;
+      throw new Error('simulated process stop between effects');
+    }
+    return updateJournal(...args);
+  };
+
+  await assert.rejects(
+    () =>
+      engine.executeVersionedStage({
+        actor,
+        componentSourceActors: [source],
+        runId: started.runId,
+        expectedRevision: started.runRevision,
+        requestId: 'execute-resume-request',
+        executionGrant: 'execute-grant',
+      }),
+    /simulated process stop/
+  );
+  runManager.invalidateCache(actor.id);
+  const interruptedRun = runManager.getActiveRun(actor, started.runId);
+  const consumeReceipt = interruptedRun.executionJournal.effects.find(
+    (effect) => effect.effectId === 'consume-ingredients'
+  ).receipt;
+  assert.equal(consumeReceipt.consumedItems[0].data.name, 'Sun Herb');
+  assert.deepEqual(consumeReceipt.consumedItems[0].ingredient, {
+    componentId: 'herb',
+    quantity: 2,
+  });
+
+  source.items = [];
+  const freshManager = new CraftingRunManager();
+  const resumedEngine = new CraftingEngine(engine.recipeManager, freshManager);
+  let hydratedConsumed = null;
+  resumedEngine._consumeIngredients = async () => {
+    throw new Error('applied consumption must not repeat');
+  };
+  resumedEngine._createResultItems = async (_actor, _recipe, _step, _set, consumedItems) => {
+    hydratedConsumed = consumedItems;
+    return {
+      items: [
+        {
+          id: 'tea-result',
+          uuid: 'Actor.resume-crafter.Item.tea-result',
+          name: 'Sun Tea',
+          img: 'sun-tea.webp',
+          system: { quantity: 1 },
+        },
+      ],
+      resolutionMeta: { disposition: 'success' },
+    };
+  };
+  resumedEngine.installVersionedRunAuthority({
+    consumeExecutionGrant: async () => ({
+      operationId: 'execute-resume',
+      resolvedCheckResult: { success: true, outcome: null, value: null, data: {} },
+    }),
+  });
+
+  const resumed = await resumedEngine.executeVersionedStage({
+    actor,
+    componentSourceActors: [source],
+    runId: started.runId,
+    expectedRevision: interruptedRun.runRevision,
+    requestId: 'execute-resume-request',
+    executionGrant: 'resume-grant',
+  });
+
+  assert.equal(resumed.success, true);
+  assert.equal(consumeCalls, 1);
+  assert.equal(hydratedConsumed[0].item.name, 'Sun Herb');
+  assert.deepEqual(hydratedConsumed[0].ingredient, { componentId: 'herb', quantity: 2 });
+  freshManager.invalidateCache(actor.id);
+  const completed = freshManager.getRunHistory(actor)[0];
+  assert.equal(completed.executionJournal.status, 'committed');
+  assert.deepEqual(completed.steps[0].createdResults, [
+    {
+      actorUuid: actor.uuid,
+      itemUuid: 'Actor.resume-crafter.Item.tea-result',
+      quantity: 1,
+      name: 'Sun Tea',
+      img: 'sun-tea.webp',
+    },
+  ]);
+
+  let awardCalls = 0;
+  let recordedRecipeUses = 0;
+  game.fabricate.getRecipeVisibilityService = () => ({
+    guardCraftStart: ({ viewer }) => ({ craftable: Boolean(viewer) }),
+    applyRecipeItemUseOnCraft: async () => {
+      recordedRecipeUses += 1;
+    },
+    learnRecipeOnCraft: async () => {},
+  });
+  resumedEngine._prepareVersionedStage = async () => ({
+    valid: true,
+    plan: {
+      recipeId: recipe.id,
+      stepId: 'step-1',
+      selectedIngredientSetId: selectedSet.id,
+      items: [],
+      currencySpends: [],
+      toolItemUuids: [],
+    },
+    toolItems: [],
+    executionRecipe: recipe,
+    craftSelection: { plan: [] },
+    toolValidation: { valid: true, tools: [] },
+    currencySpends: [],
+    resolveComponent: undefined,
+    step: recipe.getExecutionSteps()[0],
+    selectedSet,
+  });
+  resumedEngine._consumeIngredients = async () => [];
+  resumedEngine._createResultItems = async () => {
+    awardCalls += 1;
+    return {
+      items: [
+        {
+          id: 'final-result',
+          uuid: 'Actor.resume-crafter.Item.final-result',
+          name: 'Final Tea',
+          img: 'final-tea.webp',
+          system: { quantity: 1 },
+        },
+      ],
+      resolutionMeta: { disposition: 'success' },
+    };
+  };
+  resumedEngine.installVersionedRunAuthority({
+    consumeExecutionGrant: async (_grant, context) => ({
+      operationId: context.operation === 'start' ? 'start-final' : 'execute-final',
+      resolvedCheckResult: { success: true, outcome: null, value: null, data: {} },
+    }),
+  });
+  const finalizing = await resumedEngine.startVersionedRun({
+    viewer: game.user,
+    actor,
+    sourceActors: [source],
+    recipeId: recipe.id,
+    selectionPlan: { selectedIngredientSetId: selectedSet.id },
+    executionGrant: 'start-final-grant',
+    requestId: 'start-final-request',
+  });
+  game.time.worldTime += 120;
+  const freshUpdateJournal = freshManager.updateExecutionJournal.bind(freshManager);
+  freshManager.updateExecutionJournal = async (...args) => {
+    const transition = args[2];
+    if (transition?.type === 'effectApplying' && transition.effectId === 'record-recipe-use') {
+      throw new Error('simulated process stop after finalization');
+    }
+    return freshUpdateJournal(...args);
+  };
+
+  await assert.rejects(
+    () =>
+      resumedEngine.executeVersionedStage({
+        actor,
+        componentSourceActors: [source],
+        runId: finalizing.runId,
+        expectedRevision: finalizing.runRevision,
+        requestId: 'execute-final-request',
+        executionGrant: 'execute-final-grant',
+      }),
+    /simulated process stop after finalization/
+  );
+  freshManager.invalidateCache(actor.id);
+  const finalizedPrefix = freshManager.getRun(actor, finalizing.runId);
+  assert.equal(finalizedPrefix.currentStepIndex, null);
+  assert.equal(finalizedPrefix.executionJournal.status, 'planned');
+  assert.equal(
+    finalizedPrefix.executionJournal.effects.find((effect) => effect.effectId === 'finalize-stage')
+      .phase,
+    'applied'
+  );
+
+  const finalManager = new CraftingRunManager();
+  const finalEngine = new CraftingEngine(engine.recipeManager, finalManager);
+  finalEngine._createResultItems = async () => {
+    throw new Error('applied award must not repeat after finalization');
+  };
+  finalEngine.installVersionedRunAuthority({
+    consumeExecutionGrant: async () => ({
+      operationId: 'execute-final',
+      resolvedCheckResult: { success: true, outcome: null, value: null, data: {} },
+    }),
+  });
+  const finalized = await finalEngine.executeVersionedStage({
+    actor,
+    componentSourceActors: [source],
+    runId: finalizing.runId,
+    expectedRevision: finalizedPrefix.runRevision,
+    requestId: 'execute-final-request',
+    executionGrant: 'resume-final-grant',
+  });
+
+  assert.equal(finalized.success, true);
+  assert.equal(awardCalls, 1);
+  assert.equal(recordedRecipeUses, 1);
+  finalManager.invalidateCache(actor.id);
+  assert.equal(finalManager.getRun(actor, finalizing.runId).executionJournal.status, 'committed');
 });
 
 test('CraftingEngine journals a recipe-less fizzle and does not consume it twice', async () => {
@@ -843,6 +1219,7 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
     }),
   });
   const started = await engine.startVersionedRun({
+    viewer: game.user,
     actor,
     sourceActors: [source],
     recipeId: 'recipe-1',
@@ -896,6 +1273,7 @@ test('CraftingEngine world-time execution keeps an input stage blocked with zero
     }),
   });
   const started = await engine.startVersionedRun({
+    viewer: game.user,
     actor,
     sourceActors: [source],
     recipeId: 'recipe-1',
@@ -934,6 +1312,7 @@ test('CraftingEngine delegates due world-time runs to authority without pre-muta
     },
   });
   const started = await engine.startVersionedRun({
+    viewer: game.user,
     actor,
     sourceActors: [source],
     recipeId: 'recipe-1',

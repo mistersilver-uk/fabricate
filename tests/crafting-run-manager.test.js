@@ -886,6 +886,93 @@ test('CraftingRunManager plans a recipe-less v1 fizzle in history before effects
   assert.equal(manager.getRunHistory(actor).length, 1);
 });
 
+test('CraftingRunManager reconstructs applying v1 journals only under an explicit recovery scope', async () => {
+  setupGlobals(1000);
+  const actor = new FakeActor('Recovery crafter');
+  game.actors = [actor];
+  const manager = new CraftingRunManager();
+  const active = await manager.createRun(
+    actor,
+    singleStepRecipe('recovery-active'),
+    [actor],
+    'user-1',
+    { lifecycleVersion: 1 }
+  );
+  await manager.updateExecutionJournal(actor, active.id, {
+    type: 'plan',
+    plan: {
+      operationId: 'active-operation',
+      requestId: 'active-request',
+      baseRunRevision: 0,
+      intent: { stepIndex: 0 },
+      effects: [{ effectId: 'consume', kind: 'consumeItems', planned: null }],
+    },
+  });
+  await manager.updateExecutionJournal(actor, active.id, {
+    type: 'effectApplying',
+    effectId: 'consume',
+  });
+  const history = await manager.planVersionedFizzle(actor, {
+    craftingSystemId: 'system-1',
+    operationId: 'history-operation',
+    requestId: 'history-request',
+    effects: [{ effectId: 'dead-end', kind: 'recordAlchemyDeadEnd', planned: null }],
+  });
+  await manager.updateExecutionJournal(actor, history.id, {
+    type: 'effectApplying',
+    effectId: 'dead-end',
+  });
+
+  const observer = new CraftingRunManager();
+  const beforeObservation = structuredClone(actor.flags);
+  assert.equal(observer.getActiveRun(actor, active.id).executionJournal.status, 'planned');
+  assert.equal(observer.getRun(actor, history.id).executionJournal.status, 'planned');
+  assert.deepEqual(actor.flags, beforeObservation);
+  await assert.rejects(
+    () => observer.reconstructVersionedExecutions(),
+    (error) => error.code === 'INVALID_RECOVERY_SCOPE'
+  );
+  await assert.rejects(
+    () =>
+      observer.reconstructVersionedExecutions({
+        operationId: 'active-operation',
+        orphaned: true,
+      }),
+    (error) => error.code === 'INVALID_RECOVERY_SCOPE'
+  );
+
+  const explicit = await observer.reconstructVersionedExecutions({
+    operationId: 'active-operation',
+  });
+  assert.deepEqual(explicit, {
+    success: true,
+    scope: 'operation',
+    operationId: 'active-operation',
+    inspected: 1,
+    reconstructed: 1,
+    runs: [
+      {
+        actorUuid: actor.uuid,
+        runId: active.id,
+        status: 'inProgress',
+        runRevision: 3,
+        journalStatus: 'recoveryRequired',
+      },
+    ],
+  });
+  observer.invalidateCache(actor.id);
+  assert.equal(observer.getRun(actor, history.id).executionJournal.status, 'planned');
+  assert.deepEqual(observer.getRun(actor, history.id).executionJournal.effects[0].planned, null);
+
+  const orphaned = await observer.reconstructVersionedExecutions({ orphaned: true });
+  assert.equal(orphaned.scope, 'orphaned');
+  assert.equal(orphaned.operationId, null);
+  assert.equal(orphaned.inspected, 1);
+  assert.equal(orphaned.reconstructed, 1);
+  assert.equal(orphaned.runs[0].runId, history.id);
+  assert.equal(orphaned.runs[0].journalStatus, 'recoveryRequired');
+});
+
 test('CraftingRunManager: recordFizzle records unconditionally (no showAttemptHistoryToPlayers gate)', async () => {
   setupGlobals();
   const manager = new CraftingRunManager();
