@@ -60,7 +60,7 @@ function flushRender() {
 }
 
 function sourceOf(name) {
-  return readFileSync(resolve(repoRoot, component(name)), 'utf8').replaceAll(/\/\*[\s\S]*?\*\//gu, '');
+  return readFileSync(resolve(repoRoot, component(name)), 'utf8').replaceAll('\r\n', '\n').replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 }
 
 function expectGeometry(name, selector, declarations) {
@@ -80,7 +80,9 @@ describe('run primitives mounted behavior', () => {
     for (const harness of harnesses) await harness.setup();
   });
 
-  after(() => {
+  after(async () => {
+    for (const harness of harnesses) harness.remount();
+    await flushRender();
     for (const harness of harnesses) harness.teardown();
   });
 
@@ -126,7 +128,7 @@ describe('run primitives mounted behavior', () => {
 
     const target = await runActionHarness.mount(common);
     assert.deepEqual(
-      [...target.querySelectorAll(':scope > [data-run-action], :scope > [data-run-completion]')].map(
+      [...target.querySelectorAll('[data-run-action-bar] > [data-run-action], [data-run-action-bar] > [data-run-completion]')].map(
         (control) => control.getAttribute('data-run-action') || 'completion'
       ),
       ['cancel-arm', 'pause', 'completion', 'primary'],
@@ -175,7 +177,7 @@ describe('run primitives mounted behavior', () => {
       run: { id: 'run-1', paused: true },
     });
     assert.deepEqual(
-      [...paused.querySelectorAll(':scope > [data-run-action]')].map((control) =>
+      [...paused.querySelectorAll('[data-run-action-bar] > [data-run-action]')].map((control) =>
         control.getAttribute('data-run-action')
       ),
       ['cancel-arm', 'resume'],
@@ -199,7 +201,7 @@ describe('run primitives mounted behavior', () => {
     for (const control of waiting.querySelectorAll('button')) {
       assert.equal(control.getAttribute('data-keyboard-focus'), 'true');
     }
-    expectGeometry('RunActionBar', '.fab-run-action-bar', [/gap:\s*var\(--fab-space-2\)/u]);
+    expectGeometry('RunActionBar', '.fab-run-action-bar,\n  .fab-run-cancel-decision', [/gap:\s*var\(--fab-space-2\)/u]);
     expectGeometry('RunActionBar', ':global(.fab-run-action-control)', [
       /height:\s*34px/u,
       /border-radius:\s*9px/u,
@@ -323,7 +325,7 @@ describe('run primitives mounted behavior', () => {
       'overshoot does not put the progressbar value beyond its maximum'
     );
     const overshoot = target.querySelector('[data-essence-overshoot]');
-    assert.match(overshoot.textContent, /shadow is 1 over/u);
+    assert.match(overshoot.textContent, /shadow channelled is 1 over/u);
     assert.ok(
       target.querySelector('[data-essence-sources]').compareDocumentPosition(overshoot) & 4,
       'overshoot follows the source list'
