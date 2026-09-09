@@ -447,6 +447,10 @@ CraftingSystem = {
    The per-system gathering economy block (`gatheringConfig.systems[systemId].economy`, defined in `gathering-and-harvesting`) carries a normalized `resolutionMode: "d100" | "progressive" | "routed"` (default `"d100"`).
    An absent, invalid, or wrong-shape value (including a stray `"simple"`) normalizes to `"d100"` on both the read and persist paths.
    It is GM configuration and is not part of the player gathering listing payload.
+   The economy mode is inert compatibility data and never overrides task-level `resolutionMode`.
+   Gathering task library normalization and composition preserve task-owned `resolutionMode` and canonical `resultGroups` across save, reload, export and import.
+   An absent task mode selects `d100`; straight and routed retain authored result groups, and progressive keeps its separate legacy budget contract.
+   This preservation introduces no lifecycle migration or run restamping.
 10. `recipeItemDefinitions` are distinct from `components`; a recipe item definition must not be treated as a crafting ingredient/result component unless it is also intentionally imported as a component.
 11. `RecipeItemDefinition.id` values must be unique within a crafting system.
 12. `RecipeItemDefinition.originItemUuid` values should be unique within a crafting system so one system recipe item can be reused across multiple recipes.

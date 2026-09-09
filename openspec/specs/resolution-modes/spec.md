@@ -73,7 +73,7 @@ The historical macro-as-check-source and the `checkSource: "builtIn"` game-syste
 - Each of the three activity checks carries a **failure-result policy**, `failureResultPolicy` (`'never' | 'perRecord' | 'always'`), answering whether a FAILED check may produce a result at all.
 It SELECTS an authored failure output and never fabricates one, so `always` on a record authoring none produces nothing; `perRecord` and `always` therefore share ONE runtime predicate and differ as GM-facing declarations of intent.
 A newly-created system defaults to `perRecord`; an absent or unrecognized value normalizes to `perRecord` on read; and the `1.25.0` seed migration writes `never` onto every check block already on disk, so no upgraded world changes behaviour.
-Its reach is bounded by what each mode's model can express: real on crafting `simple` and alchemy `simple` and on salvage `simple` (the reserved `role: 'failure'` group, selected BY ROLE and never by index); real on crafting `routedByCheck` and salvage `routed`, where — and only where — the policy permits, failure-marked outcome tiers become assignable in the recipe result-authoring UI, route with a `disposition: 'failure'`, and are PRODUCED by the crafting failure branch (see `recipes-and-steps` §Check and Resolution item 3, including the disposition allowlist that stops a single-group routed recipe awarding its SUCCESS output on a failed check); inert on `routedByIngredients` and `progressive`, which have no tier to mark; and on gathering the whole path ships DORMANT pending issue 683.
+Its reach is bounded by what each mode's model can express: real on crafting `simple` and alchemy `simple` and on salvage `simple` (the reserved `role: 'failure'` group, selected BY ROLE and never by index); real on crafting `routedByCheck` and salvage `routed`, where — and only where — the policy permits, failure-marked outcome tiers become assignable in the recipe result-authoring UI, route with a `disposition: 'failure'`, and are PRODUCED by the crafting failure branch (see `recipes-and-steps` §Check and Resolution item 3, including the disposition allowlist that stops a single-group routed recipe awarding its SUCCESS output on a failed check); inert on `routedByIngredients` and `progressive`, which have no tier to mark; and on gathering routed tasks use the same policy through their named result-group failure path.
 **The policy therefore gates AUTHORING as well as resolution** — the tier picker, the readiness validator and the routing all read the same policy-conditional set, so the editor can never offer a tier the validator calls unroutable or the engine refuses to resolve.
 - The legacy `craftingCheck.mode` discriminator has the single valid value `passFail` and drives nothing; the active check sub-object is selected by `resolutionMode` (see `data-models` requirement 29).
 - A world carries **ONE named modifier library, at WORLD level**, in the `characterLibraries` setting, of `{id, label, expression, isRollExpression, icon?, min?, max?}` (issue 1117 absorbed the gathering character-modifier library into a single system-level list; issue 1308 lifted that list off the crafting system, so a WORLD authors modifiers in exactly one place and three crafting systems no longer mean three copies of the same expression).
@@ -175,7 +175,7 @@ Fail-open relaxes VALIDATION only: steps 2 and 4 are positional and structural i
 The placement classifier `describeRetiredModifierPlaceholder` answers only step 2 and is NOT a substitute for it: `1d20 - @craftingmod -`, `@craftingmod +` and `1d20 * -@craftingmod` are ADDITIVE placements that the decider REFUSES at step 4, so a surface asking the classifier where usability is decided by the decider gives the GM the OPPOSITE instruction on exactly those formulas.
 - **All THREE active-check derivations apply the shim BEFORE their emptiness test** — `resolveActiveCraftingCheckFormula`, `resolveActiveSalvageCheckFormula` (which delegates to `resolveSalvageCheck`, the single salvage `(mode, checkUsable)` derivation) and `resolveActiveGatheringCheckFormula` — so readiness and the roll path can never disagree on any activity: a stored `'@craftingmod'` alone reports `noFormula` rather than reporting usable, reaching `evaluateCheckRoll`, stripping to `''` and throwing inside `new Roll('')` as a rolled — and therefore consuming — failure.
 All three return the same shape, which is what lets the per-activity inert cause (`noCheck` / `noFormula`) be one derivation rather than three, with gathering `d100` the single documented exception that overrides it to `noModifierSupport`.
-`resolveActiveGatheringCheckFormula` takes the gathering resolution MODE as an argument rather than reading it off the system, because gathering's mode lives on the per-system gathering economy config and not on the crafting system.
+`resolveActiveGatheringCheckFormula` takes the gathering task's resolution MODE as an argument rather than reading it off the crafting system or the inert gathering economy mode.
 - **Salvage and gathering gain a modifier seam they never had.**
 Salvage's is live: `salvageCraftingCheck` selects over the system catalogue with the COMPONENT as its `bySubject` subject, tool bonuses append first and the modifier term after them, and all three salvage modes carry it.
 Gathering's seam is on the **FORMULA-ROLLED modes only** (`progressive`, `routed`); the `d100` mode rolls no authored formula and reports the check-modifier selection inert with cause `noModifierSupport`.
@@ -185,7 +185,8 @@ It is no longer a separate LIBRARY.
 `migrateUnifyModifierLibraries` merges `gatheringConfig.systems[].characterModifiers` into `CraftingSystem.modifiers`, rewrites every reference on drop rows, stamina-cost modifiers and events, and deletes BOTH legacy keys — the gathering one and `CraftingSystem.checkModifiers`, where the check library had lived since `1.22.0` — so one library now serves both applications.
 **The partition is stated in both directions, and it partitions APPLICATIONS rather than entries:** the character-modifier application does not participate in `progressive` or `routed`, exactly as the check-modifier application does not participate in `d100`.
 One entry may be reached by both, and it is the SELECTION or the REFERENCE that decides which arithmetic applies, never the entry itself.
-**Gathering's seam ships DORMANT**: `_libraryTaskToRuntimeTask` hardcodes `resolutionMode: 'd100'` and both other modes render `disabled` pending issue 683, so the whole check-modifier surface is inert in every configuration a GM can select today; the section renders the same inert notice `d100` gets, naming that reason, and the capability activates when 683 lands.
+Gathering composition preserves task-owned modes, so routed and legacy progressive tasks reach the formula-check seam.
+Task authoring controls are delivered separately by #1648; progressive remains unavailable as a new authoring option.
 - **`playerPicks` is the one rule deferred to ROLL time.** CRAFTING and SALVAGE supply a `modifierChoice`, built through one shared derivation (`CraftingEngine._buildInteractiveModifierChoice`), and their dialogs render the modifier fieldset on the same terms.
 GATHERING does NOT, and the gap is deliberate rather than an omission: it threads the modifier CONTEXT through both formula-rolled runners and resolves a `playerPicks` selection through the deterministic best-legal-selection, but builds no roll-time prompt, and that prompt is deferred to issue 683 with the rest of the seam.
 That is not the dormancy the seam claims elsewhere: dormancy means unreachable-but-complete, and a prompt for a path no GM-selectable configuration can reach would be speculative rather than dormant.
@@ -250,6 +251,18 @@ The player-facing Journal screen (see `ui-integration/spec.md` *Journal App*) ma
 - There is no canonical "Standard" resolution mode.
 `simple` (a DC pass/fail check) renders as "Standard (DC)" for players, even though its internal token stays `simple`.
 - A run whose recipe resolves to an unknown or absent mode falls back to the `simple` ("Standard (DC)") label rather than emitting a raw token.
+
+## Gathering Task Modes
+
+1. A gathering task owns its mode; absence selects `d100`, and the economy mode is inert compatibility data.
+2. `straight` awards all Results in exactly one nonempty authored group without a yield or check roll.
+3. `d100` resolves only drop rows using the shared item-drop roll; hazard rolls remain independent.
+4. `routed` uses `gatheringCraftingCheck.routed` and the existing `failureResultPolicy`.
+An award route requires exactly one group whose trim-normalized, case-insensitive name matches the resolved tier name; missing or duplicate matches are misconfiguration.
+Gathering does not use recipe `checkOutcomeIds` as routing authority.
+5. `progressive` retains its distinct accumulated numeric-budget semantics; it is never an alias for routed resolution.
+6. Immediate and matured-waiting execution select the same active result source, and production/reference reporting follows that source.
+Inactive mode data may remain stored but never contributes awards jointly.
 
 ## Simple Mode
 
