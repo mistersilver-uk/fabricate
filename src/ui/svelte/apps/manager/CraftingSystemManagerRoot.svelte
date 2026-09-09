@@ -4792,7 +4792,6 @@
       null
   );
   const editingGatheringTask = $derived(gatheringTaskDraft || selectedGatheringTask);
-  const gatheringTaskResolutionMode = $derived(editingGatheringTask?.resolutionMode || 'd100');
   const gatheringTaskRoutedOutcomeTiers = $derived.by(() =>
     routedTierOptionsForPolicy(
       selectedSystem?.gatheringCraftingCheck?.routed,
@@ -13810,7 +13809,7 @@
               {/if}
 
               {#if currentView === 'gathering-task-edit'}
-                {#if gatheringTaskResolutionMode === 'd100' && selectedGatheringDrop}
+                {#if (editingGatheringTask?.resolutionMode || 'd100') === 'd100' && selectedGatheringDrop}
                   <div class="manager-drop-inspector-stack" data-gathering-task-drop-inspector>
                     <section
                       class="fabricate-card manager-inspector-card manager-drop-editor-header-card"
