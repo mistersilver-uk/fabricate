@@ -407,6 +407,24 @@ describe('JournalView mounted behavior', () => {
     assert.ok(target.querySelector('[data-journal-verdict="succeeded"]'));
   });
 
+  it('anchors a terminal detail with no browse index at its final stage', async () => {
+    const steps = Array.from({ length: 3 }, (_unused, index) => ({
+      stepId: `finished-${index}`, stepName: `Finished ${index + 1}`, status: 'succeeded',
+    }));
+    const run = makeSucceededRun({ steps, stepIndex: null, currentStep: null });
+    const { store, calls } = makeJournal({ selectedRun: run, viewedStageIndex: null });
+    const target = await harness.mount({ services: makeServices(store) });
+    assert.equal(target.querySelector('[data-stage-nav-index="2"]').getAttribute('aria-pressed'), 'true');
+    assert.ok(!target.querySelector('[data-stage-nav-return]'));
+    assert.equal(target.querySelector('[data-stage-card]').dataset.stageState, 'past');
+    target.querySelector('[data-stage-nav-index="0"]').click();
+    flushSync();
+    const returnFinal = target.querySelector('[data-stage-nav-return]');
+    assert.match(returnFinal.textContent, /ReturnFinal/);
+    returnFinal.click();
+    assert.deepEqual(calls.viewStage.map((call) => call[1]), [0, 2]);
+  });
+
   it('renders the authoritative gathering preview separately from actual awards', async () => {
     const run = makeGatheringRun({
       gatheringYield: {

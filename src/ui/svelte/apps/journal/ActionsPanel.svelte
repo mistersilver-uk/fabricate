@@ -23,16 +23,25 @@
   const reason = $derived(reasonFor(actions.disabledReason, gateReady));
 
   function reasonFor(code, ready) {
-    if (!ready) return localize('FABRICATE.App.Journal.Actions.WaitingHint');
     const key = {
       authorityUnavailable: 'AuthorityUnavailable',
+      'active-gm-missing': 'AuthorityUnavailable',
+      'active-gm-required': 'ActiveGmRequired',
+      'ledger-missing': 'LedgerMissing',
+      'ledger-ambiguous': 'LedgerAmbiguous',
       recoveryRequired: 'RecoveryRequired',
+      'recovery-required': 'RecoveryRequired',
+      'claim-held': 'ClaimHeld',
+      'claim-release-failed': 'ClaimReleaseFailed',
+      'secure-random-unavailable': 'SecureRandomUnavailable',
+      executionInProgress: 'ExecutionInProgress',
       unsupportedLifecycle: 'UnsupportedLifecycle',
       selectionRequired: 'SelectionRequired',
     }[code];
-    return key
-      ? localize(`FABRICATE.App.Journal.Actions.${key}`)
-      : localize('FABRICATE.App.Journal.Actions.NeedsOwner');
+    if (key) return localize(`FABRICATE.App.Journal.Actions.${key}`);
+    if (code === 'notOwner') return localize('FABRICATE.App.Journal.Actions.NeedsOwner');
+    if (!ready) return localize('FABRICATE.App.Journal.Actions.WaitingHint');
+    return localize('FABRICATE.App.Journal.Actions.Unavailable');
   }
 
   function primaryLabel() {

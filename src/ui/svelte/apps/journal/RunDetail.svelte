@@ -26,8 +26,14 @@
   const statusView = $derived(runStatusPresentation(status));
   const terminal = $derived(['succeeded', 'failed', 'cancelled'].includes(status));
   const stages = $derived(Array.isArray(run?.steps) ? run.steps : []);
-  const currentIndex = $derived(Math.max(0, Number(run?.stepIndex) || 0));
-  const viewedIndex = $derived(Math.max(0, Number(journal?.viewedStageIndex) || 0));
+  const currentIndex = $derived(
+    terminal ? Math.max(0, stages.length - 1) : Math.max(0, Number(run?.stepIndex) || 0)
+  );
+  const viewedIndex = $derived(
+    journal?.viewedStageIndex == null
+      ? currentIndex
+      : Math.max(0, Number(journal.viewedStageIndex) || 0)
+  );
   const viewedStage = $derived(stages[viewedIndex] ?? run?.currentStep ?? null);
   const currentStage = $derived(run?.currentStep ?? stages[currentIndex] ?? null);
   const currentGate = $derived(run?.timeGate ?? currentStage?.timeGate ?? null);
@@ -47,6 +53,11 @@
   );
 
   const gatheringYield = $derived(run?.gatheringYield ?? null);
+  const craftingYield = $derived.by(() => {
+    if (terminal || run?.redacted === true || !viewedIsCurrent) return null;
+    const preview = run?.craftingYield;
+    return preview?.source === 'preview' && preview.stageIndex === currentIndex ? preview : null;
+  });
   const yieldEntries = $derived(
     Array.isArray(gatheringYield?.entries) ? gatheringYield.entries : []
   );
@@ -65,11 +76,11 @@
   const results = $derived(Array.isArray(run?.createdResults) ? run.createdResults : []);
   const resultEntries = $derived(
     results.map((result, index) => ({
-      id: result.itemUuid ?? result.componentId ?? `result-${index}`,
+      id: JSON.stringify([result.itemUuid ?? result.componentId, index]),
       name: result.name ?? result.componentId ?? localize('FABRICATE.App.Journal.Yields.Item'),
       art: result.img ?? '',
       chance: 100,
-      qty: Number(result.quantity) || 1,
+      qty: Number(result.quantity) || 0,
     }))
   );
   const requiredSeconds = $derived(
@@ -385,7 +396,12 @@
         positionLabel={(index, count) =>
           localize('FABRICATE.App.Journal.Stage.Position', { index: index + 1, count })}
         returnLabel={(index) =>
-          localize('FABRICATE.App.Journal.Stage.Return', { index: index + 1 })}
+          localize(
+            terminal
+              ? 'FABRICATE.App.Journal.Stage.ReturnFinal'
+              : 'FABRICATE.App.Journal.Stage.Return',
+            { index: index + 1 }
+          )}
       />
       {#if viewedStage}
         <StageCard
@@ -465,6 +481,52 @@
         cut: (roll) => String(roll),
       }}
     />
+  {/if}
+
+  {#if craftingYield}
+    <div data-journal-crafting-yield={craftingYield.presentation}>
+      {#if craftingYield.presentation === 'tiers'}
+        <OutcomeLadder
+          tiers={craftingYield.tiers ?? []}
+          emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
+          label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
+          hint={localize('FABRICATE.App.Journal.Yields.CraftingPreviewHint')}
+        />
+      {:else if craftingYield.presentation === 'progressive'}
+        <InspectorCard>
+          <h3>{localize('FABRICATE.App.Journal.Yields.ProgressiveTitle')}</h3>
+          <p>{localize('FABRICATE.App.Journal.Yields.ProgressiveHint')}</p>
+          <JournalFactRow
+            label={localize('FABRICATE.App.Journal.Yields.AwardMode')}
+            value={localize(
+              `FABRICATE.App.Journal.Yields.AwardModes.${craftingYield.progressive?.awardMode ?? 'equal'}`
+            )}
+          />
+          {#each craftingYield.progressive?.stages ?? [] as entry, index (index)}
+            <JournalFactRow
+              label={`${index + 1}. ${entry.name}`}
+              value={entry.cost == null
+                ? localize('FABRICATE.App.Journal.Yields.UnknownCost')
+                : localize('FABRICATE.App.Journal.Yields.BudgetCost', {
+                    quantity: entry.quantity,
+                    cost: entry.cost,
+                  })}
+            />
+          {/each}
+        </InspectorCard>
+      {:else if craftingYield.presentation === 'entries'}
+        <YieldScale
+          entries={craftingYield.entries ?? []}
+          label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
+          hint={localize('FABRICATE.App.Journal.Yields.CraftingPreviewHint')}
+          labels={{
+            threshold: () => localize('FABRICATE.App.Journal.Yields.OnSuccess'),
+            quantity: (entry) => localize('FABRICATE.App.Journal.Quantity', { n: entry.qty }),
+            chance: () => localize('FABRICATE.App.Journal.Yields.PreviewChip'),
+          }}
+        />
+      {/if}
+    </div>
   {/if}
 
   {#if resultEntries.length > 0}

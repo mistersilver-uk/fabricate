@@ -29,7 +29,9 @@
   );
   const selectedRun = $derived(journal?.selectedRun ?? null);
   const selectedRunKey = $derived(
-    String(journal?.selectedRunKey ?? selectedRun?.key ?? journal?.selectedRunId ?? '')
+    String(
+      selectedRun?.key || journal?.selectedRunKey || selectedRun?.id || journal?.selectedRunId || ''
+    )
   );
   const counts = $derived(
     journal?.activeCounts ?? {

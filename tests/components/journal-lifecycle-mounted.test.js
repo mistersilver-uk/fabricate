@@ -4,6 +4,9 @@ import { after, afterEach, before, describe, it } from 'node:test';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
+import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
+import { IngredientSet } from '../../src/models/IngredientSet.js';
+import english from '../../lang/en.json' with { type: 'json' };
 import { chooseSelectOption } from '../helpers/select-control.js';
 import {
   PLAYER_APP_COMPILED_MODULES,
@@ -119,31 +122,7 @@ const ACTOR = {
 };
 
 function ingredientSet(id, groups) {
-  const set = {
-    id,
-    name: id,
-    ingredientGroups: groups,
-    toJSON: () => ({ id, name: id, ingredientGroups: structuredClone(groups) }),
-    resolveIngredientSelection(items, matcher, { optionOverrides = {} } = {}) {
-      const selectedIngredients = [];
-      const missingGroups = [];
-      for (const group of groups) {
-        const selectedIndex = Number(optionOverrides?.[group.id]?.optionIndex) || 0;
-        const option = group.options[selectedIndex] ?? group.options[0];
-        const candidates = items.filter((candidate) => matcher?.(option, candidate));
-        const selectedItemId = optionOverrides?.[group.id]?.heldItemId;
-        const heldItem =
-          candidates.find((candidate) => candidate.uuid === selectedItemId) ?? candidates[0];
-        const have = Number(heldItem?.system?.quantity) || 0;
-        selectedIngredients.push(option);
-        if (have < Number(option.quantity ?? 1)) {
-          missingGroups.push({ group, ingredient: option, need: option.quantity ?? 1, have });
-        }
-      }
-      return { success: missingGroups.length === 0, selectedIngredients, missingGroups };
-    },
-  };
-  return set;
+  return new IngredientSet({ id, name: id, ingredientGroups: groups });
 }
 
 function componentOption(id, componentId, quantity = 1) {
@@ -257,9 +236,11 @@ const TASKS = ['straight', 'd100', 'routed'].map((mode) => ({
 }));
 const ENVIRONMENTS = [{ id: 'environment-1', craftingSystemId: SYSTEM.id }];
 
-function makeBuilder(containers, dismissed, nowWorldTime) {
-  const recipeById = new Map(RECIPES.map((entry) => [entry.id, entry]));
-  const componentById = new Map(SYSTEM.components.map((entry) => [entry.id, entry]));
+function makeBuilder(containers, dismissed, nowWorldTime, {
+  recipes = RECIPES, system = SYSTEM, visible = true, authority = { available: true, reason: null },
+} = {}) {
+  const recipeById = new Map(recipes.map((entry) => [entry.id, entry]));
+  const componentById = new Map(system.components.map((entry) => [entry.id, entry]));
   return new RunJournalBuilder({
     craftingRunManager: {
       getActiveRuns: () => Object.values(containers.craftingRuns.active),
@@ -278,20 +259,20 @@ function makeBuilder(containers, dismissed, nowWorldTime) {
       ingredientMatchesItem: (_recipe, option, held) =>
         option?.match?.componentId === held?.componentId,
     },
-    resolutionModeService: { getMode: () => 'simple' },
-    recipeVisibility: { evaluateRecipeAccess: () => ({ visible: true }) },
-    getSystem: () => SYSTEM,
+    resolutionModeService: new ResolutionModeService({ getSystem: () => system }),
+    recipeVisibility: { evaluateRecipeAccess: () => ({ visible }) },
+    getSystem: () => system,
     getComponent: (_systemId, id) => componentById.get(id) ?? null,
     getViewer: () => ({ id: 'user-1', isGM: false }),
     nowWorldTime,
     getComponentSourceActors: () => [ACTOR],
     resolveComponentForItem: (held) => componentById.get(held?.componentId) ?? null,
     getDismissedRunKeys: () => dismissed,
-    getJournalActionAvailability: () => ({ available: true, reason: null }),
+    getJournalActionAvailability: () => authority,
   });
 }
 
-function persistedRuntime(state) {
+function persistedRuntime(state, builderOptions) {
   const containers = buildLabRunStates({
     actor: ACTOR,
     userId: 'user-1',
@@ -303,7 +284,7 @@ function persistedRuntime(state) {
   const dismissed = new Set();
   const notifications = [];
   let worldTime = 1_209_600;
-  const builder = makeBuilder(containers, dismissed, () => worldTime);
+  const builder = makeBuilder(containers, dismissed, () => worldTime, builderOptions);
   const controller = createLabJournalCaseController({
     actor: ACTOR,
     containers,
@@ -341,8 +322,8 @@ function persistedRuntime(state) {
 
 let createJournalStore;
 
-async function mountState(state, { prepare = null, initialLoad = true } = {}) {
-  const runtime = persistedRuntime(state);
+async function mountState(state, { prepare = null, initialLoad = true, builderOptions } = {}) {
+  const runtime = persistedRuntime(state, builderOptions);
   prepare?.(runtime);
   const store = createJournalStore({ services: runtime.services });
   if (initialLoad) await store.load();
@@ -385,9 +366,57 @@ function assertLockedStage(target) {
   assert.ok(!card.querySelector('button, input, select'), 'future stage exposes no editing control');
 }
 
+function craftingPreviewFixture(mode, checkMode = 'none') {
+  const system = structuredClone(SYSTEM);
+  system.resolutionMode = mode;
+  system.alchemy = { checkMode };
+  system.craftingCheck = {
+    failureResultPolicy: 'never',
+    simple: { rollFormula: checkMode === 'simple' ? '1d20' : '', dc: 12 },
+    routed: {
+      type: 'fixed',
+      fixedOutcomes: [
+        { id: 'failed', name: 'Setback', success: false, start: 1, end: 9 },
+        { id: 'fine', name: 'Fine', success: true, start: 10, end: 20 },
+      ],
+    },
+    progressive: { rollFormula: '2d6', awardMode: 'partial' },
+  };
+  system.components[0].difficulty = 2;
+  system.components[1].difficulty = 5;
+  const authored = recipe('sm-r-horseshoe', 'Yield trial', [FIXED_SET], 3);
+  const groups = [
+    { id: 'fine-results', name: 'Fine', checkOutcomeIds: ['fine'], results: [
+      { id: 'iron-result', componentId: 'iron', quantity: 2 },
+      { id: 'copper-result', componentId: 'copper', quantity: 3 },
+    ] },
+  ];
+  if (mode === 'routedByIngredients') groups.push({
+    id: 'other-route', name: 'Other route', results: [{ id: 'other', componentId: 'horseshoe', quantity: 9 }],
+  });
+  for (const step of authored.steps) step.resultGroups = groups;
+  return {
+    builderOptions: { system, recipes: [authored] },
+    prepare({ containers }) {
+      const run = containers.craftingRuns.active['lab-v1-ready-single'];
+      run.currentStepIndex = 1;
+      run.steps = authored.steps.map((step, index) => ({
+        stepId: step.id, stepName: step.name,
+        status: index === 0 ? 'succeeded' : 'inProgress',
+        selectionPlan: { selectedIngredientSetId: 'fixed-set' },
+        selectedRequirementSnapshot: { id: 'fixed-set', resultGroupId: 'fine-results' },
+      }));
+    },
+  };
+}
+
 describe('Journal versioned lifecycle (mounted)', () => {
   before(async () => {
     await harness.setup();
+    globalThis.game.i18n.localize = (key) =>
+      key.split('.').reduce((value, part) => value?.[part], english) ?? key;
+    globalThis.game.i18n.format = (key, data) =>
+      globalThis.game.i18n.localize(key).replace(/\{(\w+)\}/g, (match, name) => data[name] ?? match);
     ({ createJournalStore } = await harness.loadRuneModule(
       'src/ui/svelte/stores/journalStore.svelte.js'
     ));
@@ -455,6 +484,117 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.doesNotMatch(target.textContent, /1d20/);
   });
 
+  it('renders real-builder crafting previews only for the viewed current stage across resolution modes', async () => {
+    for (const [mode, checkMode, presentation] of [
+      ['simple', 'none', 'entries'], ['simple', 'simple', 'entries'],
+      ['routedByIngredients', 'none', 'entries'], ['routedByCheck', 'none', 'tiers'],
+      ['progressive', 'none', 'progressive'], ['alchemy', 'none', 'entries'],
+      ['alchemy', 'tiered', 'tiers'],
+    ]) {
+      const mounted = await mountState('ready-single', craftingPreviewFixture(mode, checkMode));
+      assert.equal(mounted.store.selectedRun.craftingYield.presentation, presentation);
+      const preview = mounted.target.querySelector('[data-journal-crafting-yield]');
+      assert.ok(preview, `${mode}/${checkMode} has a visible preview`);
+      assert.match(preview.textContent, /Iron/);
+      assert.doesNotMatch(preview.textContent, /Received|Awarded|100%|Horseshoe/);
+      assert.equal(preview.querySelectorAll('[data-yield-cut]').length, 0);
+      if (presentation === 'tiers') {
+        assert.match(preview.textContent, /Setback/);
+        assert.match(preview.textContent, /No items/);
+        assert.ok(preview.querySelector('[data-outcome-ladder]'));
+      } else if (presentation === 'progressive') {
+        assert.ok(!preview.querySelector('[data-outcome-ladder], [data-yield-scale]'));
+        assert.match(preview.textContent, /budget/i);
+        assert.match(preview.textContent, /2/);
+        assert.match(preview.textContent, /5/);
+        assert.ok(preview.textContent.indexOf('Iron') < preview.textContent.indexOf('Copper'));
+      }
+      assert.ok(!preview.querySelector('button, input'), 'previews are read-only');
+      for (const index of [0, 2]) {
+        mounted.target.querySelector(`[data-stage-nav-index="${index}"]`).click();
+        flushSync();
+        assert.ok(!mounted.target.querySelector('[data-journal-crafting-yield]'), `stage ${index} has no current preview`);
+      }
+      mounted.target.querySelector('[data-stage-nav-return]').click();
+      flushSync();
+      assert.ok(mounted.target.querySelector('[data-journal-crafting-yield]'));
+      harness.remount();
+    }
+  });
+
+  it('keeps terminal awards immutable and suppresses previews when recipe access is redacted', async () => {
+    const fixture = craftingPreviewFixture('simple');
+    const mounted = await mountState('ready-single', fixture);
+    const run = mounted.containers.craftingRuns.active['lab-v1-ready-single'];
+    run.status = 'succeeded';
+    run.currentStepIndex = null;
+    run.steps[2].createdResults = [
+      { componentId: 'horseshoe', name: 'Recorded Horseshoe', quantity: 1 },
+      { componentId: 'iron', name: 'Refused award', quantity: 0 },
+    ];
+    mounted.containers.craftingRuns.history.push(run);
+    delete mounted.containers.craftingRuns.active[run.id];
+    await mounted.store.load(true);
+    flushSync();
+    assert.ok(!mounted.target.querySelector('[data-journal-crafting-yield]'));
+    assert.equal(mounted.target.querySelector('[data-stage-nav-index="2"]').getAttribute('aria-pressed'), 'true');
+    assert.ok(!mounted.target.querySelector('[data-stage-nav-return]'));
+    mounted.target.querySelector('[data-stage-nav-index="0"]').click();
+    flushSync();
+    const returnFinal = mounted.target.querySelector('[data-stage-nav-return]');
+    assert.match(returnFinal.textContent, /final stage 3/);
+    returnFinal.click();
+    flushSync();
+    assert.equal(mounted.store.viewedStageIndex, 2);
+    assert.equal(run.currentStepIndex, null, 'browsing history never changes execution state');
+    const awards = mounted.target.querySelector('[data-yield-scale]');
+    assert.match(awards.textContent, /Recorded Horseshoe/);
+    assert.match(awards.textContent, /×0/);
+    fixture.builderOptions.system.components[2].name = 'Changed live component';
+    fixture.builderOptions.recipes[0].steps[2].resultGroups[0].results[0].quantity = 99;
+    await mounted.store.load(true);
+    flushSync();
+    assert.doesNotMatch(awards.textContent, /Changed live component|99/);
+    assert.equal(run.steps[2].createdResults[0].quantity, 1);
+    harness.remount();
+
+    const hidden = await mountState('ready-single', {
+      ...fixture, builderOptions: { ...fixture.builderOptions, visible: false },
+    });
+    assert.equal(hidden.store.selectedRun.redacted, true);
+    assert.ok(!hidden.target.querySelector('[data-journal-crafting-yield], [data-yield-scale], [data-outcome-ladder]'));
+    assert.doesNotMatch(hidden.target.textContent, /Yield trial|Iron|Copper/);
+  });
+
+  it('uses actual authority refusal reasons even while a time gate is pending', async () => {
+    for (const [reason, key] of [
+      ['ledger-missing', 'LedgerMissing'], ['ledger-ambiguous', 'LedgerAmbiguous'],
+      ['active-gm-missing', 'AuthorityUnavailable'], ['active-gm-required', 'ActiveGmRequired'],
+      ['recovery-required', 'RecoveryRequired'], ['claim-held', 'ClaimHeld'],
+      ['claim-release-failed', 'ClaimReleaseFailed'], ['secure-random-unavailable', 'SecureRandomUnavailable'],
+    ]) {
+      const mounted = await mountState('waiting-auto-eligible', {
+        builderOptions: { authority: { available: false, reason } },
+      });
+      assert.equal(mounted.store.selectedRun.actions.disabledReason, reason);
+      assert.equal(mounted.target.querySelector('[data-run-action="primary"]').title, english.FABRICATE.App.Journal.Actions[key]);
+      assert.doesNotMatch(mounted.target.querySelector('[data-journal-actions]').textContent, /must own/);
+      harness.remount();
+    }
+  });
+
+  it('labels an executing run as in progress rather than blaming ownership', async () => {
+    const mounted = await mountState('ready-single', {
+      prepare({ containers }) {
+        containers.craftingRuns.active['lab-v1-ready-single'].executionJournal = {
+          status: 'planned', effects: [],
+        };
+      },
+    });
+    assert.equal(mounted.store.selectedRun.actions.disabledReason, 'executionInProgress');
+    assert.equal(mounted.target.querySelector('[data-run-action="primary"]').title, english.FABRICATE.App.Journal.Actions.ExecutionInProgress);
+  });
+
   it('persists completion preference and completion through a rebuild of raw records', async () => {
     const { target, store, containers, advanceWorldTime } =
       await mountState('waiting-auto-eligible');
@@ -497,6 +637,92 @@ describe('Journal versioned lifecycle (mounted)', () => {
     );
     assert.equal(commands.at(-1).payload.stepIndex, 0);
     assert.match(target.querySelector('[data-slot-id="metal"]').textContent, /copper stock/);
+  });
+
+  it('marks the effective initial selection and the fallback after its actual removal', async () => {
+    const mounted = await mountState('filter-paused');
+    const selectedId = mounted.store.selectedRun.id;
+    assert.equal(mounted.target.querySelector(`[data-run-id="${selectedId}"]`).getAttribute('aria-pressed'), 'true');
+    mounted.store.select(mounted.store.selectedRun);
+    delete mounted.containers.craftingRuns.active[selectedId];
+    await mounted.store.load(true);
+    flushSync();
+    assert.notEqual(mounted.store.selectedRun.id, selectedId);
+    assert.equal(mounted.target.querySelector(`[data-run-id="${mounted.store.selectedRun.id}"]`).getAttribute('aria-pressed'), 'true');
+  });
+
+  it('keeps a missing selected held item unfilled until an explicit replacement is chosen', async () => {
+    const mounted = await mountState('waiting-open-choice', {
+      prepare({ containers }) {
+        containers.craftingRuns.active['lab-v1-waiting-open-choice'].steps[0].selectionPlan.ingredientOptionOverrides = {
+          metal: { optionIndex: 0, heldItemId: 'Item.removed-stock' },
+        };
+      },
+    });
+    const slot = mounted.target.querySelector('[data-slot-id="metal"]');
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, false);
+    assert.doesNotMatch(slot.textContent, /iron stock/);
+    slot.querySelector('button').click();
+    flushSync();
+    assert.ok(!mounted.target.querySelector('[data-choice-id][aria-pressed="true"]'));
+    const iron = [...mounted.target.querySelectorAll('[data-choice-id]')].find((entry) => entry.textContent.includes('iron stock'));
+    iron.click();
+    await settleAction();
+    assert.match(mounted.target.querySelector('[data-slot-id="metal"]').textContent, /iron stock/);
+    assert.equal(mounted.commands.at(-1).payload.selectionPlan.ingredientOptionOverrides.metal.heldItemId, 'Item.iron-a');
+  });
+
+  it('disables choices and essence while a selection command is pending and discards refused optimism', async () => {
+    for (const [state, accepted] of [
+      ['waiting-open-choice', true], ['essence-shared', true], ['essence-shared', false],
+    ]) {
+      let finish;
+      let submitted;
+      let submissions = 0;
+      const mounted = await mountState(state, {
+        prepare({ services }) {
+          const execute = services.executeJournalRunCommand;
+          services.executeJournalRunCommand = (command) => {
+            submitted = command;
+            submissions += 1;
+            return new Promise((resolve) => { finish = resolve; }).then(() =>
+              accepted ? execute(command) : { success: false, message: 'selection refused' }
+            );
+          };
+        },
+      });
+      let control;
+      if (state === 'waiting-open-choice') {
+        mounted.target.querySelector('[data-slot-id="metal"] button').click();
+        flushSync();
+        control = mounted.target.querySelector('[data-choice-id]');
+      } else control = mounted.target.querySelector('[data-stepper-increment]');
+      control.click();
+      control.click();
+      flushSync();
+      assert.ok(mounted.store.busyRunKey);
+      const controls = mounted.target.querySelectorAll('[data-journal-stage-details] button, [data-journal-stage-details] input');
+      assert.ok(controls.length > 0);
+      assert.ok([...controls].every((control) => control.disabled), 'all visible material controls are disabled');
+      for (const control of controls) control.click();
+      assert.equal(submitted.action, 'setSelection');
+      assert.equal(submissions, 1, 'rapid input submits exactly one plan');
+      finish();
+      await settleAction();
+      assert.equal(mounted.store.busyRunKey, '');
+      if (accepted) {
+        assert.deepEqual(
+          mounted.containers.craftingRuns.active[submitted.runId].steps[0].selectionPlan,
+          submitted.payload.selectionPlan,
+          'the visible plan is the accepted persisted command'
+        );
+      }
+      if (state === 'essence-shared') {
+        assert.match(mounted.target.querySelector('[data-essence-total="earth"]').textContent, accepted ? /6 \/ 6/ : /0 \/ 6/);
+        assert.equal(mounted.target.querySelector('[data-essence-source] input').value, accepted ? '1' : '0');
+      }
+      harness.remount();
+    }
   });
 
   it('keeps future stages inert and proves the lock assertion detects a control intrusion', async () => {

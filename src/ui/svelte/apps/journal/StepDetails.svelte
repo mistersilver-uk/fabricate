@@ -8,6 +8,7 @@
 
   let { step = null, run = null, journal = null, editable = false } = $props();
   let openSlot = $state('');
+  const busy = $derived(Boolean(journal?.busyRunKey || journal?.busyRunId));
 
   const snapshot = $derived(
     step?.requirementSnapshot && typeof step.requirementSnapshot === 'object'
@@ -19,6 +20,13 @@
   );
   const availability = $derived(step?.selectionAvailability ?? null);
   const plan = $derived(step?.selectionPlan ?? {});
+  const requirementsHint = $derived.by(() => {
+    if (busy) return localize('FABRICATE.App.Journal.Actions.Working');
+    if (!editable) return localize('FABRICATE.App.Journal.Stage.Locked');
+    if (slots.some((slot) => slot.stale))
+      return localize('FABRICATE.App.Journal.Stage.StaleSelection');
+    return localize('FABRICATE.App.Journal.Stage.RequirementsHint');
+  });
 
   function tintOf(value) {
     return String(value ?? '').replace(/^--fab-tag-/u, '');
@@ -105,20 +113,39 @@
     });
   }
 
+  function selectedCandidate(requirement, candidates) {
+    const picked = Number(requirement?.selectedOptionIndex ?? -1);
+    const selectedItemId = requirement?.selectedItemId ?? null;
+    return (
+      candidates.find(
+        (candidate) =>
+          candidate.optionIndex === picked &&
+          (selectedItemId == null || candidate.heldItemId === selectedItemId)
+      ) ?? null
+    );
+  }
+
+  function slotKind(requirement, options, candidates, selected) {
+    if (requirement?.option?.kind === 'essence') return 'essence';
+    if (
+      options.length > 1 ||
+      candidates.length > 1 ||
+      (!selected && requirement?.selectedItemId != null)
+    )
+      return 'choice';
+    return 'fixed';
+  }
+
   const slots = $derived(
     requirements.map((requirement, requirementIndex) => {
       const groupId = String(requirement?.groupId ?? `requirement-${requirementIndex}`);
       const options = choiceOptions(groupId, requirement?.option);
-      const candidates = candidateRows(groupId, options);
-      const picked = Number(requirement?.selectedOptionIndex) || 0;
-      const selected =
-        candidates.find(
-          (candidate) =>
-            candidate.optionIndex === picked &&
-            candidate.heldItemId === (requirement?.selectedItemId ?? null)
-        ) ??
-        candidates.find((candidate) => candidate.optionIndex === picked) ??
-        null;
+      const candidates = candidateRows(groupId, options).map((candidate) => ({
+        ...candidate,
+        unavailable: candidate.disabled,
+        disabled: busy || candidate.disabled,
+      }));
+      const selected = selectedCandidate(requirement, candidates);
       const needed = Math.max(1, Number(requirement?.option?.need) || 1);
       const essenceRequirements = (availability?.essencePool?.requirements ?? []).filter(
         (entry) => entry?.groupId === groupId
@@ -126,17 +153,13 @@
       return {
         id: groupId,
         label: String(requirement?.name ?? ''),
-        kind:
-          requirement?.option?.kind === 'essence'
-            ? 'essence'
-            : options.length > 1
-              ? 'choice'
-              : 'fixed',
+        kind: slotKind(requirement, options, candidates, selected),
         needed,
         componentId: selected?.id ?? '',
         selected,
         candidates,
-        disabled: !editable,
+        disabled: !editable || busy,
+        stale: !selected && (requirement?.selectedItemId != null || !requirement?.option),
         poolsRequired: essenceRequirements.length,
         poolsMet: essenceRequirements.filter((entry) => entry?.satisfied === true).length,
       };
@@ -151,14 +174,14 @@
     );
     if (!slot) return 0;
     const candidate = slot.candidates.find((entry) => entry.id === componentId);
-    return candidate?.disabled ? 0 : (candidate?.held ?? 0);
+    return candidate?.unavailable ? 0 : (candidate?.held ?? 0);
   }
   function choose(groupId, candidateId) {
-    if (!editable) return;
+    if (!editable || busy) return;
     const candidate = slots
       .find((slot) => slot.id === groupId)
       ?.candidates.find((entry) => entry.id === candidateId);
-    if (!candidate) return;
+    if (!candidate || candidate.disabled) return;
     const next = {
       ...plan,
       selectedIngredientSetId: plan?.selectedIngredientSetId ?? snapshot?.id,
@@ -199,22 +222,29 @@
         })),
     }))
   );
-  function changeAllocation(itemKey, delta) {
-    if (!editable) return;
+  async function changeAllocation(itemKey, delta) {
+    if (!editable || busy) {
+      allocation = { ...allocation };
+      return;
+    }
     const nextAllocation = {
       ...allocation,
       [itemKey]: Math.max(0, (Number(allocation?.[itemKey]) || 0) + delta),
     };
     allocation = nextAllocation;
-    journal?.setSelection?.(run, {
-      ...plan,
-      selectedIngredientSetId: plan?.selectedIngredientSetId ?? snapshot?.id,
-      ingredientEssenceAllocation: {
-        stepId: step?.stepId,
-        ingredientSetId: plan?.selectedIngredientSetId ?? snapshot?.id,
-        allocation: nextAllocation,
-      },
-    });
+    try {
+      await journal?.setSelection?.(run, {
+        ...plan,
+        selectedIngredientSetId: plan?.selectedIngredientSetId ?? snapshot?.id,
+        ingredientEssenceAllocation: {
+          stepId: step?.stepId,
+          ingredientSetId: plan?.selectedIngredientSetId ?? snapshot?.id,
+          allocation: nextAllocation,
+        },
+      });
+    } finally {
+      allocation = { ...(pool?.allocation ?? {}) };
+    }
   }
   const carrier = (id) => pool?.carriers?.find((entry) => entry.itemKey === id);
   const consumed = $derived(
@@ -248,7 +278,12 @@
   }
 </script>
 
-<div class="journal-stage-details" data-journal-stage-details data-editable={editable || undefined}>
+<div
+  class="journal-stage-details"
+  data-journal-stage-details
+  data-editable={(editable && !busy) || undefined}
+  aria-busy={busy || undefined}
+>
   {#if slots.length > 0}
     <SlotRow
       requirements={slots}
@@ -258,9 +293,7 @@
       onChoose={choose}
       locked={!editable}
       label={localize('FABRICATE.App.Journal.Stage.Requirements')}
-      hint={editable
-        ? localize('FABRICATE.App.Journal.Stage.RequirementsHint')
-        : localize('FABRICATE.App.Journal.Stage.Locked')}
+      hint={requirementsHint}
       slotLabel={(slot) => slot.label}
       choiceLabel={localize('FABRICATE.App.Journal.Stage.Choose')}
       candidateSummary={(count) => localize('FABRICATE.App.Journal.Stage.Choices', { count })}
@@ -303,7 +336,7 @@
           (Number(carrier(sourceId)?.ownedUnits) || 0) - (Number(allocation?.[sourceId]) || 0)
         )}
       held={(sourceId) => Number(carrier(sourceId)?.ownedUnits) || 0}
-      locked={!editable}
+      locked={!editable || busy}
       essenceLabel={(essence) =>
         thresholds.find((threshold) => threshold.essence === essence)?.name ?? essence}
       sourceReading={(_source, _contributions, heldCount, spareCount) =>
