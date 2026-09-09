@@ -35,7 +35,7 @@
   baseline does not also carry is a real move inside the manager. `appearance` and
   `min-height` are the two this family would like and cannot have at that rank, so
   Field's element-typed chrome is a SECOND rule in the family's own block
-  (`fabricate.css:10727`) that restates the area baseline's element predicate leg for
+  (`fabricate.css:10739`) that restates the area baseline's element predicate leg for
   leg — six `input` legs and `textarea` — and carries only that block's `appearance`,
   `-webkit-appearance` and `min-height`. Widening the floor instead would take the radios
   inside a `<Field as="fieldset">` from 16px to 34, a range input from 28 to 34 and a
@@ -43,8 +43,8 @@
 
   THE PAIR EXCLUDES `select`, DELIBERATELY, and the reason is now historical. The family
   declares both halves — the strip `.fabricate-field :is(input, textarea):focus`
-  (`fabricate.css:10811`) and the repaint `.fabricate-field input:focus-visible,
-  .fabricate-field textarea:focus-visible` (`:10828`) — over `input` and `textarea` only. A
+  (`fabricate.css:10823`) and the repaint `.fabricate-field input:focus-visible,
+  .fabricate-field textarea:focus-visible` (`:10840`) — over `input` and `textarea` only. A
   `select` leg would have been (0,2,1), tied `.fabricate-app select:focus-visible` and won on
   source order, deleting the inset ring that existed because an outset outline on a select is
   clipped by an overflow-clipped container; that rule was deleted with the player app's last

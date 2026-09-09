@@ -12424,6 +12424,18 @@ export const VIEW_LAB_CASES = Object.freeze([
     // driver most needs to be able to click and the one a truthiness test would leave unaddressed,
     // so asserting it here is what keeps the sentinel's identity handle photographed rather than
     // merely unit-tested.
+    //
+    // ONE WIDTH, AND THE OTHER END OF THE RANGE IS ACCEPTED IN WRITING RATHER THAN PHOTOGRAPHED.
+    // At 1100px the browse column is the grid's `minmax(280px, 1fr)` left track; at the supported
+    // 1024px window floor `CraftingView` reflows to a single ~906px column, so the trigger and
+    // therefore this panel span it. That is not a second BEHAVIOUR to photograph, it is the same
+    // one at a wider trigger: `anchoredPopover` resolves `clamp(max(triggerWidth, minWidth),
+    // minWidth, maxWidth)` and writes the answer as a width and as both bounds, and the caller's
+    // ceiling is set above both ends of that range for exactly this reason (see
+    // `FILTER_PANEL_MAX_WIDTH` in `RecipeBrowser.svelte`). The resolution is measured in Chromium
+    // by `tests/components/select-popover-width.test.js` and the wiring — that dropping the
+    // ceiling reds — by `tests/components/recipe-browser-mounted.test.js`, so a 1024px sibling
+    // frame would depict the layout's reflow rather than anything about this control.
     query: { tab: 'crafting' },
     position: { width: 1100, height: 760 },
     steps: [{ selector: '[data-crafting-category-filter]' }],

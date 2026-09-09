@@ -1196,6 +1196,9 @@ The reason is the click, not the name: a `<label>` forwards a caption click into
 The caption keeps its class and its layout and stops being a hit target, which is the accepted cost.
 This rule REPLACES an earlier explanation that said a `<label>` cannot name a `<button>` at all; a `<button>` is labelable and the primitive's own labelled form relies on exactly that containment, so the conclusion was right and the ground beneath it was not.
 
+AN `inline` CALLER STATES A PANEL `minWidth` whenever its widest option LABEL needs more than the panel's resolved width less the row's chrome, measured at 52px for a ticked row and 32px for an unticked one, and the trigger's own width floor is not that figure.
+The two are different boxes: the panel draws every label at a fixed 12px where the `inline` trigger reads at 11.5px, and a ticked row adds a tick gutter and a row gap the trigger has no counterpart for, so a floor sized to the widest VALUE leaves the widest OPTION ellipsised — which is what the first shipping of the player app's conversion did at two of its six sites.
+
 A shared skin that a conversion appears to strand is NARROWED onto its remaining native carrier rather than deleted, until the last carrier converts.
 Deleting it early drops a still-shipping control to the platform's own treatment, which is the defect this requirement exists to remove.
 The player app's shared select skin is the first one to reach the end of that rule rather than to be narrowed by it.
