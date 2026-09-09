@@ -214,6 +214,9 @@ function compileManagerRoot() {
   // collapsible panels. Omitting either HANGS this suite (# cancelled), never fails it.
   writeCompiledSvelte('src/ui/svelte/components/ThresholdBandStrip.svelte');
   writeCompiledSvelte('src/ui/svelte/components/RowDisclosure.svelte');
+  // THE ORDERED ROW (issue 1512), which five surfaces in this tree render and which renders
+  // the disclosure above. Omitting it HANGS this suite (`# cancelled`) rather than failing it.
+  writeCompiledSvelte('src/ui/svelte/components/SortableList.svelte');
   // The odds histogram's bars are the shipped fill bar (issue 1097) rather than a sixth
   // hand-rolled copy of the shape `ui-integration/spec.md` records as debt.
   writeCompiledSvelte('src/ui/svelte/components/FillBar.svelte');
@@ -605,6 +608,10 @@ function compileManagerRoot() {
     'RecipeResultGroupCard',
     'RecipeRoutingAssignment',
     'RecipeResultItemRow',
+    // The progressive stage's complication band left that row at issue 1512 and is its own
+    // component, rendered as the shared list's BODY. A `.svelte` this tree renders but this loop
+    // omits HANGS the suite (`# cancelled`) rather than failing it.
+    'RecipeStageComplicationBand',
     'RecipeToolsSection',
   ]) {
     writeCompiledSvelte(`src/ui/svelte/apps/manager/recipe/${recipeComponent}.svelte`);

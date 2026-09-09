@@ -6,7 +6,6 @@
     "styles/fabricate.css | .fabricate-manager .manager-environment-identity:focus | 1",
     "styles/fabricate.css | .fabricate-manager .manager-essence-identity:focus | 1",
     "styles/fabricate.css | .fabricate-manager .manager-gathering-event-identity:focus | 1",
-    "styles/fabricate.css | .fabricate-manager .manager-gathering-task-drop-row:focus | 1",
     "styles/fabricate.css | .fabricate-manager .manager-gathering-task-identity:focus | 1",
     "styles/fabricate.css | .fabricate-manager .manager-nav-button.is-active:focus | 1",
     "styles/fabricate.css | .fabricate-manager .manager-nav-button:focus | 1",
@@ -64,12 +63,10 @@
     "src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte | .manager-recipe-item-stepper-value | 600 | 1",
     "src/ui/svelte/apps/manager/scoped/SystemRulesRoster.svelte | .manager-scoped-roster-count | 600 | 1",
     "src/ui/svelte/apps/manager/scoped/WorldEssenceCataloguePage.svelte | .manager-scoped-essence-stat-value | 700 | 1",
-    "styles/fabricate.css | .fabricate-manager .manager-environment-comp-order | 700 | 1",
     "styles/fabricate.css | .fabricate-manager .manager-nav-count | 600 | 1",
     "styles/fabricate.css | .fabricate-manager .manager-nav-issue-badge | 700 | 1",
     "styles/fabricate.css | .fabricate-manager .manager-recipe-flow-qty, .fabricate-manager .manager-component-flow-qty | 600 | 1",
     "styles/fabricate.css | .fabricate-manager .manager-salvage-result-difficulty, .fabricate-manager .manager-recipe-stage-dc | 700 | 1",
-    "styles/fabricate.css | .fabricate-manager .manager-salvage-result-ordinal, .fabricate-manager .manager-recipe-stage-ordinal | 700 | 1",
     "styles/fabricate.css | .fabricate-tabs .manager-editor-tab-count | 600 | 1",
     "styles/fabricate.css | .fabricate-validation .manager-recipe-rail-count-value | 700 | 1"
   ],
@@ -270,9 +267,9 @@
     "styles/fabricate.css | border-radius | 12px | 5",
     "styles/fabricate.css | border-radius | 13px | 1",
     "styles/fabricate.css | border-radius | 3px | 2",
-    "styles/fabricate.css | border-radius | 4px | 22",
+    "styles/fabricate.css | border-radius | 4px | 20",
     "styles/fabricate.css | border-radius | 5px | 13",
-    "styles/fabricate.css | border-radius | 8px | 71"
+    "styles/fabricate.css | border-radius | 8px | 69"
   ],
   "areaScopedStyleReads": [
     "src/ui/svelte/apps/manager/ImportFolderMappingModal.svelte | --fab-recipe-control-font | 4",
@@ -295,8 +292,7 @@
     "src/ui/svelte/components/ThresholdBandStrip.svelte | groupLabel | Outcome bands | 1"
   ],
   "unguardedEmptyNameBindings": [
-    "src/ui/svelte/apps/manager/ManagerModal.svelte | title | 1",
-    "src/ui/svelte/components/RowDisclosure.svelte | label | 1"
+    "src/ui/svelte/apps/manager/ManagerModal.svelte | title | 1"
   ],
   "roleFocusTargets": [
     "src/ui/svelte/apps/FabricateAppRoot.svelte | 1",
@@ -309,10 +305,7 @@
     "src/ui/svelte/apps/journal/RunCard.svelte | 1",
     "src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte | 1",
     "src/ui/svelte/apps/manager/GatheringRealmsTab.svelte | 1",
-    "src/ui/svelte/apps/manager/GatheringTaskEditView.svelte | 1",
-    "src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte | 1",
-    "src/ui/svelte/apps/manager/environment/CompositionList.svelte | 4",
-    "src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte | 1"
+    "src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte | 1"
   ],
   "formlessButtons": [
     "src/ui/svelte/apps/ComponentEditorRoot.svelte | 2",
@@ -355,7 +348,7 @@
     "src/ui/svelte/apps/manager/GatheringEventEditView.svelte | 3",
     "src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte | 1",
     "src/ui/svelte/apps/manager/GatheringPartiesTab.svelte | 1",
-    "src/ui/svelte/apps/manager/GatheringTaskEditView.svelte | 7",
+    "src/ui/svelte/apps/manager/GatheringTaskEditView.svelte | 6",
     "src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte | 1",
     "src/ui/svelte/apps/manager/InspectorActionButton.svelte | 1",
     "src/ui/svelte/apps/manager/PartyAddMemberPanel.svelte | 2",
@@ -366,7 +359,7 @@
     "src/ui/svelte/apps/manager/ToolEditView.svelte | 3",
     "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | 4",
     "src/ui/svelte/apps/manager/checks/CheckFormulaFields.svelte | 1",
-    "src/ui/svelte/apps/manager/checks/CheckTriggers.svelte | 2",
+    "src/ui/svelte/apps/manager/checks/CheckTriggers.svelte | 1",
     "src/ui/svelte/apps/manager/checks/ChecksRightMenu.svelte | 1",
     "src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte | 1",
     "src/ui/svelte/apps/manager/components/ComponentRow.svelte | 1",
@@ -381,7 +374,6 @@
     "src/ui/svelte/apps/manager/recipe/RecipeBooksScrollsTab.svelte | 1",
     "src/ui/svelte/apps/manager/recipe/RecipeIngredientOption.svelte | 4",
     "src/ui/svelte/apps/manager/recipe/RecipeOverviewTab.svelte | 1",
-    "src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte | 2",
     "src/ui/svelte/apps/manager/recipe/RecipeResultItemRow.svelte | 2",
     "src/ui/svelte/apps/manager/recipe/RecipeRoutingAssignment.svelte | 1",
     "src/ui/svelte/apps/manager/recipe/RecipeToolsSection.svelte | 1",
@@ -398,7 +390,6 @@
     "src/ui/svelte/components/ImagePathPicker.svelte | 1",
     "src/ui/svelte/components/ManagerColorPicker.svelte | 1",
     "src/ui/svelte/components/ManagerColorPopover.svelte | 2",
-    "src/ui/svelte/components/RowDisclosure.svelte | 1",
     "src/ui/svelte/components/SearchablePopover.svelte | 2",
     "src/ui/svelte/components/Stepper.svelte | 2"
   ],

@@ -140,6 +140,11 @@ describe('CompositionList mounted layout', () => {
       // THE manager's labelled push-button (issue 1118). Restore and the warning Force add
       // both render it. Omitting a rendered `.svelte` HANGS the suite (# cancelled).
       'src/ui/svelte/components/IconButton.svelte',
+      // THE ORDERED ROW and the disclosure it renders (issue 1512). Both are LEAVES TWO RUNGS
+    // DOWN of this tree, so a `.svelte` the tree renders but this list omits HANGS the suite
+    // (`# cancelled`) rather than failing it.
+      'src/ui/svelte/components/RowDisclosure.svelte',
+      'src/ui/svelte/components/SortableList.svelte',
       // THE shared overflow action menu (issue 1477), which the four row menus render and which
       // renders `IconButton` above as its trigger. Omitting a rendered `.svelte` HANGS the suite
       // (# cancelled), which is exactly how this conversion first reported.
@@ -420,36 +425,54 @@ describe('CompositionList mounted layout', () => {
       onReorder: (kind, from, to) => calls.push(['reorder', kind, from, to])
     });
 
+    // THE RANK CONTROLS ARE `SortableList`'S NOW (issue 1512), and that is what these
+    // assertions were always about: `has-rank-controls` was this file's way of saying "this row
+    // is ordered", and the list's own `reorderable` says it instead. The grip and the rank badge
+    // are the list's controls, so they are read by the list's hooks; the row is still addressed
+    // by `data-record-id`, which rides `rowData`, and it is still the drag source.
     const includedRow = target.querySelector('[data-section="included"] [data-record-id="first"]');
-    assert.ok(includedRow.classList.contains('has-rank-controls'), 'included ranked event rows opt into the handle grid');
+    assert.ok(
+      includedRow.classList.contains('fabricate-sortable-list-row'),
+      'the included ranked event row is the shared ordered row'
+    );
     assert.equal(includedRow.getAttribute('draggable'), 'true', 'included ranked event rows are draggable');
-    assert.ok(includedRow.querySelector('.manager-environment-comp-handle .fa-grip-vertical'), 'included ranked event rows render the grip handle');
-    assert.ok(includedRow.querySelector('.manager-environment-comp-order').textContent.includes('1'), 'included ranked event rows render the rank number');
+    assert.ok(includedRow.querySelector('[data-sortable-grip] .fa-grip-vertical'), 'included ranked event rows render the grip handle');
+    assert.ok(includedRow.querySelector('.fabricate-sortable-list-ordinal').textContent.includes('1'), 'included ranked event rows render the rank number');
     const forcedRow = target.querySelector('[data-section="included"] [data-record-id="forced"]');
-    assert.ok(forcedRow.classList.contains('has-rank-controls'), 'force-included event rows also opt into rank controls');
     assert.equal(forcedRow.getAttribute('draggable'), 'true', 'force-included ranked event rows are draggable');
-    assert.ok(forcedRow.querySelector('.manager-environment-comp-order').textContent.includes('4'), 'force-included rows receive their visible rank');
+    assert.ok(forcedRow.querySelector('.fabricate-sortable-list-ordinal').textContent.includes('4'), 'force-included rows receive their visible rank');
     const blockedRow = target.querySelector('[data-section="included"] [data-record-id="blocked"]');
-    assert.ok(blockedRow.classList.contains('has-rank-controls'), 'condition-blocked included event rows opt into rank controls');
     assert.equal(blockedRow.getAttribute('draggable'), 'true', 'condition-blocked included event rows are draggable');
-    assert.ok(blockedRow.querySelector('.manager-environment-comp-order').textContent.includes('3'), 'condition-blocked included rows receive their visible rank');
+    assert.ok(blockedRow.querySelector('.fabricate-sortable-list-ordinal').textContent.includes('3'), 'condition-blocked included rows receive their visible rank');
+    assert.ok(
+      blockedRow.classList.contains('is-conditions-blocked'),
+      'and the caller`s own per-record state still rides the row element, through `rowClass`'
+    );
 
     assert.equal(
-      target.querySelector('[data-section="available-to-add"] .manager-environment-comp-handle'),
+      target.querySelector('[data-section="available-to-add"] [data-sortable-grip]'),
       null,
       'available-to-add events do not reserve a blank handle placeholder'
     );
     assert.equal(
-      target.querySelector('[data-section="available-to-add"] .manager-environment-comp-row.has-rank-controls'),
+      target.querySelector('[data-section="available-to-add"] .fabricate-sortable-list-row'),
       null,
-      'available-to-add events keep the non-handle grid'
+      'available-to-add events are not an ordered list at all'
     );
 
-    const menu = await openRowMenu('first');
-    assert.ok(menu.textContent.includes('Move up'), 'ranked event menus include move up');
-    assert.ok(menu.textContent.includes('Move down'), 'ranked event menus include move down');
-    menu.querySelectorAll('button').item(1).click();
+    // THE ROCKER REPLACES THE MENU'S TWO MOVE VERBS (issue 1512). A visible pair a reader can see
+    // the range of beats two hidden copies of the same act behind an overflow trigger, so the
+    // menu no longer carries them and the row draws them.
+    const up = includedRow.querySelector('[data-sortable-move="up"]');
+    const down = includedRow.querySelector('[data-sortable-move="down"]');
+    assert.ok(up.disabled, 'the first ranked row cannot move up');
+    assert.ok(!down.disabled, 'and it can move down, so the pair reads as a range');
+    down.click();
     assert.deepEqual(calls.at(-1), ['reorder', 'event', 0, 1]);
+
+    const menu = await openRowMenu('first');
+    assert.ok(!menu.textContent.includes('Move up'), 'the menu no longer duplicates the rocker');
+    assert.ok(!menu.textContent.includes('Move down'), 'nor its other half');
   });
 
   it('event all-drops mode hides rank controls and move actions', async () => {

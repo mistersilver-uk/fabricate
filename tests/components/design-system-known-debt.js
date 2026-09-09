@@ -149,8 +149,17 @@ export function knownDebt(gate) {
  */
 export const KNOWN_BARE_FOCUS_SELECTORS = knownDebt('bareFocusSelectors');
 
-/** @see KNOWN_BARE_FOCUS_SELECTORS */
-export const KNOWN_BARE_FOCUS_TOTAL = 22;
+/**
+ * 22 -> 21 with issue 1512, and the row VANISHES rather than shrinking. The gathering drop table's
+ * row dropped its `tabindex="0"` and its Enter/Space handler — a focusable `role="row"` is a
+ * non-form element `KeyboardManager#hasFocus` cannot see, so every arrow press panned the canvas
+ * behind the window — which left `.manager-gathering-task-drop-row:focus` painting a state the
+ * row can no longer reach. Both halves of that pair are deleted with it, and the keyboard path is
+ * the component cell's own `<button>`, which takes the module ring.
+ *
+ * @see KNOWN_BARE_FOCUS_SELECTORS
+ */
+export const KNOWN_BARE_FOCUS_TOTAL = 21;
 
 /**
  * An `@media` query that is not a user preference, keyed `file | query`.
@@ -190,8 +199,15 @@ export const KNOWN_OFF_SCALE_FONT_WEIGHT_TOTAL = 7;
  */
 export const KNOWN_HEAVY_MONO_WEIGHTS = knownDebt('heavyMonoWeights');
 
-/** @see KNOWN_HEAVY_MONO_WEIGHTS */
-export const KNOWN_HEAVY_MONO_WEIGHT_TOTAL = 33;
+/**
+ * 33 -> 31 with issue 1512, and both rows VANISH rather than shrinking. The composition list's
+ * bare mono pip and the joined salvage/recipe stage badge were the two rules asking mono for 700,
+ * and both are the shared ordered row's ordinal badge now, which asks for 500 — a weight the
+ * shipped face actually has, so the numerals line up rather than being smeared sideways.
+ *
+ * @see KNOWN_HEAVY_MONO_WEIGHTS
+ */
+export const KNOWN_HEAVY_MONO_WEIGHT_TOTAL = 31;
 
 /**
  * A `box-shadow` that is neither an elevation token, `none`, nor an inset ring, keyed
@@ -468,9 +484,15 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * Re-derived from the JSON at this head rather than reasoned about, by the two-run procedure: the
  * row was banked first and the assertion reported the total the tree actually holds.
  *
+ * 283 -> 279 with issue 1512, and both rows SHRINK by construction rather than by a sweep. The
+ * 8px pair is the joined result-and-salvage stage row and the recipe step accordion's row, and the
+ * 4px pair is the two studios' reorder chevrons; all four are the shared ordered row's box and its
+ * rocker now, at the specimen's 9px and 6px. Nothing was re-cut to pay this — the ruling that
+ * moved the geometry took the radii with it.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 283;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 279;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -581,8 +603,14 @@ export const KNOWN_UNTRANSLATED_NAME_DEFAULT_TOTAL = 9;
  */
 export const KNOWN_EMPTY_NAME_BINDINGS = knownDebt('unguardedEmptyNameBindings');
 
-/** @see KNOWN_EMPTY_NAME_BINDINGS */
-export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 2;
+/**
+ * 2 -> 1 with issue 1512. `components/RowDisclosure.svelte | label` is DELETED: the control emits
+ * `aria-label={label || undefined}` now, which is the guarded spelling this gate's own message
+ * prescribes, and it had to before the component could be promoted into the member set.
+ *
+ * @see KNOWN_EMPTY_NAME_BINDINGS
+ */
+export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 1;
 
 /**
  * A non-form element with `tabindex="0"` and an interactive role, keyed `file`.
@@ -628,11 +656,28 @@ export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 2;
  * The four sibling panels that gained the same pair in that change — the recipe, recipe-item,
  * essence and Checks panels — never entered this population at all: it reads a STATIC
  * `tabindex="0"` beside an interactive role, and all four went straight to `-1`.
+ *
+ * 17 -> 11 with issue 1512, the largest single payment this population has taken, and every one
+ * of the six is paid by CONVERSION rather than by an attribute. Three rows are DELETED outright.
+ * `environment/CompositionList.svelte | 4` is the whole file: its four `<div role="button"
+ * tabindex="0">` record cells — the included list's and the three unordered lists' — are real
+ * `<button type="button">` elements now, which is what let the included row become the shared
+ * ordered list's row at all, because a whole-row button cannot nest one.
+ * `recipe/RecipeStepAccordion.svelte | 1` goes with the same conversion: its `role="button"`
+ * header was the step's disclosure, and under the maintainer's chevron-only ruling the opener is
+ * `RowDisclosure` and the copy is inert. `manager/GatheringTaskEditView.svelte | 1` is the drop
+ * table's row, which dropped its `tabindex="0"` and its Enter/Space handler: a focusable
+ * `role="row"` is a non-form element `KeyboardManager#hasFocus` cannot see, and the keyboard path
+ * is the component cell's own `<button>` in both its branches.
+ *
+ * The two remaining gathering rows — `GatheringTaskDrops` and `GatheringRealmsTab` — are issue
+ * 1512's SECOND phase and are deliberately not banked here: a phase that banks another phase's
+ * rows reds `assertRatchet` at its own commit boundary.
  */
 export const KNOWN_ROLE_FOCUS_TARGETS = knownDebt('roleFocusTargets');
 
 /** @see KNOWN_ROLE_FOCUS_TARGETS */
-export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 17;
+export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 11;
 
 /**
  * A `<button>` outside any `<form>` that does not declare `data-keyboard-focus`, keyed `file`.
@@ -758,9 +803,23 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * colour levels are a ramp no chip tone states - so it declares the attribute in place and is
  * absent from these rows for that reason rather than for the other one.
  *
+ * 231 -> 226 with issue 1512, across four files, two SHRINKING and two VANISHING, and every one
+ * paid by CONVERSION. `recipe/RecipeResultGroupCard.svelte` VANISHES: its two raw buttons were the
+ * progressive stage rocker's chevrons, and the rocker is `SortableList`'s pair of `IconButton`s
+ * now, each of which declares the attribute itself. `components/RowDisclosure.svelte` VANISHES for
+ * the plainer reason — it declares the attribute in place, which it had to before it could be the
+ * opener of a list row inside a Foundry window. `GatheringTaskEditView` 7 -> 6 and `CheckTriggers`
+ * 2 -> 1: the drop table's component cell and the trigger card's header disclosure each declare it
+ * in place, because each is the keyboard path for a row whose own focus target this change removed
+ * or whose whole header is the button.
+ *
+ * The `GatheringTaskEditView` figure is MEASURED rather than predicted: the change's own plan
+ * expected 7 -> 5, on a reading in which the empty and populated component cells were two separate
+ * buttons. They are ONE button with two branches of content, so one slot closes rather than two.
+ *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 231;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 226;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.

@@ -84,29 +84,35 @@ const FIXTURE = `
              lists, so these roles are pinned to the numbers component-studio-font-size.js
              already commits for the salvage row — the design source — NOT read off this
              markup. If the two ever disagree, the sharing has broken. -->
-        <div class="manager-recipe-result-row is-reorderable">
-          <span class="manager-recipe-stage-grip" data-m="stage-grip"><i class="fas fa-grip-vertical"></i></span>
-          <span class="manager-recipe-stage-ordinal" data-m="stage-ordinal">1</span>
-          <div class="manager-recipe-ingredient-option-row">
-            <div class="manager-recipe-option-target">
-              <div class="manager-recipe-option-component">
-                <span class="fabricate-picker manager-travel-picker manager-recipe-component-picker">
-                  <button class="fabricate-button manager-button manager-recipe-component-trigger manager-recipe-stage-trigger" data-m="stage-picker">
-                    <img class="manager-travel-portrait" alt="">
-                    <span class="manager-recipe-stage-trigger-name" data-m="stage-picker-name">Mountain Herb</span>
-                  </button>
-                </span>
+        <ul class="fabricate-sortable-list">
+          <li class="fabricate-sortable-list-row manager-recipe-stage-row">
+            <div class="fabricate-sortable-list-line">
+              <button type="button" class="fabricate-icon-button manager-icon-button fabricate-sortable-list-grip" data-sortable-grip="res-1" data-keyboard-focus="true" aria-label="Reorder Mountain Herb"><i class="fas fa-grip-vertical" data-m="stage-grip"></i></button>
+              <span class="fabricate-sortable-list-ordinal" data-m="stage-ordinal">1</span>
+              <div class="fabricate-sortable-list-content">
+                <div class="manager-recipe-ingredient-option-row">
+                  <div class="manager-recipe-option-target">
+                    <div class="manager-recipe-option-component">
+                      <span class="fabricate-picker manager-travel-picker manager-recipe-component-picker">
+                        <button class="fabricate-button manager-button manager-recipe-component-trigger manager-recipe-stage-trigger" data-m="stage-picker">
+                          <img class="manager-travel-portrait" alt="">
+                          <span class="manager-recipe-stage-trigger-name" data-m="stage-picker-name">Mountain Herb</span>
+                        </button>
+                      </span>
+                    </div>
+                  </div>
+                  <div class="manager-recipe-option-controls">
+                    <span class="manager-recipe-stage-dc" data-m="stage-dc">DC 12</span>
+                    <button class="manager-recipe-stage-edit" data-m="stage-edit"><span>Edit</span><i class="fas fa-arrow-up-right-from-square"></i></button>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div class="manager-recipe-option-controls">
-              <span class="manager-recipe-stage-dc" data-m="stage-dc">DC 12</span>
-              <button class="manager-recipe-stage-edit" data-m="stage-edit"><span>Edit</span><i class="fas fa-arrow-up-right-from-square"></i></button>
-              <span class="manager-recipe-stage-reorder">
-                <button class="manager-recipe-stage-move" data-m="stage-move"><i class="fas fa-chevron-up"></i></button>
+              <span class="fabricate-sortable-list-rocker">
+                <button type="button" class="fabricate-icon-button manager-icon-button fabricate-sortable-list-move" data-sortable-move="up" data-keyboard-focus="true" aria-label="Move Mountain Herb up"><i class="fas fa-chevron-up" data-m="stage-move"></i></button>
               </span>
             </div>
-          </div>
-        </div>
+          </li>
+        </ul>
         <!-- The Validation tab's aggregate header (issue 676), rehomed from the deleted
              context rail. Pinned to the rail's OWN committed values — the design source —
              not read off the rehomed markup: a gate authored from the implementation
@@ -376,13 +382,22 @@ const EXPECTED = {
   // stage row already commits in component-studio-font-size.test.js: the two rows are
   // the same surface and SHARE their CSS rules, so a divergence here means the sharing
   // broke, not that this row wants its own scale.
-  'stage-grip': 11.2, // 0.7rem — shared .manager-salvage-stage-grip rule
-  'stage-ordinal': 10.88, // 0.68rem mono — shared with salvage's order badge
+  // UNMOVED at issue 1512, and deliberately: the grip is the shared ordered list's `IconButton`
+  // now, and the family restates the glyph's 0.7rem so it does not fall back to the icon button's
+  // own 14px — which is the Foundry app base, the one value that means "the rule stopped
+  // applying". The pin is still SHARED with the salvage row: both studios draw the same control,
+  // which is what the joined rule existed to guarantee and what the primitive guarantees
+  // structurally.
+  'stage-grip': 11.2, // 0.7rem — the shared grip glyph
+  // MOVED with the badge itself: the specimen's 10px, where both studios drew 0.68rem.
+  'stage-ordinal': 10, // 10px mono — the specimen's order badge
   'stage-picker': 13.12, // 0.82rem — the picker trigger, as salvage's measures
   'stage-picker-name': 13.12, // the name inside the trigger reads at the trigger's size
   'stage-dc': 13, // 0.8125rem mono 700 — shared read-only DC
   'stage-edit': 13, // 0.8125rem — deliberately identical to stage-dc, as on salvage
-  'stage-move': 10.88, // 0.68rem — the reorder chevron glyph
+  // MOVED with the rocker: the specimen draws two 24x24 hit areas with a 9px glyph, where both
+  // studios drew a 30x18 pair at 0.68rem. The target GREW and the glyph inside it shrank.
+  'stage-move': 9, // 9px — the specimen's rocker chevron
   // ── The Validation tab's aggregate header (issue 676). Every value is the one the
   // deleted RecipeContextRail committed for the same roles; the rehome changed the
   // layout, not the type scale.

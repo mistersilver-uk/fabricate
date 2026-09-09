@@ -354,7 +354,22 @@ describe('environment composition editor structure', () => {
         'region, because the script above it names the role in prose explaining the conversion'
     );
     assert.ok(/const showEventRankControls = \$derived\(\s*kind === 'event' && eventSelectionMode === 'highestRankedDrop'\s*\)/.test(listSource), 'event rank controls are gated by the highest-ranked system rule');
-    assert.ok(listSource.includes('draggable={showEventRankControls ? true : undefined}'), 'reorder drag is enabled only when event rank controls are active');
+    // OVERTURNED AND REWRITTEN (issue 1512). This pinned the literal
+    // `draggable={showEventRankControls ? true : undefined}` in this component's own markup. The
+    // included list renders through `SortableList` now, so the `draggable` attribute is the
+    // PRIMITIVE'S — a source pin on it here would be pinning a string the component no longer
+    // contains, and re-adding it would mean re-hand-rolling the drag source. What the pin was
+    // FOR is unchanged and is stated against the prop that carries it: the list orders only under
+    // the highest-ranked-drop rule, and a list declared non-reorderable draws no drag source, no
+    // grip and no rocker at all.
+    assert.ok(
+      listSource.includes('reorderable={showEventRankControls}'),
+      'reorder is enabled only when event rank controls are active'
+    );
+    assert.ok(
+      !listSource.split('</script>')[1].includes('draggable='),
+      'and the component hand-rolls no drag source of its own beside it'
+    );
     assert.ok(!tasksTabSource.includes('data-composition-mode-select'), 'composition mode is set globally on the overview tab, not per-tab');
   });
 

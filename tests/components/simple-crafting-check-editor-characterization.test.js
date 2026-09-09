@@ -85,6 +85,11 @@ const harness = createMountedComponentHarness({
     // extended by its `dashed` role now (issue 1096). Manifest only.
     'src/ui/svelte/components/ManagerButton.svelte',
     'src/ui/svelte/components/IconButton.svelte',
+    // THE ORDERED ROW and the disclosure it renders (issue 1512). Both are LEAVES TWO RUNGS
+    // DOWN of this tree, so a `.svelte` the tree renders but this list omits HANGS the suite
+    // (`# cancelled`) rather than failing it.
+    'src/ui/svelte/components/RowDisclosure.svelte',
+    'src/ui/svelte/components/SortableList.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/apps/manager/checks/CheckDcMacroCard.svelte',

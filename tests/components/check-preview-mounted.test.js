@@ -37,6 +37,10 @@ const harness = createMountedComponentHarness({
   ],
   compiledModules: [
     'src/ui/svelte/components/IconButton.svelte',
+    // THE ORDERED ROW and the disclosure it renders (issue 1512). Both are LEAVES TWO RUNGS
+    // DOWN of this tree, so a `.svelte` the tree renders but this list omits HANGS the suite
+    // (`# cancelled`) rather than failing it.
+    'src/ui/svelte/components/SortableList.svelte',
     ...CHECKS_TREE_COMPILED_MODULES,
     'src/ui/svelte/components/ItemDropZone.svelte',
     'src/ui/svelte/apps/manager/SegmentedControl.svelte',

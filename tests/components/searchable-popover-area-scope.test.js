@@ -1053,6 +1053,64 @@ const PRIMITIVES = Object.freeze([
       Object.freeze({ anchor: 'manager-availability-multi', root: 'fabricate-pill-select' }),
     ]),
   }),
+  Object.freeze({
+    // ── SORTABLELIST (issue 1512). The ordered row, and the FIRST entry in this array whose family
+    // was rooted ON ARRIVAL rather than re-rooted from a manager one. There is no
+    // `manager-*` generation to name: the component was written with its whole family in
+    // `styles/fabricate.css` under the class it emits on its own `<ul>`, which is what the rooting
+    // requirement asks of a new shared primitive rather than something it had to be moved into.
+    //
+    // `namespacedFamily`, on `Select`'s precedent: every class this component writes carries the
+    // `fabricate-` prefix, so the family PATTERN is itself the namespace test and a class added to
+    // the family later cannot quietly fall outside this gate. The eight literals below are still
+    // enumerated in `roots`, because the emission clause proves the component still WRITES each
+    // one and a pattern proves nothing about emission.
+    name: 'SortableList',
+    components: Object.freeze(['src/ui/svelte/components/SortableList.svelte']),
+    roots: Object.freeze([
+      'fabricate-sortable-list',
+      'fabricate-sortable-list-row',
+      'fabricate-sortable-list-line',
+      'fabricate-sortable-list-content',
+      'fabricate-sortable-list-ordinal',
+      'fabricate-sortable-list-grip',
+      'fabricate-sortable-list-rocker',
+      'fabricate-sortable-list-move',
+      'fabricate-sortable-list-remove',
+      'fabricate-sortable-list-body',
+    ]),
+    // `IconButton`'s root, which this primitive COMPOSES rather than writes: the grip and the two
+    // rocker chevrons are `IconButton`s, and their family rules are compounds on that root because
+    // `.fabricate-icon-button.manager-icon-button` is (0,2,0) and pins a 34px box that a bare
+    // family class cannot out-rank. Cross-checked against that entry's own `roots` below, so
+    // renaming one there reds here instead of silently exempting a class.
+    inheritedRoots: Object.freeze(['fabricate-icon-button']),
+    namespacedFamily: true,
+    family: 'fabricate-sortable-list[\\w-]*',
+    anchors: Object.freeze([
+      'fabricate-sortable-list',
+      'fabricate-sortable-list-row',
+      'fabricate-sortable-list-line',
+      'fabricate-sortable-list-body',
+    ]),
+    // Measured at this commit: 10 written, 18 family selectors, 18 owned — 0 exempt and 0
+    // caller-CLASS compounds. That the three counts agree is what a family rooted ON ARRIVAL looks
+    // like: no caller container names it, because no caller wrote it before the primitive did.
+    writtenFloor: 9,
+    familyFloor: 16,
+    ownedFloor: 16,
+    // THE PAIRS ARE COMPOUNDS, not ancestries, because this clause reads ONE element's class
+    // attribute. The row's own root sits on the `<ul>` above it, which no per-element pair can
+    // express; the two rules that DO compound are the grip and the rocker chevron, each of which
+    // is painted by `.fabricate-icon-button.<family class>` and would measure the icon button's
+    // own 34px default in a fixture that wrote the family class alone. Three fixtures copy this
+    // row's markup — the two studio font-size gates and the manager layout gate — and each writes
+    // both halves.
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'fabricate-sortable-list-grip', root: 'fabricate-icon-button' }),
+      Object.freeze({ anchor: 'fabricate-sortable-list-move', root: 'fabricate-icon-button' }),
+    ]),
+  }),
 ]);
 
 const read = (file) => readFileSync(join(repoRoot, file), 'utf8');
@@ -1700,10 +1758,12 @@ test('a composed root is another primitive’s, and both new exemptions stay ent
   }
   assert.equal(
     inheritedChecked,
-    2,
-    `${inheritedChecked} inherited roots were resolved against their owner, against the two ` +
-      '`Select` declares. A different number means an entry gained or lost a composed root ' +
-      'without this clause being read.'
+    3,
+    `${inheritedChecked} inherited roots were resolved against their owner, against the three ` +
+      'this table declares: `Select`s two picker roots, and `SortableList`s one at issue 1512 — ' +
+      'the icon button it composes for the grip and the two rocker chevrons, whose family rules ' +
+      'have to compound on that root to out-rank its own (0,2,0) box. A different number means ' +
+      'an entry gained or lost a composed root without this clause being read.'
   );
 
   const select = PRIMITIVES.find((entry) => entry.name === 'Select');
