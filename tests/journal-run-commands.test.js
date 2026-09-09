@@ -3,9 +3,11 @@ import { describe, it } from 'node:test';
 
 import {
   JOURNAL_RUN_SOCKET_KIND,
+  createJournalExecutionReconstructor,
   createGatheringJournalRunOperations,
   journalRunDismissalKey,
   createJournalRunCommandService,
+  executePublicCraft,
   installCraftingJournalRunAuthority,
   installGatheringJournalRunAuthority,
 } from '../src/systems/journalRunCommands.js';
@@ -69,6 +71,73 @@ function commandHarness({
 }
 
 describe('journal run command protocol', () => {
+  it('defaults new public crafts to v1 while preserving a persisted legacy continuation', async () => {
+    const calls = [];
+    const engine = {
+      craft: async (...args) => (calls.push(args), { success: true }),
+    };
+    const runManager = {
+      getActiveRun: (_actor, runId) => runId === 'legacy-run'
+        ? { id: runId, status: 'inProgress' }
+        : null,
+    };
+    const actor = { id: 'actor' };
+    const recipe = { id: 'recipe' };
+
+    await executePublicCraft({ engine, runManager, actor, sourceActors: [actor], recipe });
+    await executePublicCraft({
+      engine,
+      runManager,
+      actor,
+      sourceActors: [actor],
+      recipe,
+      options: { lifecycleVersion: 0 },
+    });
+    await executePublicCraft({
+      engine,
+      runManager,
+      actor,
+      sourceActors: [actor],
+      recipe,
+      options: { runId: 'legacy-run' },
+    });
+
+    assert.equal(calls[0][4].lifecycleVersion, 1);
+    assert.equal(calls[1][4].lifecycleVersion, 1, 'callers cannot opt a new run out of v1');
+    assert.equal(Object.hasOwn(calls[2][4], 'lifecycleVersion'), false);
+  });
+
+  it('composes both persisted managers into one fail-closed reconstruction callback', async () => {
+    const scopes = [];
+    const reconstruct = createJournalExecutionReconstructor({
+      getCraftingRunManager: () => ({
+        reconstructVersionedExecutions: async (scope) => (
+          scopes.push(['crafting', scope]), { success: true, reconstructed: 1 }
+        ),
+      }),
+      getGatheringRunManager: () => ({
+        reconstructVersionedExecutions: async (scope) => (
+          scopes.push(['gathering', scope]), { success: true, reconstructed: 2 }
+        ),
+      }),
+    });
+
+    const response = await reconstruct({ operationId: 'operation-1', orphaned: false });
+    assert.equal(response.success, true);
+    assert.deepEqual(scopes, [
+      ['crafting', { operationId: 'operation-1', orphaned: false }],
+      ['gathering', { operationId: 'operation-1', orphaned: false }],
+    ]);
+    const unavailable = createJournalExecutionReconstructor({
+      getCraftingRunManager: () => ({}),
+      getGatheringRunManager: () => ({}),
+    });
+    assert.deepEqual(await unavailable({ orphaned: true }), {
+      success: false,
+      reason: 'reconstruction-unavailable',
+    });
+  });
+
   it('installs exact crafting and gathering request adapters on the current engines', async () => {
     const commands = [];
     const service = {
@@ -404,6 +473,31 @@ describe('journal run command protocol', () => {
     assert.equal(denied.response.reason, 'owner-required');
   });
 
+  it('passes the attested sender to a current-lifecycle start operation', async () => {
+    let startArgs = null;
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      operations: {
+        crafting: {
+          start: async (args) => (startArgs = args, { success: true, runId: 'new-run' }),
+        },
+      },
+    });
+
+    const response = await service.executeJournalRunCommand({
+      actorUuid: 'Actor.a',
+      runType: 'crafting',
+      runId: '',
+      expectedRevision: 0,
+      action: 'start',
+      payload: { recipeId: 'recipe' },
+    });
+
+    assert.equal(response.success, true);
+    assert.equal(startArgs.sender.id, 'gm');
+    assert.equal(startArgs.senderId, 'gm');
+  });
+
   it('lets only the elected GM tab answer a broadcast request', async () => {
     const { service, emitted } = commandHarness({ currentUserId: 'player' });
     const result = await service.handleSocketMessage(
@@ -424,29 +518,31 @@ describe('journal run command protocol', () => {
   });
 
   it('keeps a losing elected-GM tab silent so it cannot outrun the claim winner', async () => {
-    const { service, emitted } = commandHarness({
-      currentUserId: 'gm',
-      authority: {
-        availability: () => ({ available: false, reason: 'claim-held' }),
-        run: async () => ({ success: false, reason: 'claim-held' }),
-        consumeExecutionGrant: () => null,
-      },
-    });
-    const result = await service.handleSocketMessage(
-      {
-        kind: JOURNAL_RUN_SOCKET_KIND.REQUEST,
-        requestId: 'r1',
-        sessionId: 's1',
-        actorUuid: 'Actor.a',
-        runType: 'crafting',
-        runId: 'run-1',
-        expectedRevision: 3,
-        action: 'execute',
-      },
-      'player'
-    );
-    assert.equal(result, null);
-    assert.deepEqual(emitted, []);
+    for (const reason of ['claim-held', 'recovery-pending']) {
+      const { service, emitted } = commandHarness({
+        currentUserId: 'gm',
+        authority: {
+          availability: () => ({ available: false, reason }),
+          run: async () => ({ success: false, reason }),
+          consumeExecutionGrant: () => null,
+        },
+      });
+      const result = await service.handleSocketMessage(
+        {
+          kind: JOURNAL_RUN_SOCKET_KIND.REQUEST,
+          requestId: 'r1',
+          sessionId: 's1',
+          actorUuid: 'Actor.a',
+          runType: 'crafting',
+          runId: 'run-1',
+          expectedRevision: 3,
+          action: 'execute',
+        },
+        'player'
+      );
+      assert.equal(result, null);
+      assert.deepEqual(emitted, []);
+    }
   });
 
   it('rejects stale revision before invoking an operation', async () => {
@@ -629,6 +725,86 @@ describe('journal run command protocol', () => {
     assert.deepEqual(posted, { serializedRoll: { formula: '1d20', total: 17 } });
   });
 
+  it('drops a visible roll handoff when post-commit entitlement is lost', async () => {
+    let entitled = true;
+    let posts = 0;
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      run,
+      promptCheck: async () => ({ confirmed: true }),
+      postRollHandoff: async () => { posts += 1; },
+      operations: {
+        crafting: {
+          getRun: () => run,
+          describeCheck: async () => ({
+            required: true,
+            publicPrompt: { label: 'Known recipe' },
+            privateEvaluation: { recipeId: 'recipe', rollFormula: '1d20' },
+          }),
+          evaluateCheck: async () => ({
+            engineEvaluated: true,
+            success: true,
+            data: {},
+            rollHandoff: { serializedRoll: { formula: '1d20', total: 14 } },
+          }),
+          execute: async () => {
+            entitled = false;
+            return { success: true, runId: run.id, runRevision: 4 };
+          },
+          authorizeRollHandoff: async () => entitled,
+        },
+      },
+    });
+
+    const response = await service.executeJournalRunCommand({
+      actorUuid: 'Actor.a',
+      runType: 'crafting',
+      runId: run.id,
+      expectedRevision: 3,
+      action: 'execute',
+    });
+    assert.equal(Object.hasOwn(response, 'rollHandoff'), false);
+    assert.equal(posts, 0);
+  });
+
+  it('returns a visible roll only when post-commit entitlement remains', async () => {
+    let posts = 0;
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      run,
+      promptCheck: async () => ({ confirmed: true }),
+      postRollHandoff: async () => { posts += 1; },
+      operations: {
+        crafting: {
+          getRun: () => run,
+          describeCheck: async () => ({
+            required: true,
+            publicPrompt: { label: 'Known recipe' },
+            privateEvaluation: { recipeId: 'recipe', rollFormula: '1d20' },
+          }),
+          evaluateCheck: async () => ({
+            engineEvaluated: true,
+            success: true,
+            data: {},
+            rollHandoff: { serializedRoll: { formula: '1d20', total: 14 } },
+          }),
+          execute: async () => ({ success: true, runId: run.id, runRevision: 4 }),
+          authorizeRollHandoff: async () => true,
+        },
+      },
+    });
+    await service.executeJournalRunCommand({
+      actorUuid: 'Actor.a',
+      runType: 'crafting',
+      runId: run.id,
+      expectedRevision: 3,
+      action: 'execute',
+    });
+    assert.equal(posts, 1);
+  });
+
   it('releases a prepared check on local dismissal without invoking the mutation', async () => {
     let releases = 0;
     let mutations = 0;
@@ -667,6 +843,7 @@ describe('journal run command protocol', () => {
 
   it('returns a sanitized secret-check reply without live results or roll details', async () => {
     let posts = 0;
+    let postCommitAuthorizations = 0;
     const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
     const { service } = commandHarness({
       currentUserId: 'gm',
@@ -695,6 +872,7 @@ describe('journal run command protocol', () => {
             disposition: 'hidden-tier',
             results: [{ uuid: 'Item.secret', update() {} }],
           }),
+          authorizeRollHandoff: async () => (++postCommitAuthorizations, true),
         },
       },
     });
@@ -714,6 +892,11 @@ describe('journal run command protocol', () => {
       reason: null,
     });
     assert.equal(posts, 0);
+    assert.equal(
+      postCommitAuthorizations,
+      0,
+      'a check evaluated as secret stays secret even if visibility is gained during execution'
+    );
   });
 
   it('accepts replies only from the elected GM for this recipient/session/correlation', async () => {

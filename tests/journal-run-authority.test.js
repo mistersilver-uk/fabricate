@@ -13,7 +13,12 @@ function sharedAuthorityWorld() {
   let nextId = 0;
   let currentTime = 1000;
 
-  const realm = (userId = 'gm') =>
+  const realm = (
+    userId = 'gm',
+    {
+      reconstructExecutions = async () => ({ success: true, reconstructed: 0 }),
+    } = {}
+  ) =>
     createJournalRunAuthority({
       currentUser: () => ({ id: userId, isGM: userId === 'gm' }),
       activeGM: () => ({ id: 'gm', active: true, isGM: true }),
@@ -42,6 +47,7 @@ function sharedAuthorityWorld() {
       },
       randomId: () => `id-${++nextId}`,
       now: () => currentTime,
+      reconstructExecutions,
     });
 
   return {
@@ -114,6 +120,7 @@ describe('journal run authority ledger', () => {
     let activeGmId = 'gm';
     let claim = null;
     let handlerCalls = 0;
+    let changeElectionOnClaim = false;
     const ledger = { id: 'ledger', state: { version: 1, requests: {}, prepareTokens: {} } };
     const authority = createJournalRunAuthority({
       currentUser: () => ({ id: 'gm', isGM: true }),
@@ -124,7 +131,7 @@ describe('journal run authority ledger', () => {
       writeState: async (_entry, state) => { ledger.state = structuredClone(state); },
       createClaim: async (_entry, source) => {
         claim = { id: JOURNAL_RUN_CLAIM_PAGE_ID, ...source };
-        activeGmId = 'replacement-gm';
+        if (changeElectionOnClaim) activeGmId = 'replacement-gm';
         return claim;
       },
       readClaim: async () => claim,
@@ -133,8 +140,11 @@ describe('journal run authority ledger', () => {
         claim = null;
         return true;
       },
+      reconstructExecutions: async () => ({ success: true, reconstructed: 0 }),
       randomId: () => 'claim-id',
     });
+    assert.equal((await authority.bootstrapRecovery()).success, true);
+    changeElectionOnClaim = true;
 
     const response = await authority.run(
       { requestId: 'changed-election', senderId: 'player', sessionId: 'one' },
@@ -144,7 +154,7 @@ describe('journal run authority ledger', () => {
     assert.deepEqual(response, { success: false, reason: 'active-gm-required' });
     assert.equal(handlerCalls, 0);
     assert.equal(claim, null);
-    assert.deepEqual(ledger.state.requests, {});
+    assert.equal(Object.hasOwn(ledger.state.requests, 'changed-election'), false);
   });
 
   it('returns a durable settled response for duplicate delivery without replay', async () => {
@@ -201,6 +211,112 @@ describe('journal run authority ledger', () => {
     assert.equal((await authority.reconcile({ claimId, disposition: 'abandoned' })).success, true);
     assert.equal(world.ledger.claim, null);
     assert.equal(world.ledger.state.requests.uncertain.status, 'abandoned');
+  });
+
+  it('boot reconstruction scans orphaned journals only under a newly acquired claim', async () => {
+    const world = sharedAuthorityWorld();
+    const scopes = [];
+    const authority = world.realm('gm', {
+      reconstructExecutions: async (scope) => {
+        scopes.push(scope);
+        return { success: true, reconstructed: 2 };
+      },
+    });
+    await authority.setup();
+
+    assert.deepEqual(scopes, [{ operationId: null, orphaned: true }]);
+    assert.equal(world.ledger.claim, null);
+    assert.deepEqual(authority.availability(), { available: true, reason: null });
+  });
+
+  it('ordinary observation and a retained claim never trigger orphan reconstruction', async () => {
+    const world = sharedAuthorityWorld();
+    let reconstructions = 0;
+    const authority = world.realm('gm', {
+      reconstructExecutions: async () => (++reconstructions, { success: true }),
+    });
+    await authority.setup();
+    reconstructions = 0;
+    const player = world.realm('player', {
+      reconstructExecutions: async () => (++reconstructions, { success: true }),
+    });
+    assert.deepEqual(await player.bootstrapRecovery(), { available: true, reason: null });
+    assert.equal(reconstructions, 0);
+    world.ledger.claim = {
+      id: JOURNAL_RUN_CLAIM_PAGE_ID,
+      claimId: 'live-claim',
+      requestId: 'live-operation',
+    };
+
+    assert.equal((await authority.refreshAvailability()).reason, 'claim-held');
+    assert.equal((await authority.bootstrapRecovery()).reason, 'claim-held');
+    assert.equal((await player.bootstrapRecovery()).reason, 'claim-held');
+    assert.equal(reconstructions, 0);
+    assert.equal(world.ledger.claim.claimId, 'live-claim');
+  });
+
+  it('reconstructs the retained operation before reconciliation releases its claim', async () => {
+    const world = sharedAuthorityWorld();
+    const events = [];
+    const authority = world.realm('gm', {
+      reconstructExecutions: async (scope) => {
+        events.push(['reconstruct', scope]);
+        return { success: true, reconstructed: 1 };
+      },
+    });
+    await authority.setup();
+    events.length = 0;
+    world.ledger.claim = {
+      id: JOURNAL_RUN_CLAIM_PAGE_ID,
+      claimId: 'retained',
+      requestId: 'operation-7',
+    };
+    world.ledger.state.requests['operation-7'] = {
+      status: 'recoveryRequired',
+      operationId: 'operation-7',
+      claimId: 'retained',
+    };
+    const releaseStart = world.log.length;
+
+    assert.equal((await authority.reconcile({
+      claimId: 'retained',
+      disposition: 'reconciled',
+    })).success, true);
+    const release = world.log.slice(releaseStart).find(([kind]) => kind === 'release');
+    assert.deepEqual(events, [[
+      'reconstruct',
+      { operationId: 'operation-7', orphaned: false },
+    ]]);
+    assert.ok(release, 'the claim is released after reconstruction succeeds');
+  });
+
+  it('retains the reconciliation claim when reconstruction persistence is uncertain', async () => {
+    const world = sharedAuthorityWorld();
+    let reconstructionFails = false;
+    const authority = world.realm('gm', {
+      reconstructExecutions: async () =>
+        reconstructionFails
+          ? { success: false, reason: 'persist-failed' }
+          : { success: true, reconstructed: 0 },
+    });
+    await authority.setup();
+    reconstructionFails = true;
+    world.ledger.claim = {
+      id: JOURNAL_RUN_CLAIM_PAGE_ID,
+      claimId: 'retained',
+      requestId: 'operation-8',
+    };
+
+    const response = await authority.reconcile({
+      claimId: 'retained',
+      disposition: 'abandoned',
+    });
+    assert.deepEqual(response, {
+      success: false,
+      reason: 'reconstruction-failed',
+      claimId: 'retained',
+    });
+    assert.equal(world.ledger.claim.claimId, 'retained');
   });
 
   it('persists one-use prepare tokens and refuses release, replay, expiry, and binding mismatch', async () => {
