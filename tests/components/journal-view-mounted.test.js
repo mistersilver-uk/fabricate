@@ -182,6 +182,7 @@ describe('JournalView mounted behavior', () => {
     assert.ok(!finishedList.querySelector('[data-journal-list-scroll]').contains(finishedList.querySelector('[data-pagination]')));
     assert.equal(target.querySelectorAll('.journal-list-footer .manager-pagination').length, 2);
     assert.ok(target.querySelector('[data-journal-list="active"] [data-pagination-page]'));
+    assert.ok(target.querySelector('[data-journal-list="finished"] [data-pagination-page]'));
     assert.ok(target.querySelector('[data-journal-detail]'));
     assert.ok(target.querySelector('[data-journal-time-remaining]'));
     assert.equal(target.querySelectorAll('[data-journal-summary-card]').length, 2);
@@ -556,6 +557,27 @@ describe('JournalView mounted behavior', () => {
     assert.ok(!target.querySelector('[data-journal-time-remaining]'));
     assert.equal(target.querySelectorAll('[data-journal-summary-card]').length, 2);
     assert.match(target.querySelector('[data-journal-summary-card="check"]').textContent, /NoCheck|No check/u);
+    const guidance = target.querySelector('[data-journal-guidance]').textContent;
+    assert.match(guidance, /no check.*finish crafting to complete/iu);
+    assert.doesNotMatch(guidance, /roll/iu);
+  });
+
+  it('describes current gathering as manually resolved while preserving legacy guidance', async () => {
+    const current = makeGatheringRun({ lifecycleContract: 'current', lifecycleVersion: 1 });
+    const { store } = makeJournal({ selectedRun: current, selectedRunKey: current.key });
+    const currentTarget = await harness.mount({ services: makeServices(store) });
+    const currentGuidance = currentTarget.querySelector('[data-journal-guidance]').textContent;
+    assert.match(currentGuidance, /available action to resolve/iu);
+    assert.doesNotMatch(currentGuidance, /resolves automatically/iu);
+
+    harness.remount();
+    const legacy = makeGatheringRun();
+    const { store: legacyStore } = makeJournal({ selectedRun: legacy, selectedRunKey: legacy.key });
+    const legacyTarget = await harness.mount({ services: makeServices(legacyStore) });
+    assert.match(
+      legacyTarget.querySelector('[data-journal-guidance]').textContent,
+      /resolves automatically/iu
+    );
   });
 
   it('freezes paused time and reads summary facts from the stage being viewed', async () => {
