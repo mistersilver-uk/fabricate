@@ -33,39 +33,13 @@ import InventoryFilters from '../../../src/ui/svelte/apps/inventory/InventoryFil
 import InventorySystemSelector from '../../../src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte';
 import JournalListShell from '../../../src/ui/svelte/apps/journal/JournalListShell.svelte';
 import Select from '../../../src/ui/svelte/components/Select.svelte';
+import { installFixtureI18n, mountCaptionShape } from '../select-fixture-shared.js';
 
 const params = new URLSearchParams(globalThis.location.search);
 const subject = params.get('subject') ?? 'span';
 const startValue = params.get('value') ?? '';
 
-/**
- * `game.i18n`, backed by the REAL `lang/en.json`.
- *
- * Not decoration: `localize` returns the KEY when no `game` is present, and every width this
- * fixture reports is a text measurement. A trigger reading
- * `FABRICATE.App.Inventory.Filters.SortQuantity` is three times the width of one reading
- * "Quantity", so a fixture without this would measure its own stub rather than the product.
- */
-function lookup(key) {
-  return String(key)
-    .split('.')
-    .reduce((node, part) => (node == null ? undefined : node[part]), en);
-}
-
-globalThis.game = {
-  i18n: {
-    localize(key) {
-      const value = lookup(key);
-      return typeof value === 'string' ? value : key;
-    },
-    format(key, data = {}) {
-      const template = this.localize(key);
-      return template.replace(/\{(\w+)\}/g, (whole, name) =>
-        Object.hasOwn(data, name) ? String(data[name]) : whole
-      );
-    },
-  },
-};
+installFixtureI18n(en);
 
 const frame = document.createElement('div');
 frame.className = 'fabricate fabricate-app';
@@ -110,56 +84,21 @@ const JOURNAL_SORTS = [
   { value: 'oldest', label: 'Oldest' },
 ];
 
-/** One option set for the three caption SHAPES, so all three measure the same control. */
-const SHAPE_OPTIONS = [
-  { value: 'newest', label: 'Newest' },
-  { value: 'oldest', label: 'Oldest' },
-];
-
 /**
- * The three caption shapes, built around the same `Select`.
- *
- * `label` and `span` are hosted by fixture markup because that is exactly the difference under
- * test — the wrapper element — and the wrapper is what the conversion changed at all six call
- * sites. `field` is the primitive's own shipped form and is built by the component itself.
+ * The three caption shapes around one bare `Select`, hosted the way the journal's sort row hosts
+ * its control (the wrapper and caption classes are the difference under test).
  *
  * @returns {void}
  */
 function mountShape() {
-  if (subject === 'field') {
-    mount(Select, {
-      target: mountPoint,
-      props: {
-        size: 'inline',
-        label: 'Sort',
-        value: startValue || 'newest',
-        options: SHAPE_OPTIONS,
-        triggerData: { 'data-fixture-select': '' },
-        onChange: () => {},
-      },
-    });
-    return;
-  }
-
-  const wrapper = document.createElement(subject === 'label' ? 'label' : 'span');
-  wrapper.className = 'journal-sort fixture-wrapper';
-  const caption = document.createElement('span');
-  caption.className = 'journal-sort-label fixture-caption';
-  caption.id = 'fixture-caption';
-  caption.textContent = 'Sort';
-  wrapper.append(caption);
-  mountPoint.append(wrapper);
-
-  mount(Select, {
-    target: wrapper,
-    props: {
-      size: 'inline',
-      value: startValue || 'newest',
-      options: SHAPE_OPTIONS,
-      ariaLabelledBy: 'fixture-caption',
-      triggerData: { 'data-fixture-select': '' },
-      onChange: () => {},
-    },
+  mountCaptionShape({
+    mount,
+    Select,
+    mountPoint,
+    subject,
+    startValue,
+    wrapperClass: 'journal-sort fixture-wrapper',
+    captionClass: 'journal-sort-label fixture-caption',
   });
 }
 
