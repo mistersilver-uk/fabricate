@@ -121,6 +121,7 @@ export function makeGatheringRun(overrides = {}) {
     finishedAt: null,
     structureLabel: '',
     resolutionModeLabel: '',
+    gatheringYield: null,
     recipeId: null,
     taskId: 'task-1',
     flavor: '',
