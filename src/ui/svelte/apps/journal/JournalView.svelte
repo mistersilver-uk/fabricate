@@ -1,57 +1,76 @@
 <!-- Svelte 5 runes mode -->
-<!--
-  JournalView is the player Journal tab content. It reads the shared
-  services.journal store (so the nav badge in the shell and this view share one
-  reactive run state) and renders one of: loading, error, no-actor empty, or the
-  populated 3-column layout.
-
-  The grid is cloned from GatheringView: a container-query 3-column layout
-  (minmax(280px,1fr) / 1.5fr / 1fr) that reflows to a single column when its
-  content box is 960px or narrower. Left column = active runs + history; centre =
-  the selected run's detail; right column (mockup order) = about this run → what to expect →
-  recent results → tips. World-time guidance lives in the Tips card.
-
-  This view HOSTS the re-fetch effects (so the store stays Foundry-global-free):
-  an actor-selection change re-loads; a scene change quietly re-loads; a
-  world-time change quietly re-loads AND ticks (recomputing countdowns/progress).
-  The shell also registers world-time/scene refreshes so the badge stays fresh
-  while the tab is closed; the duplicate quiet loads are harmless.
--->
 <script>
   import { localize, subscribeSceneChange, subscribeWorldTime } from '../../util/foundryBridge.js';
+  import Field from '../../components/Field.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import Notice from '../../components/Notice.svelte';
+  import Select from '../../components/Select.svelte';
+  import SegmentedControl from '../manager/SegmentedControl.svelte';
+  import EmptyState from '../manager/EmptyState.svelte';
+  import PlayerViewState from '../PlayerViewState.svelte';
   import ActiveRunsList from './ActiveRunsList.svelte';
   import HistoryList from './HistoryList.svelte';
   import RunDetail from './RunDetail.svelte';
-  import RecentResults from './RecentResults.svelte';
-  import AboutThisRun from './AboutThisRun.svelte';
-  import WhatToExpect from './WhatToExpect.svelte';
-  import JournalTips from './JournalTips.svelte';
-  import PlayerViewState from '../PlayerViewState.svelte';
 
   let { services = null } = $props();
-
   const journal = $derived(services?.journal ?? null);
-
   const loading = $derived(journal?.loading === true);
   const error = $derived(journal?.error === true);
   const hasActor = $derived(Boolean(journal?.listing?.selectedActorId));
   const now = $derived(Number(journal?.worldTime ?? 0));
-
-  const activeRuns = $derived(Array.isArray(journal?.activeRuns) ? journal.activeRuns : []);
-  const historyPageItems = $derived(
+  const activeRuns = $derived(
+    Array.isArray(journal?.activePageItems)
+      ? journal.activePageItems
+      : Array.isArray(journal?.activeRuns)
+        ? journal.activeRuns
+        : []
+  );
+  const historyRuns = $derived(
     Array.isArray(journal?.historyPageItems) ? journal.historyPageItems : []
   );
-  const recentTerminalRuns = $derived(
-    Array.isArray(journal?.recentTerminalRuns) ? journal.recentTerminalRuns : []
-  );
   const selectedRun = $derived(journal?.selectedRun ?? null);
-  const selectedRunId = $derived(String(journal?.selectedRunId ?? ''));
-  const expectRunType = $derived(String(selectedRun?.runType ?? 'crafting'));
+  const selectedRunKey = $derived(
+    String(journal?.selectedRunKey ?? selectedRun?.key ?? journal?.selectedRunId ?? '')
+  );
+  const counts = $derived(
+    journal?.activeCounts ?? {
+      all: journal?.activeCount ?? activeRuns.length,
+      ready: 0,
+      waiting: 0,
+      paused: 0,
+    }
+  );
 
-  // The three branches this view can reach, in priority order, handed to the shared composition
-  // as data. The third is a NO-ACTOR state spelled `empty`, which is the hook the smoke locators
-  // and `journal-view-mounted` already read — the value is data, not a description, so it is
-  // forwarded exactly as written rather than renamed to match the condition.
+  const kindOptions = $derived([
+    { value: 'all', label: localize('FABRICATE.App.Journal.Filters.Kind.All') },
+    { value: 'crafting', label: localize('FABRICATE.App.Journal.Filters.Kind.Crafting') },
+    { value: 'gathering', label: localize('FABRICATE.App.Journal.Filters.Kind.Gathering') },
+    { value: 'salvage', label: localize('FABRICATE.App.Journal.Filters.Kind.Salvage') },
+    { value: 'alchemy', label: localize('FABRICATE.App.Journal.Filters.Kind.Alchemy') },
+  ]);
+  const statusOptions = $derived([
+    {
+      value: 'all',
+      fallback: localize('FABRICATE.App.Journal.Filters.Status.All'),
+      badge: counts.all ?? 0,
+    },
+    {
+      value: 'ready',
+      fallback: localize('FABRICATE.App.Journal.Filters.Status.Ready'),
+      badge: counts.ready ?? 0,
+    },
+    {
+      value: 'waiting',
+      fallback: localize('FABRICATE.App.Journal.Filters.Status.Waiting'),
+      badge: counts.waiting ?? 0,
+    },
+    {
+      value: 'paused',
+      fallback: localize('FABRICATE.App.Journal.Filters.Status.Paused'),
+      badge: counts.paused ?? 0,
+    },
+  ]);
+
   const viewStates = $derived([
     {
       when: loading,
@@ -60,14 +79,6 @@
       value: 'loading',
       icon: 'fas fa-spinner fa-spin',
       message: localize('FABRICATE.App.Journal.Loading'),
-    },
-    {
-      when: error,
-      kind: 'error',
-      hook: 'data-journal-state',
-      value: 'error',
-      icon: 'fas fa-triangle-exclamation',
-      message: localize('FABRICATE.App.Journal.Error'),
     },
     {
       when: !hasActor,
@@ -79,28 +90,11 @@
     },
   ]);
 
-  function selectRun(id) {
-    journal?.select?.(id);
-  }
-  function viewFullHistory() {
-    journal?.setHistoryPage?.(0);
-    const first = (Array.isArray(journal?.historyPageItems) ? journal.historyPageItems : [])[0];
-    if (first?.id) journal?.select?.(first.id);
-  }
-
-  // Re-fetch on mount and whenever the shared selected actor changes.
   $effect(() => {
     void services?.actorBar?.selectedActorId;
     journal?.load?.();
   });
-
-  // Scene-linked availability can change when the player navigates scenes; quietly
-  // re-fetch on a canvas redraw without flashing the spinner.
   $effect(() => subscribeSceneChange(() => journal?.load?.(true)));
-
-  // World time only advances on the synced updateWorldTime hook (no per-second
-  // core hook): quietly re-fetch and tick so countdowns/progress/readiness
-  // recompute. READ-only refresh — no side effects published here.
   $effect(() =>
     subscribeWorldTime(() => {
       journal?.load?.(true);
@@ -109,121 +103,192 @@
   );
 </script>
 
-<PlayerViewState branches={viewStates}>
-  <div class="journal-view-container">
-    <div class="journal-view-grid" data-journal-state="populated">
-      <div class="journal-view-column journal-view-column-left">
-        <ActiveRunsList
-          runs={activeRuns}
-          {selectedRunId}
-          {now}
-          onSelect={selectRun}
-          sort={journal?.activeSort ?? 'soonestReady'}
-          onSortChange={(value) => journal?.setActiveSort?.(value)}
-        />
-        <HistoryList
-          runs={historyPageItems}
-          totalCount={Number(journal?.historyCount ?? 0)}
-          pageIndex={Number(journal?.historyPage ?? 0)}
-          pageSize={Number(journal?.historyPageSize ?? 6)}
-          pageSizeOptions={journal?.historyPageSizes ?? [6, 12, 25]}
-          onPageChange={(index) => journal?.setHistoryPage?.(index)}
-          onPageSizeChange={(size) => journal?.setHistoryPageSize?.(size)}
-          {selectedRunId}
-          onSelect={selectRun}
-          {now}
-          sort={journal?.historySort ?? 'newest'}
-          onSortChange={(value) => journal?.setHistorySort?.(value)}
-        />
-      </div>
-      <section class="journal-view-column journal-view-column-center" data-journal-detail>
-        <RunDetail run={selectedRun} {now} {services} />
-      </section>
-      <div class="journal-view-column journal-view-column-right">
-        {#if selectedRun}
-          <AboutThisRun run={selectedRun} {services} />
-          <WhatToExpect runType={expectRunType} multiStep={selectedRun?.multiStep === true} />
-        {/if}
-        <RecentResults runs={recentTerminalRuns} onViewFullHistory={viewFullHistory} />
-        <JournalTips />
+{#if error}
+  <div class="journal-error-state" data-journal-state="error">
+    <Notice
+      tone="danger"
+      title={localize('FABRICATE.App.Journal.Error')}
+      action={{ label: localize('FABRICATE.App.Journal.Retry'), onClick: () => journal?.load?.() }}
+    />
+  </div>
+{:else}
+  <PlayerViewState branches={viewStates}>
+    <div class="journal-view-container" data-journal-state="populated">
+      <div class="journal-view-grid">
+        <aside class="journal-browse" aria-label={localize('FABRICATE.App.Journal.Browse.Label')}>
+          <div class="journal-browse-controls">
+            <Field as="div" class="journal-search-field">
+              <span>{localize('FABRICATE.App.Journal.Filters.SearchKicker')}</span>
+              <ManagerSearchField
+                size="38"
+                value={journal?.search ?? ''}
+                onInput={(value) => journal?.setSearch?.(value)}
+                placeholder={localize('FABRICATE.App.Journal.Filters.SearchPlaceholder')}
+                ariaLabel={localize('FABRICATE.App.Journal.Filters.SearchLabel')}
+                data-journal-search
+              />
+            </Field>
+            <Field as="div" class="journal-kind-field">
+              <span>{localize('FABRICATE.App.Journal.Filters.Kind.Label')}</span>
+              <Select
+                size="form"
+                value={journal?.kindFilter ?? 'all'}
+                options={kindOptions}
+                ariaLabel={localize('FABRICATE.App.Journal.Filters.Kind.Label')}
+                triggerData={{ 'data-journal-kind-filter': true }}
+                onChange={(value) => journal?.setKindFilter?.(value)}
+              />
+            </Field>
+          </div>
+          <SegmentedControl
+            options={statusOptions}
+            value={journal?.activeStatusFilter ?? 'all'}
+            onChange={(value) => journal?.setActiveStatusFilter?.(value)}
+            groupName="journal-active-status"
+            ariaLabel={localize('FABRICATE.App.Journal.Filters.Status.Label')}
+            dataAttr="data-journal-status-filter"
+            fill
+          />
+
+          <div class="journal-browse-lists">
+            <ActiveRunsList
+              runs={activeRuns}
+              totalCount={journal?.activeCount ?? activeRuns.length}
+              {selectedRunKey}
+              onSelect={(run) => journal?.select?.(run)}
+              {now}
+              sort={journal?.activeSort ?? 'soonestReady'}
+              onSortChange={(value) => journal?.setActiveSort?.(value)}
+              pageIndex={journal?.activePage ?? 0}
+              pageSize={journal?.activePageSize ?? 4}
+              pageSizeOptions={journal?.pageSizes ?? [4, 6, 12, 25]}
+              onPageChange={(value) => journal?.setActivePage?.(value)}
+              onPageSizeChange={(value) => journal?.setActivePageSize?.(value)}
+            />
+            <HistoryList
+              runs={historyRuns}
+              totalCount={journal?.historyCount ?? historyRuns.length}
+              pageIndex={journal?.historyPage ?? 0}
+              pageSize={journal?.historyPageSize ?? 4}
+              pageSizeOptions={journal?.historyPageSizes ?? journal?.pageSizes ?? [4, 6, 12, 25]}
+              onPageChange={(value) => journal?.setHistoryPage?.(value)}
+              onPageSizeChange={(value) => journal?.setHistoryPageSize?.(value)}
+              {selectedRunKey}
+              onSelect={(run) => journal?.select?.(run)}
+              onDismiss={(run) => journal?.dismiss?.(run)}
+              sort={journal?.historySort ?? 'newest'}
+              onSortChange={(value) => journal?.setHistorySort?.(value)}
+              {now}
+              secondsPerDay={services?.getWorldTimeComponents?.(now)?.secondsPerDay ?? 86400}
+            />
+          </div>
+        </aside>
+
+        <main class="journal-detail-pane">
+          {#if selectedRun}
+            <RunDetail run={selectedRun} {journal} {now} {services} />
+          {:else}
+            <EmptyState
+              icon="fas fa-book-open"
+              title={localize('FABRICATE.App.Journal.Empty.Detail')}
+              dataAttr="data-journal-empty"
+              dataValue="detail"
+            />
+          {/if}
+        </main>
       </div>
     </div>
-  </div>
-</PlayerViewState>
+  </PlayerViewState>
+{/if}
 
 <style>
-  /* Container-query layout cloned from GatheringView: the wrapper is the size
-     container so the columns reflow against the Fabricate window width (the app
-     is resizable/dockable, so a viewport media query would be wrong). */
   .journal-view-container {
-    container-type: inline-size;
-    container-name: fabricate-journal;
-    display: flex;
-    flex-direction: column;
+    container: fabricate-journal / inline-size;
+    height: 100%;
+    min-height: 0;
+    background: var(--fab-surface);
+  }
+
+  .journal-error-state {
+    display: grid;
+    height: 100%;
+    padding: var(--fab-space-4);
+    place-items: center;
+    background: var(--fab-surface);
+  }
+  .journal-view-grid {
+    display: grid;
+    grid-template-columns: minmax(310px, 0.72fr) minmax(0, 1.8fr);
     height: 100%;
     min-height: 0;
   }
-
-  .journal-view-grid {
-    display: grid;
-    grid-template-columns: minmax(280px, 1fr) minmax(280px, 1.5fr) minmax(280px, 1fr);
-    gap: var(--fab-space-4);
-    flex: 1 1 auto;
+  .journal-browse {
+    display: flex;
+    min-width: 0;
     min-height: 0;
-    padding: var(--fab-space-4);
-    box-sizing: border-box;
+    flex-direction: column;
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-3);
+    border-right: 1px solid var(--fab-border);
+    background: var(--fab-bg-1);
+  }
+  .journal-browse-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 138px;
+    align-items: end;
+    gap: var(--fab-space-2);
+  }
+  :global(.journal-search-field),
+  :global(.journal-kind-field) {
+    min-width: 0;
+  }
+  .journal-browse-lists {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    min-height: 0;
+    flex: 1 1 auto;
+    gap: var(--fab-space-3);
+  }
+  .journal-detail-pane {
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
     background: var(--fab-surface);
-    color: var(--fab-text);
+  }
+  .journal-detail-pane > :global(.manager-empty) {
+    min-height: 100%;
   }
 
-  /* At the supported 1024px window floor this container's content box is roughly
-     938px wide, so the shared 960px boundary is deliberately reachable.
-     Below the combined three-column minimum the grid reflows into a single
-     vertical stack so the view stays usable on a narrow window. */
   @container fabricate-journal (max-width: 960px) {
     .journal-view-grid {
       grid-template-columns: 1fr;
-      grid-auto-rows: minmax(min-content, max-content);
       height: auto;
-      min-height: 100%;
-      overflow-y: auto;
     }
-
-    /* The desktop rules below share their selectors. Keep the narrow declarations
-       more specific so the 220px minimum and left-header visibility survive the
-       normal `min-height: 0` / `overflow: hidden` flex defaults. */
-    .journal-view-grid .journal-view-column {
+    .journal-browse {
+      display: contents;
+    }
+    .journal-browse-controls,
+    .journal-browse > :global(.manager-segmented) {
+      margin: var(--fab-space-3) var(--fab-space-3) 0;
+    }
+    .journal-browse-lists {
+      display: contents;
+    }
+    .journal-browse-lists > :global(.journal-list-section) {
       min-height: 220px;
+      max-height: 360px;
+      padding: var(--fab-space-3);
+      border-bottom: 1px solid var(--fab-border);
     }
-
-    /* The stacked grid owns vertical scrolling. The desktop left pane clips its
-       two equal-height list bodies, but retaining that clip here can hide the
-       first list header beneath the player bar before either body scrolls. */
-    .journal-view-grid .journal-view-column-left {
+    .journal-detail-pane {
+      min-height: 220px;
       overflow: visible;
     }
   }
 
-  .journal-view-column {
-    min-width: 0;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-3);
-    overflow-y: auto;
-  }
-
-  /* The left column hosts two equal-height list halves (Active Runs / History);
-     it must not scroll as a whole — each half scrolls internally — so the 50/50
-     split holds instead of the sections collapsing. */
-  .journal-view-column-left {
-    overflow: hidden;
-  }
-
-  .journal-view-column-center {
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    overflow: hidden;
+  @container fabricate-journal (max-width: 560px) {
+    .journal-browse-controls {
+      grid-template-columns: 1fr;
+    }
   }
 </style>
