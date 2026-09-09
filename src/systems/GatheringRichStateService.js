@@ -452,8 +452,9 @@ export class GatheringRichStateService {
    * @param {object} [options.system] Crafting system.
    * @param {number} [options.gatheringModifier] Fallback gathering modifier value.
    * @param {number} [options.eventModifier] Fallback event modifier value.
-   * @returns {Promise<object>} Resolution payload (status, items, events,
-   *   eventPolicy, characterModifierSnapshot, [diagnostics]).
+   * @returns {Promise<object>} Resolution payload (status, roll, itemRows, items,
+   *   events, eventPolicy, characterModifierSnapshot, [diagnostics]). `itemRows`
+   *   retains every evaluated row; `items` remains the reward-selected subset.
    */
   async resolveD100Attempt({
     task,
@@ -509,6 +510,8 @@ export class GatheringRichStateService {
     if (diagnostics.length > 0) {
       return {
         status: 'misconfigured',
+        roll: null,
+        itemRows: [],
         items: [],
         events: [],
         eventPolicy: null,
@@ -550,6 +553,8 @@ export class GatheringRichStateService {
 
     return {
       status: eventResolution.status === 'failed' ? 'failed' : 'succeeded',
+      roll: itemRoll.roll,
+      itemRows: itemRoll.itemRows,
       items: itemRoll.selectedItems,
       events: eventResolution.events,
       eventPolicy: eventResolution.eventPolicy,
@@ -622,22 +627,23 @@ export class GatheringRichStateService {
 
     const conditions = environment?.conditions || {};
     const biomes = Array.isArray(environment?.biomes) ? environment.biomes : [];
-    const droppedItems = rowContributions
-      .map((entry, index) =>
-        rollDropRow({
-          row: entry.row,
-          index,
-          roll: attemptRoll,
-          modifier,
-          conditions,
-          biomes,
-          biomeAggregation: rules.biomeModifierAggregation,
-          dropModifierMode: rules.dropModifierMode,
-          characterModifierContributions: entry.contributions,
-        })
-      )
-      .filter((result) => result.dropped);
+    const itemRows = rowContributions.map((entry, index) =>
+      rollDropRow({
+        row: entry.row,
+        index,
+        roll: attemptRoll,
+        modifier,
+        conditions,
+        biomes,
+        biomeAggregation: rules.biomeModifierAggregation,
+        dropModifierMode: rules.dropModifierMode,
+        characterModifierContributions: entry.contributions,
+      })
+    );
+    const droppedItems = itemRows.filter((result) => result.dropped);
     return {
+      roll: attemptRoll,
+      itemRows,
       selectedItems: selectDrops(droppedItems, rules.rewardSelectionMode, rules.rewardLimit),
       attemptRollMessage,
     };
