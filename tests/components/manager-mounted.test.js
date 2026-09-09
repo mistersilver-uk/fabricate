@@ -24800,6 +24800,7 @@ describe('CraftingSystemManager mounted behavior', () => {
 
   it('renders the Required Tools picker in the gathering task editor and adds/removes references', async () => {
     const calls = [];
+    const toolLabel = 'Pickaxe — ' + 'exceptionally long required tool name '.repeat(12);
     target = document.createElement('div');
     document.body.appendChild(target);
     mounted = mount(Component, {
@@ -24809,7 +24810,7 @@ describe('CraftingSystemManager mounted behavior', () => {
           gatheringLibraryTools: [
             {
               id: 'tool-pickaxe',
-              label: 'Pickaxe',
+              label: toolLabel,
               enabled: true,
               componentId: 'c1',
               requirement: null,
@@ -24855,6 +24856,19 @@ describe('CraftingSystemManager mounted behavior', () => {
       'tool-pickaxe'
     );
     assert.ok(attached[0].textContent.includes('Pickaxe'));
+    assert.ok(attached[0].classList.contains('is-truncated'));
+    assert.equal(attached[0].getAttribute('title'), toolLabel.trim());
+    const toolContent = attached[0].querySelector('.manager-required-tool-content');
+    assert.ok(toolContent, 'the thumbnail and name share one shrinkable row');
+    assert.equal(toolContent.querySelector('img').getAttribute('alt'), '');
+    assert.equal(
+      toolContent.querySelector('.manager-required-tool-name').textContent,
+      toolLabel.trim()
+    );
+    assert.equal(
+      attached[0].querySelector('[data-chip-remove]').getAttribute('aria-label'),
+      `Remove ${toolLabel.trim()} from required tools`
+    );
 
     const resultCards = section.querySelectorAll('[data-gathering-task-required-tools-card]');
     assert.equal(resultCards.length, 1);
@@ -24890,6 +24904,10 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(
       afterRemovePills[0].getAttribute('data-gathering-task-required-tool-pill'),
       'tool-lantern'
+    );
+    assert.ok(
+      document.activeElement === afterRemovePills[0].querySelector('[data-chip-remove]'),
+      'removing the long-label member hands focus to the remaining remover'
     );
 
     target.querySelector('.manager-header-actions .manager-button.is-primary').click();
@@ -25221,6 +25239,53 @@ describe('CraftingSystemManager mounted behavior', () => {
     await settleSaveAttempt();
     setInputValue(target.querySelector('[data-gathering-event-field="name"]'), 'Bramble Snare');
     await settleSaveAttempt();
+  }
+
+  for (const [kind, openEditor] of [
+    ['task', openDirtyGatheringTaskEditor],
+    ['event', openDirtyGatheringEventEditor],
+  ]) {
+    it(`${kind} availability restores field-sized empties after pointer and keyboard selection`, async () => {
+      await openEditor([], {});
+      for (const field of ['biomes', 'timeOfDay', 'weather']) {
+        const host = target.querySelector(`[data-gathering-${kind}-field="${field}"]`);
+        const trigger = host.querySelector('.manager-condition-menu-button');
+        const pillSelector = `[data-gathering-${kind}-availability-pill="${field}"]`;
+        for (const remover of host.querySelectorAll(`${pillSelector} [data-chip-remove]`)) {
+          remover.click();
+          await settleSaveAttempt();
+        }
+        for (const keyboard of [false, true]) {
+          assert.ok(host.querySelector('.manager-empty.is-inline.is-field'), `${field} starts empty`);
+          trigger.click();
+          await settleSaveAttempt();
+          if (keyboard) {
+            trigger.dispatchEvent(
+              new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true })
+            );
+            await settleSaveAttempt();
+            trigger.dispatchEvent(
+              new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+            );
+          } else {
+            document
+              .querySelector(`[data-gathering-${kind}-availability-option="${field}"]`)
+              .click();
+          }
+          await settleSaveAttempt();
+          assert.ok(!host.querySelector('.manager-empty'), 'selection replaces the placeholder');
+          const remover = host.querySelector(`${pillSelector} [data-chip-remove]`);
+          assert.ok(remover, 'the selected condition has an accessible removal action');
+          assert.ok(remover.getAttribute('aria-label'));
+          remover.focus();
+          remover.click();
+          await settleSaveAttempt();
+          assert.ok(!host.querySelector(pillSelector));
+          assert.ok(host.querySelector('.manager-empty.is-inline.is-field'));
+          assert.ok(document.activeElement === trigger, 'last removal returns focus to the dropdown');
+        }
+      }
+    });
   }
 
   // Every destination this guard walks is a WORLD route since issue 1282 — Parties, Downtime
@@ -30027,4 +30092,3 @@ describe('CraftingSystemManager mounted behavior', () => {
     });
   });
 });
-

@@ -1088,7 +1088,7 @@
                   >
                 {/each}
               {:else}
-                <EmptyState inline hint={emptyAvailabilityLabel(kind)} />
+                <EmptyState inline field hint={emptyAvailabilityLabel(kind)} />
               {/if}
             </div>
             <p class="visually-hidden" aria-live="polite" data-gathering-task-availability-status>
@@ -1612,6 +1612,8 @@
                   tone="warning"
                   class="manager-required-tool-pill"
                   removable
+                  truncate
+                  title={toolDisplayLabel(entry.tool)}
                   removeLabel={text(
                     'FABRICATE.Admin.Manager.Environment.Tasks.RemoveToolFromTask',
                     'Remove {name} from required tools'
@@ -1619,12 +1621,14 @@
                   onRemove={() => onRemoveToolReference(entry.id)}
                   data-gathering-task-required-tool-pill={entry.id}
                 >
-                  <img
-                    class="manager-required-tool-thumb"
-                    src={toolDisplayImage(entry.tool)}
-                    alt=""
-                  />
-                  <span>{toolDisplayLabel(entry.tool)}</span>
+                  <span class="manager-required-tool-content">
+                    <img
+                      class="manager-required-tool-thumb"
+                      src={toolDisplayImage(entry.tool)}
+                      alt=""
+                    />
+                    <span class="manager-required-tool-name">{toolDisplayLabel(entry.tool)}</span>
+                  </span>
                 </Chip>
               {:else}
                 <Chip
@@ -2304,6 +2308,26 @@
 </main>
 
 <style>
+  .manager-required-tool-content {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fab-space-chip);
+    max-width: 100%;
+    min-width: 0;
+    vertical-align: middle;
+  }
+
+  .manager-required-tool-thumb {
+    flex: 0 0 18px;
+  }
+
+  .manager-required-tool-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* Card chrome matching the other task-editor cards. */
   .manager-task-stamina-card,
   .manager-task-nodes-card,

@@ -728,6 +728,10 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'manager-systems-empty',
     'world-tool-entry-on-break-repair-tag-picker-empty',
     'world-tool-catalogue-filtered-empty',
+    'manager-gathering-task-availability-feedback-normal',
+    'manager-gathering-task-availability-feedback-narrow',
+    'manager-gathering-event-availability-feedback-normal',
+    'manager-gathering-event-availability-feedback-narrow',
   ]),
   // BOTH parties pickers, because between them they are the primitive's two modes and
   // neither renders the other's chrome. `inlineSearchTrigger` (the actor picker) replaces
@@ -8880,6 +8884,72 @@ export const VIEW_LAB_CASES = Object.freeze([
       ].map((target) => ({ container: '[data-gathering-task-nodes]', target })),
       kinds: ['manager', 'environments', 'responsive'],
       sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/GatheringTaskEditView\.svelte$/],
+    })
+  ),
+  ...[
+    { suffix: 'normal', width: 1280, height: 820 },
+    { suffix: 'narrow', width: 1000, height: 720 },
+  ].flatMap(({ suffix, width, height }) =>
+    ['task-availability', 'task-tools', 'event-availability'].map((state) => {
+      const kind = state.startsWith('task') ? 'task' : 'event';
+      const tools = state === 'task-tools';
+      const availability = `[data-gathering-${kind}-availability]`;
+      const toolPill = '[data-gathering-task-required-tool-pill="hb-tool-mortar"]';
+      const toolCard = '[data-gathering-task-required-tools-card="hb-tool-mortar"]';
+      const focus = tools ? '[data-gathering-task-required-tools-attached]' : availability;
+      const emptyFields = ['biomes', 'timeOfDay', 'weather'].map(
+        (field) => `[data-gathering-${kind}-availability-pills="${field}"] .manager-empty.is-field`
+      );
+      return managerCase({
+        id: `manager-gathering-${state}-feedback-${suffix}`,
+        label: `Manager — Gathering ${state} feedback ${suffix}`,
+        reaches: 'beyond',
+        smokeLabels: [],
+        query: { system: 'lab-herbalism' },
+        position: { width, height },
+        steps: [
+          'Gathering',
+          { selector: `#manager-gathering-nav-${kind === 'task' ? 'tasks' : 'encounters'}` },
+          {
+            selector:
+              `[data-gathering-${kind}-id="${kind === 'task' ? 'hb-task-slowbloom' : 'hb-event-wolves'}"]` +
+              ' .manager-icon-button[aria-label^="Edit"]',
+          },
+          ...(kind === 'task'
+            ? [
+                { selector: '[data-gathering-task-availability-pill="biomes"] [data-chip-remove]' },
+                { selector: toolCard },
+                { selector: `${toolPill} [data-chip-remove]`, press: 'Space' },
+                { selector: toolCard, press: 'Enter' },
+              ]
+            : []),
+          ...['biomes', 'timeOfDay', 'weather'].flatMap((field) => [
+            {
+              selector: `[data-gathering-${kind}-field="${field}"] .manager-condition-menu-button`,
+            },
+            { selector: `[data-gathering-${kind}-availability-option="${field}"]`, press: 'Enter' },
+            {
+              selector: `[data-gathering-${kind}-availability-pill="${field}"] [data-chip-remove]`,
+              press: 'Space',
+            },
+          ]),
+          { selector: focus, scroll: true },
+        ],
+        expectView: `gathering-${kind}-edit`,
+        expectSelector:
+          `.fabricate-manager${emptyFields.map((selector) => `:has(${selector})`).join('')}` +
+          (kind === 'task' ? `:has(${toolPill} img)` : ''),
+        expectVisible: focus,
+        expectCenterHit: tools ? `${toolPill} [data-chip-remove]` : null,
+        expectNoHorizontalOverflow: focus,
+        expectContained: (tools ? [toolPill, `${toolPill} [data-chip-remove]`] : emptyFields).map(
+          (target) => ({ container: '.manager-main', target })
+        ),
+        kinds: ['manager', 'environments', 'responsive'],
+        sourceMatches: [
+          /^src\/ui\/svelte\/apps\/manager\/Gathering(TaskEditView|EventEditView)\.svelte$/,
+        ],
+      });
     })
   ),
   managerCase({

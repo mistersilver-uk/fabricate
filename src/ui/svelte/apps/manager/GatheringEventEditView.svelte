@@ -435,7 +435,7 @@
                   >
                 {/each}
               {:else}
-                <EmptyState inline hint={emptyAvailabilityLabel(kind)} />
+                <EmptyState inline field hint={emptyAvailabilityLabel(kind)} />
               {/if}
             </div>
             <p class="visually-hidden" aria-live="polite" data-gathering-event-availability-status>

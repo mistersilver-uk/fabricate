@@ -1156,6 +1156,46 @@ test('resource-node interval evidence reaches over-time controls at both require
   }
 });
 
+test('gathering feedback evidence reaches selected tools and all-empty fields at both sizes', () => {
+  const selected = mapChangedFilesToCases([
+    'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+    'src/ui/svelte/apps/manager/GatheringEventEditView.svelte',
+  ]).map((entry) => entry.id);
+  const emptyStateCases = mapChangedFilesToCases([
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
+  ]).map((entry) => entry.id);
+  for (const [suffix, width, height] of [['normal', 1280, 820], ['narrow', 1000, 720]]) {
+    for (const state of ['task-availability', 'task-tools', 'event-availability']) {
+      const id = `manager-gathering-${state}-feedback-${suffix}`;
+      const viewCase = getCaseById(id);
+      const kind = state.startsWith('task') ? 'task' : 'event';
+      assert.ok(viewCase, id);
+      assert.ok(selected.includes(id));
+      if (state.endsWith('availability')) assert.ok(emptyStateCases.includes(id));
+      assert.deepEqual(viewCase.position, { width, height });
+      assert.equal(viewCase.expectView, `gathering-${kind}-edit`);
+      for (const field of ['biomes', 'timeOfDay', 'weather']) {
+        assert.ok(viewCase.expectSelector.includes(
+          `[data-gathering-${kind}-availability-pills="${field}"] .manager-empty.is-field`
+        ));
+        assert.ok(viewCase.steps.some((step) =>
+          step.selector === `[data-gathering-${kind}-availability-pill="${field}"] [data-chip-remove]` &&
+          step.press === 'Space'
+        ), `${id} must return ${field} to empty through keyboard removal`);
+      }
+      if (kind === 'task') {
+        assert.ok(viewCase.steps.some((step) =>
+          step.selector === '[data-gathering-task-required-tools-card="hb-tool-mortar"]' &&
+          step.press === 'Enter'
+        ), `${id} must actually select its required tool`);
+        assert.ok(viewCase.expectSelector.includes('[data-gathering-task-required-tool-pill="hb-tool-mortar"] img'));
+      }
+      assert.equal(viewCase.steps.at(-1).scroll, true);
+      assert.ok(viewCase.expectContained.length >= 2);
+    }
+  }
+});
+
 test('every combination-rule value the registry targets is a real MODIFIER_POLICIES member', () => {
   // Ten selectors in this registry pin a rule option by its VALUE, and NOTHING else could
   // see them go stale. The token check above strips attribute values before extracting

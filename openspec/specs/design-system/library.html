@@ -1128,6 +1128,8 @@ a{color:var(--fab-accent)}
           <div class="k-empty"><div class="k-hint" style="max-width:34ch">No recipes match <b style="color:var(--fab-text)">&ldquo;ingot&rdquo;</b> in this system.</div><button class="k-btn">Clear filters</button></div>
         </div>
         <span class="k-hint"><code>filtered</code> is a real prop: &ldquo;no results for this filter&rdquo; and &ldquo;nothing exists yet&rdquo; are different sentences with different actions. 42 shipped callers.</span></div>
+      <div class="unit"><span class="cap">EmptyState field API &mdash; opt-in geometry (issue 1649)</span>
+        <span class="k-hint"><code>field: boolean = false</code> sizes a short placeholder to <b>width 100% &middot; height 34px &middot; border-box</b>, with <code>--fab-space-1</code> vertical and <code>--fab-space-2</code> horizontal padding. Use <code>&lt;EmptyState inline field hint={localizedHint} /&gt;</code> beneath an availability dropdown. The existing inline typography, muted text and dashed non-interactive panel remain; ordinary inline, compact, note, filtered and hero panels retain their defaults. This documents the shipped field extension, not a promotion of the target hero specimen above.</span></div>
     </div>
     <div class="notes">
       <div><h5>The routing rule</h5><ul><li><b>Callout</b> — documentation. Always true, stays put.</li><li><b>Notice</b> — state. Just happened, goes away.</li><li><b>InfoStrip</b> — current values. Read-only facts in mono.</li><li><b>Empty</b> — nothing to show, and why.</li></ul></div>

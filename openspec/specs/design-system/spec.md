@@ -590,6 +590,20 @@ It joins a rule to a same-selector twin elsewhere in the same file, because the 
 - **AND** the banking entry states the rung that was rejected and why, or records that the tile already sits at its kind's published rung
 - **AND** the resize is left to the geometry sweep that owns the ladder
 
+### Requirement: Field-sized empty states match their associated controls
+
+`EmptyState` MUST offer an opt-in `field` presentation, defaulting to false, with full control width and a 34px border-box height using tokenized low padding.
+Gathering task and event editors MUST use it for empty Biome, Time of day and Weather selections, preserving the non-interactive dashed empty-state semantics and existing typography.
+Ordinary empty panels retain their existing geometry.
+Required-tool membership chips MUST keep their thumbnail and name on one row, ellipsize long names with the full label available, and retain a visible, accessible remove control.
+
+#### Scenario: A gathering availability selection is empty
+
+- **WHEN** a task or event has no selection for an availability field
+- **THEN** its empty placeholder matches the dropdown above in width and 34px height
+- **AND** selecting a condition replaces the placeholder with a removable membership chip
+- **AND** removing the last condition restores the field-sized placeholder
+
 ### Requirement: Every interactive primitive declares its full state set
 
 An interactive primitive MUST declare rest, hover, focus-visible and disabled, and MUST declare readonly, invalid, loading and empty wherever they apply.

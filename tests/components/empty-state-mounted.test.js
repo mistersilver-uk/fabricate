@@ -49,11 +49,14 @@ function authoredClasses(node) {
 
 /** The declaration body of one rule in the component's scoped `<style>` block. */
 function ruleBody(selector) {
-  const start = emptyStateSource.indexOf(`${selector} {`);
+  const styles = emptyStateSource
+    .slice(emptyStateSource.search(/^<style>$/m))
+    .replaceAll(/\/\*[\s\S]*?\*\//g, '');
+  const start = styles.indexOf(`\n  ${selector} {`);
   assert.notEqual(start, -1, `the scoped style block declares \`${selector}\``);
-  const open = emptyStateSource.indexOf('{', start);
-  const close = emptyStateSource.indexOf('}', open);
-  return emptyStateSource.slice(open + 1, close);
+  const open = styles.indexOf('{', start);
+  const close = styles.indexOf('}', open);
+  return styles.slice(open + 1, close);
 }
 
 describe('1286 EmptyState — variant contract', () => {
@@ -93,6 +96,7 @@ describe('1286 EmptyState — variant contract', () => {
       ['filtered', 'is-filtered'],
       ['inline', 'is-inline'],
       ['note', 'is-note'],
+      ['field', 'is-field'],
     ]) {
       const target = await harness.mount({ [prop]: true });
       assert.deepEqual(
@@ -115,6 +119,22 @@ describe('1286 EmptyState — variant contract', () => {
       'the context class survives so global placement rules still reach the panel'
     );
     assert.equal(panel.getAttribute('data-complications-empty'), 'true');
+    harness.remount();
+  });
+
+  it('field sizing composes with inline without introducing an interactive placeholder', async () => {
+    const target = await harness.mount({ inline: true, field: true, hint: 'Any Weather' });
+    const panel = panelOf(target);
+    assert.deepEqual(authoredClasses(panel), ['manager-empty', 'is-inline', 'is-field']);
+    assert.equal(panel.textContent.trim(), 'Any Weather');
+    assert.ok(!panel.hasAttribute('tabindex'));
+    assert.ok(!panel.hasAttribute('role'));
+    assert.equal(panel.querySelectorAll('button, input, select, a').length, 0);
+    const geometry = ruleBody('.manager-empty.is-field');
+    assert.match(geometry, /width:\s*100%/);
+    assert.match(geometry, /height:\s*34px/);
+    assert.match(geometry, /padding:\s*var\(--fab-space-1\) var\(--fab-space-2\)/);
+    assert.match(ruleBody('.manager-empty'), /box-sizing:\s*border-box/);
     harness.remount();
   });
 
