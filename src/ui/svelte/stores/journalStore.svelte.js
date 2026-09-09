@@ -1,83 +1,104 @@
-const HISTORY_PAGE_SIZES = Object.freeze([6, 12, 25]);
+const PAGE_SIZES = Object.freeze([4, 6, 12, 25]);
 const RECENT_TERMINAL_LIMIT = 3;
+const KIND_FILTERS = new Set(['all', 'crafting', 'alchemy', 'gathering', 'salvage']);
+const ACTIVE_STATUS_FILTERS = new Set(['all', 'ready', 'waiting', 'paused']);
 
 /**
- * journalStore — shared Svelte 5 runes store for the player-facing Journal
- * screen (active + terminal run monitoring, crafting "Trigger Next Step").
- *
- * Mirrors {@link createActorBarStore}: the factory is plain and never touches
- * Foundry globals (`game`/`ui`/`Hooks`). All data and side effects go through the
- * injected `services` bag (`listJournalForActor`, `advanceCraftingRun`,
- * `cancelCraftingRun`, `getWorldTime`, `getSelectedActorId`, `notify`), preserving the
- * presentational-component boundary. Re-fetch effects (actor change, scene
- * change, `updateWorldTime`) live in the hosting view, not here.
- *
- * Readiness is computed from `run.timeGate.availableAt <= getWorldTime()` — never
- * from `run.status` — because the engine flips matured `waitingTime` runs to
- * `inProgress` asynchronously off the same world-time hook. `worldTimeTick` is a
- * reactive nudge so the derived getters recompute when world time advances.
+ * Reactive state for the player Journal. Foundry reads and writes remain behind
+ * the injected service boundary so this module can be compiled and exercised as
+ * an ordinary Svelte store.
  *
  * @param {object} deps
- * @param {object} deps.services Injected services bag.
- * @returns {object} The reactive journal store.
+ * @param {object} deps.services
+ * @returns {object}
  */
 export function createJournalStore({ services } = {}) {
   let listing = $state(null);
   let loading = $state(false);
   let error = $state(false);
   let selectedRunId = $state('');
+  let selectedRunKey = $state('');
+  let search = $state('');
+  let kindFilter = $state('all');
+  let activeStatusFilter = $state('all');
   let activeSort = $state('soonestReady');
   let historySort = $state('newest');
+  let activePage = $state(0);
+  let activePageSize = $state(PAGE_SIZES[0]);
   let historyPage = $state(0);
-  let historyPageSize = $state(HISTORY_PAGE_SIZES[0]);
+  let historyPageSize = $state(PAGE_SIZES[0]);
   let busyRunId = $state('');
+  let busyRunKey = $state('');
   let worldTimeTick = $state(0);
   let loadedOnce = $state(false);
+  let viewedStageByRunKey = $state({});
 
   function worldTime() {
-    // Read the reactive tick so derived getters recompute on world-time change;
-    // the actual value comes from the (non-reactive) services seam.
     void worldTimeTick;
     return Number(services?.getWorldTime?.() ?? 0);
   }
 
+  const allActiveRuns = $derived.by(() => [...(listing?.activeRuns ?? [])]);
+  const allHistoryRuns = $derived.by(() => [...(listing?.history ?? [])]);
+  const kindActiveRuns = $derived.by(() => allActiveRuns.filter(matchesKind(kindFilter)));
+  const activeCounts = $derived.by(() => countActiveStatuses(kindActiveRuns));
+
   const activeRuns = $derived.by(() => {
-    const runs = [...(listing?.activeRuns ?? [])];
     const now = worldTime();
     const comparator =
-      activeSort === 'newest' ? compareNewest : (left, right) => compareSoonestReady(left, right, now);
-    return runs.sort(comparator);
+      activeSort === 'newest'
+        ? compareNewest
+        : (left, right) => compareSoonestReady(left, right, now);
+    return kindActiveRuns
+      .filter(matchesSearch(search))
+      .filter(matchesActiveStatus(activeStatusFilter))
+      .sort(comparator);
   });
 
-  const sortedHistory = $derived.by(() => {
-    const runs = [...(listing?.history ?? [])];
-    return runs.sort(historySort === 'oldest' ? compareOldestFinished : compareNewestFinished);
-  });
+  const sortedHistory = $derived.by(() =>
+    allHistoryRuns
+      .filter(matchesKind(kindFilter))
+      .filter(matchesSearch(search))
+      .sort(historySort === 'oldest' ? compareOldestFinished : compareNewestFinished)
+  );
 
+  const activePageItems = $derived.by(() => {
+    const start = activePage * activePageSize;
+    return activeRuns.slice(start, start + activePageSize);
+  });
   const historyPageItems = $derived.by(() => {
     const start = historyPage * historyPageSize;
     return sortedHistory.slice(start, start + historyPageSize);
   });
-
-  const recentTerminalRuns = $derived(sortedHistory.slice(0, RECENT_TERMINAL_LIMIT));
+  const recentTerminalRuns = $derived.by(() =>
+    [...allHistoryRuns].sort(compareNewestFinished).slice(0, RECENT_TERMINAL_LIMIT)
+  );
 
   const selectedRun = $derived.by(() => {
-    const active = activeRuns;
-    const history = sortedHistory;
-    const match = [...active, ...history].find((run) => run?.id === selectedRunId);
-    if (match) return match;
-    return active[0] ?? history[0] ?? null;
+    const all = [...allActiveRuns, ...allHistoryRuns];
+    const match = selectedRunKey
+      ? all.find((run) => runKey(run, listing) === selectedRunKey)
+      : all.find((run) => run?.id === selectedRunId);
+    return match ?? allActiveRuns[0] ?? allHistoryRuns[0] ?? null;
   });
 
+  const viewedStageIndex = $derived.by(() => {
+    const run = selectedRun;
+    if (!run) return null;
+    const key = runKey(run, listing);
+    const remembered = Number(viewedStageByRunKey[key]);
+    const current = Number(run.stepIndex);
+    const fallback = Number.isSafeInteger(current)
+      ? current
+      : Math.max(0, (run.steps?.length ?? 1) - 1);
+    return normalizeStageIndex(run, Number.isSafeInteger(remembered) ? remembered : fallback);
+  });
+  const viewedStage = $derived.by(() => {
+    if (viewedStageIndex === null) return null;
+    return selectedRun?.steps?.[viewedStageIndex] ?? null;
+  });
   const navCount = $derived(Number(listing?.counts?.active ?? 0));
 
-  /**
-   * Fetch the unified listing for the remembered actor. Sets `loading` unless
-   * `quiet` (a background refresh from a world-time / scene / advance event).
-   *
-   * @param {boolean} [quiet] Suppress the loading flag + error reset.
-   * @returns {Promise<void>}
-   */
   async function load(quiet = false) {
     if (!quiet) {
       loading = true;
@@ -89,6 +110,8 @@ export function createJournalStore({ services } = {}) {
       });
       listing = next ?? null;
       error = !next;
+      reconcileSelection();
+      clampPages();
     } catch {
       error = true;
     } finally {
@@ -97,12 +120,50 @@ export function createJournalStore({ services } = {}) {
     }
   }
 
-  function select(runId) {
-    selectedRunId = runId ?? '';
+  function reconcileSelection() {
+    if (!selectedRunKey && !selectedRunId) return;
+    const all = [...(listing?.activeRuns ?? []), ...(listing?.history ?? [])];
+    const exists = selectedRunKey
+      ? all.some((run) => runKey(run, listing) === selectedRunKey)
+      : all.some((run) => run?.id === selectedRunId);
+    if (exists) return;
+    selectedRunKey = '';
+    selectedRunId = '';
+  }
+
+  function clampPages() {
+    activePage = clampPage(activePage, activePageSize, activeRuns.length);
+    historyPage = clampPage(historyPage, historyPageSize, sortedHistory.length);
+  }
+
+  function select(runOrId, runType = null) {
+    const run = resolveRun(runOrId, runType, listing);
+    selectedRunId = run?.id ?? (typeof runOrId === 'string' ? runOrId : '');
+    selectedRunKey = run ? runKey(run, listing) : '';
+  }
+
+  function setSearch(next) {
+    search = String(next ?? '').trim();
+    activePage = 0;
+    historyPage = 0;
+  }
+
+  function setKindFilter(next) {
+    if (!KIND_FILTERS.has(next)) return;
+    kindFilter = next;
+    activePage = 0;
+    historyPage = 0;
+  }
+
+  function setActiveStatusFilter(next) {
+    if (!ACTIVE_STATUS_FILTERS.has(next)) return;
+    activeStatusFilter = next;
+    activePage = 0;
   }
 
   function setActiveSort(next) {
     if (next === 'soonestReady' || next === 'newest') activeSort = next;
+    activePage = 0;
   }
 
   function setHistorySort(next) {
@@ -110,96 +171,156 @@ export function createJournalStore({ services } = {}) {
     historyPage = 0;
   }
 
+  function setActivePage(next) {
+    activePage = clampPage(next, activePageSize, activeRuns.length);
+  }
+
   function setHistoryPage(next) {
-    const page = Math.max(0, Math.trunc(Number(next) || 0));
-    historyPage = page;
+    historyPage = clampPage(next, historyPageSize, sortedHistory.length);
+  }
+
+  function setActivePageSize(next) {
+    const size = Number(next);
+    if (!PAGE_SIZES.includes(size)) return;
+    activePageSize = size;
+    activePage = 0;
   }
 
   function setHistoryPageSize(next) {
     const size = Number(next);
-    if (HISTORY_PAGE_SIZES.includes(size)) {
-      historyPageSize = size;
-      historyPage = 0;
+    if (!PAGE_SIZES.includes(size)) return;
+    historyPageSize = size;
+    historyPage = 0;
+  }
+
+  function viewStage(run, index) {
+    if (!run) return;
+    viewedStageByRunKey[runKey(run, listing)] = normalizeStageIndex(run, index);
+  }
+
+  function returnToCurrentStage(run = selectedRun) {
+    if (!run) return;
+    const current = Number(run.stepIndex);
+    viewStage(run, Number.isSafeInteger(current) ? current : (run.steps?.length ?? 1) - 1);
+  }
+
+  async function execute(run, payload = { interactive: true }) {
+    if (run?.lifecycleContract === 'legacy' || !run?.lifecycleContract) {
+      return advanceLegacy(run);
+    }
+    return runCommand(run, 'execute', payload);
+  }
+
+  async function pause(run) {
+    return runCommand(run, 'pause', {});
+  }
+
+  async function resume(run) {
+    return runCommand(run, 'resume', {});
+  }
+
+  async function setCompletionMode(run, completionMode) {
+    return runCommand(run, 'setCompletionMode', { completionMode });
+  }
+
+  async function setSelection(run, selection) {
+    return runCommand(run, 'setSelection', selection ?? {});
+  }
+
+  async function runCommand(run, action, payload) {
+    if (
+      !run?.id ||
+      busyRunKey ||
+      run?.lifecycleContract !== 'current' ||
+      run?.actions?.[action] !== true
+    )
+      return;
+    busyRunId = run.id;
+    busyRunKey = runKey(run, listing);
+    try {
+      const result = await services?.executeJournalRunCommand?.({
+        actorUuid: run.actorUuid ?? listing?.selectedActorUuid ?? null,
+        runType: run.runType,
+        runId: run.id,
+        expectedRevision: normalizeRevision(run.runRevision),
+        action,
+        payload: payload ?? {},
+      });
+      if (result?.cancelled === true) return;
+      if (result?.message) services?.notify?.(result.message);
+      await load(true);
+    } catch (err) {
+      console.error(`Fabricate | Error running Journal ${action} command:`, err);
+      services?.notify?.(services?.craftErrorMessage?.() ?? '');
+      await load(true);
+    } finally {
+      busyRunId = '';
+      busyRunKey = '';
     }
   }
 
-  /**
-   * Advance a crafting run's current step. Guards re-entrancy via `busyRunId`,
-   * surfaces the engine result message, then quietly re-fetches so the run's new
-   * step / terminal state (and the selected-run fallback) reflect immediately.
-   *
-   * Threads the loaded listing's `selectedActorId` (the world-actor `.id` the
-   * runs are keyed to) so the Foundry edge can resolve the crafting actor via
-   * `game.actors.get` — without it the advance always returns NeedsOwner. The
-   * recipe is resolved from the persisted run at the Foundry edge, so nothing is
-   * sent from here: a redacted run carries no `recipeId` to send (issue 966).
-   *
-   * A throw MUST be caught and surfaced (issue 966). Without it the rejection is
-   * unhandled inside the click handler: no notification, no refresh, no state
-   * change — a button that visibly does nothing. Mirrors craftingStore.craft.
-   *
-   * @param {object} run The crafting RunModel to advance.
-   * @returns {Promise<void>}
-   */
-  async function advance(run) {
-    if (!run?.id || busyRunId) return;
+  async function advanceLegacy(run) {
+    if (!run?.id || busyRunKey) return;
     busyRunId = run.id;
+    busyRunKey = runKey(run, listing);
     try {
       const result = await services?.advanceCraftingRun?.({
         actorId: listing?.selectedActorId ?? null,
         runId: run.id,
-        // A player-clicked "Trigger Next Step" is an interactive continuation:
-        // prompt the roll dialog + post to chat (Dice So Nice).
         interactive: true,
       });
-      // Dismissing the roll dialog is a user choice, not a failure: a cancelled
-      // result is also `success: false`, so handle it first and return quietly
-      // (no error notification, no listing churn), mirroring craftingStore.craft.
-      if (result?.cancelled === true) {
-        return;
-      }
-      const message = result?.message;
-      if (message) services?.notify?.(message);
+      if (result?.cancelled === true) return;
+      if (result?.message) services?.notify?.(result.message);
       await load(true);
     } catch (err) {
-      // The player gets the friendly toast; the real cause goes to the console,
-      // because the whole point of this catch is that the failure was invisible.
       console.error('Fabricate | Error advancing a crafting run:', err);
       services?.notify?.(services?.craftErrorMessage?.() ?? '');
     } finally {
       busyRunId = '';
+      busyRunKey = '';
     }
   }
 
-  /**
-   * Cancel a player's in-progress crafting run (issue 848). Guards re-entrancy via
-   * `busyRunId` (shared with {@link advance} so a run can't be advanced and cancelled
-   * at once), surfaces the engine result message, clears the selection when the
-   * cancelled run was selected, then quietly re-fetches so the run leaves the active
-   * list. Threads the loaded listing's `selectedActorId` so the Foundry edge resolves
-   * the crafting actor (and its ownership guard) — without it the cancel returns
-   * NeedsOwner. Catches a throw for the same reason {@link advance} does.
-   *
-   * @param {object} run The crafting RunModel to cancel.
-   * @returns {Promise<void>}
-   */
   async function cancel(run) {
-    if (!run?.id || busyRunId) return;
+    if (run?.lifecycleContract === 'current') return runCommand(run, 'cancel', {});
+    if (!run?.id || busyRunKey) return;
     busyRunId = run.id;
+    busyRunKey = runKey(run, listing);
     try {
       const result = await services?.cancelCraftingRun?.({
         actorId: listing?.selectedActorId ?? null,
         runId: run.id,
       });
-      const message = result?.message;
-      if (message) services?.notify?.(message);
-      if (selectedRunId === run.id) selectedRunId = '';
+      if (result?.message) services?.notify?.(result.message);
       await load(true);
     } catch (err) {
       console.error('Fabricate | Error cancelling a crafting run:', err);
       services?.notify?.(services?.craftErrorMessage?.() ?? '');
     } finally {
       busyRunId = '';
+      busyRunKey = '';
+    }
+  }
+
+  async function dismiss(run) {
+    if (!run?.id || busyRunKey || run?.actions?.dismiss !== true) return;
+    busyRunId = run.id;
+    busyRunKey = runKey(run, listing);
+    try {
+      const result = await services?.dismissJournalRun?.({
+        actorUuid: run.actorUuid ?? listing?.selectedActorUuid ?? null,
+        runType: run.runType,
+        runId: run.id,
+      });
+      if (result?.message) services?.notify?.(result.message);
+      await load(true);
+    } catch (err) {
+      console.error('Fabricate | Error dismissing a Journal run:', err);
+      services?.notify?.(services?.craftErrorMessage?.() ?? '');
+      await load(true);
+    } finally {
+      busyRunId = '';
+      busyRunKey = '';
     }
   }
 
@@ -220,11 +341,29 @@ export function createJournalStore({ services } = {}) {
     get selectedRunId() {
       return selectedRunId;
     },
+    get selectedRunKey() {
+      return selectedRunKey;
+    },
+    get search() {
+      return search;
+    },
+    get kindFilter() {
+      return kindFilter;
+    },
+    get activeStatusFilter() {
+      return activeStatusFilter;
+    },
     get activeSort() {
       return activeSort;
     },
     get historySort() {
       return historySort;
+    },
+    get activePage() {
+      return activePage;
+    },
+    get activePageSize() {
+      return activePageSize;
     },
     get historyPage() {
       return historyPage;
@@ -232,23 +371,35 @@ export function createJournalStore({ services } = {}) {
     get historyPageSize() {
       return historyPageSize;
     },
+    get pageSizes() {
+      return PAGE_SIZES;
+    },
     get historyPageSizes() {
-      return HISTORY_PAGE_SIZES;
+      return PAGE_SIZES;
     },
     get busyRunId() {
       return busyRunId;
     },
+    get busyRunKey() {
+      return busyRunKey;
+    },
     get loadedOnce() {
       return loadedOnce;
     },
-    // Reactive current world time: reads the `worldTimeTick` nudge so consumers
-    // (RunCard countdowns, ActionsPanel readiness) recompute when world time
-    // advances. The value itself comes from the (non-reactive) services seam.
     get worldTime() {
       return worldTime();
     },
+    get activeCounts() {
+      return activeCounts;
+    },
     get activeRuns() {
       return activeRuns;
+    },
+    get activePageItems() {
+      return activePageItems;
+    },
+    get activeCount() {
+      return activeRuns.length;
     },
     get historyPageItems() {
       return historyPageItems;
@@ -262,19 +413,106 @@ export function createJournalStore({ services } = {}) {
     get selectedRun() {
       return selectedRun;
     },
+    get viewedStageIndex() {
+      return viewedStageIndex;
+    },
+    get viewedStage() {
+      return viewedStage;
+    },
     get navCount() {
       return navCount;
     },
     load,
     select,
+    setSearch,
+    setKindFilter,
+    setActiveStatusFilter,
     setActiveSort,
     setHistorySort,
+    setActivePage,
+    setActivePageSize,
     setHistoryPage,
     setHistoryPageSize,
-    advance,
+    viewStage,
+    returnToCurrentStage,
+    execute,
+    pause,
+    resume,
+    setCompletionMode,
+    setSelection,
+    advance: execute,
     cancel,
+    dismiss,
     tickWorldTime,
   };
+}
+
+function matchesKind(kind) {
+  return (run) => kind === 'all' || activityKind(run) === kind;
+}
+
+function matchesSearch(query) {
+  const normalized = String(query ?? '')
+    .trim()
+    .toLocaleLowerCase();
+  if (!normalized) return () => true;
+  return (run) =>
+    [run?.names?.title, run?.names?.subtitle, run?.craftingSystemName].some((value) =>
+      String(value ?? '')
+        .toLocaleLowerCase()
+        .includes(normalized)
+    );
+}
+
+function matchesActiveStatus(status) {
+  return (run) => status === 'all' || run?.derivedStatus === status;
+}
+
+function activityKind(run) {
+  return run?.activityKind ?? run?.runType ?? 'crafting';
+}
+
+function countActiveStatuses(runs) {
+  const counts = { all: runs.length, ready: 0, waiting: 0, paused: 0 };
+  for (const run of runs) {
+    if (run?.derivedStatus === 'ready') counts.ready += 1;
+    if (run?.derivedStatus === 'waiting') counts.waiting += 1;
+    if (run?.derivedStatus === 'paused') counts.paused += 1;
+  }
+  return counts;
+}
+
+function resolveRun(runOrId, runType, listing) {
+  if (runOrId && typeof runOrId === 'object') return runOrId;
+  const id = String(runOrId ?? '');
+  const all = [...(listing?.activeRuns ?? []), ...(listing?.history ?? [])];
+  return all.find((run) => run?.id === id && (!runType || run?.runType === runType)) ?? null;
+}
+
+function runKey(run, listing) {
+  if (run?.key) return run.key;
+  return JSON.stringify([
+    run?.actorUuid ?? listing?.selectedActorUuid ?? listing?.selectedActorId ?? null,
+    run?.runType ?? 'crafting',
+    run?.id ?? null,
+  ]);
+}
+
+function normalizeStageIndex(run, value) {
+  const upper = Math.max(0, (run?.steps?.length ?? 1) - 1);
+  const index = Math.trunc(Number(value) || 0);
+  return Math.min(upper, Math.max(0, index));
+}
+
+function clampPage(value, pageSize, itemCount) {
+  const requested = Math.max(0, Math.trunc(Number(value) || 0));
+  const last = Math.max(0, Math.ceil(itemCount / pageSize) - 1);
+  return Math.min(requested, last);
+}
+
+function normalizeRevision(value) {
+  const revision = Number(value);
+  return Number.isSafeInteger(revision) && revision >= 0 ? revision : 0;
 }
 
 function runAvailableAt(run) {
@@ -282,22 +520,12 @@ function runAvailableAt(run) {
   return Number.isFinite(availableAt) ? availableAt : null;
 }
 
-/**
- * A run is "ready" when its current time gate has matured (or there is no gate —
- * an un-armed crafting step is actionable now). Readiness is derived from
- * `availableAt <= worldTime`, NOT from `run.status`.
- */
 function isReady(run, worldTime) {
+  if (run?.derivedStatus === 'paused') return false;
   const availableAt = runAvailableAt(run);
   return availableAt === null ? true : availableAt <= worldTime;
 }
 
-/**
- * Soonest-ready comparator: ready runs first, then ascending `availableAt`
- * (ready runs sort by how long they have been ready; waiting runs by how soon
- * they mature). Ties broken by id for a stable order. An explicit comparator is
- * required (a bare `Array#sort()` fails the SonarCloud gate).
- */
 function compareSoonestReady(left, right, worldTime) {
   const leftReady = isReady(left, worldTime);
   const rightReady = isReady(right, worldTime);
@@ -310,14 +538,12 @@ function compareSoonestReady(left, right, worldTime) {
 
 function compareNewest(left, right) {
   const delta = (Number(right?.startedAt) || 0) - (Number(left?.startedAt) || 0);
-  if (delta !== 0) return delta;
-  return String(right?.id ?? '').localeCompare(String(left?.id ?? ''));
+  return delta || String(right?.id ?? '').localeCompare(String(left?.id ?? ''));
 }
 
 function compareNewestFinished(left, right) {
   const delta = (Number(right?.finishedAt) || 0) - (Number(left?.finishedAt) || 0);
-  if (delta !== 0) return delta;
-  return String(right?.id ?? '').localeCompare(String(left?.id ?? ''));
+  return delta || String(right?.id ?? '').localeCompare(String(left?.id ?? ''));
 }
 
 function compareOldestFinished(left, right) {
