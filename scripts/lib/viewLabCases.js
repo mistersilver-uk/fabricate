@@ -1525,8 +1525,8 @@ function journalLifecycleCases() {
       query: {
         tab: 'journal',
         journalCaseState: state,
-        ...(state === 'gathering-straight' ? { gatheringTaskMode: 'straight' } : {}),
-        ...(state === 'gathering-check' ? { gatheringTaskMode: 'routed' } : {}),
+        ...(state === 'gathering-straight' && { gatheringTaskMode: 'straight' }),
+        ...(state === 'gathering-check' && { gatheringTaskMode: 'routed' }),
       },
       position: { width: state === 'narrow' ? 900 : 1240, height: 880 },
       steps: steps[state] ?? [],
