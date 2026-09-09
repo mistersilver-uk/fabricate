@@ -2514,6 +2514,10 @@ function createStore(calls = [], options = {}) {
                   toolIds: Array.isArray(options.taskInitialToolIds)
                     ? options.taskInitialToolIds
                     : [],
+                  ...(options.omitTaskResolutionMode
+                    ? {}
+                    : { resolutionMode: options.taskResolutionMode || 'd100' }),
+                  resultGroups: options.taskResultGroups || [],
                   dropRows: options.taskDropRows || [
                     {
                       id: 'drop-nightshade',
@@ -19180,6 +19184,148 @@ describe('CraftingSystemManager mounted behavior', () => {
       `expected deleteGatheringLibraryTask call for task-herbs, got ${JSON.stringify(calls)}`
     );
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'environments');
+  });
+
+  it('authors task-owned gathering modes while retaining inactive result sources across save and reload', async () => {
+    const calls = [];
+    const retainedGroups = [
+      {
+        id: 'group-rich',
+        name: '  Rich Vein ',
+        results: [{ id: 'result-ore', componentId: 'c1', quantity: 2 }],
+      },
+      {
+        id: 'group-poor',
+        name: 'Poor Vein',
+        results: [{ id: 'result-coal', componentId: 'c4', quantity: 1 }],
+      },
+    ];
+    mountManager(calls, {
+      taskResultGroups: retainedGroups,
+      gatheringResolutionMode: 'progressive',
+      gatheringCraftingCheck: {
+        routed: {
+          type: 'relative',
+          relativeOutcomes: [
+            { id: 'rich', name: 'rich vein', success: true, dc: 5 },
+            { id: 'poor', name: 'Poor Vein', success: true, dc: 0 },
+          ],
+          fixedOutcomes: [],
+        },
+      },
+    });
+    await tick();
+    flushSync();
+
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+
+    const modeGroup = target.querySelector('[data-gathering-task-resolution-mode]');
+    assert.ok(modeGroup, 'the task editor exposes its own resolution-mode control');
+    assert.equal(
+      modeGroup.querySelector('input[value="d100"]').checked,
+      true,
+      'a task mode is independent of the legacy progressive economy mode'
+    );
+    assert.ok(target.querySelector('[data-gathering-task-drops-table]'));
+    assert.ok(!target.querySelector('[data-gathering-task-results]'));
+
+    const straight = modeGroup.querySelector('input[value="straight"]');
+    straight.checked = true;
+    straight.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-gathering-task-results="straight"]'));
+    assert.ok(target.querySelector('[data-recipe-result-item]'));
+    assert.ok(target.textContent.includes('Iron Ore'), 'straight results are visible after acting');
+    assert.ok(!target.querySelector('[data-gathering-task-drops-table]'));
+    assert.ok(
+      !target.querySelector('[data-gathering-task-drop-inspector]'),
+      'inactive d100 rows do not keep their inspector active'
+    );
+
+    const routed = target.querySelector(
+      '[data-gathering-task-resolution-mode] input[value="routed"]'
+    );
+    routed.checked = true;
+    routed.dispatchEvent(new Event('change', { bubbles: true }));
+    await tick();
+    flushSync();
+    assert.ok(target.querySelector('[data-gathering-task-results="routed"]'));
+    assert.deepEqual(
+      Array.from(target.querySelectorAll('[data-gathering-routed-tier-status]')).map((row) => [
+        row.dataset.gatheringRoutedTierStatus,
+        row.dataset.matchCount,
+      ]),
+      [
+        ['rich', '1'],
+        ['poor', '1'],
+      ],
+      'routed tiers match result-group names after trimming and case folding'
+    );
+
+    target.querySelector('.manager-header-actions .manager-button.is-primary').click();
+    await tick();
+    flushSync();
+    const saved = calls.find(
+      (call) =>
+        call[0] === 'updateGatheringLibraryTask' &&
+        call[1] === 'alchemy' &&
+        call[2] === 'task-herbs' &&
+        call[3].resolutionMode === 'routed'
+    );
+    assert.ok(saved, 'Save persists the selected task resolution mode');
+    assert.deepEqual(saved[3].dropRows.map((row) => row.id), ['drop-nightshade']);
+    assert.deepEqual(saved[3].resultGroups, retainedGroups);
+
+    target.querySelector('[data-gathering-task-back]').click();
+    await tick();
+    flushSync();
+    target.querySelector('[aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('[data-gathering-task-resolution-mode] input[value="routed"]').checked,
+      true,
+      'saved task mode reloads into the selector'
+    );
+    assert.ok(target.textContent.includes('Iron Ore'));
+    assert.ok(target.textContent.includes('Coal'));
+  });
+
+  it('defaults an absent task resolution mode to d100 and removes the economy selector', async () => {
+    mountManager([], { omitTaskResolutionMode: true, gatheringResolutionMode: 'routed' });
+    await tick();
+    flushSync();
+    navButton('Gathering').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Tasks').click();
+    await tick();
+    flushSync();
+    target.querySelector('[aria-label="Edit Gather Moon Herbs"]').click();
+    await tick();
+    flushSync();
+    assert.equal(
+      target.querySelector('[data-gathering-task-resolution-mode] input[value="d100"]').checked,
+      true
+    );
+
+    target.querySelector('[data-gathering-task-back]').click();
+    await tick();
+    flushSync();
+    gatheringSubitem('Settings').click();
+    await tick();
+    flushSync();
+    assert.ok(!target.querySelector('[data-gathering-resolution-mode]'));
+    assert.ok(target.querySelector('[data-economy-mode-card]'));
   });
 
   it('edits gathering task drop rules from unresolved row through inspector modifiers', async () => {
