@@ -6963,17 +6963,31 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
     flushSync();
-    const select = target.querySelector('[data-recipe-check-tier] select');
-    assert.ok(select, 'dropdown renders when tiers exist');
-    assert.equal(select.value, 'tier1', 'reflects the recipe selection');
-    assert.equal(select.querySelectorAll('option').length, 3, 'Default + two tiers');
+    // THE PORTAL HOST IS `document.body` HERE (issue 1510). This case mounts the tab into a bare
+    // `<div>` with no `.fabricate-manager` around it, and `resolveOverlayHost` lands on the body
+    // when no application root is in the ancestry — so the panel is NOT inside `target` and every
+    // helper call is rooted on the body instead. The trigger is inside the body too, so the same
+    // root answers both lookups.
+    const tierTrigger = '[data-recipe-check-tier] [data-recipe-field="checkTierId"]';
+    assert.ok(target.querySelector(tierTrigger), 'dropdown renders when tiers exist');
+    assert.equal(
+      selectTriggerText(document.body, tierTrigger),
+      'Hard (DC 18)',
+      'reflects the recipe selection'
+    );
+    assert.deepEqual(
+      selectOptionValues(document.body, tierTrigger),
+      ['__unchanged__', 'tier1', 'tier2'],
+      'Default + two tiers'
+    );
 
-    select.value = 'tier2';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(document.body, tierTrigger, 'tier2');
     assert.deepEqual(emitted.at(-1), { checkTierId: 'tier2' });
 
-    select.value = '';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    // `__unchanged__`, not `''`: the blank-valued row's identity handle is the primitive's own
+    // sentinel, because `data-popover-option=""` would omit the attribute entirely and leave the
+    // one row that clears the field unaddressable.
+    chooseSelectOption(document.body, tierTrigger, '__unchanged__');
     assert.deepEqual(emitted.at(-1), { checkTierId: null }, 'Default clears the tier');
   });
 

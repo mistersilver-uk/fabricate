@@ -6207,9 +6207,9 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
     stamp(`
     <div class="manager-recipe-ingredient-option-row is-tag" data-recipe-option data-case="${caseName}">
       <span class="manager-recipe-option-lead is-tag"><i class="fas fa-tag"></i></span>
-      <select class="manager-recipe-option-kind" data-recipe-option-kind>
-        <option value="tags" selected>Tag</option>
-      </select>
+      <div class="fabricate-picker manager-travel-picker fabricate-select manager-recipe-option-kind">
+        <button type="button" class="fabricate-select-trigger fabricate-select-trigger-inline" data-recipe-option-kind role="combobox" aria-haspopup="listbox" aria-expanded="false"><span class="manager-travel-picker-value fabricate-select-value">Tag</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+      </div>
       <span class="manager-recipe-option-tags" data-recipe-option-tags>
         <span class="manager-recipe-tag-policy" data-recipe-tag-policy>Any of</span>${chips}
         <div class="fabricate-picker manager-travel-picker manager-recipe-tag-picker">
@@ -6226,9 +6226,9 @@ test('the tag requirement row keeps its arm whole, and an EMPTY one is a row lik
   const componentRow = stamp(`
     <div class="manager-recipe-ingredient-option-row is-component" data-recipe-option data-case="component">
       <span class="manager-recipe-option-lead is-component"><i class="fas fa-cube"></i></span>
-      <select class="manager-recipe-option-kind" data-recipe-option-kind>
-        <option value="component" selected>Component</option>
-      </select>
+      <div class="fabricate-picker manager-travel-picker fabricate-select manager-recipe-option-kind">
+        <button type="button" class="fabricate-select-trigger fabricate-select-trigger-inline" data-recipe-option-kind role="combobox" aria-haspopup="listbox" aria-expanded="false"><span class="manager-travel-picker-value fabricate-select-value">Component</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+      </div>
       <span class="manager-recipe-option-name-field">
         <span class="manager-recipe-option-chosen" data-recipe-option-chosen><i class="fas fa-cube manager-recipe-option-mark is-component"></i><span class="manager-recipe-option-chosen-name">Iron Ingot</span><button type="button" class="manager-recipe-option-clear"><i class="fa-solid fa-xmark"></i></button></span>
       </span>${controls}

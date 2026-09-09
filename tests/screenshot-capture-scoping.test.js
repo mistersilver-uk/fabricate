@@ -1071,6 +1071,15 @@ const CONVERTED_SELECT_HOOKS = Object.freeze([
   'data-prerequisite-operator',
   'data-economy-regen-policy',
   'data-economy-regen-unit',
+  // ISSUE 1510 PHASE 2 — the manager's editors, first instalment. The recipe overview's three
+  // select cells and the ingredient row's kind control. `data-recipe-field` is spelled with its
+  // VALUE at two of them, because that hook is shared with inputs and textareas across the
+  // editor and a bare token would ban a locator this change never converted.
+  'data-recipe-category-select',
+  'data-recipe-field="checkTierId"',
+  'data-recipe-field="minSuccessOutcomeId"',
+  'data-recipe-field="craftingModifierSet"',
+  'data-recipe-option-kind',
 ]);
 
 test('no capture producer drives a converted select with Playwright’s <select>-only API', () => {
