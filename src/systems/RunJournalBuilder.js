@@ -574,6 +574,7 @@ export class RunJournalBuilder {
       taskId: null,
       flavor: '',
       failureReason,
+      craftingYield: currentStep?.craftingYield ?? null,
       ...this._craftingResults(runSteps, redacted, stringOrNull(run.craftingSystemId)),
       // `manualAdvance` states what the run TYPE needs, not what the viewer may do:
       // a crafting run always advances on a click, where gathering and salvage
@@ -650,6 +651,7 @@ export class RunJournalBuilder {
       taskId: null,
       flavor: '',
       failureReason: this.localize('FABRICATE.App.Journal.Fizzle.Failure'),
+      craftingYield: null,
       createdResults: [],
       createdResultCount: 0,
       isFizzle: true,
@@ -711,6 +713,9 @@ export class RunJournalBuilder {
       selectedRequirementSnapshot: cloneJson(runStep?.selectedRequirementSnapshot) ?? null,
       requirementSnapshot:
         cloneJson(runStep?.selectedRequirementSnapshot) ?? cloneJson(runStep?.requirements) ?? [],
+      craftingYield: isCurrent
+        ? this._craftingYieldPreview({ runStep, recipeStep, system, recipe, index })
+        : null,
       selectionAvailability: isCurrent
         ? this._selectionAvailability({
             runStep,
@@ -722,6 +727,167 @@ export class RunJournalBuilder {
           })
         : null,
     };
+  }
+
+  /**
+   * Project the current active crafting step's authored output without presenting it as an
+   * award. ResolutionModeService remains the source of truth for group routing and progressive
+   * order; this method only maps its selected authored models into the Journal's plain rows.
+   * Past/future/terminal guards are owned by `_craftingStepModel`'s `isCurrent` call site.
+   *
+   * @private
+   * @returns {object|null}
+   */
+  _craftingYieldPreview({ runStep, recipeStep, system, recipe, index }) {
+    if (!runStep || !recipeStep || !system || !recipe) return null;
+    const mode = this._resolveMode(recipe, system);
+    if (
+      !['simple', 'routedByIngredients', 'routedByCheck', 'progressive', 'alchemy'].includes(mode)
+    ) {
+      return null;
+    }
+    const base = {
+      source: 'preview',
+      stageIndex: index,
+      mode,
+      entries: [],
+      tiers: [],
+      progressive: null,
+    };
+    if (mode === 'progressive') {
+      const progressive = this._craftingProgressivePreview({ recipe, recipeStep, system });
+      return progressive ? { ...base, presentation: 'progressive', progressive } : null;
+    }
+    const alchemyCheckMode = stringOrNull(system?.alchemy?.checkMode) || 'none';
+    if (mode === 'routedByCheck' || (mode === 'alchemy' && alchemyCheckMode === 'tiered')) {
+      const tiers = this._craftingOutcomeTiers({ recipe, recipeStep, system, mode });
+      return tiers ? { ...base, presentation: 'tiers', tiers } : null;
+    }
+    const groups = this._craftingDirectResultGroups({
+      runStep,
+      recipeStep,
+      recipe,
+      mode,
+    });
+    if (!groups) return null;
+    const systemId = stringOrNull(recipe.craftingSystemId);
+    return {
+      ...base,
+      presentation: 'entries',
+      entries: groups.flatMap((group) =>
+        normalizeList(group?.results).map((result, resultIndex) =>
+          this._yieldEntry(result, systemId, resultIndex, 100)
+        )
+      ),
+    };
+  }
+
+  _craftingDirectResultGroups({ runStep, recipeStep, recipe, mode }) {
+    const resolve = this._resolutionModeService?.resolveResultGroups;
+    if (typeof resolve !== 'function') return null;
+    let ingredientSet = null;
+    if (mode === 'routedByIngredients') {
+      ingredientSet = this._selectedCraftingIngredientSet(runStep, recipeStep);
+      if (!ingredientSet) return null;
+    }
+    try {
+      return normalizeList(
+        resolve.call(this._resolutionModeService, {
+          recipe,
+          step: recipeStep,
+          ingredientSet,
+          checkResult: null,
+          selectedResultGroupId: stringOrNull(runStep?.selectedResultGroupId),
+        })?.groups
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  _selectedCraftingIngredientSet(runStep, recipeStep) {
+    const selectedId = stringOrNull(
+      runStep?.selectionPlan?.selectedIngredientSetId ?? runStep?.selectedIngredientSetId
+    );
+    if (!selectedId) return null;
+    const snapshot = plainObjectOrNull(runStep?.selectedRequirementSnapshot);
+    if (stringOrNull(snapshot?.id) === selectedId) return snapshot;
+    return (
+      normalizeList(recipeStep?.ingredientSets).find(
+        (ingredientSet) => stringOrNull(ingredientSet?.id) === selectedId
+      ) ?? null
+    );
+  }
+
+  _craftingOutcomeTiers({ recipe, recipeStep, system, mode }) {
+    const resolve = this._resolutionModeService?.resolveResultGroups;
+    if (typeof resolve !== 'function') return null;
+    const routed = plainObjectOrNull(system?.craftingCheck?.routed) ?? {};
+    const outcomes =
+      routed.type === 'fixed'
+        ? normalizeList(routed.fixedOutcomes)
+        : normalizeList(routed.relativeOutcomes);
+    const permitsFailure = activityPermitsFailureResults(system, 'crafting');
+    const systemId = stringOrNull(recipe.craftingSystemId);
+    const dc = this._resolveCheckDc({ config: routed, recipe, mode });
+    try {
+      return outcomes.map((outcome, index) => {
+        const fail = outcome?.success !== true;
+        const resolved =
+          fail && !permitsFailure
+            ? null
+            : resolve.call(this._resolutionModeService, {
+                recipe,
+                step: recipeStep,
+                checkResult: { success: !fail, outcome: stringOrNull(outcome?.name) },
+              });
+        const results = normalizeList(resolved?.groups).flatMap((group) =>
+          normalizeList(group?.results)
+        );
+        return {
+          id: stringOrNull(outcome?.id) || `tier-${index + 1}`,
+          name: stringOrEmpty(outcome?.name).trim(),
+          band: craftingOutcomeBand(outcome, routed, dc),
+          fail,
+          yields: results.map((result, resultIndex) =>
+            this._tierYield(result, systemId, resultIndex)
+          ),
+        };
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  _craftingProgressivePreview({ recipe, recipeStep, system }) {
+    const occurrences = this._resolutionModeService?.progressiveStageOccurrences;
+    if (typeof occurrences !== 'function') return null;
+    try {
+      return {
+        awardMode: stringOrNull(system?.craftingCheck?.progressive?.awardMode) || 'equal',
+        stages: normalizeList(
+          occurrences.call(this._resolutionModeService, { recipe, step: recipeStep })
+        ).map((occurrence, index) => {
+          const componentId = stringOrNull(occurrence?.componentId);
+          const component =
+            plainObjectOrNull(occurrence?.component) ??
+            (componentId
+              ? this._getComponent(stringOrNull(recipe.craftingSystemId), componentId)
+              : null);
+          return compactPresentation({
+            id: stringOrNull(occurrence?.resultId) || componentId || `stage-${index + 1}`,
+            name: stringOrEmpty(component?.name) || stringOrEmpty(componentId),
+            art: stringOrNull(component?.img),
+            icon: stringOrNull(component?.icon),
+            tint: stringOrNull(component?.tint ?? component?.colorToken),
+            quantity: '×1',
+            cost: numberOrNull(component?.difficulty),
+          });
+        }),
+      };
+    } catch {
+      return null;
+    }
   }
 
   _availabilitySnapshot({ actor, run, recipe, fallback }) {
@@ -1715,6 +1881,17 @@ function routedOutcomeBand(outcome, routed, task) {
   const baseDc = numberOrNull(task?.dcOverride) ?? numberOrNull(routed?.dc) ?? 15;
   const threshold = baseDc + (numberOrNull(outcome?.dc) ?? 0);
   return routed?.thresholdMode === 'exceed' ? `>${threshold}` : `${threshold}+`;
+}
+
+function craftingOutcomeBand(outcome, routed, dc) {
+  if (routed?.type === 'fixed') return routedOutcomeBand(outcome, routed, null);
+  const offset = numberOrNull(outcome?.dc) ?? 0;
+  if (dc !== null) {
+    const threshold = dc + offset;
+    return routed?.thresholdMode === 'exceed' ? `>${threshold}` : `${threshold}+`;
+  }
+  const relative = offset === 0 ? 'DC' : `DC${offset > 0 ? '+' : '−'}${Math.abs(offset)}`;
+  return routed?.thresholdMode === 'exceed' ? `>${relative}` : `${relative}+`;
 }
 
 function selectedIngredientIndex(group, optionOverrides, selection) {
