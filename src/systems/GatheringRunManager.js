@@ -109,7 +109,7 @@ export class GatheringRunManager {
    * and a GM viewer makes `_isOpaqueBlindTask` false, which writes the drawn task's real
    * id into the player-readable actor flag that issue 901 exists to keep it out of.
    */
-  async createRun(actor, runData = {}) {
+  async createRun(actor, runData = {}, options = {}) {
     this._assertActor(actor);
     this._assertRunReferences(runData);
     const lifecycleFields = buildNewRunLifecycleFields(runData);
@@ -124,26 +124,31 @@ export class GatheringRunManager {
 
     const container = cloneContainer(this._getContainer(actor));
     const now = this._now();
-    const run = this._normalizeRun(
-      {
-        actorUuid: actor.uuid,
-        userId: stringOrNull(runData.userId) || this.getUserId(),
-        ...pickRunPayload(runData),
-        ...lifecycleFields,
-        id: this.randomID(),
-        status: ACTIVE_STATUSES.has(runData.status) ? runData.status : 'inProgress',
-        startedAtWorldTime: now,
-        updatedAtWorldTime: now,
-      },
-      { actor, terminal: false }
-    );
+    const record = {
+      actorUuid: actor.uuid,
+      userId: stringOrNull(runData.userId) || this.getUserId(),
+      ...pickRunPayload(runData),
+      ...lifecycleFields,
+      id: this.randomID(),
+      status: ACTIVE_STATUSES.has(runData.status) ? runData.status : 'inProgress',
+      startedAtWorldTime: now,
+      updatedAtWorldTime: now,
+    };
+    if (options.executionPlan) {
+      assertRunLifecycleMutation(record, { currentOnly: true });
+      record.executionJournal = transitionExecutionJournal(null, {
+        type: 'plan',
+        plan: options.executionPlan,
+      });
+    }
+    const run = this._normalizeRun(record, { actor, terminal: false });
 
     container.active[run.id] = run;
     await this._persist(actor, container);
     return run;
   }
 
-  async createWaitingRun(actor, runData = {}, timeRequirementOrGate = null) {
+  async createWaitingRun(actor, runData = {}, timeRequirementOrGate = null, options = {}) {
     const gate = this._normalizeTimeGate(
       timeRequirementOrGate ?? runData.timeGate ?? runData.timeRequirement
     );
@@ -154,11 +159,15 @@ export class GatheringRunManager {
       );
     }
 
-    return this.createRun(actor, {
-      ...runData,
-      status: 'waitingTime',
-      timeGate: gate,
-    });
+    return this.createRun(
+      actor,
+      {
+        ...runData,
+        status: 'waitingTime',
+        timeGate: gate,
+      },
+      options
+    );
   }
 
   async createTerminalRun(actor, runData = {}, status = 'succeeded', payload = {}, options = {}) {
@@ -268,14 +277,20 @@ export class GatheringRunManager {
     return completed;
   }
 
-  async clearActiveRun(actor, runId) {
+  async clearActiveRun(actor, runId, options = {}) {
     this._assertActor(actor);
     if (!runId) return null;
 
+    if (options.expectedRevision !== undefined || options.executionOperationId) {
+      this.invalidateCache(actorKey(actor));
+    }
     const container = cloneContainer(this._getContainer(actor));
     const activeRun = container.active[String(runId)];
     if (!activeRun) return null;
-    this._assertRunMutation(activeRun);
+    this._assertRunMutation(activeRun, {
+      expectedRevision: options.expectedRevision,
+      executionOperationId: options.executionOperationId,
+    });
 
     delete container.active[String(runId)];
     await this._persist(actor, container);
@@ -320,6 +335,57 @@ export class GatheringRunManager {
       transition,
       { expectedRevision, executionOperationId }
     );
+  }
+
+  /**
+   * Reconstruct persisted applying journals only while the caller owns an
+   * explicit authority scope. Ordinary reads never call this method.
+   */
+  async reconstructVersionedExecutions({ operationId = null, orphaned = false } = {}) {
+    const normalizedOperationId = stringOrNull(operationId);
+    if (Boolean(normalizedOperationId) === (orphaned === true)) {
+      throw new GatheringRunManagerError(
+        'Execution reconstruction requires exactly one authority scope',
+        'INVALID_RECONSTRUCTION_SCOPE'
+      );
+    }
+
+    const scope = orphaned === true ? 'orphaned' : 'operation';
+    const runs = [];
+    let inspected = 0;
+    for (const actor of normalizeActorList(this.getActors())) {
+      this.invalidateCache(actorKey(actor));
+      const container = cloneContainer(this._getContainer(actor));
+      let dirty = false;
+      const records = [...Object.values(container.active), ...container.history];
+      for (const run of records) {
+        if (!isApplyingVersionedJournal(run, normalizedOperationId)) continue;
+        inspected += 1;
+        run.executionJournal = transitionExecutionJournal(run.executionJournal, {
+          type: 'reconstructAfterReload',
+        });
+        incrementRunRevision(run);
+        run.updatedAtWorldTime = this._now();
+        dirty = true;
+        runs.push({
+          actorUuid: stringOrNull(run.actorUuid) || stringOrNull(actor.uuid),
+          runId: run.id,
+          status: run.status,
+          runRevision: run.runRevision,
+          journalStatus: run.executionJournal.status,
+        });
+      }
+      if (dirty) await this._persist(actor, container);
+    }
+
+    return {
+      success: true,
+      scope,
+      operationId: scope === 'operation' ? normalizedOperationId : null,
+      inspected,
+      reconstructed: runs.length,
+      runs,
+    };
   }
 
   _locateRunPersistence(actor, runId, { activeOnly = true } = {}) {
@@ -602,6 +668,14 @@ export class GatheringRunManager {
       allowExecutionJournal ? 'EXECUTION_OPERATION_REQUIRED' : 'EXECUTION_IN_PROGRESS'
     );
   }
+}
+
+function isApplyingVersionedJournal(run, operationId) {
+  if (getRunLifecycleContract(run) !== 'current') return false;
+  const journal = run?.executionJournal;
+  if (!journal || journal.status !== 'planned') return false;
+  if (operationId && journal.operationId !== operationId) return false;
+  return journal.effects.some((effect) => effect.phase === 'applying');
 }
 
 function readGatheringRunsFlag(actor) {
