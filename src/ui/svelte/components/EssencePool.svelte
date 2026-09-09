@@ -69,7 +69,9 @@
   }
 
   function step(source, next) {
-    onStep(source.id, next - allocated(source.id));
+    const previous = allocated(source.id);
+    allocation = { ...allocation, [source.id]: next };
+    onStep(source.id, next - previous);
   }
 
   const overshoots = $derived(

@@ -332,7 +332,13 @@ describe('run primitives mounted behavior', () => {
     assert.equal(increment.disabled, true, 'all pools met disables further allocation');
     const decrement = target.querySelector(':scope [data-essence-source="duskglass"] [data-stepper-decrement]');
     decrement.click();
+    await flushRender();
     assert.deepEqual(steps, [['duskglass', -1]], 'one physical allocation is stepped once');
+    assert.equal(
+      target.querySelector('[data-essence-total="radiant"]').textContent.trim(),
+      '2 / 4',
+      'the bindable allocation updates before the callback returns control'
+    );
     expectGeometry('EssencePool', '.fab-essence-pool', [/border-radius:\s*9px/u, /padding:\s*var\(--fab-space-3\)/u]);
   });
 
