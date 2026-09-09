@@ -23,6 +23,7 @@
     subscribeInventoryChange,
     subscribeCraftingDataChange,
     subscribeActorRunFlagChange,
+    subscribeJournalDismissalsChange,
   } from '../util/foundryBridge.js';
   import GatheringView from './gathering/GatheringView.svelte';
   import CraftingView from './crafting/CraftingView.svelte';
@@ -365,6 +366,17 @@
   });
   $effect(() => subscribeWorldTime(() => services?.journal?.load?.(true)));
   $effect(() => subscribeSceneChange(() => services?.journal?.load?.(true)));
+  // Dismissals live in a user setting, not actor run flags. The shell owns this
+  // subscription across tabs; payload-free replicated changes refresh the viewer's
+  // own listing, while local actor-scoped changes use the selection at fire time.
+  $effect(() =>
+    subscribeJournalDismissalsChange(() => services?.journal?.load?.(true), {
+      isRelevantActor: (actorUuid) => {
+        const selected = services?.getSelectedActorId?.() || null;
+        return Boolean(selected) && actorUuid === `Actor.${selected}`;
+      },
+    })
+  );
   // Cross-client run refresh (issues 733 + 739): a run created/advanced/archived by
   // another client (or the primary-GM world-time resume) writes the selected actor's
   // run flags. main.js drops the stale run-manager cache on the same updateActor hook,

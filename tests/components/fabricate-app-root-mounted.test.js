@@ -917,7 +917,7 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
   }
 
   /** Mount the shell with counting services and a live Hooks fake. */
-  async function mountWithSpies() {
+  async function mountWithSpies(serviceOverrides = {}) {
     installHooks();
     const registry = createPlayerExtensionsRegistry({ emitHook: () => {} });
     const { calls, services } = spyServices();
@@ -925,7 +925,7 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
       activeTab: DEFAULT_TAB,
       showAlchemy: false,
       onSelectTab: () => {},
-      services,
+      services: { ...services, ...serviceOverrides },
       extensionSurfaces: deriveExtensionSurfaces(registry, { experimentalFeaturesEnabled: true }),
       playerExtensions: registry,
     });
@@ -963,6 +963,59 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
         'narrowing was possible however good a delta was emitted'
     );
     assert.equal(hooks.count('fabricate.craftingSystemsChanged'), 0);
+  });
+
+  it('quietly refreshes Journal dismissals across tabs and actor switches, then unsubscribes', async () => {
+    const dismissalHook = 'fabricate.journalDismissalsChanged';
+    const loads = [];
+    let selectedActorId = 'actor-1';
+    const services = fakeServices({ selectedActorId });
+    services.getSelectedActorId = () => selectedActorId;
+    services.journal.load = (quiet) => loads.push({ actorId: selectedActorId, quiet });
+    await mountWithSpies(services);
+    assert.deepEqual(loads, [], 'subscribing does not itself reload an already-loaded Journal');
+
+    const localDismissal = (actorId) => ({
+      actorUuid: `Actor.${actorId}`,
+      runType: 'crafting',
+      runId: 'finished-run',
+    });
+    const expectQuietRefresh = async (payload) => {
+      loads.length = 0;
+      hooks.callAll(dismissalHook, payload);
+      await tick();
+      assert.deepEqual(loads, [{ actorId: selectedActorId, quiet: true }]);
+      assert.equal(hooks.count(dismissalHook), 1, 'exactly one shell-owned dismissal listener');
+    };
+
+    await expectQuietRefresh(localDismissal(selectedActorId));
+    await expectQuietRefresh(undefined); // Both createSetting and updateSetting publish no args.
+    loads.length = 0;
+    hooks.callAll(dismissalHook, localDismissal('actor-2'));
+    assert.deepEqual(loads, [], 'an unrelated local actor dismissal does not reload this Journal');
+
+    await harness.setProps({ activeTab: 'journal' });
+    await expectQuietRefresh(undefined);
+    selectedActorId = 'actor-2';
+    await harness.setProps({
+      services: {
+        ...services,
+        actorBar: { ...services.actorBar, selectedActorId },
+      },
+    });
+    loads.length = 0;
+    hooks.callAll(dismissalHook, localDismissal('actor-1'));
+    assert.deepEqual(loads, [], 'the listener does not retain the outgoing actor selection');
+    await expectQuietRefresh(localDismissal(selectedActorId));
+
+    await harness.setProps({ activeTab: 'crafting' });
+    await expectQuietRefresh(undefined);
+    await harness.remount();
+    assert.equal(hooks.count(dismissalHook), 0, 'unmount removes the dismissal hook by its id');
+    loads.length = 0;
+    hooks.callAll(dismissalHook);
+    await tick();
+    assert.deepEqual(loads, [], 'a closed shell cannot keep refreshing the Journal');
   });
 
   // TABLE-DRIVEN, from the shipped constant. A domain added to the taxonomy without a

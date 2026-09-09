@@ -640,6 +640,29 @@ export function subscribeActorRunFlagChange(handler, { isRelevantActor } = {}) {
   };
 }
 
+/**
+ * Subscribe to the current viewer's Journal dismissal refresh signal.
+ * Local dismissals name an actor UUID; replicated create/updateSetting signals
+ * carry no payload, so those must refresh without an actor or user-id filter.
+ * The Journal listing reads the current user's dismissal setting itself.
+ *
+ * @param {Function} handler Read-only refresh callback, invoked without arguments.
+ * @param {object} [options]
+ * @param {(actorUuid: string) => boolean} [options.isRelevantActor] Local actor
+ *   predicate read at fire time; omitted means all actors.
+ * @returns {Function} Cleanup callback; safe when Foundry Hooks is absent.
+ */
+export function subscribeJournalDismissalsChange(handler, { isRelevantActor } = {}) {
+  const hooks = globalThis.Hooks;
+  if (!hooks?.on || typeof handler !== 'function') return () => {};
+  const hook = 'fabricate.journalDismissalsChanged';
+  const id = hooks.on(hook, (payload) => {
+    if (payload?.actorUuid && isRelevantActor && !isRelevantActor(payload.actorUuid)) return;
+    handler();
+  });
+  return () => hooks.off?.(hook, id);
+}
+
 export function notifyInfo(msg) {
   globalThis.ui?.notifications?.info(msg);
 }
