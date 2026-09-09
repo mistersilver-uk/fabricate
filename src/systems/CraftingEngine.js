@@ -881,10 +881,8 @@ export class CraftingEngine {
         minutes: durationSeconds / 60,
       });
       return {
-        success: true,
+        ...versionedTransitionResult(armed, { success: true, disposition: 'time-armed' }),
         started: true,
-        waiting: true,
-        run: armed,
         requiresExecution: false,
       };
     }
