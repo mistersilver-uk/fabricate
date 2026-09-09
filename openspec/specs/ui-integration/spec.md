@@ -4849,7 +4849,7 @@ Scope:
 
 - The Journal does NOT consume the `narrative` invalidation domain: it reads no authored description anywhere, and its flavour fields are empty by construction.
   An edit that changes only prose therefore MUST NOT rebuild it — see _Shared-store refresh routing_ above and `data-models/spec.md` § Invalidation Domains.
-- The Journal **monitors** active and historical runs and, for crafting only, **advances** them.
+- The Journal monitors active and historical runs, advances crafting runs, and collects eligible versioned gathering runs.
 - It never CREATES runs; run creation stays in the Crafting, Alchemy, and Gathering flows.
 - It is the unified player home for the per-activity run views described elsewhere in this spec — the Crafting tab _Run Summary_, the Alchemy tab _Active Runs and History_, and the Gathering App _Active Runs_ / _History_.
   Those per-activity sections remain authoritative for their own tab, and the Journal cross-references rather than replaces them.
@@ -4868,27 +4868,51 @@ Scope:
 
 - The view resolves the selected actor through the shared Actor selection top bar and shows a no-actor empty state when none is selected.
 - Active runs and history are shown across all three run types (crafting, gathering, salvage) in one unified surface; each row presents the run's title, run type, status pill, crafting progress, and a time-remaining/countdown where a `timeGate` exists.
-- Each run's status pill reflects the projection's `derivedStatus` (`waiting` | `ready` | `inProgress` | `succeeded` | `failed` | `cancelled`), which is derived from the active step/run time gate against world time, not the persisted status (see `data-models/spec.md`).
-- Selecting a run opens a centre detail panel (steps, requirements, and — for a succeeded run — its crafted items, titled `FABRICATE.App.Journal.Results.Title` so it does not collide with the right column's "Recent results" card) plus a right column ordered "about this run" → "what to expect" → "recent results" → "tips".
+- Each run's status pill reflects the projection's `derivedStatus` (`paused` | `waiting` | `ready` | `inProgress` | `succeeded` | `failed` | `cancelled`), with pause taking precedence over time-gate readiness (see `data-models/spec.md`).
+- The layout has a browse zone and a selected-detail zone.
+Active and Finished lists scroll independently, with their sort controls and pagers outside the scrolling bodies; the detail scrolls independently.
+At content widths at or below 960px, stack Active, Finished and detail while preserving access to every control.
+- One shared search and kind filter covers crafting, gathering, salvage and alchemy.
+Active status filters are mutually exclusive All, Ready, Waiting and Paused.
+Status counts use the selected kind cohort before search, active-status filtering, paging or selection.
+- Each list defaults to four rows per page and retains existing page-size and sorting choices.
+Filtering and removal clamp its page independently.
+Selection is keyed by actor UUID, run type and run ID and remains selected when its row leaves the visible page or filter; fallback occurs only after actual removal or dismissal.
+- Selected detail follows identity/actions, notices, verdict, progress/stage navigation, stage requirements, yields and record facts.
+About-this-run facts remain in the record, contextual explanations and Tips remain in detail guidance, and Finished retains full access to recent results and history.
+- Current-stage choices and shared essence allocation remain editable only when the run permits them.
+Browsing past or future stages never changes the executable stage and exposes no editable controls.
+Historical authored requirements, actual spending, actual rolls and actual awards remain distinct evidence.
+- Dismissal hides only a terminal record for the current user, persisted by actor UUID, run type and run ID.
+It does not delete actor history, and another user retains independent visibility.
+The same user's clients refresh on the first setting creation as well as later setting updates.
+- Loading, error/retry, no-actor, empty and filtered-empty states remain explicit; an empty filter result does not erase selected detail.
 - All countdowns and timestamps are world-time based.
 - **Single-step recipes suppress redundant step chrome.**
   A run whose projection reports `multiStep: false` (see `data-models/spec.md`) hides the "Step X of Y" step-label chip on both the left run card and the centre identity row (its `stepLabel` is `""`) and omits the centre step timeline; the "Single-Step Recipe" structure chip is retained.
   A single-step run's requirements card uses the single-step title (`FABRICATE.App.Journal.StepDetails.TitleSingleStep`, "Craft requirements") while a multi-step run's card keeps "Step requirements" (`FABRICATE.App.Journal.StepDetails.Title`), and the run-card progress bar carries a run-neutral "Crafting progress" (`FABRICATE.App.Journal.Progress.Label`) aria-label for every run.
-  A single-step crafting run's "what to expect" card uses the single-step explainer (`FABRICATE.App.Journal.WhatToExpect.CraftingSingleStep`) instead of the multi-step crafting copy.
+  A single-step crafting run's detail guidance uses the single-step explainer (`FABRICATE.App.Journal.WhatToExpect.CraftingSingleStep`) instead of the multi-step crafting copy.
 
 ### Run-Type-Aware Actions Panel
 
-The run detail's actions area is keyed on the projection's `manualAdvance` flag:
+Versioned crafting and gathering actions use the shared RunActionBar and the projection's authoritative action availability.
+It exposes pause/resume, manual execution, cancellation and an eligible completion preference with visible disabled reasons and busy state.
+Arming cancellation replaces the sibling actions with confirm/keep controls in the bar.
+The completion switch is visible on an actively counting-down stage without a player check even when unresolved materials block automatic execution.
+The clock remains read-only; pausing a run never changes world time.
+
+Legacy actions retain the projection's `manualAdvance` contract:
 
 - **Crafting (`manualAdvance: true`)** shows a primary advance button.
   On a non-final step it reads **"Trigger Next Step"** with the `FABRICATE.App.Journal.Actions.TriggerHint` ready hint and the `FABRICATE.App.Journal.TimeRemaining.WhenPassed` gate hint; on the **final step** (`isFinalStep: true` — a single-step recipe, or the last step of a multi-step recipe, where there is no next step to trigger) it reads **"Finish Crafting"** with the `FinishHint` ready hint and the `WhenPassedFinal` gate hint, and the left run card's matured countdown reads "Ready to finish" (`Countdown.ReadyToFinish`) rather than "Ready to continue".
   It is DISABLED until the active step's time gate has matured — readiness is derived from `timeGate.availableAt <= worldTime` (race-free), NOT from the run's persisted status — and while an advance is in flight.
   Triggering invokes the crafting advance contract in `recipes-and-steps/spec.md` (_Run Progression — Player-Initiated Advance_); the final-step variant is copy-only and re-enters the same advance flow.
-- **Gathering / salvage (`manualAdvance: false`)** show an explanatory "resolves automatically when world time advances" line plus the time-remaining box, and offer no trigger button, because matured gathering and salvage runs auto-resolve on world time.
+- **Legacy gathering / salvage (`manualAdvance: false`)** show an explanatory "resolves automatically when world time advances" line plus the time-remaining box, and offer no trigger button, because those matured runs auto-resolve on world time.
 
 ### World-Time Disclosure
 
-The Journal discloses that all displayed times use the game world's world time — so a static countdown is not misread as a frozen real-time wall clock — through the right column's Tips card (`FABRICATE.App.Journal.Tips.WorldTime`) rather than a dedicated footer.
+The Journal shows a read-only WorldClockChip using the existing calendar formatter and fallback.
+Detail guidance (`FABRICATE.App.Journal.Tips.WorldTime`) explains that all countdowns and timestamps use world time.
 
 ### Crafting / Alchemy Viewer Redaction
 
@@ -4899,7 +4923,8 @@ Runs of recipes the viewer cannot see are redacted, mirroring the gathering blin
 - The redaction is enforced in the projection (`data-models/spec.md` _Run Journal Projection_), so no hidden crafting/alchemy recipe identity reaches a non-GM viewer through the Journal.
 - **Redaction hides IDENTITY ONLY and is never an authorization gate** (issue 966).
 A redacted run still projects `manualAdvance: true` and, for an owner, `canCancel: true`, so its owner can finish it and abandon it exactly as they could a visible one.
-Nothing resolves a crafting run automatically — `CraftingRunManager.processWorldTime` only flips a matured `waitingTime` step to `inProgress` — so suppressing the affordance stranded every timed craft of a recipe the crafter cannot see, with its inputs already consumed at START.
+Legacy crafting requires manual advancement: its world-time processing only flips a matured `waitingTime` step to `inProgress`.
+Versioned checks and automatic blockers also require owner actions, so redaction must not suppress those affordances.
 Alchemy makes that the DEFAULT case: brewing is never gated by visibility, and discovery lands at FINISH, so an undiscovered timed brew could never reach the FINISH that would have revealed it.
 - Because a redacted model carries no `recipeId`, `Fabricate#advanceCraftingRun` resolves the recipe from the PERSISTED RUN rather than from its caller.
 The client-supplied `recipeId` is ignored; trusting it also allowed advancing one run while naming another run's recipe.
