@@ -152,6 +152,8 @@ describe('journalStore', () => {
     assert.equal(store.navCount, 2);
     assert.equal(store.loadedOnce, true);
     assert.equal(store.error, false);
+    assert.equal(store.selectedRunKey, store.selectedRun.key, 'initial row and detail share a selection');
+    assert.equal(store.selectedRunId, store.selectedRun.id);
   });
 
   it('sorts active runs soonest-ready (ready first, then ascending availableAt)', async () => {
@@ -273,11 +275,26 @@ describe('journalStore', () => {
 
     assert.equal(store.selectedRun.id, 'a6', 'filtering does not change detail selection');
     assert.equal(store.selectedRunId, 'a6');
+    assert.equal(store.selectedRunKey, activeRuns[6].key);
 
     setup.state.listing = baseListing({ activeRuns: activeRuns.slice(0, 6), history: [] });
     await store.load(true);
     flushSync();
     assert.equal(store.selectedRun.id, 'a0', 'actual removal chooses a remaining fallback');
+    assert.equal(store.selectedRunKey, activeRuns[0].key);
+    assert.equal(store.selectedRunId, 'a0');
+  });
+
+  it('retains the initial fallback selection across listing reorder and off-page filtering', async () => {
+    const setup = makeServices();
+    const store = await loadedStore(setup);
+    const initialKey = store.selectedRun.key;
+    store.setSearch('no-match');
+    setup.state.listing = baseListing({ activeRuns: [...ACTIVE].reverse() });
+    await store.load(true);
+    flushSync();
+    assert.equal(store.selectedRun.key, initialKey);
+    assert.equal(store.selectedRunKey, initialKey);
   });
 
   it('uses composite selection so identical ids across run types do not collide', async () => {
@@ -343,6 +360,65 @@ describe('journalStore', () => {
     assert.equal(store.busyRunId, '');
   });
 
+  it('anchors a terminal null execution index at its final stage without changing history', async () => {
+    const terminal = run({ id: 'terminal', stepIndex: null, derivedStatus: 'succeeded',
+      steps: [{ index: 0 }, { index: 1 }, { index: 2 }] });
+    const store = await loadedStore(makeServices({ listing: baseListing({ activeRuns: [], history: [terminal] }) }));
+    assert.equal(store.viewedStageIndex, 2);
+    store.viewStage(terminal, 0);
+    flushSync();
+    assert.equal(store.viewedStageIndex, 0);
+    store.returnToCurrentStage();
+    flushSync();
+    assert.equal(store.viewedStageIndex, 2);
+    assert.equal(store.selectedRun.stepIndex, null);
+  });
+
+  for (const staleOutcome of ['success', 'failure', 'empty']) {
+    for (const latestFirst of [false, true]) {
+      it(`ignores stale actor load ${staleOutcome} with latestFirst=${latestFirst}`, async () => {
+        const setup = makeServices();
+        let actorId = 'actor-1';
+        const requests = [];
+        setup.services.getSelectedActorId = () => actorId;
+        setup.services.listJournalForActor = ({ rememberedActorId }) => {
+          const deferred = Promise.withResolvers();
+          requests.push({ ...deferred, actorId: rememberedActorId });
+          return deferred.promise;
+        };
+        const store = createJournalStore({ services: setup.services });
+        const older = store.load();
+        actorId = 'actor-2';
+        const latest = store.load();
+        const next = baseListing({ selectedActorId: actorId, selectedActorUuid: 'Actor.actor-2',
+          activeRuns: [run({ id: 'new-actor', actorUuid: 'Actor.actor-2' })], history: [] });
+        assert.deepEqual(requests.map((request) => request.actorId), ['actor-1', 'actor-2']);
+        if (latestFirst) {
+          requests[1].resolve(next);
+          await latest;
+        }
+        if (staleOutcome === 'failure') requests[0].reject(new Error('old actor failed'));
+        else requests[0].resolve(staleOutcome === 'empty' ? null : baseListing());
+        await older;
+        flushSync();
+        assert.equal(store.loading, !latestFirst, 'only the latest request settles loading');
+        assert.equal(store.loadedOnce, latestFirst, 'stale completion does not mark the latest load complete');
+        assert.equal(store.error, false);
+        if (!latestFirst) {
+          assert.equal(store.listing, null, 'stale success is not published while the new actor loads');
+          requests[1].resolve(next);
+          await latest;
+        }
+        flushSync();
+        assert.equal(store.listing.selectedActorId, 'actor-2');
+        assert.equal(store.selectedRun.id, 'new-actor');
+        assert.equal(store.selectedRunKey, store.selectedRun.key);
+        assert.equal(store.loading, false);
+        assert.equal(store.error, false);
+      });
+    }
+  }
+
   it('fails closed when the projection does not make a versioned action available', async () => {
     const setup = makeServices();
     const store = await loadedStore(setup);
@@ -357,6 +433,43 @@ describe('journalStore', () => {
 
     assert.deepEqual(setup.calls.command, []);
     assert.equal(setup.calls.list, 1, 'a rejected local action does not churn the listing');
+  });
+
+  it('keeps a newer same-actor load failure after an older success arrives', async () => {
+    const setup = makeServices();
+    const store = await loadedStore(setup);
+    const olderRequest = Promise.withResolvers();
+    const latestRequest = Promise.withResolvers();
+    const requests = [olderRequest, latestRequest];
+    setup.services.listJournalForActor = () => requests.shift().promise;
+    const older = store.load(true);
+    const latest = store.load();
+    latestRequest.reject(new Error('latest failed'));
+    await latest;
+    olderRequest.resolve(baseListing({ activeRuns: [], history: [] }));
+    await older;
+    flushSync();
+    assert.equal(store.error, true);
+    assert.equal(store.loading, false);
+    assert.equal(store.activeCount, ACTIVE.length, 'stale success does not replace the last accepted listing');
+  });
+
+  it('does not accept a pending result after the selected actor changes before another load starts', async () => {
+    const setup = makeServices();
+    let actorId = 'actor-1';
+    const request = Promise.withResolvers();
+    setup.services.getSelectedActorId = () => actorId;
+    setup.services.listJournalForActor = () => request.promise;
+    const store = createJournalStore({ services: setup.services });
+    const pending = store.load();
+    actorId = 'actor-2';
+    request.resolve(baseListing());
+    await pending;
+    flushSync();
+    assert.equal(store.listing, null);
+    assert.equal(store.loadedOnce, false);
+    assert.equal(store.loading, false);
+    assert.equal(store.error, false);
   });
 
   it('dismisses terminal entries at the service seam and only falls back after reload removes them', async () => {

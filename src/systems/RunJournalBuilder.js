@@ -460,10 +460,13 @@ export class RunJournalBuilder {
     const recipeSteps =
       recipe && typeof recipe.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
     const stepCount = runSteps.length;
-    const currentStepIndex = numberOrNull(run.currentStepIndex);
+    const currentStepIndex =
+      run.currentStepIndex == null ? null : numberOrNull(run.currentStepIndex);
     const status = stringOrNull(run.status) || 'inProgress';
     const activeStep =
       !terminal && Number.isFinite(currentStepIndex) ? runSteps[currentStepIndex] : null;
+    // Eligibility must be derived before identity redaction removes the public steps.
+    const hasPlayerCheck = Boolean(activeStep && this._checkLabel({ system, recipe }));
 
     const systemId = stringOrNull(run.craftingSystemId);
     const availabilitySnapshot =
@@ -515,7 +518,7 @@ export class RunJournalBuilder {
       terminal,
       derivedStatus,
       timeGate: activeStep?.timeGate,
-      hasPlayerCheck: Boolean(currentStep?.detail?.checkLabel),
+      hasPlayerCheck,
       entitled: !redacted,
       authority,
     });
@@ -973,6 +976,18 @@ export class RunJournalBuilder {
     optionOverrides,
     essenceAllocation,
   }) {
+    // The shared resolver treats invalid overrides as absent for legacy callers.
+    // Persisted Journal intent must instead remain blocked until explicitly replaced.
+    const invalidGroups = normalizeList(ingredientSet.ingredientGroups).filter(
+      (group) => ingredientOverrideIndex(group, optionOverrides) === null
+    );
+    if (invalidGroups.length) {
+      return {
+        success: false,
+        selectedIngredients: [],
+        missingGroups: invalidGroups.map((group) => ({ group })),
+      };
+    }
     const ingredientMatchesItem = this._recipeManager?.ingredientMatchesItem;
     const matcher =
       typeof ingredientMatchesItem === 'function'
@@ -1047,22 +1062,23 @@ export class RunJournalBuilder {
     const selectedMissing = normalizeList(selection?.missingGroups).some(
       (missing) => missingGroupId(missing) === groupId
     );
+    const presentation =
+      choice?.options?.[selectedOptionIndex] ??
+      this._ingredientOptionPresentation({
+        group,
+        option,
+        index: selectedOptionIndex,
+        available: !selectedMissing,
+        recipe,
+        items,
+        system,
+      });
     return {
       groupId,
       name: stringOrEmpty(group?.name),
       selectedOptionIndex,
       selectedItemId: stringOrNull(optionOverrides?.[groupId]?.heldItemId),
-      option:
-        choice?.options?.[selectedOptionIndex] ??
-        this._ingredientOptionPresentation({
-          group,
-          option,
-          index: selectedOptionIndex,
-          available: !selectedMissing,
-          recipe,
-          items,
-          system,
-        }),
+      option: option ? { ...presentation, available: !selectedMissing } : null,
     };
   }
 
@@ -1894,11 +1910,24 @@ function craftingOutcomeBand(outcome, routed, dc) {
   return routed?.thresholdMode === 'exceed' ? `>${relative}` : `${relative}+`;
 }
 
+function ingredientOverrideIndex(group, optionOverrides) {
+  const groupId = stringOrNull(group?.id);
+  if (!Object.hasOwn(optionOverrides, groupId)) return undefined;
+  const raw = optionOverrides[groupId]?.optionIndex;
+  if (typeof raw !== 'number' && typeof raw !== 'string') return null;
+  if (typeof raw === 'string' && !raw.trim()) {
+    return null;
+  }
+  const index = Number(raw);
+  return Number.isSafeInteger(index) && index >= 0 && index < normalizeList(group?.options).length
+    ? index
+    : null;
+}
+
 function selectedIngredientIndex(group, optionOverrides, selection) {
   const options = normalizeList(group?.options);
-  const groupId = stringOrNull(group?.id);
-  const override = Number(optionOverrides?.[groupId]?.optionIndex);
-  if (Number.isSafeInteger(override) && override >= 0 && override < options.length) return override;
+  const override = ingredientOverrideIndex(group, optionOverrides);
+  if (override !== undefined) return override;
   const selected = normalizeList(selection?.selectedIngredients).find((ingredient) =>
     options.includes(ingredient)
   );

@@ -34,6 +34,7 @@ export function createJournalStore({ services } = {}) {
   let worldTimeTick = $state(0);
   let loadedOnce = $state(false);
   let viewedStageByRunKey = $state({});
+  let loadGeneration = 0;
 
   function worldTime() {
     void worldTimeTick;
@@ -89,10 +90,7 @@ export function createJournalStore({ services } = {}) {
     if (!run) return null;
     const key = runKey(run, listing);
     const remembered = Number(viewedStageByRunKey[key]);
-    const current = Number(run.stepIndex);
-    const fallback = Number.isSafeInteger(current)
-      ? current
-      : Math.max(0, (run.steps?.length ?? 1) - 1);
+    const fallback = stageAnchor(run);
     return normalizeStageIndex(run, Number.isSafeInteger(remembered) ? remembered : fallback);
   });
   const viewedStage = $derived.by(() => {
@@ -102,36 +100,39 @@ export function createJournalStore({ services } = {}) {
   const navCount = $derived(Number(listing?.counts?.active ?? 0));
 
   async function load(quiet = false) {
+    const generation = ++loadGeneration;
+    const rememberedActorId = services?.getSelectedActorId?.() ?? null;
+    const isCurrentLoad = () =>
+      generation === loadGeneration &&
+      rememberedActorId === (services?.getSelectedActorId?.() ?? null);
     if (!quiet) {
       loading = true;
       error = false;
     }
     try {
       const next = await services?.listJournalForActor?.({
-        rememberedActorId: services?.getSelectedActorId?.() ?? null,
+        rememberedActorId,
       });
+      if (!isCurrentLoad()) return;
       listing = next ?? null;
       error = !next;
       reconcileCommandError();
       reconcileSelection();
       clampPages();
     } catch {
-      if (!quiet || !listing) error = true;
+      if (isCurrentLoad() && (!quiet || !listing)) error = true;
     } finally {
-      loading = false;
-      loadedOnce = true;
+      if (generation === loadGeneration) {
+        loading = false;
+        if (isCurrentLoad()) loadedOnce = true;
+      }
     }
   }
 
   function reconcileSelection() {
-    if (!selectedRunKey && !selectedRunId) return;
-    const all = [...(listing?.activeRuns ?? []), ...(listing?.history ?? [])];
-    const exists = selectedRunKey
-      ? all.some((run) => runKey(run, listing) === selectedRunKey)
-      : all.some((run) => run?.id === selectedRunId);
-    if (exists) return;
-    selectedRunKey = '';
-    selectedRunId = '';
+    const effective = selectedRun;
+    selectedRunKey = effective ? runKey(effective, listing) : '';
+    selectedRunId = effective?.id ?? '';
   }
 
   function reconcileCommandError() {
@@ -213,8 +214,7 @@ export function createJournalStore({ services } = {}) {
 
   function returnToCurrentStage(run = selectedRun) {
     if (!run) return;
-    const current = Number(run.stepIndex);
-    viewStage(run, Number.isSafeInteger(current) ? current : (run.steps?.length ?? 1) - 1);
+    viewStage(run, stageAnchor(run));
   }
 
   async function execute(run, payload = { interactive: true }) {
@@ -400,10 +400,10 @@ export function createJournalStore({ services } = {}) {
       return error;
     },
     get selectedRunId() {
-      return selectedRunId;
+      return selectedRun?.id ?? '';
     },
     get selectedRunKey() {
-      return selectedRunKey;
+      return selectedRun ? runKey(selectedRun, listing) : '';
     },
     get search() {
       return search;
@@ -561,6 +561,11 @@ function runKey(run, listing) {
     run?.runType ?? 'crafting',
     run?.id ?? null,
   ]);
+}
+
+function stageAnchor(run) {
+  const current = run.stepIndex == null ? null : Number(run.stepIndex);
+  return Number.isSafeInteger(current) ? current : Math.max(0, (run.steps?.length ?? 1) - 1);
 }
 
 function normalizeStageIndex(run, value) {

@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
 import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
+import { IngredientSet } from '../../src/models/IngredientSet.js';
 import { runStatusPresentation } from '../../src/ui/svelte/apps/journal/journalRunStatus.js';
 
 const ACTOR = { id: 'actor-1', uuid: 'Actor.actor-1', name: 'Akra', img: 'icons/a.webp' };
@@ -361,6 +362,14 @@ test('terminal single-step run blanks the label and stays final (currentStepInde
   // stepCount <= 1 marks it final even though currentStepIndex is null on a terminal run.
   assert.equal(run.isFinalStep, true);
   assert.equal(run.stepLabel, '');
+});
+
+test('terminal multi-stage projection preserves the absent execution index for final-stage browsing', () => {
+  const terminal = terminalCraftingRun({ steps: activeCraftingRun().steps });
+  const model = makeBuilder({ history: [terminal] }).buildListing({ actor: ACTOR, viewer: PLAYER }).history[0];
+  assert.equal(model.stepIndex, null, 'null must not be numerically coerced to the first stage');
+  assert.equal(model.currentStep, null);
+  assert.equal(model.steps.length, 2);
 });
 
 test('check DC comes from the recipe tier, not a hardcoded default', () => {
@@ -1908,6 +1917,72 @@ test('entitled step history prefers the selected requirement snapshot and carrie
   assert.deepEqual(projected.requirementSnapshot, selectedRequirementSnapshot);
   assert.equal(projected.requirements[0].componentId, 'legacy-iron', 'legacy flat rows remain available');
   assert.notEqual(projected.selectionPlan, selectionPlan, 'projection is cloned');
+});
+
+test('redacted checked countdown keeps owner actions but cannot offer automatic completion', () => {
+  const builder = makeBuilder({
+    active: [activeSingleStepRun({ lifecycleVersion: 1 })],
+    recipeVisibility: { evaluateRecipeAccess: () => ({ visible: false }) },
+  });
+  const model = builder.buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER }).activeRuns[0];
+  assert.equal(model.derivedStatus, 'waiting');
+  assert.equal(model.actions.setCompletionMode, false);
+  assert.equal(model.actions.pause, true);
+  assert.equal(model.actions.cancel, true);
+  assert.deepEqual(model.steps, []);
+  assert.equal(model.currentStep, null);
+  assert.equal(JSON.stringify(model).includes('1d20'), false);
+});
+
+function projectMaterialSelection(override) {
+  const ingredientSet = new IngredientSet({ id: 'materials', ingredientGroups: [{
+    id: 'metal', name: 'Metal', options: [
+      { id: 'iron-option', quantity: 1, match: { type: 'component', componentId: 'iron' } },
+      { id: 'silver-option', quantity: 1, match: { type: 'component', componentId: 'silver' } },
+    ],
+  }] });
+  const held = { id: 'iron', uuid: 'Actor.actor-1.Item.iron', name: 'Iron', system: { quantity: 5 } };
+  const plan = JSON.parse(JSON.stringify({ selectedIngredientSetId: ingredientSet.id, ingredientOptionOverrides: { metal: override } }));
+  const raw = activeSingleStepRun({ lifecycleVersion: 1, steps: [{ stepId: 's0', selectionPlan: plan }] });
+  const recipe = { ...SINGLE_STEP_RECIPE, getExecutionSteps: () => [{ id: 's0', ingredientSets: [ingredientSet] }] };
+  const model = makeBuilder({ active: [raw], recipe,
+    ingredientMatchesItem: (_recipe, ingredient, item) => ingredient.match.componentId === item.id,
+  }).buildListing({ actor: { ...ACTOR, isOwner: true, items: [held] }, viewer: PLAYER }).activeRuns[0];
+  assert.deepEqual(model.currentStep.selectionPlan, plan, 'projection never repairs persisted intent');
+  assert.equal(held.system.quantity, 5, 'projection does not spend stock');
+  return model.currentStep.selectionAvailability;
+}
+
+for (const optionIndex of [2, -1, 0.5, null, '', ' ', 'removed', undefined, false]) {
+  test(`invalid persisted option index ${String(optionIndex)} stays blocked rather than selecting stock`, () => {
+    const availability = projectMaterialSelection({ optionIndex });
+    assert.equal(availability.success, false);
+    assert.equal(availability.requirements[0].selectedOptionIndex, null);
+    assert.equal(availability.requirements[0].option, null, 'no fallback option is presented as selected');
+    assert.equal(availability.choices[0].selectedOptionIndex, null);
+    assert.equal(availability.choices[0].options[0].available, true, 'explicit replacement remains possible');
+    assert.equal(availability.missingGroups[0].id, 'metal');
+  });
+}
+
+test('valid explicit and absent material overrides retain canonical stock resolution', () => {
+  for (const override of [{ optionIndex: 0 }, { optionIndex: '0' }, undefined]) {
+    const availability = projectMaterialSelection(override);
+    assert.equal(availability.success, true);
+    assert.equal(availability.requirements[0].selectedOptionIndex, 0);
+    assert.equal(availability.requirements[0].option.available, true);
+  }
+});
+
+test('a missing held item remains pinned and blocked even when another candidate has stock', () => {
+  const availability = projectMaterialSelection({ optionIndex: 0, heldItemId: 'Actor.actor-1.Item.removed' });
+  assert.equal(availability.success, false);
+  const requirement = availability.requirements[0];
+  assert.equal(requirement.selectedItemId, 'Actor.actor-1.Item.removed');
+  assert.equal(requirement.selectedOptionIndex, 0);
+  assert.equal(requirement.option.available, false, 'selected claim is unavailable despite replacement stock');
+  assert.equal(requirement.option.candidates[0].itemId, 'Actor.actor-1.Item.iron');
+  assert.equal(availability.choices[0].options[0].available, true, 'replacement choice remains independently available');
 });
 
 test('same run id across native run types remains collision-free while same-type duplicates are dropped', () => {
