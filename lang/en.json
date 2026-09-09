@@ -9,6 +9,12 @@
       "Stepper": {
         "Decrease": "Decrease {label}",
         "Increase": "Increase {label}"
+      },
+      "SortableList": {
+        "MoveUp": "Move {name} up",
+        "MoveDown": "Move {name} down",
+        "Reorder": "Reorder {name} — use the up and down arrow keys",
+        "Remove": "Remove {name}"
       }
     },
     "Migration": {
@@ -2220,11 +2226,6 @@
           "DeleteStepAlsoTools": "its ingredients and results are deleted too",
           "DeleteStepAlsoAll": "its ingredients, results, and tools are deleted too",
           "UnnamedStep": "this step",
-          "DragStep": "Drag to reorder",
-          "DragResult": "Drag to reorder",
-          "MoveResultUp": "Move up",
-          "MoveResultDown": "Move down",
-          "ResultMoveAnnouncement": "{name} moved to position {position} of {total}",
           "UnnamedResult": "this result",
           "Difficulty": "Difficulty",
           "DifficultyUnset": "No difficulty",
@@ -2944,8 +2945,6 @@
             "DifficultyShort": "DC",
             "Edit": "Edit",
             "EditDcHint": "Set on this component in its editor",
-            "MoveUp": "Move up",
-            "MoveDown": "Move down",
             "DecrementResult": "Decrease quantity",
             "IncrementResult": "Increase quantity"
           },
@@ -5776,7 +5775,6 @@
             "ResolvedBySubject": "Chosen per {record} — each {record} picks which of these apply, and the picks are summed.",
             "ResolvedPlayerPicks": "Player picks — the crafter chooses from these at roll time, and the picks are summed.",
             "TiersLeadBands": "A recipe picks one of these; its DC anchors the outcome bands on the Outcomes section.",
-            "ReorderTier": "Reorder {name} — use the up and down arrow keys",
             "ModifierNamedHeading": "Named modifiers",
             "SimpleBoundary": "Difficulty class",
             "SimpleBandsFallback": "This check has no reachable range to draw against yet. Set a roll formula and a DC.",

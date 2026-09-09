@@ -16,6 +16,7 @@
   import { stepperLabels } from '../../../components/stepperLabels.js';
   import { ENVIRONMENT_INCLUDED_COMPOSITION_STATES } from '../../../../../systems/gatheringComposition.js';
   import IconButton from '../../../components/IconButton.svelte';
+  import SortableList from '../../../components/SortableList.svelte';
 
   let {
     kind = 'task',
@@ -46,8 +47,6 @@
     const raw = Number(weights?.[id]);
     return Number.isFinite(raw) && raw >= 0 ? raw : 1;
   }
-
-  let dragIndex = $state(-1);
 
   function text(key, fallback) {
     const translated = localize(key);
@@ -194,22 +193,11 @@
     };
   }
 
-  function includedMenuItems(index) {
+  // NO MOVE VERBS (issue 1512). `SortableList` draws a visible up/down rocker on every
+  // ordered row, so the menu's two hidden copies of the same act were a second way to say
+  // the same thing — and the one a reader could not see the range of.
+  function includedMenuItems() {
     const items = [];
-    if (showEventRankControls) {
-      items.push({
-        id: 'move-up',
-        label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveUp', 'Move up'),
-        icon: 'fas fa-arrow-up',
-        disabled: index === 0,
-      });
-      items.push({
-        id: 'move-down',
-        label: text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.MoveDown', 'Move down'),
-        icon: 'fas fa-arrow-down',
-        disabled: index === included.length - 1,
-      });
-    }
     items.push(openSourceItem());
     items.push({
       id: 'exclude',
@@ -286,19 +274,12 @@
   // ONE dispatcher for all four menus, because the verbs are shared across them: `open-source`
   // appears in every one and `include` in two. A per-menu handler would be four copies of this
   // switch with different subsets, which is how the four menus drifted apart in the first place.
-  function runMenuAction(id, entry, index) {
-    if (id === 'move-up') onReorder(kind, index, index - 1);
-    else if (id === 'move-down') onReorder(kind, index, index + 1);
-    else if (id === 'open-source') onOpenSource(kind, entry.id);
+  function runMenuAction(id, entry) {
+    if (id === 'open-source') onOpenSource(kind, entry.id);
     else if (id === 'include') onInclude(kind, entry.id);
     else if (id === 'force-include') onForceInclude(kind, entry.id);
     else if (id === 'exclude') onExclude(kind, entry.id);
     else if (id === 'restore') onRestore(kind, entry.id);
-  }
-
-  function handleDrop(targetIndex) {
-    if (dragIndex >= 0 && dragIndex !== targetIndex) onReorder(kind, dragIndex, targetIndex);
-    dragIndex = -1;
   }
 
   function formatWeightPercentage(id) {
@@ -307,11 +288,22 @@
     return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}%`;
   }
 
-  function activateOnKey(event, id) {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onSelect(kind, id);
-    }
+  // THE CALLER'S per-record state, carried onto the row element the primitive owns
+  // (issue 1512). `has-rank-controls` is gone with it: the list's own `reorderable` is what
+  // decides whether the row is ranked, so the class that used to say so twice says it once.
+  function includedRowClasses(entry) {
+    return [
+      // The caller's OWN family class leads. A rule that must reach the record's state cannot be
+      // written against the primitive's row class with an application root in front of it — that
+      // is the app-rooting the design system's rooting requirement refuses — so the state rules
+      // are keyed on this class, which this file writes and owns.
+      'manager-environment-comp-entry',
+      selectedId === entry.id ? 'is-selected' : '',
+      entry.runtimeState === 'unavailable' ? 'is-unavailable' : '',
+      entry.conditionsMet === false ? 'is-conditions-blocked' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
   }
 
   function availableRowBucket(entry) {
@@ -349,7 +341,13 @@
       class:has-rank-controls={showEventRankControls}
       aria-hidden="true"
     >
-      {#if showEventRankControls}<span></span>{/if}
+      <!-- THE LEAD TRACK IS THE LIST'S OWN CLUSTER (issue 1512). The rows are the shared
+           list's flex rows now, so this strip's first track is the width of the grip, the
+           gap and the ordinal badge the list draws before the record's cells — and it is
+           declared in the sheet from the same tokens the list is, rather than restated as a
+           number here. Without it every label would sit one cluster to the left of the
+           column it names. -->
+      <span></span>
       <span>{recordColumnLabel}</span>
       {#if showBlindWeights}<span
           >{text('FABRICATE.Admin.Manager.EnvironmentEditor.Composition.ColWeight', 'Weight')}</span
@@ -367,6 +365,9 @@
         )}</span
       >
       <span></span>
+      <!-- The trailing track under the list's chevron rocker, which only an ordered row
+           draws. -->
+      {#if showEventRankControls}<span></span>{/if}
     </div>
 
     {#if included.length === 0}
@@ -384,53 +385,39 @@
             )}
       />
     {:else}
-      <ul class="manager-environment-comp-rows">
-        {#each included as entry, index (entry.id)}
-          <li
-            class={`manager-environment-comp-row ${showEventRankControls ? 'has-rank-controls' : ''} ${selectedId === entry.id ? 'is-selected' : ''} ${entry.runtimeState === 'unavailable' ? 'is-unavailable' : ''} ${entry.conditionsMet === false ? 'is-conditions-blocked' : ''}`}
-            data-record-id={entry.id}
-            data-runtime-state={entry.runtimeState}
-            draggable={showEventRankControls ? true : undefined}
-            ondragstart={showEventRankControls
-              ? () => {
-                  dragIndex = index;
-                }
-              : undefined}
-            ondragover={showEventRankControls ? (event) => event.preventDefault() : undefined}
-            ondrop={showEventRankControls
-              ? (event) => {
-                  event.preventDefault();
-                  handleDrop(index);
-                }
-              : undefined}
-          >
-            {#if showEventRankControls}
-              <span
-                class="manager-environment-comp-handle"
-                title={text(
-                  'FABRICATE.Admin.Manager.EnvironmentEditor.Composition.DragReorder',
-                  'Drag to reorder'
-                )}
-              >
-                <i class="fas fa-grip-vertical" aria-hidden="true"></i>
-                <span class="manager-environment-comp-order">{index + 1}</span>
-              </span>
-            {/if}
-            <div
-              role="button"
-              tabindex="0"
+      <SortableList
+        items={included}
+        itemLabel={recordName}
+        numbered
+        handles
+        expandable={false}
+        reorderable={showEventRankControls}
+        onReorder={(from, to) => onReorder(kind, from, to)}
+        rowClass={(entry) => includedRowClasses(entry)}
+        rowData={(entry) => ({
+          'data-record-id': entry.id,
+          'data-runtime-state': entry.runtimeState,
+        })}
+      >
+        {#snippet row(entry)}
+          <!-- The record's CELLS, as a grid on the very variable the column-header strip
+               above reads, so a label sits over the column it names. The strip's lead track
+               is the primitive's grip-plus-badge cluster; see the sheet. -->
+          <div class="manager-environment-comp-cells">
+            <button
+              type="button"
               class="manager-environment-comp-task"
               data-action="select"
+              data-keyboard-focus="true"
               aria-pressed={selectedId === entry.id}
               onclick={() => onSelect(kind, entry.id)}
-              onkeydown={(event) => activateOnKey(event, entry.id)}
             >
               <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
               <span class="manager-environment-comp-copy">
                 <span class="manager-environment-comp-name">{recordName(entry)}</span>
                 <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
               </span>
-            </div>
+            </button>
             {#if showBlindWeights}
               <div class="manager-environment-comp-weight">
                 <!-- A `<div>`, not the `<label>` wrapping a `.visually-hidden` caption it was: see
@@ -490,14 +477,14 @@
                 </IconButton>
               {/if}
               <ActionMenu
-                items={includedMenuItems(index)}
+                items={includedMenuItems()}
                 triggerLabel={moreActionsLabel}
-                onSelect={(action) => runMenuAction(action, entry, index)}
+                onSelect={(action) => runMenuAction(action, entry)}
               />
             </div>
-          </li>
-        {/each}
-      </ul>
+          </div>
+        {/snippet}
+      </SortableList>
     {/if}
   </section>
 
@@ -536,21 +523,20 @@
               data-section-row={availableRowBucket(entry)}
               data-composition-state={entry.compositionState}
             >
-              <div
-                role="button"
-                tabindex="0"
+              <button
+                type="button"
                 class="manager-environment-comp-task"
                 data-action="select"
+                data-keyboard-focus="true"
                 aria-pressed={selectedId === entry.id}
                 onclick={() => onSelect(kind, entry.id)}
-                onkeydown={(event) => activateOnKey(event, entry.id)}
               >
                 <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
                 <span class="manager-environment-comp-copy">
                   <span class="manager-environment-comp-name">{recordName(entry)}</span>
                   <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
                 </span>
-              </div>
+              </button>
               {#if showBlindWeights}<div class="manager-environment-comp-weight">
                   <span class="manager-environment-comp-none">—</span>
                 </div>{/if}
@@ -621,21 +607,20 @@
               data-record-id={entry.id}
               data-section-row="excluded"
             >
-              <div
-                role="button"
-                tabindex="0"
+              <button
+                type="button"
                 class="manager-environment-comp-task"
                 data-action="select"
+                data-keyboard-focus="true"
                 aria-pressed={selectedId === entry.id}
                 onclick={() => onSelect(kind, entry.id)}
-                onkeydown={(event) => activateOnKey(event, entry.id)}
               >
                 <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
                 <span class="manager-environment-comp-copy">
                   <span class="manager-environment-comp-name">{recordName(entry)}</span>
                   <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
                 </span>
-              </div>
+              </button>
               {#if showBlindWeights}<div class="manager-environment-comp-weight">
                   <span class="manager-environment-comp-none">—</span>
                 </div>{/if}
@@ -708,21 +693,20 @@
               data-section-row="non-matching"
               data-composition-state={entry.compositionState}
             >
-              <div
-                role="button"
-                tabindex="0"
+              <button
+                type="button"
                 class="manager-environment-comp-task"
                 data-action="select"
+                data-keyboard-focus="true"
                 aria-pressed={selectedId === entry.id}
                 onclick={() => onSelect(kind, entry.id)}
-                onkeydown={(event) => activateOnKey(event, entry.id)}
               >
                 <img class="manager-environment-comp-thumb" src={recordImage(entry)} alt="" />
                 <span class="manager-environment-comp-copy">
                   <span class="manager-environment-comp-name">{recordName(entry)}</span>
                   <span class="manager-environment-comp-sub">{recordDescription(entry)}</span>
                 </span>
-              </div>
+              </button>
               {#if showBlindWeights}<div class="manager-environment-comp-weight">
                   <span class="manager-environment-comp-none">—</span>
                 </div>{/if}

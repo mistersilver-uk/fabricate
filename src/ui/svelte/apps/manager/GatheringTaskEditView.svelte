@@ -2061,24 +2061,26 @@
             </div>
             {#each paginatedRows as row (row.id)}
               {@const rankIndex = dropRows.indexOf(row)}
+              <!-- The row's `onclick` is a POINTER CONVENIENCE and nothing else (issue 1512):
+                   selecting a drop from the keyboard goes through the component cell's real
+                   `<button>` below, in both its branches, and `aria-selected` on this row is
+                   the single carrier of the selection state. The row is deliberately NOT
+                   focusable — a focusable `role="row"` is a non-form element Foundry's
+                   `KeyboardManager#hasFocus` cannot see, so every arrow press panned the
+                   canvas behind the window. -->
+              <!-- svelte-ignore a11y_interactive_supports_focus -->
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
               <div
                 class={`manager-gathering-task-drop-row ${selectedDrop?.id === row.id ? 'is-selected' : ''}`}
                 role="row"
                 data-gathering-task-drop-id={row.id}
                 data-gathering-task-drop-zone={row.id}
                 aria-selected={selectedDrop?.id === row.id}
-                tabindex="0"
                 use:dragDrop={{
                   onDrop: (data) => handleDropZoneDrop(row.id, data),
                   activeClass: 'is-drop-active',
                 }}
                 onclick={() => onSelectDrop(row.id)}
-                onkeydown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    onSelectDrop(row.id);
-                  }
-                }}
               >
                 {#if rankedMode}
                   <span
@@ -2136,31 +2138,48 @@
                   class="manager-drop-cell manager-drop-component-cell"
                   data-gathering-task-drop-component-cell
                 >
-                  {#if row.componentId || row.itemUuid}
-                    <button
-                      type="button"
-                      class="manager-gathering-task-identity manager-drop-component-button"
-                      title={text(
-                        'FABRICATE.Admin.Manager.Environment.Tasks.ClearDropComponentHint',
-                        'Right-click to clear component'
-                      )}
-                      onclick={(event) => {
-                        event.stopPropagation();
-                        onSelectDrop(row.id);
-                      }}
-                      onkeydown={(event) => event.stopPropagation()}
-                      onmousedown={(event) => onDropComponentMouseDown(row.id, event)}
-                      oncontextmenu={(event) => onClearDropComponent(row.id, event)}
-                    >
+                  <!-- THE COMPONENT CELL IS THE ROW'S KEYBOARD PATH (issue 1512), in BOTH
+                       branches. The row itself dropped its `tabindex="0"` and its
+                       Enter/Space handler: a `role="row"` that holds focus is a focusable
+                       non-form element Foundry's `KeyboardManager#hasFocus` cannot see, so
+                       every arrow press panned the canvas behind the open window, and
+                       `aria-selected` on the row is the single carrier of selection with no
+                       `aria-pressed` beside it.
+
+                       The EMPTY branch renders the SAME real `<button>` wrapper as the
+                       populated one. A newly added drop row is born empty, so leaving that
+                       branch a `<div>` while the row lost its focus target would have made
+                       every new row keyboard-unselectable — a regression this change would
+                       have caused rather than a residue it inherited. -->
+                  <button
+                    type="button"
+                    class={`manager-gathering-task-identity ${
+                      row.componentId || row.itemUuid
+                        ? 'manager-drop-component-button'
+                        : 'manager-drop-empty-component is-empty'
+                    }`}
+                    data-keyboard-focus="true"
+                    aria-label={componentLabel(row)}
+                    title={row.componentId || row.itemUuid
+                      ? text(
+                          'FABRICATE.Admin.Manager.Environment.Tasks.ClearDropComponentHint',
+                          'Right-click to clear component'
+                        )
+                      : undefined}
+                    onclick={(event) => {
+                      event.stopPropagation();
+                      onSelectDrop(row.id);
+                    }}
+                    onkeydown={(event) => event.stopPropagation()}
+                    onmousedown={(event) => onDropComponentMouseDown(row.id, event)}
+                    oncontextmenu={(event) => onClearDropComponent(row.id, event)}
+                  >
+                    {#if row.componentId || row.itemUuid}
                       <img class="manager-gathering-task-thumb" src={componentImage(row)} alt="" />
                       <span class="manager-system-copy">
                         <span class="manager-system-name">{componentLabel(row)}</span>
                       </span>
-                    </button>
-                  {:else}
-                    <div
-                      class="manager-gathering-task-identity manager-drop-empty-component is-empty"
-                    >
+                    {:else}
                       <span
                         class="manager-inline-drop-zone"
                         data-gathering-task-drop-zone={row.id}
@@ -2182,8 +2201,8 @@
                           )}</span
                         >
                       </span>
-                    </div>
-                  {/if}
+                    {/if}
+                  </button>
                 </span>
                 <span
                   role="cell"

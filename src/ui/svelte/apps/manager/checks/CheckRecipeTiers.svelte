@@ -24,14 +24,21 @@
   it in that order, and nothing else derives from the positions, so a move is a plain array
   reorder with no other consequence.
 
-  Drag is the pointer half. The grip is also a real BUTTON that moves its row with the arrow
-  keys, because HTML5 drag-and-drop has no keyboard path at all and reordering would
-  otherwise be mouse-only. The prototype draws one affordance, so this is one affordance
-  that answers both inputs rather than a grip plus a visible chevron rocker.
+  ## ONE AFFORDANCE IS OVERTURNED (maintainer ruling M2, 2026-09-09)
+
+  Issue 1096 read the prototype as drawing ONE affordance and recorded a deliberate refusal
+  of the chevron rocker: a grip that answers both the pointer and the arrow keys, and no
+  visible up/down pair. That decision is OVERTURNED. The design system's own specimen states
+  BOTH AFFORDANCES ALWAYS - a single-position nudge is faster than a drag, and the rocker is
+  the only affordance a reader can see the RANGE of - and the maintainer ruled for the
+  specimen. So this row renders through `SortableList` (issue 1512) and gains the numbered
+  badge, the chevron rocker and the polite reorder announcement it had none of; the ruling
+  and the decision it reverses are both recorded in the library's section 16.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
   import ManagerButton from '../../../components/ManagerButton.svelte';
+  import SortableList from '../../../components/SortableList.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   import { stepperLabels } from '../../../components/stepperLabels.js';
 
@@ -75,9 +82,8 @@
 
   // ── Reordering ────────────────────────────────────────────────────────────────────
   //
-  // `dragIndex` is the row under the pointer, and it is `$state` rather than a plain local
-  // because the row it names paints itself as travelling.
-  let dragIndex = $state(-1);
+  // BOTH INPUTS ARE THE SHARED LIST'S (issue 1512): the drag source, the grip, the arrow
+  // keys, the chevron rocker and the announcement. This surface keeps only the array move.
 
   /** Move one row, clamped. A move to where it already is emits nothing. */
   function moveTier(from, to) {
@@ -88,13 +94,6 @@
     const [moved] = next.splice(from, 1);
     next.splice(target, 0, moved);
     onChange(next);
-  }
-
-  function onGripKeydown(event, index) {
-    const delta = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
-    if (delta === 0) return;
-    event.preventDefault();
-    moveTier(index, index + delta);
   }
 
   function tierName(tier) {
@@ -132,94 +131,73 @@
         'No tiers yet. Add named tiers a recipe can select to override the DC.'
       )}
     </p>
+    <!-- THE ADDER FOLLOWS THE EMPTY MESSAGE (issue 1512): with no tiers there is no list for it
+         to be a footer of, and an empty state that says "add one" with nothing to press is a dead
+         end. -->
+    {@render addTierButton()}
   {:else}
-    <div
-      class="manager-checks-tier-list"
-      role="list"
-      aria-label={text(
-        'FABRICATE.Admin.Manager.Checks.Crafting.TiersTitle',
-        'Recipe difficulty tiers'
-      )}
+    <SortableList
+      items={list}
+      itemLabel={tierName}
+      numbered
+      handles
+      onReorder={(from, to) => moveTier(from, to)}
+      rowData={(tier) => ({ 'data-tier-row': tier.id })}
     >
-      {#each list as tier, index (tier.id)}
-        <!-- The ROW is the drag source and the drop target; the grip is the handle a
-             pointer grabs it by. `ondragover` must preventDefault or the drop never
-             fires — that is the HTML5 contract, not a workaround. -->
-        <div
-          class={`manager-checks-tier-row ${dragIndex === index ? 'is-dragging' : ''}`}
-          role="listitem"
-          data-tier-row={tier.id}
-          draggable="true"
-          ondragstart={() => {
-            dragIndex = index;
-          }}
-          ondragend={() => {
-            dragIndex = -1;
-          }}
-          ondragover={(event) => event.preventDefault()}
-          ondrop={(event) => {
-            event.preventDefault();
-            moveTier(dragIndex, index);
-            dragIndex = -1;
-          }}
-        >
-          <ManagerButton
-            class="manager-checks-tier-grip"
-            data-tier-grip={tier.id}
-            aria-label={text(
-              'FABRICATE.Admin.Manager.Checks.Crafting.ReorderTier',
-              'Reorder {name} — use the up and down arrow keys'
-            ).replace('{name}', tierName(tier))}
-            onkeydown={(event) => onGripKeydown(event, index)}
-          >
-            <i class="fas fa-grip-vertical" aria-hidden="true"></i>
-          </ManagerButton>
-          <input
-            class="manager-checks-tier-name"
-            data-tier-name
-            aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.TierName', 'Name')}
-            value={tier.name || ''}
-            oninput={(event) => updateTier(tier.id, { name: event.currentTarget.value })}
+      {#snippet row(tier)}
+        <input
+          class="manager-checks-tier-name"
+          data-tier-name
+          aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.TierName', 'Name')}
+          value={tier.name || ''}
+          oninput={(event) => updateTier(tier.id, { name: event.currentTarget.value })}
+        />
+        <!-- The prototype labels the number in the ROW rather than in a column header, so
+             the label goes where the header was and the row stays self-describing with no
+             header row above it. It is `aria-hidden` because the stepper already carries
+             the same word as its own accessible name; announcing it twice would be worse
+             than not announcing it here at all. -->
+        <span class="manager-checks-tier-unit" aria-hidden="true">{dcLabel}</span>
+        <!-- `fill`, so the stepper takes the row's pinned track and its 28px height rather
+             than sitting in it as a narrower inline island. No `allowUnset`: a tier's DC
+             has no absent state, 0 is a real DC, and the `data-*` hook rides `inputProps`
+             onto the real `<input>`.
+
+             `min={0}`: 0 is a real DC but -1 is not, and a tier's DC starts at 0, so
+             without the clamp one click of the live decrement adjunct commits a negative
+             DC. -->
+        <div class="manager-checks-tier-stepper is-narrow">
+          <Stepper
+            fill
+            min={0}
+            value={tier.dc ?? 0}
+            {...stepperLabels(dcLabel)}
+            inputProps={{ 'data-tier-dc': '' }}
+            onChange={(dc) => updateTier(tier.id, { dc })}
           />
-          <!-- The prototype labels the number in the ROW rather than in a column header, so
-               the label goes where the header was and the row stays self-describing with no
-               header row above it. It is `aria-hidden` because the stepper already carries
-               the same word as its own accessible name; announcing it twice would be worse
-               than not announcing it here at all. -->
-          <span class="manager-checks-tier-unit" aria-hidden="true">{dcLabel}</span>
-          <!-- `fill`, so the stepper takes the row's pinned track and its 28px height rather
-               than sitting in it as a narrower inline island. No `allowUnset`: a tier's DC
-               has no absent state — 0 is a real DC — and the `data-*` hook rides
-               `inputProps` onto the real `<input>`.
-
-               `min={0}`: 0 is a real DC but -1 is not, and a tier's DC starts at 0, so
-               without the clamp one click of the live `−` adjunct commits a negative DC. -->
-          <div class="manager-checks-tier-stepper is-narrow">
-            <Stepper
-              fill
-              min={0}
-              value={tier.dc ?? 0}
-              {...stepperLabels(dcLabel)}
-              inputProps={{ 'data-tier-dc': '' }}
-              onChange={(dc) => updateTier(tier.id, { dc })}
-            />
-          </div>
-          <ManagerButton
-            role="danger"
-            class="manager-checks-tier-remove"
-            data-remove-tier
-            aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.RemoveTier', 'Remove tier')}
-            onclick={() => removeTier(tier.id)}
-          >
-            <i class="fas fa-trash" aria-hidden="true"></i>
-          </ManagerButton>
         </div>
-      {/each}
-    </div>
+        <!-- NOT the list's own `removable` control: `data-remove-tier` is the hook every
+             mounted driver removes a tier by, and the list's remove writes its own. -->
+        <ManagerButton
+          role="danger"
+          class="manager-checks-tier-remove"
+          data-remove-tier
+          aria-label={text('FABRICATE.Admin.Manager.Checks.Crafting.RemoveTier', 'Remove tier')}
+          onclick={() => removeTier(tier.id)}
+        >
+          <i class="fas fa-trash" aria-hidden="true"></i>
+        </ManagerButton>
+      {/snippet}
+      {#snippet footer()}
+        <li class="manager-checks-tier-add">{@render addTierButton()}</li>
+      {/snippet}
+    </SortableList>
   {/if}
+</div>
 
+{#snippet addTierButton()}
   <ManagerButton role="dashed" data-add-tier onclick={addTier}>
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Checks.Crafting.AddTier', 'Add difficulty tier')}</span>
   </ManagerButton>
-</div>
+{/snippet}

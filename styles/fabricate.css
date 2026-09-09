@@ -3123,42 +3123,10 @@
   background: var(--fab-surface-active);
 }
 
-/* THE DRAG HANDLE. A bare grip glyph, as the prototype draws it — but a real `<button>`,
-   because HTML5 drag-and-drop has no keyboard path and a handle only a mouse can use is a
-   reordering affordance half the GMs on this screen cannot reach.
-
-   It goes through `ManagerButton` like every other button in the studio, so this rule is
-   the reset that takes the pill off it: the primitive's padding, border, radius and fill
-   would otherwise draw a 34px control where the prototype draws an 11px glyph. Same shape
-   of override as `.manager-checks-tier-remove` below, which keeps its danger tint. */
-.fabricate-manager .manager-checks-tier-row .manager-checks-tier-grip {
-  appearance: none;
-  -webkit-appearance: none;
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 28px;
-  min-width: 0;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  color: var(--fab-text-disabled);
-  background: transparent;
-  font-size: 11px;
-  cursor: grab;
-}
-
-.fabricate-manager .manager-checks-tier-row .manager-checks-tier-grip:hover {
-  color: var(--fab-text-subtle);
-  background: transparent;
-}
-
-.fabricate-manager .manager-checks-tier-row:active .manager-checks-tier-grip {
-  cursor: grabbing;
-}
+/* (THE TIER GRIP LEFT THIS FILE at issue 1512. The row is `SortableList`'s, so the grip is
+   the list's `IconButton` and the reset that used to take the `ManagerButton` pill off an
+   11px glyph is the primitive's box instead. `.manager-checks-tier-remove` below still
+   carries its own, because that control is still this surface's.) */
 
 /* The preset row. Each preset is the dashed ADD role, because that is what it does — it
    appends a row to the list below — and the row wraps rather than scrolling, so a narrow
@@ -10899,87 +10867,11 @@
   outline-offset: 2px;
 }
 
-.fabricate-manager .manager-recipe-steps-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.fabricate-manager .manager-recipe-steps-row {
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-  background: var(--fab-overlay-light-04);
-  overflow: hidden;
-}
-
-.fabricate-manager .manager-recipe-steps-row.is-expanded {
-  border-color: var(--fab-accent);
-}
-
-.fabricate-manager .manager-recipe-steps-row-head {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  padding: var(--fab-space-2);
-  min-width: 0;
-  cursor: grab;
-}
-
-.fabricate-manager .manager-recipe-steps-row-head:active {
-  cursor: grabbing;
-}
-
-.fabricate-manager .manager-recipe-steps-row-main {
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-2);
-  min-width: 0;
-  padding: 0;
-  border: none;
-  background: none;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-recipe-steps-chevron {
-  flex: 0 0 auto;
-  margin-left: auto;
-  color: var(--fab-text-muted);
-}
-
-/* Multi-step header number (issue 643): a larger rounded-square numeral badge — matching
-   the prototype — rather than the environment editor's bare pip, with the step name +
-   description copy beside it. Scoped to recipe steps so the environment comp handle is
-   untouched. On Overview the drag grip stays stacked above the badge. */
-.fabricate-manager .manager-recipe-steps-row-head .manager-environment-comp-handle {
-  flex: 0 0 auto;
-  transform: none;
-
-  /* Lay the number badge to the LEFT of the drag grip (issue 643). The markup is
-     grip-then-number, so row-reverse renders the number first (left) and the grip
-     right; non-reorderable tabs have only the badge, so the direction is moot there. */
-  flex-direction: row-reverse;
-  align-items: center;
-  gap: var(--fab-space-2);
-}
-
-.fabricate-manager .manager-recipe-steps-row-head .manager-environment-comp-order {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  background: var(--fab-bg-3);
-  color: var(--fab-text);
-  font-size: 0.82rem;
-}
+/* (THE RECIPE STEP ROW LEFT THIS FILE at issue 1512: the list, the row, its head, its
+   `role="button"` main area, its chevron and the two recipe-scoped overrides of the
+   composition list's borrowed handle and pip are all `SortableList`'s row now, at the
+   specimen's geometry. The step's own chip cluster below stays, because it is about a
+   recipe STEP rather than about ordering one.) */
 
 .fabricate-manager .manager-recipe-steps-requirements {
   display: flex;
@@ -11087,17 +10979,16 @@
   min-height: 46px;
 }
 
-.fabricate-manager .manager-recipe-steps-row-controls {
-  display: inline-flex;
-  flex: 0 0 auto;
-  gap: var(--fab-space-2xs);
-}
-
+/* The step's editor body. It is the CALLER's own element inside the shared list's body element
+   (issue 1512), which is why it survived the conversion at all: a rule keyed on the primitive's
+   body class behind this card's own would be an application root in front of a class the
+   primitive writes. Its padding is gone — the list's body already states 0 12 12 — and what is
+   left is the stack and the rule that separates it from the row's line above. */
 .fabricate-manager .manager-recipe-steps-editor {
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-2);
-  padding: var(--fab-space-3);
+  padding-top: var(--fab-space-3);
   border-top: 1px solid var(--fab-border);
 }
 
@@ -11827,62 +11718,25 @@
   text-align: left;
 }
 
-/* ── Progressive salvage stages (issue 676) ───────────────────────────────────────
+/* ── Progressive salvage stages (issue 676) ──────────────────────────────
    Progressive renders an ordered list of SINGLE results — no group boxes. The roll is
-   spent DOWN this list, so the row's POSITION is data: it gets a grip, an order badge
-   and reorder chevrons rather than being a bare select in an unlabelled sequence. */
-.fabricate-manager .manager-salvage-stage-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fab-space-chip);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
+   spent DOWN this list, so the row's POSITION is data. The list itself, its grip, its order
+   badge and its reorder chevrons are all `SortableList`'s at issue 1512; what stays below
+   is what is about a salvage STAGE rather than about ordering one. */
 
-/* The RECIPE progressive stage row shares every rule below (issue 676). The two are the
-   same surface — an ordered, quantity-less list of single results whose position is the
-   authored data — and they had drifted into two designs: the recipe row used an
-   image-only picker with the name loose beside it, a "DIFFICULTY" micro-label over a
-   combined `Difficulty 4 ↗` chip, and the order stacked under the grip. Salvage was
-   migrated and tuned first (its picker bound, its cluster spaced), so it wins, and the
-   recipe row joins its SELECTOR LISTS rather than copying the values — two copies is
-   what produced the drift in the first place. */
-.fabricate-manager .manager-salvage-stage-row,
-.fabricate-manager .manager-recipe-result-row.is-reorderable {
-  display: flex;
-  align-items: center;
-  gap: var(--fab-space-3);
-  min-width: 0;
-  padding: var(--fab-space-chip) var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 8px;
-  background: var(--fab-bg-1);
-}
 
-/* A recipe stage row that draws a complication strip hands its PADDING to the row's own
-   line (`.manager-recipe-stage-line`, in RecipeResultItemRow.svelte) and clips itself, so
-   the strip below can run edge to edge with its `border-top` acting as a card divider —
-   which is exactly how the prototype builds this card: `flex-direction: column;
-   overflow: hidden` with the padding on an inner top row and the band as its sibling.
-   Inset by the card's padding instead, the band's rule drew as a short line floating
-   inside the card rather than as a divider across it (issue 1286).
+/* (THE JOINED STAGE-ROW GEOMETRY LEFT THIS FILE at issue 1512. Issue 676 joined
+   `.manager-salvage-stage-row` with `.manager-recipe-result-row.is-reorderable` so the two
+   studios could not drift into two designs; `SortableList` is the stronger form of that
+   join, because the two surfaces now share an IMPLEMENTATION rather than a selector list.
+   The maintainer's geometry ruling moves both rows onto the specimen's padding 12 / radius
+   9 / gap 12 box, so the r8 / 6px-8px values are not carried across.
 
-   `overflow: hidden` is what keeps the band's warning fill inside the card's 8px radius.
-   It cannot clip the row's component picker: `SearchablePopover` portals its popover to
-   the manager host rather than rendering it in flow.
-
-   The grip and the ordinal moved INSIDE that line, so this no longer needs the
-   `align-items: flex-start` it once carried to stop them centring against the whole card —
-   they now centre against the line they label, which is what they always meant to do.
-
-   Additive and scoped by `:has()` to rows that actually draw a strip, so it joins nothing
-   and moves no existing stage row in either studio — the join above stays the one place
-   the two surfaces share values. */
-.fabricate-manager .manager-recipe-result-row.is-reorderable:has(.manager-recipe-stage-complications) {
-  overflow: hidden;
-  padding: 0;
-}
+   The `:has()` rule that made a banded row a column and clipped it is retired for the same
+   reason: the list's row is ALWAYS a column whose line carries the padding, and it always
+   clips itself, so the band gets its edge-to-edge treatment by construction rather than by
+   an additive override. The rules below are the ones that are about a STAGE rather than
+   about a row, re-keyed onto the list's row.) */
 
 /* THE PICKER IS CONTENT-SIZED ON A STAGE ROW, NOT GREEDY. The shared field is
    `flex: 1 1 auto`, which is right on the simple/routed row (a picker, a stepper and an ×)
@@ -11896,7 +11750,7 @@
    gets a short button, and only a name that actually needs 360px gets 360px. It still
    shrinks below that at the narrow container-query widths. */
 .fabricate-manager .manager-salvage-stage-row .manager-salvage-component-field,
-.fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-option-target {
+.fabricate-manager .manager-recipe-stage-row .manager-recipe-option-target {
   flex: 0 1 auto;
   min-width: 0;
 }
@@ -11906,7 +11760,7 @@
    packing everything left against a dead right margin. The DC always renders (the Edit link
    does NOT — it needs a chosen component), so it is the only safe anchor for the `auto`. */
 .fabricate-manager .manager-salvage-stage-row .manager-salvage-result-difficulty,
-.fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-option-controls {
+.fabricate-manager .manager-recipe-stage-row .manager-recipe-option-controls {
   margin-left: auto;
 }
 
@@ -11922,12 +11776,9 @@
    a complication band no longer hands this 4px to the BAND's own Edit link, which belongs
    to the band's eyebrow rather than to the row's trailing cluster. The recipe selectors are
    untouched — that row nests its controls in `.manager-recipe-option-controls`. */
-.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-line .manager-salvage-stage-edit,
-.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-line .manager-salvage-stage-reorder,
-.fabricate-manager .manager-salvage-stage-row > .manager-salvage-stage-line > .manager-icon-button,
-.fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-stage-edit,
-.fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-stage-reorder,
-.fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-result-remove {
+.fabricate-manager .manager-salvage-stage-row .manager-salvage-stage-edit,
+.fabricate-manager .manager-recipe-stage-row .manager-recipe-stage-edit,
+.fabricate-manager .manager-recipe-stage-row .manager-recipe-result-remove {
   margin-left: var(--fab-space-1);
 }
 
@@ -11935,86 +11786,24 @@
    shape every non-progressive result row uses), where salvage puts them straight on the
    row. So the row's own 12px gap does not apply between them — restate it here, giving
    the same 12px + 4px = 16px separation the salvage cluster measures. */
-.fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-option-controls {
+.fabricate-manager .manager-recipe-stage-row .manager-recipe-option-controls {
   display: flex;
   align-items: center;
   gap: var(--fab-space-3);
   flex: 0 0 auto;
 }
 
-/* The row being dragged. `--fab-accent-border` + a lifted surface, so the GM can see
-   which row is travelling. */
-.fabricate-manager .manager-salvage-stage-row.is-dragging,
-.fabricate-manager .manager-recipe-result-row.is-reorderable.is-dragging {
-  border-color: var(--fab-accent-border);
-  background: var(--fab-surface-active);
-}
-
-.fabricate-manager .manager-salvage-stage-grip,
-.fabricate-manager .manager-recipe-stage-grip {
-  flex: 0 0 auto;
-  color: var(--fab-text-subtle);
-  font-size: 0.7rem;
-  cursor: grab;
-}
-
-.fabricate-manager .manager-salvage-stage-row:active .manager-salvage-stage-grip,
-.fabricate-manager .manager-recipe-result-row.is-reorderable:active .manager-recipe-stage-grip {
-  cursor: grabbing;
-}
+/* (THE TRAVELLING ROW AND THE TWO GRIPS LEFT THIS FILE at issue 1512: the dragging state
+   and the grip are `SortableList`'s, and `fabricate-sortable-list-row.is-dragging` and
+   `fabricate-sortable-list-grip` carry the same treatment on the primitive's own root.) */
 
 /* (`.manager-salvage-stage-component` sized the stage row's native <select>. The row now
    picks its component through `.manager-salvage-component-field`, which both salvage rows
    share — see the yield-picker block above.) */
 
-.fabricate-manager .manager-salvage-stage-reorder,
-.fabricate-manager .manager-recipe-stage-reorder {
-  display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  gap: 2px;
-}
-
-/* Foundry's button reset — core's fixed button height would blow the row open.
-   Sized as a REAL stacked control, not a hairline: reorder is the authoring act in
-   progressive mode (the list order decides what a player is awarded), so the chevrons
-   are the primary affordance for it and the drag is the enhancement. They were 20x12 at
-   a 0.44rem glyph, which is smaller than the row's own icons and an unhittable target;
-   24x16 was still cramped. 30px wide matches the Recipe Studio's stacked rocker, and the
-   room comes free now the picker beside them is bounded. */
-.fabricate-manager .manager-salvage-stage-move,
-.fabricate-manager .manager-recipe-stage-move {
-  appearance: none;
-  -webkit-appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 18px;
-  min-height: 0;
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--fab-border);
-  border-radius: 4px;
-  color: var(--fab-text-muted);
-  background: var(--fab-surface-soft);
-  font-size: 0.68rem;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.fabricate-manager .manager-salvage-stage-move:hover:not(:disabled),
-.fabricate-manager .manager-recipe-stage-move:hover:not(:disabled) {
-  color: var(--fab-text);
-  border-color: var(--fab-accent);
-}
-
-.fabricate-manager .manager-salvage-stage-move:disabled,
-.fabricate-manager .manager-recipe-stage-move:disabled {
-  color: var(--fab-text-disabled);
-  cursor: default;
-  opacity: 0.5;
-}
+/* (THE CHEVRON ROCKER LEFT THIS FILE at issue 1512. Both studios drew their own 30x18
+   stacked pair with its own reset; the list draws ONE rocker, at the specimen's 24x24 hit
+   areas, disabled at the ends rather than hidden.) */
 
 /* The "Edit ↗" deep link to the yield component's own editor. It is the ONLY way to
    change the DC shown beside it (the DC belongs to the yield component, whose own editor
@@ -12055,24 +11844,9 @@
   border-color: var(--fab-accent);
 }
 
-/* The order badge: mono, on a raised surface, so it reads as an index rather than a
-   label. Fixed 22px keeps the selects aligned as the list passes 9 entries. */
-.fabricate-manager .manager-salvage-result-ordinal,
-.fabricate-manager .manager-recipe-stage-ordinal {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: var(--fab-surface-raised);
-  color: var(--fab-text-subtle);
-  font-family: var(--fab-font-mono);
-  font-size: 0.68rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
+/* (THE ORDER BADGE LEFT THIS FILE at issue 1512. Both studios drew their own 22px mono
+   badge; `fabricate-sortable-list-ordinal` is that badge, at the specimen's radius and
+   surface, drawn by the list for every numbered row.) */
 
 /* Read-only DC on a progressive salvage row. Mono + `--fab-info`, matching the roll
    budget banner it belongs to; never shrinks, so a long component name cannot squeeze
@@ -12314,25 +12088,15 @@
   gap: var(--fab-space-2);
 }
 
-/* A progressive recipe stage row is the SAME surface as a progressive salvage stage row,
-   and takes its whole geometry from the shared rule up in the salvage-stage block
-   (issue 676). This used to be a full parallel copy — its own 8px gap, padding, border,
-   radius and surface — which is exactly how the two drifted into two designs. Only the
-   grab cursor is stated here: it is the one thing the salvage row expresses on its grip
-   rather than on the row. */
-.fabricate-manager .manager-recipe-result-row.is-reorderable {
-  cursor: grab;
-}
-
-/* A progressive stage IS the outer reorderable card, so the item row inside it drops its
-   own border / fill / padding — no double box — and hugs one compact line (issue 643).
-   `flex-wrap: nowrap` matches the salvage stage row, which is a single flex line: the
-   shared `.manager-recipe-ingredient-option-row` wraps (right for an ingredient row,
-   whose alternatives genuinely need a second line), and at a ~520px container that made
-   the stage row break its picker onto one line and its controls onto another — 94px tall
-   against salvage's 52px. Nowrap lets the bounded picker SHRINK instead, exactly as
-   salvage's does (issue 676). */
-.fabricate-manager .manager-recipe-result-row.is-reorderable .manager-recipe-ingredient-option-row {
+/* A progressive stage IS the list's row, so the item row inside it drops its own border,
+   fill and padding — no double box — and hugs one compact line (issue 643).
+   `flex-wrap: nowrap` is what keeps it one line: the shared
+   `.manager-recipe-ingredient-option-row` wraps (right for an ingredient row, whose
+   alternatives genuinely need a second line), and at a ~520px container that made the stage
+   row break its picker onto one line and its controls onto another — 94px tall against
+   salvage's 52px. Nowrap lets the bounded picker SHRINK instead (issue 676). Re-keyed onto
+   the list's row at issue 1512; the row's own grab cursor is the list's grip now. */
+.fabricate-manager .manager-recipe-stage-row .manager-recipe-ingredient-option-row {
   flex: 1 1 auto;
   flex-wrap: nowrap;
 
@@ -15894,15 +15658,11 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-gathering-task-drop-row:focus {
-  outline: none;
-  box-shadow: none;
-}
-
-.fabricate-manager .manager-gathering-task-drop-row:focus-visible {
-  outline: 2px solid var(--fab-accent);
-  outline-offset: -3px;
-}
+/* (THE DROP ROW'S FOCUS PAIR LEFT THIS FILE at issue 1512. The row dropped its `tabindex="0"` and
+   its Enter/Space handler — a focusable `role="row"` is a non-form element Foundry's
+   `KeyboardManager#hasFocus` cannot see, so every arrow press panned the canvas behind the
+   window — so a rule keyed on the row's own `:focus` painted a state the row can no longer
+   reach. The keyboard path is the component cell's `<button>`, which takes the module ring.) */
 
 .fabricate-manager .manager-drop-component-cell {
   overflow: hidden;
@@ -19891,7 +19651,16 @@
 /* Composition table */
 .fabricate-manager .manager-environment-comp {
   --fab-env-comp-grid: minmax(0, 1fr) 92px 132px 92px;
-  --fab-env-comp-grid-ranked: 30px minmax(0, 1fr) 92px 132px 92px;
+
+  /* THE COLUMN-HEADER STRIP'S LEAD TRACK (issue 1512). The included rows are
+     `SortableList`'s flex rows now, so the strip has to reserve exactly what the list draws
+     before the record's cells: the row's own 12px padding and the 12px gap are the strip's
+     padding and gap, and this track is what is left — the 22px ordinal badge, plus the 34px
+     grip and one more 12px gap when the list orders. Stated as an arithmetic expression of
+     the list's tokens rather than as one number, because a reader who changes the badge has
+     to see this move with it. */
+  --fab-env-comp-lead: 22px;
+  --fab-env-comp-lead-ranked: calc(22px + 12px + 34px);
 
   display: flex;
   flex-direction: column;
@@ -19930,10 +19699,10 @@
 
 .fabricate-manager .manager-environment-comp-head {
   display: grid;
-  grid-template-columns: var(--fab-env-comp-grid);
+  grid-template-columns: var(--fab-env-comp-lead) var(--fab-env-comp-grid);
   align-items: center;
-  gap: var(--fab-space-2);
-  padding: 0 var(--fab-space-2) var(--fab-space-chip);
+  gap: var(--fab-space-3);
+  padding: 0 var(--fab-space-3) var(--fab-space-chip);
   font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -19962,17 +19731,37 @@
   background: var(--fab-overlay-dark-16);
 }
 
-.fabricate-manager .manager-environment-comp-head.has-rank-controls,
-.fabricate-manager .manager-environment-comp-row.has-rank-controls {
-  grid-template-columns: var(--fab-env-comp-grid-ranked);
+/* An ORDERED strip reserves the grip as well, and a trailing track under the chevron
+   rocker the list draws at the end of every ordered row. */
+.fabricate-manager .manager-environment-comp-head.has-rank-controls {
+  grid-template-columns: var(--fab-env-comp-lead-ranked) var(--fab-env-comp-grid) 24px;
 }
 
-.fabricate-manager .manager-environment-comp-row.is-selected {
+/* The included record's CELLS, inside the shared list's row (issue 1512). One template, read
+   by the strip above and by this grid, is what makes a label sit over its own column. */
+.fabricate-manager .manager-environment-comp-cells {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: var(--fab-env-comp-grid);
+  align-items: center;
+  gap: var(--fab-space-3);
+  min-width: 0;
+}
+
+/* THE CALLER'S PER-RECORD STATE (issue 1512). The included row is `SortableList`'s row now, and
+   the state it carries is the CALLER'S: `manager-environment-comp-entry` is written through
+   `rowClass` onto the row element, and every state rule keys on it. It is deliberately NOT keyed
+   on the primitive's own row class behind `.fabricate-manager` — an application root in front of
+   a class the primitive writes is exactly the app-rooting the design system's rooting requirement
+   refuses, and the area-scope gate reds on it. The three unordered lists below are still this
+   file's own rows and keep `manager-environment-comp-row`. */
+.fabricate-manager .manager-environment-comp-row.is-selected,
+.fabricate-manager .manager-environment-comp-entry.is-selected {
   border-color: var(--fab-accent);
   box-shadow: inset 0 0 0 1px var(--fab-accent);
 }
 
-.fabricate-manager .manager-environment-comp-row.is-unavailable {
+.fabricate-manager .manager-environment-comp-entry.is-unavailable {
   border-color: var(--fab-warning);
 }
 
@@ -19981,38 +19770,29 @@
   opacity: 0.85;
 }
 
-.fabricate-manager .manager-environment-comp-handle {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--fab-space-2xs);
-  color: var(--fab-text-muted);
-  cursor: grab;
-  transform: translateY(3px);
-}
-
-/* Non-reorderable step rows (Ingredients / Results / Tools tabs) keep the order
-   pip but are not a drag handle, so they should not invite a grab. */
-.fabricate-manager .manager-environment-comp-handle.is-static {
-  cursor: default;
-}
-
-/* The order pip is a NUMBER (a step index / a progressive result's position), so it
-   is set in the mono face with tabular figures (issue 643): 10 and 11 must not shift
-   the grip beside them. */
-.fabricate-manager .manager-environment-comp-order {
-  font-family: var(--fab-font-mono);
-  font-size: 0.72em;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-}
-
+/* THE FOUNDRY `<button>` RESET (issue 1512). This cell is a real `<button>` now — it was a
+   `<div role="button" tabindex="0">` at four sites, none of which Foundry's KeyboardManager
+   could see — and the host sheet centres button content and pins a fixed `height` that
+   `min-height: 0` does not cancel. It wraps a 38px thumb and two lines of copy, so the reset
+   is what keeps it at its content height. Declarations follow
+   `.manager-checks-trigger-disclosure`, the shipped template for this conversion. */
 .fabricate-manager .manager-environment-comp-task {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   gap: var(--fab-space-2);
   min-width: 0;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  box-shadow: none;
+  font: inherit;
+  line-height: inherit;
   text-align: left;
   cursor: pointer;
   color: inherit;
@@ -20580,7 +20360,6 @@
 
   .fabricate-manager .manager-environment-comp {
     --fab-env-comp-grid: minmax(0, 1fr) 80px 110px 80px;
-    --fab-env-comp-grid-ranked: 24px minmax(0, 1fr) 80px 110px 80px;
   }
 
   .fabricate-manager .manager-environment-comp[data-composition-kind="task"] {
@@ -27296,4 +27075,204 @@
   .fabricate-manager .manager-component-entry-essences .manager-component-essence-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* ══ THE ORDERED ROW — `fabricate-sortable-list` (issue 1512) ═══════════════════════════════════
+   `components/SortableList.svelte`'s own family, declared HERE rather than in a scoped `<style>`
+   block, because a shared primitive's family belongs in the global sheet: a Svelte-scoped rule is
+   injected UNLAYERED against this sheet's `layer(modules)` import and silently out-ranks every
+   global rule at any specificity, and the gate that proves a family is not application-rooted
+   cannot see a scoped block at all.
+
+   Rooted at the ONE class the component writes on its own `<ul>`. It portals nothing, so one root
+   is the whole requirement, and every class below carries the `fabricate-` namespace prefix and is
+   therefore declared a namespace root in the area-scope gate's entry.
+
+   THE GEOMETRY IS THE SPECIMEN'S, and that is a maintainer ruling rather than a preference: the
+   row is padding 12 / radius 9 / `--fab-bg-1` / gap 12 with a 22x22 r6 `--fab-surface-raised`
+   ordinal badge sitting AFTER the grip. Four shipped surfaces MOVE onto it — the recipe step
+   accordion's 28px badge left of its grip, the composition list's bare pip and 30px grid track,
+   the joined result-and-salvage row's r8 / 6px-8px box, and the tier row's 8px/11px
+   `--fab-bg-0` — and each of those reversals is recorded in the library's section 16. */
+.fabricate-sortable-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* THE ROW IS A COLUMN, and its LINE carries the padding. That is what the specimen draws for an
+   expanded row, and it is what lets a body render an edge-to-edge strip that meets the row's own
+   border: the row clips itself, so the strip's fill and its top rule stop at the radius rather
+   than square off outside it. A row with no body reads exactly as the flat specimen row does,
+   because the line is the only thing in it.
+
+   skin census (issue 1523): an UNPINNED carrier of the border/radius/fill tuple. It arrives as
+   one because the specimen states that tuple as the ordered row's box, not because a shared class
+   was refused: nothing reads this selector by name, so it would adopt `.fab-card-skin` whenever
+   that class ships and its per-adoption blocker walk is done. */
+.fabricate-sortable-list-row {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+  overflow: hidden;
+}
+
+.fabricate-sortable-list-row.is-expanded {
+  border-color: var(--fab-accent-border);
+}
+
+/* The travelling row, so a GM can see which one is in the air. */
+.fabricate-sortable-list-row.is-dragging {
+  border-style: dashed;
+  border-color: var(--fab-accent-border);
+  background: var(--fab-accent-soft);
+}
+
+/* NEVER WRAPS. A stage row carrying a long component name pushed its trailing cluster onto a
+   second line and the row grew to twice its height; the content line is what flexes instead. */
+.fabricate-sortable-list-line {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  flex-wrap: nowrap;
+}
+
+.fabricate-sortable-list-content {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* The ordinal BADGE, after the grip. It is what makes order legible once the list scrolls, which
+   a bare mono pip beside a handle never was. */
+.fabricate-sortable-list-ordinal {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--fab-text-secondary);
+  background: var(--fab-surface-raised);
+  font-family: var(--fab-font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.fabricate-sortable-list-row.is-expanded .fabricate-sortable-list-ordinal {
+  color: var(--fab-on-accent);
+  background: var(--fab-accent);
+}
+
+/* The grip is an `IconButton`, so it takes that primitive's box and focus ring; only its cursor,
+   its colour and its width are this family's. COMPOUNDED ON THE COMPOSED ROOT, because
+   `.fabricate-icon-button.manager-icon-button` is (0,2,0) and pins `flex: 0 0 34px`: a bare
+   family class is (0,1,0) and would lose, leaving a 34px grip where the specimen draws a 14px
+   glyph. `fabricate-icon-button` is a NAMESPACE root of the primitive this one composes, never an
+   application root, which is what `inheritedRoots` records in the area-scope gate. */
+.fabricate-icon-button.fabricate-sortable-list-grip {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  border-color: transparent;
+  color: var(--fab-text-subtle);
+  background: transparent;
+  cursor: grab;
+}
+
+/* The grip GLYPH keeps the size both studios drew it at. Without it the icon inherits the icon
+   button's own 14px, which is the Foundry app base — the one size a marker landing on it means
+   "the rule stopped applying" rather than "the rule says 14". */
+.fabricate-sortable-list-grip i {
+  font-size: 0.7rem;
+}
+
+.fabricate-sortable-list-row.is-dragging .fabricate-icon-button.fabricate-sortable-list-grip {
+  color: var(--fab-accent);
+  cursor: grabbing;
+}
+
+/* THE ROCKER. Two 24x24 hit areas stacked, so each meets the target minimum on its own, sitting
+   in the trailing cluster beside the delete. At the ends the unavailable chevron DIMS — it never
+   hides, because the range is only legible while both controls are drawn. */
+.fabricate-sortable-list-rocker {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+/* COMPOUNDED ON THE COMPOSED ROOT, for the grip's reason: the icon button's own (0,2,0) rule
+   pins a 34px box, and the specimen's rocker is two 24x24 hit areas stacked. */
+.fabricate-icon-button.fabricate-sortable-list-move {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+}
+
+.fabricate-sortable-list-move i {
+  font-size: 9px;
+}
+
+.fabricate-sortable-list-remove {
+  flex: 0 0 auto;
+}
+
+/* THE COLLAPSED BODY STAYS IN THE DOM (maintainer ruling, 2026-09-09) and is hidden here rather
+   than unmounted. The `[hidden]` attribute is the switch — the component writes `hidden` and
+   `inert` together, so the body also leaves the tab order — and `display: none` is declared
+   explicitly because Foundry's own reset sets `display` on generic elements and a UA `[hidden]`
+   rule loses to it. */
+.fabricate-sortable-list-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 12px 12px;
+}
+
+.fabricate-sortable-list-body[hidden] {
+  display: none;
+}
+
+/* A body whose whole content is an edge-to-edge strip gives its padding back, so the strip's own
+   `border-top` reads as the divider between it and the line above rather than as a short rule
+   floating inside a padded box. The row's `overflow: hidden` above is the other half, and the two
+   caller classes named here are the two complication bands the Recipe and Component studios draw
+   inside a stage row — they are matched rather than re-rooted, because the band belongs to the
+   caller and only its BLEED is this primitive's business. */
+.fabricate-sortable-list-body:has(> .manager-recipe-stage-complications),
+.fabricate-sortable-list-body:has(> .manager-salvage-stage-complications) {
+  padding: 0;
+}
+
+/* THE FOOTER ADDER ROWS (issue 1512). Each converted list renders its adder as its own last
+   child rather than as a sibling, so the control that used to be a stretched flex child of the
+   card body is now a flex child of an `<li>` inside `fabricate-sortable-list`. Without these the
+   dashed button shrinks to its label and stops sharing the card's edges with the rows above it,
+   which `manager-layout.test.js` measures against the Difficulty card's radio-card edges. */
+.fabricate-manager .manager-checks-tier-add,
+.fabricate-manager .manager-salvage-stage-add {
+  display: flex;
+  min-width: 0;
+}
+
+.fabricate-manager .manager-checks-tier-add > .manager-button,
+.fabricate-manager .manager-salvage-stage-add > .manager-button,
+.fabricate-manager .manager-recipe-ingredient-set-add > .manager-recipe-add-result {
+  flex: 1 1 auto;
 }

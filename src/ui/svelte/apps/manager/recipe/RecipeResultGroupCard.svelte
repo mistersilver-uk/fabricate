@@ -18,6 +18,8 @@
   import RecipeRoutingAssignment from './RecipeRoutingAssignment.svelte';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
   import IconButton from '../../../components/IconButton.svelte';
+  import SortableList from '../../../components/SortableList.svelte';
+  import RecipeStageComplicationBand from './RecipeStageComplicationBand.svelte';
 
   let {
     group = {},
@@ -75,14 +77,6 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  function format(key, fallback, replacements) {
-    let result = text(key, fallback);
-    for (const [token, value] of Object.entries(replacements)) {
-      result = result.replace(`{${token}}`, value);
-    }
-    return result;
-  }
-
   // THE CONTROL HALF of the validation row action (issue 1517). An unrouted-result-set
   // warning is about THIS set's routing, so the card is the destination and
   // `recipeReadiness.js` addresses it as `result-group-<id>`. Same literal on both sides,
@@ -98,8 +92,6 @@
   // that follows every persisted edit — rows are keyed by result id. Native HTML5
   // drag: the whole card is both the drag source and the drop target, and a splice
   // emits the reordered group.
-  let dragIndex = $state(-1);
-
   function reorderItem(from, to) {
     if (from === to || from < 0 || to < 0 || from >= results.length || to >= results.length) return;
     const next = results.slice();
@@ -108,42 +100,13 @@
     onChange({ ...group, results: next });
   }
 
-  function handleResultDrop(targetIndex) {
-    if (dragIndex >= 0 && dragIndex !== targetIndex) reorderItem(dragIndex, targetIndex);
-    dragIndex = -1;
-  }
-
-  // Reorder was DRAG-ONLY, with an aria-hidden grip on a draggable div and no keyboard
-  // path at all — a live accessibility hole, since order is load-bearing in progressive
-  // mode (the award loop spends the check budget down the list). These are real buttons,
-  // disabled at the ends, and the position change is announced through the aria-live
-  // region below (issue 643 §6).
-  let announcement = $state('');
-
+  // BOTH HALVES OF REORDER ARE `SortableList`'S NOW (issue 1512), and so is the
+  // announcement: the drag source, the grip, the chevron rocker, the read-the-name-before-
+  // the-move rule this file established, the focus move and the polite live region all live
+  // in the one list implementation rather than in this card's copy of them.
   function componentNameFor(item) {
     const match = (componentOptions || []).find((option) => option.id === item?.componentId);
     return match?.name || text('FABRICATE.Admin.Manager.Recipe.UnnamedResult', 'this result');
-  }
-
-  function moveItem(index, delta) {
-    const target = index + delta;
-    if (target < 0 || target >= results.length) return;
-
-    // Read the name BEFORE the move. `reorderItem` emits the reordered group, and once
-    // the parent round-trips the new prop `results[index]` is the item that swapped INTO
-    // this slot — so announcing after the move can name the wrong result.
-    const name = componentNameFor(results[index]);
-    const total = results.length;
-    reorderItem(index, target);
-
-    // ONE key with three placeholders, not a concatenation of "moved to position" + "of":
-    // word order is not universal, and a sentence assembled from fragments cannot be
-    // translated.
-    announcement = format(
-      'FABRICATE.Admin.Manager.Recipe.ResultMoveAnnouncement',
-      '{name} moved to position {position} of {total}',
-      { name, position: target + 1, total }
-    );
   }
 
   // Routing provider: 'ingredientSet' is Ingredient routing; 'check'
@@ -336,142 +299,98 @@
       </p>
     </div>
   {:else}
-    <div class="manager-recipe-ingredient-set-groups">
-      {#each results as item, index (item?.id || index)}
-        {#if progressive}
-          <!-- Progressive: the whole card is the drag SOURCE (so the drag ghost is
-               the full row, not just the grip) and the drop TARGET; the grip + order
-               pip stay as a visual affordance. Drag is a mouse-only enhancement.
-               Progressive rows carry no quantity field (the row hides it) and no text
-               input, so dragging from anywhere on the card is safe — order +
-               repetition are the only authored inputs. -->
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div
-            class="manager-recipe-result-row is-reorderable"
-            data-recipe-result-row
-            draggable="true"
-            ondragstart={() => {
-              dragIndex = index;
-            }}
-            ondragend={() => {
-              dragIndex = -1;
-            }}
-            ondragover={(event) => event.preventDefault()}
-            ondrop={(event) => {
-              event.preventDefault();
-              handleResultDrop(index);
-            }}
-          >
-            <RecipeResultItemRow
-              {item}
-              {componentOptions}
-              {progressive}
-              {onOpenComponent}
-              onChange={(nextItem) => updateItem(index, nextItem)}
-              onRemove={() => removeItem(index)}
-            >
-              {#snippet leadingControls()}
-                <!-- Grip, then a SEPARATE order badge — the salvage stage row's shape
-                     (issue 676). The order was stacked UNDER the grip inside one handle,
-                     which read as a decorated grip rather than as the stage number that the
-                     award loop actually spends down.
+    {#if progressive}
+      <!-- PROGRESSIVE IS AN ORDERED LIST (issue 1512), so it is the shared one. The grip,
+           the 22px ordinal badge, the chevron rocker, the drag source, the keyboard reorder
+           and the polite announcement are all `SortableList`'s; this card supplies the row's
+           own content and the stage's complication band.
 
-                     They are a SNIPPET rather than the card's own first two children
-                     (issue 1286) so that a stage carrying a complication band can put them
-                     on the band's own line: as the card's leading flex items they pushed
-                     the full-bleed band ~58px in. The row renders them unchanged and in the
-                     same place when there is no band. -->
-                <span
-                  class="manager-recipe-stage-grip"
-                  aria-hidden="true"
-                  title={text('FABRICATE.Admin.Manager.Recipe.DragResult', 'Drag to reorder')}
-                  ><i class="fas fa-grip-vertical" aria-hidden="true"></i></span
-                >
-                <span
-                  class="manager-recipe-stage-ordinal"
-                  data-recipe-result-ordinal={String(index + 1)}
-                  aria-hidden="true">{index + 1}</span
-                >
-              {/snippet}
-              {#snippet reorderControls()}
-                <!-- Reorder lives to the RIGHT of the component's DC (issue 643): after
-                     the DC + Edit pair, before the remove control. Drag is an
-                     ENHANCEMENT; these chevrons are the accessible reorder path and are
-                     what a keyboard user gets. Disabled at the ends. They share the
-                     salvage stage row's rocker geometry (issue 676) — see the shared
-                     rule in styles/fabricate.css. -->
-                <span class="manager-recipe-stage-reorder" data-recipe-result-move>
-                  <button
-                    type="button"
-                    class="manager-recipe-stage-move"
-                    data-recipe-result-move-up
-                    aria-label={`${text('FABRICATE.Admin.Manager.Recipe.MoveResultUp', 'Move up')} — ${componentNameFor(item)}`}
-                    title={text('FABRICATE.Admin.Manager.Recipe.MoveResultUp', 'Move up')}
-                    disabled={index === 0}
-                    onclick={() => moveItem(index, -1)}
-                    ><i class="fas fa-chevron-up" aria-hidden="true"></i></button
-                  >
-                  <button
-                    type="button"
-                    class="manager-recipe-stage-move"
-                    data-recipe-result-move-down
-                    aria-label={`${text('FABRICATE.Admin.Manager.Recipe.MoveResultDown', 'Move down')} — ${componentNameFor(item)}`}
-                    title={text('FABRICATE.Admin.Manager.Recipe.MoveResultDown', 'Move down')}
-                    disabled={index === results.length - 1}
-                    onclick={() => moveItem(index, 1)}
-                    ><i class="fas fa-chevron-down" aria-hidden="true"></i></button
-                  >
-                </span>
-              {/snippet}
-            </RecipeResultItemRow>
-          </div>
-        {:else}
+           The band is the list's BODY rather than part of the row's content, because it is
+           FULL-BLEED: the list's row is a column whose LINE carries the padding, so a body
+           that draws a band meets the row's own border and the band's `border-top` reads as
+           a card divider (issue 1286's shape, kept). `alwaysOpen` is what renders it on
+           every row with no disclosure — a stage's band is not something a GM opens.
+
+           NO `removable`: the row's own × carries `data-recipe-remove="result-item"`, a hook
+           the mounted suites address a progressive stage by, and the list's remove writes its
+           own. The caller keeps the control rather than the hook being renamed. -->
+      <SortableList
+        items={results}
+        itemLabel={componentNameFor}
+        numbered
+        handles
+        alwaysOpen
+        onReorder={(from, to) => reorderItem(from, to)}
+        rowClass={() => 'manager-recipe-stage-row'}
+        rowData={() => ({ 'data-recipe-result-row': '' })}
+      >
+        {#snippet row(item, index)}
+          <RecipeResultItemRow
+            {item}
+            {componentOptions}
+            {progressive}
+            {onOpenComponent}
+            onChange={(nextItem) => updateItem(index, nextItem)}
+            onRemove={() => removeItem(index)}
+          />
+        {/snippet}
+        {#snippet body(item)}
+          <RecipeStageComplicationBand {componentOptions} componentId={item?.componentId || ''} />
+        {/snippet}
+        {#snippet footer()}
+          <li class="manager-recipe-ingredient-set-add">{@render resultAdder()}</li>
+        {/snippet}
+      </SortableList>
+    {:else}
+      <div class="manager-recipe-ingredient-set-groups">
+        {#each results as item, index (item?.id || index)}
           <RecipeResultItemRow
             {item}
             {componentOptions}
             onChange={(nextItem) => updateItem(index, nextItem)}
             onRemove={() => removeItem(index)}
           />
-        {/if}
-      {/each}
-    </div>
+        {/each}
+      </div>
+    {/if}
   {/if}
 
-  {#if progressive}
-    <p class="visually-hidden" aria-live="polite" data-recipe-result-order-status>{announcement}</p>
+  <!-- THE ADDER FOLLOWS THE EMPTY MESSAGE (issue 1512). A footer of a list that is not
+       rendered cannot render either, and a surface whose empty state says "add one" with
+       nothing to press is a dead end — so at zero results, and on every non-progressive
+       set, the adder is this sibling. -->
+  {#if !progressive || results.length === 0}
+    <div class="manager-recipe-ingredient-set-add">{@render resultAdder()}</div>
   {/if}
-
-  <div class="manager-recipe-ingredient-set-add">
-    <SearchablePopover
-      options={componentPickerOptions}
-      pickerClass="manager-recipe-component-picker manager-recipe-add-component"
-      triggerClass="fabricate-button manager-button is-dashed manager-recipe-add-component-trigger manager-recipe-add-result"
-      triggerIcon="fas fa-plus"
-      triggerLabel={progressive
-        ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
-        : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
-      triggerAriaLabel={progressive
-        ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
-        : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
-      triggerAddMarker="result-item"
-      dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
-      searchPlaceholder={text(
-        'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
-        'Search components...'
-      )}
-      searchAriaLabel={text(
-        'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
-        'Search components...'
-      )}
-      emptyHint={text(
-        'FABRICATE.Admin.Manager.Recipe.NoComponentsDefined',
-        'No components defined'
-      )}
-      showChevron={false}
-      onChoose={(id) => addItem(id)}
-    />
-  </div>
 </div>
+
+{#snippet resultAdder()}
+  <SearchablePopover
+    options={componentPickerOptions}
+    pickerClass="manager-recipe-component-picker manager-recipe-add-component"
+    triggerClass="fabricate-button manager-button is-dashed manager-recipe-add-component-trigger manager-recipe-add-result"
+    triggerIcon="fas fa-plus"
+    triggerLabel={progressive
+      ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
+      : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
+    triggerAriaLabel={progressive
+      ? text('FABRICATE.Admin.Manager.Recipe.AddResultStage', 'Add result stage')
+      : text('FABRICATE.Admin.Manager.Recipe.AddResultItem', 'Add item')}
+    triggerAddMarker="result-item"
+    dialogAriaLabel={text('FABRICATE.Admin.Manager.Recipe.PickComponent', 'Pick component')}
+    searchPlaceholder={text(
+      'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
+      'Search components...'
+    )}
+    searchAriaLabel={text(
+      'FABRICATE.Admin.Manager.Recipe.ComponentSearchPlaceholder',
+      'Search components...'
+    )}
+    emptyHint={text('FABRICATE.Admin.Manager.Recipe.NoComponentsDefined', 'No components defined')}
+    showChevron={false}
+    onChoose={(id) => addItem(id)}
+  />
+{/snippet}
 
 <style>
   .manager-recipe-ingredient-set.is-reserved {

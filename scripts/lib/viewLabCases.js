@@ -349,6 +349,22 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // DISABLED state. `GatheringEconomyView.svelte:498,514` renders the two bindings, and this
   // case's own steps fill one at `[data-economy-stamina-max]`.
   'src/ui/svelte/components/Stepper.svelte': Object.freeze(['manager-gathering-economy-actors']),
+  // THE ORDERED ROW (issue 1512), and a `components/` file is a broad signal the moment it is
+  // written. Both representative frames are BROWSE surfaces — `manager-components-normal` lists
+  // components and `fabricate-app-shell` lists recipes — and neither draws an ordered list at
+  // all, let alone a row that is OPEN. `manager-recipe-edit-step-open` is the frame that answers
+  // for it: the step accordion with one row expanded to its editing body, so the grip, the 22px
+  // ordinal badge, the leading disclosure, the trailing chevron rocker, the body's containment
+  // and the footer adder are all in one picture.
+  'src/ui/svelte/components/SortableList.svelte': Object.freeze(['manager-recipe-edit-step-open']),
+  // THE ROW DISCLOSURE, promoted into the member set at issue 1512 when `SortableList` became its
+  // second importer. It is 24px of chevron and nothing else, so a frame that merely contains one
+  // proves very little; the frame that answers for it is the one where a row it controls is
+  // OPEN, which is what `manager-component-complications-expanded` photographs — its
+  // `expectSelector` asserts `aria-expanded="true"` on the disclosure itself.
+  'src/ui/svelte/components/RowDisclosure.svelte': Object.freeze([
+    'manager-component-complications-expanded',
+  ]),
   // The manager's ONE selection box, whose `sm` SIZE has exactly one caller and is absent from
   // both representative frames: `manager-components-normal` and `fabricate-app-shell` draw the
   // browse row's `lg` box and nothing else. `sm` is the Tool Studio's prerequisite row (issue
@@ -6276,6 +6292,79 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-recipe-edit-step-open',
+    label: 'Manager — Recipe edit step open',
+    // THE OPEN ROW (issue 1512), and the frame `SortableList` overrides to. Every other recipe
+    // frame draws the step accordion CLOSED, so the state this primitive exists for — a row
+    // expanded in place to its editing body, with the body contained inside the row's own
+    // border — was drawn by nothing in the registry.
+    //
+    // The disclosure is clicked rather than the row's copy, because the copy no longer opens it:
+    // the chevron is the sole opener (maintainer ruling M3, 2026-09-09) and a step's name and
+    // description are inert.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="sm-r-pattern-blade"]' },
+      { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-section="steps"] [data-sortable-disclosure]' },
+      { selector: '[data-recipe-section="steps"]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    // `aria-expanded`, not merely the presence of a body: the body is RETAINED when collapsed
+    // (maintainer ruling, 2026-09-09), so its presence is true of every row and would publish
+    // the closed accordion under this name.
+    expectSelector:
+      '.fabricate-manager [data-recipe-section="steps"] ' +
+      '[data-sortable-disclosure][aria-expanded="true"]',
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeStepAccordion\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-step-narrow',
+    label: 'Manager — Recipe edit steps narrow',
+    // NARROW CONTAINER (issue 1512). The converted row is a single flex line that never wraps,
+    // so the state worth a frame is the one where the grip, badge, copy, duration control,
+    // delete and rocker have to share a squeezed row — which is where a wrapping cluster would
+    // double the row's height and a clipped one would lose a control.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: '[data-recipe-edit="sm-r-pattern-blade"]' },
+      { selector: '#recipe-tab-overview' },
+      { selector: '[data-recipe-section="steps"]', scroll: true },
+    ],
+    expectView: 'recipe-edit',
+    expectSelector: '.fabricate-manager [data-recipe-section="steps"] .fabricate-sortable-list-row',
+    position: { width: 1000, height: 760 },
+    kinds: ['manager', 'recipes', 'responsive'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeStepAccordion\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-recipe-edit-results-narrow',
+    label: 'Manager — Recipe edit results narrow',
+    // NARROW CONTAINER (issue 1512) for the progressive RESULT stage row, whose content line
+    // carries a bounded component picker, a read-only DC, an Edit deep link and a remove control
+    // beside the list's own grip, badge and rocker. It is the busiest converted row in the
+    // product, so it is the one where a squeezed container shows first.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      'Crafting',
+      { selector: '.manager-icon-button[aria-label^="Edit"]' },
+      { selector: '#recipe-tab-results' },
+    ],
+    expectView: 'recipe-edit',
+    position: { width: 1000, height: 760 },
+    kinds: ['manager', 'recipes', 'responsive'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/recipe\/RecipeResultGroupCard\.svelte$/],
+  }),
+  managerCase({
     id: 'manager-recipe-edit-results',
     label: 'Manager — Recipe edit results',
     smokeLabels: ['manager-recipe-edit-results'],
@@ -7164,6 +7253,28 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     position: { width: 980, height: 860 },
+    kinds: ['manager', 'components', 'responsive'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
+  }),
+  managerCase({
+    id: 'manager-component-edit-salvage-narrow',
+    label: 'Manager — Component edit salvage narrow',
+    // NARROW CONTAINER (issue 1512). The salvage stage row is the one converted list inside a
+    // `<form>`, and its content line carries a bounded yield picker, a read-only DC, an Edit deep
+    // link and a remove control beside the list's grip, badge and rocker. The row never wraps, so
+    // the squeezed container is where a control would be clipped rather than pushed to a second
+    // line — which a mounted test cannot see at all.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-runework' },
+    steps: [
+      { selector: '#manager-nav-component-rules' },
+      {
+        selector: '.manager-component-row[data-component-id="rw-slag"] [data-component-edit]',
+      },
+    ],
+    expectView: 'component-edit',
+    position: { width: 1000, height: 760 },
     kinds: ['manager', 'components', 'responsive'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/ComponentEditView\.svelte$/],
   }),
@@ -9987,6 +10098,33 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
     ],
+  }),
+  managerCase({
+    id: 'manager-environment-edit-blind-weights-narrow',
+    label: 'Manager — Environment edit blind task weights narrow',
+    // NARROW CONTAINER (issue 1512). The included list is `SortableList`'s flex row now and the
+    // column-header strip above it reserves the list's own grip-plus-badge cluster as its lead
+    // track, so the alignment between a label and the column it names is a function of the
+    // container width. This is the frame that shows the two agreeing at the squeezed branch of
+    // `--fab-env-comp-grid`, where the weight, override and runtime tracks all narrow.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Gathering',
+      {
+        selector:
+          '.manager-environment-row[data-environment-id="hb-env-thicket"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '#environment-tab-tasks' },
+    ],
+    expectView: 'environment-edit',
+    expectSelector:
+      '.fabricate-manager .manager-environment-comp-head + .fabricate-sortable-list ' +
+      '.manager-environment-comp-cells',
+    position: { width: 1000, height: 760 },
+    kinds: ['manager', 'environments', 'responsive'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/environment\/CompositionList\.svelte$/],
   }),
   managerCase({
     id: 'manager-environment-edit-blind-weights',
@@ -13318,6 +13456,32 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-checks-crafting-recipe-tiers-narrow',
+    label: 'Manager — Checks crafting recipe tiers narrow',
+    // NARROW CONTAINER (issue 1512). The tier row gained a numbered badge and a chevron rocker
+    // when the maintainer's both-affordances ruling overturned issue 1096's one-affordance
+    // reading, so the row that was a grip, a name field, a unit label, a stepper and a remove is
+    // now two controls wider. The Checks Studio's card sits in a rail-flanked column, so this is
+    // where the live `<input>` between them has the least room to give.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      'Checks',
+      { selector: '#manager-checks-nav-crafting' },
+      { selector: '[data-add-tier]' },
+      { selector: '[data-add-tier]' },
+      { selector: ':nth-match([data-tier-name], 1)', fill: 'Apprentice work' },
+      { selector: ':nth-match([data-tier-name], 2)', fill: 'Masterwork' },
+      { selector: '[data-tier-row]', scroll: true },
+    ],
+    expectView: 'checks-crafting',
+    expectSelector: '.fabricate-manager .manager-checks-card-body [data-tier-row]',
+    position: { width: 1100, height: 800 },
+    kinds: ['manager', 'checks', 'responsive'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/checks\/CheckRecipeTiers\.svelte$/],
+  }),
+  managerCase({
     id: 'manager-checks-crafting-recipe-tiers',
     label: 'Manager — Checks crafting recipe tiers',
     // BEYOND the smoke. The walk never adds a recipe tier, and every simple check in the
@@ -13342,7 +13506,10 @@ export const VIEW_LAB_CASES = Object.freeze([
     expectView: 'checks-crafting',
     // The ROW, not the card: a card that kept its old table would still satisfy a selector
     // aimed at the section, and the row class is the thing this frame is evidence for.
-    expectSelector: '.fabricate-manager .manager-checks-tier-list [data-tier-row]',
+    // The list is `SortableList`'s `<ul>` since issue 1512, so the row is addressed through
+    // the card that holds it rather than through a list class this surface no longer writes;
+    // `[data-tier-row]` is the caller's own per-record hook, preserved through `rowData`.
+    expectSelector: '.fabricate-manager .manager-checks-card-body [data-tier-row]',
     kinds: ['manager', 'checks'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/checks\/CheckRecipeTiers\.svelte$/,
