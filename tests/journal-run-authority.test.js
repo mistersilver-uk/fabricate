@@ -1,10 +1,64 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import {
   JOURNAL_RUN_CLAIM_PAGE_ID,
+  createFoundryJournalRunAuthority,
   createJournalRunAuthority,
 } from '../src/systems/journalRunAuthority.js';
+
+function foundryAuthorityFixture(crypto) {
+  const journal = [];
+  const makeEntry = (source) => {
+    let state = source.flags.fabricate.journalRunAuthorityState;
+    const pages = new Map();
+    return {
+      id: 'ledger',
+      pages,
+      getFlag: (scope, key) =>
+        scope === 'fabricate' && key === 'journalRunAuthorityState'
+          ? state
+          : source.flags?.[scope]?.[key],
+      update: async (changes) => {
+        state = changes['flags.fabricate.journalRunAuthorityState'];
+      },
+      get state() {
+        return state;
+      },
+      createEmbeddedDocuments: async (_type, [pageSource]) => {
+        const page = {
+          id: pageSource._id,
+          getFlag: (scope, key) => pageSource.flags?.[scope]?.[key],
+        };
+        pages.set(page.id, page);
+        return [page];
+      },
+      deleteEmbeddedDocuments: async (_type, ids) => {
+        for (const id of ids) pages.delete(id);
+        return ids;
+      },
+    };
+  };
+  const game = {
+    journal,
+    user: { id: 'gm', isGM: true },
+    users: { activeGM: { id: 'gm', isGM: true } },
+  };
+  const JournalEntry = {
+    create: async (source) => {
+      const entry = makeEntry(source);
+      journal.push(entry);
+      return entry;
+    },
+  };
+  return createFoundryJournalRunAuthority({
+    game,
+    JournalEntry,
+    crypto,
+    reconstructExecutions: async () => ({ success: true, reconstructed: 0 }),
+  });
+}
 
 function sharedAuthorityWorld() {
   const records = [];
@@ -68,6 +122,50 @@ function sharedAuthorityWorld() {
 describe('journal run authority ledger', () => {
   it('uses the one global fixed 16-character embedded page id', () => {
     assert.equal(JOURNAL_RUN_CLAIM_PAGE_ID.length, 16);
+  });
+
+  it('uses Web Crypto UUIDs for authority claims and prepare tokens', async () => {
+    const authority = foundryAuthorityFixture({ randomUUID: () => 'secure-uuid' });
+    assert.equal((await authority.setup()).success, true);
+    const response = await authority.run(
+      { requestId: 'secure-token', senderId: 'player', sessionId: 'one' },
+      ({ issuePrepareToken }) => ({
+        success: true,
+        token: issuePrepareToken({ actorUuid: 'Actor.a', runId: 'run-1' }),
+      })
+    );
+    assert.equal(response.token, 'secure-uuid');
+  });
+
+  it('uses Web Crypto bytes when randomUUID is unavailable', async () => {
+    let calls = 0;
+    const authority = foundryAuthorityFixture({
+      getRandomValues: (bytes) => {
+        calls += 1;
+        bytes.set(Array.from({ length: bytes.length }, (_value, index) => index));
+        return bytes;
+      },
+    });
+    assert.equal((await authority.setup()).success, true);
+    const response = await authority.run(
+      { requestId: 'secure-bytes-token', senderId: 'player', sessionId: 'one' },
+      ({ issuePrepareToken }) => ({
+        success: true,
+        token: issuePrepareToken({ actorUuid: 'Actor.a', runId: 'run-1' }),
+      })
+    );
+    assert.equal(response.token, '000102030405060708090a0b0c0d0e0f');
+    assert.ok(calls >= 4, 'boot, claims, and the token use secure random values');
+  });
+
+  it('fails closed when Web Crypto is unavailable and has no Math.random fallback', async () => {
+    const authority = foundryAuthorityFixture({});
+    assert.deepEqual(await authority.setup(), {
+      success: false,
+      reason: 'secure-random-unavailable',
+    });
+    const source = readFileSync(new URL('../src/systems/journalRunAuthority.js', import.meta.url), 'utf8');
+    assert.doesNotMatch(source, /Math\.random/);
   });
 
   it('requires explicit active-GM setup and creates a private ledger once', async () => {
