@@ -110,10 +110,11 @@
     triggerData — a `data-*` map stamped verbatim on the trigger button, which is where every
                  converted call site's own stable hook goes. `data-select-size` is added to it.
     label / hint / error — present ⇒ the whole control renders inside `<Field as="label">`, with a
-                 caption span before the trigger and the hint or error span after it. A `<label>`
-                 does not name a `<button>` by containment, so the caption is given an id and
-                 pointed at with `aria-labelledby`; that is why the labelled form does not also
-                 need an `ariaLabel`.
+                 caption span before the trigger and the hint or error span after it. The caption is
+                 given an id and pointed at with `aria-labelledby` because there is no `id`-bearing
+                 labelable element for a `for` to address, NOT because a `<label>` cannot name a
+                 `<button>` — it can, and this form relies on it; the earlier wording was corrected
+                 at issue 1511. That is why the labelled form does not also need an `ariaLabel`.
     ariaLabel / ariaLabelledBy — the accessible name when there is no `label`. One of the three is
                  required. Never pass `ariaLabel` beside `ariaLabelledBy`: a labelledby WINS over
                  a label wherever both are present, so the string would be dead text free to drift

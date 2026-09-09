@@ -7504,9 +7504,10 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
 
   `.fabricate-manager select` themes the CLOSED field, so a manager dropdown looks correct
   until it is opened — and then the option list fell back to the browser's black-on-white
-  default, in every native select the manager renders. The player app has carried
-  `.fabricate-app select option` for a long time; the manager root is `.fabricate-manager`
-  and never inherited it.
+  default, in every native select the manager renders. The player app carried
+  `.fabricate-app select option` for a long time and stopped needing it at issue 1511, when its
+  last native select converted and that rule was deleted; the manager root is
+  `.fabricate-manager` and never inherited it while it existed.
 
   This is asserted from the STYLESHEET rather than from a rendered frame because it cannot
   be photographed: a native select's popup is painted by the browser, not into the page DOM,
