@@ -579,20 +579,27 @@ export class GatheringEngine {
   }
 
   async describeVersionedStageCheck({ actor, runId, preparationGrant, requestId } = {}) {
-    await this._consumeVersionedGrant(preparationGrant, {
-      operation: 'describeCheck',
-      actor,
-      runId,
-      expectedRevision: null,
-      requestId,
-    });
+    await this._consumeVersionedGrant(
+      preparationGrant,
+      {
+        operation: 'describeCheck',
+        actor,
+        runId,
+        expectedRevision: null,
+        requestId,
+      },
+      { requireOperationId: false }
+    );
     this.runManager?.invalidateCache?.(idOf(actor));
     const run = this.runManager?.getActiveRun?.(actor, runId) ?? null;
     this._assertVersionedRunExecutable(run, { requireReady: true });
     const resolvedRun = this._hydrateBlindWaitingRun(run);
     const resolved = this._resolveWaitingRunContext({ actor, run: resolvedRun });
-    if (resolved.missingReference) {
-      throw gatheringLifecycleError('The gathering references are stale', 'STALE_RUN_STAGE');
+    if (
+      resolved.missingReference ||
+      this._validateStartTask(resolved.task, resolved.system).valid !== true
+    ) {
+      return { required: false };
     }
     return this._versionedCheckDescriptor({ actor, run, ...resolved });
   }
@@ -750,7 +757,7 @@ export class GatheringEngine {
     };
   }
 
-  _consumeVersionedGrant(executionGrant, context) {
+  _consumeVersionedGrant(executionGrant, context, { requireOperationId = true } = {}) {
     const consume = this.versionedRunAuthority?.consumeExecutionGrant;
     if (typeof consume !== 'function') {
       throw gatheringLifecycleError(
@@ -759,8 +766,14 @@ export class GatheringEngine {
       );
     }
     return Promise.resolve(consume(executionGrant, context)).then((trusted) => {
-      const operationId = stringOrNull(trusted?.operationId);
-      if (!operationId) {
+      if (!trusted || typeof trusted !== 'object') {
+        throw gatheringLifecycleError(
+          'Versioned gathering authority is unavailable',
+          'AUTHORITY_UNAVAILABLE'
+        );
+      }
+      const operationId = stringOrNull(trusted.operationId);
+      if (requireOperationId && !operationId) {
         throw gatheringLifecycleError(
           'Versioned gathering authority is unavailable',
           'AUTHORITY_UNAVAILABLE'

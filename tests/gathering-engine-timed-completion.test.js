@@ -4,6 +4,11 @@ import assert from 'node:assert/strict';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
 import { GatheringRichStateService } from '../src/systems/GatheringRichStateService.js';
+import {
+  createGatheringJournalRunOperations,
+  createJournalRunCommandService,
+  installGatheringJournalRunAuthority
+} from '../src/systems/journalRunCommands.js';
 import { SETTING_KEYS } from '../src/config/settings.js';
 import { routedRoll, routedSystemCheck } from './helpers/gathering.js';
 
@@ -594,6 +599,128 @@ test('manual versioned collection terminally cancels deleted task and environmen
       error => error?.code === 'RUN_NOT_FOUND'
     );
     assert.equal(runManager.getRunHistory(actor).length, 1, missing);
+  }
+});
+
+test('journal command preflight lets authoritative cleanup settle stale and invalid check runs once', async () => {
+  for (const scenario of ['missing-environment', 'missing-task', 'invalid-config']) {
+    resetActor();
+    let worldTime = 1000;
+    const runManager = makeRunManager({ now: () => worldTime });
+    const active = await createWaitingRun(runManager, actor, {
+      lifecycleVersion: 1,
+      completionMode: 'manual'
+    });
+    worldTime = 1060;
+    const invalidTask = timedTask({
+      resultGroups: [{
+        id: 'group-a',
+        name: 'Iron',
+        results: [{ id: 'result-a', componentId: 'comp-a', quantity: NaN }]
+      }]
+    });
+    const environments =
+      scenario === 'missing-environment'
+        ? []
+        : scenario === 'missing-task'
+          ? [environment(timedTask({ id: 'replacement-task' }))]
+          : [environment(invalidTask)];
+    const calls = {};
+    const engine = makeEngine({ runManager, environments, calls });
+    const grantBindings = new WeakMap();
+    let prepareTokens = 0;
+    let promptCalls = 0;
+    let evaluationCalls = 0;
+    const serviceRef = { current: null };
+    const authority = {
+      availability: () => ({ available: true, reason: null }),
+      run: async (request, handler) => handler({
+        createExecutionGrant: (binding) => {
+          const grant = {};
+          grantBindings.set(grant, {
+            ...binding,
+            requestId: request.requestId,
+            senderId: request.senderId
+          });
+          return grant;
+        },
+        issuePrepareToken: () => {
+          prepareTokens += 1;
+          return 'unexpected-prepare-token';
+        },
+        consumePrepareToken: () => null,
+        releasePrepareToken: () => true
+      }),
+      consumeExecutionGrant: (grant, expected) => {
+        const binding = grantBindings.get(grant);
+        if (!binding || binding.operation !== expected.operation) return null;
+        return structuredClone(binding.trustedContext ?? {});
+      }
+    };
+    const operations = createGatheringJournalRunOperations({
+      engine,
+      runManager,
+      getService: () => serviceRef.current,
+      getUser: () => viewer
+    });
+    let requestSequence = 0;
+    const gm = { id: 'gm', isGM: true };
+    const service = createJournalRunCommandService({
+      authority,
+      operations: { gathering: operations },
+      currentUser: () => gm,
+      activeGM: () => gm,
+      getUser: () => gm,
+      resolveUuid: async uuid => uuid === actor.uuid ? actor : null,
+      emit: () => {},
+      randomId: () => `gathering-command-${++requestSequence}`,
+      promptCheck: async () => {
+        promptCalls += 1;
+        return { confirmed: true };
+      }
+    });
+    serviceRef.current = service;
+    installGatheringJournalRunAuthority({
+      engine,
+      service,
+      evaluatePreparedRunCheck: () => {
+        evaluationCalls += 1;
+        return { engineEvaluated: true };
+      }
+    });
+    const command = {
+      actorUuid: actor.uuid,
+      runType: 'gathering',
+      runId: active.id,
+      expectedRevision: active.runRevision,
+      action: 'execute',
+      payload: { trigger: 'manual' }
+    };
+
+    const first = await service.executeJournalRunCommand(command);
+    const settledFlags = structuredClone(actor.flags);
+    const repeated = await service.executeJournalRunCommand(command);
+
+    assert.equal(prepareTokens, 0, scenario);
+    assert.equal(promptCalls, 0, scenario);
+    assert.equal(evaluationCalls, 0, scenario);
+    assert.deepEqual(calls.evaluateCheck, [], scenario);
+    assert.deepEqual(runManager.getActiveRuns(actor), [], scenario);
+    assert.deepEqual(actor.flags, settledFlags, scenario);
+    assert.equal(repeated.success, false, scenario);
+    if (scenario === 'invalid-config') {
+      assert.equal(first.success, false, scenario);
+      assert.deepEqual(runManager.getRunHistory(actor), [], scenario);
+      assert.equal(repeated.reason, 'run-not-found', scenario);
+    } else {
+      assert.equal(first.success, true, `${scenario}: ${JSON.stringify(first)}`);
+      assert.equal(first.status, 'cancelled', scenario);
+      const history = runManager.getRunHistory(actor);
+      assert.equal(history.length, 1, scenario);
+      assert.equal(history[0].status, 'cancelled', scenario);
+      assert.equal(history[0].executionJournal.status, 'committed', scenario);
+      assert.equal(repeated.reason, 'stale-run', scenario);
+    }
   }
 });
 
