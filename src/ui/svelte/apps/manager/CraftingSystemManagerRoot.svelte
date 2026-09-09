@@ -14343,7 +14343,7 @@
                       </section>
                     </div>
                   </div>
-                {:else}
+                {:else if (editingGatheringTask?.resolutionMode || 'd100') === 'd100'}
                   <section
                     class="fabricate-card manager-inspector-card"
                     data-gathering-task-drop-inspector
