@@ -243,8 +243,10 @@ A component may also be MOVED into the shared directory WITHOUT gaining a root o
 Giving such a component a root would create a class owning NO rule, which the gate's family and owned floors correctly refuse, and which is an application root BY NAME to the entry that does own them.
 The ASYMMETRY belongs beside that corollary, because the two are related without being converse: one is about a component's LOCATION, the other about a family's OWNERSHIP AT SCALE despite partial primitive authorship.
 A class family WRITTEN BY a shared primitive is still not the primitive's to root while hand-written callers carry the same family at scale.
-`manager-availability-*` is written by `ModifierPillSelect` and by six manager views at 37 further sites, one of which renders the family's pill row outside any `ModifierPillSelect` at all, so rooting those rules at a class only the primitive emits would un-style every one of them.
-Such a family stays app-rooted, recorded with the change that converts the callers, until that change lands — which for this one is issue 1515.
+`manager-availability-*` was the worked case: it was written by `ModifierPillSelect` and by six manager views at 37 further sites, none of them inside a `ModifierPillSelect`, so rooting those rules at a class only the primitive emits would have un-styled every one of them.
+Such a family stays app-rooted, recorded with the change that converts the callers, until that change lands.
+That change has landed, so this example is now a RESOLVED one rather than an outstanding deferral: issue 1515 routed all 37 sites to their destination primitives first, then re-rooted what was left at `fabricate-pill-select`, the class the primitive writes on its own root and nothing else in the tree does.
+The deferral was discharged by retiring its premise rather than by arguing with it, which is the shape this rule expects — a family stops being app-rooted when the hand-written callers stop existing, never because the primitive's share of them grew.
 
 The rule governs SELECTOR ROOTING and does not reach a bare-element baseline an area declares for itself.
 A shared primitive nonetheless MUST NOT depend on one, for the same reason it must not read an area-scoped property: `.fabricate-manager input:not([type])` themes every free-text control in the manager, and a primitive relying on it renders Foundry's default chrome everywhere else.
@@ -791,7 +793,8 @@ A one-of-N SCOPE the list is always in — rather than a filter that can be clea
 
 The Rail Marker Family in `DOMAIN.md` is four marks and MUST NOT be substituted for one another: a record COUNT is a bare mono numeral with no fill and no border; an ISSUE SUMMARY is a filled warning badge carrying its count; a DIRTY MARKER is a 6px dot; and the PREMIUM chip marks a tier gate, in the manager only.
 The unsaved CHIP beside an editor title is a separate mark and is not a member of that family: it names the state of the record being edited rather than the state of something behind a navigation item.
-That mark, and that mark alone, is drawn by the shared chip primitive: measured, none of the family's four vehicles is one — the count, the issue summary, the dirty marker and the premium chip are all bare `span` elements painted by the `.manager-nav-*` rules in `styles/fabricate.css`, at `:13393`, `:13486`, `:13510` and `:13289` respectively.
+That mark, and that mark alone, is drawn by the shared chip primitive: measured, none of the family's four vehicles is one — the count, the issue summary, the dirty marker and the premium chip are all bare `span` elements painted from `styles/fabricate.css` by `.manager-nav-count`, `.manager-nav-issue-badge`, `.manager-nav-dirty-marker` and `.manager-nav-premium` respectively.
+The vehicles are cited by SELECTOR and never by line number, because a line into that sheet is not verifiable by a reader of this document and the four this sentence carried before had all gone stale.
 Naming the primitive here therefore binds the unsaved mark and leaves the four-mark rule intact.
 The family reaches a TAB STRIP as well as the rail, because a tab's mark states a fact about what is behind that tab exactly as a rail entry's does, and the tab-strip primitive MUST own the drawing of every vehicle it offers so that a call site names which one its mark uses and never how it looks.
 A caller that cannot name the vehicle it needs is a MISSING CAPABILITY on that primitive, never a licence to hand-roll a second strip or to draw one vehicle with another: a difference recorded between two strips MUST be a functional or informational one the shared primitive absorbs, because a deliberate STYLE divergence is precisely what a shared primitive exists to remove.
@@ -1239,6 +1242,9 @@ The arrangement has ONE implementation, `src/ui/svelte/components/EditorValidati
 That is what makes the sentence above enforceable rather than aspirational: while a second copy of the markup exists, "the same arrangement" is a convention each copy is free to drift from, and the two class families the sheet paints it with have more than one writer.
 A site whose DOM hooks, root classes, status words or reported counts differ passes them as props, and a site needing something the surface does not draw extends the surface rather than forking it.
 The counts are a closed, ordered vocabulary the surface owns — pass, then warning, then blocking — and a site reports the subset it can answer rather than choosing an order or inventing a fourth.
+"The subset it can answer" bars inventing a FIGURE as surely as it bars inventing a word: a count a surface's own report cannot derive is omitted, never shown as a zero or against a denominator the report does not hold.
+The system overview route is the worked case — it reports warning and blocking, omits pass because its report counts ISSUES rather than checks run and so has nothing to derive one from, and gives a severity outside the three, such as `info`, no chip of its own.
+That route is outside this requirement's scope for the reason recorded below, and the subset rule still binds it, because it reaches the route through the VOCABULARY this paragraph closes rather than through the arrangement the requirement fixes — a closed vocabulary is closed wherever its words are used.
 
 One editor does not use the arrangement yet, and it is recorded here rather than left to be rediscovered: the environment editor's validation tab renders check and issue LISTS inside cards, carries severity on a chip, and has no verdict medallion, no counts rail and no grouped row stack.
 It writes none of the arrangement's classes, so it is a REDESIGN of that screen rather than an adoption, and it is outstanding conformance debt against this requirement rather than an exemption from it.
@@ -1326,9 +1332,13 @@ The selection bar is a BAND OF ITS OWN directly beneath the filter bar, never a 
 The filter bar's composition MUST NOT change with selection state: a surface that adds selection controls to that row when rows are ticked, or narrows one of the row's own controls to make room for them, has made one bar mean two things and reads as a different screen in each.
 Whether the band renders at rest is per surface, and a surface that renders it only while a selection is active MUST keep a per-row selection control as the way to open one, because otherwise the mode has no entry point.
 The pagination bar sits OUTSIDE the scroll area so it never moves, and wherever it renders it never hides its disabled arrows.
-A browse surface MAY suppress the bar entirely while the whole filtered list fits ONE page, and MUST restore it the moment a second page exists; suppression is per surface and opt-in, so a surface that says nothing keeps the bar.
-The permission is bounded to the single-page case because that is the only state in which the bar can say nothing the rows do not — `Showing 1-6 of 6 - Page 1 of 1` under six rows is a control with no reachable second state.
-Suppressing it also suppresses the per-page selector, so a surface that opts in accepts that a GM who has chosen a size covering the whole list cannot choose a smaller one again from that screen until they leave it.
+The bar is TWO controls in one band, and each has its own second state: the page nav's exists only past one page, and the per-page selector's exists only when the list holds more rows than the SMALLEST offered size.
+A surface that says nothing renders the band whenever EITHER control has a reachable second state, which reduces to the smallest-offered-size threshold, because below it every offered size draws the same list and the nav can only ever say `Page 1 of 1`.
+A surface MAY opt in to the STRICTER rule that the band renders only past one page, and MUST restore it the moment a second page exists.
+That opt-in is bounded to the single-page case because that is the only state in which the bar can say nothing the rows do not — `Showing 1-6 of 6 - Page 1 of 1` under six rows is a control with no reachable second state.
+Taking it also suppresses the per-page selector, so a surface that takes it accepts that a GM who has chosen a size covering the whole list cannot choose a smaller one again from that screen until they leave it.
+A surface MAY instead opt OUT and render the band always, which is the choice for a surface whose footer is part of its frame rather than a control, and there the nav renders its disabled arrows rather than vanishing.
+The two opt-ins are mutually exclusive by meaning and rendering-always wins if both are named.
 
 An EDITOR screen orders the breadcrumb, the title block with its lede, the action pair with back before save, the tab bar, and then the body.
 An inspector rail is OPTIONAL and several shipped editors have none; where one is present it is the third track, and where an editor repurposes that track for something else it says so.
