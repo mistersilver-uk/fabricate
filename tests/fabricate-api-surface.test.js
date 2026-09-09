@@ -324,6 +324,11 @@ test('Fabricate exposes the versioned Journal command and per-user dismissal sea
 test('player-facing starts explicitly select the current journal lifecycle', () => {
   assert.match(
     mainSource,
+    /async craft\(actor, recipe, options = \{\}\)[\s\S]*?return executePublicCraft\(\{[\s\S]*?engine: this\.craftingEngine,[\s\S]*?runManager: this\.craftingRunManager,/,
+    'the general public craft facade should use the lifecycle-selecting boundary'
+  );
+  assert.match(
+    mainSource,
     /async craftRecipe[\s\S]*?return await this\.craft\([\s\S]*?lifecycleVersion:\s*1,[\s\S]*?\n\s*}\);/,
     'craftRecipe should start a versioned crafting run'
   );
@@ -340,5 +345,18 @@ test('player-facing starts explicitly select the current journal lifecycle', () 
   assert.ok(
     mainSource.includes('installGatheringJournalRunAuthority({'),
     'the constructed gathering engine should receive the journal authority adapter'
+  );
+  assert.ok(
+    mainSource.includes('fabricate.craft(actor, recipe).then(result => {'),
+    'the /craft chat command should delegate through the public craft facade'
+  );
+  assert.ok(
+    mainSource.includes('return await game.fabricate.craft(actor, recipeId, options);'),
+    'the global craft helper should delegate through the public craft facade'
+  );
+  assert.match(
+    mainSource,
+    /start: async \(\{ actor, payload, executionGrant, requestId, sender \}\)[\s\S]*?start\.call\(fabricate\.craftingEngine, \{\s*viewer: sender,/,
+    'the crafting start handler should pass the socket-attested sender as the viewer'
   );
 });

@@ -104,6 +104,54 @@ function installEngineAuthority(engine, authority) {
   return engine;
 }
 
+/** Route a public craft through the current lifecycle unless it resumes legacy persisted state. */
+export async function executePublicCraft({
+  engine,
+  runManager,
+  actor,
+  sourceActors,
+  recipe,
+  ingredientSetId = null,
+  options = {},
+} = {}) {
+  if (typeof engine?.craft !== 'function') return operationUnavailable();
+  const requestedRunId = validText(options?.runId) ? options.runId : null;
+  const existingRun = requestedRunId
+    ? await runManager?.getActiveRun?.(actor, requestedRunId)
+    : null;
+  const routedOptions = { ...options };
+  if (existingRun && !Object.hasOwn(existingRun, 'lifecycleVersion')) {
+    delete routedOptions.lifecycleVersion;
+  } else {
+    routedOptions.lifecycleVersion = 1;
+  }
+  return engine.craft(actor, sourceActors, recipe, ingredientSetId, routedOptions);
+}
+
+/** Compose both persisted run managers into the authority's reconstruction boundary. */
+export function createJournalExecutionReconstructor({
+  getCraftingRunManager,
+  getGatheringRunManager,
+} = {}) {
+  return async ({ operationId = null, orphaned = false } = {}) => {
+    const operationScoped = validText(operationId);
+    const orphanScoped = orphaned === true;
+    if (operationScoped === orphanScoped) return failure('invalid-reconstruction-scope');
+    const managers = [getCraftingRunManager?.(), getGatheringRunManager?.()];
+    if (managers.some((manager) => typeof manager?.reconstructVersionedExecutions !== 'function')) {
+      return failure('reconstruction-unavailable');
+    }
+    const scope = { operationId: operationScoped ? operationId : null, orphaned: orphanScoped };
+    const results = [];
+    for (const manager of managers) {
+      const result = await manager.reconstructVersionedExecutions(scope);
+      if (result?.success !== true) return failure('reconstruction-failed');
+      results.push(result);
+    }
+    return { success: true, results };
+  };
+}
+
 /** Install the crafting engine's current-lifecycle requests through the command service. */
 export function installCraftingJournalRunAuthority({ engine, service } = {}) {
   if (typeof service?.executeJournalRunCommand !== 'function') {
@@ -465,6 +513,7 @@ export function createJournalRunCommandService({
     let trustedContext = { operationId: request.requestId };
     let responseRollHandoff = null;
     let secretCheck = false;
+    let privateEvaluation = null;
     let preparedPayload = request.payload ?? {};
     let executionOperation = request.action;
     if (request.action === 'start' && typeof operation.prepareStart === 'function') {
@@ -492,7 +541,7 @@ export function createJournalRunCommandService({
     if (request.action === 'execute' && prepareToken) {
       const token = helpers.consumePrepareToken(prepareToken, binding);
       if (!token) return failure('prepare-token-invalid');
-      const privateEvaluation = token.binding?.privateEvaluation;
+      privateEvaluation = token.binding?.privateEvaluation;
       const evaluate = operation.evaluateCheck;
       if (typeof evaluate !== 'function') return failure('check-evaluator-unavailable');
       const resolvedCheckResult = await evaluate({
@@ -591,8 +640,37 @@ export function createJournalRunCommandService({
       secret: secretCheck,
       runId: request.runId,
     });
-    if (response.success && responseRollHandoff) {
-      return { ...response, rollHandoff: responseRollHandoff };
+    if (response.success && responseRollHandoff && !secretCheck) {
+      let rollEntitled = true;
+      if (typeof operation.authorizeRollHandoff === 'function') {
+        try {
+          const freshActor = await resolveUuid(request.actorUuid);
+          const freshSender = getUser?.(request.senderId) ?? null;
+          const freshRun =
+            freshActor && validText(request.runId)
+              ? await operation.getRun?.({
+                  actor: freshActor,
+                  runId: request.runId,
+                  includeHistory: true,
+                })
+              : null;
+          rollEntitled = Boolean(
+            freshActor &&
+            freshSender &&
+            (await operation.authorizeRollHandoff({
+              actor: freshActor,
+              run: freshRun,
+              payload,
+              sender: freshSender,
+              privateEvaluation,
+              result,
+            }))
+          );
+        } catch {
+          rollEntitled = false;
+        }
+      }
+      if (rollEntitled) return { ...response, rollHandoff: responseRollHandoff };
     }
     return response;
   }
@@ -631,9 +709,10 @@ export function createJournalRunCommandService({
     if (payload?.kind !== JOURNAL_RUN_SOCKET_KIND.REQUEST) return null;
     if (!currentRealmIsActiveGm()) return null;
     const response = await handleRequest(payload, senderId);
-    // A second tab for the same elected GM has the same attested sender id. Its losing claim
-    // response must stay silent or it can beat the winning tab's eventual settled reply.
-    if (response?.reason === 'claim-held') return null;
+    // A second tab for the same elected GM has the same attested sender id. A tab that lost
+    // either boot recovery or this command's claim must stay silent or it can beat the winning
+    // tab's eventual settled reply.
+    if (['claim-held', 'recovery-pending'].includes(response?.reason)) return null;
     const reply = buildReply(payload, senderId, response);
     emit(reply);
     return reply;
@@ -737,6 +816,7 @@ export function createJournalRunCommandService({
     getJournalRunAuthorityAvailability: () => authority.availability(),
     setupJournalRunAuthority: () => authority.setup(),
     reconcileJournalRunAuthority: (options) => authority.reconcile(options),
+    bootstrapJournalRunAuthority: () => authority.bootstrapRecovery(),
     refreshJournalRunAuthorityAvailability: () => authority.refreshAvailability(),
     consumeExecutionGrant: (grant, expected) => authority.consumeExecutionGrant(grant, expected),
     handleRequest,

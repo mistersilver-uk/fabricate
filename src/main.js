@@ -71,7 +71,9 @@ import { createFoundryJournalRunAuthority } from './systems/journalRunAuthority.
 import {
   JOURNAL_RUN_SOCKET_KIND,
   createGatheringJournalRunOperations,
+  createJournalExecutionReconstructor,
   createJournalRunCommandService,
+  executePublicCraft,
   installCraftingJournalRunAuthority,
   installGatheringJournalRunAuthority,
 } from './systems/journalRunCommands.js';
@@ -420,12 +422,13 @@ function createCraftingJournalOperations(fabricate, getService) {
         },
       };
     },
-    start: async ({ actor, payload, executionGrant, requestId }) => {
+    start: async ({ actor, payload, executionGrant, requestId, sender }) => {
       const sourceActors = await resolveJournalSourceActors(null, payload, actor);
       if (!sourceActors) return { success: false, reason: 'source-actor-not-found' };
       const start = fabricate.craftingEngine?.startVersionedRun;
       if (typeof start !== 'function') return { success: false, reason: 'unsupported-operation' };
       return start.call(fabricate.craftingEngine, {
+        viewer: sender,
         actor,
         sourceActors,
         recipeId: payload.recipeId,
@@ -496,6 +499,22 @@ function createCraftingJournalOperations(fabricate, getService) {
         secret: !visible,
       });
     },
+    authorizeRollHandoff: async ({ actor, run, payload, sender, privateEvaluation }) => {
+      const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
+      if (!componentSourceActors) return false;
+      const recipeId = privateEvaluation?.recipeId ?? run?.recipeId;
+      const recipe = fabricate.recipeManager?.getRecipe?.(recipeId) ?? null;
+      if (!recipe) return false;
+      if (sender?.isGM === true) return true;
+      return Boolean(
+        fabricate.recipeVisibilityService?.getVisibleRecipes?.({
+          viewer: sender,
+          craftingActor: actor,
+          componentSourceActors,
+          craftingSystemId: recipe.craftingSystemId,
+        })?.some?.((candidate) => candidate?.recipe?.id === recipe.id)
+      );
+    },
     execute: async ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
       const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
       if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
@@ -552,7 +571,12 @@ function createCraftingJournalOperations(fabricate, getService) {
 }
 
 function createJournalCommandsForFabricate(fabricate) {
-  const authority = createFoundryJournalRunAuthority();
+  const authority = createFoundryJournalRunAuthority({
+    reconstructExecutions: createJournalExecutionReconstructor({
+      getCraftingRunManager: () => fabricate.craftingRunManager,
+      getGatheringRunManager: () => fabricate.gatheringRunManager,
+    }),
+  });
   let service = null;
   service = createJournalRunCommandService({
     authority,
@@ -583,7 +607,6 @@ function createJournalCommandsForFabricate(fabricate) {
     onDismissalsChanged: (payload) => Hooks.callAll('fabricate.journalDismissalsChanged', payload),
   });
   installCraftingJournalRunAuthority({ engine: fabricate.craftingEngine, service });
-  void authority.refreshAvailability();
   return service;
 }
 
@@ -1826,6 +1849,7 @@ class Fabricate {
       service: this.journalRunCommands,
       evaluatePreparedRunCheck,
     });
+    await this.journalRunCommands?.bootstrapJournalRunAuthority?.();
     // Issue 901. A blind run's secret state — the drawn task, its start-time
     // snapshot, and its provisional node reservation — lives in the
     // `gatheringBlindRuns` WORLD setting, which only a GM may update. That is the
@@ -5054,13 +5078,15 @@ class Fabricate {
 
     const ingredientSetId = options.ingredientSetId || null;
 
-    return await this.craftingEngine.craft(
+    return executePublicCraft({
+      engine: this.craftingEngine,
+      runManager: this.craftingRunManager,
       actor,
-      componentSourceActors,
+      sourceActors: componentSourceActors,
       recipe,
       ingredientSetId,
-      options
-    );
+      options,
+    });
   }
 
   /**
