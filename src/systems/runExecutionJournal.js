@@ -32,14 +32,18 @@ export function transitionExecutionJournal(journal, transition = {}) {
   assertUnsettled(current);
 
   switch (transition.type) {
-    case 'effectApplying':
+    case 'effectApplying': {
       return markEffectApplying(current, transition.effectId);
-    case 'effectApplied':
+    }
+    case 'effectApplied': {
       return markEffectApplied(current, transition);
-    case 'commit':
+    }
+    case 'commit': {
       return commitJournal(current, transition.outcome);
-    default:
+    }
+    default: {
       throw journalError('Unknown execution journal transition', 'INVALID_JOURNAL_TRANSITION');
+    }
   }
 }
 
@@ -90,7 +94,7 @@ function markEffectApplying(journal, effectId) {
   }
   const index = journal.effects.findIndex((effect) => effect.effectId === effectId);
   const nextIndex = journal.effects.findIndex((effect) => effect.phase === 'planned');
-  if (index < 0 || index !== nextIndex) {
+  if (index === -1 || index !== nextIndex) {
     throw journalError('Effects must apply in planned order', 'INVALID_EFFECT_TRANSITION');
   }
   journal.effects[index].phase = 'applying';

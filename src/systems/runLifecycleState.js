@@ -38,7 +38,7 @@ export function preserveRunLifecycleFields(data = {}) {
 
 export function assertRunLifecycleMutation(
   run,
-  { currentOnly = false, expectedRevision = undefined, allowPaused = false } = {}
+  { currentOnly = false, expectedRevision, allowPaused = false } = {}
 ) {
   const contract = getRunLifecycleContract(run);
   if (contract === 'unsupported') throw unsupportedVersionError(run?.lifecycleVersion);
@@ -88,7 +88,7 @@ export function applyCompletionMode(run, completionMode, options = {}) {
   return incrementRunRevision(run);
 }
 
-export function applyPause(run, { now, availableAt, expectedRevision = undefined } = {}) {
+export function applyPause(run, { now, availableAt, expectedRevision } = {}) {
   assertRunLifecycleMutation(run, { currentOnly: true, expectedRevision, allowPaused: true });
   if (run.pauseState) {
     throw new RunLifecycleError('The run is already paused', 'RUN_ALREADY_PAUSED');
@@ -101,7 +101,7 @@ export function applyPause(run, { now, availableAt, expectedRevision = undefined
   return incrementRunRevision(run);
 }
 
-export function applyResume(run, { now, expectedRevision = undefined } = {}) {
+export function applyResume(run, { now, expectedRevision } = {}) {
   assertRunLifecycleMutation(run, { currentOnly: true, expectedRevision, allowPaused: true });
   if (!run.pauseState) {
     throw new RunLifecycleError('The run is not paused', 'RUN_NOT_PAUSED');
