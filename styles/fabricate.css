@@ -4397,8 +4397,8 @@
    still the PLATFORM widget, which paints its own field background underneath — and a 5%
    overlay over the platform's light field reads as a near-white control with a pale border.
    That is the same failure the manager solved once already, which is why every other manager
-   select — `.manager-field select`, `.manager-recipe-field select` — states an opaque fill.
-   This rule brings the trigger dropdowns back onto it. */
+   select — `.manager-field select`, and `.manager-recipe-field select` until issue 1510 retired
+   it — states an opaque fill. This rule brings the trigger dropdowns back onto it. */
 .fabricate-manager .manager-checks-trigger-body .manager-field select {
   background: var(--fab-bg-1);
 }
@@ -6485,32 +6485,24 @@
   font-size: 0.64rem;
 }
 
-/* The overview selects (Category, Check tier, Minimum success tier) carry no select
-   class of their own, so without this they rendered Foundry core's default light
-   select chrome. Give them the Fabricate surface + the theme-appropriate native
-   chevron, matching the recipe-toolbar select treatment. The two-class-plus-element
-   selector (0,2,1) outranks Foundry core's aggressive `select` rules (issue 643). */
+/* THE OVERVIEW SELECTS' SKIN IS GONE, and its absence is the point (issue 1510).
 
-/* skin census (issue 1523): pinned by tests/components/tool-studio-mounted.test.js (a
-   mounted assertion at `:975`/`:977` closes on `.manager-recipe-field`). */
-.fabricate-manager .manager-recipe-field select {
-  width: 100%;
-  min-width: 0;
-  height: 34px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 9px;
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-  font-size: var(--fab-recipe-control-font);
-  cursor: pointer;
-}
+   Two rules stood here: `.manager-recipe-field select`, which gave the Category, Check tier,
+   Minimum success tier and Eligible-modifiers controls the Fabricate surface Foundry core's
+   aggressive `select` rules would otherwise have overridden, and its `:disabled` twin. All four
+   carriers render `components/Select.svelte` now, so both rules had no carrier left at all —
+   there is no `<select>` under a `.manager-recipe-field` anywhere in `src/`, and
+   `ToolBreakageTab.svelte`, the class's other emitter, wraps only inputs and steppers.
 
-.fabricate-manager .manager-recipe-field select:disabled {
-  color: var(--fab-text-muted);
-  background: var(--fab-overlay-light-04);
-  cursor: default;
-}
+   What replaced each of them: the box comes from the `form` rung on
+   `.fabricate-select-trigger-form`, the disabled treatment from
+   `.fabricate-select-trigger:disabled`, and the `width: 100%` those cells still need from the
+   caller's own scoped block in `RecipeOverviewTab.svelte` — a width with one emitting call site
+   belongs to that call site, not to a family rule reaching a control the family does not own.
+
+   The skin census this block carried (issue 1523) retires with it. Its pin,
+   `tests/components/tool-studio-mounted.test.js`, closes two `.manager-recipe-field`
+   assertions on INPUTS (`:972`, `:974`) and is untouched by the conversion. */
 
 /* Uppercase micro-label over an unwrapped field (prototype §5.1). */
 .fabricate-manager .manager-recipe-micro-label {
@@ -12518,23 +12510,28 @@
 
 /* THE KIND SELECT (`proto:2248`), which is what makes the row retypeable in place.
 
-   An explicit WIDTH, for the reason premium's `RewardRow` states: Foundry styles a bare
-   `select` to fill its container, so left intrinsic it takes the whole row and pushes every
-   other control onto its own line — which is exactly the three-line card this change removes.
-   132px is premium's own figure. Specificity (0,2,0) beats the (0,1,1) baseline
-   `.fabricate-manager select` rule, so the radius and surface here are the ones that paint. */
+   An explicit WIDTH, for the reason premium's `RewardRow` states: left intrinsic the control
+   takes the whole row and pushes every other one onto its own line — which is exactly the
+   three-line card this change removes. 132px is premium's own figure. It used to be a bare
+   `<select>`, which Foundry styles to fill its container; issue 1510 made it the shared
+   `<Select>`, whose trigger is a `<button>` that HUGS its chosen value instead — so the
+   declaration is needed for the opposite reason and by the opposite control, and the row would
+   otherwise re-flow every time the GM retyped it.
+
+   THE CLASS NOW LANDS ON THE PICKER ROOT, not on the control. `Select`'s `class` prop is
+   forwarded to the root `SearchablePopover` renders, so this rule keeps the LAYOUT — the row's
+   flex sizing — and the box moves to the trigger beneath it. The trigger's own `inline` rung
+   already gives 30px, radius 7 and `--fab-bg-2`, exactly what this block declared; the one
+   thing the rung does NOT give is the secondary ink, which is this row's own reading and is
+   restated on the trigger below. `cursor: pointer` is the trigger's own too. */
 .fabricate-manager .manager-recipe-option-kind {
   flex: 0 0 auto;
   width: 132px;
-  height: 30px;
-  padding: 0 var(--fab-space-2);
-  border: 1px solid var(--fab-border);
-  border-radius: 7px;
+}
+
+.fabricate-manager .manager-recipe-option-kind .fabricate-select-trigger {
+  width: 100%;
   color: var(--fab-text-secondary);
-  background: var(--fab-bg-2);
-  font-size: 0.69rem;
-  font-weight: 500;
-  cursor: pointer;
 }
 
 /* THE NAME FIELD. `min-width: 0` and `flex: 1` because it is the row's ONLY flexible item —

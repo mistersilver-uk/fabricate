@@ -107,6 +107,7 @@
     findCurrencyUnit,
   } from '../../../util/recipeCurrency.js';
   import SearchablePopover from '../../../components/SearchablePopover.svelte';
+  import Select from '../../../components/Select.svelte';
   import SegmentedControl from '../SegmentedControl.svelte';
   import Stepper from '../../../components/Stepper.svelte';
   // The ONE kind table (`proto:4624`). The plate's glyph and tint, and the kind select's four
@@ -484,22 +485,26 @@
     <i class={leadIcon}></i>
   </span>
 
-  <!-- A REAL `<select>`, not a segmented control or a popover: four mutually exclusive values
-       with no search and no imagery is exactly what a select is for, and the platform widget
-       carries keyboard, screen-reader and touch behaviour a hand-rolled menu would have to
-       reimplement. `proto:2248` draws one too. -->
-  <select
+  <!-- A ONE-OF-N PICKER, not a segmented control: four mutually exclusive values with no search
+       and no imagery is exactly what a dropdown is for, and `proto:2248` draws one too. It was a
+       native `<select>` until issue 1510, for a reason that has expired — the platform widget
+       carried the keyboard, screen-reader and touch behaviour a hand-rolled menu would have had
+       to reimplement, and the shared `<Select>` is not hand-rolled: `SearchablePopover` owns the
+       listbox key model, the roving focus and the dismissal, and the panel is drawn by the app
+       so it can be themed and photographed.
+
+       The tooltip rides `triggerTitle` rather than `triggerData`: the popover spreads that map
+       FIRST and then writes `title` from its own prop, so a `title` placed in it is deleted. -->
+  <Select
     class="manager-recipe-option-kind"
-    data-recipe-option-kind
-    aria-label={kindLabel}
-    title={kindLabel}
+    size="inline"
     value={matchType}
-    onchange={(event) => setKind(event.currentTarget.value)}
-  >
-    {#each kindOptions as kind (kind.value)}
-      <option value={kind.value}>{kind.label}</option>
-    {/each}
-  </select>
+    options={kindOptions}
+    ariaLabel={kindLabel}
+    triggerTitle={kindLabel}
+    triggerData={{ 'data-recipe-option-kind': '' }}
+    onChange={(next) => setKind(next)}
+  />
 
   {#if matchType === 'tags'}
     <!-- ONE LINE (`proto:2252`-`2268`): the policy word, the chosen tags, `+ Tag`, and the
