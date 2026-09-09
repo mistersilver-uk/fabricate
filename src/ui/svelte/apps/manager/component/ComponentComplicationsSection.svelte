@@ -1150,29 +1150,42 @@
             </div>
           </ComplicationSummaryRow>
         {/each}
+        <!-- THE ADDER IS THE LIST'S LAST CHILD (issue 1512), in flow with the collection it
+             grows rather than a sibling of it. -->
+        {@render complicationAdder()}
       </div>
     {/if}
 
-    <!-- Dashed, and fullWidth: the append-a-row verb at the foot of `.fab-complications-list`,
-         which spans this panel's single-column grid track — the same shape as
-         `RecipeStepsCard`'s "Add a step" and `ComponentEditView`'s "Add result"/"Add group"
-         sites (issue 1118). The bespoke `.fab-complications-add` scoped rule this replaced
-         declared nothing the role and `fullWidth` do not already state — `display`,
-         `align-items` and `justify-content` come from the base `.manager-button` contract,
-         `border-style: dashed` and the icon/label gap from `is-dashed`, and `width: 100%`
-         from `is-full-width` — so it is retired rather than re-chained under `:global(...)`. -->
-    <ManagerButton
-      role="dashed"
-      fullWidth
-      data-complications-add
-      disabled={saving}
-      onclick={addComplication}
-    >
-      <i class="fas fa-plus" aria-hidden="true"></i>
-      <span>{text('FABRICATE.Admin.Manager.Component.Complications.Add', 'Add complication')}</span>
-    </ManagerButton>
+    <!-- With NO complications the list is not rendered, so the adder follows the empty
+         message it now sits under: a footer of a list that does not render cannot render
+         either, and an empty state that says "add one" with nothing to press is a dead
+         end. -->
+    {#if complications.length === 0}
+      {@render complicationAdder()}
+    {/if}
   </section>
 {/if}
+
+<!-- Dashed, and fullWidth: the append-a-row verb at the foot of `.fab-complications-list`,
+     which spans this panel's single-column grid track — the same shape as
+     `RecipeStepsCard`'s "Add a step" and `ComponentEditView`'s "Add result"/"Add group"
+     sites (issue 1118). The bespoke `.fab-complications-add` scoped rule this replaced
+     declared nothing the role and `fullWidth` do not already state — `display`,
+     `align-items` and `justify-content` come from the base `.manager-button` contract,
+     `border-style: dashed` and the icon/label gap from `is-dashed`, and `width: 100%`
+     from `is-full-width` — so it is retired rather than re-chained under `:global(...)`. -->
+{#snippet complicationAdder()}
+  <ManagerButton
+    role="dashed"
+    fullWidth
+    data-complications-add
+    disabled={saving}
+    onclick={addComplication}
+  >
+    <i class="fas fa-plus" aria-hidden="true"></i>
+    <span>{text('FABRICATE.Admin.Manager.Component.Complications.Add', 'Add complication')}</span>
+  </ManagerButton>
+{/snippet}
 
 <style>
   /* Theme-ROOT tokens only, per `Chip.svelte`'s note: this section wears the manager's

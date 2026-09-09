@@ -9,12 +9,20 @@
   "labelled regions that expand" landing in one change must either share an implementation
   or name the behavioural mismatch that forbids it; this is the shared implementation.
 
+  ITS SECOND CONSUMER IS `SortableList` (issue 1512), which renders it LEADING — before the
+  row's own copy — as the sole opener of an ordered row.
+
   ITS SHIPPED CONSUMER IS THE CHECKS RIGHT RAIL, whose simulator and odds panels each collapse
   to it at the existing ≤1320 breakpoint. The collapsed TRIGGER card is not a second consumer:
   issue 1096 left the trigger cards rendering expanded, so the prototype's summary row —
   condition sentence, effect chip, disclosure — is still to be built. It is recorded here
   rather than claimed, because a primitive justified by a site that does not exist is a
   justification nobody can check. When that row is built it adopts this control.
+
+  IT EMITS `data-keyboard-focus="true"` (issue 1512), because it is a real focusable
+  control inside a Foundry application: without it `KeyboardManager#hasFocus` stays false
+  while this chevron holds focus, so Space pauses the game and the arrows pan the canvas
+  behind the open window.
 
   It renders a real `<button>` and therefore must not be placed INSIDE another button.
   Converting a `role="button"` wrapper into a `<button>` around it would nest buttons and
@@ -27,6 +35,9 @@
      anything; a caller with no stable id has a layout problem, not an ARIA one.
    - label: the accessible name. It names the ROW, not the action — "Trigger 1: on a
      natural 1" reads correctly under both states because `aria-expanded` supplies the rest.
+     Emitted as `{label || undefined}` (issue 1512): an empty `aria-label` is not "no
+     label", it is a label of nothing, and it overrides the name the element would
+     otherwise take from its own content.
    - side: 'trailing' (default) or 'leading', which only decides which way the collapsed
      chevron points.
    - dataAttr / dataValue: an optional test/screenshot hook.
@@ -56,7 +67,8 @@
   class:is-expanded={expanded}
   aria-expanded={expanded}
   aria-controls={controls || undefined}
-  aria-label={label}
+  aria-label={label || undefined}
+  data-keyboard-focus="true"
   {disabled}
   {...hookAttributes}
   onclick={() => onToggle(!expanded)}

@@ -616,6 +616,7 @@
               type="button"
               class="manager-checks-trigger-disclosure"
               data-trigger-disclosure={trigger.id}
+              data-keyboard-focus="true"
               aria-expanded={expanded}
               aria-controls={`fab-trigger-body-${trigger.id}`}
               onclick={() => toggleExpanded(trigger.id)}
@@ -988,14 +989,28 @@
           {/if}
         </div>
       {/each}
+      <!-- THE ADDER IS THE LIST'S LAST CHILD (issue 1512), rather than a sibling of the
+           list: the action that grows a collection belongs in flow with the collection it
+           grows. It is `role="presentation"` because it is not a trigger, and the list
+           above declares `role="list"`. -->
+      <div role="presentation">{@render addTriggerButton()}</div>
     </div>
   {/if}
 
-  <!-- The prototype extends the list with a full-width dashed control UNDER it, not a
-       button in a card head: the action that grows the list belongs at the end of the list
-       it grows. -->
+  <!-- With NO triggers the list is not rendered, so a footer of it could not render either
+       and an empty state that says "add one" with nothing to press is a dead end. The adder
+       follows the empty message instead. -->
+  {#if triggers.length === 0}
+    {@render addTriggerButton()}
+  {/if}
+</div>
+
+<!-- The prototype extends the list with a full-width dashed control UNDER it, not a button
+     in a card head: the action that grows the list belongs at the end of the list it
+     grows. -->
+{#snippet addTriggerButton()}
   <ManagerButton role="dashed" data-add-trigger onclick={addTrigger}>
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.AddTrigger', 'Add trigger')}</span>
   </ManagerButton>
-</div>
+{/snippet}

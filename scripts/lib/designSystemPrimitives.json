@@ -78,7 +78,7 @@
       "status": "target",
       "evidence": "targeted",
       "scope": "shared",
-      "why": "The complication summary row (5 callers, reaching the player crafting and inventory apps as well as the component editor). `library.html:1509` names component complications among the rows `<SortableList>` \"opens in place\", so this row is specified as a STATE of that primitive rather than as an entry of its own. Targeted: three complication frames claim it, led by `manager-component-complications-collapsed`. Scoped `shared` DESPITE its `apps/manager/` path, for the reason the first sentence already measures: two of its five callers are the player crafting and inventory applications."
+      "why": "The complication summary row (5 callers, reaching the player crafting and inventory apps as well as the component editor). `library.html:1629` names component complications among the rows `<SortableList>` \"opens in place\", so this row is specified as a STATE of that primitive rather than as an entry of its own. Targeted: three complication frames claim it, led by `manager-component-complications-collapsed`. Scoped `shared` DESPITE its `apps/manager/` path, for the reason the first sentence already measures: two of its five callers are the player crafting and inventory applications."
     },
     {
       "path": "src/ui/svelte/components/EditorTabs.svelte",
@@ -415,6 +415,22 @@
       "evidence": "broad",
       "scope": "shared",
       "why": "`library.html:716` — a tiled strip of spans whose dividers are dragged, \"outcome tiers against a DC\", which is exactly this. Exactly 2 callers, `checks/CraftingCheckEditor.svelte` and `checks/SimpleCraftingCheckEditor.svelte`, and it carries a two-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because those are its two modes and each renders chrome the other does not."
+    },
+    {
+      "path": "src/ui/svelte/components/RowDisclosure.svelte",
+      "library": "<RowDisclosure>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Promoted at issue 1512, when `SortableList` became its second importer beside `ComplicationSummaryRow`. `target` rather than `shipped` because its specimen block states geometry with no Svelte API section: a specimen that names no props gives nothing to match, which is the rule `components/ManagerColorPopover.svelte`'s row already states verbatim. Specified at `library.html:1085`, and the `library.html:1016` this row cited had rotted onto a bare closing tag. It is separately on `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js`, cited by construct rather than by line, because omitting it there CANCELS every test in the mounted suite rather than failing one. Its family is still declared in a scoped block rather than in the sheet, which the rooting requirement forbids for a member; the re-root is filed as a successor and recorded as a live non-conformance in `ui-integration/spec.md`, rather than absorbed here, because it needs three-host probes and a section-16 row of its own."
+    },
+    {
+      "path": "src/ui/svelte/components/SortableList.svelte",
+      "library": "<SortableList>",
+      "status": "shipped",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "The ordered row, built at issue 1512 to the specimen's own API with seven props added and none dropped: `row` (without it the primitive cannot draw the composition list's grid columns, the result row's issue-643 control order, or the tier row's live input and stepper), `onRemove`, `reorderable` (five of six `RecipeStepAccordion` callers and the composition list's unranked branch order nothing, and a grip that does not reorder is a promise the surface does not keep), `rowClass` and `rowData` (the row element is the primitive's, and the callers' per-record state classes and data hooks have to live on it) and the `dataAttr`/`dataValue` hook pair. `status` is `shipped` rather than `target` because the entry states a Svelte API, on the `Callout` and `Medallion` precedent. Broad by the `components/` leg, so it ships with a `BROAD_SIGNAL_CASE_OVERRIDES` entry naming a frame that draws a row OPEN rather than one that merely renders the file. It owns its pointer AND keyboard reorder: `actions/dragSource.js` is a Foundry canvas hand-off source and `actions/dragDrop.js` is the external-payload drop half, so neither could be reused and reusing the first would have published every list row to the canvas. Rooted at `fabricate-sortable-list`, written on its own root element; it portals nothing, so it needs one root. FIVE CONVERTED CALLERS, and two of them keep a remove control of their own rather than the list's: `data-recipe-remove=\"result-item\"` and `data-remove-salvage-result` are the hooks their mounted drivers address a stage by, so `removable` is refused at those two sites and the caller's button rides the `row` snippet."
     }
   ],
   "notAPrimitive": [
@@ -467,15 +483,6 @@
         "src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte"
       ],
       "why": "ONE caller, `src/ui/svelte/apps/manager/EnvironmentsBrowserView.svelte`. The `<TintPicker>` entry is carried by its sibling `ManagerColorPopover.svelte`, which clears the bar and is a member of the set."
-    },
-    {
-      "path": "src/ui/svelte/components/RowDisclosure.svelte",
-      "library": "<RowDisclosure>",
-      "evidence": "broad",
-      "callers": [
-        "src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte"
-      ],
-      "why": "ONE caller, `src/ui/svelte/apps/manager/ComplicationSummaryRow.svelte`. Named at `library.html:1016`, so it is specified and shipped and still below the entry bar. It is separately on `SHARED_PRIMITIVES` in `tests/components/mounted-harness-primitive-allowlist.test.js`, cited by construct rather than by line because the line cited here had rotted onto an unrelated entry, for a reason the caller count cannot express: omitting it there CANCELS every test in the mounted suite — `# cancelled N`, never `# fail` — rather than hanging it, which is what that guard's own header states in as many words. That is why that list is not derived from this manifest."
     },
     {
       "path": "src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte",
