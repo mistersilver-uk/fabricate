@@ -245,7 +245,7 @@
         {stages}
         current={currentIndex}
         view={viewedIndex}
-        onView={(index) => journal?.viewStage?.(index)}
+        onView={(index) => journal?.viewStage?.(run, index)}
         stageLabel={(stage, index) =>
           localize('FABRICATE.App.Journal.Stage.Open', {
             index: index + 1,

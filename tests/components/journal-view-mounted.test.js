@@ -114,7 +114,7 @@ function makeJournal(overrides = {}) {
     setSelection: (run, value) => calls.selection.push([run, value]),
     cancel: (run) => calls.cancel.push(run),
     dismiss: (run) => calls.dismiss.push(run),
-    viewStage: (value) => calls.viewStage.push(value),
+    viewStage: (run, value) => calls.viewStage.push([run, value]),
     ...overrides,
   };
   return { store, calls };
@@ -261,7 +261,7 @@ describe('JournalView mounted behavior', () => {
     });
     const target = await harness.mount({ services: makeServices(store) });
     target.querySelector('[data-stage-nav-index="1"]').click();
-    assert.deepEqual(calls.viewStage, [1]);
+    assert.deepEqual(calls.viewStage, [[run, 1]]);
     assert.equal(target.querySelector('[data-stage-card]').getAttribute('data-stage-state'), 'current');
 
     harness.remount();
