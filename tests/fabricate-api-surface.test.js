@@ -274,7 +274,7 @@ test('Fabricate wires the crafting listing builder with a component resolver (is
   // owned-material tally silently reads as if the player owns nothing, and no existing
   // test goes red.
   assert.ok(
-    mainSource.includes("import { findMatchingComponent } from './utils/essenceResolver.js';"),
+    mainSource.includes("import { findMatchingComponent, resolveItemEssences } from './utils/essenceResolver.js';"),
     'main.js should import the same component resolver InventoryListingBuilder matches with'
   );
   assert.ok(
@@ -297,5 +297,26 @@ test('Fabricate hydrates the crafting recipe detail phase through the crafting l
   assert.ok(
     mainSource.includes('return this._getCraftingListingBuilder().buildRecipeDetail({'),
     "hydrateCraftingRecipe should route through the crafting listing builder's detail phase"
+  );
+});
+
+test('Fabricate exposes the versioned Journal command and per-user dismissal seams', () => {
+  for (const method of [
+    'executeJournalRunCommand(command)',
+    'dismissJournalRun(options)',
+    'getDismissedJournalRunKeys(options)',
+    'getJournalRunAuthorityAvailability()',
+    'setupJournalRunAuthority()',
+    'reconcileJournalRunAuthority(options)',
+  ]) {
+    assert.ok(mainSource.includes(method), `${method} should be exposed on game.fabricate`);
+  }
+  assert.ok(
+    mainSource.includes("Hooks.on('createJournalEntryPage', refreshJournalRunAuthorityAvailability)"),
+    'embedded authority-claim creation should refresh the synchronous availability cache'
+  );
+  assert.ok(
+    mainSource.includes("Hooks.on('deleteJournalEntryPage', refreshJournalRunAuthorityAvailability)"),
+    'embedded authority-claim release should refresh the synchronous availability cache'
   );
 });

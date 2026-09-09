@@ -394,6 +394,14 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // Player-facing Journal seams. The store/components never touch Foundry
       // globals; these wrappers are the single Foundry-facing edge.
       listJournalForActor: (opts = {}) => game?.fabricate?.listJournalForActor?.(opts) ?? null,
+      executeJournalRunCommand: (opts = {}) =>
+        game?.fabricate?.executeJournalRunCommand?.(opts) ?? null,
+      dismissJournalRun: (opts = {}) => game?.fabricate?.dismissJournalRun?.(opts) ?? null,
+      getDismissedJournalRunKeys: (opts = {}) =>
+        game?.fabricate?.getDismissedJournalRunKeys?.(opts) ?? new Set(),
+      getJournalRunAuthorityAvailability: () =>
+        game?.fabricate?.getJournalRunAuthorityAvailability?.()
+        ?? { available: false, reason: 'authority-unavailable' },
       advanceCraftingRun: (opts = {}) => game?.fabricate?.advanceCraftingRun?.(opts) ?? null,
       cancelCraftingRun: (opts = {}) => game?.fabricate?.cancelCraftingRun?.(opts) ?? null,
       getWorldTime: () => game?.fabricate?.getWorldTime?.() ?? 0,

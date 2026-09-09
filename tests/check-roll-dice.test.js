@@ -14,6 +14,9 @@ import assert from 'node:assert/strict';
 
 import {
   evaluateCheckRoll,
+  evaluatePreparedCheck,
+  evaluatePreparedCraftingCheck,
+  postCheckRollHandoff,
   runFormulaPassFail,
   runFormulaProgressive,
   runFormulaRouted,
@@ -316,6 +319,109 @@ test('evaluateCheckRoll: non-interactive default does not prompt or post chat', 
     assert.ok(lastRoll, 'roll still evaluated');
     assert.equal(lastRoll.toMessageCalls.length, 0, 'no chat post when not interactive');
     assert.equal(chatCreated.length, 0);
+  } finally {
+    clearStubs();
+  }
+});
+
+test('evaluatePreparedCheck validates decisions, evaluates without posting, and returns a handoff', async () => {
+  installRollStub();
+  installChatStub();
+  try {
+    lastRoll = null;
+    globalThis.Roll.prototype.toJSON = function () {
+      return { class: 'FakeRoll', formula: this.formula, total: this.total, terms: [], dice: [] };
+    };
+    const result = await evaluatePreparedCheck(
+      {
+        formula: '1d20',
+        options: {
+          flavor: 'Visible check',
+          rollMode: 'selfroll',
+          modifierChoice: {
+            modifiers: [{ id: 'allowed', value: 2, label: 'Allowed' }],
+            maxPicks: 1,
+          },
+        },
+        secret: false,
+      },
+      actor,
+      { bonus: '3', advantage: 'advantage', modifierIds: ['unknown', 'allowed'], total: 999 }
+    );
+    assert.equal(result.total, 15, 'the evaluated total comes from the GM Roll');
+    assert.match(lastRoll.formula, /2d20kh1/);
+    assert.match(lastRoll.formula, /\+ 2\[Modifiers\]/);
+    assert.match(lastRoll.formula, /\+ \(3\)/);
+    assert.equal(lastRoll.toMessageCalls.length, 0, 'the GM does not post a visible player roll');
+    assert.equal(result.rollHandoff.serializedRoll.total, 15);
+    assert.equal(Object.hasOwn(result, 'roll'), false);
+  } finally {
+    clearStubs();
+  }
+});
+
+test('evaluatePreparedCheck posts secret checks on the GM and returns no formula-bearing handoff', async () => {
+  installRollStub();
+  installChatStub();
+  try {
+    const result = await evaluatePreparedCheck(
+      { formula: '1d20 + 7', options: { flavor: 'Secret', rollMode: 'gmroll' }, secret: true },
+      actor,
+      { bonus: null, modifierIds: [] }
+    );
+    assert.equal(lastRoll.toMessageCalls.length, 1);
+    assert.equal(result.rollHandoff, undefined);
+    assert.equal(result.resolvedFormula, null, 'the sanitized result does not disclose the formula');
+  } finally {
+    clearStubs();
+  }
+});
+
+test('postCheckRollHandoff reconstructs and posts the evaluated roll in the player session', async () => {
+  const calls = [];
+  class ReconstructedRoll {
+    static fromData(data) {
+      assert.equal(data.total, 17);
+      return new ReconstructedRoll();
+    }
+    async toMessage(messageData, options) {
+      calls.push({ messageData, options });
+    }
+  }
+  const result = await postCheckRollHandoff(
+    {
+      serializedRoll: { total: 17, terms: [] },
+      flavor: 'Player check',
+      speaker: { alias: 'Tinker' },
+      rollMode: 'selfroll',
+    },
+    { Roll: ReconstructedRoll }
+  );
+  assert.equal(result.success, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].options.rollMode, 'selfroll');
+});
+
+test('evaluatePreparedCraftingCheck classifies with the GM-retained decision policy', async () => {
+  installRollStub();
+  try {
+    const result = await evaluatePreparedCraftingCheck(
+      {
+        mode: 'simple',
+        slot: 'check',
+        rollFormula: '1d20',
+        checkConfig: {},
+        decisionPolicy: { dc: 16, thresholdMode: 'meet' },
+      },
+      actor,
+      { bonus: null }
+    );
+    assert.equal(result.engineEvaluated, true);
+    assert.equal(result.success, false);
+    assert.equal(result.outcome, 'fail');
+    assert.equal(result.value, 15);
+    assert.equal(result.data.dc, 16);
+    assert.equal(Object.hasOwn(result.data, 'formula'), false, 'no blind formula enters the reply result');
   } finally {
     clearStubs();
   }
