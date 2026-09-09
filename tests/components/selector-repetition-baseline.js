@@ -212,7 +212,7 @@
  * option` had no carrier left and were deleted outright: three rules, three selectors, every one
  * of them a singleton in both keyings, because no other rule shares a list with any of them. The
  * rule count falls by three and the key and singleton counts each fall by three, while
- * `pinnedTotal` STAYS 243 across 119 rows. The change adds no sheet rule at all — the two width
+ * `pinnedTotal` STAYS 229 across 112 rows. The change adds no sheet rule at all — the two width
  * treatments the conversion needs live in the callers' own scoped blocks — so there is nothing on
  * the other side of the ledger to net against. Re-derived by running the census, not predicted.
  *
