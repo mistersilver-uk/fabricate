@@ -318,11 +318,28 @@ export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 26;
  * every one of the seven is painted by `.fabricate-field.manager-field select`, which keeps
  * three root carriers, so there was nothing stranded to strip. What each converted caller states
  * instead is the `width: 100%` that element-typed rule can no longer supply to a `<button>`.
+ *
+ * 71 -> 66 with the first instalment of issue 1510's SECOND phase, and two recipe-editor rows
+ * leave with it: `apps/manager/recipe/RecipeOverviewTab.svelte | 4` and
+ * `apps/manager/recipe/RecipeIngredientOption.svelte | 1` are DELETED because all five elements
+ * now render `components/Select.svelte`. The file count falls 24 -> 22 with them. Paid down by
+ * conversion, not by a marker: no `<!-- native select: ... -->` comment was added. The rest of
+ * that phase's editors — the component, environment, gathering-task, checks and tools screens —
+ * are still owed, so this row-set is an instalment rather than the phase.
+ *
+ * AND THIS ONE DID STRAND A SHEET RULE, which the phase before it did not. `.manager-recipe-field
+ * select` and its `:disabled` twin had exactly four carriers, all four on the overview tab, so
+ * both were DELETED rather than narrowed; `ToolBreakageTab.svelte` emits the same class and
+ * wraps no select at all. The box moved to the `form` rung on the trigger and the `width: 100%`
+ * to the caller's own scoped block, because a width with one emitting call site is that call
+ * site's rather than a family's. `.manager-recipe-option-kind` was REWRITTEN instead of deleted:
+ * the class rides `Select`'s `class` prop onto the picker root, so the row's flex sizing stayed
+ * where it was and only the box moved down onto the trigger.
  */
 export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 
 /** @see KNOWN_NATIVE_SELECT_ELEMENTS */
-export const KNOWN_NATIVE_SELECT_TOTAL = 71;
+export const KNOWN_NATIVE_SELECT_TOTAL = 66;
 
 /**
  * A native `<select>` written into a JavaScript template string, keyed `file`.
