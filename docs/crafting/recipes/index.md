@@ -152,6 +152,7 @@ Players craft in the **Crafting** tab of the unified Fabricate window.
 They browse the recipes their character can see, choose which owned actors supply the materials, roll any crafting check, and craft.
 
 The Validation tab lists anything that would stop the recipe being crafted.
+Selecting an issue's **View** button jumps to the tab it concerns and highlights the part of it the issue is about.
 
 {% include screenshot.html case="manager-recipe-edit-validation" %}
 

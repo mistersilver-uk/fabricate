@@ -51,6 +51,7 @@ The editor has three tabs:
 - **Breakage** controls whether this system is enabled for the Tool, its display label here, wear, check-driven immunity, on-break behavior, replacement, and repair materials.
 - **Requirements** controls shared character prerequisites and the Tool check bonus.
 - **Validation** lists every issue that blocks saving.
+Selecting an issue's **View** button jumps to the tab it concerns and highlights the part of it the issue is about.
 
 A Tool's identity — the linked Item, its art and its description — is not editable here.
 It belongs to the world Tool, which the header's **World Tool** button opens.

@@ -56,7 +56,7 @@ Leaving Checks for another screen with unsaved edits asks first, names which act
 ### The Validation page
 
 **Validation** gathers every issue across the crafting, salvage, and gathering checks into one list, grouped by activity and rated **Pass**, **Warning**, or **Blocks enable**.
-Selecting an issue takes you to the page and section that raised it.
+Selecting an issue takes you to the page and section that raised it, and highlights the specific field when the issue is about one.
 A blocking issue never stops you saving, only enabling the system.
 
 {% include screenshot.html case="manager-checks-validation" %}

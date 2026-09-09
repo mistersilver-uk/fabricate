@@ -49,6 +49,7 @@ The editor has two tabs:
 - **Essence rules** carries the shared-definition card, an **Enabled in _system_** switch, an **Active effect source** card and a **Macro on craft** card, and a **Reuse these rules** action that copies both behaviours into another system.
 See [Effect Transfer via Essences](#effect-transfer-via-essences) and [The Essence Property Macro](#the-essence-property-macro) below.
 - **Validation** lists anything unfinished, such as a missing description or a macro that no longer resolves.
+Selecting an issue's **View** button jumps to **Essence rules** and highlights the part of it the issue is about.
 
 Each behaviour card carries its own switch saying whether this system **inherits the world default** or **overrides** it.
 While a section is inherited the value below it is read-only, because it belongs to the shared definition; turning the switch off is what makes it this system's to change.
