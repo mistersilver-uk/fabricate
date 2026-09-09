@@ -7,7 +7,7 @@
 // projection and the paint stays the primitive's (issue 1506).
 //
 // Tones reuse the existing status palette (no new `--fab-*` tokens) and the
-// RuntimeStatePill vocabulary: waiting=warning+hourglass; ready=success+play;
+// RuntimeStatePill vocabulary: paused=neutral+pause; waiting=warning+hourglass; ready=success+play;
 // succeeded=success+check; failed=danger+xmark; cancelled (and any un-mapped
 // status, e.g. a step `pending`) = a neutral chip; inProgress=info. Ready never
 // co-occurs with Succeeded (Ready only appears on ACTIVE runs, Succeeded only in
@@ -21,6 +21,11 @@
 
 /** @type {Readonly<Record<string, RunStatusPresentation>>} */
 const STATUS_PRESENTATION = Object.freeze({
+  paused: {
+    tone: 'neutral',
+    icon: 'fa-pause',
+    labelKey: 'FABRICATE.App.Journal.Status.paused',
+  },
   waiting: {
     tone: 'warning',
     icon: 'fa-hourglass-half',

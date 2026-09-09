@@ -10,6 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
+import { runStatusPresentation } from '../../src/ui/svelte/apps/journal/journalRunStatus.js';
 
 const ACTOR = { id: 'actor-1', uuid: 'Actor.actor-1', name: 'Akra', img: 'icons/a.webp' };
 const PLAYER = { id: 'user-1', isGM: false };
@@ -138,6 +139,12 @@ function makeBuilder({
   getGatheringTask = null,
   getResultItem = null,
   getComponent = null,
+  getComponentSourceActors = null,
+  resolveItemEssences = null,
+  affordCurrency = null,
+  ingredientMatchesItem = null,
+  getDismissedRunKeys = null,
+  getJournalActionAvailability = null,
 } = {}) {
   return new RunJournalBuilder({
     craftingRunManager: {
@@ -152,7 +159,10 @@ function makeBuilder({
       getActiveRuns: () => gatheringActive,
       getRunHistory: () => [],
     },
-    recipeManager: { getRecipe: (id) => (id === recipe.id ? recipe : null) },
+    recipeManager: {
+      getRecipe: (id) => (id === recipe.id ? recipe : null),
+      ingredientMatchesItem,
+    },
     resolutionModeService: { getMode: () => mode },
     recipeVisibility,
     getSystem: (id) => (id === system.id ? system : null),
@@ -164,6 +174,11 @@ function makeBuilder({
     getGatheringTask,
     getResultItem,
     getComponent,
+    getComponentSourceActors,
+    resolveItemEssences,
+    affordCurrency,
+    getDismissedRunKeys,
+    getJournalActionAvailability,
     localize,
     nowWorldTime: () => worldTime,
   });
@@ -1154,4 +1169,404 @@ test('the GM sees a fizzle even when showAttemptHistoryToPlayers is off', () => 
   }).buildListing({ actor: ACTOR, viewer: GM });
 
   assert.equal(listing.history.length, 1, 'the GM is never gated by the player-visibility flag');
+});
+
+test('projects current lifecycle state, alchemy activity kind, pause precedence, and safe recovery evidence', () => {
+  const run = activeCraftingRun({
+    lifecycleVersion: 1,
+    runRevision: 7,
+    completionMode: 'worldTime',
+    pausedDurationSeconds: 12,
+    pauseState: { pausedAt: 180, remainingSeconds: 42 },
+    executionJournal: {
+      operationId: 'secret-operation',
+      requestId: 'secret-request',
+      baseRunRevision: 6,
+      status: 'recoveryRequired',
+      intent: { formula: '2d20kh + @secret' },
+      effects: [
+        {
+          effectId: 'consume',
+          kind: 'consumeItems',
+          phase: 'applied',
+          planned: { itemUuid: 'Actor.secret.Item.herb' },
+          receipt: { itemUuid: 'Actor.secret.Item.herb', quantity: 1 },
+        },
+        {
+          effectId: 'private-extension',
+          kind: 'private:secret-effect-kind',
+          phase: 'applied',
+          planned: { privateFormula: 'secret' },
+          receipt: { privateReceipt: 'secret' },
+        },
+        {
+          effectId: 'award',
+          kind: 'awardItems',
+          phase: 'applying',
+          planned: { componentId: 'secret-result' },
+        },
+      ],
+    },
+  });
+  const listing = makeBuilder({ active: [run], mode: 'alchemy' }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  });
+  const projected = listing.activeRuns[0];
+
+  assert.equal(listing.selectedActorUuid, ACTOR.uuid);
+  assert.equal(projected.key, JSON.stringify([ACTOR.uuid, 'crafting', 'run-1']));
+  assert.equal(projected.actorUuid, ACTOR.uuid);
+  assert.equal(projected.runType, 'crafting', 'native persistence type remains unchanged');
+  assert.equal(projected.activityKind, 'alchemy');
+  assert.equal(projected.lifecycleContract, 'current');
+  assert.equal(projected.runRevision, 7);
+  assert.equal(projected.completionMode, 'worldTime');
+  assert.deepEqual(projected.pauseState, { pausedAt: 180, remainingSeconds: 42 });
+  assert.equal(projected.derivedStatus, 'paused');
+  assert.deepEqual(projected.recoveryEvidence, {
+    status: 'recoveryRequired',
+    appliedEffectCount: 2,
+    effectCount: 3,
+    effects: [
+      { kind: 'consumeItems', phase: 'applied', hasReceipt: true },
+      { kind: 'other', phase: 'applied', hasReceipt: true },
+      { kind: 'awardItems', phase: 'applying', hasReceipt: false },
+    ],
+    required: true,
+  });
+  assert.equal(projected.actions.execute, false);
+  assert.equal(projected.actions.cancel, false);
+  assert.equal(projected.actions.disabledReason, 'recoveryRequired');
+  assert.equal(JSON.stringify(projected).includes('secret-operation'), false);
+  assert.equal(JSON.stringify(projected).includes('2d20kh'), false);
+  assert.equal(JSON.stringify(projected).includes('Actor.secret.Item.herb'), false);
+  assert.equal(JSON.stringify(projected).includes('private:secret-effect-kind'), false);
+});
+
+test('unsupported lifecycle versions remain readable and expose no mutation actions', () => {
+  const listing = makeBuilder({
+    active: [activeCraftingRun({ lifecycleVersion: 2, runRevision: 99 })],
+  }).buildListing({ actor: ACTOR, viewer: PLAYER });
+  const run = listing.activeRuns[0];
+
+  assert.equal(run.lifecycleContract, 'unsupported');
+  assert.equal(run.lifecycleVersion, 2);
+  assert.equal(run.actions.execute, false);
+  assert.equal(run.actions.pause, false);
+  assert.equal(run.actions.cancel, false);
+  assert.equal(run.actions.disabledReason, 'unsupportedLifecycle');
+});
+
+test('redaction preserves owner execution/cancel availability without leaking selection plans', () => {
+  const hiddenStep = {
+    ...activeCraftingRun().steps[1],
+    selectionPlan: {
+      selectedIngredientSetId: 'set-secret',
+      ingredientOptionOverrides: { choice: { optionIndex: 1, heldItemId: 'secret-item' } },
+      ingredientEssenceAllocation: {
+        stepId: 's1',
+        ingredientSetId: 'set-secret',
+        allocation: { 'secret-item': 2 },
+      },
+    },
+    selectedRequirementSnapshot: { id: 'set-secret', hiddenRoute: 'critical-secret' },
+  };
+  const listing = makeBuilder({
+    active: [
+      activeCraftingRun({
+        lifecycleVersion: 1,
+        runRevision: 1,
+        steps: [activeCraftingRun().steps[0], hiddenStep],
+      }),
+    ],
+    recipeVisibility: { evaluateRecipeAccess: () => ({ visible: false }) },
+    worldTime: 5000,
+  }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER });
+  const run = listing.activeRuns[0];
+
+  assert.equal(run.redacted, true);
+  assert.deepEqual(run.steps, []);
+  assert.equal(run.actions.execute, true);
+  assert.equal(run.actions.cancel, true);
+  assert.equal(JSON.stringify(run).includes('critical-secret'), false);
+  assert.equal(JSON.stringify(run).includes('secret-item'), false);
+});
+
+test('entitled step history prefers the selected requirement snapshot and carries scoped selection intent', () => {
+  const legacyRequirements = [{ componentId: 'legacy-iron', quantity: 2 }];
+  const selectedRequirementSnapshot = {
+    id: 'set-routed',
+    resultGroupId: 'result-blue',
+    ingredientGroups: [
+      { id: 'choice', options: [{ match: { type: 'tag', value: 'metal' }, quantity: 1 }] },
+    ],
+    essences: { fire: 2 },
+    currencyCost: { unit: 'gp', amount: 4 },
+  };
+  const selectionPlan = {
+    selectedIngredientSetId: 'set-routed',
+    ingredientOptionOverrides: { choice: { optionIndex: 0, heldItemId: 'Item.iron' } },
+    ingredientEssenceAllocation: {
+      stepId: 's1',
+      ingredientSetId: 'set-routed',
+      allocation: { 'Item.ember': 2 },
+    },
+  };
+  const run = activeCraftingRun({
+    lifecycleVersion: 1,
+    steps: [
+      activeCraftingRun().steps[0],
+      {
+        ...activeCraftingRun().steps[1],
+        requirements: legacyRequirements,
+        selectedRequirementSnapshot,
+        selectionPlan,
+      },
+    ],
+  });
+  const projected = makeBuilder({ active: [run] }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).activeRuns[0].currentStep;
+
+  assert.deepEqual(projected.selectionPlan, selectionPlan);
+  assert.deepEqual(projected.selectedRequirementSnapshot, selectedRequirementSnapshot);
+  assert.deepEqual(projected.requirementSnapshot, selectedRequirementSnapshot);
+  assert.equal(projected.requirements[0].componentId, 'legacy-iron', 'legacy flat rows remain available');
+  assert.notEqual(projected.selectionPlan, selectionPlan, 'projection is cloned');
+});
+
+test('same run id across native run types remains collision-free while same-type duplicates are dropped', () => {
+  const duplicateId = 'shared-id';
+  const listing = makeBuilder({
+    active: [activeCraftingRun({ id: duplicateId }), activeCraftingRun({ id: duplicateId })],
+    gatheringActive: [
+      {
+        id: duplicateId,
+        craftingSystemId: 'sys-1',
+        taskId: 'task-1',
+        status: 'inProgress',
+        timeGate: null,
+      },
+    ],
+    salvageActive: [
+      {
+        id: duplicateId,
+        craftingSystemId: 'sys-1',
+        componentId: 'c1',
+        status: 'inProgress',
+        timeGate: null,
+      },
+    ],
+  }).buildListing({ actor: ACTOR, viewer: PLAYER });
+
+  assert.deepEqual(listing.activeRuns.map((run) => run.runType), ['crafting', 'salvage', 'gathering']);
+  assert.equal(new Set(listing.activeRuns.map((run) => run.key)).size, 3);
+});
+
+test('dismissed composite keys filter before counts and stay isolated by viewer at the service seam', () => {
+  const hidden = terminalCraftingRun({ id: 'hidden' });
+  const visible = terminalCraftingRun({ id: 'visible' });
+  const hiddenKey = JSON.stringify([ACTOR.uuid, 'crafting', 'hidden']);
+  let reads = 0;
+  const builder = makeBuilder({
+    history: [hidden, visible],
+    getDismissedRunKeys: ({ actorUuid, viewerId }) => {
+      reads += 1;
+      assert.equal(actorUuid, ACTOR.uuid);
+      return viewerId === PLAYER.id ? new Set([hiddenKey]) : new Set();
+    },
+  });
+  const listing = builder.buildListing({ actor: ACTOR, viewer: PLAYER });
+  const otherViewerListing = builder.buildListing({ actor: ACTOR, viewer: GM });
+
+  assert.deepEqual(listing.history.map((run) => run.id), ['visible']);
+  assert.deepEqual(listing.counts, { active: 0, history: 1 });
+  assert.deepEqual(otherViewerListing.history.map((run) => run.id), ['hidden', 'visible']);
+  assert.equal(reads, 2, 'the per-user setting is read once for each listing pass');
+});
+
+test('authority availability gates current actions with its safe reason', () => {
+  let reads = 0;
+  const builder = makeBuilder({
+    active: [activeCraftingRun({ lifecycleVersion: 1, runRevision: 2 })],
+    getJournalActionAvailability: () => {
+      reads += 1;
+      return { available: false, reason: 'authorityUnavailable' };
+    },
+  });
+  const run = builder.buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER }).activeRuns[0];
+
+  assert.equal(run.actions.execute, false);
+  assert.equal(run.actions.cancel, false);
+  assert.equal(run.actions.disabledReason, 'authorityUnavailable');
+  assert.equal(reads, 1, 'authority is read once for the listing pass');
+});
+
+test('completion-mode switching is limited to an active countdown without a player check', () => {
+  const waitingGate = { requiredSeconds: 600, availableAt: 800 };
+  const gatheringRun = (id, taskId, timeGate = waitingGate) => ({
+    id,
+    craftingSystemId: 'sys-1',
+    environmentId: 'env-1',
+    taskId,
+    status: 'waitingTime',
+    lifecycleVersion: 1,
+    runRevision: 0,
+    timeGate,
+  });
+  const listing = makeBuilder({
+    worldTime: 200,
+    gatheringActive: [
+      gatheringRun('straight', 'straight-task'),
+      gatheringRun('rolled', 'rolled-task'),
+      gatheringRun('ready', 'straight-task', { requiredSeconds: 600, availableAt: 100 }),
+    ],
+    getGatheringTask: (_environmentId, taskId) => ({
+      name: taskId,
+      resolutionMode: taskId === 'straight-task' ? 'straight' : 'd100',
+    }),
+  }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER });
+  const byId = Object.fromEntries(listing.activeRuns.map((run) => [run.id, run]));
+
+  assert.equal(byId.straight.actions.setCompletionMode, true);
+  assert.equal(byId.rolled.actions.setCompletionMode, false, 'player rolls stay manual');
+  assert.equal(byId.ready.actions.setCompletionMode, false, 'a matured gate is no longer counting down');
+});
+
+test('salvage remains outside versioned completion-mode controls', () => {
+  const run = makeBuilder({
+    salvageActive: [
+      {
+        id: 'salvage-current',
+        craftingSystemId: 'sys-1',
+        componentId: 'ore',
+        status: 'waitingTime',
+        lifecycleVersion: 1,
+        timeGate: { requiredSeconds: 60, availableAt: 300 },
+      },
+    ],
+  }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER }).activeRuns[0];
+
+  assert.equal(run.actions.setCompletionMode, false);
+});
+
+test('current-step availability delegates material choices and shared essence allocation to the ingredient set', () => {
+  const calls = [];
+  const selectedSet = {
+    id: 'set-1',
+    ingredientGroups: [
+      { id: 'choice', options: [{ id: 'iron' }, { id: 'silver' }] },
+      { id: 'essence', options: [{ id: 'fire', match: { type: 'essence', value: 'fire' } }] },
+    ],
+    resolveIngredientSelection(items, matcher, options) {
+      calls.push({ items, matcher, options });
+      const selectedIndex = options.optionOverrides?.choice?.optionIndex ?? 0;
+      return {
+        success: false,
+        missingGroups:
+          selectedIndex === 0
+            ? [
+                {
+                  group: { id: 'fixed', name: 'Fixed input' },
+                  ingredient: { id: 'coal' },
+                  need: 1,
+                  have: 0,
+                },
+              ]
+            : [{ group: { id: 'choice' }, ingredient: { id: 'silver' }, need: 1, have: 0 }],
+        selectedIngredients: [selectedIndex === 0 ? this.ingredientGroups[0].options[0] : this.ingredientGroups[0].options[1]],
+        plan: [{ item: items[0], quantity: 1 }],
+        currencySpends: [],
+        essenceAllocation: options.essenceAllocation,
+        essencePool: {
+          requirements: [{ groupId: 'essence', essenceId: 'fire', need: 2, delivered: 2, owned: 3, satisfied: true }],
+          carriers: [{ itemKey: 'Item.ember', item: items[0], perUnit: { fire: 1 }, ownedUnits: 3, allocatedUnits: 2 }],
+          allocation: { 'Item.ember': 2 },
+          suggested: { 'Item.ember': 2 },
+          totals: { fire: 2 },
+        },
+      };
+    },
+  };
+  const recipe = {
+    ...RECIPE,
+    getExecutionSteps: () => [
+      RECIPE.getExecutionSteps()[0],
+      { ...RECIPE.getExecutionSteps()[1], ingredientSets: [selectedSet] },
+    ],
+  };
+  const held = { id: 'ember', uuid: 'Item.ember', name: 'Ember', img: 'icons/ember.webp' };
+  const actor = { ...ACTOR, isOwner: true, items: [held] };
+  const run = activeCraftingRun({
+    lifecycleVersion: 1,
+    steps: [
+      activeCraftingRun().steps[0],
+      {
+        ...activeCraftingRun().steps[1],
+        selectionPlan: {
+          selectedIngredientSetId: 'set-1',
+          ingredientOptionOverrides: { choice: { optionIndex: 0, heldItemId: 'Item.ember' } },
+          ingredientEssenceAllocation: {
+            stepId: 's1',
+            ingredientSetId: 'set-1',
+            allocation: { 'Item.ember': 2 },
+          },
+        },
+      },
+    ],
+  });
+  const step = makeBuilder({
+    active: [run],
+    recipe,
+    ingredientMatchesItem: (_recipe, ingredient, item) => ingredient.id === 'iron' && item.id === 'ember',
+    resolveItemEssences: ({ item, recipe: resolvedRecipe }) => {
+      assert.equal(item, held);
+      assert.equal(resolvedRecipe, recipe);
+      return { fire: 1 };
+    },
+    affordCurrency: () => true,
+  }).buildListing({ actor, viewer: PLAYER }).activeRuns[0].currentStep;
+
+  assert.equal(calls.length, 3, 'one selected resolve plus one canonical resolve per choice option');
+  assert.equal(calls[0].items[0], held);
+  assert.deepEqual(calls[0].options.essenceAllocation, { 'Item.ember': 2 });
+  assert.equal(calls[0].options.resolveItemEssences(held).fire, 1);
+  assert.equal(calls[0].options.affordCurrency({ unit: 'gp', amount: 1 }), true);
+  assert.deepEqual(step.selectionAvailability, {
+    success: false,
+    missingGroups: [
+      {
+        id: 'fixed',
+        name: 'Fixed input',
+        ingredientId: 'coal',
+        need: 1,
+        have: 0,
+      },
+    ],
+    choices: [
+      {
+        groupId: 'choice',
+        selectedOptionIndex: 0,
+        options: [{ index: 0, available: true }, { index: 1, available: false }],
+      },
+    ],
+    essencePool: {
+      requirements: [{ groupId: 'essence', essenceId: 'fire', need: 2, delivered: 2, owned: 3, satisfied: true }],
+      carriers: [{ itemKey: 'Item.ember', name: 'Ember', img: 'icons/ember.webp', perUnit: { fire: 1 }, ownedUnits: 3, allocatedUnits: 2 }],
+      allocation: { 'Item.ember': 2 },
+      suggested: { 'Item.ember': 2 },
+      totals: { fire: 2 },
+    },
+  });
+  assert.equal(JSON.stringify(step.selectionAvailability).includes('system'), false, 'held document internals are not spread');
+});
+
+test('paused runs use an explicit neutral pause status presentation', () => {
+  assert.deepEqual(runStatusPresentation('paused'), {
+    tone: 'neutral',
+    icon: 'fa-pause',
+    labelKey: 'FABRICATE.App.Journal.Status.paused',
+  });
 });

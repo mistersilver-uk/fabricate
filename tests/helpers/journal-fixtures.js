@@ -36,7 +36,16 @@ export function makeCraftingRun(overrides = {}) {
   ];
   return {
     id: 'run-craft-1',
+    key: JSON.stringify(['Actor.actor-1', 'crafting', 'run-craft-1']),
+    actorUuid: 'Actor.actor-1',
     runType: 'crafting',
+    activityKind: 'crafting',
+    lifecycleContract: 'legacy',
+    lifecycleVersion: null,
+    runRevision: 0,
+    completionMode: 'manual',
+    pauseState: null,
+    pausedDurationSeconds: 0,
     status: 'waitingTime',
     derivedStatus: 'waiting',
     craftingSystemId: 'sys-1',
@@ -64,6 +73,16 @@ export function makeCraftingRun(overrides = {}) {
     createdResults: [],
     createdResultCount: 0,
     manualAdvance: true,
+    actions: {
+      execute: true,
+      pause: false,
+      resume: false,
+      setCompletionMode: false,
+      setSelection: false,
+      cancel: true,
+      dismiss: false,
+      disabledReason: null,
+    },
     ...overrides
   };
 }
@@ -72,7 +91,16 @@ export function makeCraftingRun(overrides = {}) {
 export function makeGatheringRun(overrides = {}) {
   return {
     id: 'run-gather-1',
+    key: JSON.stringify(['Actor.actor-1', 'gathering', 'run-gather-1']),
+    actorUuid: 'Actor.actor-1',
     runType: 'gathering',
+    activityKind: 'gathering',
+    lifecycleContract: 'legacy',
+    lifecycleVersion: null,
+    runRevision: 0,
+    completionMode: 'manual',
+    pauseState: null,
+    pausedDurationSeconds: 0,
     status: 'inProgress',
     derivedStatus: 'waiting',
     craftingSystemId: 'sys-1',
@@ -100,6 +128,16 @@ export function makeGatheringRun(overrides = {}) {
     createdResults: [],
     createdResultCount: 0,
     manualAdvance: false,
+    actions: {
+      execute: false,
+      pause: false,
+      resume: false,
+      setCompletionMode: false,
+      setSelection: false,
+      cancel: false,
+      dismiss: false,
+      disabledReason: null,
+    },
     ...overrides
   };
 }
