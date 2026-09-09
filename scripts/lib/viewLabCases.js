@@ -1522,7 +1522,12 @@ function journalLifecycleCases() {
       label: `Player Journal — ${state.replaceAll('-', ' ')}`,
       smokeLabels: [],
       reaches: 'beyond',
-      query: { tab: 'journal', journalCaseState: state },
+      query: {
+        tab: 'journal',
+        journalCaseState: state,
+        ...(state === 'gathering-straight' ? { gatheringTaskMode: 'straight' } : {}),
+        ...(state === 'gathering-check' ? { gatheringTaskMode: 'routed' } : {}),
+      },
       position: { width: state === 'narrow' ? 900 : 1240, height: 880 },
       steps: steps[state] ?? [],
       expectSelector: expected[state] ?? '[data-journal-state="populated"]',
