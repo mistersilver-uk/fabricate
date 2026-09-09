@@ -860,10 +860,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   //
   // TWO entries, because `showTick` is a CONFIGURATION and no one frame holds both of its values.
   // `manager-recipes-bulk-edit-check-tier` is the ticked, grouped, hinted list — the densest
-  // composition any caller reaches — and `player-inventory-page-size` is the tickless narrow one,
-  // in the PLAYER window, which is a different portal host with its own per-site trigger rules. A
-  // change to the tick gutter, to the group heading's inset or to the panel band is invisible in
-  // whichever of the two it is not in.
+  // composition any caller reaches — and `player-inventory-page-size` is the TICKLESS one, which
+  // is the polarity no other frame in the registry holds: issue 1511 added three more open player
+  // panels and every one of them ticks, so this pair is still the only place a change to the tick
+  // gutter, to the group heading's inset or to the panel band can be read in both of its states.
+  // It is a player frame as well, which is a second portal host with its own per-site trigger
+  // rules, but that is no longer what makes it the entry — the absent gutter is.
   //
   // ADDITIVE, like every entry here: `selectRenderFileCases` still adds the representative pair,
   // which is what keeps the trigger's own CLOSED treatment — the form nine pagers draw — in the
@@ -5559,6 +5561,72 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+    ],
+  }),
+  managerCase({
+    id: 'manager-recipe-item-preview-recipe-pager',
+    label: 'Manager — Recipe item preview, the book detail recipe pager',
+    // THE SIXTH CONVERTED SELECT'S ONLY FRAME (issue 1511), and the reason it is a MANAGER case is
+    // measured rather than chosen. `InventoryBookDetail`'s recipes-per-page control renders only
+    // behind `filteredRecipes.length > RECIPE_PAGE_SIZES[0]`, so a book has to teach more than six
+    // recipes before the control exists at all — and no book any lab actor HOLDS can carry that
+    // membership. `labContent.js` confines authored membership to the one book nobody holds,
+    // because a held book with members reveals them through `hasMatchedItem` in the player's
+    // knowledge-gated crafting listing and pushes the recipes the player cases select onto page 2.
+    // So the player route to this control costs a world-fixture rewrite whose blast radius that
+    // file documents, and this route costs four clicks.
+    //
+    // The rail embeds the REAL player component: `RecipeItemEditor` feeds `InventoryDetail` a
+    // synthetic row through `recipeItemPreviewRow.js` precisely so the preview cannot drift from
+    // what a player sees. The control photographed here is therefore the converted one, drawn by
+    // the same `Select` call site, and this frame is what keeps that call site out of the set of
+    // conversions no frame can show.
+    //
+    // FOUR LINK CLICKS, not a fixture edit. `hb-book` links three of herbalism's nine recipes, and
+    // the picker `stayOpen`s, so four more can be linked without re-opening it. Seven clears the
+    // six-recipe guard by one, which is the smallest count that proves the boundary rather than
+    // sailing past it. The last step re-clicks the trigger to CLOSE the panel: this frame's
+    // subject is the pager, and an open picker would both occlude the rail and make the case a
+    // fifth claimant on the anchored-popover seam it has no business naming.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-herbalism' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-books-scrolls' },
+      { selector: '[data-books-scrolls-edit="hb-book"]' },
+      { selector: '[data-recipe-item-tab-button="contents"]' },
+      { selector: '[data-recipe-item-link-recipe-toggle]' },
+      { selector: '[data-recipe-item-link-recipe-option="hb-r-greater-healing"]' },
+      { selector: '[data-recipe-item-link-recipe-option="hb-r-antitoxin"]' },
+      { selector: '[data-recipe-item-link-recipe-option="hb-r-tincture"]' },
+      { selector: '[data-recipe-item-link-recipe-option="hb-r-oil"]' },
+      { selector: '[data-recipe-item-link-recipe-toggle]' },
+      { selector: '[data-recipe-item-preview] [data-inventory-recipe-pager]', scroll: true },
+    ],
+    expectView: 'recipe-item-edit',
+    // The TRIGGER, inside the preview, by the hook `triggerData` puts on the button. Scoped to
+    // `[data-recipe-item-preview]` because the rail is the only place this control can appear in a
+    // manager window: an unscoped claim would pass on any page-size trigger the editor grew.
+    expectSelector: '[data-recipe-item-preview] [data-inventory-page-size]',
+    // IN THE PHOTOGRAPH, not merely in the document. The rail is an overflow-scrolled column and
+    // the pager sits below seven recipe rows, so the selector above matches while the control is
+    // still off the visible edge — the "read from the frames rather than from their existence"
+    // failure this confirmation exists to prevent. The box check is what makes the scroll step a
+    // requirement rather than a courtesy.
+    expectContained: [
+      { container: '[data-recipe-item-preview]', target: '[data-inventory-page-size]' },
+    ],
+    kinds: ['manager', 'books-scrolls'],
+    // `apps/inventory/detail/` is named here for the reason the frame exists: this is the only
+    // case in the registry that renders a player inventory DETAIL body inside the manager window,
+    // so without the pattern a change to `InventoryBookDetail.svelte` published nothing that could
+    // contain its GM-facing render.
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/BooksScrollsView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe-item\//,
+      /^src\/ui\/svelte\/apps\/inventory\/detail\//,
+      /^src\/ui\/svelte\/util\/recipeItemPreviewRow\.js$/,
     ],
   }),
   managerCase({
@@ -11490,10 +11558,11 @@ export const VIEW_LAB_CASES = Object.freeze([
     // the primitive draws — a two-digit list is all a per-page control has to offer — so it is
     // the frame that shows the shared panel's 240px floor overridden rather than inherited.
     //
-    // And it is the only frame that draws an app-drawn option list in the PLAYER window. The panel
-    // is portaled onto `.fabricate-app` rather than `.fabricate-manager`: a different host, a
-    // different set of per-site trigger rules, and the one place a manager-only cascade repair is
-    // invisible.
+    // And it is the frame that establishes the app-drawn option list in the PLAYER window, which
+    // is now one of four: issue 1511 converted the app's own six selects and registered three of
+    // them open beside this one. The panel is portaled onto `.fabricate-app` rather than
+    // `.fabricate-manager` in all four — a different host, a different set of per-site trigger
+    // rules, and the one place a manager-only cascade repair is invisible.
     //
     // ONE STEP, and it is the trigger. Five inventory cases raise the page size to reach a card,
     // so each of them drives straight THROUGH this state; this case stops in it, which is also why
@@ -11511,6 +11580,36 @@ export const VIEW_LAB_CASES = Object.freeze([
     // Inside the captured window rather than merely in the document: the frame photographs
     // `[data-view-lab-frame]`, which IS the `.fabricate-app` window, so a panel clamped outside
     // that box would be evidence of nothing.
+    expectContained: [{ container: '.fabricate-app', target: '.fabricate-select-popover' }],
+    kinds: ['player', 'inventory'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/inventory\//,
+      /^src\/ui\/svelte\/stores\/inventoryStore/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  playerCase({
+    id: 'player-inventory-sort-list',
+    label: 'Player app — Inventory sort list',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // THE TICKED HALF OF THE PLAYER WINDOW'S PAIR (issue 1511). The frame directly above draws the
+    // same primitive at `showTick={false}`, and the two are read together: this is the frame in
+    // which the tick GUTTER exists at all under `.fabricate-app`, so a regression in that column's
+    // inset or in the selected row's ink is legible here and in no other player frame.
+    //
+    // ONE STEP, and it is the TRIGGER's own hook rather than the wrapper's. `data-inventory-sort`
+    // rides onto the button through `triggerData`, which is the identity handle the conversion
+    // moved down one element on purpose: a hook left on the surviving caption wrapper would still
+    // resolve and would open nothing.
+    query: { tab: 'inventory' },
+    steps: [{ selector: '[data-inventory-sort]' }],
+    // The portal, the TICKED configuration and a row that is not the current value. `quantity` is
+    // the middle of three sort keys and the resting selection is `name`, so a list that rendered
+    // only its own value would fail this selector rather than pass it narrowly.
+    expectSelector:
+      '.fabricate-app > .fabricate-select-popover.fabricate-select-popover-ticked ' +
+      '[data-popover-option="quantity"]',
     expectContained: [{ container: '.fabricate-app', target: '.fabricate-select-popover' }],
     kinds: ['player', 'inventory'],
     sourceMatches: [
@@ -12311,6 +12410,35 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
   playerCase({
+    id: 'player-crafting-category-filter-list',
+    label: 'Player app — Crafting category filter list',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // THE FULL-WIDTH PANEL, and the only player option list with a SENTINEL row (issue 1511).
+    // Every other converted player trigger hugs its own value; this one spans the browse column,
+    // so it is the single frame in which the caller's own `maxWidth` is doing work — without it
+    // the panel drops at the `inline` rung's 240px ceiling under a trigger far wider than that,
+    // which is the defect the primitive's own band table records.
+    //
+    // `__unchanged__` is the handle the empty-string "All categories" row carries. It is the row a
+    // driver most needs to be able to click and the one a truthiness test would leave unaddressed,
+    // so asserting it here is what keeps the sentinel's identity handle photographed rather than
+    // merely unit-tested.
+    query: { tab: 'crafting' },
+    position: { width: 1100, height: 760 },
+    steps: [{ selector: '[data-crafting-category-filter]' }],
+    expectSelector:
+      '.fabricate-app > .fabricate-select-popover.fabricate-select-popover-ticked ' +
+      '[data-popover-option="__unchanged__"]',
+    expectContained: [{ container: '.fabricate-app', target: '.fabricate-select-popover' }],
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      /^src\/ui\/svelte\/stores\/craftingStore/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
+  }),
+  playerCase({
     id: 'player-crafting-sources-picker',
     label: 'Player app — Crafting component sources picker',
     // THE PANEL TWENTY-SEVEN FRAMES CLAIM AND NONE OPENS (issue 1513). `ComponentSourcesBar` is
@@ -12926,6 +13054,35 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'journal', 'responsive'],
     expectLayout: responsiveLayout('.journal-view-container', '.journal-view-grid'),
     sourceMatches: [/^src\/ui\/svelte\/apps\/journal\//, /^src\/ui\/svelte\/stores\/journalStore/],
+  }),
+  playerCase({
+    id: 'player-journal-sort-list',
+    label: 'Player app — Journal sort list',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // THE PANEL THAT HAS TO ESCAPE ITS COLUMN (issue 1511). The journal's two list regions sit in
+    // an overflow-clipped half-height column, and that container is the one the deleted
+    // `.fabricate-app select:focus-visible` rule named as the reason its ring was INSET rather
+    // than outset. The retirement argument covers the ring, not the portal, so this frame is the
+    // one that proves the walk: the panel is a child of the application frame rather than of the
+    // column it drops out of, and a portal that failed to land would be clipped away here first.
+    //
+    // `[data-journal-sort="active"]` rather than the bare hook, because this component renders
+    // TWICE on one screen — Active Runs above History — and the hook's value is what tells the two
+    // triggers apart. The bare form would resolve to the first match by accident rather than by
+    // statement.
+    query: { tab: 'journal' },
+    steps: [{ selector: '[data-journal-sort="active"]' }],
+    expectSelector:
+      '.fabricate-app > .fabricate-select-popover.fabricate-select-popover-ticked ' +
+      '[data-popover-option="newest"]',
+    expectContained: [{ container: '.fabricate-app', target: '.fabricate-select-popover' }],
+    kinds: ['player', 'journal'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/journal\//,
+      /^src\/ui\/svelte\/stores\/journalStore/,
+      ...ANCHORED_POPOVER_SOURCES,
+    ],
   }),
   playerCase({
     id: 'fabricate-journal',
