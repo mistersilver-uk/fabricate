@@ -4399,3 +4399,28 @@ export function buildLabContent() {
     recipeItems: [...HERBALISM_RECIPE_ITEMS],
   };
 }
+
+/**
+ * Author the Journal's ready single-step fixture as a real optional no-check craft.
+ *
+ * Crafting check availability belongs to the system, not the recipe. The ordinary lab world
+ * keeps Karrun Forgecraft's authored check for its manager and crafting cases; this state-local
+ * variant turns that check off and clears its simple formula before the real managers normalize
+ * the persisted content. Bend Horseshoe already has no recipe-level check override, so the
+ * resulting run follows the same unconditional simple-mode path as a production no-check craft.
+ *
+ * @param {ReturnType<typeof buildLabContent>} content Fresh lab content, mutated in place.
+ * @returns {void}
+ */
+export function seedJournalNoCheckFixture(content) {
+  const system = content.systems?.find((entry) => entry?.id === LAB_SYSTEM_IDS.SMITHING);
+  const recipeEntry = content.recipes?.find((entry) => entry?.id === 'sm-r-horseshoe');
+  if (!system || !recipeEntry) {
+    throw new Error('view lab: ready-single no-check fixture requires smithing and Bend Horseshoe');
+  }
+  system.craftingCheck = {
+    ...system.craftingCheck,
+    enabled: false,
+    simple: { ...system.craftingCheck?.simple, rollFormula: '' },
+  };
+}

@@ -13,6 +13,11 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import {
+  buildLabContent,
+  LAB_SYSTEM_IDS,
+  seedJournalNoCheckFixture,
+} from '../view-lab/world/labContent.js';
+import {
   LAB_JOURNAL_CASE_STATE_RUN_IDS,
   buildLabRunStates,
   createLabJournalCaseController,
@@ -40,6 +45,7 @@ const harness = createMountedComponentHarness({
     component('Pagination'),
     component('IconButton'),
     component('ManagerButton'),
+    component('InspectorCard'),
     component('RunActionBar'),
     component('SlotTile'),
     component('ChoiceOptionList'),
@@ -431,6 +437,22 @@ describe('Journal versioned lifecycle (mounted)', () => {
     });
     assert.equal(gathering.gatheringRuns.history.length, 0);
     assert.equal(gathering.gatheringRuns.active['lab-v1-gathering-d100'].status, 'waitingTime');
+  });
+
+  it('authors ready-single as a real formula-less simple craft', async () => {
+    const content = buildLabContent();
+    const smithing = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.SMITHING);
+    assert.match(smithing.craftingCheck.simple.rollFormula, /1d20/);
+
+    seedJournalNoCheckFixture(content);
+    assert.equal(smithing.craftingCheck.enabled, false);
+    assert.equal(smithing.craftingCheck.simple.rollFormula, '');
+    assert.ok(content.recipes.some((entry) => entry.id === 'sm-r-horseshoe'));
+
+    const { target, store } = await mountState('ready-single');
+    assert.equal(store.selectedRun.recipeId, 'sm-r-horseshoe');
+    assert.equal(store.selectedRun.currentStep.detail.checkLabel, null);
+    assert.doesNotMatch(target.textContent, /1d20/);
   });
 
   it('persists completion preference and completion through a rebuild of raw records', async () => {

@@ -24,7 +24,12 @@ import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.j
 import { createLocalizer, toI18nStub } from '../labI18n.js';
 
 import { buildLabActors, buildDocumentIndex } from './labActors.js';
-import { buildLabContent, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
+import {
+  buildLabContent,
+  ICON_BASE,
+  LAB_SYSTEM_IDS,
+  seedJournalNoCheckFixture,
+} from './labContent.js';
 import { seedLabInteractables } from './labInteractables.js';
 import {
   buildLabBlindRunSecret,
@@ -378,6 +383,7 @@ export async function buildLabWorld({
   journalCaseState = null,
 } = {}) {
   const content = buildLabContent();
+  if (journalCaseState === 'ready-single') seedJournalNoCheckFixture(content);
   seedGatheringTaskMode(content, gatheringTaskMode);
   if (noTools) stripTools(content);
   if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);
