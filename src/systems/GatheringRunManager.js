@@ -1,4 +1,19 @@
 import { reconcileAgainstDocument, runContainerBaseline } from './runContainerCoherence.js';
+import {
+  observeExecutionJournal,
+  persistExecutionJournalTransition,
+} from './runExecutionJournal.js';
+import {
+  assertRunLifecycleMutation,
+  buildNewRunLifecycleFields,
+  getRunLifecycleContract,
+  incrementRunRevision,
+  persistCompletionMode,
+  persistPausedRun,
+  persistResumedRun,
+  preserveRunLifecycleFields,
+  RunLifecycleError,
+} from './runLifecycleState.js';
 
 const FLAG_NAMESPACE = 'fabricate';
 const FLAG_KEY = 'gatheringRuns';
@@ -69,6 +84,12 @@ export class GatheringRunManager {
     return container.history.slice(0, Number(limit));
   }
 
+  getRun(actor, runId) {
+    if (!runId) return null;
+    const container = this._getContainer(actor);
+    return findRun(container, runId)?.run || null;
+  }
+
   findActiveRunForTask(actor, taskId) {
     const normalizedTaskId = stringOrNull(taskId);
     if (!normalizedTaskId) return null;
@@ -90,6 +111,7 @@ export class GatheringRunManager {
   async createRun(actor, runData = {}) {
     this._assertActor(actor);
     this._assertRunReferences(runData);
+    const lifecycleFields = buildNewRunLifecycleFields(runData);
     this._assertNoActiveTaskRun(actor, runData.taskId);
 
     if (runData.status === 'waitingTime' && !this._normalizeTimeGate(runData.timeGate)) {
@@ -106,6 +128,7 @@ export class GatheringRunManager {
         actorUuid: actor.uuid,
         userId: stringOrNull(runData.userId) || this.getUserId(),
         ...pickRunPayload(runData),
+        ...lifecycleFields,
         id: this.randomID(),
         status: ACTIVE_STATUSES.has(runData.status) ? runData.status : 'inProgress',
         startedAtWorldTime: now,
@@ -140,6 +163,7 @@ export class GatheringRunManager {
   async createTerminalRun(actor, runData = {}, status = 'succeeded', payload = {}) {
     this._assertActor(actor);
     this._assertRunReferences(runData);
+    const lifecycleFields = buildNewRunLifecycleFields(runData);
     this._assertNoActiveTaskRun(actor, runData.taskId);
     if (!TERMINAL_STATUSES.has(status)) {
       throw new GatheringRunManagerError(
@@ -156,6 +180,7 @@ export class GatheringRunManager {
         actorUuid: actor.uuid,
         userId: stringOrNull(runData.userId) || this.getUserId(),
         ...pickRunPayload(runData),
+        ...lifecycleFields,
         ...terminalPayload,
         id: this.randomID(),
         status,
@@ -178,9 +203,7 @@ export class GatheringRunManager {
     const readyRuns = [];
     for (const actor of normalizeActorList(this.getActors())) {
       for (const run of this.getActiveRuns(actor)) {
-        if (run?.status !== 'waitingTime') continue;
-        if (!run.timeGate) continue;
-        if (readyAt < Number(run.timeGate.availableAt || 0)) continue;
+        if (!isMaturedGatheringRun(run, readyAt)) continue;
         readyRuns.push({ actor, run: cloneJson(run) });
       }
     }
@@ -200,6 +223,7 @@ export class GatheringRunManager {
     const container = cloneContainer(this._getContainer(actor));
     const activeRun = container.active[String(run.id)];
     if (!activeRun) return null;
+    this._assertRunMutation(activeRun);
 
     const now = this._now();
     const completed = this._normalizeRun(
@@ -213,6 +237,7 @@ export class GatheringRunManager {
       },
       { actor, terminal: true }
     );
+    incrementRunRevision(completed);
 
     delete container.active[completed.id];
     container.history = [completed, ...container.history].slice(0, HISTORY_LIMIT);
@@ -227,6 +252,7 @@ export class GatheringRunManager {
     const container = cloneContainer(this._getContainer(actor));
     const activeRun = container.active[String(runId)];
     if (!activeRun) return null;
+    this._assertRunMutation(activeRun);
 
     delete container.active[String(runId)];
     await this._persist(actor, container);
@@ -239,6 +265,46 @@ export class GatheringRunManager {
     return this.completeRun(actor, run, 'cancelled', options.payload ?? {}, {
       terminalRunData: options.terminalRunData,
     });
+  }
+
+  async setCompletionMode(actor, runId, completionMode, { expectedRevision = undefined } = {}) {
+    return persistCompletionMode(this._locateRunPersistence(actor, runId), completionMode, {
+      expectedRevision,
+    });
+  }
+
+  async pauseRun(actor, runId, { expectedRevision = undefined } = {}) {
+    return persistPausedRun(this._locateRunPersistence(actor, runId), { expectedRevision });
+  }
+
+  async resumeRun(actor, runId, { expectedRevision = undefined } = {}) {
+    return persistResumedRun(this._locateRunPersistence(actor, runId), { expectedRevision });
+  }
+
+  async updateExecutionJournal(actor, runId, transition, { expectedRevision = undefined } = {}) {
+    return persistExecutionJournalTransition(
+      this._locateRunPersistence(actor, runId, { activeOnly: false }),
+      transition,
+      { expectedRevision }
+    );
+  }
+
+  _locateRunPersistence(actor, runId, { activeOnly = true } = {}) {
+    const container = cloneContainer(this._getContainer(actor));
+    const location = findRun(container, runId, { activeOnly });
+    if (!location) return null;
+    const run = location.run;
+    return {
+      run,
+      now: () => this._now(),
+      getTimeGate: () => run.timeGate || null,
+      assertMutation: (options) => this._assertRunMutation(run, options),
+      persist: async () => {
+        run.updatedAtWorldTime = this._now();
+        await this._persist(actor, container);
+        return run;
+      },
+    };
   }
 
   async removeRunsForSystem(systemId) {
@@ -333,27 +399,32 @@ export class GatheringRunManager {
     if (!record || typeof record !== 'object') return null;
     if (!terminal && TERMINAL_STATUSES.has(record.status)) return null;
 
-    const id = stringOrNull(record.id);
-    const craftingSystemId = stringOrNull(record.craftingSystemId);
-    const environmentId = stringOrNull(record.environmentId);
-    const taskId = stringOrNull(record.taskId);
-    if (!id || !craftingSystemId || !environmentId || !taskId) return null;
+    const identity = normalizeRunIdentity(record, actor);
+    if (!identity) return null;
+
+    if (getRunLifecycleContract(record) === 'unsupported') {
+      return { ...cloneJson(record), ...identity.refs };
+    }
 
     const status = normalizeStatus(record.status, terminal);
     if (terminal && !TERMINAL_STATUSES.has(status)) return null;
     if (!terminal && !ACTIVE_STATUSES.has(status)) return null;
 
     const run = {
-      id,
-      actorUuid: stringOrNull(record.actorUuid) || stringOrNull(actor?.uuid),
-      userId: stringOrNull(record.userId),
-      craftingSystemId,
-      environmentId,
-      taskId,
+      ...identity.base,
       status,
       startedAtWorldTime: numberOrDefault(record.startedAtWorldTime, 0),
       updatedAtWorldTime: numberOrDefault(record.updatedAtWorldTime, record.startedAtWorldTime, 0),
+      ...preserveRunLifecycleFields(record),
     };
+
+    if (
+      getRunLifecycleContract(record) === 'current' &&
+      record.executionJournal &&
+      typeof record.executionJournal === 'object'
+    ) {
+      run.executionJournal = observeExecutionJournal(record.executionJournal);
+    }
 
     if (terminal) {
       run.completedAtWorldTime = numberOrDefault(
@@ -366,31 +437,7 @@ export class GatheringRunManager {
     if (timeGate) run.timeGate = timeGate;
     if (!terminal && status === 'waitingTime' && !timeGate) return null;
 
-    if (record.checkResult && typeof record.checkResult === 'object') {
-      run.checkResult = cloneJson(record.checkResult);
-    }
-    if (record.economyEvidence && typeof record.economyEvidence === 'object') {
-      run.economyEvidence = cloneJson(record.economyEvidence);
-    }
-    if (record.conditionSnapshot && typeof record.conditionSnapshot === 'object') {
-      run.conditionSnapshot = cloneJson(record.conditionSnapshot);
-    }
-    if (record.characterModifierSnapshot && typeof record.characterModifierSnapshot === 'object') {
-      run.characterModifierSnapshot = cloneJson(record.characterModifierSnapshot);
-    }
-    if (record.riskLevel) {
-      run.riskLevel = stringOrNull(record.riskLevel);
-    }
-    if (record.encounterOutcome && typeof record.encounterOutcome === 'object') {
-      run.encounterOutcome = cloneJson(record.encounterOutcome);
-    }
-    if (Array.isArray(record.chatMessageIds)) {
-      run.chatMessageIds = record.chatMessageIds.map(stringOrNull).filter(Boolean);
-    }
-    if (Array.isArray(record.revealEvents)) {
-      run.revealEvents = cloneJson(record.revealEvents);
-    }
-
+    copyGatheringRunEvidence(run, record);
     run.usedTools = normalizeRunItems(record.usedTools);
     run.createdResults =
       terminal && status !== 'succeeded' ? [] : normalizeRunItems(record.createdResults);
@@ -495,6 +542,18 @@ export class GatheringRunManager {
     const value = Number(this.nowWorldTime());
     return Number.isFinite(value) ? value : 0;
   }
+
+  _assertRunMutation(run, { allowExecutionJournal = false, ...options } = {}) {
+    assertRunLifecycleMutation(run, options);
+    if (!run?.executionJournal) return;
+    const journal = observeExecutionJournal(run.executionJournal);
+    if (!allowExecutionJournal && journal.status === 'planned') {
+      throw new RunLifecycleError(
+        'The run already has an execution in progress',
+        'EXECUTION_IN_PROGRESS'
+      );
+    }
+  }
 }
 
 function readGatheringRunsFlag(actor) {
@@ -546,6 +605,12 @@ function pickRunPayload(data = {}) {
     'revealEvents',
     'usedTools',
     'createdResults',
+    'lifecycleVersion',
+    'runRevision',
+    'completionMode',
+    'pauseState',
+    'pausedDurationSeconds',
+    'executionJournal',
   ]) {
     if (data[field] !== undefined) payload[field] = data[field];
   }
@@ -662,6 +727,64 @@ function cloneJson(value) {
 
 function cloneContainer(container) {
   return cloneJson(container) || { active: {}, history: [] };
+}
+
+function normalizeRunIdentity(record, actor) {
+  const refs = {
+    id: stringOrNull(record.id),
+    craftingSystemId: stringOrNull(record.craftingSystemId),
+    environmentId: stringOrNull(record.environmentId),
+    taskId: stringOrNull(record.taskId),
+  };
+  if (Object.values(refs).some((value) => !value)) return null;
+  return {
+    refs,
+    base: {
+      id: refs.id,
+      actorUuid: stringOrNull(record.actorUuid) || stringOrNull(actor?.uuid),
+      userId: stringOrNull(record.userId),
+      craftingSystemId: refs.craftingSystemId,
+      environmentId: refs.environmentId,
+      taskId: refs.taskId,
+    },
+  };
+}
+
+function copyGatheringRunEvidence(run, record) {
+  for (const field of [
+    'checkResult',
+    'economyEvidence',
+    'conditionSnapshot',
+    'characterModifierSnapshot',
+    'encounterOutcome',
+  ]) {
+    if (record[field] && typeof record[field] === 'object') {
+      run[field] = cloneJson(record[field]);
+    }
+  }
+  if (record.riskLevel) run.riskLevel = stringOrNull(record.riskLevel);
+  if (Array.isArray(record.chatMessageIds)) {
+    run.chatMessageIds = record.chatMessageIds.map(stringOrNull).filter(Boolean);
+  }
+  if (Array.isArray(record.revealEvents)) run.revealEvents = cloneJson(record.revealEvents);
+}
+
+function isMaturedGatheringRun(run, worldTime) {
+  if (run?.status !== 'waitingTime') return false;
+  if (getRunLifecycleContract(run) === 'unsupported') return false;
+  if (run.pauseState) return false;
+  if (run.executionJournal && run.executionJournal.status !== 'committed') return false;
+  if (!run.timeGate) return false;
+  return worldTime >= Number(run.timeGate.availableAt || 0);
+}
+
+function findRun(container, runId, { activeOnly = false } = {}) {
+  const id = stringOrNull(runId);
+  if (!id) return null;
+  if (container.active?.[id]) return { run: container.active[id], terminal: false };
+  if (activeOnly) return null;
+  const run = (container.history || []).find((entry) => entry?.id === id);
+  return run ? { run, terminal: true } : null;
 }
 
 function defaultRandomID() {

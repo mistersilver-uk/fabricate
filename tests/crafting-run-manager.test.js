@@ -86,6 +86,184 @@ test('CraftingRunManager: create/advance/cancel flow moves active run into histo
   assert.equal(history[0].currentStepIndex, null);
 });
 
+test('CraftingRunManager persists explicit lifecycle v1 state and exact current-step selections', async () => {
+  setupGlobals(1000);
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Versioned crafter');
+  const recipe = {
+    id: 'recipe-versioned',
+    craftingSystemId: 'system-1',
+    getExecutionSteps: () => [
+      {
+        id: 'step-1',
+        name: 'Choose ingredients',
+        ingredientSets: [{ id: 'sunward', ingredients: [{ componentId: 'herb', quantity: 2 }] }],
+      },
+    ],
+  };
+
+  const run = await manager.createRun(actor, recipe, [actor], 'user-1', {
+    lifecycleVersion: 1,
+    runRevision: 99,
+    pauseState: { pausedAt: 10, remainingSeconds: 20 },
+    pausedDurationSeconds: 99,
+  });
+  assert.equal(run.lifecycleVersion, 1);
+  assert.equal(run.runRevision, 0);
+  assert.equal(run.completionMode, 'manual');
+  assert.equal(run.pausedDurationSeconds, 0);
+  assert.equal(run.pauseState, undefined);
+  assert.equal('lifecycleVersion' in (await manager.createRun(actor, singleStepRecipe('legacy'))), false);
+
+  const selectedRequirementSnapshot = {
+    id: 'sunward',
+    name: 'Sunward route',
+    ingredients: [
+      { componentId: 'herb', quantity: 2 },
+      { tagId: 'fresh', quantity: 1 },
+      { essenceId: 'solar', quantity: 3 },
+      { currency: { unit: 'gp', amount: 5 } },
+    ],
+  };
+  const updated = await manager.setStepSelectionPlan(
+    actor,
+    run.id,
+    0,
+    {
+      selectedIngredientSetId: 'sunward',
+      ingredientOptionOverrides: { herbs: { optionIndex: 1, heldItemId: 'Item.herb' } },
+      ingredientEssenceAllocation: {
+        stepId: 'step-1',
+        ingredientSetId: 'sunward',
+        allocation: { 'Actor.source.Item.herb': 2 },
+      },
+      selectedRequirementSnapshot,
+    },
+    { expectedRevision: 0 }
+  );
+
+  assert.equal(updated.runRevision, 1);
+  assert.deepEqual(updated.steps[0].selectionPlan, {
+    selectedIngredientSetId: 'sunward',
+    ingredientOptionOverrides: { herbs: { optionIndex: 1, heldItemId: 'Item.herb' } },
+    ingredientEssenceAllocation: {
+      stepId: 'step-1',
+      ingredientSetId: 'sunward',
+      allocation: { 'Actor.source.Item.herb': 2 },
+    },
+  });
+  assert.deepEqual(updated.steps[0].selectedRequirementSnapshot, selectedRequirementSnapshot);
+
+  manager.invalidateCache(actor.id);
+  assert.deepEqual(manager.getActiveRun(actor, run.id).steps[0].selectionPlan, updated.steps[0].selectionPlan);
+});
+
+test('CraftingRunManager persists journal transitions and recovery blocks cancellation', async () => {
+  setupGlobals(1000);
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Journal crafter');
+  const run = await manager.createRun(actor, singleStepRecipe('journal'), [actor], 'user-1', {
+    lifecycleVersion: 1,
+  });
+  const plan = {
+    operationId: 'operation-1',
+    requestId: 'request-1',
+    baseRunRevision: 0,
+    intent: { stepIndex: 0 },
+    effects: [{ effectId: 'consume', kind: 'consumeItems', planned: { quantity: 1 } }],
+  };
+
+  await manager.updateExecutionJournal(actor, run.id, { type: 'plan', plan });
+  await manager.updateExecutionJournal(actor, run.id, {
+    type: 'effectApplying',
+    effectId: 'consume',
+  });
+  const recovery = await manager.updateExecutionJournal(actor, run.id, {
+    type: 'reconstructAfterReload',
+  });
+
+  assert.equal(recovery.executionJournal.status, 'recoveryRequired');
+  assert.equal(recovery.runRevision, 3);
+  await assert.rejects(
+    () => manager.cancelRun(actor, run.id),
+    (error) => error.code === 'EXECUTION_RECOVERY_REQUIRED'
+  );
+  assert.equal(manager.getActiveRun(actor, run.id).status, 'inProgress');
+});
+
+test('CraftingRunManager freezes and resumes v1 gates while preserving legacy world-time behavior', async () => {
+  setupGlobals(1000);
+  const actor = new FakeActor('Paused crafter');
+  const manager = new CraftingRunManager();
+  const run = await manager.createRun(actor, singleStepRecipe('paused'), [actor], 'user-1', {
+    lifecycleVersion: 1,
+    completionMode: 'worldTime',
+  });
+  await manager.markStepWaitingForTime(actor, run, 0, { minutes: 2 });
+
+  game.time.worldTime = 1030;
+  const paused = await manager.pauseRun(actor, run.id, { expectedRevision: 1 });
+  assert.deepEqual(paused.pauseState, { pausedAt: 1030, remainingSeconds: 90 });
+  assert.equal(paused.runRevision, 2);
+
+  await manager.processWorldTime(5000);
+  assert.equal(manager.getActiveRun(actor, run.id).status, 'waitingTime');
+
+  game.time.worldTime = 1130;
+  const resumed = await manager.resumeRun(actor, run.id, { expectedRevision: 2 });
+  assert.equal(resumed.steps[0].timeGate.availableAt, 1220);
+  assert.equal(resumed.pausedDurationSeconds, 100);
+  assert.equal(resumed.pauseState, undefined);
+  assert.equal(resumed.runRevision, 3);
+
+  await assert.rejects(
+    () => manager.setCompletionMode(actor, run.id, 'manual', { expectedRevision: 2 }),
+    (error) => error.code === 'STALE_RUN_REVISION'
+  );
+});
+
+test('CraftingRunManager preserves unsupported lifecycle records and refuses mutations without writes', async () => {
+  setupGlobals(1000);
+  const actor = new FakeActor('Future crafter');
+  actor._flags.fabricate = {
+    'fabricate.craftingRuns': {
+      active: {
+        future: {
+          id: 'future',
+          lifecycleVersion: 2,
+          status: 'waitingTime',
+          currentStepIndex: 0,
+          steps: [
+            {
+              stepId: 'step-1',
+              status: 'waitingTime',
+              timeGate: { initiatedAt: 0, requiredSeconds: 10, availableAt: 10 },
+            },
+          ],
+        },
+      },
+      history: [],
+    },
+  };
+  let writes = 0;
+  const originalSetFlag = actor.setFlag.bind(actor);
+  actor.setFlag = async (...args) => {
+    writes += 1;
+    return originalSetFlag(...args);
+  };
+  game.actors = [actor];
+  const manager = new CraftingRunManager();
+
+  await manager.processWorldTime(1000);
+  assert.equal(manager.getActiveRun(actor, 'future').status, 'waitingTime');
+  await assert.rejects(
+    () => manager.cancelRun(actor, 'future'),
+    (error) => error.code === 'UNSUPPORTED_LIFECYCLE_VERSION'
+  );
+  assert.equal(writes, 0);
+  assert.equal(manager.getActiveRun(actor, 'future').lifecycleVersion, 2);
+});
+
 test('CraftingRunManager: getRun and history limit helpers work for active + historical entries', async () => {
   setupGlobals(2000);
   const manager = new CraftingRunManager();

@@ -201,6 +201,132 @@ test('GatheringRunManager creates active runs with only canonical fields', async
   assert.equal('environmentSnapshot' in actor.flags.fabricate.gatheringRuns.active[run.id], false);
 });
 
+test('GatheringRunManager preserves explicit lifecycle v1 state and pause preferences', async () => {
+  const actor = new FakeActor();
+  let now = 1000;
+  const runs = manager({ nowWorldTime: () => now });
+  const run = await runs.createWaitingRun(
+    actor,
+    runData({ lifecycleVersion: 1, completionMode: 'worldTime' }),
+    { requiredSeconds: 120, initiatedAt: 1000, availableAt: 1120 }
+  );
+
+  assert.equal(run.lifecycleVersion, 1);
+  assert.equal(run.runRevision, 0);
+  assert.equal(run.completionMode, 'worldTime');
+  assert.equal(run.pausedDurationSeconds, 0);
+
+  now = 1030;
+  const paused = await runs.pauseRun(actor, run.id, { expectedRevision: 0 });
+  assert.deepEqual(paused.pauseState, { pausedAt: 1030, remainingSeconds: 90 });
+  assert.deepEqual(runs.getMaturedWaitingRuns(5000), []);
+
+  now = 1130;
+  const resumed = await runs.resumeRun(actor, run.id, { expectedRevision: 1 });
+  assert.equal(resumed.timeGate.availableAt, 1220);
+  assert.equal(resumed.pausedDurationSeconds, 100);
+  assert.equal(resumed.runRevision, 2);
+
+  const manual = await runs.setCompletionMode(actor, run.id, 'manual', { expectedRevision: 2 });
+  assert.equal(manual.completionMode, 'manual');
+  assert.equal(manual.runRevision, 3);
+});
+
+test('GatheringRunManager updates execution evidence in terminal history by run id', async () => {
+  const actor = new FakeActor();
+  const runs = manager();
+  const terminal = await runs.createTerminalRun(
+    actor,
+    runData({ lifecycleVersion: 1 }),
+    'succeeded',
+    {}
+  );
+  const plan = {
+    operationId: 'operation-1',
+    requestId: 'request-1',
+    baseRunRevision: 0,
+    intent: { taskId: 'task-1' },
+    effects: [{ effectId: 'award', kind: 'awardItems', planned: { componentId: 'herb' } }],
+  };
+
+  await runs.updateExecutionJournal(terminal.actorUuid && actor, terminal.id, {
+    type: 'plan',
+    plan,
+  });
+  await runs.updateExecutionJournal(actor, terminal.id, {
+    type: 'effectApplying',
+    effectId: 'award',
+  });
+  await runs.updateExecutionJournal(actor, terminal.id, {
+    type: 'effectApplied',
+    effectId: 'award',
+    receipt: { itemUuid: 'Item.herb' },
+  });
+  const committed = await runs.updateExecutionJournal(actor, terminal.id, {
+    type: 'commit',
+    outcome: { status: 'succeeded' },
+  });
+
+  assert.equal(committed.executionJournal.status, 'committed');
+  assert.deepEqual(committed.executionJournal.effects[0].receipt, { itemUuid: 'Item.herb' });
+  assert.equal(runs.getActiveRun(actor, terminal.id), null);
+  assert.equal(runs.getRunHistory(actor)[0].id, terminal.id);
+  assert.equal(runs.getRunHistory(actor)[0].runRevision, 4);
+});
+
+test('GatheringRunManager preserves future lifecycle records and refuses mutation', async () => {
+  const actor = new FakeActor();
+  actor.flags.fabricate = {
+    gatheringRuns: {
+      active: {
+        future: {
+          id: 'future',
+          lifecycleVersion: 2,
+          craftingSystemId: 'system-1',
+          environmentId: 'env-1',
+          taskId: 'task-1',
+          status: 'waitingTime',
+          startedAtWorldTime: 0,
+          updatedAtWorldTime: 0,
+          timeGate: { requiredSeconds: 10, initiatedAt: 0, availableAt: 10 },
+          futureState: { opaque: true },
+        },
+      },
+      history: [],
+    },
+  };
+  const runs = manager({ getActors: () => [actor] });
+
+  assert.equal(runs.getActiveRun(actor, 'future').lifecycleVersion, 2);
+  assert.deepEqual(runs.getMaturedWaitingRuns(100), []);
+  await assert.rejects(
+    () => runs.cancelRun(actor, 'future'),
+    (error) => error.code === 'UNSUPPORTED_LIFECYCLE_VERSION'
+  );
+  assert.equal(actor.setFlagCalls.length, 0);
+});
+
+test('GatheringRunManager keeps unsupported run data byte-shaped during unrelated writes', async () => {
+  const actor = new FakeActor();
+  const future = {
+    id: 'future',
+    lifecycleVersion: 2,
+    craftingSystemId: 'system-1',
+    environmentId: 'env-1',
+    taskId: 'future-task',
+    status: 'futureWaiting',
+    startedAtWorldTime: 0,
+    updatedAtWorldTime: 0,
+    futureState: { opaque: ['keep-me'] },
+  };
+  actor.flags.fabricate = { gatheringRuns: { active: { future }, history: [] } };
+  const runs = manager();
+
+  await runs.createRun(actor, runData({ taskId: 'legacy-task' }));
+
+  assert.deepEqual(actor.flags.fabricate.gatheringRuns.active.future, future);
+});
+
 test('GatheringRunManager rejects persistence failures without dirtying the cache', async () => {
   const actor = new RejectingActor();
   const runs = manager();
