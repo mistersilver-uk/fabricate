@@ -26,7 +26,12 @@ import { createLocalizer, toI18nStub } from '../labI18n.js';
 import { buildLabActors, buildDocumentIndex } from './labActors.js';
 import { buildLabContent, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
 import { seedLabInteractables } from './labInteractables.js';
-import { buildLabBlindRunSecret, buildLabRunStates, installLabRunStates } from './labRunStates.js';
+import {
+  buildLabBlindRunSecret,
+  buildLabRunStates,
+  createLabJournalCaseController,
+  installLabRunStates,
+} from './labRunStates.js';
 
 const FABRICATE_NAMESPACE = 'fabricate';
 
@@ -519,17 +524,26 @@ export async function buildLabWorld({
   // shows how each STATUS renders, where an empty journal shows nothing at all.
   const runRecipes = journalRecipes.length > 0 ? journalRecipes : allRecipes;
   if (runRecipes.length > 0) {
-    installLabRunStates(
-      journalActor,
-      buildLabRunStates({
+    const runContainers = buildLabRunStates({
+      actor: journalActor,
+      userId: 'user-lab-player',
+      recipes: runRecipes,
+      environments: content.environments,
+      tasks: content.gatheringConfig.tasks,
+      journalCaseState,
+    });
+    installLabRunStates(journalActor, runContainers);
+    if (journalCaseState) {
+      const controller = createLabJournalCaseController({
         actor: journalActor,
-        userId: 'user-lab-player',
+        containers: runContainers,
+        state: journalCaseState,
         recipes: runRecipes,
-        environments: content.environments,
-        tasks: content.gatheringConfig.tasks,
-        journalCaseState,
-      })
-    );
+        nowWorldTime: () => Number(fabricate.getWorldTime?.() ?? LAB_WORLD_TIME),
+      });
+      fabricate.executeJournalCaseFixtureCommand = controller.execute;
+      fabricate.journalCaseFixtureEvents = controller.events;
+    }
     // The in-flight blind run's secret half (issue 901). It is NOT a flag: the drawn task, its
     // start-time snapshot and its node reservation live in the `gatheringBlindRuns` WORLD setting,
     // which only a GM may write — that is the integrity boundary the fix draws, and the reason a

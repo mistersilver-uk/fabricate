@@ -430,6 +430,18 @@ async function mountPlayerApp(content, params) {
 function installJournalCaseServiceSeam(services, state) {
   if (!state || !services) return;
   const list = services.listJournalForActor?.bind(services);
+  const execute = services.executeJournalRunCommand?.bind(services);
+  const fixtureExecute = globalThis.game?.fabricate?.executeJournalCaseFixtureCommand;
+  const fixtureEvents = globalThis.game?.fabricate?.journalCaseFixtureEvents;
+  if (typeof fixtureExecute === 'function') {
+    services.executeJournalRunCommand = async (command) =>
+      (await fixtureExecute(command)) ?? execute?.(command) ?? null;
+    if (Array.isArray(fixtureEvents)) {
+      services.notify = (message) => {
+        fixtureEvents.push({ type: 'notification', message, state });
+      };
+    }
+  }
   if (state === 'loading') {
     services.listJournalForActor = () => new Promise(() => {});
     return;
@@ -1100,6 +1112,7 @@ async function boot() {
     services: mounted?.services ?? null,
     store: mounted?.store ?? null,
     frame: built.frame,
+    journalCaseEvents: world?.fabricate?.journalCaseFixtureEvents ?? [],
     // The dialogs standing in the page, so a case can assert one opened and the driver can settle
     // it. `frame.screenshot()` clips the PAGE to the frame's box rather than rendering the frame in
     // isolation, so a dialog centred in the viewport lands on top of the window in the capture —

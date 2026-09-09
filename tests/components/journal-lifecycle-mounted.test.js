@@ -4,6 +4,7 @@ import { after, afterEach, before, describe, it } from 'node:test';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
+import { chooseSelectOption } from '../helpers/select-control.js';
 import {
   PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
@@ -14,6 +15,7 @@ import {
 import {
   LAB_JOURNAL_CASE_STATE_RUN_IDS,
   buildLabRunStates,
+  createLabJournalCaseController,
 } from '../view-lab/world/labRunStates.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -73,6 +75,20 @@ const SYSTEM = {
   resolutionMode: 'simple',
   features: { multiStepRecipes: true },
   craftingCheck: { simple: { rollFormula: null, dc: 12 } },
+  gatheringCraftingCheck: {
+    routed: {
+      type: 'relative',
+      rollFormula: '1d20',
+      relativeOutcomes: [
+        { id: 'standard-tier', name: 'Standard', success: true, dc: 0 },
+        { id: 'failed-tier', name: 'Failed', success: false, dc: -10 },
+      ],
+    },
+  },
+  essenceDefinitions: [
+    { id: 'earth', name: 'Earth', icon: 'fas fa-mountain', colorToken: 'earth' },
+    { id: 'fire', name: 'Fire', icon: 'fas fa-fire', colorToken: 'fire' },
+  ],
   components: [
     { id: 'iron', name: 'Iron', img: 'icons/iron.webp' },
     { id: 'copper', name: 'Copper', img: 'icons/copper.webp' },
@@ -158,14 +174,67 @@ const CHOICE_SET = ingredientSet('choice-set', [
     options: [componentOption('iron', 'iron'), componentOption('copper', 'copper')],
   },
 ]);
+const SHORT_SET = ingredientSet('short-set', [
+  { id: 'metal', name: 'Metal', options: [componentOption('iron', 'iron', 6)] },
+]);
+const ESSENCE_GROUPS = [
+  {
+    id: 'earth-group',
+    name: 'Earth essence',
+    options: [{ match: { type: 'essence', essenceId: 'earth', amount: 6 } }],
+  },
+  {
+    id: 'fire-group',
+    name: 'Fire essence',
+    options: [{ match: { type: 'essence', essenceId: 'fire', amount: 3 } }],
+  },
+];
+const ESSENCE_SET = {
+  id: 'essence-set',
+  name: 'Shared essence',
+  ingredientGroups: ESSENCE_GROUPS,
+  toJSON: () => ({
+    id: 'essence-set',
+    name: 'Shared essence',
+    ingredientGroups: structuredClone(ESSENCE_GROUPS),
+  }),
+  resolveIngredientSelection(_items, _matcher, { essenceAllocation = {} } = {}) {
+    const allocatedUnits = Math.max(0, Number(essenceAllocation?.['Item.iron-a']) || 0);
+    const earth = allocatedUnits * 6;
+    const fire = allocatedUnits * 3;
+    return {
+      success: earth >= 6 && fire >= 3,
+      selectedIngredients: [],
+      missingGroups: earth >= 6 && fire >= 3 ? [] : ESSENCE_GROUPS,
+      essencePool: {
+        requirements: [
+          { groupId: 'earth-group', essenceId: 'earth', need: 6, delivered: earth, owned: 18, satisfied: earth >= 6 },
+          { groupId: 'fire-group', essenceId: 'fire', need: 3, delivered: fire, owned: 9, satisfied: fire >= 3 },
+        ],
+        carriers: [
+          {
+            itemKey: 'Item.iron-a',
+            item: ACTOR.items[0],
+            perUnit: { earth: 6, fire: 3 },
+            ownedUnits: 3,
+            allocatedUnits,
+          },
+        ],
+        allocation: structuredClone(essenceAllocation),
+        suggested: { 'Item.iron-a': 1 },
+        totals: { earth, fire },
+      },
+    };
+  },
+};
 const RECIPES = [
   recipe('sm-r-horseshoe', 'Bend Horseshoe', [FIXED_SET]),
-  recipe('hb-r-grind', 'Grind Reagent', [CHOICE_SET]),
+  recipe('sm-r-quenchoil', 'Quench in Fire-Bearing Stock', [CHOICE_SET]),
   recipe('sm-r-pattern-blade', 'Forge Pattern Blade', [FIXED_SET], 3),
-  recipe('sm-r-chainmail', 'Rivet Chainmail', [FIXED_SET]),
+  recipe('sm-r-chainmail', 'Rivet Chainmail', [SHORT_SET]),
   recipe('jw-r-cast', 'Cast Jewellery', [FIXED_SET]),
   recipe('rw-r-blade', 'Inscribe Runeblade', [FIXED_SET]),
-  recipe('sm-r-deepbind', 'Deepbind Ingot', [FIXED_SET]),
+  recipe('sm-r-deepbind', 'Deepbind Ingot', [ESSENCE_SET]),
   recipe('al-r-firebomb', 'Distil Firebomb', [FIXED_SET]),
 ];
 const TASKS = ['straight', 'd100', 'routed'].map((mode) => ({
@@ -226,9 +295,16 @@ function persistedRuntime(state) {
     journalCaseState: state,
   });
   const dismissed = new Set();
-  const commands = [];
+  const notifications = [];
   let worldTime = 1_209_600;
   const builder = makeBuilder(containers, dismissed, () => worldTime);
+  const controller = createLabJournalCaseController({
+    actor: ACTOR,
+    containers,
+    state,
+    recipes: RECIPES,
+    nowWorldTime: () => worldTime,
+  });
   const services = {
     getWorldTime: () => worldTime,
     getWorldTimeComponents: () => ({ day: 15, hour: 0, minute: 0, secondsPerDay: 86_400 }),
@@ -237,46 +313,20 @@ function persistedRuntime(state) {
       actor: ACTOR,
       viewer: { id: 'user-1', isGM: false },
     }),
-    executeJournalRunCommand: async (command) => {
-      commands.push(structuredClone(command));
-      const run = containers.craftingRuns.active[command.runId];
-      assert.ok(run, 'command targets a persisted active run');
-      switch (command.action) {
-        case 'setCompletionMode': {
-          run.completionMode = command.payload.completionMode;
-          run.runRevision += 1;
-          break;
-        }
-        case 'setSelection': {
-          assert.equal(command.payload.stepIndex, run.currentStepIndex);
-          assert.ok(command.payload.selectionPlan, 'selection command carries its envelope');
-          run.steps[run.currentStepIndex].selectionPlan = structuredClone(
-            command.payload.selectionPlan
-          );
-          run.runRevision += 1;
-          break;
-        }
-        case 'cancel':
-        case 'execute': {
-          delete containers.craftingRuns.active[run.id];
-          run.status = command.action === 'cancel' ? 'cancelled' : 'succeeded';
-          run.finishedAt = 1_209_600;
-          containers.craftingRuns.history.unshift(run);
-          break;
-        }
-      }
-      return { success: true };
-    },
+    executeJournalRunCommand: controller.execute,
     dismissJournalRun: async ({ runId, runType }) => {
       dismissed.add(JSON.stringify([ACTOR_UUID, runType, runId]));
       return { success: true };
     },
-    notify: () => {},
+    notify: (message) => {
+      notifications.push(message);
+    },
     craftErrorMessage: () => 'Craft failed.',
   };
   return {
     containers,
-    commands,
+    commands: controller.events,
+    notifications,
     services,
     dismissed,
     advanceWorldTime: (seconds) => (worldTime += seconds),
@@ -285,10 +335,11 @@ function persistedRuntime(state) {
 
 let createJournalStore;
 
-async function mountState(state) {
+async function mountState(state, { prepare = null, initialLoad = true } = {}) {
   const runtime = persistedRuntime(state);
+  prepare?.(runtime);
   const store = createJournalStore({ services: runtime.services });
-  await store.load();
+  if (initialLoad) await store.load();
   flushSync();
   const target = await harness.mount({
     services: {
@@ -298,6 +349,11 @@ async function mountState(state) {
     },
   });
   return { ...runtime, store, target };
+}
+
+async function settleAction() {
+  await new Promise((resolve) => setImmediate(resolve));
+  flushSync();
 }
 
 function assertScrollContract(target) {
@@ -354,6 +410,27 @@ describe('Journal versioned lifecycle (mounted)', () => {
       ]);
       assert.ok(runs.some((run) => run.id === runId), `${state} resolves ${runId}`);
     }
+
+    const automatic = buildLabRunStates({
+      actor: ACTOR,
+      userId: 'user-1',
+      recipes: RECIPES,
+      environments: ENVIRONMENTS,
+      tasks: TASKS,
+      journalCaseState: 'automatic-completion',
+    });
+    assert.equal(Object.keys(automatic.craftingRuns.active).length, 0);
+    assert.equal(automatic.craftingRuns.history[0].completionMode, 'worldTime');
+    const gathering = buildLabRunStates({
+      actor: ACTOR,
+      userId: 'user-1',
+      recipes: RECIPES,
+      environments: ENVIRONMENTS,
+      tasks: TASKS,
+      journalCaseState: 'gathering-d100',
+    });
+    assert.equal(gathering.gatheringRuns.history.length, 0);
+    assert.equal(gathering.gatheringRuns.active['lab-v1-gathering-d100'].status, 'waitingTime');
   });
 
   it('persists completion preference and completion through a rebuild of raw records', async () => {
@@ -432,6 +509,182 @@ describe('Journal versioned lifecycle (mounted)', () => {
     flushSync();
     assert.equal(dismissed.containers.craftingRuns.history.length, 1, 'history record remains');
     assert.ok(!dismissed.target.querySelector('[data-history-run-id="lab-v1-dismissal"]'));
+  });
+
+  it('pauses, advances world time, and resumes with a re-anchored persisted gate', async () => {
+    const paused = await mountState('waiting-auto-eligible');
+    const run = paused.containers.craftingRuns.active['lab-v1-waiting-auto-eligible'];
+    paused.target.querySelector('[data-run-action="pause"]').click();
+    await settleAction();
+    assert.equal(run.pauseState.remainingSeconds, 3 * 3600);
+    assert.ok(paused.target.querySelector('[data-journal-paused="true"]'));
+
+    paused.advanceWorldTime(2 * 3600);
+    paused.target.querySelector('[data-run-action="resume"]').click();
+    await settleAction();
+    assert.equal(run.pauseState, undefined);
+    assert.equal(run.pausedDurationSeconds, 2 * 3600);
+    assert.equal(run.steps[0].timeGate.availableAt, 1_209_600 + 5 * 3600);
+    assert.equal(paused.store.selectedRun.derivedStatus, 'waiting');
+  });
+
+  it('keeps paging independent, retains off-page detail, and filters through real controls', async () => {
+    const paging = await mountState('active-page-two');
+    const firstCard = paging.target.querySelector(
+      ':scope [data-journal-list="active"] [data-run-id]'
+    );
+    firstCard.click();
+    flushSync();
+    const selectedKey = paging.store.selectedRun.key;
+    const selectedId = paging.store.selectedRun.id;
+
+    paging.target
+      .querySelector(':scope [data-journal-list="active"] [data-pagination-next]')
+      .click();
+    flushSync();
+    assert.equal(paging.store.activePage, 1);
+    assert.equal(paging.store.historyPage, 0);
+    assert.equal(paging.store.selectedRun.key, selectedKey);
+    assert.equal(paging.target.querySelector('[data-journal-detail]').dataset.runKey, selectedKey);
+    assert.ok(
+      !paging.target.querySelector(
+        `:scope [data-journal-list="active"] [data-run-id="${selectedId}"]`
+      )
+    );
+
+    paging.target
+      .querySelector(':scope [data-journal-list="finished"] [data-pagination-next]')
+      .click();
+    flushSync();
+    assert.equal(paging.store.activePage, 1);
+    assert.equal(paging.store.historyPage, 1);
+
+    harness.remount();
+    const filtered = await mountState('filter-paused');
+    filtered.target
+      .querySelector(':scope [data-journal-status-filter] input[value="paused"]')
+      .click();
+    flushSync();
+    assert.deepEqual(filtered.store.activeCounts, { all: 2, ready: 1, waiting: 0, paused: 1 });
+    assert.equal(filtered.target.querySelectorAll('[data-run-id]').length, 1);
+    assert.equal(filtered.target.querySelector('[data-run-id]').dataset.runStatus, 'paused');
+
+    const retainedKey = filtered.store.selectedRun.key;
+    const search = filtered.target.querySelector(':scope [data-journal-search] input');
+    search.value = 'no journal run has this name';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    flushSync();
+    assert.equal(filtered.target.querySelectorAll('[data-run-id]').length, 0);
+    assert.equal(filtered.store.selectedRun.key, retainedKey);
+    assert.equal(filtered.target.querySelector('[data-journal-detail]').dataset.runKey, retainedKey);
+
+    harness.remount();
+    const salvage = await mountState('salvage');
+    chooseSelectOption(salvage.target, '[data-journal-kind-filter]', 'salvage');
+    assert.equal(salvage.store.kindFilter, 'salvage');
+    assert.ok(salvage.target.querySelector('[data-history-run-id="lab-v1-salvage"]'));
+  });
+
+  it('persists one shared essence carrier and redraws both requirement totals', async () => {
+    const essence = await mountState('essence-shared');
+    const source = essence.target.querySelector('[data-essence-source="Item.iron-a"]');
+    assert.ok(source, 'the authored dual-essence carrier is visible');
+    source.querySelector('[data-stepper-increment]').click();
+    await settleAction();
+
+    const run = essence.containers.craftingRuns.active['lab-v1-essence-shared'];
+    assert.equal(
+      run.steps[0].selectionPlan.ingredientEssenceAllocation.allocation['Item.iron-a'],
+      1
+    );
+    assert.match(essence.target.querySelector('[data-essence-total="earth"]').textContent, /6 \/ 6/);
+    assert.match(essence.target.querySelector('[data-essence-total="fire"]').textContent, /3 \/ 3/);
+  });
+
+  it('collects all three gathering modes from active previews into actual history evidence', async () => {
+    const cases = [
+      ['gathering-straight', 'straight'],
+      ['gathering-d100', 'd100'],
+      ['gathering-check', 'routed'],
+    ];
+    for (const [state, mode] of cases) {
+      const mounted = await mountState(state);
+      const runId = LAB_JOURNAL_CASE_STATE_RUN_IDS[state];
+      assert.equal(mounted.store.selectedRun.gatheringYield.mode, mode);
+      if (mode === 'routed') assert.ok(mounted.target.querySelector('[data-outcome-ladder]'));
+      else assert.ok(mounted.target.querySelector('[data-yield-scale]'));
+      assert.equal(mounted.target.querySelectorAll('[data-yield-cut]').length, 0);
+
+      mounted.target.querySelector('[data-run-action="primary"]').click();
+      await settleAction();
+      assert.ok(!mounted.containers.gatheringRuns.active[runId]);
+      assert.ok(mounted.target.querySelector(`[data-history-run-id="${runId}"]`));
+      assert.ok(mounted.store.selectedRun.createdResults.length > 0);
+      if (mode === 'straight') assert.equal(mounted.store.selectedRun.gatheringYield.roll, null);
+      if (mode === 'd100') {
+        assert.equal(mounted.store.selectedRun.gatheringYield.roll, 63);
+        assert.equal(mounted.target.querySelectorAll('[data-yield-cut]').length, 1);
+      }
+      if (mode === 'routed') {
+        assert.equal(mounted.store.selectedRun.gatheringYield.tiers.length, 2);
+        assert.equal(mounted.store.selectedRun.createdResults[0].componentId, 'iron');
+      }
+      harness.remount();
+    }
+  });
+
+  it('retries a failed load and clears busy state for each named command refusal', async () => {
+    let attempts = 0;
+    const retry = await mountState('error-retry', {
+      initialLoad: false,
+      prepare(runtime) {
+        const list = runtime.services.listJournalForActor;
+        runtime.services.listJournalForActor = (...args) => {
+          attempts += 1;
+          if (attempts === 1) return Promise.reject(new Error('fixture load failure'));
+          return list(...args);
+        };
+      },
+    });
+    await settleAction();
+    assert.ok(retry.target.querySelector('[data-journal-state="error"]'));
+    retry.target.querySelector('[data-notice-action]').click();
+    await settleAction();
+    assert.ok(retry.target.querySelector('[data-journal-state="populated"]'));
+    assert.equal(attempts, 2);
+
+    for (const [state, reason] of [
+      ['stale-action', 'stale-run'],
+      ['command-timeout', 'command-timeout'],
+      ['automatic-blocker', 'selection-required'],
+    ]) {
+      harness.remount();
+      const refused = await mountState(state);
+      const runId = LAB_JOURNAL_CASE_STATE_RUN_IDS[state];
+      refused.target.querySelector('[data-run-action="primary"]').click();
+      flushSync();
+      if (state === 'command-timeout') {
+        assert.equal(
+          refused.target.querySelector('[data-run-action-bar]').getAttribute('aria-busy'),
+          'true'
+        );
+        await new Promise((resolve) => setTimeout(resolve, 35));
+        flushSync();
+      } else await settleAction();
+      assert.ok(refused.containers.craftingRuns.active[runId]);
+      assert.equal(refused.store.busyRunKey, '');
+      assert.match(refused.notifications.at(-1), new RegExp(reason));
+      assert.equal(refused.commands.at(-1).action, 'execute');
+    }
+
+    harness.remount();
+    const cancelled = await mountState('roll-cancelled');
+    const runId = LAB_JOURNAL_CASE_STATE_RUN_IDS['roll-cancelled'];
+    cancelled.target.querySelector('[data-run-action="primary"]').click();
+    await settleAction();
+    assert.ok(cancelled.containers.craftingRuns.active[runId]);
+    assert.equal(cancelled.store.busyRunKey, '');
+    assert.equal(cancelled.notifications.length, 0);
   });
 
   it('guards independent scroll containment and detail action alignment with negative controls', async () => {
