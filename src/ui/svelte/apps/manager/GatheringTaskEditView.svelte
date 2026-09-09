@@ -108,7 +108,9 @@
   }
 
   function normalizeRoutedName(value) {
-    return String(value || '').trim().toLowerCase();
+    return String(value || '')
+      .trim()
+      .toLowerCase();
   }
 
   const routedTierMatches = $derived(
@@ -1127,10 +1129,7 @@
 
     <section class="manager-task-resolution-card" data-gathering-task-resolution>
       {@render taskCardHeader(
-        text(
-          'FABRICATE.Admin.Manager.Environment.Tasks.Resolution.Title',
-          'Gathering resolution'
-        ),
+        text('FABRICATE.Admin.Manager.Environment.Tasks.Resolution.Title', 'Gathering resolution'),
         text(
           'FABRICATE.Admin.Manager.Environment.Tasks.Resolution.Hint',
           'Choose how this task turns an attempt into gathered results.'
@@ -1924,7 +1923,7 @@
         )}
         {@render resultValidationSummary()}
         <RecipeResultsSection
-          resultGroups={resultGroups}
+          {resultGroups}
           componentOptions={managedItemOptions}
           idPrefix="gathering-task-"
           onChange={updateResultGroups}
@@ -1969,10 +1968,7 @@
                 <span class="manager-gathering-routed-tier-name">{tier.name}</span>
                 <Chip tone={tier.matchCount === 1 ? 'positive' : 'warning'}>
                   {tier.matchCount === 1
-                    ? text(
-                        'FABRICATE.Admin.Manager.Environment.Tasks.Results.Matched',
-                        'Matched'
-                      )
+                    ? text('FABRICATE.Admin.Manager.Environment.Tasks.Results.Matched', 'Matched')
                     : text(
                         'FABRICATE.Admin.Manager.Environment.Tasks.Results.MatchCount',
                         '{count} matching sets'
@@ -2044,523 +2040,531 @@
 
     {#if taskResolutionMode === 'd100'}
       <section class="manager-task-component-browser-card" data-gathering-task-component-browser>
-      <div class="manager-task-card-header">
-        <div class="manager-task-drop-header-copy">
-          <h3>
-            {text('FABRICATE.Admin.Manager.Environment.Tasks.ComponentBrowser', 'Components')}
-          </h3>
-          <p class="manager-muted">
-            {text(
-              'FABRICATE.Admin.Manager.Environment.Tasks.ComponentBrowserHint',
-              'Drag a component onto any drop rule row to assign or replace it.'
-            )}
-          </p>
-        </div>
-        <div class="manager-task-component-browser-controls">
-          <ManagerSearchField
-            compact
-            value={componentSearchTerm}
-            onInput={onComponentSearchInput}
-            placeholder={text(
-              'FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentsPlaceholder',
-              'Search components...'
-            )}
-            ariaLabel={text(
-              'FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentsByName',
-              'Search component names'
-            )}
-            data-gathering-component-name-search=""
-          />
-          <label
-            class="fabricate-search manager-search is-compact manager-task-component-tag-search"
-            data-gathering-component-tag-search
-          >
-            <i class="fas fa-tags" aria-hidden="true"></i>
-            <input
-              type="search"
-              value={componentTagSearchTerm}
-              oninput={onComponentTagSearchInput}
+        <div class="manager-task-card-header">
+          <div class="manager-task-drop-header-copy">
+            <h3>
+              {text('FABRICATE.Admin.Manager.Environment.Tasks.ComponentBrowser', 'Components')}
+            </h3>
+            <p class="manager-muted">
+              {text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.ComponentBrowserHint',
+                'Drag a component onto any drop rule row to assign or replace it.'
+              )}
+            </p>
+          </div>
+          <div class="manager-task-component-browser-controls">
+            <ManagerSearchField
+              compact
+              value={componentSearchTerm}
+              onInput={onComponentSearchInput}
               placeholder={text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.SearchTagsPlaceholder',
-                'Search tags...'
+                'FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentsPlaceholder',
+                'Search components...'
               )}
-              aria-label={text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentTags',
-                'Search component tags'
+              ariaLabel={text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentsByName',
+                'Search component names'
               )}
+              data-gathering-component-name-search=""
             />
-            {#if componentTagSuggestions.length > 0}
-              <div class="manager-tag-suggestions" data-gathering-component-tag-suggestions>
-                {#each componentTagSuggestions as tag (tag)}
-                  <button
-                    type="button"
-                    class="manager-tag-suggestion"
-                    data-gathering-component-tag-suggestion={tag}
-                    onclick={() => addComponentTag(tag)}
-                  >
-                    {tag}
-                  </button>
-                {/each}
-              </div>
-            {/if}
-          </label>
-        </div>
-      </div>
-
-      {#if selectedComponentTags.length > 0}
-        <div
-          class="manager-toolbar-pills manager-selected-tag-row manager-task-component-pills"
-          role="list"
-          aria-label={text(
-            'FABRICATE.Admin.Manager.Component.SelectedTags',
-            'Selected component tags'
-          )}
-          data-gathering-component-tag-pills
-        >
-          {#each selectedComponentTags as tag (tag)}
-            <Chip
-              class="manager-selected-tag-pill"
-              role="listitem"
-              data-gathering-component-tag-pill={tag}
+            <label
+              class="fabricate-search manager-search is-compact manager-task-component-tag-search"
+              data-gathering-component-tag-search
             >
-              {tag}
-              <button
-                type="button"
+              <i class="fas fa-tags" aria-hidden="true"></i>
+              <input
+                type="search"
+                value={componentTagSearchTerm}
+                oninput={onComponentTagSearchInput}
+                placeholder={text(
+                  'FABRICATE.Admin.Manager.Environment.Tasks.SearchTagsPlaceholder',
+                  'Search tags...'
+                )}
                 aria-label={text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.RemoveComponentTagFilter',
-                  'Remove {tag}'
-                ).replace('{tag}', tag)}
-                onclick={() => removeComponentTag(tag)}
-              >
-                <i class="fas fa-xmark" aria-hidden="true"></i>
-              </button>
-            </Chip>
-          {/each}
+                  'FABRICATE.Admin.Manager.Environment.Tasks.SearchComponentTags',
+                  'Search component tags'
+                )}
+              />
+              {#if componentTagSuggestions.length > 0}
+                <div class="manager-tag-suggestions" data-gathering-component-tag-suggestions>
+                  {#each componentTagSuggestions as tag (tag)}
+                    <button
+                      type="button"
+                      class="manager-tag-suggestion"
+                      data-gathering-component-tag-suggestion={tag}
+                      onclick={() => addComponentTag(tag)}
+                    >
+                      {tag}
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </label>
+          </div>
         </div>
-      {/if}
 
-      <div
-        class="manager-task-component-browser-scroll"
-        data-gathering-task-component-browser-scroll
-      >
-        {#if componentCards.length === 0}
-          <EmptyState
-            compact
-            icon="fas fa-box-open"
-            title={text(
-              'FABRICATE.Admin.Manager.Environment.Tasks.NoComponents',
-              'No components available'
+        {#if selectedComponentTags.length > 0}
+          <div
+            class="manager-toolbar-pills manager-selected-tag-row manager-task-component-pills"
+            role="list"
+            aria-label={text(
+              'FABRICATE.Admin.Manager.Component.SelectedTags',
+              'Selected component tags'
             )}
-          />
-        {:else if filteredComponentCards.length === 0}
-          <EmptyState
-            compact
-            icon="fas fa-search"
-            title={text(
-              'FABRICATE.Admin.Manager.Environment.Tasks.EmptyComponentSearchTitle',
-              'No components match these filters'
-            )}
-          />
-        {:else}
-          <div class="manager-task-component-grid" data-gathering-task-component-grid role="list">
-            {#each paginatedComponentCards as item (item.id)}
-              <div
-                class="manager-task-component-card"
+            data-gathering-component-tag-pills
+          >
+            {#each selectedComponentTags as tag (tag)}
+              <Chip
+                class="manager-selected-tag-pill"
                 role="listitem"
-                draggable="true"
-                data-gathering-component-card={item.id}
-                ondragstart={(event) => onComponentDragStart(item, event)}
+                data-gathering-component-tag-pill={tag}
               >
-                <img
-                  class="manager-task-component-card-image"
-                  src={componentCardImage(item)}
-                  alt=""
-                />
-                <span class="manager-task-component-card-copy">
-                  <strong>{item.name}</strong>
-                  <span
-                    >{componentDescription(item) ||
-                      text(
-                        'FABRICATE.Admin.Manager.NoDescriptionAdded',
-                        'No description has been added.'
-                      )}</span
-                  >
-                  {#if Array.isArray(item.tags) && item.tags.length > 0}
-                    <span class="manager-task-component-card-tags">
-                      {#each item.tags.slice(0, 3) as tag (tag)}
-                        <small>{tag}</small>
-                      {/each}
-                    </span>
-                  {/if}
-                </span>
-                <span class="manager-task-component-card-grip" aria-hidden="true">⋮⋮</span>
-              </div>
+                {tag}
+                <button
+                  type="button"
+                  aria-label={text(
+                    'FABRICATE.Admin.Manager.Environment.Tasks.RemoveComponentTagFilter',
+                    'Remove {tag}'
+                  ).replace('{tag}', tag)}
+                  onclick={() => removeComponentTag(tag)}
+                >
+                  <i class="fas fa-xmark" aria-hidden="true"></i>
+                </button>
+              </Chip>
             {/each}
           </div>
         {/if}
-      </div>
 
-      <div class="manager-task-component-browser-footer">
-        <span class="manager-muted manager-drop-count" data-gathering-component-count
-          >{text(
-            'FABRICATE.Admin.Manager.Environment.Tasks.ShowingComponents',
-            'Showing {start}-{end} of {total} components'
-          )
-            .replace('{start}', componentShowingStart)
-            .replace('{end}', componentShowingEnd)
-            .replace('{total}', filteredComponentCards.length)}</span
+        <div
+          class="manager-task-component-browser-scroll"
+          data-gathering-task-component-browser-scroll
         >
-        <Pagination
-          totalCount={filteredComponentCards.length}
-          pageSize={componentPageSize}
-          pageIndex={componentPageIndex}
-          pageSizeOptions={[6, 9, 12]}
-          onPageChange={(next) => (componentPageIndex = next)}
-          onPageSizeChange={(next) => {
-            componentPageSize = next;
-            componentPageIndex = 0;
-          }}
-        />
-      </div>
-    </section>
-
-    {#if showRewardRuleNotice}
-      <section class="manager-warning-band" data-gathering-task-reward-rule-notice>
-        <i class="fas fa-circle-info" aria-hidden="true"></i>
-        <span
-          >{text(
-            'FABRICATE.Admin.Manager.Environment.Tasks.RewardRuleNotice',
-            'Multiple drop rows use this component. Current drop rules may award only one matching row.'
-          )}</span
-        >
-      </section>
-    {/if}
-
-    <section class="manager-task-drops-card">
-      <div class="manager-task-card-header">
-        <div class="manager-task-drop-header-copy">
-          <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.DropRules', 'Drop Rules')}</h3>
-          <p class="manager-muted">
-            {text(
-              'FABRICATE.Admin.Manager.Environment.Tasks.DropRulesHint',
-              'Configure what can drop, how often, and which conditions modify each drop.'
-            )}
-          </p>
+          {#if componentCards.length === 0}
+            <EmptyState
+              compact
+              icon="fas fa-box-open"
+              title={text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.NoComponents',
+                'No components available'
+              )}
+            />
+          {:else if filteredComponentCards.length === 0}
+            <EmptyState
+              compact
+              icon="fas fa-search"
+              title={text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.EmptyComponentSearchTitle',
+                'No components match these filters'
+              )}
+            />
+          {:else}
+            <div class="manager-task-component-grid" data-gathering-task-component-grid role="list">
+              {#each paginatedComponentCards as item (item.id)}
+                <div
+                  class="manager-task-component-card"
+                  role="listitem"
+                  draggable="true"
+                  data-gathering-component-card={item.id}
+                  ondragstart={(event) => onComponentDragStart(item, event)}
+                >
+                  <img
+                    class="manager-task-component-card-image"
+                    src={componentCardImage(item)}
+                    alt=""
+                  />
+                  <span class="manager-task-component-card-copy">
+                    <strong>{item.name}</strong>
+                    <span
+                      >{componentDescription(item) ||
+                        text(
+                          'FABRICATE.Admin.Manager.NoDescriptionAdded',
+                          'No description has been added.'
+                        )}</span
+                    >
+                    {#if Array.isArray(item.tags) && item.tags.length > 0}
+                      <span class="manager-task-component-card-tags">
+                        {#each item.tags.slice(0, 3) as tag (tag)}
+                          <small>{tag}</small>
+                        {/each}
+                      </span>
+                    {/if}
+                  </span>
+                  <span class="manager-task-component-card-grip" aria-hidden="true">⋮⋮</span>
+                </div>
+              {/each}
+            </div>
+          {/if}
         </div>
-        <div class="manager-task-drop-controls">
-          <ManagerSearchField
-            compact
-            bind:value={searchTerm}
-            placeholder={text(
-              'FABRICATE.Admin.Manager.Environment.Tasks.SearchDropsPlaceholder',
-              'Search drop rules...'
-            )}
-            ariaLabel={text(
-              'FABRICATE.Admin.Manager.Environment.Tasks.SearchDrops',
-              'Search drop rules'
-            )}
+
+        <div class="manager-task-component-browser-footer">
+          <span class="manager-muted manager-drop-count" data-gathering-component-count
+            >{text(
+              'FABRICATE.Admin.Manager.Environment.Tasks.ShowingComponents',
+              'Showing {start}-{end} of {total} components'
+            )
+              .replace('{start}', componentShowingStart)
+              .replace('{end}', componentShowingEnd)
+              .replace('{total}', filteredComponentCards.length)}</span
+          >
+          <Pagination
+            totalCount={filteredComponentCards.length}
+            pageSize={componentPageSize}
+            pageIndex={componentPageIndex}
+            pageSizeOptions={[6, 9, 12]}
+            onPageChange={(next) => (componentPageIndex = next)}
+            onPageSizeChange={(next) => {
+              componentPageSize = next;
+              componentPageIndex = 0;
+            }}
           />
-          <!-- Primary (issue 1118, row 35): the section's CREATE action in toolbar chrome is
+        </div>
+      </section>
+
+      {#if showRewardRuleNotice}
+        <section class="manager-warning-band" data-gathering-task-reward-rule-notice>
+          <i class="fas fa-circle-info" aria-hidden="true"></i>
+          <span
+            >{text(
+              'FABRICATE.Admin.Manager.Environment.Tasks.RewardRuleNotice',
+              'Multiple drop rows use this component. Current drop rules may award only one matching row.'
+            )}</span
+          >
+        </section>
+      {/if}
+
+      <section class="manager-task-drops-card">
+        <div class="manager-task-card-header">
+          <div class="manager-task-drop-header-copy">
+            <h3>{text('FABRICATE.Admin.Manager.Environment.Tasks.DropRules', 'Drop Rules')}</h3>
+            <p class="manager-muted">
+              {text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.DropRulesHint',
+                'Configure what can drop, how often, and which conditions modify each drop.'
+              )}
+            </p>
+          </div>
+          <div class="manager-task-drop-controls">
+            <ManagerSearchField
+              compact
+              bind:value={searchTerm}
+              placeholder={text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.SearchDropsPlaceholder',
+                'Search drop rules...'
+              )}
+              ariaLabel={text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.SearchDrops',
+                'Search drop rules'
+              )}
+            />
+            <!-- Primary (issue 1118, row 35): the section's CREATE action in toolbar chrome is
                the loud one, and the identical verb in this screen's own empty state — same
                `onAddDrop`, same label — was already `is-primary`. Two spellings of one verb
                on one screen is exactly the drift the primitive exists to end. -->
-          <ManagerButton role="primary" onclick={onAddDrop} data-gathering-add-drop="toolbar">
-            <i class="fas fa-plus" aria-hidden="true"></i>
-            <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.AddDrop', 'Add drop rule')}</span
-            >
-          </ManagerButton>
+            <ManagerButton role="primary" onclick={onAddDrop} data-gathering-add-drop="toolbar">
+              <i class="fas fa-plus" aria-hidden="true"></i>
+              <span
+                >{text('FABRICATE.Admin.Manager.Environment.Tasks.AddDrop', 'Add drop rule')}</span
+              >
+            </ManagerButton>
+          </div>
         </div>
-      </div>
 
-      <section
-        class="manager-table-scroll"
-        aria-label={text(
-          'FABRICATE.Admin.Manager.Environment.Tasks.DropRulesTable',
-          'Drop rules table'
-        )}
-      >
-        {#if dropRows.length === 0}
-          <EmptyState
-            icon="fas fa-gift"
-            title={text(
-              'FABRICATE.Admin.Manager.Environment.Tasks.NoDrops',
-              'No drops have been added.'
-            )}
-          >
-            <ManagerButton role="primary" onclick={onAddDrop} data-gathering-add-drop="empty"
-              >{text(
-                'FABRICATE.Admin.Manager.Environment.Tasks.AddDrop',
-                'Add drop rule'
-              )}</ManagerButton
+        <section
+          class="manager-table-scroll"
+          aria-label={text(
+            'FABRICATE.Admin.Manager.Environment.Tasks.DropRulesTable',
+            'Drop rules table'
+          )}
+        >
+          {#if dropRows.length === 0}
+            <EmptyState
+              icon="fas fa-gift"
+              title={text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.NoDrops',
+                'No drops have been added.'
+              )}
             >
-          </EmptyState>
-        {:else if filteredRows.length === 0}
-          <EmptyState
-            icon="fas fa-search"
-            title={text(
-              'FABRICATE.Admin.Manager.Environment.Tasks.EmptyDropSearchTitle',
-              'No drop rules match this search'
-            )}
-          />
-        {:else}
-          <div
-            class={`manager-gathering-task-drops-table${rankedMode ? ' is-ranked-mode' : ''}`}
-            role="table"
-            data-gathering-task-drops-table
-          >
-            <div class="manager-table-head manager-gathering-task-drop-table-head" role="row">
-              {#if rankedMode}
-                <span
-                  role="columnheader"
-                  class="manager-drop-rank-header"
-                  aria-label={text(
-                    'FABRICATE.Admin.Manager.Environment.Tasks.DropRank',
-                    'Drop rank'
-                  )}>#</span
-                >
-              {/if}
-              <span role="columnheader"
+              <ManagerButton role="primary" onclick={onAddDrop} data-gathering-add-drop="empty"
                 >{text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.DropComponent',
-                  'Component'
-                )}</span
+                  'FABRICATE.Admin.Manager.Environment.Tasks.AddDrop',
+                  'Add drop rule'
+                )}</ManagerButton
               >
-              <span role="columnheader"
-                >{text('FABRICATE.Admin.Manager.Environment.Tasks.DropChance', 'Drop chance')}</span
-              >
-              <span role="columnheader"
-                >{text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.DropQuantityColumn',
-                  'Count'
-                )}</span
-              >
-              <span role="columnheader"
-                >{text('FABRICATE.Admin.Manager.Environment.Tasks.Modifiers', 'Modifiers')}</span
-              >
-            </div>
-            {#each paginatedRows as row (row.id)}
-              {@const rankIndex = dropRows.indexOf(row)}
-              <div
-                class={`manager-gathering-task-drop-row ${selectedDrop?.id === row.id ? 'is-selected' : ''}`}
-                role="row"
-                data-gathering-task-drop-id={row.id}
-                data-gathering-task-drop-zone={row.id}
-                aria-selected={selectedDrop?.id === row.id}
-                tabindex="0"
-                use:dragDrop={{
-                  onDrop: (data) => handleDropZoneDrop(row.id, data),
-                  activeClass: 'is-drop-active',
-                }}
-                onclick={() => onSelectDrop(row.id)}
-                onkeydown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    onSelectDrop(row.id);
-                  }
-                }}
-              >
+            </EmptyState>
+          {:else if filteredRows.length === 0}
+            <EmptyState
+              icon="fas fa-search"
+              title={text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.EmptyDropSearchTitle',
+                'No drop rules match this search'
+              )}
+            />
+          {:else}
+            <div
+              class={`manager-gathering-task-drops-table${rankedMode ? ' is-ranked-mode' : ''}`}
+              role="table"
+              data-gathering-task-drops-table
+            >
+              <div class="manager-table-head manager-gathering-task-drop-table-head" role="row">
                 {#if rankedMode}
                   <span
-                    role="cell"
-                    class="manager-drop-cell manager-drop-rank-cell"
-                    data-gathering-task-drop-rank-cell
-                  >
-                    <IconButton
-                      class="manager-drop-rank-button"
-                      ariaLabel={text(
-                        'FABRICATE.Admin.Manager.Environment.Tasks.MoveDropUp',
-                        'Move drop up'
-                      )}
-                      title={text(
-                        'FABRICATE.Admin.Manager.Environment.Tasks.MoveDropUp',
-                        'Move drop up'
-                      )}
-                      disabled={rankIndex <= 0}
-                      data-gathering-task-drop-move="up"
-                      onclick={(event) => {
-                        event.stopPropagation();
-                        onMoveDrop(row.id, 'up');
-                      }}
-                      onkeydown={(event) => event.stopPropagation()}
-                    >
-                      <i class="fas fa-chevron-up" aria-hidden="true"></i>
-                    </IconButton>
-                    <span class="manager-drop-rank-value" data-gathering-task-drop-rank
-                      >#{rankIndex + 1}</span
-                    >
-                    <IconButton
-                      class="manager-drop-rank-button"
-                      ariaLabel={text(
-                        'FABRICATE.Admin.Manager.Environment.Tasks.MoveDropDown',
-                        'Move drop down'
-                      )}
-                      title={text(
-                        'FABRICATE.Admin.Manager.Environment.Tasks.MoveDropDown',
-                        'Move drop down'
-                      )}
-                      disabled={rankIndex < 0 || rankIndex >= dropRows.length - 1}
-                      data-gathering-task-drop-move="down"
-                      onclick={(event) => {
-                        event.stopPropagation();
-                        onMoveDrop(row.id, 'down');
-                      }}
-                      onkeydown={(event) => event.stopPropagation()}
-                    >
-                      <i class="fas fa-chevron-down" aria-hidden="true"></i>
-                    </IconButton>
-                  </span>
-                {/if}
-                <span
-                  role="cell"
-                  class="manager-drop-cell manager-drop-component-cell"
-                  data-gathering-task-drop-component-cell
-                >
-                  {#if row.componentId || row.itemUuid}
-                    <button
-                      type="button"
-                      class="manager-gathering-task-identity manager-drop-component-button"
-                      title={text(
-                        'FABRICATE.Admin.Manager.Environment.Tasks.ClearDropComponentHint',
-                        'Right-click to clear component'
-                      )}
-                      onclick={(event) => {
-                        event.stopPropagation();
-                        onSelectDrop(row.id);
-                      }}
-                      onkeydown={(event) => event.stopPropagation()}
-                      onmousedown={(event) => onDropComponentMouseDown(row.id, event)}
-                      oncontextmenu={(event) => onClearDropComponent(row.id, event)}
-                    >
-                      <img class="manager-gathering-task-thumb" src={componentImage(row)} alt="" />
-                      <span class="manager-system-copy">
-                        <span class="manager-system-name">{componentLabel(row)}</span>
-                      </span>
-                    </button>
-                  {:else}
-                    <div
-                      class="manager-gathering-task-identity manager-drop-empty-component is-empty"
-                    >
-                      <span
-                        class="manager-inline-drop-zone"
-                        data-gathering-task-drop-zone={row.id}
-                        data-gathering-task-inline-drop-zone={row.id}
-                      >
-                        <i class="fas fa-file-import" aria-hidden="true"></i>
-                      </span>
-                      <span class="manager-system-copy">
-                        <span class="manager-system-name"
-                          >{text(
-                            'FABRICATE.Admin.Manager.Environment.Tasks.NoComponent',
-                            'No Component'
-                          )}</span
-                        >
-                        <span class="manager-system-description"
-                          >{text(
-                            'FABRICATE.Admin.Manager.Environment.Tasks.CreateOrAssign',
-                            'Create or assign'
-                          )}</span
-                        >
-                      </span>
-                    </div>
-                  {/if}
-                </span>
-                <span
-                  role="cell"
-                  class="manager-drop-cell manager-drop-rate-cell"
-                  data-gathering-task-drop-chance-cell
-                >
-                  <ChanceSlider
-                    value={dropRateValue(row)}
-                    numberLabel={text(
-                      'FABRICATE.Admin.Manager.Environment.Tasks.DropChancePercent',
-                      'Drop chance percent'
-                    )}
-                    rangeLabel={text(
-                      'FABRICATE.Admin.Manager.Environment.Tasks.DropChance',
-                      'Drop chance'
-                    )}
-                    resolveColor={dropRateTierColor}
-                    controlClass={dropRateTierClass(row.dropRate)}
-                    stopPropagation={true}
-                    onChange={(dropRate) => onUpdateDrop(row.id, { dropRate })}
-                  />
-                </span>
-                <span role="cell" class="manager-drop-cell manager-drop-quantity-cell">
-                  <input
-                    type="text"
-                    inputmode="numeric"
-                    pattern={'[1-9][0-9]{0,2}'}
-                    value={quantityValue(row)}
+                    role="columnheader"
+                    class="manager-drop-rank-header"
                     aria-label={text(
-                      'FABRICATE.Admin.Manager.Environment.Tasks.Quantity',
-                      'Quantity'
-                    )}
-                    oninput={(event) => onQuantityInput(row.id, event)}
-                    onblur={(event) => onQuantityBlur(row, event)}
-                    onclick={(event) => event.stopPropagation()}
-                    onkeydown={(event) => onQuantityKeydown(row, event)}
-                  />
-                </span>
-                <span role="cell" class="manager-drop-cell manager-chip-row">
-                  <span class="manager-drop-modifier-list">
-                    {#if hasModifierOverflow(row)}
-                      <Chip tone="neutral" class="manager-drop-modifier-overflow"
-                        >{text(
-                          'FABRICATE.Admin.Manager.Environment.Tasks.DropModifierOverflowHint',
-                          'See selected rule for modifiers'
-                        )}</Chip
+                      'FABRICATE.Admin.Manager.Environment.Tasks.DropRank',
+                      'Drop rank'
+                    )}>#</span
+                  >
+                {/if}
+                <span role="columnheader"
+                  >{text(
+                    'FABRICATE.Admin.Manager.Environment.Tasks.DropComponent',
+                    'Component'
+                  )}</span
+                >
+                <span role="columnheader"
+                  >{text(
+                    'FABRICATE.Admin.Manager.Environment.Tasks.DropChance',
+                    'Drop chance'
+                  )}</span
+                >
+                <span role="columnheader"
+                  >{text(
+                    'FABRICATE.Admin.Manager.Environment.Tasks.DropQuantityColumn',
+                    'Count'
+                  )}</span
+                >
+                <span role="columnheader"
+                  >{text('FABRICATE.Admin.Manager.Environment.Tasks.Modifiers', 'Modifiers')}</span
+                >
+              </div>
+              {#each paginatedRows as row (row.id)}
+                {@const rankIndex = dropRows.indexOf(row)}
+                <div
+                  class={`manager-gathering-task-drop-row ${selectedDrop?.id === row.id ? 'is-selected' : ''}`}
+                  role="row"
+                  data-gathering-task-drop-id={row.id}
+                  data-gathering-task-drop-zone={row.id}
+                  aria-selected={selectedDrop?.id === row.id}
+                  tabindex="0"
+                  use:dragDrop={{
+                    onDrop: (data) => handleDropZoneDrop(row.id, data),
+                    activeClass: 'is-drop-active',
+                  }}
+                  onclick={() => onSelectDrop(row.id)}
+                  onkeydown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onSelectDrop(row.id);
+                    }
+                  }}
+                >
+                  {#if rankedMode}
+                    <span
+                      role="cell"
+                      class="manager-drop-cell manager-drop-rank-cell"
+                      data-gathering-task-drop-rank-cell
+                    >
+                      <IconButton
+                        class="manager-drop-rank-button"
+                        ariaLabel={text(
+                          'FABRICATE.Admin.Manager.Environment.Tasks.MoveDropUp',
+                          'Move drop up'
+                        )}
+                        title={text(
+                          'FABRICATE.Admin.Manager.Environment.Tasks.MoveDropUp',
+                          'Move drop up'
+                        )}
+                        disabled={rankIndex <= 0}
+                        data-gathering-task-drop-move="up"
+                        onclick={(event) => {
+                          event.stopPropagation();
+                          onMoveDrop(row.id, 'up');
+                        }}
+                        onkeydown={(event) => event.stopPropagation()}
                       >
-                    {:else if visibleModifierEntries(row).length > 0}
-                      {#each visibleModifierEntries(row) as modifier (modifier.id)}
-                        <Chip
-                          tone={modifierTone(modifier)}
-                          icon={modifierIcon(modifier)}
-                          class="manager-drop-modifier-pill"
-                        >
-                          <span>{modifierLabel(modifier)}</span>
-                          {#if modifier.kind !== 'character'}
-                            <strong>{modifierValueLabel(modifier)}</strong>
-                          {/if}
-                        </Chip>
-                      {/each}
+                        <i class="fas fa-chevron-up" aria-hidden="true"></i>
+                      </IconButton>
+                      <span class="manager-drop-rank-value" data-gathering-task-drop-rank
+                        >#{rankIndex + 1}</span
+                      >
+                      <IconButton
+                        class="manager-drop-rank-button"
+                        ariaLabel={text(
+                          'FABRICATE.Admin.Manager.Environment.Tasks.MoveDropDown',
+                          'Move drop down'
+                        )}
+                        title={text(
+                          'FABRICATE.Admin.Manager.Environment.Tasks.MoveDropDown',
+                          'Move drop down'
+                        )}
+                        disabled={rankIndex < 0 || rankIndex >= dropRows.length - 1}
+                        data-gathering-task-drop-move="down"
+                        onclick={(event) => {
+                          event.stopPropagation();
+                          onMoveDrop(row.id, 'down');
+                        }}
+                        onkeydown={(event) => event.stopPropagation()}
+                      >
+                        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                      </IconButton>
+                    </span>
+                  {/if}
+                  <span
+                    role="cell"
+                    class="manager-drop-cell manager-drop-component-cell"
+                    data-gathering-task-drop-component-cell
+                  >
+                    {#if row.componentId || row.itemUuid}
+                      <button
+                        type="button"
+                        class="manager-gathering-task-identity manager-drop-component-button"
+                        title={text(
+                          'FABRICATE.Admin.Manager.Environment.Tasks.ClearDropComponentHint',
+                          'Right-click to clear component'
+                        )}
+                        onclick={(event) => {
+                          event.stopPropagation();
+                          onSelectDrop(row.id);
+                        }}
+                        onkeydown={(event) => event.stopPropagation()}
+                        onmousedown={(event) => onDropComponentMouseDown(row.id, event)}
+                        oncontextmenu={(event) => onClearDropComponent(row.id, event)}
+                      >
+                        <img
+                          class="manager-gathering-task-thumb"
+                          src={componentImage(row)}
+                          alt=""
+                        />
+                        <span class="manager-system-copy">
+                          <span class="manager-system-name">{componentLabel(row)}</span>
+                        </span>
+                      </button>
                     {:else}
-                      <Chip tone="neutral"
-                        >{text(
-                          'FABRICATE.Admin.Manager.Environment.Tasks.NoModifiers',
-                          'Not specified'
-                        )}</Chip
+                      <div
+                        class="manager-gathering-task-identity manager-drop-empty-component is-empty"
                       >
+                        <span
+                          class="manager-inline-drop-zone"
+                          data-gathering-task-drop-zone={row.id}
+                          data-gathering-task-inline-drop-zone={row.id}
+                        >
+                          <i class="fas fa-file-import" aria-hidden="true"></i>
+                        </span>
+                        <span class="manager-system-copy">
+                          <span class="manager-system-name"
+                            >{text(
+                              'FABRICATE.Admin.Manager.Environment.Tasks.NoComponent',
+                              'No Component'
+                            )}</span
+                          >
+                          <span class="manager-system-description"
+                            >{text(
+                              'FABRICATE.Admin.Manager.Environment.Tasks.CreateOrAssign',
+                              'Create or assign'
+                            )}</span
+                          >
+                        </span>
+                      </div>
                     {/if}
                   </span>
-                </span>
-              </div>
-            {/each}
-          </div>
-        {/if}
-      </section>
+                  <span
+                    role="cell"
+                    class="manager-drop-cell manager-drop-rate-cell"
+                    data-gathering-task-drop-chance-cell
+                  >
+                    <ChanceSlider
+                      value={dropRateValue(row)}
+                      numberLabel={text(
+                        'FABRICATE.Admin.Manager.Environment.Tasks.DropChancePercent',
+                        'Drop chance percent'
+                      )}
+                      rangeLabel={text(
+                        'FABRICATE.Admin.Manager.Environment.Tasks.DropChance',
+                        'Drop chance'
+                      )}
+                      resolveColor={dropRateTierColor}
+                      controlClass={dropRateTierClass(row.dropRate)}
+                      stopPropagation={true}
+                      onChange={(dropRate) => onUpdateDrop(row.id, { dropRate })}
+                    />
+                  </span>
+                  <span role="cell" class="manager-drop-cell manager-drop-quantity-cell">
+                    <input
+                      type="text"
+                      inputmode="numeric"
+                      pattern={'[1-9][0-9]{0,2}'}
+                      value={quantityValue(row)}
+                      aria-label={text(
+                        'FABRICATE.Admin.Manager.Environment.Tasks.Quantity',
+                        'Quantity'
+                      )}
+                      oninput={(event) => onQuantityInput(row.id, event)}
+                      onblur={(event) => onQuantityBlur(row, event)}
+                      onclick={(event) => event.stopPropagation()}
+                      onkeydown={(event) => onQuantityKeydown(row, event)}
+                    />
+                  </span>
+                  <span role="cell" class="manager-drop-cell manager-chip-row">
+                    <span class="manager-drop-modifier-list">
+                      {#if hasModifierOverflow(row)}
+                        <Chip tone="neutral" class="manager-drop-modifier-overflow"
+                          >{text(
+                            'FABRICATE.Admin.Manager.Environment.Tasks.DropModifierOverflowHint',
+                            'See selected rule for modifiers'
+                          )}</Chip
+                        >
+                      {:else if visibleModifierEntries(row).length > 0}
+                        {#each visibleModifierEntries(row) as modifier (modifier.id)}
+                          <Chip
+                            tone={modifierTone(modifier)}
+                            icon={modifierIcon(modifier)}
+                            class="manager-drop-modifier-pill"
+                          >
+                            <span>{modifierLabel(modifier)}</span>
+                            {#if modifier.kind !== 'character'}
+                              <strong>{modifierValueLabel(modifier)}</strong>
+                            {/if}
+                          </Chip>
+                        {/each}
+                      {:else}
+                        <Chip tone="neutral"
+                          >{text(
+                            'FABRICATE.Admin.Manager.Environment.Tasks.NoModifiers',
+                            'Not specified'
+                          )}</Chip
+                        >
+                      {/if}
+                    </span>
+                  </span>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </section>
 
-      <div class="manager-task-drop-footer">
-        <span class="manager-muted manager-drop-count" data-gathering-task-drop-count
-          >{text(
-            'FABRICATE.Admin.Manager.Environment.Tasks.ShowingDrops',
-            'Showing {start}-{end} of {total} drops'
-          )
-            .replace('{start}', showingStart)
-            .replace('{end}', showingEnd)
-            .replace('{total}', filteredRows.length)}</span
-        >
-        <Pagination
-          totalCount={filteredRows.length}
-          {pageSize}
-          {pageIndex}
-          onPageChange={(next) => (pageIndex = next)}
-          onPageSizeChange={(next) => {
-            pageSize = next;
-            pageIndex = 0;
-          }}
-        />
-      </div>
-    </section>
+        <div class="manager-task-drop-footer">
+          <span class="manager-muted manager-drop-count" data-gathering-task-drop-count
+            >{text(
+              'FABRICATE.Admin.Manager.Environment.Tasks.ShowingDrops',
+              'Showing {start}-{end} of {total} drops'
+            )
+              .replace('{start}', showingStart)
+              .replace('{end}', showingEnd)
+              .replace('{total}', filteredRows.length)}</span
+          >
+          <Pagination
+            totalCount={filteredRows.length}
+            {pageSize}
+            {pageIndex}
+            onPageChange={(next) => (pageIndex = next)}
+            onPageSizeChange={(next) => {
+              pageSize = next;
+              pageIndex = 0;
+            }}
+          />
+        </div>
+      </section>
 
       <section class="manager-warning-band is-formula">
         <i class="fas fa-calculator" aria-hidden="true"></i>
@@ -2618,7 +2622,17 @@
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-bg-3);
+  }
+
+  .manager-task-stamina-card,
+  .manager-task-nodes-card,
+  .manager-task-dc-card {
     box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
+  }
+
+  .manager-task-resolution-card,
+  .manager-task-results-card {
+    border-radius: 9px;
   }
 
   .manager-task-results-card :global(.manager-recipe-results-section) {
@@ -2641,7 +2655,7 @@
     min-width: 0;
     padding: var(--fab-space-2) var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
+    border-radius: 9px;
     background: var(--fab-bg-2);
   }
 

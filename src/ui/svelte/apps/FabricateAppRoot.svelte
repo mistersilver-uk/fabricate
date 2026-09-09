@@ -754,15 +754,20 @@
     min-width: 0;
   }
 
+  .fabricate-app-topbar.has-journal-clock {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    background: var(--fab-surface-soft);
+    border-bottom: 1px solid var(--fab-border);
+  }
+
   .fabricate-app-topbar.has-journal-clock :global(.fabricate-app-actor-bar) {
-    padding-right: 210px;
+    border-bottom: 0;
   }
 
   .fabricate-app-journal-clock {
-    position: absolute;
-    top: 50%;
-    right: var(--fab-space-4);
-    transform: translateY(-50%);
+    margin-right: var(--fab-space-4);
   }
 
   .fabricate-app-content {
