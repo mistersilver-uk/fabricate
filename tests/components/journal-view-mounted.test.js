@@ -11,6 +11,7 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
+import english from '../../lang/en.json' with { type: 'json' };
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
@@ -135,7 +136,16 @@ async function settle() {
 }
 
 describe('JournalView mounted behavior', () => {
-  before(() => harness.setup());
+  before(async () => {
+    await harness.setup();
+    const localize = globalThis.game.i18n.localize;
+    globalThis.game.i18n.localize = (key) => {
+      const prefix = 'FABRICATE.App.Journal.WhatToExpect.';
+      return key.startsWith(prefix)
+        ? english.FABRICATE.App.Journal.WhatToExpect[key.slice(prefix.length)] ?? key
+        : localize(key);
+    };
+  });
   afterEach(() => harness.remount());
   after(() => harness.teardown());
 
@@ -545,6 +555,8 @@ describe('JournalView mounted behavior', () => {
       timeGate: { availableAt: 100, initiatedAt: 0, requiredSeconds: 100 },
     };
     const run = makeCraftingRun({
+      lifecycleContract: 'current',
+      lifecycleVersion: 1,
       derivedStatus: 'ready',
       steps: [step],
       currentStep: step,

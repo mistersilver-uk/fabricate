@@ -63,7 +63,7 @@ function createSecureRandomId(webCrypto) {
   return () => {
     if (typeof webCrypto?.randomUUID === 'function') return webCrypto.randomUUID();
     if (typeof webCrypto?.getRandomValues !== 'function') {
-      throw new Error('Secure random ID API unavailable');
+      throw new TypeError('Secure random ID API unavailable');
     }
     const bytes = webCrypto.getRandomValues(new Uint8Array(16));
     return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
