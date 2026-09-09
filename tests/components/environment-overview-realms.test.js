@@ -211,9 +211,8 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     }));
 
     const field = target.querySelector('[data-environment-field="includedRealmIds"]');
-    assert.equal(
-      field.querySelector('select'),
-      null,
+    assert.ok(
+      !field.querySelector('select'),
       'the precondition IS the defect: every realm is selected, so the add control is gone'
     );
 
