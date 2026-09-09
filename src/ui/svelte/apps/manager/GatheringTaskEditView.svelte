@@ -17,12 +17,16 @@
   import IconButton from '../../components/IconButton.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import SearchablePopover from '../../components/SearchablePopover.svelte';
+  import RadioCardGroup from '../../components/RadioCardGroup.svelte';
+  import RecipeResultsSection from './recipe/RecipeResultsSection.svelte';
+  import RecipeResultGroupCard from './recipe/RecipeResultGroupCard.svelte';
 
   let {
     task = null,
     staminaEnabled = false,
     nodesEnabled = false,
-    resolutionMode = 'd100',
+    resolutionMode = null,
+    routedOutcomeTiers = [],
     itemCards = [],
     managedItemOptions = [],
     weatherOptions = [],
@@ -54,6 +58,90 @@
     onAddToolReference = () => {},
     onRemoveToolReference = () => {},
   } = $props();
+
+  const AUTHORABLE_RESOLUTION_MODES = new Set(['straight', 'd100', 'routed']);
+  const KNOWN_RESOLUTION_MODES = new Set([...AUTHORABLE_RESOLUTION_MODES, 'progressive']);
+  const taskResolutionMode = $derived(
+    KNOWN_RESOLUTION_MODES.has(resolutionMode)
+      ? resolutionMode
+      : KNOWN_RESOLUTION_MODES.has(task?.resolutionMode)
+        ? task.resolutionMode
+        : 'd100'
+  );
+  const resultGroups = $derived(Array.isArray(task?.resultGroups) ? task.resultGroups : []);
+  const resolutionModeOptions = [
+    {
+      value: 'straight',
+      icon: 'fas fa-gift',
+      labelKey: 'FABRICATE.Admin.Manager.Environment.Tasks.Resolution.Straight',
+      fallback: 'Direct',
+      descKey: 'FABRICATE.Admin.Manager.Environment.Tasks.Resolution.StraightDesc',
+      descFallback: 'Awards every item in one result set without rolling for yields.',
+    },
+    {
+      value: 'd100',
+      icon: 'fas fa-dice-d20',
+      labelKey: 'FABRICATE.Admin.Manager.Environment.Tasks.Resolution.D100',
+      fallback: 'd100',
+      descKey: 'FABRICATE.Admin.Manager.Environment.Tasks.Resolution.D100Desc',
+      descFallback: 'Rolls once against this task’s drop rows.',
+    },
+    {
+      value: 'routed',
+      icon: 'fas fa-route',
+      labelKey: 'FABRICATE.Admin.Manager.Environment.Tasks.Resolution.Routed',
+      fallback: 'Check',
+      descKey: 'FABRICATE.Admin.Manager.Environment.Tasks.Resolution.RoutedDesc',
+      descFallback: 'A gathering-check tier selects the same-named result set.',
+    },
+  ];
+
+  function setTaskResolutionMode(mode) {
+    if (!AUTHORABLE_RESOLUTION_MODES.has(mode)) return;
+    onUpdateTask({ resolutionMode: mode });
+  }
+
+  function normalizeRoutedName(value) {
+    return String(value || '').trim().toLowerCase();
+  }
+
+  const routedTierMatches = $derived(
+    (Array.isArray(routedOutcomeTiers) ? routedOutcomeTiers : []).map((tier) => {
+      const normalizedName = normalizeRoutedName(tier?.name);
+      return {
+        ...tier,
+        matchCount: normalizedName
+          ? resultGroups.filter((group) => normalizeRoutedName(group?.name) === normalizedName)
+              .length
+          : 0,
+      };
+    })
+  );
+
+  function newResultGroupId() {
+    const random = globalThis.foundry?.utils?.randomID;
+    return typeof random === 'function'
+      ? random()
+      : `gathering-group-${Math.random().toString(36).slice(2, 12)}`;
+  }
+
+  function updateResultGroups(nextGroups) {
+    onUpdateTask({ resultGroups: nextGroups });
+  }
+
+  function updateRoutedResultGroup(index, nextGroup) {
+    updateResultGroups(
+      resultGroups.map((group, groupIndex) => (groupIndex === index ? nextGroup : group))
+    );
+  }
+
+  function addRoutedResultGroup() {
+    updateResultGroups([...resultGroups, { id: newResultGroupId(), name: '', results: [] }]);
+  }
+
+  function removeRoutedResultGroup(index) {
+    updateResultGroups(resultGroups.filter((_, groupIndex) => groupIndex !== index));
+  }
 
   let searchTerm = $state('');
   let pageIndex = $state(0);
@@ -567,7 +655,7 @@
   // only for routed; d100 has no DC either). null = use the system gathering
   // check default DC. The Stepper renders an unset value blank on its own
   // (allowUnset), so this only normalizes `undefined` to `null`.
-  const dcOverrideEnabled = $derived(resolutionMode === 'routed');
+  const dcOverrideEnabled = $derived(taskResolutionMode === 'routed');
   const dcOverrideValue = $derived(task?.dcOverride ?? null);
   function updateDcOverride(value) {
     if (value === null || value === undefined) {
@@ -1029,6 +1117,42 @@
           </Field>
         </div>
       </div>
+    </section>
+
+    <section class="manager-task-resolution-card" data-gathering-task-resolution>
+      {@render taskCardHeader(
+        text(
+          'FABRICATE.Admin.Manager.Environment.Tasks.Resolution.Title',
+          'Gathering resolution'
+        ),
+        text(
+          'FABRICATE.Admin.Manager.Environment.Tasks.Resolution.Hint',
+          'Choose how this task turns an attempt into gathered results.'
+        )
+      )}
+      {#if taskResolutionMode === 'progressive'}
+        <div class="manager-warning-band" data-gathering-progressive-legacy>
+          <i class="fas fa-clock-rotate-left" aria-hidden="true"></i>
+          <span
+            >{text(
+              'FABRICATE.Admin.Manager.Environment.Tasks.Resolution.ProgressiveLegacy',
+              'This legacy task keeps its Progressive runtime behavior. Choose Direct, d100, or Check to replace it; Progressive is not available for new task authoring.'
+            )}</span
+          >
+        </div>
+      {/if}
+      <RadioCardGroup
+        legendKey="FABRICATE.Admin.Manager.Environment.Tasks.Resolution.Title"
+        legend="Gathering resolution"
+        options={resolutionModeOptions}
+        selectedValue={taskResolutionMode}
+        groupName={`gathering-task-resolution-${task.id}`}
+        columns={3}
+        legendVisible={false}
+        dataAttr="data-gathering-task-resolution-mode"
+        optionDataAttr="data-gathering-task-resolution-option"
+        onChange={setTaskResolutionMode}
+      />
     </section>
 
     <section class="manager-task-availability-card">
@@ -1768,7 +1892,135 @@
       {/if}
     </section>
 
-    <section class="manager-task-component-browser-card" data-gathering-task-component-browser>
+    {#if taskResolutionMode === 'straight'}
+      <section class="manager-task-results-card" data-gathering-task-results="straight">
+        {@render taskCardHeader(
+          text('FABRICATE.Admin.Manager.Environment.Tasks.Results.Title', 'Results'),
+          text(
+            'FABRICATE.Admin.Manager.Environment.Tasks.Results.StraightHint',
+            'Direct gathering awards every item in this one result set without a yield roll.'
+          )
+        )}
+        <RecipeResultsSection
+          resultGroups={resultGroups}
+          componentOptions={managedItemOptions}
+          idPrefix="gathering-task-"
+          onChange={updateResultGroups}
+        />
+      </section>
+    {:else if taskResolutionMode === 'routed'}
+      <section class="manager-task-results-card" data-gathering-task-results="routed">
+        {@render taskCardHeader(
+          text('FABRICATE.Admin.Manager.Environment.Tasks.Results.RoutedTitle', 'Results by check'),
+          text(
+            'FABRICATE.Admin.Manager.Environment.Tasks.Results.RoutedHint',
+            'Name each result set after a gathering-check tier. Matching ignores surrounding spaces and letter case.'
+          )
+        )}
+
+        {#if routedTierMatches.length === 0}
+          <div class="manager-warning-band" data-gathering-routed-no-tiers>
+            <i class="fas fa-circle-info" aria-hidden="true"></i>
+            <span
+              >{text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.Results.NoRoutedTiers',
+                'Define outcome tiers in the gathering check before routing result sets.'
+              )}</span
+            >
+          </div>
+        {:else}
+          <ul class="manager-gathering-routed-tier-list" data-gathering-routed-tier-list>
+            {#each routedTierMatches as tier (tier.id)}
+              <li
+                data-gathering-routed-tier-status={tier.id}
+                data-match-count={tier.matchCount}
+                class:is-matched={tier.matchCount === 1}
+                class:is-mismatched={tier.matchCount !== 1}
+              >
+                <i
+                  class={tier.matchCount === 1
+                    ? 'fas fa-check-circle'
+                    : 'fas fa-triangle-exclamation'}
+                  aria-hidden="true"
+                ></i>
+                <span class="manager-gathering-routed-tier-name">{tier.name}</span>
+                <Chip tone={tier.matchCount === 1 ? 'positive' : 'warning'}>
+                  {tier.matchCount === 1
+                    ? text(
+                        'FABRICATE.Admin.Manager.Environment.Tasks.Results.Matched',
+                        'Matched'
+                      )
+                    : text(
+                        'FABRICATE.Admin.Manager.Environment.Tasks.Results.MatchCount',
+                        '{count} matching sets'
+                      ).replace('{count}', tier.matchCount)}
+                </Chip>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+
+        {#if resultGroups.length === 0}
+          <EmptyState
+            compact
+            icon="fas fa-gift"
+            title={text(
+              'FABRICATE.Admin.Manager.Environment.Tasks.Results.Empty',
+              'No result sets yet'
+            )}
+            hint={text(
+              'FABRICATE.Admin.Manager.Environment.Tasks.Results.EmptyHint',
+              'Add a named set for each gathering-check tier that can produce results.'
+            )}
+          >
+            <ManagerButton
+              role="dashed"
+              fullWidth
+              data-gathering-add-result-set="empty"
+              onclick={addRoutedResultGroup}
+            >
+              <i class="fas fa-plus" aria-hidden="true"></i>
+              <span
+                >{text(
+                  'FABRICATE.Admin.Manager.Environment.Tasks.Results.AddSet',
+                  'Add result set'
+                )}</span
+              >
+            </ManagerButton>
+          </EmptyState>
+        {:else}
+          <ul class="manager-recipe-result-groups">
+            {#each resultGroups as group, index (group?.id || index)}
+              <li class="manager-recipe-result-group-item">
+                <RecipeResultGroupCard
+                  {group}
+                  componentOptions={managedItemOptions}
+                  onChange={(nextGroup) => updateRoutedResultGroup(index, nextGroup)}
+                  onRemove={() => removeRoutedResultGroup(index)}
+                />
+              </li>
+            {/each}
+          </ul>
+          <ManagerButton
+            role="dashed"
+            fullWidth
+            data-gathering-add-result-set="footer"
+            onclick={addRoutedResultGroup}
+          >
+            <i class="fas fa-plus" aria-hidden="true"></i>
+            <span
+              >{text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.Results.AddSet',
+                'Add result set'
+              )}</span
+            >
+          </ManagerButton>
+        {/if}
+      </section>
+    {/if}
+
+    {#if taskResolutionMode === 'd100'}
+      <section class="manager-task-component-browser-card" data-gathering-task-component-browser>
       <div class="manager-task-card-header">
         <div class="manager-task-drop-header-copy">
           <h3>
@@ -2287,15 +2539,16 @@
       </div>
     </section>
 
-    <section class="manager-warning-band is-formula">
-      <i class="fas fa-calculator" aria-hidden="true"></i>
-      <span
-        >{text(
-          'FABRICATE.Admin.Manager.Environment.Tasks.DropCalculationHelp',
-          'Final drop chance = base chance + matching drop-level time/weather modifiers. Gathering modifiers affect the d100 roll.'
-        )}</span
-      >
-    </section>
+      <section class="manager-warning-band is-formula">
+        <i class="fas fa-calculator" aria-hidden="true"></i>
+        <span
+          >{text(
+            'FABRICATE.Admin.Manager.Environment.Tasks.DropCalculationHelp',
+            'Final drop chance = base chance + matching drop-level time/weather modifiers. Gathering modifiers affect the d100 roll.'
+          )}</span
+        >
+      </section>
+    {/if}
   {:else}
     <EmptyState
       icon="fas fa-list-check"
@@ -2331,7 +2584,9 @@
   /* Card chrome matching the other task-editor cards. */
   .manager-task-stamina-card,
   .manager-task-nodes-card,
-  .manager-task-dc-card {
+  .manager-task-dc-card,
+  .manager-task-resolution-card,
+  .manager-task-results-card {
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -2341,6 +2596,44 @@
     border-radius: 8px;
     background: var(--fab-bg-3);
     box-shadow: inset 0 1px 0 var(--fab-overlay-light-06);
+  }
+
+  .manager-task-results-card :global(.manager-recipe-results-section) {
+    display: grid;
+    gap: var(--fab-space-3);
+  }
+
+  .manager-gathering-routed-tier-list {
+    display: grid;
+    gap: var(--fab-space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .manager-gathering-routed-tier-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--fab-space-2);
+    min-width: 0;
+    padding: var(--fab-space-2) var(--fab-space-3);
+    border: 1px solid var(--fab-border);
+    border-radius: 8px;
+    background: var(--fab-bg-2);
+  }
+
+  .manager-gathering-routed-tier-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 600;
+  }
+
+  .manager-gathering-routed-tier-list .is-matched > i {
+    color: var(--fab-success-text);
+  }
+
+  .manager-gathering-routed-tier-list .is-mismatched > i {
+    color: var(--fab-warning-text);
   }
 
   /* The DC override is a single field on an otherwise empty card, so nothing in the chain

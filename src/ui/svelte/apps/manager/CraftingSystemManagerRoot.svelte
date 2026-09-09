@@ -4792,6 +4792,13 @@
       null
   );
   const editingGatheringTask = $derived(gatheringTaskDraft || selectedGatheringTask);
+  const gatheringTaskResolutionMode = $derived(editingGatheringTask?.resolutionMode || 'd100');
+  const gatheringTaskRoutedOutcomeTiers = $derived.by(() =>
+    routedTierOptionsForPolicy(
+      selectedSystem?.gatheringCraftingCheck?.routed,
+      selectedSystem?.gatheringCraftingCheck?.failureResultPolicy
+    )
+  );
   const selectedGatheringDrop = $derived(
     gatheringTaskDropRows(editingGatheringTask).find((row) => row.id === selectedGatheringDropId) ||
       gatheringTaskDropRows(editingGatheringTask)[0] ||
@@ -13108,7 +13115,8 @@
         task={editingGatheringTask}
         staminaEnabled={selectedGatheringTaskStaminaEnabled}
         nodesEnabled={selectedGatheringTaskNodesEnabled}
-        resolutionMode={gatheringResolutionMode}
+        resolutionMode={editingGatheringTask?.resolutionMode || 'd100'}
+        routedOutcomeTiers={gatheringTaskRoutedOutcomeTiers}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={gatheringConditionOptions('weather')}
@@ -13802,7 +13810,7 @@
               {/if}
 
               {#if currentView === 'gathering-task-edit'}
-                {#if selectedGatheringDrop}
+                {#if gatheringTaskResolutionMode === 'd100' && selectedGatheringDrop}
                   <div class="manager-drop-inspector-stack" data-gathering-task-drop-inspector>
                     <section
                       class="fabricate-card manager-inspector-card manager-drop-editor-header-card"
