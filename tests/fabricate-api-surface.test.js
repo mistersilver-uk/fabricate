@@ -319,6 +319,20 @@ test('Fabricate exposes the versioned Journal command and per-user dismissal sea
     mainSource.includes("Hooks.on('deleteJournalEntryPage', refreshJournalRunAuthorityAvailability)"),
     'embedded authority-claim release should refresh the synchronous availability cache'
   );
+  assert.ok(
+    mainSource.includes(
+      'emit: (message, options) => game.socket?.emit(EVENT_SCENE_SOCKET, message, options)'
+    ),
+    'journal command replies should pass targeted-recipient options to the Foundry socket'
+  );
+  assert.ok(
+    mainSource.includes("Hooks.on('updateUser', bootstrapJournalRunAuthority)"),
+    'a GM election update should trigger guarded recovery bootstrap in the newly active realm'
+  );
+  assert.ok(
+    mainSource.includes("Hooks.on('userConnected', bootstrapJournalRunAuthority)"),
+    'a GM connection transition should trigger guarded recovery bootstrap'
+  );
 });
 
 test('player-facing starts explicitly select the current journal lifecycle', () => {

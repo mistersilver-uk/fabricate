@@ -767,7 +767,7 @@ export function createJournalRunCommandService({
     // tab's eventual settled reply.
     if (['claim-held', 'recovery-pending'].includes(response?.reason)) return null;
     const reply = buildReply(payload, senderId, response);
-    emit(reply);
+    emit(reply, { recipients: [senderId] });
     return reply;
   }
 

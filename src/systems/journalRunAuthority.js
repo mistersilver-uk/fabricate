@@ -97,6 +97,7 @@ export function createJournalRunAuthority({
   async function refreshAvailability() {
     const result = await ledgerResult();
     const activeRealmNeedsRecovery = activeGmMatches(currentUser?.(), activeGM?.());
+    if (!activeRealmNeedsRecovery) recoveryReady = false;
     const available = result.success === true && (!activeRealmNeedsRecovery || recoveryReady);
     cachedAvailability = {
       available,
@@ -162,91 +163,101 @@ export function createJournalRunAuthority({
     return result?.success === true ? result : unavailable('reconstruction-failed');
   }
 
-  function bootstrapRecovery() {
-    return queue(async () => {
-      if (!activeGmMatches(currentUser?.(), activeGM?.())) return refreshAvailability();
-      const requestId = `boot-${randomId()}`;
-      const acquired = await acquire({ requestId });
-      if (!acquired.success) {
-        cachedAvailability = { available: false, reason: acquired.reason };
-        return unavailable(acquired.reason);
-      }
-      const { ledger, claimId } = acquired;
-      if (!activeGmMatches(currentUser?.(), activeGM?.())) {
-        const released = await deleteClaim(ledger, claimId);
-        cachedAvailability = {
-          available: false,
-          reason: released ? 'active-gm-required' : 'claim-release-failed',
-        };
-        return unavailable(cachedAvailability.reason);
-      }
-
-      const state = normalizedState(await readState(ledger));
-      state.requests[requestId] = {
-        kind: 'bootRecovery',
-        operationId: null,
-        status: 'processing',
-        senderId: currentUser?.()?.id ?? null,
-        sessionId: null,
-        startedAt: now(),
-        claimId,
+  // This body always runs within localQueue, including the opportunistic recovery in run().
+  async function performBootstrapRecovery() {
+    if (!activeGmMatches(currentUser?.(), activeGM?.())) {
+      recoveryReady = false;
+      return refreshAvailability();
+    }
+    if (recoveryReady) {
+      const availability = await refreshAvailability();
+      return availability.available ? { success: true } : unavailable(availability.reason);
+    }
+    const requestId = `boot-${randomId()}`;
+    const acquired = await acquire({ requestId });
+    if (!acquired.success) {
+      cachedAvailability = { available: false, reason: acquired.reason };
+      return unavailable(acquired.reason);
+    }
+    const { ledger, claimId } = acquired;
+    if (!activeGmMatches(currentUser?.(), activeGM?.())) {
+      const released = await deleteClaim(ledger, claimId);
+      cachedAvailability = {
+        available: false,
+        reason: released ? 'active-gm-required' : 'claim-release-failed',
       };
-      try {
-        await writeState(ledger, state);
-        const result = await reconstruct({ operationId: null, orphaned: true });
-        if (result.success !== true) throw new Error(result.reason);
-      } catch {
-        state.requests[requestId] = {
-          ...state.requests[requestId],
-          status: 'recoveryRequired',
-          settledAt: now(),
-          response: unavailable('reconstruction-failed', { claimId }),
-        };
-        try {
-          await writeState(ledger, state);
-        } catch {
-          // The embedded claim remains the durable stop signal when state persistence is uncertain.
-        }
-        cachedAvailability = { available: false, reason: 'recovery-required' };
-        return unavailable('reconstruction-failed', { claimId });
-      }
+      return unavailable(cachedAvailability.reason);
+    }
 
-      if (!activeGmMatches(currentUser?.(), activeGM?.())) {
-        state.requests[requestId] = {
-          ...state.requests[requestId],
-          status: 'recoveryRequired',
-          settledAt: now(),
-          response: unavailable('active-gm-required', { claimId }),
-        };
-        try {
-          await writeState(ledger, state);
-        } catch {
-          // Preserve the claim when either election or persistence became uncertain.
-        }
-        cachedAvailability = { available: false, reason: 'recovery-required' };
-        return unavailable('active-gm-required', { claimId });
-      }
-
+    const state = normalizedState(await readState(ledger));
+    state.requests[requestId] = {
+      kind: 'bootRecovery',
+      operationId: null,
+      status: 'processing',
+      senderId: currentUser?.()?.id ?? null,
+      sessionId: null,
+      startedAt: now(),
+      claimId,
+    };
+    try {
+      await writeState(ledger, state);
+      const result = await reconstruct({ operationId: null, orphaned: true });
+      if (result.success !== true) throw new Error(result.reason);
+    } catch {
       state.requests[requestId] = {
         ...state.requests[requestId],
-        status: 'settled',
+        status: 'recoveryRequired',
         settledAt: now(),
-        response: { success: true, reconstructed: true },
-        claimId: null,
+        response: unavailable('reconstruction-failed', { claimId }),
       };
       try {
         await writeState(ledger, state);
       } catch {
-        cachedAvailability = { available: false, reason: 'recovery-required' };
-        return unavailable('reconstruction-failed', { claimId });
+        // The embedded claim remains the durable stop signal when state persistence is uncertain.
       }
-      const released = await deleteClaim(ledger, claimId);
-      recoveryReady = released;
-      cachedAvailability = released
-        ? { available: true, reason: null }
-        : { available: false, reason: 'claim-release-failed' };
-      return released ? { success: true } : unavailable('claim-release-failed');
-    });
+      cachedAvailability = { available: false, reason: 'recovery-required' };
+      return unavailable('reconstruction-failed', { claimId });
+    }
+
+    if (!activeGmMatches(currentUser?.(), activeGM?.())) {
+      state.requests[requestId] = {
+        ...state.requests[requestId],
+        status: 'recoveryRequired',
+        settledAt: now(),
+        response: unavailable('active-gm-required', { claimId }),
+      };
+      try {
+        await writeState(ledger, state);
+      } catch {
+        // Preserve the claim when either election or persistence became uncertain.
+      }
+      cachedAvailability = { available: false, reason: 'recovery-required' };
+      return unavailable('active-gm-required', { claimId });
+    }
+
+    state.requests[requestId] = {
+      ...state.requests[requestId],
+      status: 'settled',
+      settledAt: now(),
+      response: { success: true, reconstructed: true },
+      claimId: null,
+    };
+    try {
+      await writeState(ledger, state);
+    } catch {
+      cachedAvailability = { available: false, reason: 'recovery-required' };
+      return unavailable('reconstruction-failed', { claimId });
+    }
+    const released = await deleteClaim(ledger, claimId);
+    recoveryReady = released;
+    cachedAvailability = released
+      ? { available: true, reason: null }
+      : { available: false, reason: 'claim-release-failed' };
+    return released ? { success: true } : unavailable('claim-release-failed');
+  }
+
+  function bootstrapRecovery() {
+    return queue(performBootstrapRecovery);
   }
 
   async function acquire(request) {
@@ -311,9 +322,14 @@ export function createJournalRunAuthority({
 
   function run(request, handler) {
     return queue(async () => {
+      if (!activeGmMatches(currentUser?.(), activeGM?.())) {
+        recoveryReady = false;
+        await refreshAvailability();
+        return unavailable('active-gm-required');
+      }
       if (!recoveryReady) {
-        const availability = await refreshAvailability();
-        return unavailable(availability.reason);
+        const boot = await performBootstrapRecovery();
+        if (!boot.success) return boot;
       }
       const acquired = await acquire(request);
       if (!acquired.success) {
