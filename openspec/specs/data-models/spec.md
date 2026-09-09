@@ -2978,6 +2978,59 @@ Result = {
 2. `quantity` must be positive.
 3. `propertyMacroUuid` is only valid when `features.propertyMacros` is true.
 
+## Versioned Run Lifecycle
+
+Applicable crafting runs, including alchemy, and gathering runs share these optional persisted fields.
+Salvage retains its existing contract.
+
+```js
+RunLifecycle = {
+  lifecycleVersion: 1,
+  runRevision: number, // non-negative integer; starts at zero
+  completionMode: "manual" | "worldTime", // new runs default to manual
+  pauseState?: { pausedAt: number, remainingSeconds: number },
+  pausedDurationSeconds: number, // starts at zero
+  executionJournal?: {
+    operationId: string,
+    requestId: string,
+    baseRunRevision: number,
+    status: "planned" | "committed" | "recoveryRequired",
+    intent: object | null,
+    effects: Array<{
+      effectId: string,
+      kind: string,
+      planned: object | null,
+      phase: "planned" | "applying" | "applied",
+      receipt?: object | null,
+    }>,
+    outcome?: object | null,
+  },
+}
+```
+
+### Requirements
+
+1. Only an absent `lifecycleVersion` selects legacy behavior, preserving existing consumption, refunds and automatic progression without migration or restamping.
+A present unsupported version remains readable and preserved, but mutation entrypoints refuse it before effects.
+2. New applicable runs explicitly request version 1; ordinary legacy manager callers remain unstamped.
+Accepted versioned mutations advance `runRevision`, and a stale expected revision is refused.
+Revision validation is not a cross-client lock; authoritative command arbitration owns that boundary.
+3. Pause records the current world time and remaining gate seconds, including zero.
+Paused runs retain their selections and completion preference and never mature through world-time processing.
+Resume reanchors readiness at the new world time plus the frozen remainder and accumulates paused duration.
+4. Manual and automatic execution refuse paused runs; cancellation remains available while paused.
+Recovery-required and unsupported-version runs refuse ordinary execution, cancellation and replay.
+5. The shared execution-journal transition implementation persists the complete plan before effects, one effect as `applying` before invoking its seam, and its actual receipt as `applied` afterward.
+Applied effects form a prefix; at most one effect is applying, and later effects remain planned.
+6. Resuming execution after reload with an applying effect, failure after its invocation begins, or inability to persist its receipt requires recovery and never replays the uncertain effect.
+A normal observing-client refresh during live execution does not itself trigger recovery.
+Committed requests return their recorded outcome.
+7. Gathering persists its terminal record with the planned execution journal before effects and updates receipts in that same history record by run ID.
+It does not delay terminal history until effects finish.
+8. Intent, effect plans, receipts and outcomes retain existing secret and blind-run redaction.
+Authority request deduplication and prepare tokens live in the private authority ledger; the run record retains effect evidence.
+9. Stage browsing is transient UI state and never changes the persisted executable stage index.
+
 ## CraftingRun
 
 ### Purpose
@@ -3044,7 +3097,19 @@ CraftingRunStepState = {
 
   selectedIngredientSetId?: string,
 
-  // START-phase consumption snapshot for a time-gated step, written when the gate is ARMED
+  // Versioned current-stage intent; validated again against live requirements before spending.
+  selectionPlan?: {
+    selectedIngredientSetId: string | null,
+    ingredientOptionOverrides: Record<string, { optionIndex: number, heldItemId?: string }>,
+    ingredientEssenceAllocation?: {
+      stepId: string,
+      ingredientSetId: string,
+      allocation: Record<string, number>, // physical item key -> units
+    },
+  },
+  selectedRequirementSnapshot?: object, // full selected authored set, including route/currency/tag/essence
+
+  // Legacy START-phase consumption snapshot for a time-gated step, written when the gate is ARMED
   // and read at FINISH (source items are already deleted) and by the cancel reversal.
   // Absent for instant / non-timed steps and on pre-snapshot historical records.
   preparedConsumption?: {
@@ -3058,7 +3123,7 @@ CraftingRunStepState = {
     }>,
   },
 
-  // Authored ingredient requirements snapshot, captured at run creation (`_buildStepStates`).
+  // Legacy authored ingredient requirements snapshot, captured at run creation (`_buildStepStates`).
   // Component-backed ingredients of the step's primary (first) ingredient set only; tag /
   // essence requirements carry no component id and are omitted. Persisting the stable ids
   // keeps a history entry's requirements intact after the recipe is later edited or deleted.
@@ -3847,7 +3912,7 @@ A step failure is handled entirely by the engine's failure-consumption policy; t
 
 ## Foundry Multi-Write Invariants
 
-When one Fabricate operation uses multiple separate sequential Foundry settings, flag, or document API calls to establish one invariant, it MUST treat the calls as a compensating transaction.
+When one Fabricate operation uses multiple separate sequential Foundry settings, flag, or document API calls to establish one invariant, it MUST treat the calls as a compensating transaction, except for the versioned execution-journal operations specified below.
 Equality of the primary setting, flag, or document value MUST NOT short-circuit the operation when an ancillary invariant may still require repair.
 
 Before the first write, the operation MUST snapshot the complete pre-state needed to restore every affected key or document, including whether each key existed separately from its stored value.
@@ -3859,6 +3924,10 @@ Tests MUST cover a same-primary-value call that repairs an unsatisfied ancillary
 
 This requirement applies only when the application composes separate sequential API calls into one invariant.
 A single Foundry atomic or batched document operation does not require application-level compensation merely because its one API call writes several documents or fields.
+
+Versioned execution-journal operations deliberately use durable intent, ordered effect phases and actual receipts instead of compensating rollback.
+An ambiguous effect requires manual recovery and must never be replayed automatically.
+The journal records the known applied prefix and uncertain boundary; the preceding compensation requirements continue to apply outside this versioned exception.
 
 **Reverse-compensating a delete cannot restore document identity.**
 Value and key presence are restorable; a document's `_id` and its `_stats` are not.
