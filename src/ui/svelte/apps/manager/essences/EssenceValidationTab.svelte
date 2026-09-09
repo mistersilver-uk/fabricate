@@ -93,7 +93,7 @@
     return {
       status: 'pass',
       icon: 'fas fa-circle-check',
-      title: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryAllClear', 'All clear'),
+      title: text('FABRICATE.Admin.Manager.Validation.SummaryAllClear', 'All clear'),
       sub: text(
         'FABRICATE.Admin.Manager.Essence.Validation.AllClearSub',
         'Every structural check passes.'

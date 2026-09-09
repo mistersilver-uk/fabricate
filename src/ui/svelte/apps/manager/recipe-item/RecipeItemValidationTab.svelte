@@ -166,7 +166,7 @@
         }
       : {
           icon: 'fas fa-circle-check',
-          title: text('FABRICATE.Admin.Manager.RecipeItem.Validation.SummaryAllClear', 'All clear'),
+          title: text('FABRICATE.Admin.Manager.Validation.SummaryAllClear', 'All clear'),
           sub: text(
             'FABRICATE.Admin.Manager.RecipeItem.Validation.SummaryAllClearSub',
             'Every check passes. This recipe item is ready to use.'
@@ -188,15 +188,20 @@
     text('FABRICATE.Admin.Manager.RecipeItem.Validation.Title', 'Validation')
   );
 
-  // Two entries, not three: the surface draws the counts it is REPORTED, and this check set
-  // has no warning tier at all (issue 797, decision 1).
-  const countLabels = $derived({
-    passing: text('FABRICATE.Admin.Manager.RecipeItem.Validation.CountPassing', 'Passing'),
-    blocking: text('FABRICATE.Admin.Manager.RecipeItem.Validation.CountBlocking', 'Blocking'),
-  });
-
+  // THE COUNT WORDS ARE NOT PASSED AT ALL, and the STATUS WORDS ARE PASSED FOR ONE WORD
+  // (issue 1517, docs round). `Passing`, `Blocking` and `Pass` were byte-identical copies of the
+  // vocabulary `EditorValidationSurface` already defaults to, written into this namespace — the
+  // second home the design-system requirement's "lives once" sentence forbids. Two entries
+  // rather than three is still what this tab reports, because the surface draws the tiles it is
+  // given a COUNT for and this check set has no warning tier (issue 797, decision 1); dropping
+  // the labels changes nothing about that.
+  //
+  // `block` STAYS ITS OWN WORD, and that is the other half of the same rule. The shared default
+  // is the ENABLE-gated wording — `Blocks enable` — and a recipe item has no enable gate: it
+  // works for players or it does not, which is why its blocked verdict reads `Cannot be used`.
+  // So this surface localizes the one word that is genuinely its own and takes the rest.
   const statusLabels = $derived({
-    pass: text('FABRICATE.Admin.Manager.RecipeItem.Validation.StatusPass', 'Pass'),
+    pass: text('FABRICATE.Admin.Manager.Validation.StatusPass', 'Pass'),
     block: text('FABRICATE.Admin.Manager.RecipeItem.Validation.StatusBlock', 'Block'),
   });
 
@@ -228,7 +233,6 @@
     sub: summaryMeta.sub,
   }}
   counts={{ passing: passingCount, blocking: blockingCount }}
-  {countLabels}
   {groups}
   {statusLabels}
   rowDataAttr="data-recipe-item-check"

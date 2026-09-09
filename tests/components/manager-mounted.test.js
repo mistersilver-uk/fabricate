@@ -23040,6 +23040,79 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
   });
 
+  // ── THE ROW ACTION RE-HOMES THE KEYBOARD AND SAYS WHERE (issue 1517, docs round) ───────────
+  //
+  // This editor wired half of the row action: it selected the record and switched the tab, and
+  // stopped. Activating a row therefore unmounted the very View button that was pressed and
+  // dropped focus onto `<body>` — where `KeyboardManager#hasFocus` is false, so Space pauses the
+  // game, the arrows pan the canvas behind the window and Tab walks out of the application. It is
+  // now the SIXTH host of the shared action.
+  //
+  // ITS ROWS ADDRESS A RECORD, NOT A CONTROL, which is what makes this host's shape different
+  // from the other five and worth its own mounted proof: there is no `data-validation-target`
+  // anywhere on the destination to resolve, so the resolver answers `null` on every activation and
+  // the PANEL fallback is the whole of the focus move here rather than a route-only special case.
+  it('lands the keyboard in the destination panel and announces the record it selected', async () => {
+    mountEnvironmentEditor(environmentDraftWith({}), {
+      compositionMode: 'manual',
+      counts: { availableTasks: 1, availableEvents: 1, includedNotMatchingEvents: 1 },
+      tasks: [describedTask('task-moon-herbs', 'Gather Moon Herbs')],
+      events: [
+        {
+          id: 'event-thorns',
+          kind: 'event',
+          record: { name: 'Thorn Snare', description: 'Tangled thorns.', img: 'icons/svg/hazard.svg' },
+          compositionState: 'includedNotMatching',
+          runtimeState: 'unavailable',
+          evidence: {},
+        },
+      ],
+    });
+
+    const region = target.querySelector('[data-environment-issue-announcement]');
+    assert.ok(Boolean(region), 'the live region exists before it has any text');
+    assert.equal(region.textContent.trim(), '', 'and it is empty until an action has an outcome');
+
+    target.querySelector('[data-environment-issue-action="event"]').click();
+    // A MACROTASK, not a microtask. The focus move is two `queueMicrotask` hops deep — one in
+    // `announceAfterFocusMove`, so Svelte has flushed the route it just wrote, and one inside
+    // `focusValidationTarget`, for the same reason — so an assertion made after `await tick()`
+    // alone reads the pre-hop `document.activeElement` and fails for the wrong reason.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    flushSync();
+
+    assert.equal(
+      target.querySelector('[data-environment-tab-button="events"]').getAttribute('aria-selected'),
+      'true',
+      'the route ran first, so the panel the keyboard is about to land in is the Events one'
+    );
+    const panel = target.querySelector('.manager-environment-tab-panel');
+    // `assert.ok(a === b)` rather than `assert.strictEqual`: on failure `node:assert` serialises a
+    // mounted happy-dom element to build its diff and walks its circular tree until the heap dies,
+    // which surfaces a two-millisecond assertion failure as an unattributable OOM.
+    assert.ok(
+      document.activeElement === panel,
+      'the destination PANEL took the keyboard. Without it focus rests on `<body>`, where every ' +
+        'Foundry keybinding is live'
+    );
+    assert.equal(
+      panel.getAttribute('data-keyboard-focus'),
+      'true',
+      'and it declares itself focused, or Foundry treats the window as unfocused while it holds ' +
+        'the keyboard'
+    );
+    assert.equal(region.textContent.trim(), '', 'the sentence is QUEUED BEHIND the focus move');
+
+    await waitForQueuedAnnouncement();
+
+    assert.equal(
+      region.textContent.trim(),
+      'Events — Thorn Snare',
+      'the sentence names the route and the RECORD the route selected, which is where the GM ' +
+        'now is. The harness localizer returns the key, so the tab word is the English fallback'
+    );
+  });
+
   it('refuses "Saves and enables" for a disabled environment nothing can enable', async () => {
     // `noAvailableTasks` is `critical` on an ACTIVE environment and `warning` on a disabled one —
     // the same missing task, graded by how loud it needs to be — and it carries `blocks: 'enable'`

@@ -73,18 +73,6 @@
     }))
   );
 
-  const counts = $derived.by(() => {
-    let passing = 0;
-    let warnings = 0;
-    let blocking = 0;
-    for (const { readiness } of evaluated) {
-      passing += readiness.checks.filter((check) => check.satisfied).length;
-      warnings += readiness.issues.filter((issue) => issue.severity !== 'critical').length;
-      blocking += readiness.issues.filter((issue) => issue.severity === 'critical').length;
-    }
-    return { passing, warnings, blocking };
-  });
-
   /**
    * WHICH CONTROL EACH ISSUE NAMES — the `data-validation-target` half of a row's address
    * (issue 1517), keyed by ISSUE ID rather than by section.
@@ -212,6 +200,30 @@
     }))
   );
 
+  // THE RAIL IS A TALLY OF THE ROWS ABOVE IT, and it is declared after them for that reason
+  // (issue 1517, docs round). It used to count the readiness objects instead — passing =
+  // satisfied checks, warnings = non-critical ISSUES, blocking = critical ones — and the rows
+  // are not the issues, so two states the tab can reach were drawn and not counted:
+  //
+  //  - an unsatisfied check whose subsystem raised no matching issue paints an amber row that
+  //    nothing tallied, which is the same divergence the environment and recipe rails carried;
+  //  - a subsystem with no tick and no issue at all — a gathering check in `d100` mode with no
+  //    eligible modifiers — draws the "No issues detected." PASS row `rowsFor` synthesises for
+  //    exactly that case, and the old count could not see it either.
+  //
+  // Counting what is rendered closes both without either half having to know about the other.
+  const counts = $derived.by(() => {
+    const tally = { passing: 0, warnings: 0, blocking: 0 };
+    for (const group of groups) {
+      for (const row of group.rows) {
+        if (row.status === 'pass') tally.passing += 1;
+        else if (row.status === 'block') tally.blocking += 1;
+        else tally.warnings += 1;
+      }
+    }
+    return tally;
+  });
+
   // The hero. Three states, and the UNSAVED one is not a decoration: `evaluateCheckReadiness`
   // above ran against the live DRAFT, while enabling the system reads what is committed, so
   // a clean draft is not evidence that the system may be enabled.
@@ -251,6 +263,11 @@
   });
 </script>
 
+<!-- THE COUNT AND PILL WORDS ARE NOT PASSED (issue 1517, docs round). This route wrote
+     `Passing / Warnings / Blocking` and `Pass / Warning / Blocks enable` into its own namespace,
+     byte for byte identical to the vocabulary `EditorValidationSurface` already defaults to —
+     the second home the design-system requirement's "lives once" sentence forbids. Both props
+     are gone and the six keys with them. -->
 <div class="manager-checks-validation-route" data-checks-panel="validation">
   <EditorValidationSurface
     title={text('FABRICATE.Admin.Manager.Checks.Validation.Title', 'Validation')}
@@ -260,17 +277,7 @@
     )}
     {summary}
     {counts}
-    countLabels={{
-      passing: text('FABRICATE.Admin.Manager.Checks.Validation.CountPassing', 'Passing'),
-      warnings: text('FABRICATE.Admin.Manager.Checks.Validation.CountWarnings', 'Warnings'),
-      blocking: text('FABRICATE.Admin.Manager.Checks.Validation.CountBlocking', 'Blocking'),
-    }}
     {groups}
-    statusLabels={{
-      pass: text('FABRICATE.Admin.Manager.Checks.Validation.StatusPass', 'Pass'),
-      warn: text('FABRICATE.Admin.Manager.Checks.Validation.StatusWarn', 'Warning'),
-      block: text('FABRICATE.Admin.Manager.Checks.Validation.StatusBlock', 'Blocks enable'),
-    }}
     rowDataAttr="data-checks-validation-check"
     {onSelectIssue}
   />

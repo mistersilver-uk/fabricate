@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { describeValidationHostContract } from '../helpers/validationAddressContracts.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -74,6 +75,77 @@ describe('RecipeValidationTab (mounted)', () => {
     assert.ok(
       target.querySelector('[data-issue="noName"].is-block'),
       'a blocking issue reads as a BLOCKS ENABLE row'
+    );
+    harness.remount();
+  });
+
+  // ── THE RAIL IS A TALLY OF THE ROWS (issue 1517, docs round) ─────────────────────────────
+  //
+  // `stepsNamed` is the one check in this tab with NO `CHECK_TO_ISSUES` entry, because nothing in
+  // `recipeReadiness.js` raises an issue for an unnamed step. The row builder does not need one —
+  // an unsatisfied check with no owning issue paints `warn` — but the rail used to count the
+  // ISSUES, so this recipe drew an amber row under "Warnings: 0" and a green "All clear" verdict
+  // above it. No fixture in this file reached the state: every other unsatisfied check here pairs
+  // with an issue, so the two readings agreed by accident.
+  const unnamedStepRecipe = {
+    name: 'Refine Ore',
+    enabled: true,
+    steps: [
+      { id: 'step-1', name: 'Crush', ingredientSets: [{ id: 's1' }], resultGroups: [{ id: 'r1' }] },
+      { id: 'step-2', name: '', ingredientSets: [{ id: 's2' }], resultGroups: [{ id: 'r2' }] }
+    ]
+  };
+
+  /** The rail's tiles, as numbers, keyed by the count each one reports. */
+  const railCounts = (target) =>
+    Object.fromEntries(
+      Array.from(target.querySelectorAll('[data-editor-validation-count]')).map((tile) => [
+        tile.getAttribute('data-editor-validation-count'),
+        Number(tile.textContent.trim())
+      ])
+    );
+
+  /** The SAME question asked of the rendered rows: how many of each status is drawn. */
+  const rowStatusTally = (target) => {
+    const tally = { passing: 0, warnings: 0, blocking: 0 };
+    for (const row of target.querySelectorAll('[data-validation-group] .manager-recipe-val-row')) {
+      if (row.classList.contains('is-pass')) tally.passing += 1;
+      if (row.classList.contains('is-warn')) tally.warnings += 1;
+      if (row.classList.contains('is-block')) tally.blocking += 1;
+    }
+    return tally;
+  };
+
+  it('counts an unsatisfied check that raises NO issue, and does not call it all clear', async () => {
+    const target = await harness.mount({ recipe: unnamedStepRecipe });
+
+    assert.equal(
+      target.querySelectorAll('[data-issue]').length,
+      0,
+      'the fixture raises no issue at all, which is what makes the divergence visible'
+    );
+    const stepsRow = target.querySelector('[data-check="stepsNamed"]');
+    assert.ok(Boolean(stepsRow), 'the unnamed step draws its own row');
+    assert.ok(
+      stepsRow.classList.contains('is-warn'),
+      `an unsatisfied check with no owning issue paints amber, got ${stepsRow.className}`
+    );
+    assert.equal(railCounts(target).warnings, 1, 'and the rail counts it, where it read 0');
+    assert.deepEqual(
+      rowStatusTally(target),
+      railCounts(target),
+      'the rail is a TALLY OF THE ROWS, so the two cannot disagree - which is the whole defect: ' +
+        'a count is a reading of a result, and there were two readings'
+    );
+    assert.equal(
+      target
+        .querySelector('[data-editor-validation-summary]')
+        .getAttribute('data-editor-validation-summary'),
+      // The CALLER's own word, which this surface carries through verbatim on the hook while
+      // resolving it to `is-warn` for the class. The point of the assertion is that it is not
+      // `clear`.
+      'warning',
+      'and the verdict is not "All clear" over an amber row'
     );
     harness.remount();
   });
@@ -585,4 +657,30 @@ describe('EditorValidationSurface row action (mounted)', () => {
     }
     surfaceHarness.remount();
   });
+});
+
+// THE HOST HALF, WHICH NOTHING READ (issue 1517, review r2). Four of the five hosts registered
+// this contract and the recipe editor — the oldest of them, and the one every other conversion was
+// modelled on — did not, so its ordering was guarded by nothing: deferring `activeTab = route`
+// into a microtask, which is precisely the mistake the ordering exists to prevent, left the whole
+// suite green. The clauses are the same five, over this host's own facts.
+describeValidationHostContract({
+  title: 'RecipeEditView wires the row action in the order the mechanism needs',
+  hostFile: 'RecipeEditView.svelte',
+  tabComponent: 'RecipeValidationTab',
+  routeCall: 'activeTab = route',
+  regionMarker: 'data-recipe-issue-announcement',
+  regionOutsideNoun: 'record guard and tab chain',
+  mustPrecede: [
+    {
+      marker: '{#if recipe}',
+      present: 'the record guard must exist',
+      order: 'the region sits outside the record guard'
+    },
+    {
+      marker: "{#if activeTab === 'overview'}",
+      present: 'the tab chain must exist',
+      order: 'and outside the tab chain'
+    }
+  ]
 });

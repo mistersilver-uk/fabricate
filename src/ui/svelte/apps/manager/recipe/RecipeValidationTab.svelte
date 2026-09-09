@@ -22,7 +22,11 @@
   import EditorValidationSurface from '../../../components/EditorValidationSurface.svelte';
   import { localize } from '../../../util/foundryBridge.js';
   import { localizeActivationIssue } from '../../../../../utils/recipeActivationMessages.js';
-  import { evaluateRecipeReadiness } from './recipeReadiness.js';
+  import {
+    countRecipeReadiness,
+    evaluateRecipeReadiness,
+    recipeValidationRowStates,
+  } from './recipeReadiness.js';
 
   let {
     recipe = null,
@@ -119,20 +123,6 @@
     noSignatureCollision: 'requirements',
   };
 
-  // The negative issue id(s) that own each check, so an unsatisfied check can borrow
-  // that issue's severity, blocking flag, text and deep-link target.
-  const CHECK_TO_ISSUES = {
-    hasName: ['noName'],
-    hasIngredientSet: ['noIngredientSet'],
-    hasResultGroup: ['noResultGroup'],
-    noDuplicateMatches: ['duplicateAlternative', 'duplicateRequirement'],
-    noRequirementOverlap: ['requirementOverlap'],
-    routedResultGroupsRouted: ['unroutedResultGroup'],
-    routedOutcomeTiersProduced: ['unproducedOutcomeTier'],
-    alchemyResultSelection: ['alchemyResultSelection'],
-    noSignatureCollision: ['signatureCollision'],
-  };
-
   const GROUP_ORDER = [
     ['ingredients', 'GroupIngredients', 'Ingredients', 'fas fa-flask'],
     ['results', 'GroupResults', 'Results', 'fas fa-box-open'],
@@ -177,59 +167,38 @@
     return attrs;
   }
 
-  // Build one row per check, borrowing the owning issue when the check fails.
-  const rows = $derived.by(() => {
-    // Function-local bookkeeping scratch, discarded when the $derived.by returns.
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const usedIssueIds = new Set();
-    const checkRows = readiness.checks.map((check) => {
-      const owners = CHECK_TO_ISSUES[check.id] || [];
-      const issue = check.satisfied
-        ? null
-        : readiness.issues.find((entry) => owners.includes(entry.id)) || null;
-      if (issue) usedIssueIds.add(issue);
-      const status = check.satisfied
-        ? 'pass'
-        : issue && (issue.blocks === 'enable' || issue.severity === 'critical')
-          ? 'block'
-          : 'warn';
-      return {
-        id: check.id,
-        category: CHECK_CATEGORY[check.id] || 'requirements',
-        status,
-        title: checkLabel(check.id),
-        detail: issue ? issueTitle(issue) : '',
-        dataAttrs: rowAttrs(check.id, check.satisfied, issue ? issue.id : ''),
-        target: issue ? issue.target || '' : '',
-        // The CONTROL half, forwarded verbatim from the owning issue (issue 1517). It is
-        // threaded here and not derived: `recipeReadiness.js` is the only thing that knows
-        // WHICH requirement or result set a failing check is about, and a row that dropped
-        // it would render a View button that changes route and focuses nothing.
-        focusTarget: issue ? issue.focusTarget || '' : '',
-      };
-    });
-    // Any issue not attached to a check row (e.g. `disabledIncomplete`) becomes its
-    // own row, grouped by its deep-link target so nothing is lost when the Issues
-    // card is retired.
-    const targetGroup = {
-      ingredients: 'ingredients',
-      results: 'results',
-      overview: 'requirements',
-    };
-    const orphanRows = readiness.issues
-      .filter((issue) => !usedIssueIds.has(issue))
-      .map((issue) => ({
-        id: '',
-        category: targetGroup[issue.target] || 'requirements',
-        status: issue.blocks === 'enable' || issue.severity === 'critical' ? 'block' : 'warn',
-        title: issueTitle(issue),
-        detail: '',
-        dataAttrs: rowAttrs('', false, issue.id),
-        target: issue.target || '',
-        focusTarget: issue.focusTarget || '',
-      }));
-    return [...checkRows, ...orphanRows];
-  });
+  // WHICH GROUP AN ISSUE-ONLY ROW JOINS, by the route it deep-links to. A check row is placed by
+  // `CHECK_CATEGORY`; a row that is only an issue (`disabledIncomplete` is the usual one) has no
+  // check to place it, so its destination does.
+  const ISSUE_TARGET_GROUP = {
+    ingredients: 'ingredients',
+    results: 'results',
+    overview: 'requirements',
+  };
+
+  // ONE ROW PER CHECK, borrowing the owning issue when the check fails, then one row per issue no
+  // check claimed. The pairing and the STATUS come from `recipeReadiness.js` — see
+  // {@link recipeValidationRowStates} for why they moved out of this file — and this maps them
+  // onto copy. The status is taken verbatim, so the tab strip's badge, which counts the same
+  // states, cannot report a number this list contradicts.
+  const rows = $derived(
+    recipeValidationRowStates(readiness).map(({ checkId, issue, status }) => ({
+      id: checkId,
+      category: checkId
+        ? CHECK_CATEGORY[checkId] || 'requirements'
+        : ISSUE_TARGET_GROUP[issue?.target] || 'requirements',
+      status,
+      title: checkId ? checkLabel(checkId) : issueTitle(issue),
+      detail: checkId && issue ? issueTitle(issue) : '',
+      dataAttrs: rowAttrs(checkId, checkId ? status === 'pass' : false, issue ? issue.id : ''),
+      target: issue ? issue.target || '' : '',
+      // The CONTROL half, forwarded verbatim from the owning issue (issue 1517). It is
+      // threaded here and not derived: `recipeReadiness.js` is the only thing that knows
+      // WHICH requirement or result set a failing check is about, and a row that dropped
+      // it would render a View button that changes route and focuses nothing.
+      focusTarget: issue ? issue.focusTarget || '' : '',
+    }))
+  );
 
   const groups = $derived(
     GROUP_ORDER.map(([id, labelKey, labelFallback, icon]) => ({
@@ -245,32 +214,30 @@
   // was open. The grouped rows below say what each check does; nothing said the
   // at-a-glance STATE, so this is a header over them, not a duplicate of them.
   //
-  // It reads the SAME `readiness` object the rows are built from — literally the one
-  // `$derived` above, not a second call — so "the aggregate can never disagree with the
-  // list" is structural rather than a convention someone has to remember. Blocking =
-  // critical issues (they block enabling); passing = the satisfied structural checks.
-  const criticalIssues = $derived(
-    (readiness?.issues || []).filter((issue) => issue.severity === 'critical')
-  );
-  const warningIssues = $derived(
-    (readiness?.issues || []).filter((issue) => issue.severity === 'warning')
-  );
-  const passingCount = $derived(
-    (readiness?.checks || []).filter((check) => check.satisfied).length
-  );
-  const warningCount = $derived(warningIssues.length);
-  const blockingCount = $derived(criticalIssues.length);
+  // THE COUNTS ARE A TALLY OF THE ROWS ABOVE, not a second reading beside them (issue 1517,
+  // docs round). They used to read the `readiness` object directly — passing = satisfied
+  // checks, warnings = `severity === 'warning'` issues, blocking = `critical` ones — on the
+  // claim that reading the same object made the rail structurally unable to disagree with the
+  // list. It did not, because the rows are not the issues:
+  //
+  //  - `stepsNamed` has no `CHECK_TO_ISSUES` entry, so an unnamed step in a multi-step recipe
+  //    paints an amber row that raised no issue, and the old warnings count could not see it:
+  //    the rail read "Warnings: 0" and the verdict read "All clear" over an amber row.
+  //  - a `blocks: 'enable'` issue graded `warning` draws a BLOCK row and was counted as a
+  //    warning, which is the same divergence the environment editor's rail had.
+  //
+  // `countRecipeReadiness` tallies the SAME row states the list above is built from, so the two
+  // cannot disagree by construction rather than by convention — and the editor shell's tab badge
+  // reads that one function too.
+  const counts = $derived(countRecipeReadiness(readiness));
   const summaryStatus = $derived(
-    blockingCount > 0 ? 'blocked' : warningCount > 0 ? 'warning' : 'clear'
+    counts.blocking > 0 ? 'blocked' : counts.warnings > 0 ? 'warning' : 'clear'
   );
   const summaryMeta = $derived(
     summaryStatus === 'blocked'
       ? {
           icon: 'fas fa-circle-xmark',
-          title: text(
-            'FABRICATE.Admin.Manager.Recipe.Validation.SummaryBlocked',
-            'Cannot be enabled'
-          ),
+          title: text('FABRICATE.Admin.Manager.Validation.SummaryBlocked', 'Cannot be enabled'),
           sub: text(
             'FABRICATE.Admin.Manager.Recipe.Validation.SummaryBlockedSub',
             'Clear every blocking issue before this recipe can be enabled.'
@@ -280,17 +247,17 @@
         ? {
             icon: 'fas fa-triangle-exclamation',
             title: text(
-              'FABRICATE.Admin.Manager.Recipe.Validation.SummaryWarnings',
+              'FABRICATE.Admin.Manager.Validation.SummaryWarnings',
               'Enabled with warnings'
             ),
             sub: text(
-              'FABRICATE.Admin.Manager.Recipe.Validation.SummaryWarningsSub',
+              'FABRICATE.Admin.Manager.Validation.SummaryWarningsSub',
               'Saves and enables — review the warnings when you can.'
             ),
           }
         : {
             icon: 'fas fa-circle-check',
-            title: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryAllClear', 'All clear'),
+            title: text('FABRICATE.Admin.Manager.Validation.SummaryAllClear', 'All clear'),
             sub: text(
               'FABRICATE.Admin.Manager.Recipe.Validation.SummaryAllClearSub',
               'Every structural check passes. Ready to enable.'
@@ -298,27 +265,13 @@
           }
   );
 
-  // The pill WORD per status. The three status ICONS this table also used to carry are the
-  // surface's own — glyph for glyph, `fa-circle-check` / `fa-triangle-exclamation` /
-  // `fa-circle-exclamation` — so they are no longer restated here where a second copy could
-  // drift from the one that renders.
-  const STATUS_LABELS = {
-    pass: ['StatusPass', 'PASS'],
-    warn: ['StatusWarn', 'WARNING'],
-    block: ['StatusBlock', 'BLOCKS ENABLE'],
-  };
-
-  function statusPill(status) {
-    const meta = STATUS_LABELS[status] || STATUS_LABELS.pass;
-    return text(`FABRICATE.Admin.Manager.Recipe.Validation.${meta[0]}`, meta[1]);
-  }
-
-  const statusLabels = $derived({
-    pass: statusPill('pass'),
-    warn: statusPill('warn'),
-    block: statusPill('block'),
-  });
-
+  // THE PILL WORDS AND THE COUNT WORDS ARE NOT PASSED AT ALL (issue 1517, docs round). This tab
+  // wrote `Pass / Warning / Blocks enable` and `Passing / Warnings / Blocking` into its own
+  // namespace, byte for byte identical to the shared vocabulary `EditorValidationSurface`
+  // already defaults to — which is the second home the requirement's "lives once" sentence
+  // forbids. Both props are gone and the six keys with them, so the words this tab renders and
+  // the words every other validation surface renders are one string each. The three status
+  // ICONS went the same way at issue 1444.
   const tabTitle = $derived(text('FABRICATE.Admin.Manager.Recipe.Validation.Title', 'Validation'));
 </script>
 
@@ -334,14 +287,8 @@
     title: summaryMeta.title,
     sub: summaryMeta.sub,
   }}
-  counts={{ passing: passingCount, warnings: warningCount, blocking: blockingCount }}
-  countLabels={{
-    passing: text('FABRICATE.Admin.Manager.Recipe.Validation.CountPassing', 'Passing'),
-    warnings: text('FABRICATE.Admin.Manager.Recipe.Validation.CountWarnings', 'Warnings'),
-    blocking: text('FABRICATE.Admin.Manager.Recipe.Validation.CountBlocking', 'Blocking'),
-  }}
+  {counts}
   {groups}
-  {statusLabels}
   viewDataAttr="data-recipe-issue-view"
   hookAttrs={{
     root: { 'data-recipe-tab': 'validation', 'aria-label': tabTitle },

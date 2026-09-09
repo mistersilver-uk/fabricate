@@ -3,8 +3,9 @@
  *
  * `validationFocus.js` beside this file answers "which control does this row address, and can
  * it hold focus". This file answers the two questions that follow it — "where did I just land"
- * and "when is the GM told" — for all five hosts that wire the action: the recipe editor, the
- * recipe-item editor, the essence editor, the Tool editor and the Checks studio.
+ * and "when is the GM told" — for all six hosts that wire the action: the recipe editor, the
+ * recipe-item editor, the essence editor, the Tool editor, the Checks studio and the
+ * environment editor.
  *
  * IT IS ONE LEAF BECAUSE IT WAS FIVE COPIES. Each host held its own `accessibleNameOf`, its own
  * `<route> — <control>` join and its own ordering, which is five places for one sentence's
@@ -32,10 +33,19 @@
  * then `title` — because that is the name the GM's screen reader is about to speak, and a
  * second name composed from the row's own copy would be a second thing to keep in step.
  *
- * ── AND WHAT IS DELIBERATELY LEFT IN THE FIVE HOSTS ─────────────────────────────────────────
+ * (2b) AND THE THIRD DESTINATION, WHICH IS A RECORD. A row addresses either a CONTROL in the
+ * route it names or a RECORD the route SELECTS — the environment editor's rows are the second
+ * kind, because a stale included task is a record and not a field. There is no control to read
+ * a name off, so a host with a record destination hands its name over as `destinationName` and
+ * the sentence is `"<route> — <record name>"`. It is composed HERE rather than at that host,
+ * even though the host knows both halves, because the join between a route and its destination
+ * is the one thing every sentence in this file shares: composed at the call site it would be a
+ * second `' — '`, and the whole reason this file exists is that there were five.
  *
- * THE LIVE REGION ITSELF, which is the one other thing that is written five times. It stays,
- * because the five copies are not a copy of one decision: each region has to sit OUTSIDE the
+ * ── AND WHAT IS DELIBERATELY LEFT IN THE HOSTS ──────────────────────────────────────────────
+ *
+ * THE LIVE REGION ITSELF, which is the one other thing that is written once per host. It stays,
+ * because the copies are not a copy of one decision: each region has to sit OUTSIDE the
  * exact block its own host's route change unmounts — outside `{#if recipe}` and the tab chain in
  * the recipe editor, outside the route switch in the Checks studio, as a third child of a
  * `<main>` in the Tool editor — and each carries its own `data-*` hook, which mounted suites and
@@ -94,6 +104,9 @@ export function accessibleNameOf(root, element) {
  *   for a route-only row — `focusValidationTarget(root, focusTarget)`, always.
  * @param {Element|null} [options.fallbackPanel] The destination tab panel, focused when the row
  *   addressed no control. See (1) above.
+ * @param {string} [options.destinationName] The name of the RECORD the route selects, for a row
+ *   that addresses a record rather than a control. Read only when no control was reached, which
+ *   is every activation for such a row. See (2b) above.
  * @param {(sentence: string) => void} options.announce Writes the live region.
  */
 export function announceValidationOutcome({
@@ -101,6 +114,7 @@ export function announceValidationOutcome({
   routeLabel = '',
   focus,
   fallbackPanel = null,
+  destinationName = '',
   announce = () => {},
 }) {
   // (3): cleared BEFORE the move, written after it, so a repeat activation is two changes.
@@ -117,7 +131,10 @@ export function announceValidationOutcome({
       return focusFallbackPanel(fallbackPanel);
     },
     () => {
-      const name = accessibleNameOf(root, control);
+      // The control's own name when one was reached, and the record's when the row addressed a
+      // record instead. Never both: a row carries ONE address, so exactly one of these is the
+      // thing the GM is now standing in front of.
+      const name = control ? accessibleNameOf(root, control) : destinationName;
       announce(name ? `${routeLabel}${ROUTE_CONTROL_SEPARATOR}${name}` : routeLabel);
     }
   );

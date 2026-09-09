@@ -660,3 +660,96 @@ export function countIssues(severity, issues = []) {
 export function blocksEnable(issues = []) {
   return issues.some((issue) => issue.blocks === 'enable');
 }
+
+/**
+ * THE NEGATIVE ISSUE(S) THAT OWN EACH CHECK, so an unsatisfied check can borrow that issue's
+ * severity, blocking flag, text and deep-link address.
+ *
+ * It lived in `RecipeValidationTab.svelte` until issue 1517's docs round. It is domain knowledge
+ * — which finding explains which failing check — rather than presentation, and more to the point
+ * it is the join TWO screens now need: the tab draws a row per check and the editor shell badges
+ * the same state on its tab strip. While the tab owned the map, the shell could not read it and
+ * counted `issues` instead, so the two screens answered the same question from two populations.
+ *
+ * `stepsNamed` IS DELIBERATELY ABSENT, and is the reason {@link recipeValidationRowStates} exists.
+ * Nothing here raises an issue for an unnamed step, so that check fails with no owner — which is a
+ * perfectly good amber row, and was a warning neither the rail nor the badge could count.
+ *
+ * @type {Readonly<Record<string, readonly string[]>>}
+ */
+export const CHECK_TO_ISSUES = Object.freeze({
+  hasName: ['noName'],
+  hasIngredientSet: ['noIngredientSet'],
+  hasResultGroup: ['noResultGroup'],
+  noDuplicateMatches: ['duplicateAlternative', 'duplicateRequirement'],
+  noRequirementOverlap: ['requirementOverlap'],
+  routedResultGroupsRouted: ['unroutedResultGroup'],
+  routedOutcomeTiersProduced: ['unproducedOutcomeTier'],
+  alchemyResultSelection: ['alchemyResultSelection'],
+  noSignatureCollision: ['signatureCollision'],
+});
+
+/**
+ * One row's status word: `pass`, `warn` or `block`.
+ *
+ * `blocks: 'enable'` FIRST and severity second, for the reason the environment editor's row
+ * builder gives: the block word is literally "Blocks enable", which is what that field says, and
+ * an issue that stops a recipe enabling while graded `warning` is a blocker whatever it is called.
+ *
+ * @param {ReadinessIssue|null} issue
+ * @returns {string}
+ */
+function issueStatus(issue) {
+  if (!issue) return 'warn';
+  return issue.blocks === 'enable' || issue.severity === 'critical' ? 'block' : 'warn';
+}
+
+/**
+ * EVERY ROW THE VALIDATION SURFACE DRAWS, in render order, as `{ checkId, issue, status }`.
+ *
+ * ONE DERIVATION, TWO READERS (issue 1517, docs round). `RecipeValidationTab` maps these onto
+ * copy — the check's label, the owning issue's sentence, the deep-link address — and takes each
+ * row's status VERBATIM; `RecipeEditView` counts them for its tab badge. Neither computes a status
+ * of its own, so the badge cannot report a state the tab's own list contradicts, which is the
+ * defect this replaced: the badge counted `critical` and `warning` ISSUES while the tab drew a row
+ * per CHECK, and an unsatisfied check with no owning issue was drawn amber and counted by nothing.
+ *
+ * A check row comes first for every check, then one row for each issue no failing check claimed
+ * (`disabledIncomplete` is the usual one) — the order the surface receives them in, and therefore
+ * the order it groups them in.
+ *
+ * @param {{checks?: ReadinessCheck[], issues?: ReadinessIssue[]}} readiness
+ * @returns {{checkId: string, issue: ReadinessIssue|null, status: string}[]}
+ */
+export function recipeValidationRowStates(readiness = {}) {
+  const checks = Array.isArray(readiness?.checks) ? readiness.checks : [];
+  const issues = Array.isArray(readiness?.issues) ? readiness.issues : [];
+  const claimed = new Set();
+  const rows = checks.map((check) => {
+    const owners = CHECK_TO_ISSUES[check.id] || [];
+    const issue = check.satisfied ? null : issues.find((entry) => owners.includes(entry.id)) || null;
+    if (issue) claimed.add(issue);
+    return { checkId: check.id, issue, status: check.satisfied ? 'pass' : issueStatus(issue) };
+  });
+  for (const issue of issues) {
+    if (claimed.has(issue)) continue;
+    rows.push({ checkId: '', issue, status: issueStatus(issue) });
+  }
+  return rows;
+}
+
+/**
+ * The count rail's three numbers, as a tally of the rows above.
+ *
+ * @param {{checks?: ReadinessCheck[], issues?: ReadinessIssue[]}} readiness
+ * @returns {{passing: number, warnings: number, blocking: number}}
+ */
+export function countRecipeReadiness(readiness = {}) {
+  const tally = { passing: 0, warnings: 0, blocking: 0 };
+  for (const row of recipeValidationRowStates(readiness)) {
+    if (row.status === 'pass') tally.passing += 1;
+    else if (row.status === 'block') tally.blocking += 1;
+    else tally.warnings += 1;
+  }
+  return tally;
+}

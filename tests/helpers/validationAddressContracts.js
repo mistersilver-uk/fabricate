@@ -91,15 +91,52 @@ function spellingsOf(source, address) {
 }
 
 /**
- * Whether the element carrying a WRITTEN stamp can really hold focus, as a fault string or null.
+ * The whole opening tag an index sits inside: back to the nearest tag opening, forward to its
+ * close.
+ *
+ * @param {string} source Stripped source.
+ * @param {number} index A position inside the tag — an attribute's own offset.
+ * @returns {{element: string, tag: string}}
+ */
+function openingTagAt(source, index) {
+  const opening = source.slice(0, index).lastIndexOf('<');
+  const element = source.slice(opening, source.indexOf('>', index) + 1);
+  return { element, tag: (/^<([a-zA-Z][\w-]*)/u.exec(element) ?? [])[1] || '' };
+}
+
+/**
+ * Whether an element can really hold focus, as a fault string or null.
  *
  * THE MUTATION THIS EXISTS FOR is the one a mounted assertion cannot see: happy-dom focuses
  * anything — `.focus()` on a bare `<div>` sets `document.activeElement` — so moving a stamp off
- * the field control and onto its wrapper leaves every mounted clause passing while a real browser
- * focuses nothing and `focusValidationTarget` refuses the target. The element is therefore read
+ * the field control and onto its wrapper, or deleting a destination panel's `tabindex`, leaves
+ * every mounted clause passing while a real browser focuses nothing. The element is therefore read
  * off the SOURCE: either it is one of the tags that take focus unaided, or it declares BOTH the
  * `tabindex` that makes the focus real and the `data-keyboard-focus` that tells Foundry the window
  * is focused — without the second, Space pauses the game and the arrows pan the canvas.
+ *
+ * SHARED BY THE TWO ELEMENTS THIS FILE READS: the CONTROL an address resolves to, and the PANEL a
+ * host falls back to. They are the same question about two elements, and a second copy of the
+ * reading is a second place for the pair to become a single check.
+ *
+ * @param {{element: string, tag: string}} located The opening tag, from {@link openingTagAt}.
+ * @param {string} subject What to call it in the message.
+ * @param {string} file The file it lives in, for the message.
+ * @returns {string|null}
+ */
+function focusDeclarationFault({ element, tag }, subject, file) {
+  if (NATIVELY_FOCUSABLE.has(tag.toLowerCase())) return null;
+  if (!/tabindex="-1"/u.test(element)) {
+    return `${subject}: <${tag}> in ${file} takes focus from nothing — no tabindex`;
+  }
+  if (!/data-keyboard-focus="true"/u.test(element)) {
+    return `${subject}: <${tag}> in ${file} does not declare itself focused`;
+  }
+  return null;
+}
+
+/**
+ * The same question, asked of the control a written stamp rides.
  *
  * @param {string} source Stripped destination source.
  * @param {string} address
@@ -108,18 +145,7 @@ function spellingsOf(source, address) {
  */
 function focusFault(source, address, file) {
   const stamp = source.indexOf(`data-validation-target="${address}"`);
-  // The element the stamp rides: back to the nearest tag opening, forward to its close.
-  const opening = source.slice(0, stamp).lastIndexOf('<');
-  const element = source.slice(opening, source.indexOf('>', stamp) + 1);
-  const tag = (/^<([a-zA-Z][\w-]*)/u.exec(element) ?? [])[1] || '';
-  if (NATIVELY_FOCUSABLE.has(tag.toLowerCase())) return null;
-  if (!/tabindex="-1"/u.test(element)) {
-    return `${address}: <${tag}> in ${file} takes focus from nothing — no tabindex`;
-  }
-  if (!/data-keyboard-focus="true"/u.test(element)) {
-    return `${address}: <${tag}> in ${file} does not declare itself focused`;
-  }
-  return null;
+  return focusDeclarationFault(openingTagAt(source, stamp), address, file);
 }
 
 /**
@@ -255,6 +281,10 @@ export function describeValidationAddressPairing({
  * @param {string} options.title The suite title.
  * @param {string} options.hostFile The editor, under the manager root.
  * @param {string} options.tabComponent The validation tab's component name, as the host spells it.
+ * @param {string} [options.tabProp] The prop the tab takes the handler on. Parameterised rather
+ *   than fixed at `onSelectIssue` because one tab's rows address a RECORD rather than a control,
+ *   and it names its callback for what it is handed; hard-coding the majority spelling would have
+ *   meant either renaming that prop to satisfy a test or leaving that host unguarded.
  * @param {string} options.routeCall The host's own route write, e.g. `onOpenActivity(`.
  * @param {string} options.regionMarker The live region's attribute.
  * @param {string} options.regionOutsideNoun What the region must sit outside, for the clause title.
@@ -272,12 +302,13 @@ export function describeValidationHostContract({
   regionOutsideNoun,
   mustPrecede,
   handler = 'selectIssue',
+  tabProp = 'onSelectIssue',
 }) {
   describe(title, () => {
     const host = readManagerSource(hostFile);
 
     it('passes its own handler to the validation tab', () => {
-      const wiring = String.raw`<${tabComponent}[\s\S]*?onSelectIssue=\{${handler}\}`;
+      const wiring = String.raw`<${tabComponent}[\s\S]*?${tabProp}=\{${handler}\}`;
       assert.match(host, new RegExp(wiring, 'u'));
     });
 
@@ -288,7 +319,7 @@ export function describeValidationHostContract({
       // query; moving focus first would query a panel that is not in the DOM. Everything after
       // that — the panel fallback for a route-only row, the sentence composed FROM the element
       // that resolved, and the delay that queues it behind the focus utterance — belongs to
-      // `validationAnnouncement.js`, which owns it for all five hosts. So what this reads is that
+      // `validationAnnouncement.js`, which owns it for all six hosts. So what this reads is that
       // the host still writes its route first, hands the focus move over as the `focus` mover
       // rather than performing it, and gives the leaf its own live-region write.
       const signature = String.raw`(?:async )?function ${handler}\([\s\S]*?\n {2}\}`;
@@ -308,6 +339,33 @@ export function describeValidationHostContract({
         /fallbackPanel:/u,
         'a route-only row must have a panel to fall back to, or focus lands on `<body>` and every ' +
           'Foundry keybinding goes live'
+      );
+    });
+
+    it('binds a destination panel that can REALLY take the keyboard, and says so to Foundry', () => {
+      // THE HALF THE CLAUSE ABOVE CANNOT REACH, and no mounted suite can either. `fallbackPanel:`
+      // proves the host HANDS the leaf a panel; whether that panel can hold focus is a property of
+      // the element, and happy-dom focuses anything — a `<div>` with no `tabindex` sets
+      // `document.activeElement` exactly as one with it does. So deleting `tabindex="-1"` from a
+      // destination panel left every mounted clause in this repository green while a real browser
+      // focused nothing and the GM's next Space bar press paused the game.
+      //
+      // The panel is found through the host's OWN binding name, read out of its `fallbackPanel:`
+      // line rather than passed in: five hosts call it `tabPanel` and the Checks studio calls it
+      // `sectionPanel`, and a name restated at the call site would let a host rename its state and
+      // quietly stop being checked.
+      const binding = (/fallbackPanel: (\w+)/u.exec(host) ?? [])[1] || '';
+      assert.ok(binding, 'the handler must name the panel it falls back to');
+      const bound = host.indexOf(`bind:this={${binding}}`);
+      assert.ok(
+        bound !== -1,
+        `the handler falls back to \`${binding}\`, and no element in this host is bound to it`
+      );
+      assert.equal(
+        focusDeclarationFault(openingTagAt(host, bound), 'the destination panel', hostFile),
+        null,
+        'a route-only row lands here, so this element has to be able to hold the keyboard AND to ' +
+          'tell Foundry the window is focused while it does'
       );
     });
 

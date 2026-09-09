@@ -130,7 +130,7 @@
       : {
           status: 'pass',
           icon: 'fas fa-circle-check',
-          title: text('FABRICATE.Admin.Manager.Recipe.Validation.SummaryAllClear', 'All clear'),
+          title: text('FABRICATE.Admin.Manager.Validation.SummaryAllClear', 'All clear'),
           sub: text(
             'FABRICATE.Admin.Manager.Tools.Editor.ValidationAllClearSub',
             'Every Tool check passes. Ready to save.'
@@ -228,7 +228,7 @@
   rowDataAttr="data-tool-validation-check"
   viewDataAttr="data-tool-validation-view"
   {onSelectIssue}
-  blockLabel={text('FABRICATE.Admin.Manager.Recipe.Validation.StatusBlock', 'BLOCKS ENABLE')}
+  blockLabel={text('FABRICATE.Admin.Manager.Validation.StatusBlock', 'Blocks enable')}
 >
   {#if identityBroken}
     <!-- The note and the ONE control that answers it are one object (issue 1505). They used to

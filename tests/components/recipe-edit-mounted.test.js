@@ -6299,6 +6299,50 @@ describe('RecipeEditView — surfaces rehomed from the deleted context rail (mou
     ],
   };
 
+  // ── THE STRIP'S BADGE AND THE TAB'S RAIL ARE ONE READING (issue 1517, docs round) ──────────
+  //
+  // They were two. The badge counted `critical` and `warning` ISSUES while the tab drew a row per
+  // readiness CHECK, and `stepsNamed` is the check nothing raises an issue for — so a multi-step
+  // recipe with one unnamed step painted an amber row inside a tab whose strip showed no badge at
+  // all. Both now read `countRecipeReadiness`, which tallies the row states the list itself is
+  // built from, so this fixture is the state where the old pair disagreed.
+  const UNNAMED_STEP_RECIPE = {
+    ...COMPLETE_RECIPE,
+    steps: [
+      {
+        id: 'step-1',
+        name: 'Crush',
+        ingredientSets: COMPLETE_RECIPE.ingredientSets,
+        resultGroups: COMPLETE_RECIPE.resultGroups,
+      },
+      {
+        id: 'step-2',
+        name: '',
+        ingredientSets: COMPLETE_RECIPE.ingredientSets,
+        resultGroups: COMPLETE_RECIPE.resultGroups,
+      },
+    ],
+  };
+
+  it('badges an unnamed step with the same warnings count its own rail shows', async () => {
+    const target = await openValidation(UNNAMED_STEP_RECIPE);
+
+    assert.equal(
+      target.querySelectorAll('[data-issue]').length,
+      0,
+      'the fixture raises no issue at all, which is what made the two numbers part'
+    );
+    assert.equal(counts(target).warnings, 1, 'the rail counts the unnamed step');
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-recipe-tab-button="validation"] .manager-editor-tab-badge')].map(
+        (node) => node.textContent.trim()
+      ),
+      ['1'],
+      'and so does the strip badge, which showed nothing here'
+    );
+    editHarness.remount();
+  });
+
   it('renders the aggregate summary + count table as a header on the Validation tab', async () => {
     const target = await openValidation(COMPLETE_RECIPE);
     assert.ok(

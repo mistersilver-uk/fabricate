@@ -33,7 +33,11 @@
   import RecipeAccessTab from './recipe/RecipeAccessTab.svelte';
   import RecipeBooksScrollsTab from './recipe/RecipeBooksScrollsTab.svelte';
   import RecipeValidationTab from './recipe/RecipeValidationTab.svelte';
-  import { evaluateRecipeReadiness, blocksEnable } from './recipe/recipeReadiness.js';
+  import {
+    blocksEnable,
+    countRecipeReadiness,
+    evaluateRecipeReadiness,
+  } from './recipe/recipeReadiness.js';
   import { focusValidationTarget } from './validationFocus.js';
   import { announceValidationOutcome } from './validationAnnouncement.js';
   import { resolutionModeOptions } from './resolutionModeOptions.js';
@@ -327,12 +331,14 @@
       }
     )
   );
-  const errorCount = $derived(
-    readiness.issues.filter((issue) => issue.severity === 'critical').length
-  );
-  const warningCount = $derived(
-    readiness.issues.filter((issue) => issue.severity === 'warning').length
-  );
+  // THE BADGE IS THE VALIDATION TAB'S OWN COUNTS, READ THROUGH THE SHARED TALLY (issue 1517,
+  // docs round). It used to count `critical` and `warning` ISSUES here while the tab it badges
+  // drew a row per readiness CHECK — so an unnamed step in a multi-step recipe, which raises no
+  // issue at all, painted an amber row inside a tab whose strip showed nothing. Two numbers
+  // describing one screen have to be one number.
+  const validationCounts = $derived(countRecipeReadiness(readiness));
+  const errorCount = $derived(validationCounts.blocking);
+  const warningCount = $derived(validationCounts.warnings);
 
   // Tab count badges (issue 643 §F1): Ingredients / Results / Tools carry a mono
   // count so the strip reads like the prototype. Multi-step recipes sum each tab's

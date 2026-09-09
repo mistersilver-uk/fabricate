@@ -2957,14 +2957,9 @@
           summary={validationSummary}
           counts={validation.counts}
           groups={validation.groups}
-          countLabels={{
-            passing: text('FABRICATE.Admin.Manager.Component.Validation.Passing', 'Passing'),
-            warnings: text('FABRICATE.Admin.Manager.Component.Validation.Warnings', 'Warnings'),
-            blocking: text('FABRICATE.Admin.Manager.Component.Validation.Blocking', 'Blocking'),
-          }}
           statusLabels={{
-            pass: text('FABRICATE.Admin.Manager.Component.Validation.Pass', 'Pass'),
-            warn: text('FABRICATE.Admin.Manager.Component.Validation.Warning', 'Warning'),
+            pass: text('FABRICATE.Admin.Manager.Validation.StatusPass', 'Pass'),
+            warn: text('FABRICATE.Admin.Manager.Validation.StatusWarn', 'Warning'),
             block: text('FABRICATE.Admin.Manager.Component.Validation.Blocks', 'Blocks'),
           }}
           hookAttrs={{ root: { 'data-component-edit-validation': '' } }}
