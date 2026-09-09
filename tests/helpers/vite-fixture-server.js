@@ -115,3 +115,27 @@ export function createViteFixtureServer({ styleMountPrefix, extraPlugins = [] })
     },
   };
 }
+
+/**
+ * A real pointer press on one element: `mousedown`, `mouseup`, then the click they produce.
+ *
+ * Through Playwright's own mouse rather than `locator.click()` so the three events are separable
+ * in a failure message, and so the sequence is unmistakably the one a user's pointer generates
+ * rather than a synthesised activation that skips `mousedown` entirely. A synthesised click
+ * proves nothing about a panel dismissed on `mousedown`: the dismisser never runs, and every
+ * wrapper shape passes. Shared by the player (issue 1511) and manager (issue 1510) select proofs.
+ *
+ * @param {import('playwright').Page} page
+ * @param {string} selector
+ * @returns {Promise<void>}
+ */
+export async function pressPointerOn(page, selector) {
+  const box = await page.locator(selector).first().boundingBox();
+  if (!box) throw new Error(`${selector} has no box to press on`);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.up();
+  await page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
+  );
+}

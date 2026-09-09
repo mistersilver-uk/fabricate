@@ -64,7 +64,9 @@ import { createServices, makeSystem } from '../helpers/adminStoreServices.js';
 // panel PORTALED onto the manager root rather than a `change` on a native `<select>`. Every
 // lookup is therefore rooted on the mount target and not on the control's own container.
 import {
+  assertSelectHasResolvedName,
   chooseSelectOption,
+  selectOptionLabels,
   selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
@@ -24095,21 +24097,30 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
 
-    const strategy = target.querySelector('[data-world-currency-strategy-select]');
-    assert.ok(strategy, 'spend-strategy select should render');
-    const optionValues = [...strategy.querySelectorAll('option')].map((option) => option.value);
+    const strategy = '[data-world-currency-strategy-select]';
+    assert.ok(target.querySelector(strategy), 'the spend-strategy control should render');
     assert.deepEqual(
-      optionValues,
+      selectOptionValues(target, strategy),
       ['actorProperty', 'actorInventory', 'macro'],
-      'three peer spend strategies should be offered'
+      'three peer spend strategies should be offered, in their pre-conversion order'
     );
-    // The single shared strategy hint reflects the selected strategy.
+    assert.deepEqual(
+      selectOptionLabels(target, strategy),
+      ['Actor data path', 'Actor inventory', 'Macro'],
+      'and the same rendered text the `<option>` elements drew, fallback strings included'
+    );
+    // THE NAME NARROWED, DELIBERATELY, and this is where that is recorded (issue 1510). The
+    // wrapper was a `<Field as="label">` holding the caption, the control AND the strategy hint,
+    // so the containment named this control "Spend strategy" plus the whole hint paragraph — a
+    // name that CHANGED every time the GM changed the value, because the hint reflects the
+    // strategy. The demoted `Field as="div"` points at the caption alone.
+    assert.equal(assertSelectHasResolvedName(target, strategy), 'Spend strategy');
+    // The single shared strategy hint reflects the selected strategy, and stays where it is.
     assert.ok(
       target.querySelector('[data-world-currency-strategy-hint]'),
       'a strategy hint should render'
     );
-    strategy.value = 'macro';
-    strategy.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, strategy, 'macro');
     await tick();
     flushSync();
     assert.ok(calls.some((call) => call[0] === 'setCurrencySpendStrategy' && call[1] === 'macro'));
@@ -24309,9 +24320,28 @@ describe('CraftingSystemManager mounted behavior', () => {
       .click();
     await tick();
     flushSync();
-    const builder = card.querySelector('.manager-currency-subunit-builder');
-    if (!builder) return [];
-    return [...builder.querySelectorAll('select option')].map((option) => option.value);
+    // NEITHER ABSENCE IS AN ANSWER. A missing builder or a missing trigger used to return `[]`,
+    // and `[]` satisfies every "must not be offered" clause below — which is the vacuity that let
+    // the conversion's own regression sit green until a positive clause caught it. A helper that
+    // cannot see the control must SAY SO, because the clauses that read it are negatives and a
+    // negative cannot tell "not offered" from "nothing was read".
+    assert.ok(
+      card.querySelector('.manager-currency-subunit-builder'),
+      `expanding ${expandUnitId} rendered no add-sub-unit builder, so every clause reading this ` +
+        'helper would pass on an empty list rather than on the option set it is about'
+    );
+    // THE ROWS OF THE OPEN PANEL, not `<option>` children (issue 1510). This control is the
+    // shared `<Select>` now and `SearchablePopover` PORTALS its list onto the application root,
+    // so the rows are not descendants of the builder at all. The old query returned an EMPTY
+    // array after the conversion, and the three "must not be offered" clauses below passed
+    // vacuously on it — the one positive clause is what caught it.
+    const trigger = `[data-world-currency-unit="${expandUnitId}"] .manager-currency-subunit-builder .fabricate-select-trigger`;
+    assert.ok(
+      target.querySelector(trigger),
+      `the add-sub-unit builder for ${expandUnitId} rendered no converted trigger to open, so ` +
+        'the option set below would be read from a control that is not there'
+    );
+    return selectOptionValues(target, trigger);
   }
 
   it('drives the add-sub-unit dropdown from disjoint reachable sets for chain, diamond, and cross-parent cases', async () => {
@@ -24340,8 +24370,24 @@ describe('CraftingSystemManager mounted behavior', () => {
         contains: [{ unitId: 'C', amount: 10 }],
       },
       { id: 'C', label: 'Copper', abbreviation: 'C', actorPath: 'system.currency.c', contains: [] },
+      // THE POSITIVE THIS SET OTHERWISE LACKS. Every other clause here is a negative, and a
+      // negative is satisfied by an empty list — so without one unit that MUST be offered, a
+      // helper that read nothing at all would report this case as green.
+      {
+        id: 'X',
+        label: 'Unrelated',
+        abbreviation: 'X',
+        actorPath: 'system.currency.x',
+        contains: [],
+      },
     ];
     const chainOffered = await offeredSubUnitOptionIds(chainUnits, 'P');
+    assert.ok(
+      chainOffered.includes('X'),
+      'chain: X (unrelated to P in either direction) SHOULD be offered when editing P — and it ' +
+        'is what makes the three exclusions below claims about an option set rather than about ' +
+        'an empty one'
+    );
     assert.ok(
       !chainOffered.includes('C'),
       'chain: C (deeper descendant of P) must not be offered when editing P'
@@ -24386,8 +24432,20 @@ describe('CraftingSystemManager mounted behavior', () => {
         actorPath: 'system.currency.ep',
         contains: [{ unitId: 'sp', amount: 5 }],
       },
+      // The same positive, for the same reason: both exclusions below are negatives.
+      {
+        id: 'X',
+        label: 'Unrelated',
+        abbreviation: 'X',
+        actorPath: 'system.currency.x',
+        contains: [],
+      },
     ];
     const diamondOffered = await offeredSubUnitOptionIds(diamondUnits, 'gp');
+    assert.ok(
+      diamondOffered.includes('X'),
+      'diamond: X (unrelated to gp in either direction) SHOULD be offered when editing gp'
+    );
     assert.ok(
       !diamondOffered.includes('ep'),
       'diamond: ep must not be offered when editing gp (would create a second gp->sp path)'

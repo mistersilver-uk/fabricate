@@ -929,12 +929,14 @@ describe('CraftingSystemManager source contract', () => {
     // Currency spend-strategy / provider / macro controls.
     for (const snippet of [
       'data-world-currency-strategy-select',
-      'onSetCurrencySpendStrategy(event.currentTarget.value)',
+      // Issue 1510: the shared `<Select>` hands the caller its OWN typed value, so the
+      // handler takes `next` rather than reading `event.currentTarget.value` off an element.
+      'onChange={(next) => onSetCurrencySpendStrategy(next)}',
       // The single shared strategy hint reflects the selected strategy.
       'data-world-currency-strategy-hint',
       'currencySpendStrategyHint()',
       'data-world-currency-provider-select',
-      'onSetCurrencyProvider(event.currentTarget.value)',
+      'onChange={(next) => onSetCurrencyProvider(next)}',
       'data-world-currency-no-provider',
       'data-world-currency-macros',
       'data-world-currency-macro-dropzone',

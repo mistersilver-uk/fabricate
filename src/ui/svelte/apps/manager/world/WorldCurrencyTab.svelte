@@ -26,6 +26,7 @@
   import IconPicker from '../../../components/IconPicker.svelte';
   import ManagerButton from '../../../components/ManagerButton.svelte';
   import IconButton from '../../../components/IconButton.svelte';
+  import Select from '../../../components/Select.svelte';
 
   let {
     currencyUnits = [],
@@ -249,6 +250,48 @@
     });
   }
 
+  // THE THREE OPTION LISTS THE CONVERTED SELECTS SPEAK (issue 1510). Each is the `<option>` set
+  // it replaced, mapped to the shared `<Select>`'s `{value, label}` shape and nothing else: same
+  // order, same values, same rendered text. The strategy list localises at derivation time
+  // rather than in the template, which is where the `<option>` did it.
+  const currencySpendStrategyOptions = $derived(
+    CURRENCY_SPEND_STRATEGY_OPTIONS.map((option) => ({
+      value: option.value,
+      label: text(option.labelKey, option.fallback),
+    }))
+  );
+
+  const currencyProviderSelectOptions = $derived(
+    currencyProviderOptions.map((option) => ({ value: option.id, label: option.label }))
+  );
+
+  /**
+   * A unit's assignable sub-units, as the shared `<Select>`'s option shape.
+   *
+   * A FUNCTION rather than a `$derived`, because the list is per EXPANDED UNIT: the caller
+   * already computes `subUnitOptions` inside the `{#each}` over units, and lifting it out would
+   * mean re-deriving the same per-unit set a second way.
+   *
+   * @param {Array<{id: string, label: string, abbreviation?: string}>} options
+   * @returns {Array<{value: string, label: string}>}
+   */
+  function subUnitSelectOptions(options) {
+    return options.map((option) => ({
+      value: option.id,
+      label: `${option.label}${option.abbreviation ? ` (${option.abbreviation})` : ''}`,
+    }));
+  }
+
+  // The spend-strategy caption's id, per instance: the trigger is named by pointing at the
+  // caption rather than by containment, and two tabs on one screen must not share the pointer.
+  const instanceId = $props.id();
+  const strategyCaptionId = `${instanceId}-strategy-caption`;
+
+  // The hint's id, for the same reason as the caption's: the hint is DRAWN by this caller (its
+  // copy changes with the chosen strategy) rather than by the primitive's own labelled form, so
+  // the trigger reaches it through `ariaDescribedBy` and nothing else would announce it.
+  const strategyHintId = `${instanceId}-strategy-hint`;
+
   // The strategy select renders one shared hint that reflects the selected strategy, so the GM
   // sees the actor-data-path / actor-inventory / macro guidance inline as they switch.
   function currencySpendStrategyHint() {
@@ -430,41 +473,70 @@
 
     <div id="manager-section-body-currency" class="manager-section-body">
       <div class="manager-currency-strategy" data-world-currency-strategy>
-        <Field as="label">
-          <span
+        <!-- A `Field as="div"` RATHER THAN THE `as="label"` THIS WAS (issue 1510), because the
+             select is the shared `<Select>` now and a `<label>` forwards a caption click into the
+             trigger it names — which, with the panel open, dismisses it on `mousedown` and
+             re-opens it on the forwarded click. The wrapper is NOT deleted in favour of the
+             primitive's own `label=` form, because it holds a third child this control does not
+             own: the `[data-world-currency-strategy-hint]` line, whose copy changes with the
+             chosen strategy and which the smoke and the case registry both address. -->
+        <Field as="div">
+          <span id={strategyCaptionId}
             >{text('FABRICATE.Admin.Manager.CurrencyUnits.SpendStrategy', 'Spend strategy')}</span
           >
-          <select
+          <Select
             value={currencySpendStrategy}
-            data-world-currency-strategy-select
-            onchange={(event) => onSetCurrencySpendStrategy(event.currentTarget.value)}
+            options={currencySpendStrategyOptions}
+            showTick={false}
+            ariaLabelledBy={strategyCaptionId}
+            ariaDescribedBy={strategyHintId}
+            triggerData={{ 'data-world-currency-strategy-select': '' }}
+            onChange={(next) => onSetCurrencySpendStrategy(next)}
+          />
+          <!-- THE PRIMITIVE'S OWN NOTE, MARKUP AND ALL (issue 1510). The provider below renders
+               its hint through `hint=`, which draws a `<span class="fabricate-select-note">`;
+               this one is drawn here because its copy changes with the chosen strategy, so it
+               is written as the same element with the same class and the two hints in one card
+               read alike.
+
+               A `<span>` RATHER THAN THE `<small>` THIS WAS, and the element is the whole
+               mechanism. `.fabricate-field.manager-field small` (`styles/fabricate.css:13118`)
+               is ELEMENT-TYPED at (0,2,1) and `.fabricate-select-note` is (0,1,0), so on a
+               `<small>` the class is out-ranked and adding it changes nothing at all — measured
+               in Chromium on `tests/fixtures/manager-select/?subject=currency`, which is where
+               the sibling clause in `manager-select-conversion-rendered.test.js` compares the
+               two computed treatments. Changing the element is what lets the class win, and it
+               leaves the shared sheet alone.
+
+               The ACCEPTED COST is contrast: this line moves from `--fab-text-muted` at
+               12.16px/500 (5.38:1 on `--fab-bg-1`) to `--fab-text-subtle` at 10.5px/400
+               (3.71:1). The library's `k-hint` is the authority for that treatment and the token
+               question belongs to issue 1523's geometry and token sweep, not here —
+               consistency inside the card is what this change owes. -->
+          <span class="fabricate-select-note" id={strategyHintId} data-world-currency-strategy-hint
+            >{currencySpendStrategyHint()}</span
           >
-            {#each CURRENCY_SPEND_STRATEGY_OPTIONS as option (option.value)}
-              <option value={option.value}>{text(option.labelKey, option.fallback)}</option>
-            {/each}
-          </select>
-          <small data-world-currency-strategy-hint>{currencySpendStrategyHint()}</small>
         </Field>
 
         {#if currencyShowProviderBranch}
-          <Field as="label">
-            <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
-            <select
-              value={currencyProviderId}
-              data-world-currency-provider-select
-              onchange={(event) => onSetCurrencyProvider(event.currentTarget.value)}
-            >
-              {#each currencyProviderOptions as option (option.id)}
-                <option value={option.id}>{option.label}</option>
-              {/each}
-            </select>
-            <small
-              >{text(
-                'FABRICATE.Admin.Manager.CurrencyUnits.ProviderHint',
-                'A preconfigured adapter that reads and spends coins from the actor inventory.'
-              )}</small
-            >
-          </Field>
+          <!-- THE WRAPPER IS GONE, not demoted (issue 1510). It existed only to caption the
+               select and to carry a hint beneath it, and the shared `<Select>`'s own labelled
+               form renders exactly that column — a visible caption span, the trigger, then the
+               hint — so the caller keeps neither a class nor a hook here and the two strings
+               ride `label=` and `hint=` instead. This is the first caller of `hint` in the
+               corpus. -->
+          <Select
+            value={currencyProviderId}
+            options={currencyProviderSelectOptions}
+            showTick={false}
+            label={text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}
+            hint={text(
+              'FABRICATE.Admin.Manager.CurrencyUnits.ProviderHint',
+              'A preconfigured adapter that reads and spends coins from the actor inventory.'
+            )}
+            triggerData={{ 'data-world-currency-provider-select': '' }}
+            onChange={(next) => onSetCurrencyProvider(next)}
+          />
         {:else if currencySpendStrategy === 'actorInventory'}
           <Field as="div">
             <span>{text('FABRICATE.Admin.Manager.CurrencyUnits.Provider', 'Provider')}</span>
@@ -815,27 +887,20 @@
                       </Field>
                       {#if subUnitOptions.length > 0}
                         <div class="manager-currency-subunit-builder">
-                          <Field as="label">
-                            <span
-                              >{text(
-                                'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
-                                'Add sub-unit'
-                              )}</span
-                            >
-                            <select
-                              value={currencySelectedSubUnit(unit.id)}
-                              onchange={(event) =>
-                                updateCurrencySubUnitSelection(unit.id, event.currentTarget.value)}
-                            >
-                              {#each subUnitOptions as option (option.id)}
-                                <option value={option.id}
-                                  >{option.label}{option.abbreviation
-                                    ? ` (${option.abbreviation})`
-                                    : ''}</option
-                                >
-                              {/each}
-                            </select>
-                          </Field>
+                          <!-- THE WRAPPER IS GONE, not demoted (issue 1510): it captioned the
+                               select and held nothing else, so the caption rides `label=` on the
+                               shared `<Select>`'s own labelled form. The option labels are
+                               carried verbatim, abbreviation parenthetical and all. -->
+                          <Select
+                            value={currencySelectedSubUnit(unit.id)}
+                            options={subUnitSelectOptions(subUnitOptions)}
+                            showTick={false}
+                            label={text(
+                              'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
+                              'Add sub-unit'
+                            )}
+                            onChange={(next) => updateCurrencySubUnitSelection(unit.id, next)}
+                          />
                           <IconButton
                             ariaLabel={text(
                               'FABRICATE.Admin.Manager.CurrencyUnits.AddSubUnit',
@@ -1058,5 +1123,33 @@
   .currency-validation-list {
     margin: 0;
     padding-inline-start: var(--fab-space-4);
+  }
+
+  /* THE WIDTH THE ELEMENT-TYPED SHEET RULE NO LONGER SUPPLIES (issue 1510), for EVERY converted
+     control in this component. `.fabricate-field.manager-field select { width: 100% }`
+     (`styles/fabricate.css:10839`) painted them until they became `<button>`s, and
+     `.fabricate-select-trigger` declares no width at all — a trigger's box belongs to the row it
+     sits in. Without this rule the spend strategy measured 68.73px on "Macro" and 118.78px on
+     "Actor data path" in a 654px column, the provider 214.64px, and the add-sub-unit control
+     90.27px on "Silver (sp)" and 142.38px on "Electrum piece (ep)" in a 266px column, so the
+     card's controls sat at whatever width the chosen value happened to need. Measured in Chromium
+     against the fixture's declared Arial face; with the rule the add-sub-unit trigger holds 266px
+     across both option labels.
+
+     ONE RULE FOR THREE CONTROLS. The strategy field is the caller's own demoted `Field as="div"`
+     column; the provider and the add-sub-unit control are the primitive's own labelled form,
+     whose `<Field>` emits `.fabricate-select-field`. All three are `.manager-field` columns, so
+     the descendant selector reaches them without naming either shape. Two anchors are needed
+     because they sit in two blocks this component writes: `.manager-currency-strategy` holds the
+     first two, and `.manager-currency-subunit-builder` — a `minmax(0, 1fr) auto` grid
+     (`styles/fabricate.css:5209-5213`) whose first track is full width — holds the third, which
+     the strategy anchor cannot reach. Both `:global()`s are anchored at classes THIS component
+     writes, so the rules keep a scoping hash rather than reaching every trigger in the document.
+
+     The shape is the shipped one: the three interactables roots state exactly this rule for the
+     labelled form's trigger, and the player pagers state their own fills the same way. */
+  .manager-currency-strategy :global(.manager-field .fabricate-select-trigger),
+  .manager-currency-subunit-builder :global(.manager-field .fabricate-select-trigger) {
+    width: 100%;
   }
 </style>

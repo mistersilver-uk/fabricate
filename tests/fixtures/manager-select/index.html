@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Manager select conversion — caption clicks, trigger widths and panel bands</title>
+    <!--
+      Served by `tests/components/manager-select-conversion-rendered.test.js` from a Vite dev
+      server, so `mount.js` can import the REAL `.svelte` components through the real Svelte
+      plugin (issue 1510). Same reason `tests/fixtures/player-select/index.html` records for
+      issue 1511: every question this fixture answers is about what a component's SCRIPT does at
+      runtime, or about a cascade happy-dom does not compute.
+
+        - THE CAPTION CLICK. A `<label>` forwards a click on its caption into the control it
+          wraps. The control is a `<button>` toggling a portaled panel, and that panel's
+          outside-click dismissal listens on `mousedown` IN THE CAPTURE PHASE and only while the
+          panel is open. Nothing in that sentence is markup.
+        - THE TRIGGER WIDTH. A `<select>` sizes itself to its widest option; the `<button>` that
+          replaces it hugs the one it is showing.
+        - THE PANEL BAND. `actions/anchoredPopover.js` resolves the panel's width at run time
+          from a measurement and writes it as an inline style, so there is no declaration to
+          read — and a ticked row spends its width on a tick gutter and row padding before it
+          draws a label, which is what decides whether an option label truncates.
+    -->
+    <link rel="stylesheet" href="/@manager-select-styles/fabricate.css" />
+    <style>
+      /*
+        Foundry core's universal border-box reset (`foundry2.css` `@layer reset`). The trigger
+        declares a padding and a border and takes `box-sizing: border-box` from its own family
+        rule, but the wrappers around it do not — and a content-box wrapper measures every figure
+        here wider than the product does.
+      */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background: #0b0a13;
+      }
+
+      /*
+        ARIAL, DELIBERATELY AND EXPLICITLY, on the precedent `tests/fixtures/player-select/` set.
+        Every width here is a text measurement and the product's own face is Foundry's licensed
+        Signika, which this repository cannot ship. Chromium resolves `Arial, sans-serif` to a
+        metric-compatible face on every platform CI runs on, so the numbers reproduce on a
+        maintainer's machine and on the runner. The suite asserts the declaration took effect
+        rather than trusting it.
+      */
+      body {
+        font-family: Arial, sans-serif;
+      }
+
+      /*
+        The manager window's ApplicationV2 frame. `.fabricate-manager` is the overlay host every
+        converted panel portals into, and it is usable as one because `styles/fabricate.css`
+        declares it `position: relative` — a static frame would move the panel's containing block
+        up to the initial one and measure a different arrangement than production has.
+      */
+      .fabricate-manager {
+        width: 1180px;
+        height: 760px;
+        overflow: hidden;
+        border: 1px solid #3b3a48;
+      }
+
+      .fixture-mount {
+        padding: 24px;
+      }
+
+      /*
+        The narrow end of the manager's own content column. The settings and tab routes this
+        change converts render inside `.manager-section-body` at the width the window leaves
+        after the nav rail and the context panel, and 760 is that column at the 1280px position
+        every one of these screens' View Lab cases uses. Fixture chrome, deliberately not in
+        `styles/fabricate.css`.
+      */
+      .fixture-column {
+        width: 760px;
+      }
+    </style>
+  </head>
+  <body class="vtt game theme-dark">
+    <script type="module" src="/tests/fixtures/manager-select/mount.js"></script>
+  </body>
+</html>

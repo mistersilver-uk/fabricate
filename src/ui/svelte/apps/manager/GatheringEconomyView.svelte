@@ -26,6 +26,7 @@
   import { stepperLabels } from '../../components/stepperLabels.js';
   import RadioCardGroup from '../../components/RadioCardGroup.svelte';
   import IconButton from '../../components/IconButton.svelte';
+  import Select from '../../components/Select.svelte';
 
   let { services = null, systemId = '' } = $props();
 
@@ -35,6 +36,27 @@
   }
 
   const UNITS = ['minutes', 'hours', 'days', 'weeks'];
+
+  // THE TWO REGENERATION OPTION LISTS, in the shared `<Select>`'s shape (issue 1510). Both are
+  // the `<option>` sets they replaced: same order, same values, same rendered text. The unit
+  // labels stay `Economy.Unit.*`'s singular capitalised forms — "Minute", "Hour", "Day", "Week"
+  // — so the shipped row still reads "Every [3] Minute". `DurationUnitPlural` exists and is
+  // deliberately NOT adopted here: a copy change is not this conversion's to make.
+  const regenPolicyOptions = [
+    {
+      value: 'none',
+      label: text('FABRICATE.Admin.Manager.Economy.RegenPolicyNone', 'Manual only'),
+    },
+    {
+      value: 'overTime',
+      label: text('FABRICATE.Admin.Manager.Economy.RegenPolicyElapsed', 'Over world time'),
+    },
+  ];
+
+  const regenUnitOptions = UNITS.map((unit) => ({
+    value: unit,
+    label: text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, unit),
+  }));
 
   let economy = $state(defaultEconomy());
   let staminaActors = $state([]);
@@ -385,39 +407,28 @@
           class="manager-economy-regen-grid"
           class:is-single={economy.stamina.regen.policy !== 'overTime'}
         >
-          <Field as="label">
-            <span>{text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}</span>
-            <select
-              value={economy.stamina.regen.policy}
-              onchange={(e) => updateRegen({ policy: e.currentTarget.value })}
-              data-economy-regen-policy
-            >
-              <option value="none"
-                >{text('FABRICATE.Admin.Manager.Economy.RegenPolicyNone', 'Manual only')}</option
-              >
-              <option value="overTime"
-                >{text(
-                  'FABRICATE.Admin.Manager.Economy.RegenPolicyElapsed',
-                  'Over world time'
-                )}</option
-              >
-            </select>
-          </Field>
+          <!-- THE TWO WRAPPERS ARE GONE, not demoted (issue 1510). Each existed only to caption
+               its select — no per-site class, no hook, no sibling — and the shared `<Select>`'s
+               own labelled form renders exactly that column, so the captions ride `label=`. The
+               option labels are carried verbatim, including `Economy.Unit.*`'s singular
+               capitalised forms, so the row still reads "Every [3] Minute". -->
+          <Select
+            value={economy.stamina.regen.policy}
+            options={regenPolicyOptions}
+            showTick={false}
+            label={text('FABRICATE.Admin.Manager.Economy.RegenPolicy', 'Regeneration')}
+            triggerData={{ 'data-economy-regen-policy': '' }}
+            onChange={(next) => updateRegen({ policy: next })}
+          />
           {#if economy.stamina.regen.policy === 'overTime'}
-            <Field as="label">
-              <span>{text('FABRICATE.Admin.Manager.Economy.RegenPer', 'Per')}</span>
-              <select
-                value={economy.stamina.regen.unit}
-                onchange={(e) => updateRegen({ unit: e.currentTarget.value })}
-                data-economy-regen-unit
-              >
-                {#each UNITS as unit (unit)}
-                  <option value={unit}
-                    >{text(`FABRICATE.Admin.Manager.Economy.Unit.${unit}`, unit)}</option
-                  >
-                {/each}
-              </select>
-            </Field>
+            <Select
+              value={economy.stamina.regen.unit}
+              options={regenUnitOptions}
+              showTick={false}
+              label={text('FABRICATE.Admin.Manager.Economy.RegenPer', 'Per')}
+              triggerData={{ 'data-economy-regen-unit': '' }}
+              onChange={(next) => updateRegen({ unit: next })}
+            />
           {/if}
         </div>
 
@@ -598,6 +609,24 @@
 </div>
 
 <style>
+  /* THE WIDTH THE ELEMENT-TYPED SHEET RULE NO LONGER SUPPLIES (issue 1510).
+     `.fabricate-field.manager-field select { width: 100% }` painted the two regeneration
+     controls until they became `<button>`s, and `.fabricate-select-trigger` declares no width at
+     all — a trigger's box belongs to the row it sits in. Without this rule the policy control
+     measured 121.53px and the unit control 61.09px on "Hour" against 71.53px on "Minute", inside
+     236px grid tracks; the two cells of a two-column grid rendered at different widths and the
+     unit cell re-sized as the GM changed it. Measured in Chromium against the fixture's declared
+     Arial face.
+
+     Both are the primitive's own labelled form, whose `<Field>` emits `.fabricate-select-field`,
+     so the rule names `.manager-field` and reaches both. The `:global()` is anchored at
+     `.manager-economy-regen-grid`, which THIS component writes, so it keeps a scoping hash
+     rather than reaching every trigger in the document — the shape the three interactables
+     roots already ship for this same form. */
+  .manager-economy-regen-grid :global(.manager-field .fabricate-select-trigger) {
+    width: 100%;
+  }
+
   /* Span the full settings grid (2 columns) so the economy reads as one card
      above the Times-of-day / Weather / Regions panels. Stack the resolution-mode
      card and the limitation card vertically with the same gap the cards use

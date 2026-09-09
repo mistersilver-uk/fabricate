@@ -297,11 +297,32 @@ export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 26;
  * root goes, and this is the first row-set in this table whose payment emptied a root. Every
  * remaining row is the manager's (issue 1510's sweep and the root's own convergence, issue 1357)
  * except `WorldVocabularyPage.svelte | 1`, which is the manager's too.
+ *
+ * 78 -> 71 with issue 1510's FIRST phase, and four settings-and-tabs rows leave with it:
+ * `apps/manager/system/CharacterPrerequisitesCard.svelte | 1`,
+ * `apps/manager/world/WorldCurrencyTab.svelte | 3`,
+ * `apps/manager/ImportFolderMappingModal.svelte | 1` and
+ * `apps/manager/GatheringEconomyView.svelte | 2` are DELETED because all seven elements now
+ * render `components/Select.svelte`. The file count falls 28 -> 24 with them. Paid down by
+ * conversion, not by a marker: no `<!-- native select: ... -->` comment was added.
+ *
+ * WHAT THAT PAYMENT ALSO BOUGHT, and it is not a row in any table: the primitive's own labelled
+ * form was REPAIRED in the same change. `Select label=` hosted on `<Field as="label">`, and a
+ * `<label>` forwards a caption click into the control it names — which, with the panel open,
+ * the capture-phase dismisser closes on `mousedown` and the forwarded click re-opens, so the
+ * list could never be closed from its own caption at any of its twelve shipped call sites. The
+ * host is `Field as="div"` now. Three of this phase's seven conversions adopted that form, which
+ * is why the repair belongs to the phase rather than to a caller sweep, and no caller changed.
+ *
+ * NO SHEET RULE WAS DELETED IN THIS PHASE, and the reason is measured rather than deferred:
+ * every one of the seven is painted by `.fabricate-field.manager-field select`, which keeps
+ * three root carriers, so there was nothing stranded to strip. What each converted caller states
+ * instead is the `width: 100%` that element-typed rule can no longer supply to a `<button>`.
  */
 export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 
 /** @see KNOWN_NATIVE_SELECT_ELEMENTS */
-export const KNOWN_NATIVE_SELECT_TOTAL = 78;
+export const KNOWN_NATIVE_SELECT_TOTAL = 71;
 
 /**
  * A native `<select>` written into a JavaScript template string, keyed `file`.

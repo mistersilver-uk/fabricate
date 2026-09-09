@@ -84,6 +84,38 @@ export function chooseSelectOption(root, triggerSelector, value) {
 }
 
 /**
+ * Closes a converted select's panel, the way clicking away from it does (issue 1510).
+ *
+ * WHY A SUITE NEEDS THIS AT ALL. {@link openSelectPanel} finds the panel by CLASS over the whole
+ * portal host and then proves the pairing through `aria-controls` — which is what turns "an
+ * earlier select is still open" from a silently wrong reading into a named failure. In a real
+ * browser the earlier panel would already be gone: `dismissOnOutsideClick` listens on `mousedown`
+ * and a pointer press on the next trigger fires one. A mounted suite's `.click()` fires no
+ * `mousedown` at all, so nothing dismisses anything and a screen with two converted controls
+ * leaves both panels in the DOM. Reading one list and then another therefore needs the first
+ * closed explicitly.
+ *
+ * Closing is the trigger's own toggle rather than a synthesized outside click, because that is
+ * the affordance the primitive publishes and the one a keyboard user reaches.
+ *
+ * @param {HTMLElement} root The harness mount target.
+ * @param {string} triggerSelector A selector for the trigger.
+ * @returns {void}
+ */
+export function closeSelectPanel(root, triggerSelector) {
+  const trigger = root.querySelector(triggerSelector);
+  assert.ok(Boolean(trigger), `no converted select trigger matches ${triggerSelector}`);
+  if (trigger.getAttribute('aria-expanded') !== 'true') return;
+  trigger.click();
+  flushSync();
+  assert.equal(
+    trigger.getAttribute('aria-expanded'),
+    'false',
+    `${triggerSelector} did not close when its trigger was clicked a second time`
+  );
+}
+
+/**
  * Every value a converted select currently offers, in rendered order.
  *
  * Indexed over `[role="option"]` rather than over `[data-popover-option]`, so a row that lost
@@ -134,4 +166,52 @@ export function selectTriggerText(root, triggerSelector) {
   const trigger = root.querySelector(triggerSelector);
   assert.ok(Boolean(trigger), `no converted select trigger matches ${triggerSelector}`);
   return trigger.querySelector('.fabricate-select-value')?.textContent?.trim() ?? '';
+}
+
+/**
+ * The accessible NAME a converted trigger actually resolves to, asserted non-empty (issue 1510).
+ *
+ * WHY A POSITIVE ASSERTION RATHER THAN A WARNING COUNT. `Select.svelte` warns only when all three
+ * name props are absent, so "no `Fabricate | Select:` warning" proves AT LEAST ONE name rather
+ * than the right one — and it is entirely silent for a demoted wrapper whose caption never
+ * received its `id`, which is the exact defect the demotion rule can introduce. This resolves the
+ * name the way an assistive technology does — `aria-labelledby` first, then `aria-label` — and
+ * reds when the pointer names nothing, so a caption with no `id` fails here by name.
+ *
+ * It does NOT assert "never both". `Select.svelte` writes at most one of the two onto the trigger
+ * by construction, so a DOM-level clause could never red; the check that can is the SOURCE-level
+ * one over call sites, which is a different artifact.
+ *
+ * @param {HTMLElement} root The harness mount target.
+ * @param {string} triggerSelector A selector for the trigger — normally the call site's own hook.
+ * @returns {string} The resolved name, so a suite can pin it against a pre-conversion value.
+ */
+export function assertSelectHasResolvedName(root, triggerSelector) {
+  const trigger = root.querySelector(triggerSelector);
+  assert.ok(Boolean(trigger), `no converted select trigger matches ${triggerSelector}`);
+
+  const labelledBy = trigger.getAttribute('aria-labelledby');
+  if (labelledBy) {
+    // THE DOCUMENT, not `root`. The caption may sit outside the harness mount target when a
+    // suite mounts a portaled surface, and an `aria-labelledby` is resolved against the whole
+    // document either way — so scoping the lookup here would report a working name as broken.
+    const caption = trigger.ownerDocument.getElementById(labelledBy);
+    const name = caption?.textContent?.replaceAll(/\s+/gu, ' ').trim() ?? '';
+    assert.ok(
+      name.length > 0,
+      `${triggerSelector} points \`aria-labelledby\` at "${labelledBy}", which names ` +
+        `${caption ? 'an empty element' : 'no element in the document'}. A demoted wrapper whose ` +
+        'caption never received its `id` fails here — and the primitive does not warn about it, ' +
+        'because it was given a name prop.'
+    );
+    return name;
+  }
+
+  const ariaLabel = trigger.getAttribute('aria-label') ?? '';
+  assert.ok(
+    ariaLabel.trim().length > 0,
+    `${triggerSelector} resolves to no accessible name at all: no \`aria-labelledby\` and no ` +
+      '`aria-label` on the trigger'
+  );
+  return ariaLabel.trim();
 }

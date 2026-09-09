@@ -858,14 +858,24 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // shell, and each draws its pager's per-page trigger CLOSED, where the conversion is a button
   // with a chevron.
   //
-  // TWO entries, because `showTick` is a CONFIGURATION and no one frame holds both of its values.
-  // `manager-recipes-bulk-edit-check-tier` is the ticked, grouped, hinted list — the densest
-  // composition any caller reaches — and `player-inventory-page-size` is the TICKLESS one, which
-  // is the polarity no other frame in the registry holds: issue 1511 added three more open player
-  // panels and every one of them ticks, so this pair is still the only place a change to the tick
-  // gutter, to the group heading's inset or to the panel band can be read in both of its states.
-  // It is a player frame as well, which is a second portal host with its own per-site trigger
-  // rules, but that is no longer what makes it the entry — the absent gutter is.
+  // THREE entries. The first two are a polarity pair, because `showTick` is a CONFIGURATION and
+  // no one frame holds both of its values: `manager-recipes-bulk-edit-check-tier` is the ticked,
+  // grouped, hinted list — the densest composition any caller reaches — and
+  // `player-inventory-page-size` is the TICKLESS one, which is the polarity no other frame in the
+  // registry holds: issue 1511 added three more open player panels and every one of them ticks,
+  // so this pair is still the only place a change to the tick gutter, to the group heading's
+  // inset or to the panel band can be read in both of its states. It is a player frame as well,
+  // which is a second portal host with its own per-site trigger rules, but that is no longer what
+  // makes it the entry — the absent gutter is.
+  //
+  // The third is the LABELLED FORM, and it was added at issue 1510 because that change swapped
+  // the form's host element — `<Field as="label">` to `<Field as="div">`, so the caption is no
+  // longer a hit target and the trigger is named by pointing at it — and neither frame above
+  // draws a caption at all. `interactables-manager-region-open` is the promote card's
+  // `<Select label="Region">` with its panel open at this window's full-width trigger, so the
+  // caption, the trigger and the panel are all in one frame; the change that repaired the form
+  // touched twelve shipped call sites without editing one of them, which is exactly the shape of
+  // change a published frame is for.
   //
   // ADDITIVE, like every entry here: `selectRenderFileCases` still adds the representative pair,
   // which is what keeps the trigger's own CLOSED treatment — the form nine pagers draw — in the
@@ -877,6 +887,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/Select.svelte': Object.freeze([
     'manager-recipes-bulk-edit-check-tier',
     'player-inventory-page-size',
+    'interactables-manager-region-open',
   ]),
   // The essence SOURCE picker (issue 1503), whose panel moved wholesale onto the primitive above
   // — a new backdrop rung, `--fab-shadow-lg`, a 10px radius, the primitive's search row and list,
@@ -2006,11 +2017,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Manager — World Currency macro',
     smokeLabels: ['currency-macro'],
     reaches: 'exact',
-    // The macro branch is a `<select>` value, so `select` is the only verb that reaches it.
+    // The macro branch is chosen on the app's own option list (issue 1510): the strategy control
+    // is a `<Select>` now, so the native `select:` verb — which `view-lab-screenshots.mjs` turns
+    // into Playwright's `<select>`-only `selectOption` — would throw on its `<button>` trigger.
     steps: [
       { selector: '#manager-world-nav-rules', press: 'Enter' },
       { selector: '#manager-rules-nav-currency', press: 'Enter' },
-      { selector: '[data-world-currency-strategy-select]', select: 'macro' },
+      ...chooseSelectOption('[data-world-currency-strategy-select]', 'macro'),
       { selector: '[data-world-currency-units]', scroll: true },
     ],
     expectView: 'world-currency',
@@ -2029,7 +2042,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     steps: [
       { selector: '#manager-world-nav-rules', press: 'Enter' },
       { selector: '#manager-rules-nav-currency', press: 'Enter' },
-      { selector: '[data-world-currency-strategy-select]', select: 'actorInventory' },
+      ...chooseSelectOption('[data-world-currency-strategy-select]', 'actorInventory'),
       { selector: '[data-world-currency-units]', scroll: true },
     ],
     expectView: 'world-currency',
@@ -2097,6 +2110,136 @@ export const VIEW_LAB_CASES = Object.freeze([
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldPrerequisitesTab\.svelte$/],
+  }),
+  // ── THE OPEN-PANEL FRAMES FOR ISSUE 1510'S FIRST PHASE ────────────────────────────────────
+  //
+  // Every converted control's OPEN state became photographable for the first time with the
+  // conversion — a native `<select>`'s popup is drawn by the operating system and does not appear
+  // in a screenshot at all — and an open-panel case cannot double as its view's closed-state
+  // frame, because the portal occludes the screen behind it. So these sit beside the closed
+  // frames rather than replacing them.
+  //
+  // The set is chosen by what can BREAK rather than by what changed: one case per tick polarity,
+  // the narrowest trigger in the phase (whose panel is the one overridden away from its rung's
+  // 240px floor), and the trailing-edge trigger of a two-column row, where a panel wider than its
+  // trigger is clipped by the window edge if it is clipped at all.
+  //
+  // TWO OF THE PHASE'S LISTS HAVE NO CASE, and the reason is the world rather than the plan. The
+  // currency PROVIDER roster renders only under the `actorInventory` strategy, and dnd5e
+  // registers no inventory provider — `currency-actor-inventory` above photographs the
+  // no-provider callout that appears in its place. The folder-import category list renders only
+  // inside a modal opened by a folder drop, which no case performs. Both are the genuinely
+  // data-driven lists this phase converted, and both are measured instead by
+  // `tests/components/manager-select-conversion-rendered.test.js`, which mounts their real
+  // components against the real sheet.
+  //
+  // ONE CLOSED-STATE FRAME JOINS THEM: `world-prerequisites-condition-row`. Its route's ordinary
+  // closed frame (`world-prerequisites` above) draws the list with every item COLLAPSED, so the
+  // condition row the conversion moved appears in no frame at all except the open-panel one that
+  // occludes it. A converted control's closed treatment is the state a GM reads for all but a
+  // moment, and where the ordinary `mapChangedFilesToCases` frame does not reach it, the registry
+  // owes it a case rather than an assumption.
+  managerCase({
+    id: 'world-currency-strategy-list',
+    label: 'Manager — World Currency spend strategy list',
+    smokeLabels: [],
+    // `beyond`: the smoke walks THROUGH this control to the macro and inventory states and never
+    // rests on it open, so there is no counterpart frame to fall short of.
+    reaches: 'beyond',
+    // The closed-state case's own route, stopped at the trigger with no row click.
+    steps: [
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-currency', press: 'Enter' },
+      { selector: '[data-world-currency-strategy-select]' },
+    ],
+    expectView: 'world-currency',
+    // THREE claims, and a trigger-only frame satisfies none of them: the panel exists, it is a
+    // DIRECT child of the manager root (the portal, not the fallback that draws it in place), and
+    // it is the UNTICKED configuration. The rung is deliberately NOT compounded in: the class is
+    // composed as `fabricate-select-popover-${rung}` in a template literal, so a literal
+    // `fabricate-select-popover-form` appears nowhere in `src/` and the registry's own
+    // selector-liveness gate reads it as naming UI that does not exist. The rung is measured
+    // where it can be — the mounted and rendered suites. The `:not()` is the half that matters — a caller that lost `showTick={false}` draws a tick gutter with every other claim
+    // here still true.
+    expectSelector:
+      '.fabricate-manager > .fabricate-select-popover' +
+      ':not(.fabricate-select-popover-ticked) [data-popover-option="macro"]',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
+  }),
+  managerCase({
+    id: 'world-prerequisites-operator-list',
+    label: 'Manager — World Character prerequisite operator list',
+    smokeLabels: [],
+    reaches: 'beyond',
+    // THE NARROWEST TRIGGER IN THE PHASE, and the one whose panel is overridden. The operator sits
+    // in a `flex: 1 1 160px` cell beside a wider path field and a narrow value field, so its
+    // column is the tightest box any converted control in this phase opens from — and the caller
+    // states `minWidth={160}` so the panel hugs that column instead of opening at the `form`
+    // rung's 240px floor and overhanging the cell it belongs to. It is also the phase's TICKED
+    // case: nine comparison operators are close cousins and the trigger shows one symbol.
+    steps: [
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-prerequisites', press: 'Enter' },
+      { selector: '.manager-prerequisite-item [data-toggle-prerequisite]' },
+      { selector: '[data-prerequisite-operator]' },
+    ],
+    expectView: 'world-prerequisites',
+    // The tick element ON THE SELECTED ROW, which is the claim the panel's own class does not
+    // make. `.fabricate-select-popover-ticked` says the list RESERVES a gutter; naming a tick
+    // inside a row that `-ticked` already selected only re-asserts it. What a reader of this
+    // frame needs is that the row `aria-selected="true"` names is the row DRAWING the tick — the
+    // gutter is reserved, occupied, and occupied in the right place — because a run of
+    // single-line rows with an empty gutter, or with the mark on the wrong row, is exactly the
+    // regression this frame exists to be read against.
+    expectSelector:
+      '.fabricate-manager > .fabricate-select-popover.fabricate-select-popover-ticked ' +
+      '[role="option"][aria-selected="true"] .fabricate-select-tick',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/system\/CharacterPrerequisitesCard\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/world\/WorldPrerequisitesTab\.svelte$/,
+    ],
+  }),
+  managerCase({
+    // THE CONVERTED ROW WITH ITS LIST SHUT (issue 1510). Its sibling above is the only frame in
+    // the registry that draws this control, and it draws it OPEN — the panel occludes the row it
+    // belongs to, so the trigger's own closed treatment inside the condition row (its box in a
+    // `flex: 1 1 160px` cell, its chevron, its baseline against the path and value inputs beside
+    // it) is not readable in any published frame. That is the state a GM sees for all but a
+    // moment, and it is the state the demotion moved: the caller's wrapper was a `<label>` and is
+    // a `Field as="div"` behind a `visually-hidden` caption now, with the trigger's width stated
+    // by the caller's own scoped counterpart.
+    //
+    // The steps are the operator list's own, minus its last: opening the panel is exactly what
+    // this case must not do. The trailing `scroll` is what puts the expanded item in the PNG —
+    // `frame.screenshot()` does not scroll a nested overflow container, so without it every
+    // assertion passes on a frame that shows the list header alone.
+    id: 'world-prerequisites-condition-row',
+    label: 'Manager — World Character prerequisite condition row, operator closed',
+    smokeLabels: [],
+    // `beyond`: the smoke never expands a prerequisite item, so there is no counterpart frame
+    // this one could fall short of and no label it could claim.
+    reaches: 'beyond',
+    steps: [
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-prerequisites', press: 'Enter' },
+      { selector: '.manager-prerequisite-item [data-toggle-prerequisite]' },
+      { selector: '[data-world-prerequisites-page]', scroll: true },
+    ],
+    expectView: 'world-prerequisites',
+    // BOTH halves matter. `[data-prerequisite-operator]` is the caller's own hook and
+    // `.fabricate-select-trigger` is the primitive's class, so the pair asserts that the hook is
+    // still ON the converted trigger rather than on a wrapper — which is what a caller that
+    // reached for a wrapper instead of `triggerData` would produce — and the ancestor asserts the
+    // row it sits in still exists under the class its width counterpart is anchored at.
+    expectSelector:
+      '.manager-prerequisite-condition [data-prerequisite-operator].fabricate-select-trigger',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/system\/CharacterPrerequisitesCard\.svelte$/],
   }),
   managerCase({
     id: 'world-modifiers',
@@ -9987,6 +10130,39 @@ export const VIEW_LAB_CASES = Object.freeze([
       /^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/EnvironmentsBrowserView\.svelte$/,
     ],
+  }),
+  managerCase({
+    id: 'manager-gathering-economy-regen-unit-list',
+    label: 'Manager — Gathering economy regeneration unit list',
+    smokeLabels: [],
+    // `beyond`: the live smoke never walks the Gathering Settings tab at all.
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism' },
+    // THE TRAILING-EDGE TRIGGER OF THE PHASE. The regeneration row is a two-column grid and the
+    // unit control is its right-hand cell, so its panel is the one that opens nearest the window
+    // edge — the case where a panel wider than its trigger is clipped if it is clipped at all.
+    // It is also the phase's second UNTICKED list, drawn from a caller that adopted the
+    // primitive's own labelled form rather than demoting a wrapper.
+    //
+    // THE STATE IS DRIVEN, on `manager-gathering-economy-actors`' own reasoning: the fixture world
+    // enables stamina on no system, and seeding one would put a stamina readout into the player
+    // gathering frames of whichever system it was seeded on. Four gestures reach it — enable the
+    // Stamina limitation, give it a max expression, switch regeneration to Over world time (which
+    // is what renders the unit cell at all), then open the unit list.
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-settings' },
+      { selector: '[data-economy-mode-option="stamina"]' },
+      { selector: '[data-economy-stamina-max]', fill: '12' },
+      ...chooseSelectOption('[data-economy-regen-policy]', 'overTime'),
+      { selector: '[data-economy-regen-unit]' },
+    ],
+    expectView: 'environments',
+    expectSelector:
+      '.fabricate-manager > .fabricate-select-popover' +
+      ':not(.fabricate-select-popover-ticked) [data-popover-option="weeks"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/],
   }),
   managerCase({
     id: 'manager-environment-edit-blind-weights',

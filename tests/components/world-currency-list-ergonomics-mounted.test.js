@@ -1,7 +1,10 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -30,6 +33,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayHost.js'
   ],
   compiledModules: [
+    // THE APP'S ONE SELECT AND ITS WHOLE COMPILED CLOSURE (issue 1510), spread rather than copied.
+    // This tree renders `components/Select.svelte` now, and a `.svelte` the tree renders but the
+    // harness omits HANGS the suite (`# cancelled`) rather than failing it.
+    ...SELECT_COMPILED_MODULES,
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled)
     // rather than failing it, so every one is named.
     'src/ui/svelte/components/Chip.svelte',

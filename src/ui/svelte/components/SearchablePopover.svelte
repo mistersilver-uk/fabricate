@@ -185,6 +185,13 @@
                    `type`, `onclick` or ARIA contract.
     triggerTitle — optional native `title` tooltip on the trigger button
                    (backward-compatible; omitted when empty)
+    triggerAriaDescribedBy — OPTIONAL id list for the trigger's `aria-describedby`,
+                   beside `triggerAriaLabelledBy` and omitted when empty. A
+                   DESCRIPTION rather than a name: a caller that renders a hint or an
+                   error beside the control points at it here so the announcement
+                   carries it, and the trigger is a `<button>` with no containment to
+                   supply one. `triggerData` is not the route — it is spread FIRST,
+                   and this key is written after it.
     triggerHasPopup — `'dialog'` (default) or `'listbox'`, the trigger's `aria-haspopup`
                    (issue 1458). This is INFORMATIONAL rather than structural: it tells
                    assistive technology what activating the trigger will open, and it is
@@ -558,6 +565,7 @@
     triggerAriaDisabled = false,
     triggerAriaLabel = '',
     triggerAriaLabelledBy = '',
+    triggerAriaDescribedBy = '',
     dialogAriaLabel = '',
     dialogAriaLabelledBy = '',
     searchPlaceholder = '',
@@ -1211,6 +1219,11 @@
     // is the one the accessibility tree uses — which is the point: the visible caption wins over
     // a string, and a caller that has a caption should be naming the control with it.
     'aria-labelledby': triggerAriaLabelledBy || undefined,
+    // THE DESCRIPTION, not a second name. A caller whose control renders a hint or an error
+    // beside it points here, and the accessibility tree announces the description AFTER the
+    // name rather than in place of it. Omitted when empty for the same reason as the two above:
+    // an `aria-describedby` pointing at no element is worse than none at all.
+    'aria-describedby': triggerAriaDescribedBy || undefined,
     // THE TRIGGER IS THE HOLDER when no query field is rendered (`spec.md`'s own case for the
     // search-suppressed shape): `role="combobox"` plus the activedescendant pair, and
     // `data-keyboard-focus="true"` because a `<button>` outside a `<form>` answers Foundry's

@@ -2,7 +2,16 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
+import {
+  assertSelectHasResolvedName,
+  closeSelectPanel,
+  selectOptionLabels,
+  selectOptionValues,
+} from '../helpers/select-control.js';
 import { assertNoElement } from '../helpers/svelte-dom.js';
 import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 
@@ -38,6 +47,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayHost.js'
   ],
   compiledModules: [
+    // THE APP'S ONE SELECT AND ITS WHOLE COMPILED CLOSURE (issue 1510), spread rather than copied.
+    // This tree renders `components/Select.svelte` now, and a `.svelte` the tree renders but the
+    // harness omits HANGS the suite (`# cancelled`) rather than failing it.
+    ...SELECT_COMPILED_MODULES,
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled) rather
     // than failing it, so every one is named.
     'src/ui/svelte/components/Chip.svelte',
@@ -408,6 +421,97 @@ describe('WorldCurrencyTab validation copy (issue 1493)', () => {
         JSON.parse(found[1]),
         shipped[leaf],
         `the ${leaf} fallback must read exactly what lang/en.json ships`
+      );
+    }
+  });
+
+  it('names both converted currency controls by their captions, and keeps their option lists', async () => {
+    // THE PROVIDER CONTROL'S FIRST MOUNTED COVERAGE (issue 1510), and the pin for BOTH names this
+    // change touched. The strategy control's wrapper demoted to `Field as="div"`; the provider's
+    // was DELETED, its caption and its hint riding the primitive's own `label=`/`hint=` form —
+    // which is `hint`'s first caller in the corpus.
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      currencySpendStrategy: 'actorInventory',
+      currencyProviderId: 'dnd5e-inventory',
+      currencyProviderOptions: [
+        { id: 'dnd5e-inventory', label: 'D&D 5e actor inventory currency' },
+        { id: 'pf2e-inventory', label: 'Pathfinder 2e actor inventory currency' },
+      ],
+    });
+
+    const provider = '[data-world-currency-provider-select]';
+    assert.deepEqual(selectOptionValues(root, provider), ['dnd5e-inventory', 'pf2e-inventory']);
+    assert.deepEqual(selectOptionLabels(root, provider), [
+      'D&D 5e actor inventory currency',
+      'Pathfinder 2e actor inventory currency',
+    ]);
+    closeSelectPanel(root, provider);
+
+    // BOTH NAMES NARROWED, DELIBERATELY, and this is the assertion that records it. Each wrapper
+    // was a `<Field as="label">` holding the caption, the control AND a hint, so the containment
+    // named each control by its caption plus the whole hint paragraph — and for the strategy that
+    // name CHANGED with the value, because the hint reflects the chosen strategy. Both are named
+    // by their caption alone now.
+    assert.equal(assertSelectHasResolvedName(root, provider), 'Provider');
+    assert.equal(
+      assertSelectHasResolvedName(root, '[data-world-currency-strategy-select]'),
+      'Spend strategy'
+    );
+
+    // The provider's hint is the primitive's own note line, after the control rather than inside
+    // the name, and the strategy's stayed the caller's hooked `<small>`.
+    assert.ok(
+      root.querySelector(provider).closest('.manager-field').querySelector('.fabricate-select-note'),
+      'the provider hint renders through `hint=`, under the control'
+    );
+    assert.ok(
+      root.querySelector('[data-world-currency-strategy-hint]'),
+      'and the strategy hint stays the caller`s own hooked element'
+    );
+    // AND BOTH HINTS ARE ANNOUNCED, not merely drawn. Each control lost its `<label>`
+    // containment, which is what used to fold the hint into the announced name — narrowing the
+    // name was the right repair, but it left two hints on screen that nothing read. The provider
+    // rides the primitive's own note through `hint=`; the strategy's is the caller's `<small>`,
+    // drawn here because its copy changes with the chosen strategy, and reached through
+    // `ariaDescribedBy`. Both are resolved to their rendered TEXT, because a pointer at a missing
+    // element is exactly the failure this clause exists to catch.
+    for (const [selector, expected] of [
+      [
+        provider,
+        'A preconfigured adapter that reads and spends coins from the actor inventory.',
+      ],
+      [
+        '[data-world-currency-strategy-select]',
+        'Use a preconfigured provider that reads and spends coins from the actor inventory (e.g. pf2e).',
+      ],
+    ]) {
+      const describedBy = root.querySelector(selector).getAttribute('aria-describedby');
+      assert.ok(Boolean(describedBy), `${selector} describes itself by the hint beside it`);
+      assert.equal(
+        root.querySelector(`#${describedBy}`)?.textContent.trim(),
+        expected,
+        `${selector}'s aria-describedby resolves to the hint the GM can see`
+      );
+    }
+    assert.equal(
+      root
+        .querySelector('[data-world-currency-strategy-select]')
+        .getAttribute('aria-describedby'),
+      root.querySelector('[data-world-currency-strategy-hint]').id,
+      'and the strategy points at the caller`s own hooked element, not at a note the primitive ' +
+        'would have drawn instead'
+    );
+
+    // BOTH TRIGGERS, because "either" is what the message claims and one of them was never
+    // asked. The strategy is the demote-and-point site — the caller's own wrapper became a
+    // `Field as="div"` — and the provider is the primitive's own labelled form, whose host this
+    // change swapped inside `Select.svelte`; a regression in either place is a caption that
+    // forwards its click into a panel dismissed on `mousedown`.
+    for (const trigger of [provider, '[data-world-currency-strategy-select]']) {
+      assert.ok(
+        !root.querySelector(trigger).closest('label'),
+        `no \`<label>\` survives around ${trigger}`
       );
     }
   });

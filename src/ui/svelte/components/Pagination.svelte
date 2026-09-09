@@ -273,12 +273,20 @@
       </nav>
     {/if}
     {#if showPageSize}
-      <!-- A `<span>` RATHER THAN THE `<label>` THIS WAS (issue 1504). The control is a
-           `<button>` now, and a `<label>` names no button by containment while it DOES forward
-           its clicks to one — which would toggle the panel open and straight shut again. The
-           class survives unchanged: it is what the five player pagers' and the journal's own
-           per-site trigger fills hang off, and what the manager's 64px floor is stated
-           through. -->
+      <!-- A `<span>` RATHER THAN THE `<label>` THIS WAS (issue 1504; its stated reason corrected
+           at issue 1510). The control is a `<button>` now, and the reason for the demotion is the
+           CLICK rather than the name: a `<label>` names a `<button>` by containment perfectly
+           well — `<button>` is a labelable element — but it also FORWARDS a caption click into
+           the control it names, and this control's panel is dismissed on `mousedown` in the
+           capture phase while it is open. So from the closed state a caption click opens the list
+           and it stays open, and from the OPEN state the caption's own mousedown dismisses it and
+           the forwarded click re-opens it — the caption can never close the list. Measured in a
+           real browser at issue 1511 and again at issue 1510, on both this shape and the
+           primitive's own labelled form, which was repaired the same way in the same change.
+           The caption is named through `aria-labelledby` for a different reason again: there is
+           no `id`-bearing labelable element for a `for` to address. The class survives unchanged:
+           it is what the five player pagers' and the journal's own per-site trigger fills hang
+           off, and what the manager's 64px floor is stated through. -->
       <span class="manager-pagination-size">
         <span id={captionId}>{text('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span>
         <Select

@@ -9407,20 +9407,25 @@ async function main() {
         await showCurrencyCard();
         await screenshot(page, 'currency-actor-property');
 
+        // THE SPEND STRATEGY IS THE APP'S OWN OPTION LIST (issue 1510), so `selectOption` — which
+        // is Playwright's `<select>`-ONLY API and THROWS on anything else — is replaced by the
+        // harness's own two-click drive. Each row is addressed by its `data-popover-option`
+        // handle rather than positionally, so a vocabulary change reads as a missing option
+        // rather than as a different strategy being chosen.
         const currencyStrategy = page.locator('.fabricate-manager [data-world-currency-strategy-select]').first();
-        await currencyStrategy.selectOption('macro');
+        await chooseSelectOption(page, currencyStrategy, { value: 'macro' });
         await page.locator('.fabricate-manager [data-world-currency-macros]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await showCurrencyCard();
         await screenshot(page, 'currency-macro');
 
-        await currencyStrategy.selectOption('actorInventory');
+        await chooseSelectOption(page, currencyStrategy, { value: 'actorInventory' });
         await page.locator('.fabricate-manager [data-world-currency-no-provider]').first().waitFor({ state: 'visible', timeout: 5_000 });
         await showCurrencyCard();
         await screenshot(page, 'currency-actor-inventory');
 
         // Leave the persisted world on the default strategy. The walk does not navigate back:
         // the next section opens its own manager route (`openManagerCraftingSection`).
-        await currencyStrategy.selectOption('actorProperty');
+        await chooseSelectOption(page, currencyStrategy, { value: 'actorProperty' });
         await page.waitForTimeout(300);
 
         // ── D0 section: recipes / crafting (issue #826 scoped-skip guard) ──────

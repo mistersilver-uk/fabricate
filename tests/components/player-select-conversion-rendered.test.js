@@ -25,10 +25,12 @@
  * at all, so the dismisser never runs and both shapes pass. The sequence below is the real one a
  * pointer produces — `mousedown`, `mouseup`, `click` — dispatched through Playwright's own mouse.
  *
- * The THIRD subject is REPORT-ONLY and is the primitive's own shipped labelled form, `Select
- * label=`, which renders `<Field as="label">` AROUND the trigger. It is a surviving `<label>`
- * wrapper with live callers, and this change adopts none of them — so its leg 2 is measured and
- * recorded here for issue 1510's decision rather than acted on by this one.
+ * The THIRD subject is the primitive's own labelled form, `Select label=`. It rendered
+ * `<Field as="label">` AROUND the trigger when this suite landed — a surviving `<label>` wrapper
+ * with twelve live callers, none of them this change's — so its leg 2 was measured and REPORTED
+ * for issue 1510's decision. It failed. Issue 1510 took the maintainer's ruling and repaired the
+ * form inside the primitive (`Field as="div"` with the caption pointed at), so the clause is an
+ * assertion now rather than a report.
  *
  * ── 2. WHETHER A WIDTH FLOOR IS ACTUALLY A FLOOR ────────────────────────────────────────────
  * A `<select>` sizes itself to its widest option; the `<button>` that replaces it hugs the one it
@@ -263,22 +265,28 @@ describe('a caption click cannot close a list it is wrapped in a <label> with (i
     assert.match(surviving.accessibleName, /Sort/, 'the wrapped trigger IS named by its caption');
   });
 
-  it('reports both legs for the primitive’s own shipped labelled form (report-only)', async () => {
-    // REPORT-ONLY, and routed here from issue 1510. `Select label=` renders `<Field as="label">`
-    // AROUND the trigger, so it is a surviving `<label>` wrapper with live callers — and this
-    // change adopts none of them, which is why the outcome is recorded rather than acted on. The
-    // assertion is that the form still OPENS, which is the property its callers depend on; the
-    // closing leg is printed for the decision issue 1510 has to take.
+  it('closes from open on the primitive’s own labelled form, which issue 1510 repaired', async () => {
+    // THIS CLAUSE WAS REPORT-ONLY WHEN IT LANDED, and it is an assertion now. Issue 1511 measured
+    // `Select label=` as it then shipped — `<Field as="label">` around the trigger, a surviving
+    // `<label>` wrapper with twelve live callers — and reported leg 2 FAILING there, which was
+    // this suite's whole reason for carrying a third subject. On that report the maintainer ruled
+    // the repair into issue 1510 rather than into a caller sweep: the host is `Field as="div"`
+    // now, the caption span carries the id the trigger's `aria-labelledby` already pointed at,
+    // and no caller changed. So the leg that was printed for a decision is the decision's
+    // regression guard.
     const field = await captionClickLegs('field', '.fabricate-select-caption');
-    console.log(
-      `ISSUE 1511 REPORT — Select label= (Field as="label"): leg 1 opens=${field.openedFromClosed}, ` +
-        `leg 2 closes=${field.closedFromOpen}, accessible name="${field.accessibleName}"`
+    assert.equal(
+      field.closedFromOpen,
+      true,
+      'the repaired labelled form closes when its own caption is pressed. Before issue 1510 it ' +
+        'did not: the caption’s mousedown dismissed the panel and the `<label>` forwarded a ' +
+        'click that re-opened it, at all twelve `Select label=` call sites.'
     );
     assert.equal(
       field.openedFromClosed,
-      true,
-      'the shipped labelled form still opens from a caption click, which is what its twelve ' +
-        'callers depend on'
+      false,
+      'and its caption is no longer a hit target, which is the same accepted cost the caller-side ' +
+        'demotion pays — paid inside the primitive this time'
     );
   });
 });

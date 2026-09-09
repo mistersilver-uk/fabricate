@@ -27,6 +27,7 @@
     prerequisitePreview,
   } from '../../../../../systems/characterPrerequisites.js';
   import IconButton from '../../../components/IconButton.svelte';
+  import Select from '../../../components/Select.svelte';
 
   let {
     library = [],
@@ -79,6 +80,26 @@
   function text(key, fallback) {
     const translated = localize(key);
     return translated && translated !== key ? translated : fallback;
+  }
+
+  // THE OPERATOR VOCABULARY, mapped once for the shared `<Select>` rather than per row. The
+  // labels are carried verbatim from the `<option>` text this replaced, including the `symbol ·
+  // label` join a valueless operator does not take, so nothing a GM reads changes.
+  const operatorOptions = PREREQUISITE_OPERATORS.map((operator) => ({
+    value: operator.id,
+    label: operator.valueless ? operator.label : `${operator.symbol} · ${operator.label}`,
+  }));
+
+  // The caption id, per ROW rather than per component: the library renders one of these per
+  // prerequisite, and two triggers pointing at one caption would name both controls the same.
+  const instanceId = $props.id();
+
+  /**
+   * @param {string} entryId The prerequisite's own id.
+   * @returns {string} The document-unique id of that row's operator caption.
+   */
+  function operatorCaptionId(entryId) {
+    return `${instanceId}-operator-${entryId}`;
   }
 
   function toggleOpen(id) {
@@ -279,23 +300,28 @@
                       />
                     </div>
                   </Field>
-                  <Field as="label" class="manager-prerequisite-operator">
-                    <span class="visually-hidden">
+                  <!-- A `Field as="div"` RATHER THAN THE `as="label"` THIS WAS (issue 1510). The
+                       select is the shared `<Select>` now, so the control is a `<button>` opening
+                       a portaled panel — and a `<label>` forwards a caption click into it, which
+                       from the open state dismisses the panel on `mousedown` and re-opens it on
+                       the forwarded click. The caption keeps its class and its `visually-hidden`
+                       treatment and names the trigger through `aria-labelledby` instead of by
+                       containment. It stays hidden rather than adopting the primitive's own
+                       `label=` form, which renders a VISIBLE caption: this row already carries a
+                       "Condition" heading above it, and putting "Operator" on screen beside the
+                       path and value fields would be new copy this change is not making. -->
+                  <Field as="div" class="manager-prerequisite-operator">
+                    <span class="visually-hidden" id={operatorCaptionId(entry.id)}>
                       {text('FABRICATE.Admin.Manager.CharacterPrerequisites.Operator', 'Operator')}
                     </span>
-                    <select
+                    <Select
                       value={entry.op}
-                      data-prerequisite-operator
-                      onchange={(event) => onUpdate(entry.id, { op: event.currentTarget.value })}
-                    >
-                      {#each PREREQUISITE_OPERATORS as operator (operator.id)}
-                        <option value={operator.id}
-                          >{operator.valueless
-                            ? operator.label
-                            : `${operator.symbol} · ${operator.label}`}</option
-                        >
-                      {/each}
-                    </select>
+                      options={operatorOptions}
+                      ariaLabelledBy={operatorCaptionId(entry.id)}
+                      triggerData={{ 'data-prerequisite-operator': '' }}
+                      minWidth={160}
+                      onChange={(next) => onUpdate(entry.id, { op: next })}
+                    />
                   </Field>
                   {#if !isValuelessOperator(entry.op)}
                     <Field as="label" class="manager-prerequisite-value">
@@ -327,3 +353,23 @@
     {/if}
   </div>
 </section>
+
+<style>
+  /* THE WIDTH THE ELEMENT-TYPED SHEET RULE NO LONGER SUPPLIES (issue 1510).
+     `.fabricate-field.manager-field select { width: 100% }` painted this control until it became
+     a `<button>`, and `.fabricate-select-trigger` declares no width at all by design — a
+     trigger's box belongs to the row it sits in. Without this rule the button hugs its value, so
+     the operator control measured 72.91px on "is false", 92.28px on "≥ · at least" and 109.66px
+     on "≠ · not equals" inside a 218px column, and picking a different comparison visibly
+     re-flowed the path and value fields beside it. Measured in Chromium against the fixture's
+     declared Arial face; the same three values render at one width with it.
+
+     The `:global()` is anchored at `.manager-prerequisite-condition`, which THIS component
+     writes, so the rule keeps a scoping hash rather than reaching every trigger in the document.
+     The class it qualifies sits on a `<Field>`, which Svelte stamps no hash on — the trap
+     `Field.svelte` documents at length. */
+  .manager-prerequisite-condition
+    :global(.manager-prerequisite-operator .fabricate-select-trigger) {
+    width: 100%;
+  }
+</style>

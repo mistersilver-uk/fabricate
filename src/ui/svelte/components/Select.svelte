@@ -16,7 +16,7 @@
   already shipped by that primitive and by `util/listboxNavigation.js`. Nothing here rebuilds any
   of it. What this component owns is the SELECT'S OWN vocabulary — a `{value, label, hint, badge,
   group}` option shape rather than the primitive's `{id, dataId}` one, three published size rungs,
-  the tick column, and the `<Field as="label">` labelled form.
+  the tick column, and the `<Field as="div">` labelled form.
 
   It uses the primitive's OWN trigger rather than supplying a `trigger` snippet, which is what
   makes the combobox contract free: with `showSearch={false}` the primitive already puts
@@ -116,12 +116,26 @@
                  which is the defect issue 1511 shipped and corrected.
     triggerData — a `data-*` map stamped verbatim on the trigger button, which is where every
                  converted call site's own stable hook goes. `data-select-size` is added to it.
-    label / hint / error — present ⇒ the whole control renders inside `<Field as="label">`, with a
+                 It cannot carry a `title`, an `aria-label` or an `aria-labelledby`:
+                 `SearchablePopover` spreads it FIRST and then writes all three from its own
+                 props, so any of the three placed here is deleted. `triggerTitle` is the route
+                 for the first, `ariaLabel`/`ariaLabelledBy` for the other two. `aria-describedby`
+                 rides `ariaDescribedBy` for the same reason and not this map.
+    triggerTitle — a native `title` tooltip on the trigger button, forwarded verbatim to
+                 `SearchablePopover`'s own prop of that name. It exists because that is the only
+                 route: a `title` inside `triggerData` is overwritten by the primitive's own
+                 write. It has NO caller on this commit: the two
+                 manager sites whose control carries a tooltip as well as an accessible name
+                 (`recipe/RecipeOverviewTab.svelte` and `recipe/RecipeIngredientOption.svelte`)
+                 convert at issue 1510's second phase. It is not a substitute for either name.
+    label / hint / error — present ⇒ the whole control renders inside `<Field as="div">`, with a
                  caption span before the trigger and the hint or error span after it. The caption is
                  given an id and pointed at with `aria-labelledby` because there is no `id`-bearing
                  labelable element for a `for` to address, NOT because a `<label>` cannot name a
-                 `<button>` — it can, and this form relies on it; the earlier wording was corrected
-                 at issue 1511. That is why the labelled form does not also need an `ariaLabel`.
+                 `<button>` — it can, and this form relied on exactly that containment until issue
+                 1510. The host is a `<div>` because a `<label>` ALSO forwards a caption click into
+                 the control, which cannot close a list dismissed on `mousedown`; see the note on
+                 the markup below. That is why the labelled form does not also need an `ariaLabel`.
     ariaLabel / ariaLabelledBy — the accessible name when there is no `label`. One of the three is
                  required. Never pass `ariaLabel` beside `ariaLabelledBy`: a labelledby WINS over
                  a label wherever both are present, so the string would be dead text free to drift
@@ -129,6 +143,14 @@
                  trigger: `label`/`ariaLabel` reach it as the primitive's `dialogAriaLabel` and
                  `ariaLabelledBy` as its `dialogAriaLabelledBy`, so a control named by a caption
                  it already renders no longer opens a dialog and a listbox with no name at all.
+    ariaDescribedBy — the trigger's `aria-describedby`, for a CALLER that renders its own hint or
+                 error beside the control. It overrides the default, which is this component's own
+                 `hint`/`error` span in the labelled form: that span is drawn AFTER the trigger and
+                 the trigger is a `<button>` with no containment, so without a describedby the
+                 hint was on screen and announced by nothing. A caller passing this points at its
+                 own element instead — the currency card's spend-strategy hint, which the caller
+                 draws because it is conditional on the chosen strategy. Never routed through
+                 `triggerData`; see the note there.
     id / name  — the specimen marks both required because a `<label for>` and an error message
                  reference them. Neither is required here and the reason is structural: the
                  labelled form names its trigger with `aria-labelledby`, so there is no `for`/`id`
@@ -205,11 +227,13 @@
     minWidth = 0,
     maxWidth = 0,
     triggerData = {},
+    triggerTitle = '',
     label = '',
     hint = '',
     error = '',
     ariaLabel = '',
     ariaLabelledBy = '',
+    ariaDescribedBy = '',
     id = '',
     name = '',
     readonly = false,
@@ -226,6 +250,7 @@
   // their trigger at the same caption.
   const instanceId = $props.id();
   const captionId = `${instanceId}-caption`;
+  const noteId = `${instanceId}-note`;
 
   const rung = $derived(Object.hasOwn(SIZES, size) ? size : FALLBACK_SIZE);
   const band = $derived(SIZES[rung]);
@@ -242,6 +267,15 @@
   // no label at all.
   const labelledByTarget = $derived(ariaLabelledBy || (label ? captionId : ''));
   const labelTarget = $derived(labelledByTarget ? '' : ariaLabel);
+
+  // THE DESCRIPTION IS THE SPAN THIS COMPONENT ALREADY DRAWS, unless the caller names its own.
+  // The labelled form renders the hint or the error AFTER the trigger with nothing pointing at
+  // it, and a `<button>` has no containment that would announce it — so the note was visible and
+  // silent. A caller's own `ariaDescribedBy` wins because a caller that draws the hint itself
+  // (a conditional one, say) has the id the trigger must point at and this component does not.
+  const describedByTarget = $derived(
+    ariaDescribedBy || (labelled && (error || hint) ? noteId : '')
+  );
 
   /**
    * The primitive's option array, built at the ONE point where the two vocabularies meet.
@@ -443,8 +477,10 @@
     triggerLabel={triggerText}
     triggerIcon={icon}
     triggerData={triggerAttributeData}
+    {triggerTitle}
     triggerAriaLabel={labelTarget}
     triggerAriaLabelledBy={labelledByTarget}
+    triggerAriaDescribedBy={describedByTarget}
     triggerAriaDisabled={readonly}
     dialogAriaLabel={label || ariaLabel}
     dialogAriaLabelledBy={ariaLabelledBy}
@@ -457,13 +493,30 @@
 {/snippet}
 
 {#if labelled}
-  <Field as="label" class={`fabricate-select-field ${extraClass}`} {...restTarget}>
+  <!-- A `<div>` RATHER THAN THE `<label>` THIS WAS (issue 1510, on the maintainer's ruling). The
+       host was `Field as="label"` and the containment named the trigger perfectly well — a
+       `<button>` is labelable — but a `<label>` also FORWARDS a caption click into the control it
+       wraps, and this control is a button toggling a portaled panel whose dismissal listens on
+       `mousedown` in the capture phase while the panel is open. So from open, the caption's own
+       mousedown dismissed the list and the forwarded click re-opened it: the list could never be
+       closed from its own caption, at every one of this form's shipped call sites. Measured on
+       `tests/fixtures/manager-select/`, and it is the same defect the caller-side demotion rule
+       in `openspec/specs/design-system/spec.md` removes at a wrapping `<label>`.
+
+       Nothing else moves. The caption keeps its class, its position and its layout, the trigger
+       is named by the `aria-labelledby` it already carried to that caption's id, and no announced
+       name changes anywhere. The ACCEPTED COST is the same one the caller-side rule accepts: the
+       caption stops being a hit target, so a GM who clicked the caption to open the list now
+       clicks the control. That is accepted because the alternative is a control the caption can
+       never close, and because the trigger is a full-width or rung-floored button rather than a
+       12px checkbox. -->
+  <Field as="div" class={`fabricate-select-field ${extraClass}`} {...restTarget}>
     <span class="fabricate-select-caption" id={captionId}>{label}</span>
     {@render control()}
     {#if error}
-      <span class="fabricate-select-error">{error}</span>
+      <span class="fabricate-select-error" id={noteId}>{error}</span>
     {:else if hint}
-      <span class="fabricate-select-note">{hint}</span>
+      <span class="fabricate-select-note" id={noteId}>{hint}</span>
     {/if}
   </Field>
 {:else}
