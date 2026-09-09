@@ -75,6 +75,7 @@ import {
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
 import { normalizeGatheringResultGroups } from '../../../systems/gatheringResultGroups.js';
+import { Result } from '../../../models/Result.js';
 import { Tool } from '../../../models/Tool.js';
 import { classifyModeChange } from '../../../migration/migrateRecipeForModeChange.js';
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
@@ -90,7 +91,9 @@ import { authoredFailureOutcome } from '../../../utils/gatheringFailureOutcome.j
 import {
   activityFailureResultPolicy,
   normalizeFailureResultPolicy,
+  permitsFailureResults,
 } from '../../../utils/failureResultPolicy.js';
+import { normalizeRoutedName } from '../../../utils/routedOutcomeKeywords.js';
 import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
 import {
   seedToolRepairRequirements as _seedToolRepairRequirements,

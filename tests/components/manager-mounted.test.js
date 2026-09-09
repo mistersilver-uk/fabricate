@@ -14221,7 +14221,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.textContent.includes('Internal ID'), false);
     assert.ok(
       target.textContent.includes(
-        'Edit availability, identity, and drop rules for the selected gathering task.'
+        'Edit identity, availability, resolution, and results for the selected gathering task.'
       )
     );
     assert.ok(target.querySelector('[data-gathering-task-drops-table]'));

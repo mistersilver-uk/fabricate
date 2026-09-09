@@ -9463,10 +9463,15 @@ export function createAdminStore(services) {
     const nextTask = existing
       ? _normalizeGatheringTask({ ...existing, ...mergedUpdates }, _randomID)
       : null;
-    const validatesTaskContent = ['name', 'resolutionMode', 'dropRows', 'resultGroups'].some((key) =>
+    // A fresh task's identity can be authored before either result source exists.
+    // Once sources are authored, a rename still validates their active-mode content.
+    const renamesAuthoredTask =
+      Object.hasOwn(updates, 'name') &&
+      (nextTask?.dropRows.length > 0 || nextTask?.resultGroups.length > 0);
+    const validatesTaskContent = ['resolutionMode', 'dropRows', 'resultGroups'].some((key) =>
       Object.hasOwn(updates, key)
     );
-    if (validatesTaskContent) {
+    if (validatesTaskContent || renamesAuthoredTask) {
       const validation = _validateGatheringLibraryTaskForSystem(nextTask, systemId);
       if (!validation.valid) {
         services.notify?.error?.(validation.errors[0] || 'Gathering task validation failed.');

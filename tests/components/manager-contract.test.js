@@ -1607,43 +1607,32 @@ describe('CraftingSystemManager source contract', () => {
     );
   });
 
-  it('offers a gathering resolution-mode card with d100 selectable and progressive/routed coming soon', () => {
+  it('authors straight, d100 and routed on each task rather than the gathering economy', () => {
     const gatheringEconomySource = readFileSync(
       resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte'),
       'utf8'
     );
     assert.ok(
-      gatheringEconomySource.includes('data-gathering-resolution-mode'),
-      'gathering view should declare the resolution fieldset hook'
+      !gatheringEconomySource.includes('data-gathering-resolution-mode'),
+      'the inert economy mode has no authoring selector'
     );
-    assert.ok(
-      gatheringEconomySource.includes('data-gathering-resolution-mode-option'),
-      'gathering view should declare the resolution option hook'
+    const taskEditorSource = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte'),
+      'utf8'
     );
-    assert.ok(
-      gatheringEconomySource.includes('manager-gathering-resolution-mode'),
-      'gathering view should use the dedicated resolution radio group name'
+    assert.ok(taskEditorSource.includes('<RadioCardGroup'), 'task mode reuses the shared radio cards');
+    const optionsMatch = taskEditorSource.match(
+      /resolutionModeOptions\s*=\s*\[([\s\S]*?)\];/
     );
-
-    const optionsMatch = gatheringEconomySource.match(
-      /gatheringResolutionModeOptions\s*=\s*\[([\s\S]*?)\];/
-    );
-    assert.ok(optionsMatch, 'gathering view should define a gatheringResolutionModeOptions array');
+    assert.ok(optionsMatch, 'the task editor defines its mode choices');
     const optionsBlock = optionsMatch[1];
-    assert.ok(optionsBlock.includes("value: 'd100'"), 'gathering should offer d100');
-    assert.ok(optionsBlock.includes("value: 'progressive'"), 'gathering should offer progressive');
-    assert.ok(optionsBlock.includes("value: 'routed'"), 'gathering should offer routed');
-
-    // d100 is selectable; progressive/routed are disabled coming-soon affordances.
-    assert.equal(
-      lang.FABRICATE.Admin.Manager.Economy.GatheringResolutionMode,
-      'Gathering resolution mode'
-    );
-    for (const key of ['D100', 'D100Desc', 'Progressive', 'Routed']) {
-      const value = lang.FABRICATE.Admin.Manager.Economy.Resolution[key];
-      assert.equal(typeof value, 'string', `Economy.Resolution.${key} should be a string`);
-      assert.ok(value.length > 0, `Economy.Resolution.${key} should be non-empty`);
+    for (const mode of ['straight', 'd100', 'routed']) {
+      assert.ok(optionsBlock.includes(`value: '${mode}'`), `the task offers ${mode}`);
     }
+    assert.ok(!optionsBlock.includes("value: 'progressive'"), 'dormant progressive is not offered');
+    assert.ok(!optionsBlock.includes('disabled:'), 'all three authored modes are selectable');
+    assert.ok(taskEditorSource.includes('onUpdateTask({ resolutionMode: mode })'), 'mode edits patch the task');
+    assert.ok(rootSource.includes('resolutionMode={gatheringTaskResolutionMode}'), 'the parent supplies the task mode');
   });
 
   it('folds the validation overview into a full-width tabbed System Overview page (#429)', () => {
