@@ -133,7 +133,7 @@
   .fab-stage-card-facts {
     display: grid;
     gap: var(--fab-space-3);
-    padding: 0 var(--fab-space-3) var(--fab-space-3) 48px;
+    padding: 0 var(--fab-space-3) var(--fab-space-3) calc(var(--fab-space-6) * 2);
   }
 
   .fab-stage-card-body {

@@ -300,7 +300,9 @@ export function isExemptSpacingPixels(pixels) {
 // this change adds declare a width and a background and no spacing at all, and the trigger's own
 // inline padding is the family's `var(--fab-space-3)`. So the six occupancies are paid rather
 // than relocated. Measured on the tree, not subtracted.
-export const KNOWN_RAW_SPACING_TOTAL = 832;
+// Issue 1648 banks 18 removed Journal literals. The new run primitives derive their specific
+// 3px pip gap and 48px stage indent from the published scale without changing library geometry.
+export const KNOWN_RAW_SPACING_TOTAL = 814;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

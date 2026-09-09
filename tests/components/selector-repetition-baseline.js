@@ -29,7 +29,7 @@
  * rather than these 112, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,043 `(at-context, selector)` keys, of which 2,931 appear exactly
+ * Unfiltered, the sheet holds 3,045 `(at-context, selector)` keys, of which 2,933 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH

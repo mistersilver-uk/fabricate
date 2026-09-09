@@ -516,7 +516,7 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 281;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 279;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -976,7 +976,11 @@ export const KNOWN_OFF_LADDER_ART_SIZES = knownDebt('offLadderArtSizes');
  *
  * Both are pre-existing geometry becoming visible, on the same reading as the thirteen above.
  */
-export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 74;
+// Issue 1648 removes six former Journal render sites and adds SlotTile's single 56px site.
+// The generic 38px maximum is rejected for that site because the published SlotTile specimen
+// specifies a 56px material-choice tile with an overlaid quantity pip. Its dedicated geometry
+// takes precedence over the generic Medallion ladder; ordinary Journal art now uses 30px/38px.
+export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 69;
 
 export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredSharedComponents');
 
