@@ -74,6 +74,7 @@ import {
 } from '../../../systems/gatheringComposition.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
+import { normalizeGatheringResultGroups } from '../../../systems/gatheringResultGroups.js';
 import { Tool } from '../../../models/Tool.js';
 import { classifyModeChange } from '../../../migration/migrateRecipeForModeChange.js';
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';

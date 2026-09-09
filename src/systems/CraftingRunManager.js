@@ -1,4 +1,19 @@
 import { RunContainerManagerBase } from './runContainerStore.js';
+import {
+  observeExecutionJournal,
+  persistExecutionJournalTransition,
+  transitionExecutionJournal,
+} from './runExecutionJournal.js';
+import {
+  assertRunLifecycleMutation,
+  buildNewRunLifecycleFields,
+  getRunLifecycleContract,
+  incrementRunRevision,
+  persistCompletionMode,
+  persistPausedRun,
+  persistResumedRun,
+  RunLifecycleError,
+} from './runLifecycleState.js';
 import { selectWritableActors } from './writableActors.js';
 
 const HISTORY_LIMIT = 50;
@@ -99,10 +114,11 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return runs.find((run) => run.recipeId === recipeId) || null;
   }
 
-  async createRun(actor, recipe, componentSourceActors = [], userId = null) {
+  async createRun(actor, recipe, componentSourceActors = [], userId = null, lifecycle = {}) {
     const container = this._getContainer(actor);
     const runId = foundry.utils.randomID();
     const stepStates = this._buildStepStates(recipe);
+    const lifecycleFields = buildNewRunLifecycleFields(lifecycle);
     const run = {
       id: runId,
       actorUuid: actor.uuid,
@@ -116,6 +132,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
       currentStepIndex: 0,
       steps: stepStates,
       componentSourceActorUuids: componentSourceActors.map((a) => a.uuid),
+      ...lifecycleFields,
     };
 
     container.active[runId] = run;
@@ -123,9 +140,23 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return run;
   }
 
-  async updateRun(actor, run) {
+  async updateRun(actor, run, { expectedRevision, executionOperationId = null } = {}) {
+    const isCurrentLifecycle = getRunLifecycleContract(run) === 'current';
+    if (isCurrentLifecycle) this.invalidateCache(actor.id);
     const container = this._getContainer(actor);
-    if (!container.active[run.id]) return null;
+    const persistedRun = container.active[run.id];
+    if (!persistedRun) return null;
+    if (isCurrentLifecycle) {
+      this._assertRunMutation(persistedRun, {
+        expectedRevision: run.runRevision,
+        executionOperationId,
+      });
+      if (expectedRevision !== undefined) {
+        this._assertRunMutation(persistedRun, { expectedRevision, executionOperationId });
+      }
+    }
+    this._assertRunMutation(run, { expectedRevision, executionOperationId });
+    incrementRunRevision(run);
     run.updatedAt = this._nowWorldTime();
     container.active[run.id] = run;
     await this._persist(actor, container);
@@ -133,6 +164,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   async markStepWaitingForTime(actor, run, stepIndex, timeRequirement) {
+    this._assertRunMutation(run);
     const seconds = this._durationToSeconds(timeRequirement);
     if (seconds <= 0) return run;
 
@@ -197,6 +229,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * @returns {Promise<object|null>} the updated run, or null if the step index is invalid
    */
   async markStepPrepared(actor, run, stepIndex, prepared = {}) {
+    this._assertRunMutation(run);
     const step = run.steps?.[stepIndex];
     if (!step) return null;
     step.preparedConsumption = {
@@ -237,6 +270,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * @returns {Promise<object>} the updated run
    */
   async armCollapsedChainGate(actor, run, seconds) {
+    this._assertRunMutation(run);
     const total = Number(seconds);
     if (!Number.isFinite(total) || total <= 0) return run;
     const worldTime = this._nowWorldTime();
@@ -259,12 +293,20 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   canProceedTimeGate(run, stepIndex, worldTime = this._nowWorldTime()) {
+    if (getRunLifecycleContract(run) === 'unsupported' || run?.pauseState) return false;
+    if (
+      run?.executionJournal?.status !== undefined &&
+      run.executionJournal.status !== 'committed'
+    ) {
+      return false;
+    }
     const step = run.steps?.[stepIndex];
     if (!step?.timeGate) return true;
     return Number(worldTime) >= Number(step.timeGate.availableAt || 0);
   }
 
-  async markStepInProgress(actor, run, stepIndex) {
+  async markStepInProgress(actor, run, stepIndex, options = {}) {
+    this._assertRunMutation(run, options);
     const worldTime = this._nowWorldTime();
     const step = run.steps?.[stepIndex];
     if (!step) return run;
@@ -273,11 +315,12 @@ export class CraftingRunManager extends RunContainerManagerBase {
     step.status = 'inProgress';
     step.startedAt ??= worldTime;
     step.updatedAt = worldTime;
-    await this.updateRun(actor, run);
+    await this.updateRun(actor, run, options);
     return run;
   }
 
-  async completeStepSuccess(actor, run, stepIndex, payload = {}) {
+  async completeStepSuccess(actor, run, stepIndex, payload = {}, options = {}) {
+    this._assertRunMutation(run, options);
     const worldTime = this._nowWorldTime();
     const step = run.steps?.[stepIndex];
     if (!step) return run;
@@ -293,7 +336,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
 
     const nextIndex = stepIndex + 1;
     if (nextIndex >= (run.steps?.length || 0)) {
-      return this.completeRun(actor, run, 'succeeded');
+      return this.completeRun(actor, run, 'succeeded', options);
     }
 
     run.currentStepIndex = nextIndex;
@@ -304,11 +347,19 @@ export class CraftingRunManager extends RunContainerManagerBase {
       nextStep.startedAt ??= worldTime;
       nextStep.updatedAt = worldTime;
     }
-    await this.updateRun(actor, run);
+    await this.updateRun(actor, run, options);
     return run;
   }
 
-  async completeStepFailure(actor, run, stepIndex, reason = 'Crafting check failed', payload = {}) {
+  async completeStepFailure(
+    actor,
+    run,
+    stepIndex,
+    reason = 'Crafting check failed',
+    payload = {},
+    options = {}
+  ) {
+    this._assertRunMutation(run, options);
     const worldTime = this._nowWorldTime();
     const step = run.steps?.[stepIndex];
     if (!step) return run;
@@ -323,17 +374,30 @@ export class CraftingRunManager extends RunContainerManagerBase {
     step.usedTools = payload.usedTools || step.usedTools || [];
     step.createdResults = payload.createdResults || step.createdResults || [];
 
-    return this.completeRun(actor, run, 'failed');
+    return this.completeRun(actor, run, 'failed', options);
   }
 
-  async completeRun(actor, run, status = 'succeeded') {
+  async completeRun(actor, run, status = 'succeeded', options = {}) {
+    if (options.executionOperationId) this.invalidateCache(actor.id);
     const container = this._getContainer(actor);
-    if (!container.active?.[run.id]) return run;
+    const persistedRun = container.active?.[run.id];
+    if (!persistedRun) return run;
+    if (options.executionOperationId) {
+      this._assertRunMutation(persistedRun, {
+        ...options,
+        expectedRevision: options.expectedRevision ?? run.runRevision,
+      });
+    }
+    this._assertRunMutation(run, {
+      ...options,
+      allowPaused: status === 'cancelled',
+    });
 
     run.status = status;
     run.currentStepIndex = null;
     run.updatedAt = this._nowWorldTime();
     run.finishedAt = this._nowWorldTime();
+    incrementRunRevision(run);
 
     delete container.active[run.id];
     // Never archive a run that already has a history entry: a duplicate id would
@@ -375,6 +439,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     const container = this._getContainer(actor);
     const run = container.active?.[runId];
     if (!run) return null;
+    this._assertRunMutation(run);
     delete container.active[runId];
     await this._persist(actor, container);
     return run;
@@ -421,6 +486,60 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return entry;
   }
 
+  async planVersionedFizzle(
+    actor,
+    {
+      craftingSystemId = null,
+      userId = null,
+      componentSourceActorUuids = [],
+      operationId,
+      requestId,
+      effects = [],
+    } = {}
+  ) {
+    this.invalidateCache(actor.id);
+    const container = this._getContainer(actor);
+    const duplicate = (container.history || []).find(
+      (run) =>
+        getRunLifecycleContract(run) === 'current' &&
+        run?.isFizzle === true &&
+        run?.executionJournal?.requestId === String(requestId ?? '').trim()
+    );
+    if (duplicate) return duplicate;
+    const now = this._nowWorldTime();
+    const entry = {
+      id: foundry.utils.randomID(),
+      actorUuid: actor.uuid,
+      userId: userId || game.user?.id || null,
+      craftingSystemId: craftingSystemId ?? null,
+      recipeId: null,
+      isFizzle: true,
+      activityKind: 'alchemy',
+      status: 'failed',
+      startedAt: now,
+      updatedAt: now,
+      finishedAt: now,
+      currentStepIndex: null,
+      steps: [],
+      componentSourceActorUuids: [...componentSourceActorUuids],
+      ...buildNewRunLifecycleFields({ lifecycleVersion: 1, completionMode: 'manual' }),
+    };
+    entry.executionJournal = transitionExecutionJournal(undefined, {
+      type: 'plan',
+      plan: {
+        operationId,
+        requestId,
+        baseRunRevision: entry.runRevision,
+        intent: { activityKind: 'alchemy', craftingSystemId },
+        effects,
+      },
+    });
+    container.history.unshift(entry);
+    if (container.history.length > HISTORY_LIMIT) container.history.length = HISTORY_LIMIT;
+    await this._persist(actor, container);
+    return entry;
+  }
+
   async processWorldTime(worldTime = this._nowWorldTime()) {
     // Timed resume only (issue 656): driven from the synced updateWorldTime hook, and
     // flipping waitingTime→inProgress triggers _persist → actor.setFlag, a broadcast
@@ -432,23 +551,225 @@ export class CraftingRunManager extends RunContainerManagerBase {
       let dirty = false;
 
       for (const run of Object.values(container.active || {})) {
-        if (run.status !== 'waitingTime') continue;
-        const idx = Number(run.currentStepIndex);
-        if (!Number.isFinite(idx)) continue;
-        const step = run.steps?.[idx];
-        if (!step?.timeGate) continue;
-        if (Number(worldTime) < Number(step.timeGate.availableAt || 0)) continue;
+        const step = this._maturedWaitingStep(run, worldTime);
+        if (!step) continue;
 
         run.status = 'inProgress';
         step.status = 'inProgress';
         step.updatedAt = Number(worldTime);
         run.updatedAt = Number(worldTime);
+        incrementRunRevision(run);
         dirty = true;
       }
 
       if (dirty) {
         await this._persist(actor, container);
       }
+    }
+  }
+
+  _maturedWaitingStep(run, worldTime) {
+    if (run.status !== 'waitingTime') return null;
+    if (getRunLifecycleContract(run) !== 'legacy') return null;
+    if (run.pauseState) return null;
+    if (run.executionJournal && run.executionJournal.status !== 'committed') return null;
+    const index = Number(run.currentStepIndex);
+    if (!Number.isFinite(index)) return null;
+    const step = run.steps?.[index];
+    if (!step?.timeGate) return null;
+    if (Number(worldTime) < Number(step.timeGate.availableAt || 0)) return null;
+    return step;
+  }
+
+  listDueVersionedRuns(worldTime = this._nowWorldTime()) {
+    const due = [];
+    for (const actor of game.actors || []) {
+      this.invalidateCache(actor.id);
+      const container = this._getContainer(actor);
+      for (const run of Object.values(container.active || {})) {
+        if (!this._dueVersionedStep(run, worldTime)) continue;
+        const currentStepIndex = Number(run.currentStepIndex);
+        due.push({
+          actor,
+          runId: run.id,
+          expectedRevision: run.runRevision,
+          componentSourceActorUuids: [...(run.componentSourceActorUuids || [])],
+          maximumAttempts: Math.max(1, (run.steps?.length || 0) - currentStepIndex),
+        });
+      }
+    }
+    return due;
+  }
+
+  _dueVersionedStep(run, worldTime) {
+    if (getRunLifecycleContract(run) !== 'current') return null;
+    if (run.status !== 'waitingTime' || run.completionMode !== 'worldTime' || run.pauseState) {
+      return null;
+    }
+    if (run.executionJournal && run.executionJournal.status !== 'committed') return null;
+    const index = Number(run.currentStepIndex);
+    if (!Number.isSafeInteger(index)) return null;
+    const step = run.steps?.[index];
+    if (!step?.timeGate || Number(worldTime) < Number(step.timeGate.availableAt || 0)) return null;
+    return step;
+  }
+
+  async setCompletionMode(actor, runId, completionMode, { expectedRevision } = {}) {
+    return persistCompletionMode(this._locateRunPersistence(actor, runId), completionMode, {
+      expectedRevision,
+    });
+  }
+
+  async pauseRun(actor, runId, { expectedRevision } = {}) {
+    return persistPausedRun(this._locateRunPersistence(actor, runId), { expectedRevision });
+  }
+
+  async resumeRun(actor, runId, { expectedRevision } = {}) {
+    return persistResumedRun(this._locateRunPersistence(actor, runId), { expectedRevision });
+  }
+
+  async setStepSelectionPlan(actor, runId, stepIndex, selection = {}, { expectedRevision } = {}) {
+    const location = this._locateRunPersistence(actor, runId);
+    if (!location) return null;
+    const run = location.run;
+    this._assertRunMutation(run, { currentOnly: true, expectedRevision });
+    const index = Number(stepIndex);
+    const step = run.steps?.[index];
+    if (!step || index !== Number(run.currentStepIndex)) {
+      throw new RunLifecycleError(
+        'Selections may only change on the current crafting step',
+        'STALE_RUN_STAGE'
+      );
+    }
+    step.selectionPlan = buildSelectionPlan(selection);
+    step.selectedIngredientSetId = step.selectionPlan.selectedIngredientSetId;
+    if (selection.selectedRequirementSnapshot !== undefined) {
+      step.selectedRequirementSnapshot = cloneJson(selection.selectedRequirementSnapshot);
+    }
+    step.updatedAt = this._nowWorldTime();
+    incrementRunRevision(run);
+    return location.persist();
+  }
+
+  async updateExecutionJournal(actor, runId, transition, { expectedRevision } = {}) {
+    return persistExecutionJournalTransition(
+      this._locateRunPersistence(actor, runId, { activeOnly: false }),
+      transition,
+      { expectedRevision }
+    );
+  }
+
+  async reconstructVersionedExecutions({ operationId = null, orphaned = false } = {}) {
+    const normalizedOperationId = String(operationId ?? '').trim();
+    const operationScope = normalizedOperationId.length > 0;
+    if (operationScope === (orphaned === true)) {
+      throw new RunLifecycleError(
+        'Execution reconstruction requires exactly one authority recovery scope',
+        'INVALID_RECOVERY_SCOPE'
+      );
+    }
+
+    const candidates = [];
+    for (const actor of selectWritableActors(game.actors)) {
+      this.invalidateCache(actor.id);
+      const container = this._getContainer(actor);
+      const runs = [
+        ...Object.values(container.active || {}),
+        ...(Array.isArray(container.history) ? container.history : []),
+      ];
+      for (const run of runs) {
+        if (getRunLifecycleContract(run) !== 'current' || !run?.executionJournal) continue;
+        const journal = observeExecutionJournal(run.executionJournal);
+        if (operationScope && journal.operationId !== normalizedOperationId) continue;
+        if (
+          journal.status !== 'planned' ||
+          journal.effects.every((effect) => effect.phase !== 'applying')
+        ) {
+          continue;
+        }
+        candidates.push({ actor, runId: run.id, expectedRevision: run.runRevision });
+      }
+    }
+
+    const runs = [];
+    for (const candidate of candidates) {
+      const reconstructed = await this.updateExecutionJournal(
+        candidate.actor,
+        candidate.runId,
+        { type: 'reconstructAfterReload' },
+        { expectedRevision: candidate.expectedRevision }
+      );
+      if (!reconstructed) {
+        throw new RunLifecycleError(
+          'An execution disappeared during recovery reconstruction',
+          'STALE_RUN_REVISION'
+        );
+      }
+      runs.push({
+        actorUuid: candidate.actor.uuid,
+        runId: reconstructed.id,
+        status: reconstructed.status,
+        runRevision: reconstructed.runRevision,
+        journalStatus: reconstructed.executionJournal.status,
+      });
+    }
+
+    return {
+      success: true,
+      scope: operationScope ? 'operation' : 'orphaned',
+      operationId: operationScope ? normalizedOperationId : null,
+      inspected: candidates.length,
+      reconstructed: runs.length,
+      runs,
+    };
+  }
+
+  _locateRunPersistence(actor, runId, { activeOnly = true } = {}) {
+    this.invalidateCache(actor.id);
+    const container = cloneJson(this._getContainer(actor));
+    const location = findRunLocation(container, runId);
+    if (!location || (activeOnly && location.terminal)) return null;
+    const run = location.run;
+    const currentStep = () => {
+      const index = Number(run.currentStepIndex);
+      return Number.isSafeInteger(index) ? run.steps?.[index] : null;
+    };
+    return {
+      run,
+      now: () => this._nowWorldTime(),
+      getTimeGate: () => currentStep()?.timeGate || null,
+      touchTimeGate: () => {
+        const step = currentStep();
+        if (step) step.updatedAt = this._nowWorldTime();
+      },
+      assertMutation: (options) => this._assertRunMutation(run, options),
+      persist: async () => {
+        run.updatedAt = this._nowWorldTime();
+        await this._persist(actor, container);
+        return run;
+      },
+    };
+  }
+
+  _assertRunMutation(
+    run,
+    { allowExecutionJournal = false, executionOperationId = null, ...options } = {}
+  ) {
+    assertRunLifecycleMutation(run, options);
+    if (!run?.executionJournal) return;
+    const journal = observeExecutionJournal(run.executionJournal);
+    if (!allowExecutionJournal && journal.status === 'planned') {
+      if (executionOperationId) {
+        if (journal.operationId === String(executionOperationId)) return;
+        throw new RunLifecycleError(
+          'The execution operation does not own this run',
+          'EXECUTION_OPERATION_MISMATCH'
+        );
+      }
+      throw new RunLifecycleError(
+        'The run already has an execution in progress',
+        'EXECUTION_IN_PROGRESS'
+      );
     }
   }
 
@@ -460,13 +781,14 @@ export class CraftingRunManager extends RunContainerManagerBase {
       let dirty = false;
 
       for (const [runId, run] of Object.entries(container.active || {})) {
+        if (getRunLifecycleContract(run) === 'unsupported') continue;
         if (run?.craftingSystemId !== target) continue;
         delete container.active[runId];
         dirty = true;
       }
 
       const nextHistory = (container.history || []).filter(
-        (run) => run?.craftingSystemId !== target
+        (run) => getRunLifecycleContract(run) === 'unsupported' || run?.craftingSystemId !== target
       );
       if (nextHistory.length !== (container.history || []).length) {
         container.history = nextHistory;
@@ -503,12 +825,15 @@ export class CraftingRunManager extends RunContainerManagerBase {
       let dirty = false;
 
       for (const [runId, run] of Object.entries(container.active || {})) {
+        if (getRunLifecycleContract(run) === 'unsupported') continue;
         if (!dropActiveRun(run)) continue;
         delete container.active[runId];
         dirty = true;
       }
 
-      const nextHistory = (container.history || []).filter((run) => keepHistoryEntry(run));
+      const nextHistory = (container.history || []).filter(
+        (run) => getRunLifecycleContract(run) === 'unsupported' || keepHistoryEntry(run)
+      );
       if (nextHistory.length !== (container.history || []).length) {
         container.history = nextHistory;
         dirty = true;
@@ -593,6 +918,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
       let dirty = false;
 
       for (const [runId, run] of Object.entries(container.active || {})) {
+        if (getRunLifecycleContract(run) === 'unsupported') continue;
         const recipe = run?.recipeId ? resolveRecipe(run.recipeId) : null;
         if (!recipe) continue;
         const steps =
@@ -610,4 +936,33 @@ export class CraftingRunManager extends RunContainerManagerBase {
     }
     return pruned;
   }
+}
+
+function buildSelectionPlan(selection) {
+  return {
+    selectedIngredientSetId: stringOrNull(selection.selectedIngredientSetId),
+    ingredientOptionOverrides: cloneObject(selection.ingredientOptionOverrides),
+    ingredientEssenceAllocation: cloneObject(selection.ingredientEssenceAllocation),
+  };
+}
+
+function cloneObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? cloneJson(value) : {};
+}
+
+function findRunLocation(container, runId) {
+  const id = String(runId ?? '').trim();
+  if (!id) return null;
+  if (container.active?.[id]) return { run: container.active[id], terminal: false };
+  const run = (container.history || []).find((entry) => entry?.id === id);
+  return run ? { run, terminal: true } : null;
+}
+
+function stringOrNull(value) {
+  const normalized = String(value ?? '').trim();
+  return normalized || null;
+}
+
+function cloneJson(value) {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }

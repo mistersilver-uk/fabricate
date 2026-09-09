@@ -922,9 +922,11 @@ function collectBrokenInternalReferences(payload, out) {
     for (const alt of arrayOf(ref.alternatives)) reportIngredientRef(alt, owner, ownerType);
   };
   const reportResultRef = (result, owner, ownerType) => {
-    const componentId = result?.componentId || result?.systemItemId || null;
-    if (componentId && !componentIds.has(componentId)) {
-      push(REFERENCE_KINDS.COMPONENT_LINK, ownerType, owner, componentId);
+    const references = new Set([result?.componentId, result?.systemItemId].filter(Boolean));
+    for (const componentId of references) {
+      if (!componentIds.has(componentId)) {
+        push(REFERENCE_KINDS.COMPONENT_LINK, ownerType, owner, componentId);
+      }
     }
   };
   const reportResultGroups = (resultGroups, owner, ownerType) => {
@@ -941,6 +943,9 @@ function collectBrokenInternalReferences(payload, out) {
       reportIngredientRef(ingredient, owner, ownerType);
     for (const catalyst of arrayOf(set.catalysts)) reportIngredientRef(catalyst, owner, ownerType);
   };
+  for (const task of arrayOf(slice.tasks)) {
+    reportResultGroups(task?.resultGroups, task, 'task');
+  }
   for (const recipe of arrayOf(payload.recipes)) {
     if (!recipe || typeof recipe !== 'object') continue;
     for (const set of arrayOf(recipe.ingredientSets)) reportIngredientSet(set, recipe, 'recipe');

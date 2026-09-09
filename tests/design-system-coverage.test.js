@@ -255,7 +255,7 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 39 library entries with no shipped implementation.
+ * The 28 library entries with no shipped implementation.
  *
  * Not a debt list to be paid down in one change and not a ceiling: it is the specified-but-unbuilt
  * quadrant of the conformance question, and it moves in BOTH directions — down when a primitive is
@@ -273,13 +273,12 @@ test('every manifest library name resolves to a library entry', () => {
  * all STAY, because building one name in a multi-name block builds one name.
  */
 const SPECIFIED_ONLY = [
-  'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard',
-  'ChoiceGroup', 'ChoiceOptionList', 'DataTable', 'EssencePool', 'InfoStrip', 'ListRow',
-  'LogList', 'Menu', 'Meter', 'NavSidebar', 'OutcomeLadder', 'PageHeader',
-  'PickerRow', 'Rail', 'RequirementChooser', 'RuleRow',
-  'RuleSentence', 'RunActionBar', 'RunProgress', 'Search', 'SetPicker', 'SlotRow', 'SlotTile', 'SortableList',
-  'StageBars', 'StageCard', 'StageNav', 'TierTrack', 'ValidationList', 'ValidationSummary',
-  'ViewToggle', 'Well', 'WorldClockChip', 'XrefList', 'YieldScale',
+  'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard', 'ChoiceGroup',
+  'DataTable', 'InfoStrip', 'ListRow', 'LogList', 'Menu',
+  'Meter', 'NavSidebar', 'PageHeader', 'PickerRow', 'Rail',
+  'RequirementChooser', 'RuleRow', 'RuleSentence', 'Search', 'SetPicker',
+  'SortableList', 'StageBars', 'TierTrack', 'ValidationList', 'ValidationSummary',
+  'ViewToggle', 'Well', 'XrefList',
 ];
 
 test('every library entry is either recorded as shipped or recorded as unbuilt', () => {
@@ -853,6 +852,10 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
   'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
   'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
+  // Issue 1648 reuses these domain authoring compositions across crafting and gathering.
+  // The manifest records their new shared membership and why no generic library entry applies.
+  'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/components/ActionMenu.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',

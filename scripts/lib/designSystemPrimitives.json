@@ -415,6 +415,30 @@
       "evidence": "broad",
       "scope": "shared",
       "why": "`library.html:716` — a tiled strip of spans whose dividers are dragged, \"outcome tiers against a DC\", which is exactly this. Exactly 2 callers, `checks/CraftingCheckEditor.svelte` and `checks/SimpleCraftingCheckEditor.svelte`, and it carries a two-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because those are its two modes and each renders chrome the other does not."
+    },
+    {
+      "path": "src/ui/svelte/components/RunProgress.svelte",
+      "library": "<RunProgress>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 implements the library contract and adopts it in src/ui/svelte/apps/journal/RunCard.svelte and src/ui/svelte/apps/journal/RunDetail.svelte. Target status remains until the final state captures and comparison are accepted."
+    },
+    {
+      "path": "src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte",
+      "library": null,
+      "status": "target",
+      "evidence": "targeted",
+      "scope": "manager-only",
+      "why": "Issue 1648 reuses this result-group authoring composition in crafting and gathering. Independent importers: `src/ui/svelte/apps/manager/GatheringTaskEditView.svelte`, `src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte`. It edits domain result groups and routing assignments rather than implementing a named generic library entry. The manager-only scope reflects its authoring context and dependencies; this is a recorded shared composition with its existing geometry, not a new library contract."
+    },
+    {
+      "path": "src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte",
+      "library": null,
+      "status": "target",
+      "evidence": "targeted",
+      "scope": "manager-only",
+      "why": "Issue 1648 reuses this result-group authoring composition in crafting and gathering. Independent importers: `src/ui/svelte/apps/manager/GatheringTaskEditView.svelte`, `src/ui/svelte/apps/manager/recipe/RecipeResultsTab.svelte`. It edits domain result groups and routing assignments rather than implementing a named generic library entry. The manager-only scope reflects its authoring context and dependencies; this is a recorded shared composition with its existing geometry, not a new library contract."
     }
   ],
   "notAPrimitive": [
@@ -512,6 +536,96 @@
         "src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte"
       ],
       "why": "ONE caller, `src/ui/svelte/apps/manager/recipes/RecipeBulkEditPanel.svelte`, since issue 1371 r16-list. The bulk panel's leave-unchanged select had two (issue 1010) until maintainer ruling M23 rebuilt the system Component Rules bulk panel's category axis as the reference's inline staging inset — a search well over rows carrying `n/N` counts — so the Component Studio stopped rendering a select there. It is still the Recipe Studio's category and check-tier control, and `library.html:666` still specifies `<Select>` as one shell shared with text, number and search; it re-enters the set at a second caller, which is a decision for the change that adds one rather than a row this file can keep true today."
+    },
+    {
+      "path": "src/ui/svelte/components/RunActionBar.svelte",
+      "library": "<RunActionBar>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/apps/journal/ActionsPanel.svelte"
+      ],
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/ActionsPanel.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+    },
+    {
+      "path": "src/ui/svelte/components/WorldClockChip.svelte",
+      "library": "<WorldClockChip>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/apps/FabricateAppRoot.svelte"
+      ],
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/FabricateAppRoot.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+    },
+    {
+      "path": "src/ui/svelte/components/SlotRow.svelte",
+      "library": "<SlotRow>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/apps/journal/StepDetails.svelte"
+      ],
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/StepDetails.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+    },
+    {
+      "path": "src/ui/svelte/components/SlotTile.svelte",
+      "library": "<SlotTile>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/components/SlotRow.svelte"
+      ],
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/components/SlotRow.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+    },
+    {
+      "path": "src/ui/svelte/components/ChoiceOptionList.svelte",
+      "library": "<ChoiceOptionList>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/components/SlotRow.svelte"
+      ],
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/components/SlotRow.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+    },
+    {
+      "path": "src/ui/svelte/components/EssencePool.svelte",
+      "library": "<EssencePool>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/apps/journal/StepDetails.svelte"
+      ],
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/StepDetails.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+    },
+    {
+      "path": "src/ui/svelte/components/StageNav.svelte",
+      "library": "<StageNav>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/apps/journal/RunDetail.svelte"
+      ],
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+    },
+    {
+      "path": "src/ui/svelte/components/StageCard.svelte",
+      "library": "<StageCard>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/apps/journal/RunDetail.svelte"
+      ],
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+    },
+    {
+      "path": "src/ui/svelte/components/YieldScale.svelte",
+      "library": "<YieldScale>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/apps/journal/RunDetail.svelte"
+      ],
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
+    },
+    {
+      "path": "src/ui/svelte/components/OutcomeLadder.svelte",
+      "library": "<OutcomeLadder>",
+      "evidence": "broad",
+      "callers": [
+        "src/ui/svelte/apps/journal/RunDetail.svelte"
+      ],
+      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
     }
   ],
   "ruledOut": [

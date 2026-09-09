@@ -31,15 +31,46 @@ function writeCompiledModule(sourcePath) {
   writeFileSync(destination, rewriteClientImports(compiled.js.code));
 }
 
+function run(overrides = {}) {
+  const runType = overrides.runType ?? 'crafting';
+  const id = overrides.id ?? 'run-1';
+  return {
+    id,
+    key: JSON.stringify(['Actor.actor-1', runType, id]),
+    actorUuid: 'Actor.actor-1',
+    runType,
+    activityKind: overrides.activityKind ?? runType,
+    lifecycleContract: overrides.lifecycleContract ?? 'legacy',
+    lifecycleVersion: overrides.lifecycleVersion ?? null,
+    runRevision: overrides.runRevision ?? 0,
+    derivedStatus: overrides.derivedStatus ?? 'inProgress',
+    names: overrides.names ?? { title: id, subtitle: '' },
+    actions: overrides.actions ?? {
+      execute: true,
+      pause: true,
+      resume: true,
+      setCompletionMode: true,
+      setSelection: true,
+      cancel: true,
+      dismiss: false,
+    },
+    ...overrides,
+  };
+}
+
 const ACTIVE = [
-  { id: 'a', recipeId: 'r-a', startedAt: 80, timeGate: { availableAt: 1000 } }, // waiting (now=200)
-  { id: 'b', recipeId: 'r-b', startedAt: 50, timeGate: { availableAt: 100 } } // ready
+  run({ id: 'a', recipeId: 'r-a', startedAt: 80, timeGate: { availableAt: 1000 }, derivedStatus: 'waiting' }),
+  run({ id: 'b', recipeId: 'r-b', startedAt: 50, timeGate: { availableAt: 100 }, derivedStatus: 'ready' }),
 ];
 
 function history(count = 8) {
   return Array.from({ length: count }, (_unused, index) => ({
-    id: `h${index + 1}`,
-    finishedAt: 100 - index * 10
+    ...run({
+      id: `h${index + 1}`,
+      derivedStatus: 'succeeded',
+      actions: { dismiss: true },
+    }),
+    finishedAt: 100 - index * 10,
   }));
 }
 
@@ -48,6 +79,7 @@ function baseListing(overrides = {}) {
   const active = overrides.activeRuns ?? ACTIVE;
   return {
     selectedActorId: overrides.selectedActorId ?? 'actor-1',
+    selectedActorUuid: overrides.selectedActorUuid ?? 'Actor.actor-1',
     counts: { active: active.length, history: hist.length },
     activeRuns: active,
     history: hist
@@ -55,7 +87,7 @@ function baseListing(overrides = {}) {
 }
 
 function makeServices(overrides = {}) {
-  const calls = { list: 0, advance: [], cancel: [], notify: [] };
+  const calls = { list: 0, advance: [], cancel: [], command: [], dismiss: [], notify: [] };
   const state = { listing: overrides.listing ?? baseListing() };
   const services = {
     getWorldTime: () => overrides.worldTime ?? 200,
@@ -73,6 +105,16 @@ function makeServices(overrides = {}) {
       calls.cancel.push(args);
       if (overrides.cancelThrows) throw new Error('boom');
       return overrides.cancelResult ?? { success: true, cancelled: true, message: 'Craft cancelled.' };
+    },
+    executeJournalRunCommand: async (args) => {
+      calls.command.push(args);
+      if (overrides.commandThrows) throw new Error('command boom');
+      return overrides.commandResult ?? { success: true, message: 'Updated' };
+    },
+    dismissJournalRun: async (args) => {
+      calls.dismiss.push(args);
+      if (overrides.dismissThrows) throw new Error('dismiss boom');
+      return overrides.dismissResult ?? { success: true, message: 'Dismissed' };
     },
     notify: (message) => calls.notify.push(message),
     craftErrorMessage: () => 'Crafting failed.'
@@ -123,13 +165,13 @@ describe('journalStore', () => {
 
   it('paginates history with the page size', async () => {
     const store = await loadedStore(makeServices());
-    assert.equal(store.historyPageSize, 6);
-    assert.equal(store.historyPageItems.length, 6);
+    assert.equal(store.historyPageSize, 4);
+    assert.equal(store.historyPageItems.length, 4);
     assert.deepEqual(store.historyPageItems[0].id, 'h1', 'newest first');
 
     store.setHistoryPage(1);
     flushSync();
-    assert.equal(store.historyPageItems.length, 2, 'remaining 2 of 8');
+    assert.equal(store.historyPageItems.length, 4, 'remaining 4 of 8');
   });
 
   it('exposes the top recent terminal runs', async () => {
@@ -148,7 +190,7 @@ describe('journalStore', () => {
     // Run 'a' completes: it leaves activeRuns and appears in history.
     setup.state.listing = baseListing({
       activeRuns: [ACTIVE[1]],
-      history: [{ id: 'a', finishedAt: 200 }, ...history()]
+      history: [run({ id: 'a', derivedStatus: 'succeeded', finishedAt: 200 }), ...history()]
     });
     await store.load(true);
     flushSync();
@@ -158,6 +200,330 @@ describe('journalStore', () => {
     store.select('missing');
     flushSync();
     assert.equal(store.selectedRun.id, 'b');
+  });
+
+  it('filters by kind, search, and mutually exclusive active status while counting the kind cohort first', async () => {
+    const activeRuns = [
+      run({ id: 'craft-ready', activityKind: 'crafting', derivedStatus: 'ready', names: { title: 'Iron Sword', subtitle: 'Forge' } }),
+      run({ id: 'craft-wait', activityKind: 'crafting', derivedStatus: 'waiting', names: { title: 'Oak Shield', subtitle: 'Forge' } }),
+      run({ id: 'craft-paused', activityKind: 'crafting', derivedStatus: 'paused', names: { title: 'Silver Ring', subtitle: 'Forge' } }),
+      run({ id: 'brew', activityKind: 'alchemy', derivedStatus: 'ready', names: { title: 'Silver Draught', subtitle: 'Alchemy' } }),
+      run({ id: 'gather', runType: 'gathering', activityKind: 'gathering', derivedStatus: 'waiting', names: { title: 'Silver Herbs', subtitle: 'Wilds' } }),
+    ];
+    const store = await loadedStore(makeServices({ listing: baseListing({ activeRuns, history: [] }) }));
+
+    store.setKindFilter('crafting');
+    store.setSearch('silver');
+    store.setActiveStatusFilter('paused');
+    flushSync();
+
+    assert.deepEqual(store.activeCounts, { all: 3, ready: 1, waiting: 1, paused: 1 });
+    assert.deepEqual(store.activeRuns.map((entry) => entry.id), ['craft-paused']);
+    store.setActiveStatusFilter('ready');
+    flushSync();
+    assert.deepEqual(store.activeRuns, [], 'search is applied after the pre-filter counts');
+  });
+
+  it('keeps active/history pages independent, accepts 4/6/12/25 sizes, and clamps after filtering or reload deletion', async () => {
+    const activeRuns = Array.from({ length: 10 }, (_unused, index) => run({ id: `a${index}`, startedAt: index }));
+    const setup = makeServices({ listing: baseListing({ activeRuns, history: history(10) }) });
+    const store = await loadedStore(setup);
+
+    assert.deepEqual(store.pageSizes, [4, 6, 12, 25]);
+    assert.equal(store.activePageSize, 4);
+    assert.equal(store.historyPageSize, 4);
+    store.setActivePage(2);
+    store.setHistoryPage(2);
+    flushSync();
+    assert.equal(store.activePageItems.length, 2);
+    assert.equal(store.historyPageItems.length, 2);
+
+    store.setActivePageSize(6);
+    flushSync();
+    assert.equal(store.activePage, 0);
+    assert.equal(store.historyPage, 2, 'history pager is independent');
+
+    store.setHistoryPageSize(25);
+    flushSync();
+    assert.equal(store.historyPage, 0);
+    store.setHistoryPage(9);
+    flushSync();
+    assert.equal(store.historyPage, 0, 'setter clamps to the last real page');
+
+    store.setActivePageSize(4);
+    store.setActivePage(2);
+    setup.state.listing = baseListing({ activeRuns: activeRuns.slice(0, 2), history: history(2) });
+    await store.load(true);
+    flushSync();
+    assert.equal(store.activePage, 0, 'reload deletion clamps active page');
+  });
+
+  it('retains selected detail when filtered or off-page and falls back only after actual removal', async () => {
+    const activeRuns = Array.from({ length: 7 }, (_unused, index) => run({
+      id: `a${index}`,
+      activityKind: index === 6 ? 'alchemy' : 'crafting',
+      names: { title: index === 6 ? 'Hidden Brew' : `Craft ${index}`, subtitle: '' },
+    }));
+    const setup = makeServices({ listing: baseListing({ activeRuns, history: [] }) });
+    const store = await loadedStore(setup);
+    store.select(activeRuns[6]);
+    store.setKindFilter('crafting');
+    store.setSearch('no-match');
+    flushSync();
+
+    assert.equal(store.selectedRun.id, 'a6', 'filtering does not change detail selection');
+    assert.equal(store.selectedRunId, 'a6');
+
+    setup.state.listing = baseListing({ activeRuns: activeRuns.slice(0, 6), history: [] });
+    await store.load(true);
+    flushSync();
+    assert.equal(store.selectedRun.id, 'a0', 'actual removal chooses a remaining fallback');
+  });
+
+  it('uses composite selection so identical ids across run types do not collide', async () => {
+    const crafting = run({ id: 'same', runType: 'crafting', names: { title: 'Craft', subtitle: '' } });
+    const gathering = run({ id: 'same', runType: 'gathering', names: { title: 'Gather', subtitle: '' } });
+    const store = await loadedStore(makeServices({ listing: baseListing({ activeRuns: [crafting, gathering], history: [] }) }));
+
+    store.select(gathering);
+    flushSync();
+    assert.equal(store.selectedRun.names.title, 'Gather');
+    assert.equal(store.selectedRunKey, gathering.key);
+  });
+
+  it('keeps viewed stage separate from executable stage and can return to current', async () => {
+    const crafting = run({ id: 'stages', stepIndex: 2, steps: [{ index: 0 }, { index: 1 }, { index: 2 }] });
+    const store = await loadedStore(makeServices({ listing: baseListing({ activeRuns: [crafting], history: [] }) }));
+    store.select(crafting);
+    store.viewStage(crafting, 0);
+    flushSync();
+
+    assert.equal(store.selectedRun.stepIndex, 2, 'persisted executable index is unchanged');
+    assert.equal(store.viewedStageIndex, 0);
+    assert.equal(store.viewedStage.index, 0);
+    store.returnToCurrentStage(crafting);
+    flushSync();
+    assert.equal(store.viewedStageIndex, 2);
+  });
+
+  it('routes versioned commands with native composite identity/revision and refreshes', async () => {
+    const setup = makeServices();
+    const store = await loadedStore(setup);
+    const selected = run({
+      ...ACTIVE[1],
+      lifecycleContract: 'current',
+      lifecycleVersion: 1,
+      runRevision: 0,
+      stepIndex: 2,
+    });
+
+    await store.execute(selected, { interactive: true });
+    await store.pause(selected);
+    await store.resume(selected);
+    await store.setCompletionMode(selected, 'worldTime');
+    await store.setSelection(selected, { selectedIngredientSetId: 'set-1' });
+    flushSync();
+
+    assert.deepEqual(setup.calls.command.map(({ action }) => action), [
+      'execute', 'pause', 'resume', 'setCompletionMode', 'setSelection',
+    ]);
+    assert.deepEqual(setup.calls.command[0], {
+      actorUuid: 'Actor.actor-1',
+      runType: 'crafting',
+      runId: 'b',
+      expectedRevision: 0,
+      action: 'execute',
+      payload: { interactive: true },
+    });
+    assert.equal(setup.calls.list, 6, 'each settled command refreshes authoritative state');
+    assert.deepEqual(setup.calls.command[4].payload, {
+      stepIndex: 2,
+      selectionPlan: { selectedIngredientSetId: 'set-1' },
+    }, 'selection targets the executable stage with the authority command contract');
+    assert.equal(store.busyRunId, '');
+  });
+
+  it('fails closed when the projection does not make a versioned action available', async () => {
+    const setup = makeServices();
+    const store = await loadedStore(setup);
+    const current = run({
+      id: 'blocked',
+      lifecycleContract: 'current',
+      lifecycleVersion: 1,
+      actions: { execute: false, pause: false },
+    });
+
+    await store.pause(current);
+
+    assert.deepEqual(setup.calls.command, []);
+    assert.equal(setup.calls.list, 1, 'a rejected local action does not churn the listing');
+  });
+
+  it('dismisses terminal entries at the service seam and only falls back after reload removes them', async () => {
+    const done = history(2);
+    const setup = makeServices({ listing: baseListing({ activeRuns: [], history: done }) });
+    const store = await loadedStore(setup);
+    store.select(done[0]);
+    setup.services.dismissJournalRun = async (args) => {
+      setup.calls.dismiss.push(args);
+      setup.state.listing = baseListing({ activeRuns: [], history: [done[1]] });
+      return { success: true };
+    };
+
+    await store.dismiss(done[0]);
+    flushSync();
+
+    assert.deepEqual(setup.calls.dismiss, [{
+      actorUuid: 'Actor.actor-1',
+      runType: 'crafting',
+      runId: 'h1',
+    }]);
+    assert.equal(store.selectedRun.id, 'h2');
+  });
+
+  it('command errors clear busy state, notify, and refresh without rejecting', async () => {
+    const setup = makeServices({ commandThrows: true });
+    const store = await loadedStore(setup);
+
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+    await assert.doesNotReject(() => store.pause(current));
+    flushSync();
+
+    assert.equal(store.busyRunId, '');
+    assert.deepEqual(setup.calls.notify, ['Crafting failed.']);
+    assert.equal(setup.calls.list, 2, 'failure refreshes authoritative state');
+    assert.deepEqual(store.commandError, {
+      runKey: current.key,
+      actorUuid: current.actorUuid,
+      message: 'Crafting failed.',
+    });
+  });
+
+  it('keeps a safe run-scoped refusal through a failed refresh and clears it on retry', async () => {
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+    const setup = makeServices({
+      listing: baseListing({ activeRuns: [current], history: [] }),
+      commandResult: { success: false, message: 'The run changed. Try again.' },
+    });
+    const store = await loadedStore(setup);
+    store.select(current);
+    setup.services.listJournalForActor = async () => {
+      throw new Error('refresh failed');
+    };
+
+    await store.pause(current);
+    flushSync();
+    assert.deepEqual(store.commandError, {
+      runKey: current.key,
+      actorUuid: current.actorUuid,
+      message: 'The run changed. Try again.',
+    });
+    assert.deepEqual(setup.calls.notify, ['The run changed. Try again.']);
+    assert.equal(store.error, false, 'a quiet refresh failure keeps the populated Journal visible');
+
+    setup.services.executeJournalRunCommand = async (args) => {
+      setup.calls.command.push(args);
+      return { success: true, message: 'Updated' };
+    };
+    setup.services.listJournalForActor = async () => setup.state.listing;
+    await store.retryCommandError();
+    flushSync();
+    assert.equal(store.commandError, null);
+    assert.equal(setup.calls.command.length, 2);
+  });
+
+  it('treats a cancelled versioned command as a silent retryable-state clear', async () => {
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+    const setup = makeServices({
+      listing: baseListing({ activeRuns: [current], history: [] }),
+      commandResult: { success: false, message: 'The run changed. Try again.' },
+    });
+    const store = await loadedStore(setup);
+
+    await store.pause(current);
+    flushSync();
+    assert.ok(store.commandError);
+
+    setup.services.executeJournalRunCommand = async (args) => {
+      setup.calls.command.push(args);
+      return { success: false, cancelled: true, message: 'Roll cancelled.' };
+    };
+    await store.pause(current);
+    flushSync();
+
+    assert.equal(store.commandError, null);
+    assert.deepEqual(setup.calls.notify, ['The run changed. Try again.']);
+    assert.equal(setup.calls.list, 2, 'the cancelled command does not trigger another refresh');
+  });
+
+  it('clears a command failure when selection moves to another run', async () => {
+    const setup = makeServices({ commandResult: { success: false, message: 'Stale run.' } });
+    const store = await loadedStore(setup);
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+    await store.pause(current);
+    flushSync();
+    assert.equal(store.commandError?.runKey, current.key);
+
+    store.select(ACTIVE[1]);
+    flushSync();
+    assert.equal(store.commandError, null);
+  });
+
+  it('clears a command failure when the loaded actor changes', async () => {
+    const setup = makeServices({ commandResult: { success: false, message: 'Stale run.' } });
+    const store = await loadedStore(setup);
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+    await store.pause(current);
+    flushSync();
+    assert.equal(store.commandError?.actorUuid, 'Actor.actor-1');
+
+    setup.state.listing = baseListing({
+      selectedActorId: 'actor-2',
+      selectedActorUuid: 'Actor.actor-2',
+      activeRuns: [run({ id: 'other', actorUuid: 'Actor.actor-2' })],
+      history: [],
+    });
+    await store.load(true);
+    flushSync();
+    assert.equal(store.commandError, null);
+  });
+
+  it('shares one busy guard across competing actions for the same store', async () => {
+    const setup = makeServices();
+    let release;
+    setup.services.executeJournalRunCommand = async (args) => {
+      setup.calls.command.push(args);
+      return new Promise((resolvePromise) => {
+        release = resolvePromise;
+      });
+    };
+    const store = await loadedStore(setup);
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+
+    const first = store.pause(current);
+    await Promise.resolve();
+    await store.resume(current);
+    assert.equal(setup.calls.command.length, 1, 'second action is ignored while the first is busy');
+    assert.equal(store.busyRunId, 'a');
+
+    release({ success: true });
+    await first;
+    flushSync();
+    assert.equal(store.busyRunId, '');
+  });
+
+  it('surfaces listing load failures without leaving the loading state stuck', async () => {
+    const setup = makeServices();
+    setup.services.listJournalForActor = async () => {
+      throw new Error('listing failed');
+    };
+    const store = createJournalStore({ services: setup.services });
+
+    await assert.doesNotReject(() => store.load());
+    flushSync();
+    assert.equal(store.loading, false);
+    assert.equal(store.loadedOnce, true);
+    assert.equal(store.error, true);
   });
 
   it('advance surfaces the result message and refetches quietly', async () => {
@@ -194,7 +560,7 @@ describe('journalStore', () => {
     assert.equal(store.busyRunId, '', 'busy flag cleared');
   });
 
-  it('cancel routes to cancelCraftingRun, notifies, clears selection, and refetches', async () => {
+  it('cancel routes to cancelCraftingRun, notifies, retains selection, and refetches', async () => {
     const setup = makeServices();
     const store = await loadedStore(setup);
     store.select('b');
@@ -206,7 +572,7 @@ describe('journalStore', () => {
 
     assert.deepEqual(setup.calls.cancel, [{ actorId: 'actor-1', runId: 'b' }]);
     assert.deepEqual(setup.calls.notify, ['Craft cancelled.']);
-    assert.equal(store.selectedRunId, '', 'the cancelled run is deselected');
+    assert.equal(store.selectedRunId, 'b', 'selection stays while the refreshed run still exists');
     assert.equal(setup.calls.list, 2, 'refetched after cancel');
     assert.equal(store.busyRunId, '', 'busy flag cleared');
   });

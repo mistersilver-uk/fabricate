@@ -9,7 +9,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
 import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
+import { runStatusPresentation } from '../../src/ui/svelte/apps/journal/journalRunStatus.js';
 
 const ACTOR = { id: 'actor-1', uuid: 'Actor.actor-1', name: 'Akra', img: 'icons/a.webp' };
 const PLAYER = { id: 'user-1', isGM: false };
@@ -130,14 +132,23 @@ function makeBuilder({
   worldTime = 200,
   recipeVisibility = null,
   gatheringActive = [],
+  gatheringHistory = [],
   salvageActive = [],
   salvageHistory = [],
   mode = 'simple',
   system = SYSTEM,
   recipe = RECIPE,
   getGatheringTask = null,
+  getGatheringBlindSecret = null,
   getResultItem = null,
   getComponent = null,
+  getComponentSourceActors = null,
+  resolveItemEssences = null,
+  affordCurrency = null,
+  ingredientMatchesItem = null,
+  getDismissedRunKeys = null,
+  getJournalActionAvailability = null,
+  resolutionModeService = null,
 } = {}) {
   return new RunJournalBuilder({
     craftingRunManager: {
@@ -150,10 +161,13 @@ function makeBuilder({
     },
     gatheringRunSource: {
       getActiveRuns: () => gatheringActive,
-      getRunHistory: () => [],
+      getRunHistory: () => gatheringHistory,
     },
-    recipeManager: { getRecipe: (id) => (id === recipe.id ? recipe : null) },
-    resolutionModeService: { getMode: () => mode },
+    recipeManager: {
+      getRecipe: (id) => (id === recipe.id ? recipe : null),
+      ingredientMatchesItem,
+    },
+    resolutionModeService: resolutionModeService ?? { getMode: () => mode },
     recipeVisibility,
     getSystem: (id) => (id === system.id ? system : null),
     getTool: (systemId, toolId) => {
@@ -162,8 +176,14 @@ function makeBuilder({
       return tool ? { id: tool.id, name: tool.label } : null;
     },
     getGatheringTask,
+    getGatheringBlindSecret,
     getResultItem,
     getComponent,
+    getComponentSourceActors,
+    resolveItemEssences,
+    affordCurrency,
+    getDismissedRunKeys,
+    getJournalActionAvailability,
     localize,
     nowWorldTime: () => worldTime,
   });
@@ -382,6 +402,323 @@ test('aggregates createdResults across steps', () => {
   assert.equal(run.createdResults[0].quantity, 1);
 });
 
+test('active simple crafting previews current authored yields without rewriting past, future, or history', () => {
+  const system = {
+    ...SYSTEM,
+    resolutionMode: 'simple',
+    craftingCheck: { simple: { rollFormula: '', dc: 15 } },
+    components: [{ id: 'blade', name: 'Sword Blade', img: 'icons/blade.webp' }],
+  };
+  const resultGroup = {
+    id: 'success',
+    name: 'Success',
+    results: [{ id: 'blade-result', componentId: 'blade', quantity: 2 }],
+  };
+  const recipe = {
+    ...RECIPE,
+    steps: [{ id: 'past' }, { id: 'current' }, { id: 'future' }],
+    getExecutionSteps: () => [
+      { id: 'past', resultGroups: [resultGroup] },
+      { id: 'current', resultGroups: [resultGroup] },
+      { id: 'future', resultGroups: [resultGroup] },
+    ],
+  };
+  const run = activeCraftingRun({
+    currentStepIndex: 1,
+    steps: [
+      { stepId: 'past', status: 'succeeded', createdResults: [{ componentId: 'blade', quantity: 1 }] },
+      { stepId: 'current', status: 'inProgress' },
+      { stepId: 'future', status: 'pending' },
+    ],
+  });
+  const resolutionModeService = new ResolutionModeService({ getSystem: () => system });
+  const builder = makeBuilder({
+    active: [run],
+    history: [terminalCraftingRun()],
+    recipe,
+    system,
+    resolutionModeService,
+    getComponent: (_systemId, id) => system.components.find((entry) => entry.id === id),
+  });
+
+  const listing = builder.buildListing({ actor: ACTOR, viewer: PLAYER });
+  const active = listing.activeRuns[0];
+  assert.deepEqual(active.craftingYield, {
+    source: 'preview',
+    stageIndex: 1,
+    mode: 'simple',
+    presentation: 'entries',
+    entries: [
+      {
+        id: 'blade-result',
+        name: 'Sword Blade',
+        art: 'icons/blade.webp',
+        qty: 2,
+        chance: 100,
+      },
+    ],
+    tiers: [],
+    progressive: null,
+  });
+  assert.equal(active.steps[0].craftingYield, null, 'past stages use their recorded awards');
+  assert.equal(active.steps[1].craftingYield, active.craftingYield);
+  assert.equal(active.steps[2].craftingYield, null, 'future choices cannot be treated as selected');
+  assert.equal(listing.history[0].craftingYield, null, 'terminal entries retain actual awards only');
+});
+
+test('routed-by-ingredients crafting previews the persisted selected route', () => {
+  const system = { ...SYSTEM, resolutionMode: 'routedByIngredients' };
+  const recipe = {
+    ...SINGLE_STEP_RECIPE,
+    getExecutionSteps: () => [
+      {
+        id: 's0',
+        ingredientSets: [
+          { id: 'iron-set', resultGroupId: 'iron-results' },
+          { id: 'silver-set', resultGroupId: 'silver-results' },
+        ],
+        resultGroups: [
+          {
+            id: 'iron-results',
+            name: 'Iron',
+            results: [{ id: 'iron', componentId: 'iron', quantity: 1 }],
+          },
+          {
+            id: 'silver-results',
+            name: 'Silver',
+            results: [{ id: 'silver', componentId: 'silver', quantity: 3 }],
+          },
+        ],
+      },
+    ],
+  };
+  const run = activeSingleStepRun({
+    steps: [
+      {
+        stepId: 's0',
+        status: 'inProgress',
+        selectionPlan: { selectedIngredientSetId: 'silver-set' },
+        selectedRequirementSnapshot: { id: 'silver-set', resultGroupId: 'silver-results' },
+      },
+    ],
+  });
+  const resolutionModeService = new ResolutionModeService({ getSystem: () => system });
+  const preview = makeBuilder({
+    active: [run],
+    recipe,
+    system,
+    resolutionModeService,
+    getComponent: (_systemId, id) => ({ id, name: `${id} component` }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].craftingYield;
+
+  assert.equal(preview.mode, 'routedByIngredients');
+  assert.equal(preview.presentation, 'entries');
+  assert.deepEqual(preview.entries, [
+    { id: 'silver', name: 'silver component', qty: 3, chance: 100 },
+  ]);
+});
+
+test('routed-by-check crafting projects the authored outcome ladder through resolution routing', () => {
+  const system = {
+    ...SYSTEM,
+    resolutionMode: 'routedByCheck',
+    craftingCheck: {
+      failureResultPolicy: 'never',
+      routed: {
+        type: 'relative',
+        dc: 12,
+        thresholdMode: 'meet',
+        relativeOutcomes: [
+          { id: 'setback', name: 'Setback', success: false, dc: -3 },
+          { id: 'masterwork', name: 'Masterwork', success: true, dc: 4 },
+        ],
+      },
+    },
+  };
+  const recipe = {
+    ...SINGLE_STEP_RECIPE,
+    getExecutionSteps: () => [
+      {
+        id: 's0',
+        resultGroups: [
+          {
+            id: 'failure-results',
+            name: 'Setback',
+            checkOutcomeIds: ['setback'],
+            results: [{ id: 'scrap', componentId: 'scrap', quantity: 1 }],
+          },
+          {
+            id: 'success-results',
+            name: 'Masterwork',
+            checkOutcomeIds: ['masterwork'],
+            results: [{ id: 'sword', componentId: 'sword', quantity: 2 }],
+          },
+        ],
+      },
+    ],
+  };
+  const resolutionModeService = new ResolutionModeService({ getSystem: () => system });
+  const preview = makeBuilder({
+    active: [activeSingleStepRun({ steps: [{ stepId: 's0', status: 'inProgress' }] })],
+    recipe,
+    system,
+    resolutionModeService,
+    getComponent: (_systemId, id) => ({ id, name: id }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].craftingYield;
+
+  assert.deepEqual(preview, {
+    source: 'preview',
+    stageIndex: 0,
+    mode: 'routedByCheck',
+    presentation: 'tiers',
+    entries: [],
+    tiers: [
+      { id: 'setback', name: 'Setback', band: '9+', fail: true, yields: [] },
+      {
+        id: 'masterwork',
+        name: 'Masterwork',
+        band: '16+',
+        fail: false,
+        yields: [{ id: 'sword', name: 'sword', quantity: '×2' }],
+      },
+    ],
+    progressive: null,
+  });
+});
+
+test('progressive crafting keeps ordered difficulty-budget stages distinct from chances and tiers', () => {
+  const system = {
+    ...SYSTEM,
+    resolutionMode: 'progressive',
+    craftingCheck: { progressive: { rollFormula: '2d6', awardMode: 'partial' } },
+    components: [
+      { id: 'pommel', name: 'Pommel', img: 'icons/pommel.webp', difficulty: 2 },
+      { id: 'blade', name: 'Blade', img: 'icons/blade.webp', difficulty: 5 },
+    ],
+  };
+  const recipe = {
+    ...SINGLE_STEP_RECIPE,
+    getExecutionSteps: () => [
+      {
+        id: 's0',
+        resultGroups: [
+          {
+            id: 'progression',
+            results: [
+              { id: 'blade-result', componentId: 'blade' },
+              { id: 'pommel-result', componentId: 'pommel' },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const resolutionModeService = new ResolutionModeService(
+    { getSystem: () => system },
+    { getPlayerResultOrder: () => ['pommel-result', 'blade-result'] }
+  );
+  const preview = makeBuilder({
+    active: [activeSingleStepRun({ steps: [{ stepId: 's0', status: 'inProgress' }] })],
+    recipe,
+    system,
+    resolutionModeService,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].craftingYield;
+
+  assert.equal(preview.presentation, 'progressive');
+  assert.deepEqual(preview.entries, []);
+  assert.deepEqual(preview.tiers, []);
+  assert.deepEqual(preview.progressive, {
+    awardMode: 'partial',
+    stages: [
+      {
+        id: 'pommel-result',
+        name: 'Pommel',
+        art: 'icons/pommel.webp',
+        quantity: '×1',
+        cost: 2,
+      },
+      {
+        id: 'blade-result',
+        name: 'Blade',
+        art: 'icons/blade.webp',
+        quantity: '×1',
+        cost: 5,
+      },
+    ],
+  });
+  assert.equal(JSON.stringify(preview).includes('chance'), false);
+});
+
+test('alchemy preview follows its check mode while redaction and missing references fail closed', () => {
+  const system = {
+    ...SYSTEM,
+    resolutionMode: 'alchemy',
+    alchemy: { checkMode: 'tiered' },
+    craftingCheck: {
+      routed: {
+        type: 'fixed',
+        fixedOutcomes: [{ id: 'fine', name: 'Fine', success: true, start: 10, end: 14 }],
+      },
+    },
+  };
+  const recipe = {
+    ...SINGLE_STEP_RECIPE,
+    getExecutionSteps: () => [
+      {
+        id: 's0',
+        resultGroups: [
+          {
+            id: 'fine-results',
+            name: 'Fine',
+            checkOutcomeIds: ['fine'],
+            results: [{ id: 'potion', componentId: 'potion', quantity: 1 }],
+          },
+        ],
+      },
+    ],
+  };
+  const resolutionModeService = new ResolutionModeService({ getSystem: () => system });
+  const options = {
+    active: [activeSingleStepRun({ steps: [{ stepId: 's0', status: 'inProgress' }] })],
+    recipe,
+    system,
+    resolutionModeService,
+    getComponent: (_systemId, id) => ({ id, name: 'Fine Potion' }),
+  };
+  const visible = makeBuilder(options).buildListing({ actor: ACTOR, viewer: GM }).activeRuns[0];
+  assert.equal(visible.activityKind, 'alchemy');
+  assert.equal(visible.craftingYield.mode, 'alchemy');
+  assert.equal(visible.craftingYield.presentation, 'tiers');
+  assert.deepEqual(visible.craftingYield.tiers[0].yields, [
+    { id: 'potion', name: 'Fine Potion', quantity: '×1' },
+  ]);
+
+  const directSystem = {
+    ...system,
+    alchemy: { checkMode: 'none' },
+  };
+  const direct = makeBuilder({
+    ...options,
+    system: directSystem,
+    resolutionModeService: new ResolutionModeService({ getSystem: () => directSystem }),
+  }).buildListing({ actor: ACTOR, viewer: GM }).activeRuns[0];
+  assert.equal(direct.craftingYield.presentation, 'entries');
+  assert.deepEqual(direct.craftingYield.entries, [
+    { id: 'potion', name: 'Fine Potion', qty: 1, chance: 100 },
+  ]);
+
+  const hidden = makeBuilder({
+    ...options,
+    recipeVisibility: { evaluateRecipeAccess: () => ({ visible: false }) },
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+  assert.equal(hidden.craftingYield, null);
+  assert.equal(JSON.stringify(hidden).includes('Fine Potion'), false);
+
+  const missing = makeBuilder({ ...options, recipe: { ...recipe, getExecutionSteps: () => [] } })
+    .buildListing({ actor: ACTOR, viewer: GM }).activeRuns[0];
+  assert.equal(missing.craftingYield, null);
+});
+
 test('redacts an undiscovered recipe for a non-GM viewer but not for a GM', () => {
   const recipeVisibility = { evaluateRecipeAccess: () => ({ visible: false }) };
 
@@ -456,6 +793,7 @@ test('gathering runs pass through with null steps and re-mapped *WorldTime field
   assert.equal(run.updatedAt, 150);
   assert.equal(run.derivedStatus, 'waiting');
   assert.equal(run.taskId, 'task-a');
+  assert.equal(run.environmentId, null);
 });
 
 test('gathering run resolves task name + image via getGatheringTask (no persisted label)', () => {
@@ -479,6 +817,7 @@ test('gathering run resolves task name + image via getGatheringTask (no persiste
 
   assert.equal(run.names.title, 'Mine Iron Ore', 'friendly task name, not the raw id');
   assert.equal(run.img, 'icons/tools/pick.webp', 'task image, not the generic default');
+  assert.equal(run.environmentId, 'env-1', 'visible gathering context can request a personalized preview');
 });
 
 test('gathering run falls back to the raw taskId + default image when the task is unresolved', () => {
@@ -497,6 +836,255 @@ test('gathering run falls back to the raw taskId + default image when the task i
 
   assert.equal(run.names.title, 'mwTaskUnknown');
   assert.equal(run.img, 'icons/svg/item-bag.svg');
+});
+
+test('gathering yield projects straight and d100 authored previews without replacing historical awards', () => {
+  const straightTask = {
+    id: 'straight-task',
+    name: 'Quarry',
+    resolutionMode: 'straight',
+    resultGroups: [
+      {
+        id: 'stone-group',
+        name: 'Stone',
+        results: [{ id: 'stone-result', componentId: 'stone', quantity: 3 }],
+      },
+    ],
+  };
+  const d100Task = {
+    id: 'd100-task',
+    name: 'Bog',
+    resolutionMode: 'd100',
+    dropRows: [
+      { id: 'moss-row', componentId: 'moss', quantity: 2, dropRate: 65, enabled: true },
+      { id: 'reed-row', name: 'Bog Reed', quantity: 1, dropRate: 40, enabled: true },
+      { id: 'disabled-row', componentId: 'secret', quantity: 9, dropRate: 100, enabled: false },
+    ],
+  };
+  const historyRun = {
+    id: 'd100-history',
+    craftingSystemId: 'sys-1',
+    environmentId: 'env-1',
+    taskId: 'd100-task',
+    status: 'succeeded',
+    checkResult: {
+      provider: 'd100',
+      roll: 42,
+      items: [{ id: 'moss-row', roll: 42, finalDropRate: 71 }],
+      itemRows: [
+        { id: 'moss-row', roll: 42, finalDropRate: 71, dropped: true },
+        { id: 'reed-row', roll: 42, finalDropRate: 23, dropped: false },
+      ],
+    },
+    createdResults: [{ componentId: 'moss', quantity: 2, name: 'Bog Moss', img: 'icons/moss.webp' }],
+  };
+  const listing = makeBuilder({
+    gatheringActive: [
+      {
+        id: 'straight-active',
+        craftingSystemId: 'sys-1',
+        environmentId: 'env-1',
+        taskId: 'straight-task',
+        status: 'inProgress',
+      },
+    ],
+    gatheringHistory: [historyRun],
+    getGatheringTask: (_environmentId, taskId) =>
+      taskId === straightTask.id ? straightTask : d100Task,
+    getComponent: (_systemId, componentId) => ({
+      id: componentId,
+      name: componentId === 'stone' ? 'Granite' : 'Bog Moss',
+      img: componentId === 'stone' ? 'icons/granite.webp' : 'icons/moss.webp',
+    }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER });
+
+  assert.deepEqual(listing.activeRuns[0].gatheringYield, {
+    mode: 'straight',
+    entries: [
+      {
+        id: 'stone-result',
+        name: 'Granite',
+        art: 'icons/granite.webp',
+        qty: 3,
+        chance: 100,
+      },
+    ],
+    roll: null,
+    tiers: [],
+  });
+  assert.deepEqual(listing.history[0].gatheringYield, {
+    mode: 'd100',
+    entries: [
+      {
+        id: 'moss-row',
+        name: 'Bog Moss',
+        art: 'icons/moss.webp',
+        qty: 2,
+        chance: 71,
+      },
+      {
+        id: 'reed-row',
+        name: 'Bog Reed',
+        qty: 1,
+        chance: 23,
+      },
+    ],
+    roll: 42,
+    tiers: [],
+  });
+  assert.deepEqual(listing.history[0].createdResults, [
+    {
+      componentId: 'moss',
+      itemUuid: null,
+      quantity: 2,
+      name: 'Bog Moss',
+      img: 'icons/moss.webp',
+    },
+  ]);
+});
+
+test('gathering routed yield uses authored tier bands, normalized group names, and failure policy', () => {
+  const system = {
+    ...SYSTEM,
+    gatheringCraftingCheck: {
+      failureResultPolicy: 'never',
+      routed: {
+        type: 'relative',
+        dc: 12,
+        thresholdMode: 'meet',
+        relativeOutcomes: [
+          { id: 'fail', name: ' Setback ', success: false, dc: -4 },
+          { id: 'pass', name: 'Bounty', success: true, dc: 3 },
+        ],
+      },
+    },
+  };
+  const task = {
+    id: 'routed-task',
+    name: 'Hunt',
+    resolutionMode: 'routed',
+    dcOverride: 14,
+    resultGroups: [
+      { id: 'failure-group', name: 'setback', results: [{ id: 'hide', componentId: 'hide', quantity: 1 }] },
+      { id: 'success-group', name: ' BOUNTY ', results: [{ id: 'venison', componentId: 'venison', quantity: 4 }] },
+    ],
+  };
+  const run = makeBuilder({
+    system,
+    gatheringActive: [
+      {
+        id: 'routed',
+        craftingSystemId: system.id,
+        environmentId: 'env-1',
+        taskId: task.id,
+        status: 'inProgress',
+      },
+    ],
+    getGatheringTask: () => task,
+    getComponent: (_systemId, componentId) => ({ id: componentId, name: componentId }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+
+  assert.deepEqual(run.gatheringYield, {
+    mode: 'routed',
+    entries: [],
+    roll: null,
+    tiers: [
+      { id: 'fail', name: 'Setback', band: '10+', fail: true, yields: [] },
+      {
+        id: 'pass',
+        name: 'Bounty',
+        band: '17+',
+        fail: false,
+        yields: [{ id: 'venison', name: 'venison', quantity: '×4' }],
+      },
+    ],
+  });
+});
+
+test('gathering yield prefers the persisted task snapshot and hides opaque blind details from owners', () => {
+  const snapshotTask = {
+    id: 'old-task',
+    name: 'Old Grove',
+    resolutionMode: 'd100',
+    dropRows: [{ id: 'old-herb', name: 'Old Herb', quantity: 1, dropRate: 25 }],
+  };
+  const currentTask = {
+    id: 'old-task',
+    name: 'Edited Grove',
+    resolutionMode: 'straight',
+    resultGroups: [],
+  };
+  const blindTask = {
+    id: 'secret-task',
+    name: 'Secret Grove',
+    resolutionMode: 'd100',
+    dropRows: [{ id: 'secret-herb', name: 'Secret Herb', quantity: 1, dropRate: 90 }],
+  };
+  const runs = [
+    {
+      id: 'snapshotted',
+      craftingSystemId: 'sys-1',
+      environmentId: 'env-1',
+      taskId: 'old-task',
+      status: 'waitingTime',
+      economyEvidence: { runtimeSnapshot: { task: snapshotTask } },
+    },
+    {
+      id: 'blind-run',
+      craftingSystemId: 'sys-1',
+      environmentId: 'env-1',
+      taskId: 'blind:env-1',
+      status: 'waitingTime',
+      checkResult: {
+        provider: 'd100',
+        roll: 7,
+        items: [],
+        itemRows: [{ id: 'secret-herb', roll: 7, finalDropRate: 90, dropped: false }],
+      },
+    },
+  ];
+  const builder = makeBuilder({
+    gatheringActive: runs,
+    getGatheringTask: (_environmentId, taskId) =>
+      taskId === 'secret-task' ? blindTask : currentTask,
+    getGatheringBlindSecret: () => ({ taskId: 'secret-task', snapshot: { task: blindTask } }),
+  });
+
+  const playerRuns = builder.buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER }).activeRuns;
+  assert.equal(playerRuns[0].gatheringYield.mode, 'd100');
+  assert.equal(playerRuns[0].gatheringYield.entries[0].chance, 25);
+  assert.equal(playerRuns[1].gatheringYield, null);
+  assert.equal(playerRuns[1].environmentId, null, 'opaque blind runs expose no preview context');
+  assert.equal(JSON.stringify(playerRuns[1]).includes('Secret Herb'), false);
+  assert.equal(JSON.stringify(playerRuns[1]).includes('90'), false);
+
+  const gmBlind = builder.buildListing({ actor: ACTOR, viewer: GM }).activeRuns[1];
+  assert.equal(gmBlind.blindSecretPreview, true);
+  assert.equal(gmBlind.gatheringYield.mode, 'd100');
+  assert.equal(gmBlind.gatheringYield.entries[0].name, 'Secret Herb');
+  assert.equal(gmBlind.gatheringYield.roll, 7);
+});
+
+test('progressive gathering is not misrepresented as routed yield', () => {
+  const run = makeBuilder({
+    gatheringActive: [
+      {
+        id: 'progressive',
+        craftingSystemId: 'sys-1',
+        environmentId: 'env-1',
+        taskId: 'progressive-task',
+        status: 'inProgress',
+      },
+    ],
+    getGatheringTask: () => ({
+      id: 'progressive-task',
+      name: 'Long Hunt',
+      resolutionMode: 'progressive',
+      resultGroups: [{ id: 'not-a-tier', name: 'Progress', results: [] }],
+    }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+
+  assert.equal(run.gatheringYield, null);
 });
 
 test('gathering run with a blind/null taskId does not consult the task resolver', () => {
@@ -1154,4 +1742,527 @@ test('the GM sees a fizzle even when showAttemptHistoryToPlayers is off', () => 
   }).buildListing({ actor: ACTOR, viewer: GM });
 
   assert.equal(listing.history.length, 1, 'the GM is never gated by the player-visibility flag');
+});
+
+test('projects current lifecycle state, alchemy activity kind, pause precedence, and safe recovery evidence', () => {
+  const run = activeCraftingRun({
+    lifecycleVersion: 1,
+    runRevision: 7,
+    completionMode: 'worldTime',
+    pausedDurationSeconds: 12,
+    pauseState: { pausedAt: 180, remainingSeconds: 42 },
+    executionJournal: {
+      operationId: 'secret-operation',
+      requestId: 'secret-request',
+      baseRunRevision: 6,
+      status: 'recoveryRequired',
+      intent: { formula: '2d20kh + @secret' },
+      effects: [
+        {
+          effectId: 'consume',
+          kind: 'consumeIngredients',
+          phase: 'applied',
+          planned: { itemUuid: 'Actor.secret.Item.herb' },
+          receipt: { itemUuid: 'Actor.secret.Item.herb', quantity: 1 },
+        },
+        {
+          effectId: 'private-extension',
+          kind: 'private:secret-effect-kind',
+          phase: 'applied',
+          planned: { privateFormula: 'secret' },
+          receipt: { privateReceipt: 'secret' },
+        },
+        {
+          effectId: 'award',
+          kind: 'awardResults',
+          phase: 'applying',
+          planned: { componentId: 'secret-result' },
+        },
+      ],
+    },
+  });
+  const listing = makeBuilder({ active: [run], mode: 'alchemy' }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  });
+  const projected = listing.activeRuns[0];
+
+  assert.equal(listing.selectedActorUuid, ACTOR.uuid);
+  assert.equal(projected.key, JSON.stringify([ACTOR.uuid, 'crafting', 'run-1']));
+  assert.equal(projected.actorUuid, ACTOR.uuid);
+  assert.equal(projected.runType, 'crafting', 'native persistence type remains unchanged');
+  assert.equal(projected.activityKind, 'alchemy');
+  assert.equal(projected.lifecycleContract, 'current');
+  assert.equal(projected.runRevision, 7);
+  assert.equal(projected.completionMode, 'worldTime');
+  assert.deepEqual(projected.pauseState, { pausedAt: 180, remainingSeconds: 42 });
+  assert.equal(projected.derivedStatus, 'paused');
+  assert.deepEqual(projected.recoveryEvidence, {
+    status: 'recoveryRequired',
+    appliedEffectCount: 2,
+    effectCount: 3,
+    effects: [
+      { kind: 'consumeIngredients', phase: 'applied', hasReceipt: true },
+      { kind: 'other', phase: 'applied', hasReceipt: true },
+      { kind: 'awardResults', phase: 'applying', hasReceipt: false },
+    ],
+    required: true,
+  });
+  assert.equal(projected.actions.execute, false);
+  assert.equal(projected.actions.cancel, false);
+  assert.equal(projected.actions.disabledReason, 'recoveryRequired');
+  assert.equal(JSON.stringify(projected).includes('secret-operation'), false);
+  assert.equal(JSON.stringify(projected).includes('2d20kh'), false);
+  assert.equal(JSON.stringify(projected).includes('Actor.secret.Item.herb'), false);
+  assert.equal(JSON.stringify(projected).includes('private:secret-effect-kind'), false);
+});
+
+test('unsupported lifecycle versions remain readable and expose no mutation actions', () => {
+  const listing = makeBuilder({
+    active: [activeCraftingRun({ lifecycleVersion: 2, runRevision: 99 })],
+  }).buildListing({ actor: ACTOR, viewer: PLAYER });
+  const run = listing.activeRuns[0];
+
+  assert.equal(run.lifecycleContract, 'unsupported');
+  assert.equal(run.lifecycleVersion, 2);
+  assert.equal(run.actions.execute, false);
+  assert.equal(run.actions.pause, false);
+  assert.equal(run.actions.cancel, false);
+  assert.equal(run.actions.disabledReason, 'unsupportedLifecycle');
+});
+
+test('redaction preserves owner execution/cancel availability without leaking selection plans', () => {
+  const hiddenStep = {
+    ...activeCraftingRun().steps[1],
+    selectionPlan: {
+      selectedIngredientSetId: 'set-secret',
+      ingredientOptionOverrides: { choice: { optionIndex: 1, heldItemId: 'secret-item' } },
+      ingredientEssenceAllocation: {
+        stepId: 's1',
+        ingredientSetId: 'set-secret',
+        allocation: { 'secret-item': 2 },
+      },
+    },
+    selectedRequirementSnapshot: { id: 'set-secret', hiddenRoute: 'critical-secret' },
+  };
+  const listing = makeBuilder({
+    active: [
+      activeCraftingRun({
+        lifecycleVersion: 1,
+        runRevision: 1,
+        steps: [activeCraftingRun().steps[0], hiddenStep],
+      }),
+    ],
+    recipeVisibility: { evaluateRecipeAccess: () => ({ visible: false }) },
+    worldTime: 5000,
+  }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER });
+  const run = listing.activeRuns[0];
+
+  assert.equal(run.redacted, true);
+  assert.deepEqual(run.steps, []);
+  assert.equal(run.actions.execute, true);
+  assert.equal(run.actions.cancel, true);
+  assert.equal(JSON.stringify(run).includes('critical-secret'), false);
+  assert.equal(JSON.stringify(run).includes('secret-item'), false);
+});
+
+test('entitled step history prefers the selected requirement snapshot and carries scoped selection intent', () => {
+  const legacyRequirements = [{ componentId: 'legacy-iron', quantity: 2 }];
+  const selectedRequirementSnapshot = {
+    id: 'set-routed',
+    resultGroupId: 'result-blue',
+    ingredientGroups: [
+      { id: 'choice', options: [{ match: { type: 'tag', value: 'metal' }, quantity: 1 }] },
+    ],
+    essences: { fire: 2 },
+    currencyCost: { unit: 'gp', amount: 4 },
+  };
+  const selectionPlan = {
+    selectedIngredientSetId: 'set-routed',
+    ingredientOptionOverrides: { choice: { optionIndex: 0, heldItemId: 'Item.iron' } },
+    ingredientEssenceAllocation: {
+      stepId: 's1',
+      ingredientSetId: 'set-routed',
+      allocation: { 'Item.ember': 2 },
+    },
+  };
+  const run = activeCraftingRun({
+    lifecycleVersion: 1,
+    steps: [
+      activeCraftingRun().steps[0],
+      {
+        ...activeCraftingRun().steps[1],
+        requirements: legacyRequirements,
+        selectedRequirementSnapshot,
+        selectionPlan,
+      },
+    ],
+  });
+  const projected = makeBuilder({ active: [run] }).buildListing({
+    actor: ACTOR,
+    viewer: PLAYER,
+  }).activeRuns[0].currentStep;
+
+  assert.deepEqual(projected.selectionPlan, selectionPlan);
+  assert.deepEqual(projected.selectedRequirementSnapshot, selectedRequirementSnapshot);
+  assert.deepEqual(projected.requirementSnapshot, selectedRequirementSnapshot);
+  assert.equal(projected.requirements[0].componentId, 'legacy-iron', 'legacy flat rows remain available');
+  assert.notEqual(projected.selectionPlan, selectionPlan, 'projection is cloned');
+});
+
+test('same run id across native run types remains collision-free while same-type duplicates are dropped', () => {
+  const duplicateId = 'shared-id';
+  const listing = makeBuilder({
+    active: [activeCraftingRun({ id: duplicateId }), activeCraftingRun({ id: duplicateId })],
+    gatheringActive: [
+      {
+        id: duplicateId,
+        craftingSystemId: 'sys-1',
+        taskId: 'task-1',
+        status: 'inProgress',
+        timeGate: null,
+      },
+    ],
+    salvageActive: [
+      {
+        id: duplicateId,
+        craftingSystemId: 'sys-1',
+        componentId: 'c1',
+        status: 'inProgress',
+        timeGate: null,
+      },
+    ],
+  }).buildListing({ actor: ACTOR, viewer: PLAYER });
+
+  assert.deepEqual(listing.activeRuns.map((run) => run.runType), ['crafting', 'salvage', 'gathering']);
+  assert.equal(new Set(listing.activeRuns.map((run) => run.key)).size, 3);
+});
+
+test('dismissed composite keys filter before counts and stay isolated by viewer at the service seam', () => {
+  const hidden = terminalCraftingRun({ id: 'hidden' });
+  const visible = terminalCraftingRun({ id: 'visible' });
+  const hiddenKey = JSON.stringify([ACTOR.uuid, 'crafting', 'hidden']);
+  let reads = 0;
+  const builder = makeBuilder({
+    history: [hidden, visible],
+    getDismissedRunKeys: ({ actorUuid, viewerId }) => {
+      reads += 1;
+      assert.equal(actorUuid, ACTOR.uuid);
+      return viewerId === PLAYER.id ? new Set([hiddenKey]) : new Set();
+    },
+  });
+  const listing = builder.buildListing({ actor: ACTOR, viewer: PLAYER });
+  const otherViewerListing = builder.buildListing({ actor: ACTOR, viewer: GM });
+
+  assert.deepEqual(listing.history.map((run) => run.id), ['visible']);
+  assert.deepEqual(listing.counts, { active: 0, history: 1 });
+  assert.deepEqual(otherViewerListing.history.map((run) => run.id), ['hidden', 'visible']);
+  assert.equal(reads, 2, 'the per-user setting is read once for each listing pass');
+});
+
+test('authority availability gates current actions with its safe reason', () => {
+  let reads = 0;
+  const builder = makeBuilder({
+    active: [activeCraftingRun({ lifecycleVersion: 1, runRevision: 2 })],
+    getJournalActionAvailability: () => {
+      reads += 1;
+      return { available: false, reason: 'authorityUnavailable' };
+    },
+  });
+  const run = builder.buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER }).activeRuns[0];
+
+  assert.equal(run.actions.execute, false);
+  assert.equal(run.actions.cancel, false);
+  assert.equal(run.actions.disabledReason, 'authorityUnavailable');
+  assert.equal(reads, 1, 'authority is read once for the listing pass');
+});
+
+test('completion-mode switching is limited to an active countdown without a player check', () => {
+  const waitingGate = { requiredSeconds: 600, availableAt: 800 };
+  const gatheringRun = (id, taskId, timeGate = waitingGate) => ({
+    id,
+    craftingSystemId: 'sys-1',
+    environmentId: 'env-1',
+    taskId,
+    status: 'waitingTime',
+    lifecycleVersion: 1,
+    runRevision: 0,
+    timeGate,
+  });
+  const listing = makeBuilder({
+    worldTime: 200,
+    gatheringActive: [
+      gatheringRun('straight', 'straight-task'),
+      gatheringRun('rolled', 'rolled-task'),
+      gatheringRun('ready', 'straight-task', { requiredSeconds: 600, availableAt: 100 }),
+    ],
+    getGatheringTask: (_environmentId, taskId) => ({
+      name: taskId,
+      resolutionMode: taskId === 'straight-task' ? 'straight' : 'd100',
+    }),
+  }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER });
+  const byId = Object.fromEntries(listing.activeRuns.map((run) => [run.id, run]));
+
+  assert.equal(byId.straight.actions.setCompletionMode, true);
+  assert.equal(byId.rolled.actions.setCompletionMode, false, 'player rolls stay manual');
+  assert.equal(byId.ready.actions.setCompletionMode, false, 'a matured gate is no longer counting down');
+});
+
+test('salvage remains outside versioned completion-mode controls', () => {
+  const run = makeBuilder({
+    salvageActive: [
+      {
+        id: 'salvage-current',
+        craftingSystemId: 'sys-1',
+        componentId: 'ore',
+        status: 'waitingTime',
+        lifecycleVersion: 1,
+        timeGate: { requiredSeconds: 60, availableAt: 300 },
+      },
+    ],
+  }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER }).activeRuns[0];
+
+  assert.equal(run.actions.setCompletionMode, false);
+});
+
+test('current-step availability delegates material choices and shared essence allocation to the ingredient set', () => {
+  const calls = [];
+  const selectedSet = {
+    id: 'set-1',
+    ingredientGroups: [
+      {
+        id: 'choice',
+        name: 'Metal',
+        options: [
+          { id: 'iron', quantity: 1, match: { type: 'component', componentId: 'iron' } },
+          { id: 'silver', quantity: 1, match: { type: 'component', componentId: 'silver' } },
+        ],
+      },
+      {
+        id: 'essence',
+        name: 'Essence',
+        options: [
+          { id: 'fire', match: { type: 'essence', essenceId: 'fire', amount: 2 } },
+        ],
+      },
+    ],
+    resolveIngredientSelection(items, matcher, options) {
+      calls.push({ items, matcher, options });
+      const selectedIndex = options.optionOverrides?.choice?.optionIndex ?? 0;
+      return {
+        success: false,
+        missingGroups:
+          selectedIndex === 0
+            ? [
+                {
+                  group: { id: 'fixed', name: 'Fixed input' },
+                  ingredient: { id: 'coal' },
+                  need: 1,
+                  have: 0,
+                },
+              ]
+            : [{ group: { id: 'choice' }, ingredient: { id: 'silver' }, need: 1, have: 0 }],
+        selectedIngredients: [selectedIndex === 0 ? this.ingredientGroups[0].options[0] : this.ingredientGroups[0].options[1]],
+        plan: [{ item: items[0], quantity: 1 }],
+        currencySpends: [],
+        essenceAllocation: options.essenceAllocation,
+        essencePool: {
+          requirements: [{ groupId: 'essence', essenceId: 'fire', need: 2, delivered: 2, owned: 3, satisfied: true }],
+          carriers: [{ itemKey: 'Item.ember', item: items[0], perUnit: { fire: 1 }, ownedUnits: 3, allocatedUnits: 2 }],
+          allocation: { 'Item.ember': 2 },
+          suggested: { 'Item.ember': 2 },
+          totals: { fire: 2 },
+        },
+      };
+    },
+  };
+  const recipe = {
+    ...RECIPE,
+    getExecutionSteps: () => [
+      RECIPE.getExecutionSteps()[0],
+      { ...RECIPE.getExecutionSteps()[1], ingredientSets: [selectedSet] },
+    ],
+  };
+  const held = {
+    id: 'ember',
+    uuid: 'Item.ember',
+    name: 'Ember',
+    img: 'icons/ember.webp',
+    system: { quantity: 3 },
+  };
+  const actor = { ...ACTOR, isOwner: true, items: [held] };
+  const system = {
+    ...SYSTEM,
+    components: [
+      { id: 'iron', name: 'Iron Ingot', img: 'icons/iron.webp' },
+      { id: 'silver', name: 'Silver Ingot', img: 'icons/silver.webp' },
+    ],
+    essenceDefinitions: [
+      { id: 'fire', name: 'Fire', icon: 'fas fa-fire', colorToken: 'ember' },
+    ],
+  };
+  const run = activeCraftingRun({
+    lifecycleVersion: 1,
+    steps: [
+      activeCraftingRun().steps[0],
+      {
+        ...activeCraftingRun().steps[1],
+        selectionPlan: {
+          selectedIngredientSetId: 'set-1',
+          ingredientOptionOverrides: { choice: { optionIndex: 0, heldItemId: 'Item.ember' } },
+          ingredientEssenceAllocation: {
+            stepId: 's1',
+            ingredientSetId: 'set-1',
+            allocation: { 'Item.ember': 2 },
+          },
+        },
+      },
+    ],
+  });
+  const step = makeBuilder({
+    active: [run],
+    system,
+    recipe,
+    ingredientMatchesItem: (_recipe, ingredient, item) => ingredient.id === 'iron' && item.id === 'ember',
+    resolveItemEssences: ({ item, recipe: resolvedRecipe }) => {
+      assert.equal(item, held);
+      assert.equal(resolvedRecipe, recipe);
+      return { fire: 1 };
+    },
+    affordCurrency: () => true,
+    getComponent: (_systemId, componentId) =>
+      system.components.find((component) => component.id === componentId) ?? null,
+  }).buildListing({ actor, viewer: PLAYER }).activeRuns[0].currentStep;
+
+  assert.equal(calls.length, 3, 'one selected resolve plus one canonical resolve per choice option');
+  assert.equal(calls[0].items[0], held);
+  assert.deepEqual(calls[0].options.essenceAllocation, { 'Item.ember': 2 });
+  assert.equal(calls[0].options.resolveItemEssences(held).fire, 1);
+  assert.equal(calls[0].options.affordCurrency({ unit: 'gp', amount: 1 }), true);
+  assert.deepEqual(step.selectionAvailability, {
+    success: false,
+    missingGroups: [
+      {
+        id: 'fixed',
+        name: 'Fixed input',
+        ingredientId: 'coal',
+        need: 1,
+        have: 0,
+      },
+    ],
+    choices: [
+      {
+        groupId: 'choice',
+        selectedOptionIndex: 0,
+        options: [
+          {
+            index: 0,
+            id: 'iron',
+            kind: 'component',
+            name: 'Iron Ingot',
+            img: 'icons/iron.webp',
+            icon: null,
+            colorToken: null,
+            need: 1,
+            available: true,
+            candidates: [
+              {
+                itemId: 'Item.ember',
+                name: 'Ember',
+                img: 'icons/ember.webp',
+                held: 3,
+                available: true,
+              },
+            ],
+          },
+          {
+            index: 1,
+            id: 'silver',
+            kind: 'component',
+            name: 'Silver Ingot',
+            img: 'icons/silver.webp',
+            icon: null,
+            colorToken: null,
+            need: 1,
+            available: false,
+            candidates: [],
+          },
+        ],
+      },
+    ],
+    requirements: [
+      {
+        groupId: 'choice',
+        name: 'Metal',
+        selectedOptionIndex: 0,
+        selectedItemId: 'Item.ember',
+        option: {
+          index: 0,
+          id: 'iron',
+          kind: 'component',
+          name: 'Iron Ingot',
+          img: 'icons/iron.webp',
+          icon: null,
+          colorToken: null,
+          need: 1,
+          available: true,
+          candidates: [
+            {
+              itemId: 'Item.ember',
+              name: 'Ember',
+              img: 'icons/ember.webp',
+              held: 3,
+              available: true,
+            },
+          ],
+        },
+      },
+      {
+        groupId: 'essence',
+        name: 'Essence',
+        selectedOptionIndex: 0,
+        selectedItemId: null,
+        option: {
+          index: 0,
+          id: 'fire',
+          kind: 'essence',
+          name: 'Fire essence',
+          img: null,
+          icon: 'fas fa-fire',
+          colorToken: 'ember',
+          need: 2,
+          available: true,
+          candidates: [],
+        },
+      },
+    ],
+    essencePool: {
+      requirements: [
+        {
+          groupId: 'essence',
+          essenceId: 'fire',
+          name: 'Fire',
+          icon: 'fas fa-fire',
+          colorToken: 'ember',
+          need: 2,
+          delivered: 2,
+          owned: 3,
+          satisfied: true,
+        },
+      ],
+      carriers: [{ itemKey: 'Item.ember', name: 'Ember', img: 'icons/ember.webp', perUnit: { fire: 1 }, ownedUnits: 3, allocatedUnits: 2 }],
+      allocation: { 'Item.ember': 2 },
+      suggested: { 'Item.ember': 2 },
+      totals: { fire: 2 },
+    },
+  });
+  assert.equal(JSON.stringify(step.selectionAvailability).includes('system'), false, 'held document internals are not spread');
+});
+
+test('paused runs use an explicit neutral pause status presentation', () => {
+  assert.deepEqual(runStatusPresentation('paused'), {
+    tone: 'neutral',
+    icon: 'fa-pause',
+    labelKey: 'FABRICATE.App.Journal.Status.paused',
+  });
 });

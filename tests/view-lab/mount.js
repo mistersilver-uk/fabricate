@@ -132,6 +132,8 @@ function readParams() {
     // three manager surfaces exist only for a system in the right visibility mode - clicking to
     // them is impossible when the rail entry is not rendered at all.
     system: params.get('system') ?? null,
+    gatheringTaskMode: params.get('gatheringTaskMode') ?? null,
+    journalCaseState: params.get('journalCaseState') ?? null,
     // TWO things, and the name says only the second: a world seeded with NO crafting systems,
     // and the persisted selection cleared through the real admin store after construction. Both
     // halves are needed, because a Manager refresh resolves an empty selection back to the first
@@ -393,6 +395,7 @@ async function mountPlayerApp(content, params) {
     render: () => {},
   });
   const services = app._buildServices();
+  installJournalCaseServiceSeam(services, params.journalCaseState);
 
   const props = {
     activeTab,
@@ -422,6 +425,48 @@ async function mountPlayerApp(content, params) {
   };
   const instance = mount(FabricateAppRoot, { target: content, props });
   return { instance, services, props };
+}
+
+function installJournalCaseServiceSeam(services, state) {
+  if (!state || !services) return;
+  const list = services.listJournalForActor?.bind(services);
+  const execute = services.executeJournalRunCommand?.bind(services);
+  const fixtureExecute = globalThis.game?.fabricate?.executeJournalCaseFixtureCommand;
+  const fixtureEvents = globalThis.game?.fabricate?.journalCaseFixtureEvents;
+  if (typeof fixtureExecute === 'function') {
+    services.executeJournalRunCommand = async (command) =>
+      (await fixtureExecute(command)) ?? execute?.(command) ?? null;
+    if (Array.isArray(fixtureEvents)) {
+      services.notify = (message) => {
+        fixtureEvents.push({ type: 'notification', message, state });
+      };
+    }
+  }
+  if (state === 'loading') {
+    services.listJournalForActor = () => new Promise(() => {});
+    return;
+  }
+  if (state === 'error-retry') {
+    let attempts = 0;
+    services.listJournalForActor = (...args) => {
+      attempts += 1;
+      if (attempts === 1) return Promise.reject(new Error('View Lab Journal load failure'));
+      return list?.(...args) ?? null;
+    };
+    return;
+  }
+  if (state === 'no-actor-empty') {
+    services.getSelectedActorId = () => '';
+    services.listJournalForActor = async () => ({
+      selectedActorId: null,
+      selectedActorUuid: null,
+      actor: null,
+      worldTime: Number(services.getWorldTime?.() ?? 0),
+      activeRuns: [],
+      history: [],
+      counts: { active: 0, history: 0 },
+    });
+  }
 }
 // view-lab-region:end
 
@@ -1017,6 +1062,8 @@ async function boot() {
         noAuthoredWorldComponents: params.noAuthoredWorldComponents,
         longTravelLabels: params.longTravelLabels,
         noInteractables: params.noInteractables,
+        gatheringTaskMode: params.gatheringTaskMode,
+        journalCaseState: params.journalCaseState,
       });
   if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);
   const localize = world ? world.localize : (key) => key;
@@ -1065,6 +1112,7 @@ async function boot() {
     services: mounted?.services ?? null,
     store: mounted?.store ?? null,
     frame: built.frame,
+    journalCaseEvents: world?.fabricate?.journalCaseFixtureEvents ?? [],
     // The dialogs standing in the page, so a case can assert one opened and the driver can settle
     // it. `frame.screenshot()` clips the PAGE to the frame's box rather than rendering the frame in
     // isolation, so a dialog centred in the viewport lands on top of the window in the capture —
@@ -1072,6 +1120,9 @@ async function boot() {
     dialogs: () => (world ? world.shim.openDialogs() : []),
     settle: () => settle(labSettleRoots(built.frame, world), mounted?.services ?? null),
   };
+  if (params.journalCaseState) {
+    document.body.setAttribute('data-journal-case-state', params.journalCaseState);
+  }
   document.body.setAttribute(READY_ATTRIBUTE, params.caseId ?? params.appId);
 }
 

@@ -65,6 +65,15 @@ function pickComparedFields(envelope) {
 
 test('public-API export carries the gathering authoring bundle (non-empty)', () => {
   const fixture = buildFullAuthoringFixture();
+  const sourceTask = fixture.gatheringConfig.systems[FIXTURE_SYSTEM_ID].tasks[0];
+  sourceTask.resolutionMode = 'routed';
+  sourceTask.resultGroups = [
+    {
+      id: 'route-rich',
+      name: 'Rich',
+      results: [{ id: 'result-herb', componentId: 'comp-herb', quantity: 2 }]
+    }
+  ];
   const h = makeHarness(fixture);
 
   const envelope = exportViaPublicApiResolution(h, FIXTURE_SYSTEM_ID);
@@ -88,6 +97,8 @@ test('public-API export carries the gathering authoring bundle (non-empty)', () 
     (envelope.gatheringConfig.system.tasks?.length ?? 0) > 0,
     'the exported gatheringConfig slice retains the system tasks'
   );
+  assert.equal(envelope.gatheringConfig.system.tasks[0].resolutionMode, 'routed');
+  assert.deepEqual(envelope.gatheringConfig.system.tasks[0].resultGroups, sourceTask.resultGroups);
 });
 
 test('public-API and admin-store export paths emit equivalent envelopes (excluding exportedAt)', () => {

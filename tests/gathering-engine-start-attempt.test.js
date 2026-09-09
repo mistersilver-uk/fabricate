@@ -322,17 +322,20 @@ test('startAttempt creates one waitingTime run for a fully guarded timed task', 
   assert.equal(calls.createWaitingRun.length, 1);
   assert.equal(calls.createWaitingRun[0].length, 3);
   assert.equal(calls.createWaitingRun[0][0], actor);
-  assert.deepEqual(calls.createWaitingRun[0][1], {
-    craftingSystemId: 'system-a',
-    environmentId: 'env-a',
-    taskId: 'timed-task',
-    // Load-bearing (issue 1288): a WAITING run is the only run a relayed blind start
-    // creates, and it is created on the ELECTED GM's client. Without the requesting
-    // viewer's id here the run manager's ambient fallback stamps the GM, and
-    // `getGatheringRunViewer` reads that back at maturity as a GM viewer — which
-    // un-blinds the terminal history written to the player's own actor flag.
-    userId: viewer.id
-  });
+  const waitingRunData = calls.createWaitingRun[0][1];
+  assert.equal(waitingRunData.craftingSystemId, 'system-a');
+  assert.equal(waitingRunData.environmentId, 'env-a');
+  assert.equal(waitingRunData.taskId, 'timed-task');
+  // Load-bearing (issue 1288): a WAITING run is the only run a relayed blind start
+  // creates, and it is created on the ELECTED GM's client. Without the requesting
+  // viewer's id here the run manager's ambient fallback stamps the GM, and
+  // `getGatheringRunViewer` reads that back at maturity as a GM viewer — which
+  // un-blinds the terminal history written to the player's own actor flag.
+  assert.equal(waitingRunData.userId, viewer.id);
+  // All non-blind timed tasks carry their start-time runtime contract so later live
+  // authoring edits cannot change the mode or yields at maturity (#1650).
+  assert.equal(waitingRunData.economyEvidence.runtimeSnapshot.task.resolutionMode, 'routed');
+  assert.equal(waitingRunData.economyEvidence.runtimeSnapshot.task.id, 'timed-task');
   assert.equal('usedTools' in calls.createWaitingRun[0][1], false);
   assert.equal('createdResults' in calls.createWaitingRun[0][1], false);
   assert.deepEqual(calls.createWaitingRun[0][2], {

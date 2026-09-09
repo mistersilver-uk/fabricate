@@ -333,6 +333,47 @@ export const BROAD_SIGNAL_PATTERN = new RegExp(
  * `manager-gathering-stamina-rolls` for years and no case has ever had that id.
  */
 export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
+  // Issue 1648: each run control maps to a state that actually renders it.
+  'src/ui/svelte/components/RunActionBar.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-ready-single',
+    'fabricate-journal-lifecycle-cancel-confirmation',
+    'fabricate-journal-lifecycle-paused',
+  ]),
+  'src/ui/svelte/components/WorldClockChip.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-ready-single',
+  ]),
+  'src/ui/svelte/components/SlotRow.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-waiting-open-choice',
+    'fabricate-journal-lifecycle-material-shortage',
+  ]),
+  'src/ui/svelte/components/SlotTile.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-waiting-open-choice',
+    'fabricate-journal-lifecycle-material-shortage',
+  ]),
+  'src/ui/svelte/components/ChoiceOptionList.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-waiting-open-choice',
+  ]),
+  'src/ui/svelte/components/EssencePool.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-essence-shared',
+  ]),
+  'src/ui/svelte/components/RunProgress.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-past-stage',
+  ]),
+  'src/ui/svelte/components/StageNav.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-past-stage',
+    'fabricate-journal-lifecycle-future-stage',
+  ]),
+  'src/ui/svelte/components/StageCard.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-ready-single',
+    'fabricate-journal-lifecycle-past-stage',
+    'fabricate-journal-lifecycle-future-stage',
+  ]),
+  'src/ui/svelte/components/YieldScale.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-gathering-d100',
+  ]),
+  'src/ui/svelte/components/OutcomeLadder.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-gathering-check',
+  ]),
   // The shared icon picker (issue 1269). Everything it presents — the pinned resolved row, the
   // row labels, the popover's own geometry — exists ONLY in the open popover, and neither
   // representative frame opens one. This is the one case whose steps click an icon-picker trigger.
@@ -1397,6 +1438,119 @@ function playerCase(entry) {
 
 function responsiveLayout(containerSelector, gridSelector) {
   return { containerSelector, gridSelector, maxContentBoxInlineSize: 960 };
+}
+
+/** Journal lifecycle fixtures use persisted records; steps operate the real controls. */
+function journalLifecycleCases() {
+  const states = [
+    'ready-single',
+    'waiting-auto-eligible',
+    'waiting-open-choice',
+    'material-shortage',
+    'ingredient-route',
+    'check-route',
+    'essence-shared',
+    'paused',
+    'cancel-confirmation',
+    'past-stage',
+    'future-stage',
+    'gathering-straight',
+    'gathering-d100',
+    'gathering-check',
+    'gathering-straight-finished',
+    'gathering-d100-finished',
+    'gathering-check-finished',
+    'finished-success',
+    'finished-failure',
+    'finished-cancelled',
+    'active-page-two',
+    'finished-page-two',
+    'filter-paused',
+    'empty-search',
+    'automatic-completion',
+    'automatic-blocker',
+    'dismissal',
+    'redacted-owner',
+    'alchemy',
+    'salvage',
+    'legacy',
+    'loading',
+    'error-retry',
+    'no-actor-empty',
+    'stale-action',
+    'command-timeout',
+    'authority-unavailable',
+    'roll-cancelled',
+    'unsupported-version',
+    'recovery-required',
+    'wide',
+    'narrow',
+  ];
+  const steps = {
+    'waiting-open-choice': [{ selector: '[data-slot-row] button.fab-slot-tile' }],
+    'cancel-confirmation': [{ selector: '[data-run-action="cancel-arm"]' }],
+    'past-stage': [{ selector: '[data-stage-nav-index="0"]' }],
+    'future-stage': [{ selector: '[data-stage-nav-index="2"]' }],
+    'active-page-two': [{ selector: '[data-journal-list="active"] [data-pagination-next]' }],
+    'finished-page-two': [{ selector: '[data-journal-list="finished"] [data-pagination-next]' }],
+    'gathering-straight-finished': [{ selector: '[data-run-action="primary"]' }],
+    'gathering-d100-finished': [{ selector: '[data-run-action="primary"]' }],
+    'gathering-check-finished': [{ selector: '[data-run-action="primary"]' }],
+    'filter-paused': [{ selector: '[data-journal-status-filter] input[value="paused"]' }],
+    'empty-search': [{ selector: '[data-journal-search] input', fill: 'No matching Journal run' }],
+    dismissal: [{ selector: '[data-journal-dismiss]' }],
+    'stale-action': [{ selector: '[data-run-action="primary"]' }],
+    'command-timeout': [{ selector: '[data-run-action="primary"]' }],
+    'roll-cancelled': [{ selector: '[data-run-action="primary"]' }],
+  };
+  const expected = {
+    loading: '[data-journal-state="loading"]',
+    'error-retry': '[data-journal-state="error"]',
+    'no-actor-empty': '[data-journal-state="empty"]',
+    'cancel-confirmation': '[data-run-cancel-decision]',
+    'waiting-open-choice': '[data-choice-options]',
+    'past-stage': '[data-stage-nav-return]',
+    'future-stage': '[data-stage-nav-return]',
+    'gathering-d100': '[data-yield-scale]',
+    'gathering-check': '[data-outcome-ladder]',
+    'essence-shared': '[data-essence-pool]',
+    'recovery-required': '[data-journal-recovery]',
+    'ready-single': '[data-run-status="ready"]',
+    paused: '[data-journal-paused]',
+    'finished-success': '[data-journal-verdict="succeeded"]',
+    'finished-failure': '[data-journal-verdict="failed"]',
+    'finished-cancelled': '[data-journal-verdict="cancelled"]',
+    'gathering-straight-finished': '[data-journal-verdict="succeeded"]',
+    'gathering-d100-finished': '[data-yield-cut]',
+    'gathering-check-finished': '[data-journal-verdict="succeeded"]',
+    'active-page-two': '[data-run-id="lab-v1-active-5"]',
+    'finished-page-two': '[data-history-run-id="lab-v1-finished-5"]',
+    'automatic-completion': '[data-journal-verdict="succeeded"]',
+    dismissal: '[data-journal-empty="detail"]',
+  };
+  return states.map((state) =>
+    playerCase({
+      id: `fabricate-journal-lifecycle-${state}`,
+      label: `Player Journal — ${state.replaceAll('-', ' ')}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: {
+        tab: 'journal',
+        journalCaseState: state.replace(/-finished$/, ''),
+        ...(state.startsWith('gathering-straight') && { gatheringTaskMode: 'straight' }),
+        ...(state.startsWith('gathering-check') && { gatheringTaskMode: 'routed' }),
+      },
+      position: { width: state === 'narrow' ? 900 : 1240, height: 880 },
+      steps: steps[state] ?? [],
+      expectSelector: expected[state] ?? '[data-journal-state="populated"]',
+      kinds: ['player', 'journal', ...(state === 'narrow' ? ['responsive'] : [])],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/journal\//,
+        /^src\/ui\/svelte\/stores\/journalStore/,
+        /^src\/systems\/RunJournalBuilder\.js$/,
+      ],
+    })
+  );
 }
 
 /**
@@ -8953,6 +9107,113 @@ export const VIEW_LAB_CASES = Object.freeze([
     })
   ),
   managerCase({
+    id: 'manager-gathering-task-editor-straight',
+    label: 'Manager — Gathering task Direct yields',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism', gatheringTaskMode: 'straight' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-task-results]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector: '[data-gathering-task-results="straight"] [data-recipe-result-item]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringTaskEditView)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
+    ],
+  }),
+  ...['selector', 'straight', 'routed'].map((mode) =>
+    managerCase({
+      id: `manager-gathering-task-editor-${mode}-narrow`,
+      label: `Manager — Gathering task ${mode}, narrow`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      position: { width: 1000, height: 720 },
+      query: {
+        system: 'lab-herbalism',
+        gatheringTaskMode: mode === 'selector' ? 'straight' : mode,
+      },
+      steps: [
+        'Gathering',
+        { selector: '#manager-gathering-nav-tasks' },
+        {
+          selector:
+            '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+        },
+        {
+          selector:
+            mode === 'selector'
+              ? '[data-gathering-task-resolution]'
+              : '[data-gathering-task-results]',
+          scroll: true,
+        },
+      ],
+      expectView: 'gathering-task-edit',
+      expectSelector:
+        mode === 'selector'
+          ? '[data-gathering-task-resolution-mode]'
+          : `[data-gathering-task-results="${mode}"]`,
+      kinds: ['manager', 'environments', 'responsive'],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringTaskEditView)\.svelte$/,
+        /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
+      ],
+    })
+  ),
+  managerCase({
+    id: 'manager-gathering-task-editor-routed',
+    label: 'Manager — Gathering task Matched check yields',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism', gatheringTaskMode: 'routed' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-task-results]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector: '[data-gathering-routed-tier-status="lab-abundant"][data-match-count="1"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringTaskEditView)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-gathering-task-editor-routed-unmatched',
+    label: 'Manager — Gathering task Unmatched check yields',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { system: 'lab-herbalism', gatheringTaskMode: 'routed-unmatched' },
+    steps: [
+      'Gathering',
+      { selector: '#manager-gathering-nav-tasks' },
+      {
+        selector:
+          '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+      },
+      { selector: '[data-gathering-task-results]', scroll: true },
+    ],
+    expectView: 'gathering-task-edit',
+    expectSelector: '[data-gathering-routed-tier-status="lab-abundant"][data-match-count="0"]',
+    kinds: ['manager', 'environments'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringTaskEditView)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
+    ],
+  }),
+  managerCase({
     id: 'manager-gathering-task-availability-menu',
     label: 'Manager — Gathering task availability menu open',
     // BEYOND the smoke: no smoke routine opens an availability menu, so there is no counterpart
@@ -10220,16 +10481,13 @@ export const VIEW_LAB_CASES = Object.freeze([
     // DELIBERATELY not `manager-gathering-economy-actors`, which reaches the same tab. That case
     // enables the Stamina limitation, fills a maximum, rolls a pool and then scrolls the panel to
     // the actor table, so it shows a driven state of a region far below this one. A documentation
-    // frame of the resolution and limitation cards has to be the untouched page.
+    // frame of the limitation card has to be the untouched page.
     query: { system: 'lab-herbalism' },
     steps: ['Gathering', { selector: '#manager-gathering-nav-settings' }],
     expectView: 'environments',
-    // The resolution-mode card, which sits above the limitation card and is the top of the page
-    // this frame is framed on. Named rather than left to `expectView` because the route key is the
-    // environments route for every gathering sub-tab, so the view assertion alone cannot tell this
-    // tab from the browser it opens on.
-    expectSelector:
-      '.fabricate-manager [data-gathering-resolution-card] [data-gathering-resolution-mode]',
+    // Resolution belongs to each task; this page starts with its economy limitation controls.
+    // The route key alone cannot distinguish these settings from the environments browser.
+    expectSelector: '.fabricate-manager [data-economy-mode-card] [data-economy-mode-option]',
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/GatheringEconomyView\.svelte$/,
@@ -13473,6 +13731,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/journal\//, /^src\/ui\/svelte\/stores\/journalStore/],
   }),
   ...journalBlindRunCases(),
+  ...journalLifecycleCases(),
   // ───────────────────────────────────────────────────────────────────────────────────────────────
   // Coverage matrix — states the live smoke does NOT photograph.
   //

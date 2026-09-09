@@ -20,14 +20,52 @@
  *   4. initialize as GM (initialization migrates and writes),
  *   5. flip the viewer for player frames.
  */
-import { buildLabActors, buildDocumentIndex } from './labActors.js';
-import { buildLabContent, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
-import { seedLabInteractables } from './labInteractables.js';
-import { buildLabBlindRunSecret, buildLabRunStates, installLabRunStates } from './labRunStates.js';
 import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
 
+import { buildLabActors, buildDocumentIndex } from './labActors.js';
+import {
+  buildLabContent,
+  ICON_BASE,
+  LAB_SYSTEM_IDS,
+  seedJournalNoCheckFixture,
+} from './labContent.js';
+import { seedLabInteractables } from './labInteractables.js';
+import {
+  buildLabBlindRunSecret,
+  buildLabRunStates,
+  createLabJournalCaseController,
+  installLabRunStates,
+} from './labRunStates.js';
+
 const FABRICATE_NAMESPACE = 'fabricate';
+
+// These variants change persisted authoring before the real services initialize. The default
+// world remains unchanged, including every existing d100 editor and gathering screenshot.
+function seedGatheringTaskMode(content, mode) {
+  if (!['straight', 'routed', 'routed-unmatched'].includes(mode)) return;
+  const system = content.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.HERBALISM);
+  const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.HERBALISM];
+  const task = structuredClone(slice.tasks.find((entry) => entry.id === 'hb-task-slowbloom'));
+  task.resolutionMode = mode === 'straight' ? 'straight' : 'routed';
+  task.resultGroups = [{
+    id: 'lab-gathering-yield',
+    name: mode === 'routed-unmatched' ? 'Old abundance name' : 'Abundant',
+    results: [{ id: 'lab-gathering-emberbloom', componentId: 'hb-emberbloom', quantity: 2 }],
+  }];
+  if (mode !== 'straight') {
+    system.gatheringCraftingCheck = { ...system.gatheringCraftingCheck, routed: {
+      rollFormula: '1d20',
+      dc: 15,
+      type: 'relative',
+      thresholdMode: 'meet',
+      relativeOutcomes: [{ id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 }],
+    } };
+  }
+  const replaceTask = (entry) => entry.id === task.id ? task : entry;
+  slice.tasks = slice.tasks.map(replaceTask);
+  content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(replaceTask);
+}
 
 /** 14 days into the world's calendar, so relative timestamps render as something. */
 export const LAB_WORLD_TIME = 1_209_600;
@@ -328,6 +366,7 @@ function stripAuthoredWorldComponents(content) {
  *   whatever the active scene carries, so "nothing on this scene" is a property of the world
  *   rather than of which behaviour a case opens. See `labInteractables.js` for why the two config
  *   states are seeded behaviours instead.
+ * @param {string|null} [options.journalCaseState] Focused persisted Journal state for View Lab.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
 export async function buildLabWorld({
@@ -340,8 +379,12 @@ export async function buildLabWorld({
   noTools = false,
   noAuthoredWorldComponents = false,
   noInteractables = false,
+  gatheringTaskMode = null,
+  journalCaseState = null,
 } = {}) {
   const content = buildLabContent();
+  if (journalCaseState === 'ready-single') seedJournalNoCheckFixture(content);
+  seedGatheringTaskMode(content, gatheringTaskMode);
   if (noTools) stripTools(content);
   if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);
   // A real Manager refresh resolves an empty selection to the first available crafting system.
@@ -432,6 +475,14 @@ export async function buildLabWorld({
   await runtime.runOwnedItemComponentIdentityRestamp();
   world.fabricate = fabricate;
 
+  // Versioned Journal frames need to show the controls that an available authority enables. The
+  // lab has no real JournalEntry document service, so it cannot prove arbitration; this narrow
+  // presentation collaborator answers only the availability question consumed by the projection.
+  // Command correctness remains owned by mounted command tests and the two-realm Foundry gate.
+  if (journalCaseState && journalCaseState !== 'authority-unavailable') {
+    fabricate.getJournalRunAuthorityAvailability = () => ({ available: true, reason: null });
+  }
+
   if (!fabricate.craftingSystemManager?.initialized) {
     throw new Error(
       'view lab: CraftingSystemManager did not initialize; the fixture world is unusable'
@@ -479,15 +530,26 @@ export async function buildLabWorld({
   // shows how each STATUS renders, where an empty journal shows nothing at all.
   const runRecipes = journalRecipes.length > 0 ? journalRecipes : allRecipes;
   if (runRecipes.length > 0) {
-    installLabRunStates(
-      journalActor,
-      buildLabRunStates({
+    const runContainers = buildLabRunStates({
+      actor: journalActor,
+      userId: 'user-lab-player',
+      recipes: runRecipes,
+      environments: content.environments,
+      tasks: content.gatheringConfig.tasks,
+      journalCaseState,
+    });
+    installLabRunStates(journalActor, runContainers);
+    if (journalCaseState) {
+      const controller = createLabJournalCaseController({
         actor: journalActor,
-        userId: 'user-lab-player',
+        containers: runContainers,
+        state: journalCaseState,
         recipes: runRecipes,
-        environments: content.environments,
-      })
-    );
+        nowWorldTime: () => Number(fabricate.getWorldTime?.() ?? LAB_WORLD_TIME),
+      });
+      fabricate.executeJournalCaseFixtureCommand = controller.execute;
+      fabricate.journalCaseFixtureEvents = controller.events;
+    }
     // The in-flight blind run's secret half (issue 901). It is NOT a flag: the drawn task, its
     // start-time snapshot and its node reservation live in the `gatheringBlindRuns` WORLD setting,
     // which only a GM may write — that is the integrity boundary the fix draws, and the reason a

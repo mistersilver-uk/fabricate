@@ -59,7 +59,24 @@ import { BulkSalvageService } from './systems/BulkSalvageService.js';
 import { BulkDestroyService } from './systems/BulkDestroyService.js';
 import { applyBulkChatVisibility } from './systems/bulkChatVisibility.js';
 import { AlchemyListingBuilder } from './systems/AlchemyListingBuilder.js';
-import { resolveCheckFormulaDisplay, runFormulaPassFail, runFormulaProgressive } from './systems/checkRoll.js';
+import {
+  evaluatePreparedCraftingCheck,
+  evaluatePreparedRunCheck,
+  postCheckRollHandoff,
+  resolveCheckFormulaDisplay,
+  runFormulaPassFail,
+  runFormulaProgressive,
+} from './systems/checkRoll.js';
+import { createFoundryJournalRunAuthority } from './systems/journalRunAuthority.js';
+import {
+  JOURNAL_RUN_SOCKET_KIND,
+  createGatheringJournalRunOperations,
+  createJournalExecutionReconstructor,
+  createJournalRunCommandService,
+  executePublicCraft,
+  installCraftingJournalRunAuthority,
+  installGatheringJournalRunAuthority,
+} from './systems/journalRunCommands.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
@@ -74,7 +91,7 @@ import {
 import { resolveAlchemySubmissions } from './utils/alchemySubmissions.js';
 // The item -> managed-component resolver the crafting listing's summary phase tallies held
 // stacks with (issue 1075), shared with InventoryListingBuilder's owned-row matching.
-import { findMatchingComponent } from './utils/essenceResolver.js';
+import { findMatchingComponent, resolveItemEssences } from './utils/essenceResolver.js';
 import { progressiveOrderKey } from './utils/progressiveResultOrder.js';
 import { findStackableMatch } from './utils/sourceUuid.js';
 import { STARTUP_PHASES, createStartupMarks } from './utils/startupMarks.js';
@@ -233,7 +250,11 @@ const CREDIT_CURRENCY_GATE_KEYS = Object.freeze({
  * copy of both bought exactly one failure mode: someone editing a string. The builder is the one
  * home of a member's words, and the gate now answers `{ actors, outcome, messageData }`.
  */
-import { checkWorldCurrencyAffordability, creditWorldCurrency } from './systems/currencyAffordance.js';
+import {
+  buildCurrencyAffordProbe,
+  checkWorldCurrencyAffordability,
+  creditWorldCurrency,
+} from './systems/currencyAffordance.js';
 import { isGatheringActorSelectableByUser } from './config/preferencesCleanup.js';
 import { registerFragmentDiscoveryHook } from './systems/FragmentDiscoveryHook.js';
 import { registerRecipeItemLearningHook } from './systems/RecipeItemLearningHook.js';
@@ -289,6 +310,305 @@ const complicationDeliveryRateLimiter = createComplicationRateLimiter();
 // elected GM with the world open in two tabs — two realms, two sets — which is a stated,
 // accepted residual rather than an oversight (see `complicationSocket.js`).
 const complicationDeliveryDedupe = createComplicationDeliveryDedupe();
+
+async function resolveJournalSourceActors(run, payload = {}, fallbackActor = null) {
+  const supplied = Array.isArray(payload.sourceActorUuids) ? payload.sourceActorUuids : null;
+  const persisted = Array.isArray(run?.componentSourceActorUuids)
+    ? run.componentSourceActorUuids
+    : null;
+  const uuids = persisted ?? supplied ?? [];
+  const actors = [];
+  for (const uuid of uuids) {
+    try {
+      const actor = await globalThis.fromUuid?.(uuid);
+      if (actor) actors.push(actor);
+    } catch (_error) {
+      return null;
+    }
+  }
+  return actors.length > 0 ? actors : (fallbackActor ? [fallbackActor] : []);
+}
+
+function journalSourcesOwnedBy(sender, actors) {
+  return sender?.isGM === true || actors.every(
+    (actor) => actor?.testUserPermission?.(sender, 'OWNER') === true
+  );
+}
+
+function consumeJournalGrant(service, grant, context) {
+  return service?.consumeExecutionGrant?.(grant, context) ?? null;
+}
+
+function createCraftingJournalOperations(fabricate, getService) {
+  const managerMutation = async (args, operation, mutate) => {
+    const trusted = consumeJournalGrant(getService(), args.executionGrant, {
+      operation,
+      actor: args.actor,
+      runId: args.runId,
+      expectedRevision: args.expectedRevision,
+      requestId: args.requestId,
+    });
+    if (!trusted) return { success: false, reason: 'execution-grant-invalid' };
+    const result = await mutate();
+    return result ? { success: true, run: result } : { success: false, reason: 'run-not-found' };
+  };
+  return {
+    getRun: ({ actor, runId }) => {
+      fabricate.craftingRunManager?.invalidateCache?.(actor?.id);
+      return fabricate.craftingRunManager?.getRun?.(actor, runId)
+        ?? fabricate.craftingRunManager?.getActiveRun?.(actor, runId)
+        ?? null;
+    },
+    authorize: async ({ actor, run, payload, sender }) => {
+      const sourceActors = await resolveJournalSourceActors(run, payload, actor);
+      return Boolean(sourceActors && journalSourcesOwnedBy(sender, sourceActors));
+    },
+    prepareStart: async ({ actor, payload, preparationGrant, requestId }) => {
+      if (payload.activityKind !== 'alchemy') return { success: true, payload };
+      const sourceActors = await resolveJournalSourceActors(null, payload, actor);
+      if (!sourceActors) return { success: false, reason: 'source-actor-not-found' };
+      const system = fabricate.craftingSystemManager?.getSystem?.(payload.craftingSystemId) ?? null;
+      if (!system || system.resolutionMode !== 'alchemy') {
+        return { success: false, reason: 'alchemy-system-not-found' };
+      }
+      const submitted = Array.isArray(payload.submittedItems) ? payload.submittedItems : [];
+      const componentIds = submitted.map((record) => record?.componentId);
+      if (componentIds.some((id) => typeof id !== 'string' || id.length === 0)) {
+        return { success: false, reason: 'alchemy-submission-invalid' };
+      }
+      const canonicalSubmissions = resolveAlchemySubmissions(
+        sourceActors,
+        resolvedComponentsFor(system),
+        componentIds,
+        payload.craftingSystemId
+      );
+      if (
+        canonicalSubmissions.length !== submitted.length ||
+        canonicalSubmissions.some((record, index) => record.item?.uuid !== submitted[index]?.itemUuid)
+      ) {
+        return { success: false, reason: 'alchemy-submission-invalid' };
+      }
+      const prepare = fabricate.craftingEngine?.prepareVersionedAlchemyStart;
+      if (typeof prepare !== 'function') return { success: false, reason: 'unsupported-operation' };
+      const prepared = await prepare.call(fabricate.craftingEngine, {
+        actor,
+        sourceActors,
+        craftingSystemId: payload.craftingSystemId,
+        submittedItems: canonicalSubmissions,
+        executionGrant: preparationGrant,
+        requestId,
+      });
+      if (!prepared?.matched) {
+        return {
+          success: true,
+          executionOperation: 'executeAlchemyFizzle',
+          payload,
+          trustedContext: {
+            ...prepared,
+            alchemySubmittedItems: canonicalSubmissions,
+          },
+        };
+      }
+      return {
+        success: true,
+        payload: {
+          ...payload,
+          recipeId: prepared.recipeId,
+          selectionPlan: prepared.selectionPlan,
+        },
+        trustedContext: {
+          ...prepared,
+          alchemySubmittedItems: canonicalSubmissions,
+        },
+      };
+    },
+    start: async ({ actor, payload, executionGrant, requestId, sender }) => {
+      const sourceActors = await resolveJournalSourceActors(null, payload, actor);
+      if (!sourceActors) return { success: false, reason: 'source-actor-not-found' };
+      const start = fabricate.craftingEngine?.startVersionedRun;
+      if (typeof start !== 'function') return { success: false, reason: 'unsupported-operation' };
+      return start.call(fabricate.craftingEngine, {
+        viewer: sender,
+        actor,
+        sourceActors,
+        recipeId: payload.recipeId,
+        selectionPlan: payload.selectionPlan,
+        completionMode: payload.completionMode,
+        executionGrant,
+        requestId,
+      });
+    },
+    executeAlchemyFizzle: async ({ actor, payload, executionGrant, requestId }) => {
+      const sourceActors = await resolveJournalSourceActors(null, payload, actor);
+      if (!sourceActors) return { success: false, reason: 'source-actor-not-found' };
+      const system = fabricate.craftingSystemManager?.getSystem?.(payload.craftingSystemId) ?? null;
+      const submitted = Array.isArray(payload.submittedItems) ? payload.submittedItems : [];
+      const submittedItems = resolveAlchemySubmissions(
+        sourceActors,
+        resolvedComponentsFor(system),
+        submitted.map((record) => record?.componentId),
+        payload.craftingSystemId
+      );
+      if (
+        submittedItems.length !== submitted.length ||
+        submittedItems.some((record, index) => record.item?.uuid !== submitted[index]?.itemUuid)
+      ) {
+        return { success: false, reason: 'alchemy-submission-invalid' };
+      }
+      const execute = fabricate.craftingEngine?.executeVersionedAlchemyFizzle;
+      if (typeof execute !== 'function') return { success: false, reason: 'unsupported-operation' };
+      return execute.call(fabricate.craftingEngine, {
+        actor,
+        sourceActors,
+        craftingSystemId: payload.craftingSystemId,
+        submittedItems,
+        executionGrant,
+        requestId,
+      });
+    },
+    describeCheck: async ({ actor, run, payload, preparationGrant, requestId }) => {
+      const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
+      if (!componentSourceActors) return { required: false, blocked: 'source-actor-not-found' };
+      const describe = fabricate.craftingEngine?.describeVersionedStageCheck;
+      if (typeof describe !== 'function') {
+        return { required: false, blocked: 'unsupported-operation' };
+      }
+      return describe.call(fabricate.craftingEngine, {
+        actor,
+        componentSourceActors,
+        runId: run.id,
+        selectionPlan: payload.selectionPlan,
+        preparationGrant,
+        requestId,
+      });
+    },
+    evaluateCheck: async ({ actor, privateEvaluation, decision, sender }) => {
+      const componentSourceActors = await resolveJournalSourceActors(null, {
+        sourceActorUuids: privateEvaluation?.componentSourceActorUuids,
+      }, actor) ?? [];
+      const recipe = fabricate.recipeManager?.getRecipe?.(privateEvaluation?.recipeId) ?? null;
+      const visible = sender?.isGM === true || Boolean(
+        recipe && fabricate.recipeVisibilityService?.getVisibleRecipes?.({
+          viewer: sender,
+          craftingActor: actor,
+          componentSourceActors,
+          craftingSystemId: recipe.craftingSystemId,
+        })?.some?.((candidate) => candidate?.recipe?.id === recipe.id)
+      );
+      return evaluatePreparedCraftingCheck(privateEvaluation, actor, decision, {
+        secret: !visible,
+      });
+    },
+    authorizeRollHandoff: async ({ actor, run, payload, sender, privateEvaluation }) => {
+      const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
+      if (!componentSourceActors) return false;
+      const recipeId = privateEvaluation?.recipeId ?? run?.recipeId;
+      const recipe = fabricate.recipeManager?.getRecipe?.(recipeId) ?? null;
+      if (!recipe) return false;
+      if (sender?.isGM === true) return true;
+      return Boolean(
+        fabricate.recipeVisibilityService?.getVisibleRecipes?.({
+          viewer: sender,
+          craftingActor: actor,
+          componentSourceActors,
+          craftingSystemId: recipe.craftingSystemId,
+        })?.some?.((candidate) => candidate?.recipe?.id === recipe.id)
+      );
+    },
+    execute: async ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
+      const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
+      if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
+      const execute = fabricate.craftingEngine?.executeVersionedStage;
+      if (typeof execute !== 'function') return { success: false, reason: 'unsupported-operation' };
+      return execute.call(fabricate.craftingEngine, {
+        actor,
+        componentSourceActors,
+        runId: run.id,
+        expectedRevision,
+        selectionPlan: payload.selectionPlan,
+        trigger: payload.trigger === 'worldTime' ? 'worldTime' : 'manual',
+        executionGrant,
+        requestId,
+      });
+    },
+    cancel: async ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
+      const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
+      if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
+      const cancel = fabricate.craftingEngine?.cancelVersionedRun;
+      if (typeof cancel !== 'function') return { success: false, reason: 'unsupported-operation' };
+      return cancel.call(fabricate.craftingEngine, {
+        actor,
+        runId: run.id,
+        expectedRevision,
+        executionGrant,
+        requestId,
+      });
+    },
+    pause: (args) => managerMutation(args, 'pause', () =>
+      fabricate.craftingRunManager?.pauseRun?.(args.actor, args.runId, {
+        expectedRevision: args.expectedRevision,
+      })),
+    resume: (args) => managerMutation(args, 'resume', () =>
+      fabricate.craftingRunManager?.resumeRun?.(args.actor, args.runId, {
+        expectedRevision: args.expectedRevision,
+      })),
+    setCompletionMode: (args) => managerMutation(args, 'setCompletionMode', () =>
+      fabricate.craftingRunManager?.setCompletionMode?.(
+        args.actor,
+        args.runId,
+        args.payload.completionMode,
+        { expectedRevision: args.expectedRevision }
+      )),
+    setSelection: (args) => managerMutation(args, 'setSelection', () =>
+      fabricate.craftingRunManager?.setStepSelectionPlan?.(
+        args.actor,
+        args.runId,
+        args.payload.stepIndex,
+        args.payload.selectionPlan,
+        { expectedRevision: args.expectedRevision }
+      )),
+  };
+}
+
+function createJournalCommandsForFabricate(fabricate) {
+  const authority = createFoundryJournalRunAuthority({
+    reconstructExecutions: createJournalExecutionReconstructor({
+      getCraftingRunManager: () => fabricate.craftingRunManager,
+      getGatheringRunManager: () => fabricate.gatheringRunManager,
+    }),
+  });
+  let service = null;
+  service = createJournalRunCommandService({
+    authority,
+    operations: {
+      crafting: createCraftingJournalOperations(fabricate, () => service),
+      gathering: createGatheringJournalRunOperations({
+        getEngine: () => gatheringEngine,
+        runManager: fabricate.gatheringRunManager,
+        getService: () => service,
+        getUser: (userId) => game.users?.get(userId) ?? null,
+      }),
+    },
+    currentUser: () => game.user,
+    activeGM: () => game.users?.activeGM ?? null,
+    getUser: (userId) => game.users?.get(userId) ?? null,
+    resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
+    emit: (message, options) => game.socket?.emit(EVENT_SCENE_SOCKET, message, options),
+    randomId: () => foundry.utils.randomID(),
+    promptCheck: (descriptor) => promptCheckRoll({
+      name: descriptor?.label,
+      activity: descriptor?.label,
+      allowAdvantage: descriptor?.allowAdvantage === true,
+      modifierChoice: descriptor?.modifierChoice ?? null,
+    }),
+    postRollHandoff: (handoff) => postCheckRollHandoff(handoff),
+    getDismissals: () => getSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS),
+    setDismissals: (value) => setSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS, value),
+    onDismissalsChanged: (payload) => Hooks.callAll('fabricate.journalDismissalsChanged', payload),
+  });
+  installCraftingJournalRunAuthority({ engine: fabricate.craftingEngine, service });
+  return service;
+}
 
 // The GM notice for each way a startup migration pass can DEFER (issue 1242): a corpus
 // could not be read, or could not be written. One complete localized sentence per reason,
@@ -1048,7 +1368,10 @@ function processFabricateWorldTime(worldTime = Number(game.time?.worldTime || 0)
   return Promise.all(processWorldTimeCallbacksSafely([
     {
       label: 'Crafting',
-      callback: () => game.fabricate?.getCraftingRunManager?.()?.processWorldTime?.(worldTime)
+      callback: async () => {
+        await game.fabricate?.getCraftingRunManager?.()?.processWorldTime?.(worldTime);
+        await game.fabricate?.getCraftingEngine?.()?.processVersionedWorldTime?.({ worldTime });
+      }
     },
     {
       label: 'Salvage',
@@ -1092,6 +1415,7 @@ class Fabricate {
     this.craftingRunManager = null;
     this.salvageRunManager = null;
     this._runJournalBuilder = null;
+    this.journalRunCommands = null;
     this.gatheringEnvironmentStore = null;
     this.gatheringNodeDepletionWriter = null;
     this.gatheringBlindRunStore = null;
@@ -1357,6 +1681,7 @@ class Fabricate {
         currencyConfigStore: this.currencyConfigStore
       }
     );
+    this.journalRunCommands = createJournalCommandsForFabricate(this);
 
     // Initialize recipe manager. Both `initialize()` calls deserialize a whole world-setting
     // payload, so this span is the corpus-proportional half of startup.
@@ -1519,6 +1844,12 @@ class Fabricate {
           update
         })
     });
+    installGatheringJournalRunAuthority({
+      engine: gatheringEngine,
+      service: this.journalRunCommands,
+      evaluatePreparedRunCheck,
+    });
+    await this.journalRunCommands?.bootstrapJournalRunAuthority?.();
     // Issue 901. A blind run's secret state — the drawn task, its start-time
     // snapshot, and its provisional node reservation — lives in the
     // `gatheringBlindRuns` WORLD setting, which only a GM may update. That is the
@@ -3375,6 +3706,7 @@ class Fabricate {
     // post; omitted/false for macros/automation so they stay silent (no API break).
     return await this.craft(craftingActor, recipeId, {
       componentSourceActors: sources,
+      lifecycleVersion: 1,
       ingredientSetId,
       // Per-group player option overrides (issue 552); null keeps default resolution.
       ingredientOptionOverrides,
@@ -3935,6 +4267,7 @@ class Fabricate {
     }
     return await this.craftingEngine.craftAlchemy(craftingActor, sources, submittedItems, {
       craftingSystemId,
+      lifecycleVersion: 1,
       interactive,
     });
   }
@@ -4179,6 +4512,14 @@ class Fabricate {
     // the engine falls back to selectableActors[0] and silently mis-gates the
     // attempt — the player-app "nothing happens" bug. See _withRememberedActorDefault.
     const withRememberedActor = this._withRememberedActorDefault(options);
+    const selectableActors = getGatheringSelectableActors({ viewer: game.user });
+    const selectedActor = withRememberedActor.actor ?? (
+      withRememberedActor.rememberedActorId
+        ? selectableActors.find((actor) =>
+            [actor?.id, actor?.uuid].includes(withRememberedActor.rememberedActorId)) ?? null
+        : (selectableActors[0] ?? null)
+    );
+    Object.assign(withRememberedActor, { actor: selectedActor, lifecycleVersion: 1 });
 
     // `requestStart`, not `startAttempt`: a blind timed start this client may not
     // write is routed to the active GM before any task is drawn (issue 901). Every
@@ -4381,6 +4722,37 @@ class Fabricate {
     if (game.user?.isGM !== true) throw new Error('Gathering rich state changes require a GM user');
   }
 
+  executeJournalRunCommand(command) {
+    this._requireReady();
+    return this.journalRunCommands?.executeJournalRunCommand(command)
+      ?? Promise.resolve({ success: false, reason: 'authority-unavailable' });
+  }
+
+  dismissJournalRun(options) {
+    this._requireReady();
+    return this.journalRunCommands?.dismissJournalRun(options)
+      ?? Promise.resolve({ success: false, reason: 'authority-unavailable' });
+  }
+
+  getDismissedJournalRunKeys(options) {
+    return this.journalRunCommands?.getDismissedJournalRunKeys(options) ?? new Set();
+  }
+
+  getJournalRunAuthorityAvailability() {
+    return this.journalRunCommands?.getJournalRunAuthorityAvailability()
+      ?? { available: false, reason: 'authority-unavailable' };
+  }
+
+  setupJournalRunAuthority() {
+    return this.journalRunCommands?.setupJournalRunAuthority()
+      ?? Promise.resolve({ success: false, reason: 'authority-unavailable' });
+  }
+
+  reconcileJournalRunAuthority(options) {
+    return this.journalRunCommands?.reconcileJournalRunAuthority(options)
+      ?? Promise.resolve({ success: false, reason: 'authority-unavailable' });
+  }
+
   /**
    * Current world time in seconds (the Foundry-facing read seam). Lives on this
    * edge so the Journal store and pure UI utils stay free of `game.*`.
@@ -4450,6 +4822,33 @@ class Fabricate {
         // never reads component tallies itself; this is here so its snapshot is the same
         // complete value every other pass builds.
         resolveComponentForItem: findMatchingComponent,
+        getComponentSourceActors: ({ actor, run }) => {
+          const uuids = Array.isArray(run?.componentSourceActorUuids)
+            ? run.componentSourceActorUuids
+            : [];
+          const sources = uuids
+            .map((uuid) => globalThis.fromUuidSync?.(uuid) ?? null)
+            .filter(Boolean);
+          return sources.length > 0 ? sources : (actor ? [actor] : []);
+        },
+        resolveItemEssences: ({ item, recipe }) => {
+          const system = this.craftingSystemManager?.getSystem(recipe?.craftingSystemId);
+          return resolveItemEssences(
+            item,
+            resolvedComponentsFor(system),
+            recipe?.craftingSystemId,
+            findMatchingComponent
+          );
+        },
+        affordCurrency: ({ actor, recipe, match }) =>
+          buildCurrencyAffordProbe(
+            actor,
+            recipe,
+            this.craftingEngine?._currencySeams?.() ?? {}
+          )(match),
+        getDismissedRunKeys: ({ actorUuid, viewerId }) =>
+          this.getDismissedJournalRunKeys({ actorUuid, viewerId }),
+        getJournalActionAvailability: () => this.getJournalRunAuthorityAvailability(),
       });
     }
     return this._runJournalBuilder;
@@ -4679,13 +5078,17 @@ class Fabricate {
 
     const ingredientSetId = options.ingredientSetId || null;
 
-    return await this.craftingEngine.craft(
+    return executePublicCraft({
+      engine: this.craftingEngine,
+      runManager: this.craftingRunManager,
       actor,
-      componentSourceActors,
+      sourceActors: componentSourceActors,
       recipe,
       ingredientSetId,
-      options
-    );
+      options,
+      executeCommand: (command) => this.executeJournalRunCommand(command),
+      resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
+    });
   }
 
   /**
@@ -5118,6 +5521,14 @@ Hooks.once('ready', async () => {
   InteractableManager.instance.register();
 
   game.socket?.on(EVENT_SCENE_SOCKET, (payload, senderId) => {
+    if (
+      payload?.kind === JOURNAL_RUN_SOCKET_KIND.REQUEST ||
+      payload?.kind === JOURNAL_RUN_SOCKET_KIND.REPLY
+    ) {
+      Promise.resolve(fabricate.journalRunCommands?.handleSocketMessage(payload, senderId)).catch(
+        (error) => console.error('Fabricate | Journal run socket command failed', error)
+      );
+    }
     // `senderId` is Foundry's server-attested sender user id (the trusted 2nd
     // callback arg of a custom module socket broadcast — set from the authenticated
     // session in `dist/server/sockets.mjs handleCustomSocket`, NOT from the client
@@ -5288,6 +5699,9 @@ Hooks.once('ready', async () => {
         // destroyed inventory.
         applyItemStackQuantityPathSetting({ notify: true });
       }
+      if (key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.JOURNAL_RUN_DISMISSALS}`) {
+        Hooks.callAll('fabricate.journalDismissalsChanged');
+      }
       // Cross-client refresh: `craftingSystemsChanged` / `recipesChanged` are local
       // `Hooks.callAll`s fired only on the GM's client. The setting hooks fire on every
       // client when the replicated world setting lands, so reload the stale in-memory
@@ -5312,6 +5726,19 @@ Hooks.once('ready', async () => {
   // downstream distinguishes a create from an update: both deliver the new value in the
   // document, and every branch reacts by re-reading the key.
   Hooks.on('createSetting', handleFabricateSettingDocumentChange);
+  const refreshJournalRunAuthorityAvailability = () => {
+    void fabricate.journalRunCommands?.refreshJournalRunAuthorityAvailability?.();
+  };
+  const bootstrapJournalRunAuthority = () => {
+    void fabricate.journalRunCommands?.bootstrapJournalRunAuthority?.();
+  };
+  Hooks.on('createJournalEntry', refreshJournalRunAuthorityAvailability);
+  Hooks.on('updateJournalEntry', refreshJournalRunAuthorityAvailability);
+  Hooks.on('deleteJournalEntry', refreshJournalRunAuthorityAvailability);
+  Hooks.on('createJournalEntryPage', refreshJournalRunAuthorityAvailability);
+  Hooks.on('deleteJournalEntryPage', refreshJournalRunAuthorityAvailability);
+  Hooks.on('updateUser', bootstrapJournalRunAuthority);
+  Hooks.on('userConnected', bootstrapJournalRunAuthority);
   Hooks.on('canvasReady', () => {
     void runInteractableMarkerSync();
   });

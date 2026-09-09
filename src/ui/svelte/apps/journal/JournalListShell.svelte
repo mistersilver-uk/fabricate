@@ -15,6 +15,7 @@
   let {
     titleId = '',
     kind = '',
+    listName = kind,
     title = '',
     count = null,
     sortLabel = '',
@@ -25,6 +26,7 @@
     emptyIcon = 'fa-inbox',
     emptyText = '',
     children,
+    footer = undefined,
   } = $props();
 
   // MANDATORY HERE, not defensive. This component renders TWICE on one screen - Active Runs above
@@ -67,7 +69,7 @@
   const SORT_PANEL_MIN_WIDTH = 135;
 </script>
 
-<section class="journal-list-section" aria-labelledby={titleId}>
+<section class="journal-list-section" aria-labelledby={titleId} data-journal-list={listName}>
   <header class="journal-list-header">
     <h3 id={titleId} class="journal-list-title">
       {title}{#if count !== null}<span class="journal-list-count">{count}</span>{/if}
@@ -100,7 +102,7 @@
     </span>
   </header>
 
-  <div class="journal-list-body" class:is-empty={isEmpty}>
+  <div class="journal-list-body" class:is-empty={isEmpty} data-journal-list-scroll>
     {#if isEmpty}
       <!--
         `compact`, because this panel shares a half-height column with a sibling list: the
@@ -125,6 +127,9 @@
       {@render children?.()}
     {/if}
   </div>
+  {#if footer}
+    <footer class="journal-list-footer">{@render footer()}</footer>
+  {/if}
 </section>
 
 <style>
@@ -151,6 +156,11 @@
   .journal-list-body.is-empty {
     justify-content: center;
     overflow: hidden;
+  }
+
+  .journal-list-footer {
+    flex: 0 0 auto;
+    min-width: 0;
   }
 
   .journal-list-header {

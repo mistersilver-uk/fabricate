@@ -524,6 +524,85 @@ test('task and event libraries match environments by tags and global conditions'
   );
 });
 
+test('library task composition preserves task-owned resolution mode and result groups', () => {
+  const resultGroups = [
+    {
+      id: 'group-herbs',
+      name: 'Herbs',
+      results: [
+        {
+          id: 'result-herb',
+          componentId: 'herb',
+          quantity: 2,
+          propertyMacroUuid: 'Macro.herb-properties'
+        }
+      ]
+    }
+  ];
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': {
+          economy: { resolutionMode: 'd100' },
+          tasks: [
+            {
+              id: 'task-straight',
+              name: 'Pick Herbs',
+              resolutionMode: 'straight',
+              resultGroups,
+              dropRows: [
+                { id: 'inactive-drop', componentId: 'sand', quantity: 9, dropRate: 100 }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  });
+
+  const [task] = service.composeEnvironment(environment(), system).tasks;
+
+  assert.equal(task.resolutionMode, 'straight');
+  assert.deepEqual(task.resultGroups, [
+    {
+      ...resultGroups[0],
+      results: [
+        {
+          ...resultGroups[0].results[0],
+          systemItemId: 'herb',
+          itemUuid: null
+        }
+      ]
+    }
+  ]);
+  assert.equal(task.dropRows[0].id, 'inactive-drop', 'inactive mode data remains stored');
+});
+
+test('library task composition defaults an absent task resolution mode to d100', () => {
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': {
+          economy: { resolutionMode: 'straight' },
+          tasks: [
+            {
+              id: 'task-legacy',
+              name: 'Legacy Forage',
+              dropRows: [
+                { id: 'drop-herb', componentId: 'herb', quantity: 1, dropRate: 50 }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  });
+
+  const [task] = service.composeEnvironment(environment(), system).tasks;
+
+  assert.equal(task.resolutionMode, 'd100', 'economy mode never overrides the task default');
+});
+
 test('composeEnvironment carries the system eventVisibility rule onto composed.rules', () => {
   const { service } = makeRichState({
     config: {
@@ -1031,8 +1110,51 @@ test('d100 resolution supports all-drops items and failure-with-event policy', a
   );
 });
 
+test('environmental event resolution is mode-independent and rolls each matched event once', async () => {
+  const { service, rollCalls } = makeRichState({ rolls: [95] });
+  const task = {
+    id: 'task-straight',
+    name: 'Direct forage',
+    resolutionMode: 'straight',
+    resultGroups: [{
+      id: 'group-direct',
+      name: 'Direct yield',
+      results: [{ id: 'result-herb', componentId: 'herb', quantity: 1 }]
+    }]
+  };
+  const event = {
+    id: 'event-thorns',
+    name: 'Thorns',
+    enabled: true,
+    dangerTags: ['hazardous'],
+    dropRate: 10
+  };
+  const env = environment({
+    tasks: [task],
+    events: [event],
+    rules: { eventSelectionMode: 'allDrops', eventPolicy: 'failureWithEvent' }
+  });
+
+  const resolved = await service.resolveEnvironmentalEvents({
+    task,
+    environment: env,
+    actor,
+    viewer,
+    system
+  });
+
+  assert.equal(resolved.status, 'failed');
+  assert.deepEqual(resolved.events.map((entry) => entry.id), ['event-thorns']);
+  assert.equal(resolved.eventPolicy, 'failureWithEvent');
+  assert.deepEqual(resolved.characterModifierSnapshot, {
+    rows: [],
+    events: [{ eventId: 'event-thorns', contributions: [] }]
+  });
+  assert.equal(rollCalls.length, 1, 'one matched event consumes exactly one independent roll');
+});
+
 test('one d100 decides every drop row, while events roll independently', async () => {
-  const { service } = makeRichState({
+  const { service, rollCalls } = makeRichState({
     // One attempt roll, then one per event. 50 clears the rare row's threshold of 21 but
     // not the common row's 91, so the SAME number sorts the haul by rarity. The two
     // events share a rate — and so a threshold — yet only the one handed 95 fires, which
@@ -1069,6 +1191,16 @@ test('one d100 decides every drop row, while events roll independently', async (
 
   assert.equal(result.accepted, true);
   const { items, events } = calls.terminal[0].payload.checkResult;
+  const { roll, itemRows } = calls.terminal[0].payload.checkResult;
+  assert.equal(roll, 50, 'the shared item roll is retained independently of awards');
+  assert.deepEqual(
+    itemRows.map(row => [row.id, row.roll, row.dropped]),
+    [
+      ['drop-common', 50, false],
+      ['drop-rare', 50, true]
+    ],
+    'every evaluated row retains the same shared roll, including misses'
+  );
   assert.deepEqual(items.map(row => row.id), ['drop-rare'], 'only the row the one roll cleared');
   assert.deepEqual(
     [...new Set(items.map(row => row.roll))],
@@ -1080,6 +1212,7 @@ test('one d100 decides every drop row, while events roll independently', async (
     ['event-a'],
     'two events at one rate split, so they did not share the attempt roll'
   );
+  assert.equal(rollCalls.length, 3, 'd100 consumes one item roll and one roll per event');
 });
 
 test('d100 resolution applies system gathering rules over legacy task and environment fields', async () => {
@@ -1134,6 +1267,11 @@ test('d100 resolution applies system gathering rules over legacy task and enviro
   assert.deepEqual(
     calls.terminal[0].payload.checkResult.items.map((row) => row.id),
     ['drop-first', 'drop-second']
+  );
+  assert.deepEqual(
+    calls.terminal[0].payload.checkResult.itemRows.map((row) => row.id),
+    ['drop-first', 'drop-second', 'drop-third'],
+    'selection-limited rows remain evidence and never become awards'
   );
   assert.deepEqual(
     calls.terminal[0].payload.checkResult.events.map((row) => row.id),
@@ -1293,6 +1431,11 @@ test('drop resolution clamps negative condition modifiers at zero drop chance', 
   });
 
   assert.deepEqual(result.items, []);
+  assert.equal(result.roll, 100);
+  assert.deepEqual(
+    result.itemRows.map((row) => [row.id, row.finalDropRate, row.dropped]),
+    [['drop-zero', 0, false]]
+  );
 });
 
 test('gathering start validation accepts zero drop chance rows', async () => {

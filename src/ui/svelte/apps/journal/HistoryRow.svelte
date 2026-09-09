@@ -10,11 +10,18 @@
   import { statusChipTone } from '../../util/statusChipTone.js';
   import Chip from '../../components/Chip.svelte';
   import Medallion from '../../components/Medallion.svelte';
+  import IconButton from '../../components/IconButton.svelte';
   import { runStatusPresentation } from './journalRunStatus.js';
 
   const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 
-  let { run = null, selected = false, onSelect = null, relativeTime = '' } = $props();
+  let {
+    run = null,
+    selected = false,
+    onSelect = null,
+    onDismiss = null,
+    relativeTime = '',
+  } = $props();
 
   const id = $derived(String(run?.id ?? ''));
   const title = $derived(String(run?.names?.title ?? ''));
@@ -31,7 +38,11 @@
   );
 
   function activate() {
-    if (id) onSelect?.(id);
+    if (id) onSelect?.(run);
+  }
+  function dismiss(event) {
+    event.stopPropagation();
+    onDismiss?.(run);
   }
   function onKey(event) {
     if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
@@ -41,38 +52,46 @@
   }
 </script>
 
-<div
-  class="journal-history-row"
-  class:is-selected={selected}
-  role="button"
-  tabindex="0"
-  data-history-run-id={id}
-  data-selected={selected ? 'true' : 'false'}
-  aria-pressed={selected}
-  onclick={activate}
-  onkeydown={onKey}
->
-  <Medallion art={img} alt="" size={40} />
-  <div class="journal-history-copy">
-    <span class="journal-history-name" {title}>{title}</span>
-    <div class="journal-history-meta">
-      <Chip
-        class="journal-run-status"
-        density="list"
-        tone={statusChipTone(runStatus.tone)}
-        icon={`fas ${runStatus.icon}`}
-        data-run-status={status}>{localize(runStatus.labelKey)}</Chip
-      >
-      {#if relativeTime !== ''}
-        <span class="journal-history-time">{relativeTime}</span>
-      {/if}
+<div class="journal-history-row" class:is-selected={selected}>
+  <div
+    class="journal-history-select"
+    role="button"
+    tabindex="0"
+    data-history-run-id={id}
+    data-selected={selected ? 'true' : 'false'}
+    aria-pressed={selected}
+    onclick={activate}
+    onkeydown={onKey}
+  >
+    <Medallion art={img} alt="" size={30} />
+    <div class="journal-history-copy">
+      <span class="journal-history-name" {title}>{title}</span>
+      <div class="journal-history-meta">
+        <Chip
+          class="journal-run-status"
+          density="list"
+          tone={statusChipTone(runStatus.tone)}
+          icon={`fas ${runStatus.icon}`}
+          data-run-status={status}>{localize(runStatus.labelKey)}</Chip
+        >
+        {#if relativeTime !== ''}
+          <span class="journal-history-time">{relativeTime}</span>
+        {/if}
+      </div>
     </div>
+    {#if totalQuantity > 1}
+      <span class="journal-history-quantity" data-history-quantity>
+        {localize('FABRICATE.App.Journal.Quantity', { n: totalQuantity })}
+      </span>
+    {/if}
   </div>
-  {#if totalQuantity > 1}
-    <span class="journal-history-quantity" data-history-quantity>
-      {localize('FABRICATE.App.Journal.Quantity', { n: totalQuantity })}
-    </span>
-  {/if}
+  <IconButton
+    class="journal-history-dismiss"
+    ariaLabel={localize('FABRICATE.App.Journal.History.Dismiss', { name: title })}
+    title={localize('FABRICATE.App.Journal.History.Dismiss', { name: title })}
+    data-journal-dismiss={id}
+    onclick={dismiss}><i class="fas fa-xmark" aria-hidden="true"></i></IconButton
+  >
 </div>
 
 <style>
@@ -80,15 +99,23 @@
     box-sizing: border-box;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--fab-space-2);
     width: 100%;
-    padding: 8px;
+    padding: var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
     color: var(--fab-text);
     text-align: left;
     cursor: pointer;
+  }
+
+  .journal-history-select {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    flex: 1 1 auto;
+    gap: var(--fab-space-2);
   }
 
   .journal-history-row:not(.is-selected):hover {

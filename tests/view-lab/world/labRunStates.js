@@ -40,6 +40,52 @@ const NOW = 1_209_600;
 const HOUR = 3600;
 
 /**
+ * Stable run identity selected by each Journal fixture query. A null identity means the state is
+ * produced by the lab-only service seam or by operating a real Journal control after mount.
+ */
+export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
+  'ready-single': 'lab-v1-ready-single',
+  'waiting-auto-eligible': 'lab-v1-waiting-auto-eligible',
+  'waiting-open-choice': 'lab-v1-waiting-open-choice',
+  'material-shortage': 'lab-v1-material-shortage',
+  'ingredient-route': 'lab-v1-ingredient-route',
+  'check-route': 'lab-v1-check-route',
+  'essence-shared': 'lab-v1-essence-shared',
+  paused: 'lab-v1-paused',
+  'cancel-confirmation': 'lab-v1-cancel-confirmation',
+  'past-stage': 'lab-v1-stage-browser',
+  'future-stage': 'lab-v1-stage-browser',
+  'gathering-straight': 'lab-v1-gathering-straight',
+  'gathering-d100': 'lab-v1-gathering-d100',
+  'gathering-check': 'lab-v1-gathering-check',
+  'finished-success': 'lab-v1-finished-success',
+  'finished-failure': 'lab-v1-finished-failure',
+  'finished-cancelled': 'lab-v1-finished-cancelled',
+  'active-page-two': 'lab-v1-active-5',
+  'finished-page-two': 'lab-v1-finished-5',
+  'filter-paused': 'lab-v1-filter-paused',
+  'empty-search': 'lab-v1-ready-single',
+  'automatic-completion': 'lab-v1-automatic-completion',
+  'automatic-blocker': 'lab-v1-automatic-blocker',
+  dismissal: 'lab-v1-dismissal',
+  'redacted-owner': 'lab-gathering-blind-waiting',
+  alchemy: 'lab-v1-alchemy',
+  salvage: 'lab-v1-salvage',
+  legacy: 'lab-run-inprogress-single',
+  loading: null,
+  'error-retry': 'lab-v1-ready-single',
+  'no-actor-empty': null,
+  'stale-action': 'lab-v1-stale-action',
+  'command-timeout': 'lab-v1-command-timeout',
+  'authority-unavailable': 'lab-v1-authority-unavailable',
+  'roll-cancelled': 'lab-v1-roll-cancelled',
+  'unsupported-version': 'lab-unsupported-version',
+  'recovery-required': 'lab-v1-recovery-required',
+  wide: 'lab-v1-wide',
+  narrow: 'lab-v1-wide',
+});
+
+/**
  * The in-flight BLIND gathering run (issue 901), and the run id its GM-owned secret is keyed by.
  *
  * Exported because the secret does NOT live on the actor — that is the whole point of the fix — so
@@ -229,13 +275,34 @@ export function buildLabBlindRunSecret({ actor, environments, tasks }) {
  * @param {string} options.userId Owning user id.
  * @param {Array<{id: string, craftingSystemId: string, steps?: unknown[]}>} options.recipes Real recipes.
  * @param {object[]} options.environments Real gathering environments, for the blind run below.
+ * @param {object[]} [options.tasks] Real gathering tasks.
+ * @param {string|null} [options.journalCaseState] Focused persisted state selected by View Lab.
  * @returns {{craftingRuns: object, salvageRuns: object, gatheringRuns: object}} Flag containers.
  */
-export function buildLabRunStates({ actor, userId, recipes, environments }) {
+export function buildLabRunStates({
+  actor,
+  userId,
+  recipes,
+  environments,
+  tasks = [],
+  journalCaseState = null,
+}) {
   const actorUuid = actor.uuid;
   const multiStep = recipes.find((recipe) => (recipe.steps?.length ?? 0) > 1) ?? recipes[0];
   const single = recipes.find((recipe) => (recipe.steps?.length ?? 0) <= 1) ?? recipes[0];
   const pick = (index) => recipes[index % recipes.length] ?? recipes[0];
+
+  if (journalCaseState && !['legacy', 'redacted-owner'].includes(journalCaseState)) {
+    return buildJournalCaseContainers({
+      state: journalCaseState,
+      actor,
+      userId,
+      recipes,
+      environments,
+      tasks,
+      defaults: null,
+    });
+  }
 
   const active = {};
   const history = [];
@@ -378,7 +445,7 @@ export function buildLabRunStates({ actor, userId, recipes, environments }) {
     true
   );
 
-  return {
+  const defaults = {
     craftingRuns: { active, history },
     // Salvage and gathering share the container shape. One terminal salvage record is enough for
     // the journal's mixed-source list to show all three kinds side by side; gathering carries an
@@ -402,6 +469,655 @@ export function buildLabRunStates({ actor, userId, recipes, environments }) {
     },
     gatheringRuns: buildLabGatheringRuns({ actorUuid, userId, environments }),
   };
+  if (!journalCaseState) return defaults;
+  return buildJournalCaseContainers({
+    state: journalCaseState,
+    actor,
+    userId,
+    recipes,
+    environments,
+    tasks,
+    defaults,
+  });
+}
+
+function buildJournalCaseContainers({
+  state,
+  actor,
+  userId,
+  recipes,
+  environments,
+  tasks,
+  defaults,
+}) {
+  if (!Object.hasOwn(LAB_JOURNAL_CASE_STATE_RUN_IDS, state)) {
+    throw new Error(`labRunStates: unknown journalCaseState "${state}"`);
+  }
+  if (state === 'legacy') return defaults;
+  if (state === 'redacted-owner') {
+    return emptyRunContainers({ gatheringActive: Object.values(defaults.gatheringRuns.active) });
+  }
+  if (state === 'no-actor-empty') return emptyRunContainers();
+
+  const context = { actor, actorUuid: actor.uuid, userId, recipes, environments, tasks };
+  const factories = journalCaseFactories(context);
+  const factory = factories[state];
+  if (!factory) throw new Error(`labRunStates: journalCaseState "${state}" has no fixture factory`);
+  return factory();
+}
+
+function journalCaseFactories(context) {
+  const single = () => requireRecipe(context.recipes, 'sm-r-horseshoe');
+  const choice = () => requireRecipe(context.recipes, 'sm-r-quenchoil');
+  const shortage = () => requireRecipe(context.recipes, 'sm-r-chainmail');
+  const ingredientRoute = () => requireRecipe(context.recipes, 'jw-r-cast');
+  const checkRoute = () => requireRecipe(context.recipes, 'rw-r-blade');
+  const essence = () => requireRecipe(context.recipes, 'sm-r-deepbind');
+  const multi = () => requireRecipe(context.recipes, 'sm-r-pattern-blade');
+  const alchemy = () =>
+    context.recipes.find((recipe) => recipe?.craftingSystemId === LAB_SYSTEM_IDS.ALCHEMY) ??
+    requireRecipe(context.recipes, 'al-r-firebomb');
+  const active = (run) => emptyRunContainers({ craftingActive: [run] });
+  const finished = (run) => emptyRunContainers({ craftingHistory: [run] });
+  const ready = (id, recipe = single()) =>
+    versionedCraftingRun(context, recipe, {
+      id,
+      status: 'waitingTime',
+      steps: [versionedRecipeStep(recipe, 0, 'waitingTime', maturedGate())],
+    });
+  const waiting = (id, recipe = single(), extra = {}) =>
+    versionedCraftingRun(context, recipe, {
+      id,
+      status: 'waitingTime',
+      completionMode: 'worldTime',
+      steps: [versionedRecipeStep(recipe, 0, 'waitingTime', futureGate())],
+      ...extra,
+    });
+  const readyAlias = (id) => () => active(ready(id));
+
+  return {
+    'ready-single': readyAlias('lab-v1-ready-single'),
+    'waiting-auto-eligible': () => active(waiting('lab-v1-waiting-auto-eligible')),
+    'waiting-open-choice': () =>
+      active(waiting('lab-v1-waiting-open-choice', choice(), { completionMode: 'manual' })),
+    'material-shortage': () =>
+      active(waiting('lab-v1-material-shortage', shortage(), { completionMode: 'manual' })),
+    'ingredient-route': () =>
+      active(
+        versionedCraftingRun(context, ingredientRoute(), {
+          id: 'lab-v1-ingredient-route',
+          steps: [
+            versionedRecipeStep(ingredientRoute(), 0, 'inProgress', {
+              selectedSetIndex: 1,
+            }),
+          ],
+        })
+      ),
+    'check-route': () => active(ready('lab-v1-check-route', checkRoute())),
+    'essence-shared': () => active(ready('lab-v1-essence-shared', essence())),
+    paused: () =>
+      active(
+        waiting('lab-v1-paused', single(), {
+          runRevision: 3,
+          pauseState: { pausedAt: NOW - HOUR, remainingSeconds: 3 * HOUR },
+          pausedDurationSeconds: HOUR,
+        })
+      ),
+    'cancel-confirmation': readyAlias('lab-v1-cancel-confirmation'),
+    'past-stage': () => active(stageBrowserRun(context, multi())),
+    'future-stage': () => active(stageBrowserRun(context, multi())),
+    'gathering-straight': () =>
+      emptyRunContainers({ gatheringActive: [gatheringCaseRun(context, 'straight')] }),
+    'gathering-d100': () =>
+      emptyRunContainers({ gatheringActive: [gatheringCaseRun(context, 'd100')] }),
+    'gathering-check': () =>
+      emptyRunContainers({ gatheringActive: [gatheringCaseRun(context, 'routed')] }),
+    'finished-success': () => finished(terminalCraftingCase(context, single(), 'succeeded')),
+    'finished-failure': () => finished(terminalCraftingCase(context, checkRoute(), 'failed')),
+    'finished-cancelled': () => finished(cancelledCraftingCase(context, multi())),
+    'active-page-two': () => pagingContainers(context, single()),
+    'finished-page-two': () => pagingContainers(context, single()),
+    'filter-paused': () => filterContainers(context, single()),
+    'empty-search': readyAlias('lab-v1-ready-single'),
+    'automatic-completion': () =>
+      finished(automaticCompletedCase(context, single(), 'lab-v1-automatic-completion')),
+    'automatic-blocker': () =>
+      active(
+        versionedCraftingRun(context, shortage(), {
+          id: 'lab-v1-automatic-blocker',
+          status: 'waitingTime',
+          completionMode: 'worldTime',
+          steps: [versionedRecipeStep(shortage(), 0, 'waitingTime', maturedGate())],
+        })
+      ),
+    dismissal: () => finished(terminalCraftingCase(context, single(), 'succeeded', 'lab-v1-dismissal')),
+    alchemy: () => active(ready('lab-v1-alchemy', alchemy())),
+    salvage: () => emptyRunContainers({ salvageHistory: [versionedSalvageCase(context)] }),
+    'stale-action': readyAlias('lab-v1-stale-action'),
+    'command-timeout': readyAlias('lab-v1-command-timeout'),
+    'authority-unavailable': readyAlias('lab-v1-authority-unavailable'),
+    'roll-cancelled': readyAlias('lab-v1-roll-cancelled'),
+    'unsupported-version': () =>
+      active({ ...ready('lab-unsupported-version'), lifecycleVersion: 2 }),
+    'recovery-required': () => active(recoveryCase(context, single())),
+    wide: () => wideContainers(context, multi()),
+    narrow: () => wideContainers(context, multi()),
+    loading: readyAlias('lab-v1-ready-single'),
+    'error-retry': readyAlias('lab-v1-ready-single'),
+  };
+}
+
+function requireRecipe(recipes, id) {
+  const recipe = (recipes ?? []).find((entry) => entry?.id === id);
+  if (!recipe) throw new Error(`labRunStates: journal fixture requires real recipe "${id}"`);
+  return recipe;
+}
+
+function recipeSteps(recipe) {
+  return typeof recipe?.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
+}
+
+function versionedRecipeStep(recipe, index, status, extra = {}) {
+  const authored = recipeSteps(recipe)[index];
+  if (!authored) {
+    throw new Error(`labRunStates: recipe "${recipe?.id}" has no execution step ${index}`);
+  }
+  const selectedSetIndex = Number(extra.selectedSetIndex) || 0;
+  const selectedSet = authored.ingredientSets?.[selectedSetIndex] ?? authored.ingredientSets?.[0];
+  const selectedRequirementSnapshot = selectedSet?.toJSON?.() ?? selectedSet ?? null;
+  const selectedIngredientSetId = selectedRequirementSnapshot?.id ?? null;
+  const fields = { ...extra };
+  delete fields.selectedSetIndex;
+  return step(index, status, {
+    stepId: authored.id,
+    stepName: authored.name || `Step ${index + 1}`,
+    selectedIngredientSetId,
+    selectedRequirementSnapshot,
+    selectionPlan: selectedIngredientSetId
+      ? { selectedIngredientSetId, ingredientOptionOverrides: {} }
+      : null,
+    ...fields,
+  });
+}
+
+function versionedCraftingRun(context, recipe, overrides = {}) {
+  const steps = overrides.steps ?? [versionedRecipeStep(recipe, 0, 'inProgress')];
+  return {
+    ...craftingRun({
+      id: overrides.id,
+      actorUuid: context.actorUuid,
+      userId: context.userId,
+      systemId: recipe.craftingSystemId,
+      recipeId: recipe.id,
+      status: overrides.status ?? 'inProgress',
+      steps,
+      finishedAt: overrides.finishedAt,
+      currentStepIndex: overrides.currentStepIndex ?? 0,
+    }),
+    lifecycleVersion: 1,
+    runRevision: overrides.runRevision ?? 0,
+    completionMode: overrides.completionMode ?? 'manual',
+    pausedDurationSeconds: overrides.pausedDurationSeconds ?? 0,
+    ...(overrides.pauseState && { pauseState: overrides.pauseState }),
+    ...(overrides.executionJournal && { executionJournal: overrides.executionJournal }),
+  };
+}
+
+function maturedGate() {
+  return { timeGate: { requiredSeconds: HOUR, initiatedAt: NOW - 2 * HOUR, availableAt: NOW - HOUR } };
+}
+
+function futureGate() {
+  return { timeGate: { requiredSeconds: 4 * HOUR, initiatedAt: NOW - HOUR, availableAt: NOW + 3 * HOUR } };
+}
+
+function stageBrowserRun(context, recipe) {
+  const authored = recipeSteps(recipe);
+  const steps = authored.map((_entry, index) => {
+    if (index === 0) {
+      return versionedRecipeStep(recipe, index, 'succeeded', {
+        completedAt: NOW - HOUR,
+        lastCheckResult: {
+          success: true,
+          value: 17,
+          data: { resolvedFormula: '1d20 + 3', total: 17, dc: 14 },
+        },
+        consumedIngredients: [
+          { componentId: 'sm-steel-ingot', quantity: 2, name: 'Steel Ingot' },
+        ],
+      });
+    }
+    if (index === 1) return versionedRecipeStep(recipe, index, 'waitingTime', futureGate());
+    return versionedRecipeStep(recipe, index, 'pending', {
+      lastCheckResult: {
+        success: false,
+        value: 8,
+        data: { resolvedFormula: '1d20 + 1', total: 8, dc: 15 },
+      },
+    });
+  });
+  return versionedCraftingRun(context, recipe, {
+    id: 'lab-v1-stage-browser',
+    status: 'waitingTime',
+    currentStepIndex: Math.min(1, steps.length - 1),
+    steps,
+  });
+}
+
+function terminalCraftingCase(context, recipe, status, id = null) {
+  const succeeded = status === 'succeeded';
+  const suffix = status === 'succeeded' ? 'success' : status === 'failed' ? 'failure' : 'cancelled';
+  const runId = id ?? `lab-v1-finished-${suffix}`;
+  const persistedStep = versionedRecipeStep(recipe, 0, status, {
+    completedAt: NOW - HOUR,
+    lastCheckResult: {
+      success: succeeded,
+      value: succeeded ? 18 : 6,
+      reason: succeeded ? null : 'checkFailed',
+      data: { resolvedFormula: '1d20 + 2', total: succeeded ? 18 : 6, dc: 12 },
+    },
+    consumedIngredients: [{ componentId: 'sm-iron-ingot', quantity: 1, name: 'Iron Ingot' }],
+    createdResults: succeeded
+      ? [{ componentId: 'sm-horseshoe', quantity: 4, name: 'Horseshoe' }]
+      : [],
+    ...(!succeeded && { failureReason: 'checkFailed' }),
+  });
+  return versionedCraftingRun(context, recipe, {
+    id: runId,
+    status,
+    finishedAt: NOW - HOUR,
+    steps: [persistedStep],
+    executionJournal: {
+      operationId: `${runId}-operation`,
+      status: 'committed',
+      effects: [
+        { id: 'spend', kind: 'ingredientConsumption', phase: 'applied', receipt: { count: 1 } },
+        ...(succeeded
+          ? [{ id: 'award', kind: 'awardCreation', phase: 'applied', receipt: { count: 1 } }]
+          : []),
+      ],
+    },
+  });
+}
+
+function cancelledCraftingCase(context, recipe) {
+  const first = versionedRecipeStep(recipe, 0, 'succeeded', {
+    completedAt: NOW - 2 * HOUR,
+    consumedIngredients: [{ componentId: 'sm-steel-ingot', quantity: 2, name: 'Steel Ingot' }],
+  });
+  const second = versionedRecipeStep(recipe, 1, 'cancelled', {
+    timeGate: { requiredSeconds: 8 * HOUR, initiatedAt: NOW - HOUR, availableAt: NOW + 7 * HOUR },
+  });
+  return versionedCraftingRun(context, recipe, {
+    id: 'lab-v1-finished-cancelled',
+    status: 'cancelled',
+    currentStepIndex: 1,
+    finishedAt: NOW,
+    steps: [first, second],
+  });
+}
+
+function gatheringCaseRun(context, mode) {
+  const task = requireGatheringTask(context.tasks, mode);
+  const environment =
+    context.environments.find((entry) => entry?.craftingSystemId === task.craftingSystemId) ??
+    context.environments[0];
+  if (!environment) throw new Error(`labRunStates: ${mode} gathering fixture has no environment`);
+  const id = `lab-v1-gathering-${mode === 'routed' ? 'check' : mode}`;
+  return {
+    id,
+    actorUuid: context.actorUuid,
+    userId: context.userId,
+    craftingSystemId: task.craftingSystemId,
+    environmentId: environment.id,
+    taskId: task.id,
+    lifecycleVersion: 1,
+    runRevision: 0,
+    completionMode: 'manual',
+    pausedDurationSeconds: 0,
+    status: 'waitingTime',
+    startedAtWorldTime: NOW - 2 * HOUR,
+    updatedAtWorldTime: NOW - HOUR,
+    timeGate: maturedGate().timeGate,
+    economyEvidence: { runtimeSnapshot: { task } },
+    checkResult: null,
+    createdResults: [],
+  };
+}
+
+function automaticCompletedCase(context, recipe, id) {
+  const completed = versionedRecipeStep(recipe, 0, 'succeeded', {
+    completedAt: NOW,
+    createdResults: authoredResults(recipe, 0),
+  });
+  return versionedCraftingRun(context, recipe, {
+    id,
+    status: 'succeeded',
+    completionMode: 'worldTime',
+    finishedAt: NOW,
+    steps: [completed],
+  });
+}
+
+function authoredResults(recipe, stepIndex) {
+  const authored = recipeSteps(recipe)[stepIndex];
+  return (authored?.resultGroups ?? []).flatMap((group) =>
+    (group?.results ?? []).map((result) => ({
+      componentId: result.componentId,
+      quantity: result.quantity ?? 1,
+      name: result.name,
+      img: result.img,
+    }))
+  );
+}
+
+function requireGatheringTask(tasks, mode) {
+  const task = (tasks ?? []).find((entry) => {
+    const resolutionMode = entry?.resolutionMode ?? 'd100';
+    return resolutionMode === mode;
+  });
+  if (!task) throw new Error(`labRunStates: journal fixture requires a real ${mode} gathering task`);
+  return task;
+}
+
+function pagingContainers(context, recipe) {
+  const activeRuns = Array.from({ length: 6 }, (_unused, index) => ({
+    ...versionedCraftingRun(context, recipe, {
+      id: `lab-v1-active-${index + 1}`,
+      status: 'waitingTime',
+      steps: [versionedRecipeStep(recipe, 0, 'waitingTime', futureGate())],
+    }),
+    startedAt: NOW - index * 60,
+  }));
+  const historyRuns = Array.from({ length: 6 }, (_unused, index) => ({
+    ...terminalCraftingCase(
+      context,
+      recipe,
+      'succeeded',
+      `lab-v1-finished-${index + 1}`
+    ),
+    finishedAt: NOW - index * 60,
+  }));
+  return emptyRunContainers({ craftingActive: activeRuns, craftingHistory: historyRuns });
+}
+
+function filterContainers(context, recipe) {
+  const paused = {
+    ...versionedCraftingRun(context, recipe, {
+      id: 'lab-v1-filter-paused',
+      status: 'waitingTime',
+      steps: [versionedRecipeStep(recipe, 0, 'waitingTime', futureGate())],
+      pauseState: { pausedAt: NOW - 300, remainingSeconds: HOUR },
+    }),
+  };
+  return emptyRunContainers({
+    craftingActive: [
+      paused,
+      versionedCraftingRun(context, recipe, {
+        id: 'lab-v1-filter-ready',
+        status: 'waitingTime',
+        steps: [versionedRecipeStep(recipe, 0, 'waitingTime', maturedGate())],
+      }),
+    ],
+  });
+}
+
+function versionedSalvageCase(context) {
+  return {
+    id: 'lab-v1-salvage',
+    actorUuid: context.actorUuid,
+    userId: context.userId,
+    craftingSystemId: LAB_SYSTEM_IDS.HERBALISM,
+    componentId: 'hb-cracked-alembic',
+    lifecycleVersion: 1,
+    runRevision: 1,
+    completionMode: 'manual',
+    pausedDurationSeconds: 0,
+    status: 'succeeded',
+    startedAt: NOW - 2 * HOUR,
+    updatedAt: NOW - HOUR,
+    finishedAt: NOW - HOUR,
+    consumedComponents: [{ itemUuid: 'Item.hb-cracked-alembic', quantity: 1 }],
+    createdResults: [],
+  };
+}
+
+function recoveryCase(context, recipe) {
+  return versionedCraftingRun(context, recipe, {
+    id: 'lab-v1-recovery-required',
+    status: 'inProgress',
+    steps: [versionedRecipeStep(recipe, 0, 'inProgress')],
+    executionJournal: {
+      operationId: 'lab-recovery-operation',
+      status: 'recoveryRequired',
+      effects: [
+        { id: 'spend', kind: 'ingredientConsumption', phase: 'applied', receipt: { count: 1 } },
+        { id: 'award', kind: 'awardCreation', phase: 'applying' },
+      ],
+    },
+  });
+}
+
+function wideContainers(context, recipe) {
+  const containers = pagingContainers(context, recipe);
+  const wide = versionedCraftingRun(context, recipe, {
+    id: 'lab-v1-wide',
+    status: 'waitingTime',
+    currentStepIndex: 1,
+    steps: recipeSteps(recipe).map((_entry, index) =>
+      versionedRecipeStep(recipe, index, index === 1 ? 'waitingTime' : index < 1 ? 'succeeded' : 'pending',
+        index === 1 ? futureGate() : {})
+    ),
+  });
+  containers.craftingRuns.active = {
+    [wide.id]: wide,
+    ...containers.craftingRuns.active,
+  };
+  return containers;
+}
+
+function emptyRunContainers({
+  craftingActive = [],
+  craftingHistory = [],
+  salvageActive = [],
+  salvageHistory = [],
+  gatheringActive = [],
+  gatheringHistory = [],
+} = {}) {
+  const keyed = (runs) => Object.fromEntries(runs.map((run) => [run.id, run]));
+  return {
+    craftingRuns: { active: keyed(craftingActive), history: craftingHistory },
+    salvageRuns: { active: keyed(salvageActive), history: salvageHistory },
+    gatheringRuns: { active: keyed(gatheringActive), history: gatheringHistory },
+  };
+}
+
+/**
+ * Build the View Lab's test-only command collaborator. It changes the same persisted containers
+ * installed on the actor, then the production Journal builder/store reloads those records. This
+ * proves control wiring and visible transitions without claiming Foundry authority arbitration.
+ *
+ * @param {object} options Options.
+ * @param {object} options.actor Actor carrying the run flags.
+ * @param {object} options.containers Persisted run containers installed on the actor.
+ * @param {string|null} options.state Selected Journal fixture state.
+ * @param {object[]} [options.recipes] Authored recipes used to resolve completion results.
+ * @param {() => number} [options.nowWorldTime] Current world-time reader.
+ * @returns {{events: object[], execute: (command: object) => Promise<object|undefined>}}
+ */
+export function createLabJournalCaseController({
+  actor,
+  containers,
+  state,
+  recipes = [],
+  nowWorldTime = () => NOW,
+}) {
+  const events = [];
+  const persist = () => installLabRunStates(actor, containers);
+
+  async function execute(command) {
+    const event = { ...cloneFixtureValue(command ?? {}), state };
+    events.push(event);
+    const located = locateActiveRun(containers, command);
+    if (!located) return undefined;
+    const { container, run } = located;
+
+    if (state === 'stale-action') {
+      run.runRevision = Math.max(0, Number(run.runRevision) || 0) + 1;
+      persist();
+      return fixtureFailure('stale-run');
+    }
+    if (state === 'command-timeout') {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      return fixtureFailure('command-timeout');
+    }
+    if (state === 'roll-cancelled') {
+      return { success: false, cancelled: true, reason: 'roll-cancelled' };
+    }
+    if (state === 'automatic-blocker' && command.action === 'execute') {
+      return fixtureFailure('selection-required');
+    }
+
+    applyFixtureCommand({ command, container, run, recipes, now: Number(nowWorldTime()) || NOW });
+    persist();
+    return { success: true };
+  }
+
+  return { events, execute };
+}
+
+function cloneFixtureValue(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function fixtureFailure(reason) {
+  return { success: false, reason, message: `Journal fixture command refused: ${reason}` };
+}
+
+function locateActiveRun(containers, command) {
+  const key = `${command?.runType ?? ''}Runs`;
+  const container = containers?.[key];
+  const run = container?.active?.[command?.runId];
+  return run ? { container, run } : null;
+}
+
+function applyFixtureCommand({ command, container, run, recipes, now }) {
+  switch (command.action) {
+    case 'setCompletionMode': {
+      run.completionMode = command.payload?.completionMode === 'worldTime' ? 'worldTime' : 'manual';
+      bumpRun(run);
+      return;
+    }
+    case 'setSelection': {
+      const stepIndex = Math.max(0, Number(command.payload?.stepIndex) || 0);
+      if (run.steps?.[stepIndex]) {
+        run.steps[stepIndex].selectionPlan = cloneFixtureValue(command.payload?.selectionPlan ?? {});
+      }
+      bumpRun(run);
+      return;
+    }
+    case 'pause': {
+      const availableAt = Number(run.timeGate?.availableAt ?? run.steps?.[run.currentStepIndex]?.timeGate?.availableAt);
+      run.pauseState = {
+        pausedAt: now,
+        remainingSeconds: Number.isFinite(availableAt) ? Math.max(0, availableAt - now) : 0,
+      };
+      bumpRun(run);
+      return;
+    }
+    case 'resume': {
+      const remaining = Math.max(0, Number(run.pauseState?.remainingSeconds) || 0);
+      const pausedAt = Number(run.pauseState?.pausedAt);
+      const gate = {
+        requiredSeconds: remaining,
+        initiatedAt: now,
+        availableAt: now + remaining,
+      };
+      if (run.runType === 'gathering' || !Array.isArray(run.steps)) run.timeGate = gate;
+      else if (run.steps[run.currentStepIndex]) run.steps[run.currentStepIndex].timeGate = gate;
+      run.pausedDurationSeconds =
+        Math.max(0, Number(run.pausedDurationSeconds) || 0) +
+        (Number.isFinite(pausedAt) ? Math.max(0, now - pausedAt) : 0);
+      delete run.pauseState;
+      bumpRun(run);
+      return;
+    }
+    case 'cancel': {
+      finishFixtureRun({ container, run, status: 'cancelled', now });
+      return;
+    }
+    case 'execute': {
+      completeFixtureRun({ container, run, recipes, now });
+    }
+  }
+}
+
+function bumpRun(run) {
+  run.runRevision = Math.max(0, Number(run.runRevision) || 0) + 1;
+}
+
+function completeFixtureRun({ container, run, recipes, now }) {
+  if (run.taskId) completeGatheringFixture(run, now);
+  else {
+    const recipe = recipes.find((entry) => entry?.id === run.recipeId);
+    const stepIndex = Math.max(0, Number(run.currentStepIndex) || 0);
+    const current = run.steps?.[stepIndex];
+    if (current) {
+      current.status = 'succeeded';
+      current.completedAt = now;
+      current.createdResults = authoredResults(recipe, stepIndex);
+      if (recipe?.craftingSystemId === LAB_SYSTEM_IDS.RUNEWORK) {
+        current.lastCheckResult = {
+          success: true,
+          outcome: 'rw-standard',
+          value: 17,
+          data: { resolvedFormula: '1d20 + 3', total: 17, dc: 12 },
+        };
+      }
+    }
+  }
+  finishFixtureRun({ container, run, status: 'succeeded', now });
+}
+
+function completeGatheringFixture(run, now) {
+  const task = run.economyEvidence?.runtimeSnapshot?.task ?? {};
+  const mode = task.resolutionMode ?? 'd100';
+  const firstDrop = task.dropRows?.find((row) => row?.enabled !== false);
+  const firstGroup = task.resultGroups?.[0];
+  const awarded = mode === 'd100' ? (firstDrop ? [firstDrop] : []) : (firstGroup?.results ?? []);
+  run.createdResults = awarded.map((result) => ({
+    componentId: result.componentId,
+    quantity: result.quantity ?? 1,
+    name: result.name,
+    img: result.img,
+  }));
+  run.checkResult =
+    mode === 'straight'
+      ? null
+      : {
+          success: true,
+          outcome: mode === 'routed' ? firstGroup?.name ?? null : null,
+          roll: 63,
+          value: 63,
+          data: { total: 63 },
+          itemRows: (task.dropRows ?? []).map((row) => ({
+            id: row.id,
+            finalDropRate: row.dropRate,
+            roll: 63,
+            awarded: row === firstDrop,
+          })),
+        };
+  run.completedAtWorldTime = now;
+  run.updatedAtWorldTime = now;
+}
+
+function finishFixtureRun({ container, run, status, now }) {
+  delete container.active[run.id];
+  run.status = status;
+  run.finishedAt = now;
+  if (run.taskId) run.completedAtWorldTime = now;
+  bumpRun(run);
+  container.history.unshift(run);
 }
 
 /**

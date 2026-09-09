@@ -15,7 +15,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import Chip from '../../components/Chip.svelte';
-  import FillBar from '../../components/FillBar.svelte';
+  import RunProgress from '../../components/RunProgress.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { runStatusPresentation } from './journalRunStatus.js';
   import { formatDurationHMS } from '../../util/formatDuration.js';
@@ -56,7 +56,7 @@
   const progressPercent = $derived(progress === null ? 0 : Math.round(progress * 100));
 
   function activate() {
-    if (id) onSelect?.(id);
+    if (id) onSelect?.(run);
   }
   function onKey(event) {
     if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
@@ -80,13 +80,10 @@
   onkeydown={onKey}
 >
   <div class="journal-run-card-main">
-    <Medallion art={img} alt="" size={64} />
+    <Medallion art={img} alt="" size={38} />
     <div class="journal-run-card-copy">
-      <span class="journal-run-card-name" {title}>{title}</span>
-      {#if subtitle !== ''}
-        <span class="journal-run-card-subtitle">{subtitle}</span>
-      {/if}
-      <div class="journal-run-card-meta">
+      <div class="journal-run-card-heading">
+        <span class="journal-run-card-name" {title}>{title}</span>
         <Chip
           class="journal-run-status"
           density="list"
@@ -104,52 +101,60 @@
             {localize('FABRICATE.App.Journal.BlindSecret.Badge')}
           </span>
         {/if}
-        {#if stepLabel !== ''}
-          <span class="journal-run-card-step">{stepLabel}</span>
-        {/if}
       </div>
-    </div>
-  </div>
-
-  {#if hasGate}
-    <div class="journal-run-card-countdown" data-run-countdown>
-      <i class="fas fa-clock" aria-hidden="true"></i>
-      {#if isReady}
-        <span
-          >{localize(
-            isFinalStep
-              ? 'FABRICATE.App.Journal.Countdown.ReadyToFinish'
-              : 'FABRICATE.App.Journal.Countdown.ReadyToContinue'
-          )}</span
-        >
-      {:else}
-        <span>{localize('FABRICATE.App.Journal.Countdown.Remaining', { time: remaining })}</span>
+      {#if subtitle !== '' || stepLabel !== ''}
+        <div class="journal-run-card-context">
+          {#if subtitle !== ''}<span class="journal-run-card-subtitle">{subtitle}</span>{/if}
+          {#if stepLabel !== ''}<span class="journal-run-card-step">{stepLabel}</span>{/if}
+        </div>
+      {/if}
+      {#if hasGate}
+        <div class="journal-run-card-timing">
+          {#if progress !== null}
+            <div
+              class="journal-run-card-progress"
+              role="progressbar"
+              aria-label={localize('FABRICATE.App.Journal.Progress.Label')}
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow={progressPercent}
+              data-run-progress={progressPercent}
+            >
+              <RunProgress
+                stages={Array.isArray(run?.steps) && run.steps.length > 0 ? run.steps : [{}]}
+                current={Math.max(0, Number(run?.stepIndex) || 0)}
+                progress={progressPercent}
+              />
+            </div>
+          {/if}
+          <div class="journal-run-card-countdown" data-run-countdown>
+            <i class="fas fa-clock" aria-hidden="true"></i>
+            {#if isReady}
+              <span
+                >{localize(
+                  isFinalStep
+                    ? 'FABRICATE.App.Journal.Countdown.ReadyToFinish'
+                    : 'FABRICATE.App.Journal.Countdown.ReadyToContinue'
+                )}</span
+              >
+            {:else}
+              <span
+                >{localize('FABRICATE.App.Journal.Countdown.Remaining', { time: remaining })}</span
+              >
+            {/if}
+          </div>
+        </div>
       {/if}
     </div>
-    {#if progress !== null}
-      <div
-        class="journal-run-card-progress"
-        role="progressbar"
-        aria-label={localize('FABRICATE.App.Journal.Progress.Label')}
-        aria-valuemin="0"
-        aria-valuemax="100"
-        aria-valuenow={progressPercent}
-        data-run-progress={progressPercent}
-      >
-        <FillBar value={progressPercent} tone="accent" size="sm" />
-      </div>
-    {/if}
-  {/if}
+  </div>
 </div>
 
 <style>
   .journal-run-card {
     box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+    display: block;
     width: 100%;
-    padding: 10px;
+    padding: var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
@@ -172,7 +177,7 @@
   .journal-run-card-main {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--fab-space-2);
     min-width: 0;
   }
 
@@ -181,7 +186,16 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--fab-space-chip);
+  }
+
+  .journal-run-card-heading,
+  .journal-run-card-context,
+  .journal-run-card-timing {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: var(--fab-space-2);
   }
 
   .journal-run-card-name {
@@ -192,29 +206,31 @@
     font-weight: 600;
   }
 
-  .journal-run-card-subtitle {
+  .journal-run-card-subtitle,
+  .journal-run-card-step {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 12px;
     color: var(--fab-text-muted);
   }
 
-  .journal-run-card-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
+  .journal-run-card-context > :last-child:not(:first-child)::before {
+    content: '·';
+    margin-right: var(--fab-space-2);
   }
 
   /* THE ROW'S STATUS CHIP holds its width (issue 1506). The retired journal status pill declared
      `flex: 0 0 auto` on itself; the shared chip declares no flex at all, because POSITION is the
      caller's and geometry is the primitive's — the rule its own `density` note states. So the one
      property that was doing work here is restated here, where the row that squeezes it lives. */
-  .journal-run-card-meta :global(.journal-run-status) {
+  .journal-run-card-heading :global(.journal-run-status) {
     flex: 0 0 auto;
   }
 
   .journal-run-card-step {
     font-size: 11px;
-    color: var(--fab-text-muted);
   }
 
   /* GM secret preview marker. Deliberately styled as a warning-toned chip rather
@@ -239,6 +255,7 @@
     font-size: 12px;
     font-weight: 600;
     color: var(--fab-text);
+    white-space: nowrap;
   }
 
   .journal-run-card-countdown i {
@@ -253,6 +270,7 @@
      ground and the fill are all the primitive's now. Only the full width stays, because a
      `FillBar` is `flex: 1 1 auto` and this wrapper is a plain block. */
   .journal-run-card-progress {
-    width: 100%;
+    min-width: 56px;
+    flex: 1 1 auto;
   }
 </style>

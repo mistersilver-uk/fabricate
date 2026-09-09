@@ -767,6 +767,7 @@ a{color:var(--fab-accent)}
     </div>
     <div class="delta"><b>Why the completion switch is a segmented and not a toggle.</b> Section 14 routes a value that could be “none” to a toggle and a one-of-N scope to a segmented. Both settings here are live behaviour a player is choosing between — <em>by hand</em> is not the absence of <em>as time passes</em> — and each needs its own icon and its own hover sentence, which a toggle has nowhere to put. It is one setting for the whole run, not per stage, because a player sets an intention once and does not want to re-declare it at every stage.</div>
     <div class="delta warn"><b>One thing this bar must never grow.</b> A world-clock control. The clock is the GM’s; the player window states it and never moves it. A run set to finish on its own resolves on the tick the clock lands on, and carries a bolt on its list row so the player can see which runs will move without them.</div>
+    <div class="delta warn"><b>Candidate implementation.</b> Issue 1648 task 6 now supplies the component and mounted interaction contract, but this entry remains <b>target</b> until the coordinated Journal consumer and reachable action-bar states are registered and reviewed.</div>
   </div>
 </section>
 
@@ -1099,6 +1100,7 @@ a{color:var(--fab-accent)}
       <div><h5>Svelte API</h5><ul><li><b>value</b> the formatted world time — a pre-localized string</li><li><b>label</b> <span class="req">required</span> — the kicker text</li><li>No events. A surface that needs to advance the clock is a GM surface and uses its own control.</li></ul></div>
     </div>
     <div class="delta warn"><b>Why the player window has no clock control.</b> Time is shared world state. A player advancing it to finish their own run advances every other run at the table, which is a GM decision with no player-side undo. The chip therefore reports and the rail carries the bolt, so nothing about a self-completing run is a surprise without also being a player’s own earlier choice.</div>
+    <div class="delta warn"><b>Candidate implementation.</b> Issue 1648 task 6 now supplies the read-only component, but this entry remains <b>target</b> until the coordinated player placement and reachable world-clock frame are registered and reviewed.</div>
   </div>
 </section>
 
@@ -1965,6 +1967,7 @@ a{color:var(--fab-accent)}
     </div>
     <div class="delta"><b>Spare stock, not held stock, decides whether a candidate is usable.</b> One stage can claim the same component from three directions at once — a fixed quantity, an open slot, and an essence source list — and all three are claims on one pile. Every cap, every disabled increment and every dimmed candidate is derived from a single claims map for the stage, so the row can never offer a component it has already spent elsewhere in the same stage. A design that checks <em>held</em> per requirement lets a player double-spend and only discovers it on commit.</div>
     <div class="delta warn"><b>Each fact lives in exactly one place.</b> The stage being worked shows its live slot row and states only its output; the countdown belongs to the time card, the state to the stage’s own tag, and the blocker to the line under the progress kicker. Restating any of them beside the tiles gives two surfaces the chance to disagree, which is how a player stops trusting either.</div>
+    <div class="delta warn"><b>Candidate implementation.</b> Issue 1648 task 6 now supplies all three components and their mounted chooser contract, but their entries remain <b>target</b> until the coordinated crafting consumer and open-slot frame are registered and reviewed.</div>
   </div>
 <div class="spec" data-status="target" data-status-EssencePool="target">
     <div class="spec-head"><h4>&lt;EssencePool&gt;</h4><span class="st st-target">target</span><p class="why">An essence requirement has no single source: several reagents each contribute, and the player decides which. Every essence threshold on one stage draws from <b>one</b> allocation and <b>one</b> source list, because a reagent is one physical thing — a Duskglass spent here gives its Radiant <em>and</em> its Shadow, and it cannot be spent twice.</p></div>
@@ -2060,6 +2063,7 @@ a{color:var(--fab-accent)}
     </div>
     <div class="delta"><b>Why the allocation is keyed to the stage and not to the requirement.</b> Model a spend per threshold and the same Duskglass can be allocated to Radiant and to Shadow independently, which lets a player satisfy both from one reagent they only own once. One allocation shared across every threshold on the stage is the only shape in which the arithmetic is honest, and it is why the source list is rendered once rather than repeated under each bar. Under a routed recipe the allocation is keyed by stage <em>and route</em>, because changing route changes what the stage is asking for.</div>
     <div class="delta ok"><b>This refines the chooser family rather than replacing it.</b> The essence panel already in the set states the total, the contributions and the overshoot; what it lacked was the control that decides them and the shared-pool rule. Both are added here as the same primitive, so a surface that only needs to <em>report</em> a past spend renders the bars and rows with <code>locked</code> and no steppers.</div>
+    <div class="delta warn"><b>Candidate implementation.</b> Issue 1648 task 6 now supplies the component and its mounted shared-carrier arithmetic, but this entry remains <b>target</b> until the coordinated crafting consumer and short/met frames are registered and reviewed.</div>
   </div>
 <div class="spec" data-status="target" data-status-RunProgress="target" data-status-StageNav="target" data-status-StageCard="target">
     <div class="spec-head"><h4>&lt;RunProgress&gt; &lt;StageNav&gt; &lt;StageCard&gt;</h4><span class="st st-target">RunProgress &middot; target</span><span class="st st-target">StageNav &middot; target</span><span class="st st-target">StageCard &middot; target</span><p class="why">A staged run is read one stage at a time. A track per stage says where the run is, a windowed numbered nav says which stage you are looking at, and exactly one stage — the one being worked — carries live controls. Every other stage is inert and says only what it knows.</p></div>
@@ -2108,10 +2112,12 @@ a{color:var(--fab-accent)}
         <li><b>window</b> number = 5 · <b>onView</b> (index)</li>
         <li><b>stageLabel</b> (stage, index) <span class="req">required</span> — each numeral is a bare number</li>
         <li><b>body</b> (stage) snippet — rendered for the worked stage only</li>
+        <li><b>showHeading</b> boolean = true — a single-stage surface may suppress the redundant numeral/name header while retaining the stage body</li>
         <li><b>blocker</b> string — the one line beside the Progress kicker</li>
       </ul></div>
     </div>
     <div class="delta"><b><code>view</code> is not <code>current</code>, and neither is derived from the other.</b> Reading ahead must not advance the run, and completing a stage must not strand the player on a stage they were inspecting. The surface therefore holds two indices: the run owns <em>current</em>, the component owns <em>view</em>, and the <em>Back to stage N</em> control exists precisely because they can diverge. Both are keyed by run id and held in the component, not lifted into the run store — every completion refreshes that store, and a view index held there would snap the player away mid-read.</div>
+    <div class="delta warn"><b>Candidate implementation.</b> Issue 1648 task 6 now supplies all three components and mounted current/view separation, but their entries remain <b>target</b> until the coordinated Journal consumer and current/past/future frames are registered and reviewed.</div>
   </div>
 <div class="spec" data-status="target" data-status-YieldScale="target" data-status-OutcomeLadder="target">
     <div class="spec-head"><h4>&lt;YieldScale&gt; &lt;OutcomeLadder&gt;</h4><span class="st st-target">YieldScale &middot; target</span><span class="st st-target">OutcomeLadder &middot; target</span><p class="why">What a gathering run might bring back, and afterwards where the roll landed. A drop table is <b>one</b> roll read against an ordered scale, so it is stated in that order — commonest first — rather than as a list of independent chances.</p></div>
@@ -2211,6 +2217,7 @@ a{color:var(--fab-accent)}
     </div>
     <div class="delta"><b>Why this is not a table.</b> A table earns its shape where a reader compares the same field down a column and would want to sort it. Here the order <em>is</em> the meaning: sorting this by name would destroy the only thing the scale says. Each row also carries art, a sentence and a pill, which is a list row’s job. Section 09’s table rule routes it here.</div>
     <div class="delta ok"><b>One roll, stated once.</b> A d100 run rolls a single d100 for the whole run rather than one per find, so the surface shows a single cut rather than a per-row outcome. Rendering per-row hits and misses without the line would let a reader believe four independent rolls happened, which changes what they think their odds were.</div>
+    <div class="delta warn"><b>Candidate implementation.</b> Issue 1648 task 6 now supplies both read-only components and their mounted ordering/cut contracts, but their entries remain <b>target</b> until the coordinated gathering consumers and before/after/routed frames are registered and reviewed.</div>
   </div>
 </section>
 

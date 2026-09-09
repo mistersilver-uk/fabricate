@@ -32,6 +32,8 @@
   import ActorSelectTopBar from './ActorSelectTopBar.svelte';
   import PlayerExtensionHost from './PlayerExtensionHost.svelte';
   import Notice from '../components/Notice.svelte';
+  import WorldClockChip from '../components/WorldClockChip.svelte';
+  import { worldTimeLabel } from '../util/worldTimeLabel.js';
   import { buildPlayerNavTabs, parseRouteKey } from '../../playerNavModel.js';
   import {
     DOMAIN_CONSUMERS,
@@ -88,6 +90,12 @@
   // The Journal nav entry carries a live active-run count badge fed by the shared
   // journal store's reactive `navCount` rune getter.
   const journalNavCount = $derived(Number(services?.journal?.navCount ?? 0));
+  const journalWorldClock = $derived(
+    worldTimeLabel(
+      services?.getWorldTimeComponents?.(Number(services?.journal?.worldTime ?? 0)) ?? null,
+      { localize }
+    )
+  );
   // ONE derivation, three callers: this rail, the application host that owns the active tab,
   // and the View Lab's mount harness all read `playerNavModel.js` rather than each computing
   // its own answer. Its projection is an explicit allowlist, never a spread, so a field Core
@@ -527,7 +535,17 @@
          context cluster (next to the gathering weather/time/region info). It is
          passed down so ActorSelectTopBar can render it adjacent to those
          conditions; see ActorSelectTopBar for the chip markup + aria-live. -->
-    <ActorSelectTopBar store={services?.actorBar} {services} {activeTab} {activeCanvasTool} />
+    <div class="fabricate-app-topbar" class:has-journal-clock={activeTab === 'journal'}>
+      <ActorSelectTopBar store={services?.actorBar} {services} {activeTab} {activeCanvasTool} />
+      {#if activeTab === 'journal' && journalWorldClock}
+        <div class="fabricate-app-journal-clock">
+          <WorldClockChip
+            label={localize('FABRICATE.App.Journal.WorldClock.Label')}
+            value={journalWorldClock}
+          />
+        </div>
+      {/if}
+    </div>
 
     <!-- A `div`, not the `section` this used to be. Naming the panel is what makes it a
          labelled `region` landmark by implication, and a landmark cannot also be a tabpanel:
@@ -728,6 +746,28 @@
 
   .fabricate-app-main :global(.fabricate-app-actor-bar) {
     flex: 0 0 auto;
+  }
+
+  .fabricate-app-topbar {
+    position: relative;
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  .fabricate-app-topbar.has-journal-clock {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    background: var(--fab-surface-soft);
+    border-bottom: 1px solid var(--fab-border);
+  }
+
+  .fabricate-app-topbar.has-journal-clock :global(.fabricate-app-actor-bar) {
+    border-bottom: 0;
+  }
+
+  .fabricate-app-journal-clock {
+    margin-right: var(--fab-space-4);
   }
 
   .fabricate-app-content {

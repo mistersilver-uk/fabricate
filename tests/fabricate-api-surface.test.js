@@ -274,7 +274,7 @@ test('Fabricate wires the crafting listing builder with a component resolver (is
   // owned-material tally silently reads as if the player owns nothing, and no existing
   // test goes red.
   assert.ok(
-    mainSource.includes("import { findMatchingComponent } from './utils/essenceResolver.js';"),
+    mainSource.includes("import { findMatchingComponent, resolveItemEssences } from './utils/essenceResolver.js';"),
     'main.js should import the same component resolver InventoryListingBuilder matches with'
   );
   assert.ok(
@@ -297,5 +297,85 @@ test('Fabricate hydrates the crafting recipe detail phase through the crafting l
   assert.ok(
     mainSource.includes('return this._getCraftingListingBuilder().buildRecipeDetail({'),
     "hydrateCraftingRecipe should route through the crafting listing builder's detail phase"
+  );
+});
+
+test('Fabricate exposes the versioned Journal command and per-user dismissal seams', () => {
+  for (const method of [
+    'executeJournalRunCommand(command)',
+    'dismissJournalRun(options)',
+    'getDismissedJournalRunKeys(options)',
+    'getJournalRunAuthorityAvailability()',
+    'setupJournalRunAuthority()',
+    'reconcileJournalRunAuthority(options)',
+  ]) {
+    assert.ok(mainSource.includes(method), `${method} should be exposed on game.fabricate`);
+  }
+  assert.ok(
+    mainSource.includes("Hooks.on('createJournalEntryPage', refreshJournalRunAuthorityAvailability)"),
+    'embedded authority-claim creation should refresh the synchronous availability cache'
+  );
+  assert.ok(
+    mainSource.includes("Hooks.on('deleteJournalEntryPage', refreshJournalRunAuthorityAvailability)"),
+    'embedded authority-claim release should refresh the synchronous availability cache'
+  );
+  assert.ok(
+    mainSource.includes(
+      'emit: (message, options) => game.socket?.emit(EVENT_SCENE_SOCKET, message, options)'
+    ),
+    'journal command replies should pass targeted-recipient options to the Foundry socket'
+  );
+  assert.ok(
+    mainSource.includes("Hooks.on('updateUser', bootstrapJournalRunAuthority)"),
+    'a GM election update should trigger guarded recovery bootstrap in the newly active realm'
+  );
+  assert.ok(
+    mainSource.includes("Hooks.on('userConnected', bootstrapJournalRunAuthority)"),
+    'a GM connection transition should trigger guarded recovery bootstrap'
+  );
+});
+
+test('player-facing starts explicitly select the current journal lifecycle', () => {
+  assert.match(
+    mainSource,
+    /async craft\(actor, recipe, options = \{\}\)[\s\S]*?return executePublicCraft\(\{[\s\S]*?engine: this\.craftingEngine,[\s\S]*?runManager: this\.craftingRunManager,/,
+    'the general public craft facade should use the lifecycle-selecting boundary'
+  );
+  assert.match(
+    mainSource,
+    /executeCommand: \(command\) => this\.executeJournalRunCommand\(command\),\s*resolveUuid: \(uuid\) => globalThis\.fromUuid\?\.\(uuid\),/,
+    'a ready public craft should execute through the command service and hydrate result UUIDs locally'
+  );
+  assert.match(
+    mainSource,
+    /async craftRecipe[\s\S]*?return await this\.craft\([\s\S]*?lifecycleVersion:\s*1,[\s\S]*?\n\s*}\);/,
+    'craftRecipe should start a versioned crafting run'
+  );
+  assert.match(
+    mainSource,
+    /async submitAlchemyAttempt[\s\S]*?this\.craftingEngine\.craftAlchemy\([\s\S]*?lifecycleVersion:\s*1,[\s\S]*?\n\s*}\);/,
+    'submitAlchemyAttempt should start a versioned alchemy run'
+  );
+  assert.match(
+    mainSource,
+    /startGatheringAttempt[\s\S]*?selectedActor[\s\S]*?actor:\s*selectedActor,\s*lifecycleVersion:\s*1[\s\S]*?'requestStart'/,
+    'startGatheringAttempt should start a versioned gathering run'
+  );
+  assert.ok(
+    mainSource.includes('installGatheringJournalRunAuthority({'),
+    'the constructed gathering engine should receive the journal authority adapter'
+  );
+  assert.ok(
+    mainSource.includes('fabricate.craft(actor, recipe).then(result => {'),
+    'the /craft chat command should delegate through the public craft facade'
+  );
+  assert.ok(
+    mainSource.includes('return await game.fabricate.craft(actor, recipeId, options);'),
+    'the global craft helper should delegate through the public craft facade'
+  );
+  assert.match(
+    mainSource,
+    /start: async \(\{ actor, payload, executionGrant, requestId, sender \}\)[\s\S]*?start\.call\(fabricate\.craftingEngine, \{\s*viewer: sender,/,
+    'the crafting start handler should pass the socket-attested sender as the viewer'
   );
 });

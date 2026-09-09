@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
+import { normalizeGatheringResultGroups } from '../src/systems/gatheringResultGroups.js';
 import { routedRoll, routedSystemCheck, stubRoll } from './helpers/gathering.js';
 
 const viewer = { id: 'user-1', isGM: false };
@@ -27,6 +28,9 @@ function makeEngine({
   runManager = null,
   gatheringCraftingCheck = null,
   systemManager = null,
+  richState = null,
+  eventSceneTrigger = null,
+  hookPublisher = null,
   calls = {}
 } = {}) {
   calls.resolveProgressive = [];
@@ -38,6 +42,7 @@ function makeEngine({
   calls.failureFeedback = [];
   calls.createTerminalRun = [];
   calls.createWaitingRun = [];
+  calls.published = [];
 
   const libraryToolsMap = new Map(libraryTools.map(tool => [tool.id, tool]));
 
@@ -139,6 +144,9 @@ function makeEngine({
         };
       }
     },
+    richState,
+    eventSceneTrigger,
+    hookPublisher,
     localize: (key, data) => data ? `${key}:${JSON.stringify(data)}` : key,
     ...(systemManager ? { systemManager } : {})
   });
@@ -171,6 +179,14 @@ function routedTask(overrides = {}) {
     }],
     ...overrides
   };
+}
+
+function straightTask(overrides = {}) {
+  return routedTask({
+    resolutionMode: 'straight',
+    dropRows: [{ id: 'inactive-drop', componentId: 'comp-c', quantity: 99, dropRate: 100 }],
+    ...overrides
+  });
 }
 
 class FakeActor {
@@ -277,6 +293,168 @@ test('immediate routed success creates result items and writes succeeded termina
     assert.equal(calls.createTerminalRun[0][3].checkResult.success, true);
   } finally {
     delete globalThis.Roll;
+  }
+});
+
+test('immediate straight resolution awards its sole result group without a check or yield roll', async () => {
+  const calls = {};
+  const task = straightTask();
+  const createdResults = [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }];
+  const engine = makeEngine({ task, createdResults, calls });
+
+  const result = await engine.startAttempt({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a'
+  });
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.state, 'succeeded');
+  assert.deepEqual(calls.evaluateCheck, []);
+  assert.deepEqual(calls.resolveProgressive, []);
+  assert.deepEqual(calls.createResults[0].resultGroups, task.resultGroups);
+  assert.deepEqual(result.createdResults, createdResults);
+  assert.equal(calls.createTerminalRun[0][3].checkResult, undefined);
+});
+
+test('straight validation rejects empty groups or multiple groups before terminal side effects', async () => {
+  for (const resultGroups of [
+    [],
+    [{ ...routedTask().resultGroups[0], results: [] }],
+    [
+      routedTask().resultGroups[0],
+      { ...routedTask().resultGroups[0], id: 'group-b', name: 'Copper' }
+    ]
+  ]) {
+    const calls = {};
+    const engine = makeEngine({ task: straightTask({ resultGroups }), calls });
+
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a'
+    });
+
+    assert.equal(result.accepted, false);
+    assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
+    assertNoTerminalSideEffects(calls);
+  }
+});
+
+test('straight and routed reject invalid fixed result quantities before terminal side effects', async () => {
+  for (const [mode, quantity] of [
+    ['straight', -1],
+    ['routed', 'three']
+  ]) {
+    const calls = {};
+    const task = routedTask({
+      resolutionMode: mode,
+      resultGroups: [{
+        ...routedTask().resultGroups[0],
+        results: [{ ...routedTask().resultGroups[0].results[0], quantity }]
+      }]
+    });
+    const engine = makeEngine({ task, calls });
+
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a'
+    });
+
+    assert.equal(result.accepted, false, `${mode} rejects quantity ${quantity}`);
+    assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
+    assertNoTerminalSideEffects(calls);
+  }
+});
+
+test('normalized zero result quantity remains invalid at the runtime start boundary', async () => {
+  const resultGroups = normalizeGatheringResultGroups([
+    {
+      id: 'group-a',
+      name: 'Iron',
+      results: [{ id: 'result-a', componentId: 'comp-a', quantity: 0 }]
+    }
+  ]);
+  assert.equal(resultGroups[0].results[0].quantity, 0, 'normalization preserves the invalid input');
+  const calls = {};
+  const engine = makeEngine({ task: straightTask({ resultGroups }), calls });
+
+  const result = await engine.startAttempt({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a'
+  });
+
+  assert.equal(result.accepted, false);
+  assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
+  assertNoTerminalSideEffects(calls);
+});
+
+test('immediate straight and routed attempts resolve one independent environmental event', async () => {
+  for (const mode of ['straight', 'routed']) {
+    const calls = {};
+    const event = { id: `event-${mode}`, name: `${mode} cave-in` };
+    const evidence = { rows: [], events: [{ eventId: event.id, contributions: [] }] };
+    const eventCalls = [];
+    const sceneCalls = [];
+    const task = routedTask({ resolutionMode: mode });
+    const richState = {
+      resolveEnvironmentalEvents: async (payload) => {
+        eventCalls.push(payload);
+        return {
+          status: 'failed',
+          events: [event],
+          eventPolicy: 'failureWithEvent',
+          characterModifierSnapshot: evidence
+        };
+      }
+    };
+    const environment = targetedEnvironment({ events: [event] });
+    if (mode === 'routed') routedRoll(true);
+    try {
+      const engine = makeEngine({
+        environment,
+        task,
+        richState,
+        eventSceneTrigger: {
+          apply: async (payload) => {
+            sceneCalls.push(payload);
+          }
+        },
+        hookPublisher: {
+          publishAttemptCompleted: (payload) => {
+            calls.published.push(payload);
+          }
+        },
+        calls
+      });
+
+      const result = await engine.startAttempt({
+        viewer,
+        actor,
+        environmentId: 'env-a',
+        taskId: 'task-a'
+      });
+
+      assert.equal(result.accepted, true, mode);
+      assert.equal(result.state, 'failed', `${mode} applies failureWithEvent`);
+      assert.equal(eventCalls.length, 1, `${mode} rolls events exactly once`);
+      assert.deepEqual(calls.createResults, [], `${mode} event failure withholds results`);
+      const persistedCheck = calls.createTerminalRun[0][3].checkResult;
+      assert.deepEqual(persistedCheck.events, [event]);
+      assert.equal(persistedCheck.eventPolicy, 'failureWithEvent');
+      assert.deepEqual(persistedCheck.characterModifierSnapshot, evidence);
+      assert.deepEqual(calls.createTerminalRun[0][3].characterModifierSnapshot, evidence);
+      assert.deepEqual(sceneCalls[0].events, [event]);
+      assert.deepEqual(calls.published[0].checkResult.events, [event]);
+    } finally {
+      if (mode === 'routed') delete globalThis.Roll;
+    }
   }
 });
 
@@ -1128,6 +1306,31 @@ test('_resolveRoutedFormulaOutcome: a winning tier with no matching result group
     assert.deepEqual(outcome.resultGroups, []);
     // The roll is still reported, so the GM can see which tier failed to route.
     assert.equal(outcome.checkResult.outcome, 'Iron');
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
+test('_resolveRoutedFormulaOutcome: duplicate normalized tier-name matches are MISCONFIGURED', async () => {
+  const task = routedTask({
+    resultGroups: [
+      routedTask().resultGroups[0],
+      { ...routedTask().resultGroups[0], id: 'group-duplicate', name: ' iron ' }
+    ]
+  });
+  const routed = routedSystemCheck().routed;
+  stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
+  try {
+    const engine = makeEngine({ task });
+    const outcome = await engine._resolveRoutedFormulaOutcome({
+      routed,
+      rollFormula: routed.rollFormula,
+      actor,
+      task
+    });
+
+    assert.equal(outcome.status, 'misconfigured');
+    assert.equal(outcome.code, 'ROUTED_TIER_AMBIGUOUS');
   } finally {
     delete globalThis.Roll;
   }

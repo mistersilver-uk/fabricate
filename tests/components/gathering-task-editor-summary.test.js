@@ -7,10 +7,12 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
 const editorPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte');
+const economyPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/GatheringEconomyView.svelte');
 const rootPath = resolve(repoRoot, 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte');
 const langPath = resolve(repoRoot, 'lang/en.json');
 
 const editorSource = readFileSync(editorPath, 'utf8');
+const economySource = readFileSync(economyPath, 'utf8');
 const rootSource = readFileSync(rootPath, 'utf8');
 const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 
@@ -78,5 +80,34 @@ describe('Selected gathering task — drops summary lives in the inspector', () 
     assert.ok(editorMountIndex >= 0, 'editor mount should be present in the manager root');
     const editorMountSlice = rootSource.slice(editorMountIndex, editorMountIndex + 2000);
     assert.equal(/\benvironments=\{environmentList\}/.test(editorMountSlice), false, 'editor mount should not pass environments anymore');
+  });
+
+  it('owns gathering resolution on the task editor and keeps the economy selector inert', () => {
+    assert.ok(editorSource.includes('data-gathering-task-resolution-mode'));
+    assert.ok(editorSource.includes("onUpdateTask({ resolutionMode: mode })"));
+    assert.ok(editorSource.includes('KNOWN_RESOLUTION_MODES.has(task?.resolutionMode)'));
+    assert.equal(economySource.includes('data-gathering-resolution-mode'), false);
+    assert.equal(economySource.includes('setResolutionMode'), false);
+  });
+
+  it('routes task-mode authoring to the correct persisted result source', () => {
+    assert.ok(editorSource.includes("taskResolutionMode === 'd100'"));
+    assert.ok(editorSource.includes("taskResolutionMode === 'straight'"));
+    assert.ok(editorSource.includes("taskResolutionMode === 'routed'"));
+    assert.ok(editorSource.includes('<RecipeResultsSection'));
+    assert.ok(editorSource.includes('<RecipeResultGroupCard'));
+    assert.equal(editorSource.includes('checkOutcomeIds'), false);
+    assert.ok(rootSource.includes("editingGatheringTask?.resolutionMode || 'd100'"));
+    assert.ok(
+      rootSource.includes(
+        'Edit identity, availability, resolution, and results for the selected gathering task.'
+      )
+    );
+  });
+
+  it('renders active result validation beside the result editor', () => {
+    assert.ok(editorSource.includes('resultValidationErrors = []'));
+    assert.ok(editorSource.includes('data-gathering-task-results-validation'));
+    assert.ok(rootSource.includes('resultValidationErrors={gatheringTaskValidation.resultErrors'));
   });
 });

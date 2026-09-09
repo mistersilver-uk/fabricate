@@ -142,3 +142,21 @@ test('CraftingRunManager.processWorldTime: primary GM resumes and persists exact
   assert.equal(actor.setFlagCalls, 1, 'the primary GM persists exactly once');
   assert.equal(manager.getActiveRun(actor, 'craft-1').status, 'inProgress', 'run resumes');
 });
+
+test('CraftingRunManager.processWorldTime: a paused v1 run stays frozen on the primary GM', async () => {
+  const actor = new FakeActor('paused-craft-actor');
+  seedCraftingActor(actor, 100);
+  const stored = actor._flags.fabricate['fabricate.craftingRuns'].active['craft-1'];
+  stored.lifecycleVersion = 1;
+  stored.runRevision = 2;
+  stored.completionMode = 'worldTime';
+  stored.pausedDurationSeconds = 0;
+  stored.pauseState = { pausedAt: 50, remainingSeconds: 50 };
+  setupGame({ userId: 'gm-1', gmId: 'gm-1', worldTime: 200, actors: [actor] });
+  const manager = new CraftingRunManager({ isPrimaryGM: WIRED_IS_PRIMARY_GM });
+
+  await manager.processWorldTime(200);
+
+  assert.equal(actor.setFlagCalls, 0, 'paused run causes no broadcast write');
+  assert.equal(manager.getActiveRun(actor, 'craft-1').status, 'waitingTime');
+});

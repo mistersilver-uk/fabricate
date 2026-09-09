@@ -101,6 +101,8 @@ import {
 } from '../../../systems/gatheringComposition.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
+import { normalizeGatheringResultGroups } from '../../../systems/gatheringResultGroups.js';
+import { Result } from '../../../models/Result.js';
 import { Tool } from '../../../models/Tool.js';
 import { classifyModeChange } from '../../../migration/migrateRecipeForModeChange.js';
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
@@ -116,7 +118,9 @@ import { authoredFailureOutcome } from '../../../utils/gatheringFailureOutcome.j
 import {
   activityFailureResultPolicy,
   normalizeFailureResultPolicy,
+  permitsFailureResults,
 } from '../../../utils/failureResultPolicy.js';
+import { normalizeRoutedName } from '../../../utils/routedOutcomeKeywords.js';
 import { REVISION_SCOPES } from '../../../systems/revisionTokens.js';
 // The two authority tokens, imported rather than re-spelled (issue 1374): the world-scope
 // write path treats ANY third value as a CLEAR of the per-system override, so the set that
@@ -210,7 +214,7 @@ const RESOLUTION_MODE_LABEL_KEYS = {
 
 const BASE_TABS = new Set(['systems', 'items', 'recipes', 'rules', 'graph']);
 const ENVIRONMENTS_TAB = 'environments';
-const TASK_RESOLUTION_MODES = new Set(['routed', 'progressive']);
+const TASK_RESOLUTION_MODES = new Set(['straight', 'd100', 'progressive', 'routed']);
 const TASK_PROGRESSIVE_AWARD_MODES = new Set(['equal', 'partial', 'exceed']);
 const TASK_TIME_UNITS = ['minutes', 'hours', 'days', 'months', 'years'];
 const TASK_FAILURE_OUTCOME_MODES = new Set(['text', 'macro']);
@@ -856,6 +860,11 @@ function _normalizeGatheringTask(task = {}, randomID = _fallbackRandomID) {
     weather: _normalizeGatheringConditionIdList(task.weather),
     timeOfDay: _normalizeGatheringConditionIdList(task.timeOfDay),
     itemSelectionMode: task.itemSelectionMode === 'allDrops' ? 'allDrops' : 'highestRankedDrop',
+    resolutionMode: TASK_RESOLUTION_MODES.has(task.resolutionMode) ? task.resolutionMode : 'd100',
+    resultGroups: normalizeGatheringResultGroups(task.resultGroups, {
+      createId: () => randomID(),
+      fallbackPrefix: id,
+    }),
     dropRows: (Array.isArray(task.dropRows ?? task.itemDrops)
       ? (task.dropRows ?? task.itemDrops)
       : []
@@ -5594,13 +5603,10 @@ export function createAdminStore(services) {
    * from. So the component a task requires is one join away, and reading `task.toolIds` as
    * component ids would key every reference by a Tool id no component carries.
    *
-   * ── AND WHY ITS PRODUCTION IS READ OFF `dropRows`, NOT `resultGroups` ─────────────────────
-   * A STORED gathering task carries `dropRows` — `_normalizeGatheringTask` is an allowlist rebuild
-   * that emits it from `task.dropRows ?? task.itemDrops` and emits no `resultGroups` at all.
-   * `resultGroups` is minted at COMPOSITION time, with `results: []`, and stays empty until issue
-   * 683. A `resultGroups` read therefore compiles, runs, iterates nothing, and reports no gathering
-   * production on any world — which is what this leg did until round 2, invisibly, because the
-   * projection does not yet render `producedBy`.
+   * ── HOW GATHERING PRODUCTION SELECTS ITS ACTIVE SOURCE ─────────────────────────────────────
+   * Legacy/`d100` tasks produce from `dropRows`; straight, progressive, and routed tasks produce
+   * from `resultGroups`. Both shapes stay persisted for lossless mode changes, while reporting
+   * follows only the task's active mode.
    *
    * @returns {Record<string, {recipeCount: number, recipeCountBySystem: Record<string, number>,
    *   requiredBy: Array<object>, producedBy: Array<object>}>} keyed by world component id.
@@ -5663,10 +5669,7 @@ export function createAdminStore(services) {
           const componentId = componentIdByToolId.get(String(raw ?? '').trim());
           if (componentId) reference(componentId, 'requiredBy', named);
         }
-        // `itemDrops` is the legacy alias the normalizer itself accepts, so a corpus written
-        // before the rename still answers here rather than reporting nothing.
-        const dropRows = task?.dropRows ?? task?.itemDrops;
-        for (const row of Array.isArray(dropRows) ? dropRows : []) {
+        for (const row of _gatheringProductionResults(task)) {
           // `componentId ?? systemItemId` is the pair `normalizeItemDrop` coalesces, so a row
           // authored under either name reaches the same component.
           const componentId = String(row?.componentId ?? row?.systemItemId ?? '').trim();
@@ -5675,6 +5678,17 @@ export function createAdminStore(services) {
       }
     }
     return usage;
+  }
+
+  function _gatheringProductionResults(task) {
+    const mode = TASK_RESOLUTION_MODES.has(task?.resolutionMode) ? task.resolutionMode : 'd100';
+    if (mode === 'd100') {
+      const rows = task?.dropRows ?? task?.itemDrops;
+      return Array.isArray(rows) ? rows : [];
+    }
+    return (Array.isArray(task?.resultGroups) ? task.resultGroups : []).flatMap((group) =>
+      Array.isArray(group?.results) ? group.results : []
+    );
   }
 
   function buildWorldScopeState() {
@@ -9239,11 +9253,52 @@ export function createAdminStore(services) {
     return services.getCraftingSystemManager?.()?.getSystem?.(systemId) || null;
   }
 
+  function _validateGatheringResultGroups(groups, label, { requireResult = false } = {}) {
+    const errors = [];
+    for (const [groupIndex, group] of (Array.isArray(groups) ? groups : []).entries()) {
+      if (!group || typeof group !== 'object') {
+        errors.push(`${label} result group ${groupIndex + 1} is invalid`);
+        continue;
+      }
+      const groupLabel = String(group.name || '').trim() || group.id || groupIndex + 1;
+      const results = Array.isArray(group.results) ? group.results : [];
+      if (requireResult && results.length === 0) {
+        errors.push(`${label} result group "${groupLabel}" requires at least one result`);
+      }
+      for (const [resultIndex, result] of results.entries()) {
+        const resultLabel = `${label} result group "${groupLabel}" result ${resultIndex + 1}`;
+        const quantity = result?.quantity;
+        const quantityValid =
+          typeof quantity === 'number' && Number.isFinite(quantity) && quantity > 0;
+        if (!quantityValid) {
+          errors.push(`${resultLabel} quantity must be a positive finite number`);
+        }
+        const candidate = Result.fromJSON({
+          ...result,
+          // `Result` owns the remaining field contract. Give its legacy quantity default a
+          // valid value after checking the authored raw value above so zero cannot become one.
+          quantity: quantityValid ? quantity : 1,
+        });
+        for (const error of candidate.validate().errors) {
+          errors.push(`${resultLabel}: ${error}`);
+        }
+      }
+    }
+    return errors;
+  }
+
+  function _activeGatheringRoutedTiers(system) {
+    const routed = system?.gatheringCraftingCheck?.routed;
+    const tiers = routed?.type === 'fixed' ? routed.fixedOutcomes : routed?.relativeOutcomes;
+    return Array.isArray(tiers) ? tiers.filter((tier) => tier?.id) : [];
+  }
+
   function _validateGatheringLibraryTaskForSystem(task, systemId = get(selectedSystemId)) {
     const errors = [];
+    const resultErrors = [];
     if (!task || typeof task !== 'object') {
       errors.push('Task is required');
-      return { valid: false, errors };
+      return { valid: false, errors, resultErrors };
     }
     const name = String(task.name || '').trim();
     if (!name) {
@@ -9251,21 +9306,70 @@ export function createAdminStore(services) {
     }
     const label = `Task "${name || task.id || 'unnamed'}"`;
     const system = _selectedGatheringSystem(systemId);
-    errors.push(
-      ...validateDropRows(task.dropRows, label, {
-        system,
-        systemId,
-        validateDisabledRows: true,
-      })
-    );
-    if (Array.isArray(task.dropRows)) {
-      for (const row of task.dropRows) {
-        if (row?.enabled === false && !row?.componentId && !row?.itemUuid) {
-          errors.push(`${label} drop row "${row?.id || 'row'}" requires componentId or itemUuid`);
+    const mode = TASK_RESOLUTION_MODES.has(task.resolutionMode) ? task.resolutionMode : 'd100';
+    switch (mode) {
+      case 'd100': {
+        errors.push(
+          ...validateDropRows(task.dropRows, label, {
+            system,
+            systemId,
+            validateDisabledRows: true,
+          })
+        );
+        if (Array.isArray(task.dropRows)) {
+          for (const row of task.dropRows) {
+            if (row?.enabled === false && !row?.componentId && !row?.itemUuid) {
+              errors.push(
+                `${label} drop row "${row?.id || 'row'}" requires componentId or itemUuid`
+              );
+            }
+          }
         }
+        break;
+      }
+      case 'straight': {
+        const groups = Array.isArray(task.resultGroups) ? task.resultGroups : [];
+        if (groups.length !== 1) {
+          resultErrors.push(`${label} Direct mode requires exactly one result group`);
+        }
+        resultErrors.push(
+          ..._validateGatheringResultGroups(groups, label, { requireResult: true })
+        );
+        break;
+      }
+      case 'routed': {
+        const groups = Array.isArray(task.resultGroups) ? task.resultGroups : [];
+        const tiers = _activeGatheringRoutedTiers(system);
+        const failureResultsAllowed = permitsFailureResults(
+          system?.gatheringCraftingCheck?.failureResultPolicy
+        );
+        for (const tier of tiers) {
+          if (tier.success !== true && !failureResultsAllowed) continue;
+          const tierName = String(tier.name || tier.id).trim();
+          const normalizedTierName = normalizeRoutedName(tierName);
+          const matchCount = groups.filter(
+            (group) => normalizeRoutedName(group?.name) === normalizedTierName
+          ).length;
+          if (tier.success === true && matchCount !== 1) {
+            resultErrors.push(
+              `${label} check tier "${tierName}" requires exactly one matching result group`
+            );
+          } else if (tier.success !== true && matchCount > 1) {
+            resultErrors.push(
+              `${label} failure tier "${tierName}" allows at most one matching result group`
+            );
+          }
+        }
+        resultErrors.push(..._validateGatheringResultGroups(groups, label));
+        break;
+      }
+      default: {
+        // Legacy Progressive tasks keep their dormant authored sources unchanged.
+        break;
       }
     }
-    return { valid: errors.length === 0, errors };
+    errors.push(...resultErrors);
+    return { valid: errors.length === 0, errors, resultErrors };
   }
 
   function validateGatheringLibraryTask(task) {
@@ -9326,17 +9430,22 @@ export function createAdminStore(services) {
         mergedUpdates = { ...patch, ...updates };
       }
     }
-    systemConfig.tasks = systemConfig.tasks.map((task) =>
-      task.id === taskId ? _normalizeGatheringTask({ ...task, ...mergedUpdates }, _randomID) : task
+    const nextTask = existing
+      ? _normalizeGatheringTask({ ...existing, ...mergedUpdates }, _randomID)
+      : null;
+    const validatesTaskContent = ['name', 'resolutionMode', 'dropRows', 'resultGroups'].some((key) =>
+      Object.hasOwn(updates, key)
     );
-    if (Array.isArray(updates.dropRows)) {
-      const nextTask = systemConfig.tasks.find((task) => task.id === taskId);
+    if (validatesTaskContent) {
       const validation = _validateGatheringLibraryTaskForSystem(nextTask, systemId);
       if (!validation.valid) {
         services.notify?.error?.(validation.errors[0] || 'Gathering task validation failed.');
         return false;
       }
     }
+    systemConfig.tasks = systemConfig.tasks.map((task) =>
+      task.id === taskId ? nextTask : task
+    );
     await _saveGatheringConfig(config);
     _notifyGatheringLibraryRecordDisabled({
       systemId,
