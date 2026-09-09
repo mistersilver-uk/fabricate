@@ -107,13 +107,21 @@
                  `tests/components/select-popover-width.test.js` measures the result in Chromium.
                  {@link SIZES} is the single source of the numbers and a mounted case pins the
                  per-rung fallback rules in the sheet against it.
+                 AN `inline` CALLER STATES `minWidth` WHENEVER ITS WIDEST OPTION LABEL NEEDS MORE
+                 THAN THE PANEL'S RESOLVED WIDTH LESS THE ROW'S CHROME — 52px with a tick, 32px
+                 without, measured — AND THE TRIGGER'S OWN FLOOR IS NOT THAT FIGURE, because the
+                 panel draws its labels at a fixed 12px while the rung's trigger reads at 11.5px
+                 and the row adds a tick gutter the trigger has no counterpart for. A trigger
+                 floor sized to the widest VALUE therefore leaves the widest OPTION ellipsised,
+                 which is the defect issue 1511 shipped and corrected.
     triggerData — a `data-*` map stamped verbatim on the trigger button, which is where every
                  converted call site's own stable hook goes. `data-select-size` is added to it.
     label / hint / error — present ⇒ the whole control renders inside `<Field as="label">`, with a
-                 caption span before the trigger and the hint or error span after it. A `<label>`
-                 does not name a `<button>` by containment, so the caption is given an id and
-                 pointed at with `aria-labelledby`; that is why the labelled form does not also
-                 need an `ariaLabel`.
+                 caption span before the trigger and the hint or error span after it. The caption is
+                 given an id and pointed at with `aria-labelledby` because there is no `id`-bearing
+                 labelable element for a `for` to address, NOT because a `<label>` cannot name a
+                 `<button>` — it can, and this form relies on it; the earlier wording was corrected
+                 at issue 1511. That is why the labelled form does not also need an `ariaLabel`.
     ariaLabel / ariaLabelledBy — the accessible name when there is no `label`. One of the three is
                  required. Never pass `ariaLabel` beside `ariaLabelledBy`: a labelledby WINS over
                  a label wherever both are present, so the string would be dead text free to drift

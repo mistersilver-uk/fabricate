@@ -7504,9 +7504,10 @@ test('both converted chance-slider sites render a real fill, not a bare thumb', 
 
   `.fabricate-manager select` themes the CLOSED field, so a manager dropdown looks correct
   until it is opened — and then the option list fell back to the browser's black-on-white
-  default, in every native select the manager renders. The player app has carried
-  `.fabricate-app select option` for a long time; the manager root is `.fabricate-manager`
-  and never inherited it.
+  default, in every native select the manager renders. The player app carried
+  `.fabricate-app select option` for a long time and stopped needing it at issue 1511, when its
+  last native select converted and that rule was deleted; the manager root is
+  `.fabricate-manager` and never inherited it while it existed.
 
   This is asserted from the STYLESHEET rather than from a rendered frame because it cannot
   be photographed: a native select's popup is painted by the browser, not into the page DOM,
@@ -12721,9 +12722,12 @@ test('the source picker`s trigger fills its column, and only one of its two site
 //      outline plus a 4px glow on `button:focus`; `.fabricate button:focus` strips both and
 //      `.fabricate button:focus-visible` restores a 2px accent OUTSET outline at (0,2,1). The
 //      specimen's focus state is "border to accent-border, no glow", so the family's own rule
-//      has to beat the SUPPLYING half on specificity alone — and because the winning rule draws no outset ring at all,
-//      the clipped-edge defect that `.fabricate-app select:focus-visible`'s INSET ring exists for
-//      cannot arise once the player's page-size control moves off `select` and onto `button`.
+//      has to beat the SUPPLYING half on specificity alone — and because the winning rule draws no
+//      outset ring at all, the clipped-edge defect that `.fabricate-app select:focus-visible`'s
+//      INSET ring EXISTED for cannot arise on a `<button>` trigger. That rule is history: it was
+//      deleted at issue 1511 when the player app's last native select converted, so nothing under
+//      `.fabricate-app` carries an inset ring today and this clause records why none is needed
+//      rather than which of two rules wins.
 //
 // The `toolbar` rung carries a fourth claim of its own. Its type size is written as the LITERAL
 // `0.72rem` rather than as a read of the area-scoped control-font property, and the observable

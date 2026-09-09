@@ -12331,8 +12331,11 @@ async function main() {
         // render as a SINGLE inventory card, its quantity counted ONCE, carrying a
         // System selector DROP-DOWN that re-scopes the whole detail body. This one frame
         // proves both halves: (a) the collapsed single card with its union badges and a ×1
-        // pip (never ×2), and (b) the `<select>` selector with per-system affordance
-        // annotations, opened to a participation's detail. Fails loudly, by design (no
+        // pip (never ×2), and (b) the selector with per-system affordance annotations, opened
+        // to a participation's detail. That control was a native `<select>` until issue 1511
+        // and renders the app's OWN option list now, so what the frame shows is Fabricate's
+        // trigger rather than the operating system's; the wait below is unaffected, because
+        // the hook rides `triggerData` onto the trigger button. Fails loudly, by design (no
         // guard, no try/catch), for the same reason as the salvage frames above — the
         // evidence gate only scrapes the `screenshot(page, '<label>')` literal, so a
         // silent no-op would publish no PNG yet still pass. Does NOT commit a salvage.
@@ -12344,7 +12347,8 @@ async function main() {
         await appShell.locator('[data-inventory-card]').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
         await appShell.locator('[data-inventory-card]').first().click();
-        // The multi-system selector drop-down is the visual proof of the collapse.
+        // The multi-system selector drop-down is the visual proof of the collapse. The hook is
+        // on the converted trigger, which is why this wait survived the conversion unchanged.
         await appShell.locator('[data-inventory-system-select]').first()
           .waitFor({ state: 'visible', timeout: 10_000 });
         await assertNoScreenshotOverlays(page);

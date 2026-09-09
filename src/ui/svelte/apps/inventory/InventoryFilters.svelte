@@ -9,12 +9,15 @@
   THE KIND FILTER IS THE SHARED `SegmentedControl` (issue 1514), drawn as a pill run
   in the soft-accent family. It was five `aria-pressed` buttons in a `role="group"`
   and is now one radiogroup, which is the semantics a one-of-N choice has; see the
-  markup below for the two props that reproduce its construction and its paint. The
-  search field and the sort select are NOT converted here: they belong to the controls issue
-  and the player-selects issue respectively.
+  markup below for the two props that reproduce its construction and its paint.
+
+  THE SORT CONTROL IS THE SHARED `Select` (issue 1511), so the list it opens is the app's own
+  rather than the operating system's. The search field is still NOT converted: it belongs to the
+  controls issue.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import Select from '../../components/Select.svelte';
   import SegmentedControl from '../manager/SegmentedControl.svelte';
 
   let {
@@ -67,11 +70,35 @@
     PILLS.map((pill) => ({ ...pill, count: Number(counts?.[pill.value] ?? 0) }))
   );
 
+  // The caption this control is named by, per instance: the inventory header can be rendered
+  // twice on one screen by the GM preview, and two triggers must not share one caption id.
+  const instanceId = $props.id();
+  const sortCaptionId = `${instanceId}-sort`;
+
+  const sortOptions = $derived(
+    SORTS.map((option) => ({ value: option.id, label: localize(option.labelKey) }))
+  );
+
+  /**
+   * THE PANEL'S OWN FLOOR, WHICH IS NOT THE TRIGGER'S (issue 1511, review round 1).
+   *
+   * The rule is stated once in `Select.svelte`'s band docblock: an `inline` caller states a
+   * `minWidth` whenever its widest option label needs more than the panel's resolved width less
+   * the row's chrome. This site needs one, and the first shipping of this conversion did not have
+   * it — `Quantity` opened the list reading `Quanti…`.
+   *
+   * The two faces disagree on nothing that matters here, so the figure is the wider: measured in
+   * `tests/fixtures/player-select/` under Chromium, the `Quantity` ROW's label is 44.70px in
+   * Arial and 44.36px in Signika, at the panel's fixed 12px rather than the trigger's 11.5px. A
+   * ticked row spends 52px on chrome before the label gets any — 2px of panel border, 12px of
+   * panel padding, 2px of row border, 16px of row padding, the 12px tick gutter and the 8px row
+   * gap — so the panel needs 44.70 + 52 = 96.70px and takes the next whole pixel. The rung's own
+   * floor is 96px, which is why one pixel of shortfall was enough to ellipsise the label.
+   */
+  const SORT_PANEL_MIN_WIDTH = 97;
+
   function onInput(event) {
     onSearch?.(event.currentTarget.value);
-  }
-  function onSortInput(event) {
-    onSort?.(event.currentTarget.value);
   }
 </script>
 
@@ -112,20 +139,25 @@
       tone="accent-soft"
     />
 
-    <label class="inventory-sort">
-      <span class="inventory-sort-label"
+    <!-- A `<span>` RATHER THAN THE `<label>` THIS WAS (issue 1511): the control is a `<button>`
+         toggling a portaled panel, and a `<label>` forwards a caption click into it, so with the
+         list open the caption's own mousedown would dismiss the panel and the forwarded click
+         would re-open it. The caption keeps its class and names the trigger through
+         `aria-labelledby` instead of through the deleted `aria-label` that duplicated it. -->
+    <span class="inventory-sort">
+      <span class="inventory-sort-label" id={sortCaptionId}
         >{localize('FABRICATE.App.Inventory.Filters.SortLabel')}</span
       >
-      <select
+      <Select
+        size="inline"
         value={sort}
-        aria-label={localize('FABRICATE.App.Inventory.Filters.SortLabel')}
-        onchange={onSortInput}
-      >
-        {#each SORTS as option (option.id)}
-          <option value={option.id}>{localize(option.labelKey)}</option>
-        {/each}
-      </select>
-    </label>
+        options={sortOptions}
+        ariaLabelledBy={sortCaptionId}
+        minWidth={SORT_PANEL_MIN_WIDTH}
+        triggerData={{ 'data-inventory-sort': '' }}
+        onChange={(next) => onSort?.(next)}
+      />
+    </span>
   </div>
 </div>
 
@@ -183,20 +215,33 @@
     white-space: nowrap;
   }
 
-  .inventory-sort select {
-    box-sizing: border-box;
-    height: 28px;
-    padding: 0 8px;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface);
-    color: var(--fab-text-secondary);
-    font-size: 11px;
-    font-weight: 500;
-  }
+  /* A WIDTH FLOOR, AND WHY THIS ROW CAN ABSORB ONE (issue 1511). Height, corner, fill, type and
+     the focus treatment are the `inline` rung's now; the one property left to this file is the
+     width, because a `<select>` sized itself to its widest option while a `<button>` hugs the
+     one it is showing - so choosing Type after Quantity would visibly shrink the control and
+     shuffle the pill run beside it. The floor is the measured width of the TRIGGER showing the
+     widest of the three `SORTS` labels - `Quantity` - so every value renders at one width.
+     MEASURED IN BOTH FACES in `tests/fixtures/player-select/` under Chromium and floored at the
+     next whole pixel above the wider: 76.83px under the Arial fallback the repository's Chromium
+     gates render against, 76.52px under Foundry's own Signika, both at the `inline` rung's
+     11.5px.
 
-  .inventory-sort select:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
+     RE-DERIVED AT REVIEW ROUND 1, and this floor MOVED: 90px stood on a recorded pair of 88.33
+     and 86.58 that the fixture does not reproduce. Both figures were 11.50px - one whole rung
+     font-size - above what the control measures, at all three floored sites alike, so they were
+     arithmetic rather than measurement. The floor now stands where its own sentence says it
+     does.
+
+     It is NOT the panel's floor, and the two are 20px apart: see `SORT_PANEL_MIN_WIDTH` above
+     for the 97px the open list needs, which is the same label read at the panel's 12px behind
+     52px of row chrome. Widening the trigger to cover the panel would be the wrong knob twice
+     over - it would move the closed control to fix an open one.
+
+     The row is `flex-wrap: wrap` with `justify-content: space-between`, which is what makes an
+     over-sized floor wrap the pill run rather than widen the control - so the figure is the
+     measured widest value and not a round number above it. Ancestor-qualified, because a leading
+     bare `:global()` would reach every trigger in the document. */
+  .inventory-sort :global(.fabricate-select-trigger) {
+    min-width: 77px;
   }
 </style>

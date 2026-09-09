@@ -29,7 +29,7 @@
  * rather than these 112, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,046 `(at-context, selector)` keys, of which 2,934 appear exactly
+ * Unfiltered, the sheet holds 3,043 `(at-context, selector)` keys, of which 2,931 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -41,7 +41,7 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,565 rules at that head, 112 repeated keys and 229 appearances
+ * printed from. The sheet holds 2,562 rules at that head, 112 repeated keys and 229 appearances
  * between them; five keys appear three times and none appears four or more.
  *
  * ISSUE 1517 PHASE 3 RE-KEYED NO ROW AND MOVED THE THREE CONTEXTUAL FIGURES, by adding ONE rule
@@ -204,6 +204,17 @@
  * `.is-modifier`, now written once — and `pinnedTotal` falls to 229 across 112 rows. The
  * re-rooting itself moves NONE of them: every one of the eleven surviving selectors is renamed
  * from `.fabricate-manager` to `.fabricate-pill-select` one for one.
+ *
+ * ISSUE 1511 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, and it is the
+ * first change to move them by deleting an APPLICATION ROOT'S element theme rather than a
+ * primitive's or an area's copy of one. The player app's last native select converted, so
+ * `.fabricate-app select:focus-visible`, `.fabricate-app select` and `.fabricate-app select
+ * option` had no carrier left and were deleted outright: three rules, three selectors, every one
+ * of them a singleton in both keyings, because no other rule shares a list with any of them. The
+ * rule count falls by three and the key and singleton counts each fall by three, while
+ * `pinnedTotal` STAYS 229 across 112 rows. The change adds no sheet rule at all — the two width
+ * treatments the conversion needs live in the callers' own scoped blocks — so there is nothing on
+ * the other side of the ledger to net against. Re-derived by running the census, not predicted.
  *
  * ISSUE 1520 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting eight
  * rule blocks and adding one. Deleted: the per-area Foundry-core focus-ring copies carried by the

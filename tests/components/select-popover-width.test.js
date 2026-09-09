@@ -49,6 +49,16 @@ const css = readFileSync(resolve(__dirname, '../../styles/fabricate.css'), 'utf8
 const FORM_RUNG_MAX_WIDTH = 340;
 /** The shared box's floor, which the "or…" menu shipped being clipped UP to. */
 const SHARED_PANEL_MIN_WIDTH = 240;
+/**
+ * The `inline` rung's band, restated here from `Select.svelte`'s own `SIZES` (issue 1511).
+ *
+ * The two figures are what the two cases at the bottom of this file are measured AGAINST rather
+ * than what they ask for: a caller raising `maxWidth` past 240 is exactly the shape the `form`
+ * cases above prove for the wider rung, and the player app's crafting filters are the first
+ * callers to need it at `inline`. The floor matters too — a 280px trigger clears it, so a case
+ * that resolved to 96 would be reporting a layout that never ran.
+ */
+const INLINE_RUNG = Object.freeze({ minWidth: 96, maxWidth: 240 });
 
 /** A rect literal in the shape `getBoundingClientRect` returns. */
 function rect(left, top, width, height) {
@@ -109,11 +119,11 @@ function withoutBounds(style) {
   return style.replaceAll(/(?:min|max)-width: \d+px; /g, '');
 }
 
-/** One panel, exactly as `Select` renders it at the `form` rung, carrying one style. */
-function panelMarkup(probe, style) {
+/** One panel, exactly as `Select` renders it at one rung, carrying one style. */
+function panelMarkup(probe, style, rung = 'form') {
   return `
     <div
-      class="fabricate-picker-popover manager-travel-popover fabricate-select-popover fabricate-select-popover-form"
+      class="fabricate-picker-popover manager-travel-popover fabricate-select-popover fabricate-select-popover-${rung}"
       data-probe="${probe}"
       role="dialog"
       style="${style}"
@@ -140,9 +150,10 @@ after(async () => {
  * Measure both boxes for one band, in one page.
  *
  * @param {{triggerWidth: number, minWidth: number, maxWidth: number}} band
+ * @param {string} [rung] The `Select` rung whose class rule the panel carries.
  * @returns {Promise<{fixed: number, control: number, style: string}>}
  */
-async function measure(band) {
+async function measure(band, rung = 'form') {
   setupDOM();
   let style;
   try {
@@ -177,12 +188,17 @@ async function measure(band) {
             @layer modules { ${css} }
             body { margin: 0; font-family: Arial, sans-serif; }
             .probe-frame { position: relative; width: 480px; height: 700px; }
+            /* The reflowed browse column is wider than the config window this fixture was
+               written for, and a definite width is not shrunk by its container — but a frame
+               narrower than the case would still be measuring its own scaffolding if that ever
+               changed, so the wide case gets a frame of its own. */
+            .probe-frame-wide { position: relative; width: 1000px; height: 700px; }
           </style>
         </head>
         <body>
-          <div class="fabricate fabricate-app probe-frame">
-            ${panelMarkup('fixed', style)}
-            ${panelMarkup('control', withoutBounds(style))}
+          <div class="fabricate fabricate-app ${band.triggerWidth > 480 ? 'probe-frame-wide' : 'probe-frame'}">
+            ${panelMarkup('fixed', style, rung)}
+            ${panelMarkup('control', withoutBounds(style), rung)}
           </div>
         </body>
       </html>
@@ -261,5 +277,44 @@ test('a trigger narrower than the band opens at the band floor, not the shared 2
     `${FORM_RUNG_MAX_WIDTH}px`,
     'the control is the pre-fix box — a bare width under the class rule — which is what makes ' +
       'the two assertions above refutable'
+  );
+});
+
+test('an inline trigger at the browse column minimum opens a panel of its own width', async () => {
+  // THE PLAYER APP'S CRAFTING FILTERS (issue 1511), at the narrow end of their range. The browse
+  // column is `minmax(280px, 1fr)`, so 280 is the narrowest trigger these two filters can have —
+  // and it is already 40px past the `inline` rung's own 240px ceiling, which is why they pass a
+  // `maxWidth` at all. Measured in the View Lab at the 280px column minimum.
+  const { fixed, control } = await measure(
+    { triggerWidth: 280, minWidth: INLINE_RUNG.minWidth, maxWidth: 1024 },
+    'inline'
+  );
+
+  assert.equal(fixed.width, 280, 'the panel is as wide as the trigger it drops from');
+  assert.equal(fixed.maxWidth, '280px', 'and its ceiling is the resolved band, not the rung rule');
+  assert.equal(
+    control.width,
+    INLINE_RUNG.maxWidth,
+    'and the sheet DOES still clip a bare width to the inline rung’s 240, so the assertion ' +
+      'above is about the two bound declarations rather than about a box nothing constrains'
+  );
+  assert.equal(control.maxWidth, `${INLINE_RUNG.maxWidth}px`, 'which is where that clip came from');
+});
+
+test('an inline trigger in the reflowed single column opens a panel of its own width', async () => {
+  // THE WIDE END of the same range. At the supported 1024px window floor the crafting grid
+  // reflows to ONE column and the browse column measures 906px, so the same two filters drop a
+  // 906px list — nearly four times the rung's own ceiling. Measured at the 1024px reflow.
+  const { fixed, control } = await measure(
+    { triggerWidth: 906, minWidth: INLINE_RUNG.minWidth, maxWidth: 1024 },
+    'inline'
+  );
+
+  assert.equal(fixed.width, 906, 'the resolved band survives the sheet at the reflowed width');
+  assert.equal(fixed.maxWidth, '906px', 'bounded at itself rather than at the rung ceiling');
+  assert.equal(
+    control.width,
+    INLINE_RUNG.maxWidth,
+    'the pre-fix box is still 240 here, so the gap between the two is the whole finding'
   );
 });

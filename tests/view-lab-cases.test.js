@@ -2187,10 +2187,14 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // `apps/crafting/ComponentSourcesBar.svelte` explicitly — the bar draws in their tabs as well,
   // and `CRAFTING_SHARED` could never route to them. Both open no recipe detail, so both are
   // required to claim no body, which is exactly what the `wrong` sweep above holds them to.
+  //
+  // 32 as of issue 1511. `player-crafting-category-filter-list` opens the browser's converted
+  // category filter and stops there, so like the sources picker it renders no recipe detail and is
+  // correct to claim no mode body.
   assert.equal(
     examined.length,
-    31,
-    `expected the 31 crafting-path cases to be examined, saw ${examined.length}`
+    32,
+    `expected the 32 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>
@@ -2448,12 +2452,22 @@ test('the broad SearchablePopover signal captures every deliberate picker state,
   );
 });
 
-// The seventeen frames a change to the shared positioning seam must publish (issue 1500; the
+// The twenty frames a change to the shared positioning seam must publish (issue 1500; the
 // eleventh joined at issue 1503, when `EssenceSourceSelector`'s panel finally got a frame, the
 // twelfth and thirteenth at issue 1504, when `Select`'s option list got two — one of them in the
 // PLAYER window, which is a second application root for the seam to clamp against — and the
 // fourteenth and fifteenth at issue 1520's second review round, which is the two GM canvas
 // windows' open option panels).
+//
+// THE EIGHTEENTH, NINETEENTH AND TWENTIETH ARRIVED WITH THE CONTROLS THEY DROP FROM (issue 1511).
+// The player app's six native selects converted, and three of them are registered open:
+// `player-inventory-sort-list`, `player-journal-sort-list` and
+// `player-crafting-category-filter-list`. They are three rather than one because the three states
+// are genuinely different for THIS seam — a panel clamped to a narrow floored trigger, a panel
+// that has to portal out of an overflow-clipped half-height column, and a panel tracking a
+// full-width trigger under a caller-supplied ceiling — and a regression in the measure, clamp and
+// portal pass shows in whichever of the three it reaches. All three rest on an open panel, which
+// is this array's own membership test, and each spreads the seam in its own `sourceMatches`.
 //
 // THE SIXTEENTH ARRIVED BY THE SAME DOOR AS THE THREE BEFORE IT (issue 1513).
 // `manager-recipe-item-contents-picker` opens the recipe-item editor's link-recipe picker, which
@@ -2507,8 +2521,11 @@ const ANCHORED_POPOVER_FRAMES = [
   'manager-world-parties-actor-picker',
   'manager-world-parties-realm-override-picker',
   'player-actor-picker',
+  'player-crafting-category-filter-list',
   'player-crafting-sources-picker',
   'player-inventory-page-size',
+  'player-inventory-sort-list',
+  'player-journal-sort-list',
   'world-tool-entry-on-break-repair-tag-picker-empty',
 ];
 

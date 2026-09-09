@@ -856,14 +856,26 @@ test('a converted select did not pay its ratchet with a marker', () => {
   // proof above runs on synthetic fixtures rather than on the corpus.
   //
   // So the converted files are named and their marker COUNT is pinned at zero. Named rather than
-  // derived, because the property is about these four files specifically: they are the ones whose
-  // rows this change deleted, and a file that later regains a `<select>` legitimately — under a
+  // derived, because the property is about these files specifically: they are the ones whose rows
+  // a conversion deleted, and a file that later regains a `<select>` legitimately — under a
   // marker, with a reason — is a decision someone must take deliberately by editing this list.
+  //
+  // ISSUE 1511 ADDED THE PLAYER APP'S FIVE, and it is the payment with the sharpest version of
+  // this hazard: `InventorySystemSelector.svelte` had carried a DOCBLOCK reason for its native
+  // select since issue 766, so it was the one file in the tree where turning that prose into a
+  // marker would have looked like tidying rather than like exempting. The pin fell 84 -> 78
+  // because six elements converted, and this clause is what says none of the six was paid for
+  // with a comment.
   const CONVERTED = [
     'src/ui/svelte/components/Select.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/apps/manager/BulkEditSelect.svelte',
     'src/ui/svelte/apps/manager/scoped/EntityListInspectorFrame.svelte',
+    'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
+    'src/ui/svelte/apps/inventory/InventoryFilters.svelte',
+    'src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte',
+    'src/ui/svelte/apps/inventory/detail/InventorySystemSelector.svelte',
+    'src/ui/svelte/apps/journal/JournalListShell.svelte',
   ];
   const sources = collectWorkingTreeSources(['src'], ['.svelte']);
   for (const file of CONVERTED) {
@@ -876,13 +888,105 @@ test('a converted select did not pay its ratchet with a marker', () => {
     assert.equal(
       (source.match(new RegExp(NATIVE_SELECT_MARKER, 'gu')) ?? []).length,
       0,
-      `${file} carries a \`<!-- native select: … -->\` marker. Issue 1504 lowered the native ` +
-        'select pin by converting this file to the app’s own option list; a marker here would ' +
-        'have lowered the same pin by the same amount while the operating system’s drop-down ' +
-        'went on shipping, which is the one way that ratchet can be paid without the defect ' +
-        'being fixed.'
+      `${file} carries a \`<!-- native select: … -->\` marker. Issues 1504 and 1511 lowered the ` +
+        'native select pin by converting this file to the app’s own option list; a marker here ' +
+        'would have lowered the same pin by the same amount while the operating system’s ' +
+        'drop-down went on shipping, which is the one way that ratchet can be paid without the ' +
+        'defect being fixed.'
     );
   }
+});
+
+/**
+ * The one phrase both published documents state the ratchet's pin in.
+ *
+ * Each numeral is captured BOUND TO ITS NOUN rather than searched for loose in the sentence.
+ * The loose form — "does the pin sentence contain the number 78 anywhere" — is satisfied by a
+ * sentence that has the element total and the file count the wrong way round, and by one whose
+ * file count happens to equal an unrelated figure beside it; both are exactly the drift this
+ * clause exists to catch.
+ */
+const PIN_PHRASE = /(\d+) elements across (\d+)\s*(?:<code>)?`?\.svelte`?(?:<\/code>)? files/u;
+
+/** The `### Requirement:` section that owns the select pin, so a fragment cannot match elsewhere. */
+function selectRequirement() {
+  const spec = readFileSync(new URL('../../openspec/specs/design-system/spec.md', import.meta.url), 'utf8');
+  const heading = '### Requirement: Every select renders the app’s own option list';
+  const start = spec.indexOf(heading);
+  assert.ok(
+    start !== -1,
+    'the design-system spec no longer carries an "Every select renders the app’s own option ' +
+      'list" requirement, so this clause is pinning a sentence in a section that has been ' +
+      'renamed or dropped. Retarget it, or delete it deliberately.'
+  );
+  const end = spec.indexOf('\n### ', start + heading.length);
+  return spec.slice(start, end === -1 ? spec.length : end);
+}
+
+/**
+ * Assert one document's pin phrase names today's two constants, each in its own position.
+ *
+ * @param {string} where The document, for the failure message.
+ * @param {string} sentence The single sentence carrying the pin.
+ */
+function assertPinPhrase(where, sentence) {
+  const match = sentence.match(PIN_PHRASE);
+  assert.ok(
+    match,
+    `${where}'s pin no longer reads "<N> elements across <M> .svelte files", so this clause has ` +
+      `stopped reading the phrase it was written to pin rather than found it correct. It reads: ${sentence}`
+  );
+  const [, elements, files] = match;
+  assert.equal(
+    Number(elements),
+    KNOWN_NATIVE_SELECT_TOTAL,
+    `${where} publishes ${elements} native select ELEMENTS against a ratchet pinned at ` +
+      `${KNOWN_NATIVE_SELECT_TOTAL}`
+  );
+  assert.equal(
+    Number(files),
+    KNOWN_NATIVE_SELECT_ELEMENTS.length,
+    `${where} publishes ${files} FILES against a baseline of ${KNOWN_NATIVE_SELECT_ELEMENTS.length}`
+  );
+}
+
+test('both published pin sentences state the two numerals this ratchet measures', () => {
+  // THE SENTENCE, NOT THE SECTION. The requirement's next line carries HISTORICAL figures — the
+  // pin's earlier values — so a stale pin could match one of those and read as green. The slice
+  // is therefore the one sentence that begins "The figure is the RATCHET'S PIN", which is the
+  // only sentence in the spec making a claim about today's constants.
+  //
+  // Precedent: `control-height-ladder.test.js` asserts the ladder's rungs FROM its constants for
+  // exactly this reason. It is worth a clause of its own here because this sentence has ALREADY
+  // rotted once: it read "96 elements across 36 `.svelte` files" against a pin of 84 across 33,
+  // and nothing in `npm test` could see it.
+  //
+  // AND THE SPECIMEN CARRIES THE SAME CLAIM, which is why it is read here too. `library.html` is
+  // the published shape of this capability and its select entry states the pin in the identical
+  // phrase; guarding only the prose leaves a second copy that rots on its own schedule, and the
+  // specimen is the one a reader is shown.
+  const requirement = selectRequirement();
+  const pin = requirement.match(/^The figure is the RATCHET'S PIN[^\n]*$/mu)?.[0];
+  assert.ok(
+    pin,
+    'the requirement no longer carries a sentence beginning "The figure is the RATCHET\'S PIN", ' +
+      'so this clause has stopped reading the sentence it was written to pin rather than found ' +
+      'it correct'
+  );
+  assertPinPhrase('the design-system spec', pin);
+
+  const library = readFileSync(
+    new URL('../../openspec/specs/design-system/library.html', import.meta.url),
+    'utf8'
+  );
+  const specimenPin = library.match(/Every remaining native select is recorded DEBT[^<]*<b>[^<]*<code>[^<]*<\/code>[^<]*<\/b>/u)?.[0];
+  assert.ok(
+    specimenPin,
+    'the select specimen in `library.html` no longer carries an "Every remaining native select ' +
+      'is recorded DEBT against the ratchet" sentence ending in the bolded pin, so this clause ' +
+      'is reading nothing'
+  );
+  assertPinPhrase('the `library.html` select specimen', specimenPin);
 });
 
 test('no new native <select> is rendered by a Svelte template', () => {
@@ -1312,10 +1416,10 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
  *
  * THE POPULATION IS KEYED ON ELEMENTS, NOT ON DECLARATIONS. What makes a block a copy of the
  * module ring is that it reaches the same elements at the same rank; the declarations are the part
- * a copy can vary — `.fabricate-app select:focus-visible` writes the ring as an inset
- * `box-shadow` — while still deciding the same state by source order. Two selector shapes are a
- * ring: `<root> <element>:focus-visible` ({@link RING_COMPOUND}) and {@link SELF_RING_COMPOUND},
- * and every member of the list has to share one root.
+ * a copy can vary — the roll-prompt dialog's `select` ring writes an inset `box-shadow` where the
+ * module ring writes an outset `outline` — while still deciding the same state by source order.
+ * Two selector shapes are a ring: `<root> <element>:focus-visible` ({@link RING_COMPOUND}) and
+ * {@link SELF_RING_COMPOUND}, and every member of the list has to share one root.
  *
  * A ring on a WIDGET CLASS is NOT in this population and must not be. `.fabricate-manager
  * .manager-nav-button:focus-visible` is per-widget chrome the design system allows, and the sheet
@@ -1323,8 +1427,8 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
  * blocks — pinning them would pin the manager's whole widget inventory to this list. The shape is
  * named so the figure is checkable; an earlier reading published 30 under no stated shape.
  *
- * Derived from the sheet rather than asserted: 10 roots over 10 blocks, every one of them
- * legitimate today, which is exactly why an eleventh would not stand out to a reader. It was 9
+ * Derived from the sheet rather than asserted: 9 roots over 9 blocks, every one of them
+ * legitimate today, which is exactly why a tenth would not stand out to a reader. It was 9
  * over 10 until issue 1508 rooted `Field` and `ManagerSearchField` at the classes they emit and
  * each gained the ring half of its own pair, and 11 over 12 until its third phase did the same
  * for `ChanceSlider`. Issue 1509 rooted `EditorTabs` and its tab strip gained
@@ -1334,7 +1438,13 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
  * config sheet's and the interactables manager's per-area rings, three roots over three blocks,
  * each a copy of the module ring reaching the same elements at the same rank; and the roll-prompt
  * dialog's `button, input` ring, a FOURTH block whose root stays. Three roots and four blocks, so
- * 13 over 14 becomes 10 over 10.
+ * 13 over 14 became 10 over 10. Issue 1511 then took `.fabricate-app` out entirely, one root over
+ * one block: its `select:focus-visible` ring was a VARIANT rather than a copy — an inset
+ * `box-shadow` against the module's outset `outline`, written because an outset ring on a select
+ * flush to an overflow-clipped container is clipped — and it was deleted rather than narrowed
+ * because the player app's last native select converted and no carrier is left under that root.
+ * A variant with no carrier is a rule, not a decision, which is what makes 10 over 10 nine over
+ * nine.
  *
  * BOTH FIGURES ARE RE-MEASURED HERE RATHER THAN CARRIED FORWARD, and the block half needed it: the
  * count published before this rebase read 15 where the walk over the same sheet produces 14, an
@@ -1367,7 +1477,6 @@ const SELF_RING_COMPOUND = /^(\.[\w-]+):focus-visible$/u;
 const RING_ROOTS = Object.freeze(
   [
     MODULE_ROOT,
-    '.fabricate-app',
     '.fabricate-button',
     '.fabricate-field',
     '.fabricate-icon-button',
@@ -1834,8 +1943,8 @@ test("the repetition ledger publishes the figures the sheet actually produces", 
 });
 
 test("the module sheet's cross-list selector repetition does not move", () => {
-  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 3,046 `(at-context, selector)`
-  // keys under this very keying, of which 2,934 appear exactly once; `assertRatchet` compares key
+  // FILTERED TO count >= 2 ON BOTH SIDES. Unfiltered the sheet holds 3,043 `(at-context, selector)`
+  // keys under this very keying, of which 2,931 appear exactly once; `assertRatchet` compares key
   // by key, so an unfiltered table would report every singleton as new debt the first time anybody
   // added a rule. Filtering both sides keeps a selector FALLING to one appearance visible: it
   // leaves the observed tally, and a baseline row nothing matches is a VANISHED failure.

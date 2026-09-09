@@ -289,7 +289,18 @@ export function isExemptSpacingPixels(pixels) {
 // first is still the row's separation from what follows it, and the second moved verbatim from
 // the deleted refusal `<p>` onto the wrapper that now holds a `<Notice>`, which is a caller-owned
 // margin the primitive declines to declare.
-export const KNOWN_RAW_SPACING_TOTAL = 838;
+// 838 -> 832 (issue 1511): the player app's six native selects render `Select` now, and the four
+// scoped blocks that skinned them went with the elements. ONE row SHRINKS and FIVE at one
+// occupancy VANISH. The one that shrinks is `InventoryBookDetail | padding 6`, whose second
+// occupancy was the page-size select's own `padding: 2px 6px`; the row survives on the recipe
+// row's. The five that vanish are `RecipeBrowser | padding 8` and `InventoryFilters | padding 8`
+// (both selects' `padding: 0 8px`), `InventoryBookDetail | padding 2` (the same shorthand's first
+// value) and `InventorySystemSelector | padding 2` and `padding 8` (its `padding: 2px 8px`).
+// NOTHING COMES BACK IN THEIR PLACE: the three width floors and the two full-width restatements
+// this change adds declare a width and a background and no spacing at all, and the trigger's own
+// inline padding is the family's `var(--fab-space-3)`. So the six occupancies are paid rather
+// than relocated. Measured on the tree, not subtracted.
+export const KNOWN_RAW_SPACING_TOTAL = 832;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that
@@ -302,6 +313,13 @@ export const KNOWN_RAW_SPACING_TOTAL = 838;
  * found". Ordinary work moves them by a handful and no test would notice, which is exactly why
  * they are not pinned: the enforced figures are the floors, which are the ones with a failure
  * mode worth stopping.
+ *
+ * RE-DERIVED AT ISSUE 1511 AND DELIBERATELY NOT REWRITTEN: the same scan produces 1534 and 1715
+ * at that head, roughly six and four per cent above the pair below. These constants are the
+ * counts AT THE COMMIT THAT CHOSE THE FLOORS, which is what makes "when the floor of 1300 was
+ * set" a true sentence, so moving them to a later head would quietly redefine them into live
+ * figures nothing derives. The live pair is recorded here instead, which is the only claim a
+ * re-derivation can honestly make about an anchor.
  */
 export const FLOOR_REFERENCE_STYLESHEET_SPACING_DECLARATIONS = 1445;
 

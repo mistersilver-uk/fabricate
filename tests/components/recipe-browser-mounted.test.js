@@ -1,5 +1,6 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
@@ -10,6 +11,11 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { recipe } from '../helpers/crafting-fixtures.js';
 import { chipToneOf } from '../helpers/chipTone.js';
+import {
+  chooseSelectOption,
+  openSelectPanel,
+  selectOptionValues,
+} from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -19,7 +25,46 @@ const harness = createMountedComponentHarness({
   rawModules: CRAFTING_APP_RAW_MODULES,
   compiledModules: CRAFTING_APP_COMPILED_MODULES,
   componentPath: 'src/ui/svelte/apps/crafting/RecipeBrowser.svelte',
+  // THE PLAYER ROOT, and it is load-bearing rather than cosmetic (issue 1511). The harness
+  // defaults its mount target to `fabricate-manager`, and `SearchablePopover` PORTALS the panel
+  // its two converted filters open to the nearest Fabricate application root. This component's
+  // production host is the player window, so without the real root every panel here would land
+  // on `<body>` and `select-control.js` would find nothing to click.
+  rootClass: 'fabricate-app',
 });
+
+/**
+ * A rect literal in the shape `getBoundingClientRect` returns.
+ *
+ * @param {number} width
+ * @returns {DOMRect} enough of one for the layout to read.
+ */
+function rectOf(width) {
+  return { left: 0, top: 0, width, height: 30, right: width, bottom: 30 };
+}
+
+/**
+ * Stub the two boxes `anchoredPopover` measures, BEFORE the panel opens.
+ *
+ * BOTH, and in this order, because happy-dom lays nothing out and returns zeros for every rect.
+ * The trigger's width is what the band resolves against; the HOST's is what caps it —
+ * `computeIconPickerPopoverLayout` works in `availableWidth = hostWidth − 2 × viewportMargin` and
+ * returns `null` outright for a zero-width viewport, at which point `anchoredPopover` writes an
+ * EMPTY style attribute with or without a `maxWidth` and the assertion below would pass over the
+ * defect it exists to catch. `sync()` measures at action mount, so both stubs must be installed
+ * before the click rather than before the read.
+ *
+ * @param {HTMLElement} root The mount target, which is the overlay host.
+ * @param {string} triggerSelector
+ * @param {number} triggerWidth
+ * @returns {void}
+ */
+function stubPopoverGeometry(root, triggerSelector, triggerWidth) {
+  const trigger = root.querySelector(triggerSelector);
+  assert.ok(Boolean(trigger), `no converted select trigger matches ${triggerSelector}`);
+  trigger.getBoundingClientRect = () => rectOf(triggerWidth);
+  root.getBoundingClientRect = () => rectOf(triggerWidth + 32);
+}
 
 describe('RecipeBrowser mounted behavior', () => {
   before(harness.setup);
@@ -186,16 +231,16 @@ describe('RecipeBrowser mounted behavior', () => {
     assert.equal(favToggles, 1, 'favourites toggle callback fired');
     assert.equal(craftToggles, 1, 'craftable toggle callback fired');
 
-    const select = target.querySelector('.crafting-browser-filter-system select');
-    assert.ok(select, 'system dropdown renders on its own line');
-    assert.equal(
-      select.querySelectorAll('option').length,
-      3,
-      'all-systems + one option per system'
+    // DRIVEN THE WAY A PLAYER DRIVES IT (issue 1511): the control is a `<button>` opening a
+    // portaled list, so reading the offered values means opening the panel, and choosing one is
+    // two clicks rather than a `value` write and a synthetic `change`.
+    const trigger = '[data-crafting-system-filter]';
+    assert.deepEqual(
+      selectOptionValues(target, trigger),
+      ['__unchanged__', 'sys-a', 'sys-b'],
+      'all-systems sentinel plus one row per system, the sentinel addressable by its own handle'
     );
-    select.value = 'sys-b';
-    select.dispatchEvent(new window.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(target, trigger, 'sys-b');
     assert.deepEqual(systems, ['sys-b'], 'system change forwards the selected id');
   });
 
@@ -287,15 +332,17 @@ describe('RecipeBrowser mounted behavior', () => {
       onCategoryChange: (id) => chosen.push(id),
     });
 
-    const select = target.querySelector('.crafting-browser-filter-category select');
-    assert.ok(select, 'category dropdown renders');
-    const options = select.querySelectorAll('option');
-    assert.equal(options.length, 3, 'all-categories + one option per distinct category');
-    assert.equal(options[0].value, '', 'the first option is the value="" all-categories option');
+    const trigger = '[data-crafting-category-filter]';
+    const values = selectOptionValues(target, trigger);
+    assert.equal(values.length, 3, 'all-categories + one row per distinct category');
+    assert.equal(
+      values[0],
+      '__unchanged__',
+      'the leading row is the empty-value all-categories sentinel, which the primitive gives a ' +
+        'non-empty handle so it is addressable at all'
+    );
 
-    select.value = 'weapons';
-    select.dispatchEvent(new window.Event('change', { bubbles: true }));
-    flushSync();
+    chooseSelectOption(target, trigger, 'weapons');
     assert.deepEqual(chosen, ['weapons'], 'category change forwards the selected id');
   });
 
@@ -324,5 +371,140 @@ describe('RecipeBrowser mounted behavior', () => {
     const empty = target.querySelector('[data-crafting-browser-empty]');
     assert.ok(empty, 'empty message rendered');
     assert.match(empty.textContent, /Browser\.Empty/, 'uses the generic empty localization key');
+  });
+  it('names each converted filter by the caption it renders, not by a duplicated string', async () => {
+    // THE `aria-label` BOTH FILTERS CARRIED IS GONE, and this is the assertion that says what
+    // replaced it. `ariaLabelledBy` and `ariaLabel` are mutually exclusive on this primitive —
+    // a labelledby wins in the accessibility tree — so passing both would have left a string
+    // free to drift from the caption beside it.
+    const target = await harness.mount({
+      recipes: [recipe({ id: 'r1' })],
+      totalCount: 1,
+      systems: [{ id: 'sys-a', name: 'Alchemy' }],
+      categories: [{ id: 'armor', name: 'Armor' }],
+    });
+
+    for (const [hook, captionClass] of [
+      ['[data-crafting-category-filter]', '.crafting-browser-filter-category'],
+      ['[data-crafting-system-filter]', '.crafting-browser-filter-system'],
+    ]) {
+      const trigger = target.querySelector(hook);
+      assert.ok(Boolean(trigger), `${hook} renders a trigger`);
+      assert.ok(!trigger.getAttribute('aria-label'), `${hook} carries no duplicated aria-label`);
+      const caption = target.querySelector(`${captionClass} .crafting-browser-filter-label`);
+      assert.ok(Boolean(caption), `${captionClass} still draws its own caption`);
+      assert.equal(
+        trigger.getAttribute('aria-labelledby'),
+        caption.id,
+        `${hook} is named by the caption its wrapper renders`
+      );
+      assert.ok(caption.id, 'the caption carries a minted id rather than an empty string');
+      assert.ok(
+        caption.textContent.trim().length > 0,
+        'and the caption it points at has text, which an aria-labelledby to an empty node ' +
+          'would not — and the primitive would not warn about'
+      );
+    }
+  });
+
+  it('demotes each filter wrapper to a span that keeps its class', async () => {
+    // THE COST AND THE MECHANISM IN ONE ASSERTION (issue 1511). A `<label>` forwards a caption
+    // click into the control it wraps; the control is a `<button>` toggling a portaled panel
+    // whose dismissal listens on `mousedown` while open, so from the OPEN state the caption's
+    // own mousedown dismissed the list and the forwarded click re-opened it. The class survives
+    // because the wrapper's column layout and its scoped width rule both hang off it.
+    const target = await harness.mount({
+      recipes: [recipe({ id: 'r1' })],
+      totalCount: 1,
+      systems: [{ id: 'sys-a', name: 'Alchemy' }],
+      categories: [{ id: 'armor', name: 'Armor' }],
+    });
+
+    for (const wrapper of ['.crafting-browser-filter-category', '.crafting-browser-filter-system']) {
+      const element = target.querySelector(wrapper);
+      assert.ok(Boolean(element), `${wrapper} still renders`);
+      assert.equal(element.tagName, 'SPAN', `${wrapper} is a span rather than a label`);
+    }
+    assert.ok(
+      !target.querySelector('label.crafting-browser-filter-category'),
+      'no label wrapper survives the conversion'
+    );
+  });
+
+  it('opens each filter’s panel at the trigger’s own width, not the inline rung’s 240px ceiling', async () => {
+    // THE WIRING PROOF FOR `maxWidth` (issue 1511 acceptance 11b). `select-popover-width.test.js`
+    // measures what the sheet does to a band in Chromium and never reads this component; this is
+    // the half that says THIS caller's prop reaches the layout. Without the `maxWidth` the
+    // `inline` rung's own 240 ceiling clamps a 280px trigger's panel to 240, so the figures below
+    // differ with and without it.
+    //
+    // Read from `getAttribute('style')` rather than `style.cssText`: happy-dom drops a nested
+    // `var()` out of `cssText`, and the attribute is the verbatim string the action wrote.
+    const target = await harness.mount({
+      recipes: [recipe({ id: 'r1' })],
+      totalCount: 1,
+      systems: [{ id: 'sys-a', name: 'Alchemy' }],
+      categories: [{ id: 'armor', name: 'Armor' }],
+    });
+
+    for (const [hook, width] of [
+      ['[data-crafting-category-filter]', 280],
+      ['[data-crafting-system-filter]', 906],
+    ]) {
+      stubPopoverGeometry(target, hook, width);
+      const panel = openSelectPanel(target, hook);
+      const style = panel.getAttribute('style') ?? '';
+      for (const property of ['width', 'min-width', 'max-width']) {
+        assert.ok(
+          style.includes(`${property}: ${width}px`),
+          `${hook} opened a panel whose ${property} is not the trigger's own ${width}px. ` +
+            `Style written: "${style}"`
+        );
+      }
+      target.querySelector(hook).click();
+      flushSync();
+    }
+  });
+
+  it('keeps both filters full-width by restating it, since a trigger hugs its value', async () => {
+    // THE REFUSAL HALF of the width axis, asserted on the RULE rather than on a computed box,
+    // because happy-dom computes no cascade. What is under contract is that the two full-width
+    // restatements are ancestor-qualified: a leading bare `:global(.fabricate-select-trigger)`
+    // is document-wide and would reach the pager's trigger one row below, which deliberately
+    // refuses a width floor.
+    const source = readFileSync(
+      resolve(repoRoot, 'src/ui/svelte/apps/crafting/RecipeBrowser.svelte'),
+      'utf8'
+    );
+    for (const wrapper of ['.crafting-browser-filter-category', '.crafting-browser-filter-system']) {
+      assert.ok(
+        source.includes(`${wrapper} :global(.fabricate-select-trigger)`),
+        `${wrapper} no longer qualifies its :global() trigger rule by its own wrapper class`
+      );
+    }
+    assert.ok(
+      !/^\s*:global\(\.fabricate-select-trigger\)/mu.test(source),
+      'a leading bare :global() rule reaches every trigger in the document, including the ' +
+        'pager one row below that refuses a width floor'
+    );
+    // THE DECLARATIONS ARE READ FROM THE BLOCK, NOT FROM THE FILE. A file-wide `includes` for
+    // `background: var(--fab-surface);` cannot fail here: this component declares that fill at
+    // three other elements, so the clause was green whether or not the trigger rule carried it.
+    const blockStart = source.indexOf('.crafting-browser-filter-category :global(');
+    assert.ok(blockStart !== -1, 'the category filter no longer opens a scoped :global() block');
+    const block = source.slice(blockStart, source.indexOf('}', blockStart) + 1);
+    assert.ok(
+      block.includes('.crafting-browser-filter-system :global(.fabricate-select-trigger)'),
+      'the two filters no longer share one trigger block, so this clause is reading the ' +
+        `category filter's alone. It reads: ${block}`
+    );
+    for (const declaration of ['width: 100%;', 'background: var(--fab-surface);']) {
+      assert.ok(
+        block.includes(declaration),
+        `the filters' own trigger block no longer declares \`${declaration}\` — the two ` +
+          'properties this call site keeps are the width core used to supply and the column ' +
+          `fill the pager beside it restates. The block reads: ${block}`
+      );
+    }
   });
 });

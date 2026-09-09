@@ -121,9 +121,15 @@
  *     caller-override half is measured as well, on the two classes the regression moved.
  *  2. THE RINGS. Each primitive now declares its own `:focus-visible` outline, and a ring is only
  *     observable on a focused element in a browser that has decided `:focus-visible` applies. The
- *     rule's declared text is the thing under contract here — that it exists, that its
- *     declarations are the two the module ring uses, and that nothing this change added reaches a
- *     `<select>` and so displaces `.fabricate-app select:focus-visible`'s inset ring.
+ *     rule's declared text is the thing under contract here — that it exists and that its
+ *     declarations are the two the module ring uses — plus the standing rule that none of these
+ *     families may reach a bare `<select>` on `:focus`. That last half outlived the rule it was
+ *     written to protect: `.fabricate-app select:focus-visible` was deleted with the player app's
+ *     last native select at issue 1511, so there is no longer an inset ring here to displace, and
+ *     what the clause holds now is the boundary itself — a family that started ringing selects
+ *     would be writing element chrome the module ring already owns, and would tie the manager's
+ *     surviving `<select>`s at equal rank while issue 1510's sweep and the root's own convergence
+ *     (issue 1357) are still in flight.
  *
  * ── THE MARKUP IS THE PRIMITIVE'S OWN CLASS LIST, READ OUT OF THE PRIMITIVE ─────────────────
  * The controls are rendered as markup rather than by compiling and mounting three Svelte
@@ -2751,22 +2757,22 @@ test('each re-rooted family declares its own focus ring, and none of them reache
       );
     }
 
-    // THE SELECT'S INSET RING IS INTACT. `.fabricate-pagination :is(button, select)` would have
-    // tied `.fabricate-app select:focus-visible` and won on source order, deleting its
-    // `outline: none` + inset `box-shadow` and reinstating the clipped-outline defect that rule
-    // exists to prevent. Proved twice: the rule still says what it said, and no rule rooted at
-    // one of the three new namespace classes names a `select` at all.
-    const selectRing = rules.filter(
-      (rule) => rule.selectorText === '.fabricate-app select:focus-visible'
-    );
-    assert.equal(selectRing.length, 1, 'the player app`s select ring must still be declared once');
-    assert.match(selectRing[0].cssText, /outline:\s*none/, 'the select ring stays outline-less');
-    assert.match(
-      selectRing[0].cssText,
-      /box-shadow:\s*inset 0(?:px)? 0(?:px)? 0(?:px)? 2px var\(--fab-accent\)/,
-      'the select ring stays an INSET box-shadow, which is the part that is never clipped'
-    );
-
+    // NO RE-ROOTED FAMILY REACHES A FOCUSED `select`, and this is now the whole of that claim.
+    //
+    // It used to be half of a pair. `.fabricate-pagination :is(button, select)` would have tied
+    // `.fabricate-app select:focus-visible` and won on source order, deleting its `outline: none`
+    // + inset `box-shadow` and reinstating the clipped-outline defect that rule existed to
+    // prevent — so the clause above this one read that rule back out of the sheet and pinned its
+    // two declarations. Issue 1511 converted the player app's last native select and DELETED the
+    // rule, so that half was retired with its subject rather than left asserting the presence of
+    // something the same change removed.
+    //
+    // What survives is the reach half, and it is not vacuous without its partner: the elements
+    // are still there. The manager renders 78 native selects, a `<select>` in a `Field` is a
+    // stated residue of issue 1510's sweep and of the root's own convergence (issue 1357), and a
+    // family rooted at a class it emits travels into both areas. A leg added here would be family
+    // chrome over an element the module ring already reaches at the same rank, decided by source
+    // order — which is exactly what the eight-root list below exists to refuse.
     const roots = [
       'fabricate-button',
       'fabricate-icon-button',
@@ -2787,8 +2793,10 @@ test('each re-rooted family declares its own focus ring, and none of them reache
     assert.deepEqual(
       selectReach.map((rule) => rule.selectorText),
       [],
-      'a rule rooted at one of the eight namespace classes reaches a focused `select`, which ' +
-        'is what would displace the inset ring above'
+      'a rule rooted at one of the eight namespace classes reaches a focused `select`. That is ' +
+        'element chrome the module ring already writes, at the same rank, so which one paints ' +
+        'would be decided by source order — and the manager still renders the selects it would ' +
+        'be decided over'
     );
   } finally {
     await tab.close();
