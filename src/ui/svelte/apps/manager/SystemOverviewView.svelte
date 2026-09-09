@@ -199,9 +199,9 @@
     carry them — so the row is lifted out of the deleted `<section>` and kept as a direct child
     of `.manager-main`, with `data-system-overview-counts` unchanged.
 
-    AND IT SPEAKS THE SPEC'S CLOSED VOCABULARY, AS THE SUBSET IT CAN SUPPLY. `spec.md:1268`
-    gives the validation surface "passing, warning and blocking counts" and `:1199` fixes that
-    as their order. This row used to read `critical / warnings / notes`, which agreed with the
+    AND IT SPEAKS THE SPEC'S CLOSED VOCABULARY, AS THE SUBSET IT CAN SUPPLY. `spec.md:1305`
+    gives the validation surface "passing, warning and blocking counts" and `:1244-1245` fixes
+    that as their order. This row used to read `critical / warnings / notes`, which agreed with the
     spec on one word of three. Reconciled per the maintainer ruling on issue 1515:
 
       - `passing` is OMITTED, not invented. The report is `evaluateSystemValidation`'s, which

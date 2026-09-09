@@ -9667,7 +9667,7 @@
    * One of the three environment inspector counts, as the store computed it.
    *
    * All three now read a stored number with a zero fallback — the pattern
-   * `EnvironmentsBrowserView.svelte:340-345` already uses for the same fact. The
+   * `EnvironmentsBrowserView.svelte:394-398` already uses for the same fact. The
    * `environmentComposedIds` fallback these three used to share is deleted, not moved:
    *
    * - It was **unreachable in practice.** `adminStore.js`'s `_buildEnvironmentState` writes a

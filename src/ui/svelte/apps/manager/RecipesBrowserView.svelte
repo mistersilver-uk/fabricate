@@ -123,7 +123,7 @@
   let flashMessage = $state('');
 
   // A REFUSAL COUNTER, WHICH THE SHARED NOTICE MAKES NECESSARY (issue 1515). `Notice` owns its
-  // own dismissal — `library.html:1060` declares `dismissable` as a boolean with no caller to
+  // own dismissal — `library.html:1079` declares `dismissable` as a boolean with no caller to
   // tell, so the component simply leaves the DOM — and this view's message is not always new.
   // Clearing the term and setting it again inside ONE toggle is a single batched update, so the
   // `{#if}` never goes false and the same component instance survives with `dismissed` still
