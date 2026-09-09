@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { VIEW_LAB_CASES } from '../scripts/lib/viewLabCases.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
 import { buildLabActors, buildDocumentIndex } from './view-lab/world/labActors.js';
+import { LAB_JOURNAL_CASE_STATE_RUN_IDS } from './view-lab/world/labRunStates.js';
 
 const content = buildLabContent();
 const actors = buildLabActors(content);
@@ -45,9 +46,12 @@ function labRunIds() {
     join(dirname(fileURLToPath(import.meta.url)), 'view-lab', 'world', 'labRunStates.js'),
     'utf8'
   );
-  return [...source.matchAll(/(?:id|RUN_ID) = ?'(lab-[\w-]+)'|id: '(lab-[\w-]+)'/g)].map(
-    (match) => match[1] ?? match[2]
-  );
+  return [
+    ...Object.values(LAB_JOURNAL_CASE_STATE_RUN_IDS),
+    ...[...source.matchAll(/(?:id|RUN_ID) = ?'(lab-[\w-]+)'|id: '(lab-[\w-]+)'/g)].map(
+      (match) => match[1] ?? match[2]
+    ),
+  ];
 }
 
 /**
