@@ -111,7 +111,10 @@ function makeEngine({
   usedTools = [],
   calls = {},
   getRunViewer = null,
-  richState = null
+  richState = null,
+  eventSceneTrigger = null,
+  hookPublisher = null,
+  isPrimaryGM = null
 } = {}) {
   calls.evaluateCheck = [];
   calls.planResults = [];
@@ -174,6 +177,9 @@ function makeEngine({
         return { delivered: true };
       }
     },
+    eventSceneTrigger,
+    hookPublisher,
+    ...(isPrimaryGM ? { isPrimaryGM } : {}),
     localize: (key, data) => data ? `${key}:${JSON.stringify(data)}` : key
   });
 }
@@ -284,6 +290,150 @@ test('processWorldTime resolves a matured straight task without a check or d100 
   assert.deepEqual(calls.createResults[0].resultGroups, task.resultGroups);
   assert.deepEqual(runManager.getRunHistory(actor)[0].createdResults, createdResults);
   assert.equal(runManager.getRunHistory(actor)[0].checkResult, undefined);
+});
+
+test('non-blind timed task resolves from its start-time mode and results after live edits', async () => {
+  resetActor();
+  let worldTime = 1000;
+  const runManager = makeRunManager({ now: () => worldTime });
+  const task = timedTask({ resolutionMode: 'straight' });
+  const env = environment(task);
+  const calls = {};
+  const engine = makeEngine({
+    runManager,
+    environments: [env],
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.original', quantity: 2 }],
+    calls
+  });
+
+  const started = await engine.startAttempt({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a'
+  });
+  const active = runManager.getActiveRuns(actor)[0];
+  assert.equal(started.state, 'waitingTime');
+  assert.equal(active.economyEvidence.runtimeSnapshot.task.resolutionMode, 'straight');
+
+  task.resolutionMode = 'routed';
+  task.resultGroups = [{
+    id: 'edited-group',
+    name: 'Edited',
+    results: [{ id: 'edited-result', componentId: 'comp-edited', quantity: 9 }]
+  }];
+  worldTime = 1060;
+
+  const result = await engine.processWorldTime(worldTime);
+
+  assert.equal(result.completed[0].state, 'succeeded');
+  assert.deepEqual(calls.evaluateCheck, [], 'the edited routed mode is not read at maturity');
+  assert.deepEqual(calls.planResults[0].resultGroups, [
+    {
+      id: 'group-a',
+      name: 'Iron',
+      results: [{ id: 'result-a', componentId: 'comp-a', quantity: 2 }]
+    }
+  ]);
+});
+
+test('matured legacy run rejects an invalid live result quantity before terminal side effects', async () => {
+  resetActor();
+  let worldTime = 1000;
+  const runManager = makeRunManager({ now: () => worldTime });
+  await createWaitingRun(runManager);
+  worldTime = 1060;
+  const task = timedTask({
+    resolutionMode: 'straight',
+    resultGroups: [{
+      id: 'group-a',
+      name: 'Iron',
+      results: [{ id: 'result-a', componentId: 'comp-a', quantity: NaN }]
+    }]
+  });
+  const calls = {};
+  const engine = makeEngine({ runManager, environments: [environment(task)], calls });
+
+  const result = await engine.processWorldTime(worldTime);
+
+  assert.equal(result.cleared.length, 1);
+  assert.deepEqual(runManager.getActiveRuns(actor), []);
+  assert.deepEqual(runManager.getRunHistory(actor), []);
+  assert.deepEqual(calls.planResults, []);
+  assert.deepEqual(calls.createResults, []);
+  assert.deepEqual(calls.planTools, []);
+  assert.deepEqual(calls.applyTools, []);
+  assert.deepEqual(calls.failureFeedback, []);
+});
+
+test('timed straight and routed attempts resolve one independent environmental event', async () => {
+  for (const mode of ['straight', 'routed']) {
+    resetActor();
+    let worldTime = 1000;
+    const runManager = makeRunManager({ now: () => worldTime });
+    const task = timedTask({ resolutionMode: mode });
+    const env = environment(task);
+    const event = { id: `event-${mode}`, name: `${mode} rockfall` };
+    env.events = [event];
+    const evidence = { rows: [], events: [{ eventId: event.id, contributions: [] }] };
+    const eventCalls = [];
+    const sceneCalls = [];
+    const published = [];
+    const richState = {
+      resolveEnvironmentalEvents: async (payload) => {
+        eventCalls.push(payload);
+        return {
+          status: 'succeeded',
+          events: [event],
+          eventPolicy: 'successWithEvent',
+          characterModifierSnapshot: evidence
+        };
+      }
+    };
+    const calls = {};
+    const engine = makeEngine({
+      runManager,
+      environments: [env],
+      richState,
+      eventSceneTrigger: {
+        apply: async (payload) => {
+          sceneCalls.push(payload);
+        }
+      },
+      hookPublisher: {
+        publishAttemptCompleted: (payload) => {
+          published.push(payload);
+        }
+      },
+      isPrimaryGM: () => true,
+      calls
+    });
+    if (mode === 'routed') routedRoll(true);
+    try {
+      const started = await engine.startAttempt({
+        viewer,
+        actor,
+        environmentId: 'env-a',
+        taskId: 'task-a'
+      });
+      assert.equal(started.state, 'waitingTime', mode);
+      worldTime = 1060;
+
+      const result = await engine.processWorldTime(worldTime);
+
+      assert.equal(result.completed[0].state, 'succeeded', mode);
+      assert.equal(eventCalls.length, 1, `${mode} rolls events exactly once at maturity`);
+      const history = runManager.getRunHistory(actor)[0];
+      assert.deepEqual(history.checkResult.events, [event]);
+      assert.equal(history.checkResult.eventPolicy, 'successWithEvent');
+      assert.deepEqual(history.checkResult.characterModifierSnapshot, evidence);
+      assert.deepEqual(history.characterModifierSnapshot, evidence);
+      assert.deepEqual(sceneCalls[0].events, [event]);
+      assert.deepEqual(published[0].checkResult.events, [event]);
+    } finally {
+      if (mode === 'routed') delete globalThis.Roll;
+    }
+  }
 });
 
 test('processWorldTime completes matured failure without results and applies feedback after history persistence', async () => {

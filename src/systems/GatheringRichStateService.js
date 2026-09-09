@@ -9,8 +9,8 @@ import {
 } from './gatheringComposition.js';
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { depleteNodeOnce, normalizeNodeConfig } from './gatheringNodeConfig.js';
-import { normalizeGatheringResultGroups } from './gatheringResultGroups.js';
 import { GatheringNodeService } from './GatheringNodeService.js';
+import { normalizeGatheringResultGroups } from './gatheringResultGroups.js';
 import {
   cloneJson,
   nonNegativeInteger,
@@ -477,13 +477,7 @@ export class GatheringRichStateService {
     flavor,
   } = {}) {
     const flatBonus = Number.isFinite(extraModifier) ? extraModifier : 0;
-    const itemRows = normalizeList(task?.dropRows ?? task?.itemDrops);
     const taskModifier = numericModifier(task?.gatheringModifier, gatheringModifier);
-    const conditions = environment?.conditions || {};
-    const library =
-      environment?.__libraryCharacterModifiers instanceof Map
-        ? environment.__libraryCharacterModifiers
-        : new Map();
 
     // Resolve rules up front so the system-default character-modifier mode is
     // available while resolving each reference (the loops below predate the
@@ -491,16 +485,90 @@ export class GatheringRichStateService {
     const rules = resolveRulesForAttempt(task, environment);
     const dropModifierMode = rules.dropModifierMode;
 
-    const diagnostics = [];
-    const enabledRows = itemRows
+    const itemResolution = await this._prepareD100ItemRows({
+      task,
+      environment,
+      actor,
+      viewer,
+      system,
+      dropModifierMode,
+    });
+
+    const environmentalEvents = await this._prepareEnvironmentalEvents({
+      task,
+      environment,
+      actor,
+      viewer,
+      system,
+      dropModifierMode,
+    });
+    const diagnostics = [...itemResolution.diagnostics, ...environmentalEvents.diagnostics];
+    const { rowSnapshots, rowContributions } = itemResolution;
+    const { eventSnapshots, eventContributions } = environmentalEvents;
+
+    if (diagnostics.length > 0) {
+      return {
+        status: 'misconfigured',
+        items: [],
+        events: [],
+        eventPolicy: null,
+        characterModifierSnapshot: { rows: rowSnapshots, events: eventSnapshots },
+        diagnostics,
+      };
+    }
+
+    const itemRoll = await this._rollD100ItemRows({
+      rowContributions,
+      rules,
+      environment,
+      modifier: taskModifier + flatBonus,
+      animate,
+    });
+
+    const eventResolution = this._resolvePreparedEnvironmentalEvents({
+      eventContributions,
+      eventSnapshots,
+      rules,
+      environment,
+      eventModifier,
+      extraModifier: flatBonus,
+    });
+
+    // Surface the attempt's single d100 to chat so Dice So Nice animates it, and so the
+    // number the player reads is the number the rows were actually tested against.
+    // Interactive/animate-only; a chat failure is logged and swallowed, never thrown.
+    if (itemRoll.attemptRollMessage) {
+      try {
+        await itemRoll.attemptRollMessage.toMessage(
+          { speaker, flavor },
+          { rollMode, create: true }
+        );
+      } catch (error) {
+        console.error('Fabricate | Failed to post d100 roll to chat:', error);
+      }
+    }
+
+    return {
+      status: eventResolution.status === 'failed' ? 'failed' : 'succeeded',
+      items: itemRoll.selectedItems,
+      events: eventResolution.events,
+      eventPolicy: eventResolution.eventPolicy,
+      characterModifierSnapshot: { rows: rowSnapshots, events: eventSnapshots },
+    };
+  }
+
+  async _prepareD100ItemRows({ task, environment, actor, viewer, system, dropModifierMode }) {
+    const library =
+      environment?.__libraryCharacterModifiers instanceof Map
+        ? environment.__libraryCharacterModifiers
+        : new Map();
+    const enabledRows = normalizeList(task?.dropRows ?? task?.itemDrops)
       .filter((row) => row?.enabled !== false)
       .map((row) => normalizeItemDrop(row));
-    const enabledEvents = normalizeList(environment?.events)
-      .filter((event) => event?.enabled !== false)
-      .map((event) => normalizeEvent(event));
-
     const rowSnapshots = [];
     const rowContributions = [];
+    const diagnostics = [];
+
     for (const row of enabledRows) {
       const contributions = [];
       const rowEvidence = [];
@@ -526,18 +594,121 @@ export class GatheringRichStateService {
         rowEvidence.push(resolved.evidence);
       }
       rowSnapshots.push({ rowId: row.id, contributions: rowEvidence });
-      rowContributions.push({
-        row,
-        contributions,
-      });
+      rowContributions.push({ row, contributions });
     }
 
+    return { rowSnapshots, rowContributions, diagnostics };
+  }
+
+  async _rollD100ItemRows({ rowContributions, rules, environment, modifier, animate }) {
+    // All item rows share one attempt roll. Environmental events are resolved separately,
+    // with one independent throw per event, so hazards never correlate with the item haul.
+    const rollsAttemptCheck = rowContributions.length > 0;
+    let attemptRoll = null;
+    let attemptRollMessage = null;
+    if (rollsAttemptCheck && animate && typeof globalThis.Roll === 'function') {
+      try {
+        const rolled = await new globalThis.Roll('1d100').evaluate({ allowInteractive: false });
+        const face = Number(rolled?.dice?.[0]?.results?.[0]?.result);
+        if (Number.isFinite(face)) {
+          attemptRoll = face;
+          attemptRollMessage = rolled;
+        }
+      } catch (error) {
+        console.error('Fabricate | Failed to roll the d100 gathering check:', error);
+      }
+    }
+    if (rollsAttemptCheck && attemptRoll === null) attemptRoll = this.rollD100();
+
+    const conditions = environment?.conditions || {};
+    const biomes = Array.isArray(environment?.biomes) ? environment.biomes : [];
+    const droppedItems = rowContributions
+      .map((entry, index) =>
+        rollDropRow({
+          row: entry.row,
+          index,
+          roll: attemptRoll,
+          modifier,
+          conditions,
+          biomes,
+          biomeAggregation: rules.biomeModifierAggregation,
+          dropModifierMode: rules.dropModifierMode,
+          characterModifierContributions: entry.contributions,
+        })
+      )
+      .filter((result) => result.dropped);
+    return {
+      selectedItems: selectDrops(droppedItems, rules.rewardSelectionMode, rules.rewardLimit),
+      attemptRollMessage,
+    };
+  }
+
+  /**
+   * Resolve the environment's independent event throws for any gathering yield mode.
+   * Item/check resolution remains owned by the engine or the d100 path; this seam owns only
+   * event matching, character-modifier evidence, selection, and failure-with-event policy.
+   *
+   * @param {object} options
+   * @returns {Promise<object>} Event resolution payload.
+   */
+  async resolveEnvironmentalEvents({
+    task,
+    environment,
+    actor = null,
+    viewer = null,
+    system = null,
+    eventModifier = 0,
+    extraModifier = 0,
+  } = {}) {
+    const rules = resolveRulesForAttempt(task, environment);
+    const prepared = await this._prepareEnvironmentalEvents({
+      task,
+      environment,
+      actor,
+      viewer,
+      system,
+      dropModifierMode: rules.dropModifierMode,
+    });
+    if (prepared.diagnostics.length > 0) {
+      return {
+        status: 'misconfigured',
+        events: [],
+        eventPolicy: null,
+        characterModifierSnapshot: { rows: [], events: prepared.eventSnapshots },
+        diagnostics: prepared.diagnostics,
+      };
+    }
+    return this._resolvePreparedEnvironmentalEvents({
+      ...prepared,
+      rules,
+      environment,
+      eventModifier,
+      extraModifier,
+    });
+  }
+
+  async _prepareEnvironmentalEvents({
+    task,
+    environment,
+    actor,
+    viewer,
+    system,
+    dropModifierMode,
+  }) {
+    const conditions = environment?.conditions || {};
+    const library =
+      environment?.__libraryCharacterModifiers instanceof Map
+        ? environment.__libraryCharacterModifiers
+        : new Map();
+    const enabledEvents = normalizeList(environment?.events)
+      .filter((event) => event?.enabled !== false)
+      .map((event) => normalizeEvent(event));
     const eventSnapshots = [];
     const eventContributions = [];
+    const diagnostics = [];
+
     for (const event of enabledEvents) {
-      // Weather/time are runtime gates: an event that does not currently meet its
-      // required weather/timeOfDay never triggers, even if it matched the
-      // environment (region/biome/danger) at composition time.
+      // Weather and time remain runtime gates after environment composition.
       if (
         evaluateEnvironmentMatch(event, environment, conditions, { includeDanger: true })
           .conditionsMet === false
@@ -568,80 +739,23 @@ export class GatheringRichStateService {
         eventEvidence.push(resolved.evidence);
       }
       eventSnapshots.push({ eventId: event.id, contributions: eventEvidence });
-      eventContributions.push({
-        event,
-        contributions,
-      });
+      eventContributions.push({ event, contributions });
     }
 
-    if (diagnostics.length > 0) {
-      return {
-        status: 'misconfigured',
-        items: [],
-        events: [],
-        eventPolicy: null,
-        characterModifierSnapshot: { rows: rowSnapshots, events: eventSnapshots },
-        diagnostics,
-      };
-    }
+    return { eventSnapshots, eventContributions, diagnostics };
+  }
 
+  _resolvePreparedEnvironmentalEvents({
+    eventContributions,
+    eventSnapshots,
+    rules,
+    environment,
+    eventModifier = 0,
+    extraModifier = 0,
+  }) {
+    const conditions = environment?.conditions || {};
     const biomes = Array.isArray(environment?.biomes) ? environment.biomes : [];
-    const biomeAggregation = rules.biomeModifierAggregation;
-
-    // ONE d100 for the attempt. Every enabled drop row is tested against this SAME
-    // percentile roll, so an attempt is a single gathering check whose one number
-    // decides the whole haul: the rarer a row, the higher the roll it needs.
-    //
-    // Each row's MARGINAL chance is untouched — a row at 40% still drops on 40 of the
-    // 100 faces — so `previewDropBreakdown` and every authored rate keep their meaning.
-    // What changes is the CORRELATION: rows now succeed and fail together in rarity
-    // order, instead of each being an independent draw. That is what makes the roll
-    // reportable; the previous per-row model could only ever be published as an
-    // `Nd100` pool whose total was the sum of unrelated checks and meant nothing.
-    //
-    // EVENTS KEEP THEIR OWN INDEPENDENT THROWS and are never pooled or posted. Sharing
-    // the attempt roll with them would fire EVERY matched hazard on a high roll and
-    // none on a low one, welding "found the good loot" to "sprang all nine traps".
-    // Events are environment hazards, not part of the gathering check the player rolls.
-    // Drawn ONLY when there is something to test it against. A task with no enabled drop
-    // rows is rejected by start validation, so this is unreachable in play, but rolling a
-    // gathering check against nothing would still be wrong — and it would consume a draw.
-    const rollsAttemptCheck = rowContributions.length > 0;
-    let attemptRoll = null;
-    let attemptRollMessage = null;
-    if (rollsAttemptCheck && animate && typeof globalThis.Roll === 'function') {
-      try {
-        const rolled = await new globalThis.Roll('1d100').evaluate({ allowInteractive: false });
-        const face = Number(rolled?.dice?.[0]?.results?.[0]?.result);
-        if (Number.isFinite(face)) {
-          attemptRoll = face;
-          attemptRollMessage = rolled;
-        }
-      } catch (error) {
-        console.error('Fabricate | Failed to roll the d100 gathering check:', error);
-      }
-    }
-    // The injected seam still owns the non-animated path, and catches an animated roll
-    // that failed to evaluate, so resolution never depends on the chat/DSN round trip.
-    if (rollsAttemptCheck && attemptRoll === null) attemptRoll = this.rollD100();
-
-    const droppedItems = rowContributions
-      .map((entry, index) =>
-        rollDropRow({
-          row: entry.row,
-          index,
-          roll: attemptRoll,
-          modifier: taskModifier + flatBonus,
-          conditions,
-          biomes,
-          biomeAggregation,
-          dropModifierMode: rules.dropModifierMode,
-          characterModifierContributions: entry.contributions,
-        })
-      )
-      .filter((result) => result.dropped);
-    const selectedItems = selectDrops(droppedItems, rules.rewardSelectionMode, rules.rewardLimit);
-
+    const flatBonus = Number.isFinite(extraModifier) ? extraModifier : 0;
     const droppedEvents = eventContributions
       .map((entry, index) =>
         rollDropRow({
@@ -651,33 +765,19 @@ export class GatheringRichStateService {
           modifier: numericModifier(entry.event?.eventModifier, eventModifier) + flatBonus,
           conditions,
           biomes,
-          biomeAggregation,
+          biomeAggregation: rules.biomeModifierAggregation,
           dropModifierMode: rules.dropModifierMode,
           characterModifierContributions: entry.contributions,
         })
       )
       .filter((result) => result.dropped);
-    const selectedEvents = selectDrops(droppedEvents, rules.eventSelectionMode, rules.eventLimit);
-    const eventPolicy = rules.eventPolicy;
-
-    // Surface the attempt's single d100 to chat so Dice So Nice animates it, and so the
-    // number the player reads is the number the rows were actually tested against.
-    // Interactive/animate-only; a chat failure is logged and swallowed, never thrown.
-    if (attemptRollMessage) {
-      try {
-        await attemptRollMessage.toMessage({ speaker, flavor }, { rollMode, create: true });
-      } catch (error) {
-        console.error('Fabricate | Failed to post d100 roll to chat:', error);
-      }
-    }
-
+    const events = selectDrops(droppedEvents, rules.eventSelectionMode, rules.eventLimit);
     return {
       status:
-        selectedEvents.length > 0 && eventPolicy === 'failureWithEvent' ? 'failed' : 'succeeded',
-      items: selectedItems,
-      events: selectedEvents,
-      eventPolicy,
-      characterModifierSnapshot: { rows: rowSnapshots, events: eventSnapshots },
+        events.length > 0 && rules.eventPolicy === 'failureWithEvent' ? 'failed' : 'succeeded',
+      events,
+      eventPolicy: rules.eventPolicy,
+      characterModifierSnapshot: { rows: [], events: eventSnapshots },
     };
   }
 

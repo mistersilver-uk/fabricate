@@ -213,6 +213,14 @@ async function producedGatheringConfig(system) {
   await store.updateGatheringLibraryTask('sys-1', task.id, {
     toolIds: ['tool-1'],
     dropRows: [{ id: 'drop-1', componentId: 'comp-1', quantity: 1, dropRate: 50 }],
+    resolutionMode: 'straight',
+    resultGroups: [
+      {
+        id: 'gathering-rg-1',
+        name: 'Gathered result',
+        results: [{ id: 'gathering-result-1', componentId: 'comp-1', quantity: 1 }],
+      },
+    ],
   });
   const event = await store.addGatheringLibraryEvent('sys-1');
   await store.updateGatheringLibraryEvent('sys-1', event.id, { dangerTags: ['storm'] });

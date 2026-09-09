@@ -1110,8 +1110,51 @@ test('d100 resolution supports all-drops items and failure-with-event policy', a
   );
 });
 
+test('environmental event resolution is mode-independent and rolls each matched event once', async () => {
+  const { service, rollCalls } = makeRichState({ rolls: [95] });
+  const task = {
+    id: 'task-straight',
+    name: 'Direct forage',
+    resolutionMode: 'straight',
+    resultGroups: [{
+      id: 'group-direct',
+      name: 'Direct yield',
+      results: [{ id: 'result-herb', componentId: 'herb', quantity: 1 }]
+    }]
+  };
+  const event = {
+    id: 'event-thorns',
+    name: 'Thorns',
+    enabled: true,
+    dangerTags: ['hazardous'],
+    dropRate: 10
+  };
+  const env = environment({
+    tasks: [task],
+    events: [event],
+    rules: { eventSelectionMode: 'allDrops', eventPolicy: 'failureWithEvent' }
+  });
+
+  const resolved = await service.resolveEnvironmentalEvents({
+    task,
+    environment: env,
+    actor,
+    viewer,
+    system
+  });
+
+  assert.equal(resolved.status, 'failed');
+  assert.deepEqual(resolved.events.map((entry) => entry.id), ['event-thorns']);
+  assert.equal(resolved.eventPolicy, 'failureWithEvent');
+  assert.deepEqual(resolved.characterModifierSnapshot, {
+    rows: [],
+    events: [{ eventId: 'event-thorns', contributions: [] }]
+  });
+  assert.equal(rollCalls.length, 1, 'one matched event consumes exactly one independent roll');
+});
+
 test('one d100 decides every drop row, while events roll independently', async () => {
-  const { service } = makeRichState({
+  const { service, rollCalls } = makeRichState({
     // One attempt roll, then one per event. 50 clears the rare row's threshold of 21 but
     // not the common row's 91, so the SAME number sorts the haul by rarity. The two
     // events share a rate — and so a threshold — yet only the one handed 95 fires, which
@@ -1159,6 +1202,7 @@ test('one d100 decides every drop row, while events roll independently', async (
     ['event-a'],
     'two events at one rate split, so they did not share the attempt roll'
   );
+  assert.equal(rollCalls.length, 3, 'd100 consumes one item roll and one roll per event');
 });
 
 test('d100 resolution applies system gathering rules over legacy task and environment fields', async () => {
