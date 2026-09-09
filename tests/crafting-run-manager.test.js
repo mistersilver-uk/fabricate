@@ -191,6 +191,52 @@ test('CraftingRunManager persists journal transitions and recovery blocks cancel
   assert.equal(manager.getActiveRun(actor, run.id).status, 'inProgress');
 });
 
+test('CraftingRunManager admits only the matching planned operation through execution mutations', async () => {
+  setupGlobals(1000);
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Operation crafter');
+  const run = await manager.createRun(actor, singleStepRecipe('operation'), [actor], 'user-1', {
+    lifecycleVersion: 1,
+  });
+  const planned = await manager.updateExecutionJournal(actor, run.id, {
+    type: 'plan',
+    plan: {
+      operationId: 'operation-1',
+      requestId: 'request-1',
+      baseRunRevision: 0,
+      intent: { stepIndex: 0 },
+      effects: [{ effectId: 'stage', kind: 'executeCraftingStage', planned: null }],
+    },
+  });
+  const applying = await manager.updateExecutionJournal(actor, run.id, {
+    type: 'effectApplying',
+    effectId: 'stage',
+  });
+
+  await assert.rejects(
+    () =>
+      manager.markStepInProgress(actor, applying, 0, {
+        expectedRevision: applying.runRevision,
+        executionOperationId: 'wrong-operation',
+      }),
+    (error) => error.code === 'EXECUTION_OPERATION_MISMATCH'
+  );
+  await assert.rejects(
+    () =>
+      manager.markStepInProgress(actor, applying, 0, {
+        expectedRevision: planned.runRevision,
+        executionOperationId: 'operation-1',
+      }),
+    (error) => error.code === 'STALE_RUN_REVISION'
+  );
+
+  const progressed = await manager.markStepInProgress(actor, applying, 0, {
+    expectedRevision: applying.runRevision,
+    executionOperationId: 'operation-1',
+  });
+  assert.equal(progressed.runRevision, 3);
+});
+
 test('CraftingRunManager freezes and resumes v1 gates while preserving legacy world-time behavior', async () => {
   setupGlobals(1000);
   const actor = new FakeActor('Paused crafter');
