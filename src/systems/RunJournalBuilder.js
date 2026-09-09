@@ -1,4 +1,5 @@
 import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
+import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 
 import {
   actorToOption,
@@ -12,6 +13,8 @@ import {
 } from './gatheringEngineInternals.js';
 import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
+import { readStackQuantity } from './itemStackQuantity.js';
+import { resolvedEssencesFor } from './scopedEntityReads.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 // Generic player-facing label for a blind gathering run, shared with the
@@ -34,7 +37,24 @@ const MODE_LABEL_KEYS = Object.freeze({
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 const EXECUTION_JOURNAL_STATUSES = new Set(['planned', 'committed', 'recoveryRequired']);
 const EXECUTION_EFFECT_PHASES = new Set(['planned', 'applying', 'applied']);
-const SAFE_EXECUTION_EFFECT_KINDS = new Set(['executeCraftingStage', 'consumeItems', 'awardItems']);
+const SAFE_EXECUTION_EFFECT_KINDS = new Set([
+  'executeCraftingStage',
+  'consumeItems',
+  'awardItems',
+  'consumeIngredients',
+  'consumeAlchemyExtras',
+  'spendCurrency',
+  'applyToolUsage',
+  'spendItemPilesCurrency',
+  'awardResults',
+  'finalizeCraftingStage',
+  'recordRecipeUse',
+  'learnAlchemyRecipe',
+  'fireComplications',
+  'postCraftChat',
+  'recordAlchemyDeadEnd',
+  'consumeAlchemyItems',
+]);
 
 /**
  * Defensively drop models that repeat a native run identity, keeping the first
@@ -743,23 +763,39 @@ export class RunJournalBuilder {
       optionOverrides,
       essenceAllocation,
     });
+    const system = this._getSystem(stringOrNull(recipe?.craftingSystemId));
+    const choices = normalizeList(ingredientSet.ingredientGroups)
+      .filter((group) => normalizeList(group?.options).length > 1)
+      .map((group) =>
+        this._choiceAvailability({
+          group,
+          ingredientSet,
+          recipe,
+          actor,
+          items,
+          optionOverrides,
+          essenceAllocation,
+          system,
+          selection,
+        })
+      );
+    const choicesByGroup = new Map(choices.map((choice) => [choice.groupId, choice]));
     return {
       success: selection?.success === true,
       missingGroups: normalizeList(selection?.missingGroups).map(safeMissingGroup),
-      choices: normalizeList(ingredientSet.ingredientGroups)
-        .filter((group) => normalizeList(group?.options).length > 1)
-        .map((group) =>
-          this._choiceAvailability({
-            group,
-            ingredientSet,
-            recipe,
-            actor,
-            items,
-            optionOverrides,
-            essenceAllocation,
-          })
-        ),
-      essencePool: safeEssencePool(selection?.essencePool),
+      choices,
+      requirements: normalizeList(ingredientSet.ingredientGroups).map((group) =>
+        this._requirementPresentation({
+          group,
+          recipe,
+          items,
+          optionOverrides,
+          selection,
+          system,
+          choice: choicesByGroup.get(stringOrNull(group?.id)) ?? null,
+        })
+      ),
+      essencePool: this._safeEssencePool(selection?.essencePool, system),
     };
   }
 
@@ -805,10 +841,12 @@ export class RunJournalBuilder {
     items,
     optionOverrides,
     essenceAllocation,
+    system,
+    selection,
   }) {
     const groupId = stringOrNull(group?.id);
-    const selectedOptionIndex = normalizeOptionIndex(optionOverrides?.[groupId]?.optionIndex);
-    const options = normalizeList(group?.options).map((_option, index) => {
+    const selectedOptionIndex = selectedIngredientIndex(group, optionOverrides, selection);
+    const options = normalizeList(group?.options).map((option, index) => {
       const candidate = this._resolveIngredientSelection({
         ingredientSet,
         recipe,
@@ -823,9 +861,129 @@ export class RunJournalBuilder {
       const optionMissing = normalizeList(candidate?.missingGroups).some(
         (missing) => missingGroupId(missing) === groupId
       );
-      return { index, available: !optionMissing };
+      return this._ingredientOptionPresentation({
+        group,
+        option,
+        index,
+        available: !optionMissing,
+        recipe,
+        items,
+        system,
+      });
     });
     return { groupId, selectedOptionIndex, options };
+  }
+
+  _requirementPresentation({ group, recipe, items, optionOverrides, selection, system, choice }) {
+    const groupId = stringOrNull(group?.id);
+    const selectedOptionIndex = selectedIngredientIndex(group, optionOverrides, selection);
+    const option = normalizeList(group?.options)[selectedOptionIndex] ?? null;
+    const selectedMissing = normalizeList(selection?.missingGroups).some(
+      (missing) => missingGroupId(missing) === groupId
+    );
+    return {
+      groupId,
+      name: stringOrEmpty(group?.name),
+      selectedOptionIndex,
+      selectedItemId: stringOrNull(optionOverrides?.[groupId]?.heldItemId),
+      option:
+        choice?.options?.[selectedOptionIndex] ??
+        this._ingredientOptionPresentation({
+          group,
+          option,
+          index: selectedOptionIndex,
+          available: !selectedMissing,
+          recipe,
+          items,
+          system,
+        }),
+    };
+  }
+
+  _ingredientOptionPresentation({ group, option, index, available, recipe, items, system }) {
+    const match = plainObjectOrNull(option?.match);
+    const kind = ingredientKind(option);
+    const definition =
+      kind === 'essence'
+        ? (resolvedEssencesFor(system).find((entry) => entry?.id === match?.essenceId) ?? null)
+        : null;
+    const componentId = kind === 'component' ? stringOrNull(match?.componentId) : null;
+    const component = componentId
+      ? this._getComponent(stringOrNull(recipe?.craftingSystemId), componentId)
+      : null;
+    const candidates = this._ingredientCandidates({ option, recipe, items });
+    const name = ingredientOptionName({ group, option, kind, match, definition, component });
+    return {
+      index,
+      id: stringOrNull(option?.id) || `${stringOrEmpty(group?.id)}:${index}`,
+      kind,
+      name,
+      img:
+        stringOrNull(component?.img) ||
+        (kind === 'item' ? stringOrNull(candidates[0]?.img) : null) ||
+        (kind === 'tag' ? stringOrNull(candidates[0]?.img) : null),
+      icon: stringOrNull(definition?.icon),
+      colorToken: stringOrNull(definition?.colorToken),
+      need: ingredientNeed(option),
+      available: available === true,
+      candidates,
+    };
+  }
+
+  _ingredientCandidates({ option, recipe, items }) {
+    const kind = ingredientKind(option);
+    if (!['component', 'tag', 'item'].includes(kind)) return [];
+    const matcher = this._recipeManager?.ingredientMatchesItem;
+    if (typeof matcher !== 'function') return [];
+    const need = ingredientNeed(option);
+    return items
+      .filter((item) =>
+        matcher.call(this._recipeManager, recipe, option, item, this._resolveComponentForItem)
+      )
+      .map((item) => {
+        const held = readStackQuantity(item);
+        return {
+          itemId: stringOrNull(item?.uuid) || stringOrNull(idOf(item)),
+          name: stringOrEmpty(item?.name),
+          img: stringOrNull(item?.img),
+          held,
+          available: held >= need,
+        };
+      });
+  }
+
+  _safeEssencePool(pool, system) {
+    if (!pool || typeof pool !== 'object') return null;
+    const definitions = new Map(
+      resolvedEssencesFor(system).map((definition) => [stringOrNull(definition?.id), definition])
+    );
+    return {
+      requirements: normalizeList(pool.requirements).map((requirement) => {
+        const definition = definitions.get(stringOrNull(requirement?.essenceId));
+        return {
+          groupId: stringOrNull(requirement?.groupId),
+          essenceId: stringOrNull(requirement?.essenceId),
+          name: stringOrEmpty(definition?.name) || stringOrEmpty(requirement?.essenceId),
+          icon: stringOrNull(definition?.icon),
+          colorToken: stringOrNull(definition?.colorToken),
+          need: numberOrNull(requirement?.need) ?? 0,
+          delivered: numberOrNull(requirement?.delivered) ?? 0,
+          owned: numberOrNull(requirement?.owned) ?? 0,
+          satisfied: requirement?.satisfied === true,
+        };
+      }),
+      carriers: normalizeList(pool.carriers).map((carrier) => ({
+        itemKey: stringOrNull(carrier?.itemKey),
+        name: stringOrNull(carrier?.item?.name),
+        img: stringOrNull(carrier?.item?.img),
+        perUnit: cloneJson(carrier?.perUnit) ?? {},
+        ownedUnits: numberOrNull(carrier?.ownedUnits) ?? 0,
+        allocatedUnits: numberOrNull(carrier?.allocatedUnits) ?? 0,
+      })),
+      allocation: cloneJson(pool.allocation) ?? {},
+      suggested: cloneJson(pool.suggested) ?? {},
+      totals: cloneJson(pool.totals) ?? {},
+    };
   }
 
   _scopedEssenceAllocation(plan, runStep, ingredientSet) {
@@ -1070,14 +1228,17 @@ export class RunJournalBuilder {
         ? numberOrNull(run.completedAtWorldTime)
         : numberOrNull(run.finishedAt);
 
+    const gatheringContext =
+      runType === 'gathering' ? this._gatheringRunDisplayTask({ run, viewer }) : null;
     const { title, img, blindSecretPreview } = this._passthroughRunIdentity({
       run,
       runType,
       viewer,
+      gatheringContext,
       fallbackTitle: stringOrEmpty(run.label) || stringOrEmpty(run.taskId),
     });
     const hasPlayerCheck =
-      runType === 'gathering' ? this._gatheringRunHasPlayerCheck({ run, viewer }) : false;
+      runType === 'gathering' ? this._gatheringRunHasPlayerCheck(gatheringContext) : false;
 
     const derivedStatus = this._derivePassthroughStatus({ status, timeGate, worldTime, run });
     return {
@@ -1118,6 +1279,10 @@ export class RunJournalBuilder {
       finishedAt,
       structureLabel: '',
       resolutionModeLabel: '',
+      gatheringYield:
+        runType === 'gathering'
+          ? this._gatheringYield({ run, system, context: gatheringContext })
+          : null,
       recipeId: null,
       taskId: stringOrNull(run.taskId),
       // GM-only marker: this row names a task the acting player cannot see.
@@ -1142,8 +1307,10 @@ export class RunJournalBuilder {
    * @returns {{title: string, img: string, blindSecretPreview: boolean}}
    * @private
    */
-  _passthroughRunIdentity({ run, runType, viewer, fallbackTitle }) {
-    if (runType === 'gathering') return this._gatheringRunIdentity({ run, viewer, fallbackTitle });
+  _passthroughRunIdentity({ run, runType, viewer, gatheringContext = null, fallbackTitle }) {
+    if (runType === 'gathering') {
+      return this._gatheringRunIdentity({ run, viewer, context: gatheringContext, fallbackTitle });
+    }
     if (runType === 'salvage') return this._salvageRunIdentity({ run, fallbackTitle });
     return { title: fallbackTitle, img: DEFAULT_RUN_IMAGE, blindSecretPreview: false };
   }
@@ -1166,8 +1333,8 @@ export class RunJournalBuilder {
    * @returns {{title: string, img: string, blindSecretPreview: boolean}}
    * @private
    */
-  _gatheringRunIdentity({ run, viewer, fallbackTitle }) {
-    const { blind, secret, task } = this._gatheringRunDisplayTask({ run, viewer });
+  _gatheringRunIdentity({ run, viewer, context = null, fallbackTitle }) {
+    const { blind, secret, task } = context ?? this._gatheringRunDisplayTask({ run, viewer });
     return {
       title:
         stringOrEmpty(task?.name) || (blind ? this.localize(BLIND_TASK_LABEL_KEY) : fallbackTitle),
@@ -1176,8 +1343,7 @@ export class RunJournalBuilder {
     };
   }
 
-  _gatheringRunHasPlayerCheck({ run, viewer }) {
-    const { task } = this._gatheringRunDisplayTask({ run, viewer });
+  _gatheringRunHasPlayerCheck({ task } = {}) {
     const resolutionMode = stringOrNull(task?.resolutionMode) || 'd100';
     return resolutionMode !== 'straight';
   }
@@ -1196,16 +1362,135 @@ export class RunJournalBuilder {
       return {
         blind: false,
         secret: false,
-        task: this._getGatheringTask(environmentId, stringOrNull(run.taskId)),
+        task:
+          plainObjectOrNull(run?.economyEvidence?.runtimeSnapshot?.task) ??
+          this._getGatheringTask(environmentId, stringOrNull(run.taskId)),
       };
     }
     // Only a GM may see behind the marker, and only through the GM-owned store.
     const record = viewer?.isGM === true ? this._getGatheringBlindSecret?.(run.id) : null;
     if (!record) return { blind: true, secret: false, task: null };
     const task =
-      this._getGatheringTask(environmentId, stringOrNull(record.taskId)) ??
-      plainObjectOrNull(record.snapshot?.task);
+      plainObjectOrNull(record.snapshot?.task) ??
+      this._getGatheringTask(environmentId, stringOrNull(record.taskId));
     return { blind: true, secret: Boolean(task), task };
+  }
+
+  _gatheringYield({ run, system, context }) {
+    if (!context?.task || (context.blind && !context.secret)) return null;
+    const mode = stringOrNull(context.task.resolutionMode) || 'd100';
+    if (!['straight', 'd100', 'routed'].includes(mode)) return null;
+    return {
+      mode,
+      entries:
+        mode === 'straight'
+          ? this._straightYieldEntries(context.task, stringOrNull(run.craftingSystemId))
+          : mode === 'd100'
+            ? this._d100YieldEntries(context.task, run, stringOrNull(run.craftingSystemId))
+            : [],
+      roll: this._gatheringActualRoll(run),
+      tiers:
+        mode === 'routed'
+          ? this._routedYieldTiers(context.task, system, stringOrNull(run.craftingSystemId))
+          : [],
+    };
+  }
+
+  _straightYieldEntries(task, systemId) {
+    return normalizeList(task?.resultGroups).flatMap((group) =>
+      normalizeList(group?.results).map((result, index) =>
+        this._yieldEntry(result, systemId, index, 100)
+      )
+    );
+  }
+
+  _d100YieldEntries(task, run, systemId) {
+    const actualById = new Map(
+      normalizeList(run?.checkResult?.items)
+        .filter((item) => stringOrNull(item?.id))
+        .map((item) => [stringOrNull(item.id), item])
+    );
+    return normalizeList(task?.dropRows ?? task?.itemDrops)
+      .filter((row) => row?.enabled !== false)
+      .map((row, index) => {
+        const actual = actualById.get(stringOrNull(row?.id));
+        const chance = numberOrNull(actual?.finalDropRate) ?? numberOrNull(row?.dropRate) ?? 0;
+        return this._yieldEntry(row, systemId, index, Math.min(100, Math.max(0, chance)));
+      });
+  }
+
+  _yieldEntry(result, systemId, index, chance) {
+    const mapped = this._mapResult(result, systemId);
+    return compactPresentation({
+      id:
+        stringOrNull(result?.id) ||
+        stringOrNull(mapped.componentId) ||
+        stringOrNull(mapped.itemUuid) ||
+        `yield-${index + 1}`,
+      name: stringOrEmpty(mapped.name) || stringOrEmpty(result?.name),
+      art: stringOrNull(mapped.img),
+      icon: stringOrNull(result?.icon),
+      tint: stringOrNull(result?.tint ?? result?.colorToken),
+      qty: numberOrNull(result?.quantity) ?? 1,
+      chance,
+    });
+  }
+
+  _gatheringActualRoll(run) {
+    const result = plainObjectOrNull(run?.checkResult);
+    const candidates = [
+      result?.value,
+      result?.roll,
+      result?.data?.total,
+      ...normalizeList(result?.items).map((item) => item?.roll),
+    ];
+    return candidates.map(numberOrNull).find((value) => value !== null) ?? null;
+  }
+
+  _routedYieldTiers(task, system, systemId) {
+    const routed = plainObjectOrNull(system?.gatheringCraftingCheck?.routed) ?? {};
+    const outcomes =
+      routed.type === 'fixed'
+        ? normalizeList(routed.fixedOutcomes)
+        : normalizeList(routed.relativeOutcomes);
+    const groupsByName = new Map();
+    for (const group of normalizeList(task?.resultGroups)) {
+      const name = normalizeName(group?.name);
+      groupsByName.set(name, [...(groupsByName.get(name) ?? []), group]);
+    }
+    const permitFailure = activityPermitsFailureResults(system, 'gathering');
+    return outcomes.map((outcome, index) => {
+      const fail = outcome?.success !== true;
+      const groups = groupsByName.get(normalizeName(outcome?.name)) ?? [];
+      const results =
+        fail && !permitFailure ? [] : groups.flatMap((group) => normalizeList(group?.results));
+      return {
+        id: stringOrNull(outcome?.id) || `tier-${index + 1}`,
+        name: stringOrEmpty(outcome?.name).trim(),
+        band: routedOutcomeBand(outcome, routed, task),
+        fail,
+        yields: results.map((result, resultIndex) =>
+          this._tierYield(result, systemId, resultIndex)
+        ),
+      };
+    });
+  }
+
+  _tierYield(result, systemId, index) {
+    const mapped = this._mapResult(result, systemId);
+    const quantity = numberOrNull(result?.quantity) ?? 1;
+    return compactPresentation({
+      id:
+        stringOrNull(result?.id) ||
+        stringOrNull(mapped.componentId) ||
+        stringOrNull(mapped.itemUuid) ||
+        `result-${index + 1}`,
+      name: stringOrEmpty(mapped.name) || stringOrEmpty(result?.name),
+      art: stringOrNull(mapped.img),
+      icon: stringOrNull(result?.icon),
+      tint: stringOrNull(result?.tint ?? result?.colorToken),
+      quantity: `×${quantity}`,
+    });
   }
 
   /**
@@ -1400,9 +1685,80 @@ function safePrimitive(value) {
   return String(value);
 }
 
+function compactPresentation(value) {
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([, entry]) => entry !== null && entry !== undefined && entry !== ''
+    )
+  );
+}
+
+function normalizeName(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase();
+}
+
+function routedOutcomeBand(outcome, routed, task) {
+  if (routed?.type === 'fixed') {
+    const start = numberOrNull(outcome?.start) ?? 0;
+    const end = numberOrNull(outcome?.end) ?? start;
+    return start === end ? String(start) : `${start}–${end}`;
+  }
+  const baseDc = numberOrNull(task?.dcOverride) ?? numberOrNull(routed?.dc) ?? 15;
+  const threshold = baseDc + (numberOrNull(outcome?.dc) ?? 0);
+  return routed?.thresholdMode === 'exceed' ? `>${threshold}` : `${threshold}+`;
+}
+
 function normalizeOptionIndex(value) {
   const index = Number(value);
   return Number.isSafeInteger(index) && index >= 0 ? index : 0;
+}
+
+function selectedIngredientIndex(group, optionOverrides, selection) {
+  const options = normalizeList(group?.options);
+  const groupId = stringOrNull(group?.id);
+  const override = Number(optionOverrides?.[groupId]?.optionIndex);
+  if (Number.isSafeInteger(override) && override >= 0 && override < options.length) return override;
+  const selected = normalizeList(selection?.selectedIngredients).find((ingredient) =>
+    options.includes(ingredient)
+  );
+  const selectedIndex = options.indexOf(selected);
+  return selectedIndex >= 0 ? selectedIndex : 0;
+}
+
+function ingredientKind(option) {
+  if (option?.itemUuid) return 'item';
+  const type = option?.match?.type;
+  if (type === 'tags') return 'tag';
+  if (['component', 'essence', 'currency'].includes(type)) return type;
+  return 'unknown';
+}
+
+function ingredientNeed(option) {
+  const match = plainObjectOrNull(option?.match);
+  if (match?.type === 'essence' || match?.type === 'currency') {
+    return Math.max(0, numberOrNull(match.amount) ?? 0);
+  }
+  return Math.max(0, numberOrNull(option?.quantity) ?? 1);
+}
+
+function ingredientOptionName({ group, option, kind, match, definition, component }) {
+  if (kind === 'component') {
+    return stringOrEmpty(component?.name) || stringOrEmpty(match?.componentId);
+  }
+  if (kind === 'essence') {
+    const essenceName = stringOrEmpty(definition?.name) || stringOrEmpty(match?.essenceId);
+    return essenceName ? `${essenceName} essence` : '';
+  }
+  if (kind === 'currency') {
+    return `${ingredientNeed(option)} ${stringOrEmpty(match?.unit)}`.trim();
+  }
+  if (kind === 'tag') {
+    const tags = normalizeList(match?.tags).map(stringOrEmpty).filter(Boolean);
+    return tags.join(match?.tagMatch === 'all' ? ' & ' : ' | ') || stringOrEmpty(group?.name);
+  }
+  return stringOrEmpty(option?.name) || stringOrEmpty(group?.name);
 }
 
 function safeMissingGroup(group) {
@@ -1418,29 +1774,4 @@ function safeMissingGroup(group) {
 
 function missingGroupId(group) {
   return stringOrNull(group?.group?.id ?? group?.groupId ?? group?.id);
-}
-
-function safeEssencePool(pool) {
-  if (!pool || typeof pool !== 'object') return null;
-  return {
-    requirements: normalizeList(pool.requirements).map((requirement) => ({
-      groupId: stringOrNull(requirement?.groupId),
-      essenceId: stringOrNull(requirement?.essenceId),
-      need: numberOrNull(requirement?.need) ?? 0,
-      delivered: numberOrNull(requirement?.delivered) ?? 0,
-      owned: numberOrNull(requirement?.owned) ?? 0,
-      satisfied: requirement?.satisfied === true,
-    })),
-    carriers: normalizeList(pool.carriers).map((carrier) => ({
-      itemKey: stringOrNull(carrier?.itemKey),
-      name: stringOrNull(carrier?.item?.name),
-      img: stringOrNull(carrier?.item?.img),
-      perUnit: cloneJson(carrier?.perUnit) ?? {},
-      ownedUnits: numberOrNull(carrier?.ownedUnits) ?? 0,
-      allocatedUnits: numberOrNull(carrier?.allocatedUnits) ?? 0,
-    })),
-    allocation: cloneJson(pool.allocation) ?? {},
-    suggested: cloneJson(pool.suggested) ?? {},
-    totals: cloneJson(pool.totals) ?? {},
-  };
 }

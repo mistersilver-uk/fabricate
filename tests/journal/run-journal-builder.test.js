@@ -131,12 +131,14 @@ function makeBuilder({
   worldTime = 200,
   recipeVisibility = null,
   gatheringActive = [],
+  gatheringHistory = [],
   salvageActive = [],
   salvageHistory = [],
   mode = 'simple',
   system = SYSTEM,
   recipe = RECIPE,
   getGatheringTask = null,
+  getGatheringBlindSecret = null,
   getResultItem = null,
   getComponent = null,
   getComponentSourceActors = null,
@@ -157,7 +159,7 @@ function makeBuilder({
     },
     gatheringRunSource: {
       getActiveRuns: () => gatheringActive,
-      getRunHistory: () => [],
+      getRunHistory: () => gatheringHistory,
     },
     recipeManager: {
       getRecipe: (id) => (id === recipe.id ? recipe : null),
@@ -172,6 +174,7 @@ function makeBuilder({
       return tool ? { id: tool.id, name: tool.label } : null;
     },
     getGatheringTask,
+    getGatheringBlindSecret,
     getResultItem,
     getComponent,
     getComponentSourceActors,
@@ -512,6 +515,234 @@ test('gathering run falls back to the raw taskId + default image when the task i
 
   assert.equal(run.names.title, 'mwTaskUnknown');
   assert.equal(run.img, 'icons/svg/item-bag.svg');
+});
+
+test('gathering yield projects straight and d100 authored previews without replacing historical awards', () => {
+  const straightTask = {
+    id: 'straight-task',
+    name: 'Quarry',
+    resolutionMode: 'straight',
+    resultGroups: [
+      {
+        id: 'stone-group',
+        name: 'Stone',
+        results: [{ id: 'stone-result', componentId: 'stone', quantity: 3 }],
+      },
+    ],
+  };
+  const d100Task = {
+    id: 'd100-task',
+    name: 'Bog',
+    resolutionMode: 'd100',
+    dropRows: [
+      { id: 'moss-row', componentId: 'moss', quantity: 2, dropRate: 65, enabled: true },
+      { id: 'disabled-row', componentId: 'secret', quantity: 9, dropRate: 100, enabled: false },
+    ],
+  };
+  const historyRun = {
+    id: 'd100-history',
+    craftingSystemId: 'sys-1',
+    environmentId: 'env-1',
+    taskId: 'd100-task',
+    status: 'succeeded',
+    checkResult: { provider: 'd100', items: [{ id: 'moss-row', roll: 42, finalDropRate: 71 }] },
+    createdResults: [{ componentId: 'moss', quantity: 2, name: 'Bog Moss', img: 'icons/moss.webp' }],
+  };
+  const listing = makeBuilder({
+    gatheringActive: [
+      {
+        id: 'straight-active',
+        craftingSystemId: 'sys-1',
+        environmentId: 'env-1',
+        taskId: 'straight-task',
+        status: 'inProgress',
+      },
+    ],
+    gatheringHistory: [historyRun],
+    getGatheringTask: (_environmentId, taskId) =>
+      taskId === straightTask.id ? straightTask : d100Task,
+    getComponent: (_systemId, componentId) => ({
+      id: componentId,
+      name: componentId === 'stone' ? 'Granite' : 'Bog Moss',
+      img: componentId === 'stone' ? 'icons/granite.webp' : 'icons/moss.webp',
+    }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER });
+
+  assert.deepEqual(listing.activeRuns[0].gatheringYield, {
+    mode: 'straight',
+    entries: [
+      {
+        id: 'stone-result',
+        name: 'Granite',
+        art: 'icons/granite.webp',
+        qty: 3,
+        chance: 100,
+      },
+    ],
+    roll: null,
+    tiers: [],
+  });
+  assert.deepEqual(listing.history[0].gatheringYield, {
+    mode: 'd100',
+    entries: [
+      {
+        id: 'moss-row',
+        name: 'Bog Moss',
+        art: 'icons/moss.webp',
+        qty: 2,
+        chance: 71,
+      },
+    ],
+    roll: 42,
+    tiers: [],
+  });
+  assert.deepEqual(listing.history[0].createdResults, [
+    {
+      componentId: 'moss',
+      itemUuid: null,
+      quantity: 2,
+      name: 'Bog Moss',
+      img: 'icons/moss.webp',
+    },
+  ]);
+});
+
+test('gathering routed yield uses authored tier bands, normalized group names, and failure policy', () => {
+  const system = {
+    ...SYSTEM,
+    gatheringCraftingCheck: {
+      failureResultPolicy: 'never',
+      routed: {
+        type: 'relative',
+        dc: 12,
+        thresholdMode: 'meet',
+        relativeOutcomes: [
+          { id: 'fail', name: ' Setback ', success: false, dc: -4 },
+          { id: 'pass', name: 'Bounty', success: true, dc: 3 },
+        ],
+      },
+    },
+  };
+  const task = {
+    id: 'routed-task',
+    name: 'Hunt',
+    resolutionMode: 'routed',
+    dcOverride: 14,
+    resultGroups: [
+      { id: 'failure-group', name: 'setback', results: [{ id: 'hide', componentId: 'hide', quantity: 1 }] },
+      { id: 'success-group', name: ' BOUNTY ', results: [{ id: 'venison', componentId: 'venison', quantity: 4 }] },
+    ],
+  };
+  const run = makeBuilder({
+    system,
+    gatheringActive: [
+      {
+        id: 'routed',
+        craftingSystemId: system.id,
+        environmentId: 'env-1',
+        taskId: task.id,
+        status: 'inProgress',
+      },
+    ],
+    getGatheringTask: () => task,
+    getComponent: (_systemId, componentId) => ({ id: componentId, name: componentId }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+
+  assert.deepEqual(run.gatheringYield, {
+    mode: 'routed',
+    entries: [],
+    roll: null,
+    tiers: [
+      { id: 'fail', name: 'Setback', band: '10+', fail: true, yields: [] },
+      {
+        id: 'pass',
+        name: 'Bounty',
+        band: '17+',
+        fail: false,
+        yields: [{ id: 'venison', name: 'venison', quantity: '×4' }],
+      },
+    ],
+  });
+});
+
+test('gathering yield prefers the persisted task snapshot and hides opaque blind details from owners', () => {
+  const snapshotTask = {
+    id: 'old-task',
+    name: 'Old Grove',
+    resolutionMode: 'd100',
+    dropRows: [{ id: 'old-herb', name: 'Old Herb', quantity: 1, dropRate: 25 }],
+  };
+  const currentTask = {
+    id: 'old-task',
+    name: 'Edited Grove',
+    resolutionMode: 'straight',
+    resultGroups: [],
+  };
+  const blindTask = {
+    id: 'secret-task',
+    name: 'Secret Grove',
+    resolutionMode: 'd100',
+    dropRows: [{ id: 'secret-herb', name: 'Secret Herb', quantity: 1, dropRate: 90 }],
+  };
+  const runs = [
+    {
+      id: 'snapshotted',
+      craftingSystemId: 'sys-1',
+      environmentId: 'env-1',
+      taskId: 'old-task',
+      status: 'waitingTime',
+      economyEvidence: { runtimeSnapshot: { task: snapshotTask } },
+    },
+    {
+      id: 'blind-run',
+      craftingSystemId: 'sys-1',
+      environmentId: 'env-1',
+      taskId: 'blind:env-1',
+      status: 'waitingTime',
+      checkResult: { provider: 'd100', items: [{ id: 'secret-herb', roll: 7 }] },
+    },
+  ];
+  const builder = makeBuilder({
+    gatheringActive: runs,
+    getGatheringTask: (_environmentId, taskId) =>
+      taskId === 'secret-task' ? blindTask : currentTask,
+    getGatheringBlindSecret: () => ({ taskId: 'secret-task', snapshot: { task: blindTask } }),
+  });
+
+  const playerRuns = builder.buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER }).activeRuns;
+  assert.equal(playerRuns[0].gatheringYield.mode, 'd100');
+  assert.equal(playerRuns[0].gatheringYield.entries[0].chance, 25);
+  assert.equal(playerRuns[1].gatheringYield, null);
+  assert.equal(JSON.stringify(playerRuns[1]).includes('Secret Herb'), false);
+  assert.equal(JSON.stringify(playerRuns[1]).includes('90'), false);
+
+  const gmBlind = builder.buildListing({ actor: ACTOR, viewer: GM }).activeRuns[1];
+  assert.equal(gmBlind.blindSecretPreview, true);
+  assert.equal(gmBlind.gatheringYield.mode, 'd100');
+  assert.equal(gmBlind.gatheringYield.entries[0].name, 'Secret Herb');
+  assert.equal(gmBlind.gatheringYield.roll, 7);
+});
+
+test('progressive gathering is not misrepresented as routed yield', () => {
+  const run = makeBuilder({
+    gatheringActive: [
+      {
+        id: 'progressive',
+        craftingSystemId: 'sys-1',
+        environmentId: 'env-1',
+        taskId: 'progressive-task',
+        status: 'inProgress',
+      },
+    ],
+    getGatheringTask: () => ({
+      id: 'progressive-task',
+      name: 'Long Hunt',
+      resolutionMode: 'progressive',
+      resultGroups: [{ id: 'not-a-tier', name: 'Progress', results: [] }],
+    }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+
+  assert.equal(run.gatheringYield, null);
 });
 
 test('gathering run with a blind/null taskId does not consult the task resolver', () => {
@@ -1187,7 +1418,7 @@ test('projects current lifecycle state, alchemy activity kind, pause precedence,
       effects: [
         {
           effectId: 'consume',
-          kind: 'consumeItems',
+          kind: 'consumeIngredients',
           phase: 'applied',
           planned: { itemUuid: 'Actor.secret.Item.herb' },
           receipt: { itemUuid: 'Actor.secret.Item.herb', quantity: 1 },
@@ -1201,7 +1432,7 @@ test('projects current lifecycle state, alchemy activity kind, pause precedence,
         },
         {
           effectId: 'award',
-          kind: 'awardItems',
+          kind: 'awardResults',
           phase: 'applying',
           planned: { componentId: 'secret-result' },
         },
@@ -1229,9 +1460,9 @@ test('projects current lifecycle state, alchemy activity kind, pause precedence,
     appliedEffectCount: 2,
     effectCount: 3,
     effects: [
-      { kind: 'consumeItems', phase: 'applied', hasReceipt: true },
+      { kind: 'consumeIngredients', phase: 'applied', hasReceipt: true },
       { kind: 'other', phase: 'applied', hasReceipt: true },
-      { kind: 'awardItems', phase: 'applying', hasReceipt: false },
+      { kind: 'awardResults', phase: 'applying', hasReceipt: false },
     ],
     required: true,
   });
@@ -1457,8 +1688,21 @@ test('current-step availability delegates material choices and shared essence al
   const selectedSet = {
     id: 'set-1',
     ingredientGroups: [
-      { id: 'choice', options: [{ id: 'iron' }, { id: 'silver' }] },
-      { id: 'essence', options: [{ id: 'fire', match: { type: 'essence', value: 'fire' } }] },
+      {
+        id: 'choice',
+        name: 'Metal',
+        options: [
+          { id: 'iron', quantity: 1, match: { type: 'component', componentId: 'iron' } },
+          { id: 'silver', quantity: 1, match: { type: 'component', componentId: 'silver' } },
+        ],
+      },
+      {
+        id: 'essence',
+        name: 'Essence',
+        options: [
+          { id: 'fire', match: { type: 'essence', essenceId: 'fire', amount: 2 } },
+        ],
+      },
     ],
     resolveIngredientSelection(items, matcher, options) {
       calls.push({ items, matcher, options });
@@ -1497,8 +1741,24 @@ test('current-step availability delegates material choices and shared essence al
       { ...RECIPE.getExecutionSteps()[1], ingredientSets: [selectedSet] },
     ],
   };
-  const held = { id: 'ember', uuid: 'Item.ember', name: 'Ember', img: 'icons/ember.webp' };
+  const held = {
+    id: 'ember',
+    uuid: 'Item.ember',
+    name: 'Ember',
+    img: 'icons/ember.webp',
+    system: { quantity: 3 },
+  };
   const actor = { ...ACTOR, isOwner: true, items: [held] };
+  const system = {
+    ...SYSTEM,
+    components: [
+      { id: 'iron', name: 'Iron Ingot', img: 'icons/iron.webp' },
+      { id: 'silver', name: 'Silver Ingot', img: 'icons/silver.webp' },
+    ],
+    essenceDefinitions: [
+      { id: 'fire', name: 'Fire', icon: 'fas fa-fire', colorToken: 'ember' },
+    ],
+  };
   const run = activeCraftingRun({
     lifecycleVersion: 1,
     steps: [
@@ -1519,6 +1779,7 @@ test('current-step availability delegates material choices and shared essence al
   });
   const step = makeBuilder({
     active: [run],
+    system,
     recipe,
     ingredientMatchesItem: (_recipe, ingredient, item) => ingredient.id === 'iron' && item.id === 'ember',
     resolveItemEssences: ({ item, recipe: resolvedRecipe }) => {
@@ -1527,6 +1788,8 @@ test('current-step availability delegates material choices and shared essence al
       return { fire: 1 };
     },
     affordCurrency: () => true,
+    getComponent: (_systemId, componentId) =>
+      system.components.find((component) => component.id === componentId) ?? null,
   }).buildListing({ actor, viewer: PLAYER }).activeRuns[0].currentStep;
 
   assert.equal(calls.length, 3, 'one selected resolve plus one canonical resolve per choice option');
@@ -1549,11 +1812,102 @@ test('current-step availability delegates material choices and shared essence al
       {
         groupId: 'choice',
         selectedOptionIndex: 0,
-        options: [{ index: 0, available: true }, { index: 1, available: false }],
+        options: [
+          {
+            index: 0,
+            id: 'iron',
+            kind: 'component',
+            name: 'Iron Ingot',
+            img: 'icons/iron.webp',
+            icon: null,
+            colorToken: null,
+            need: 1,
+            available: true,
+            candidates: [
+              {
+                itemId: 'Item.ember',
+                name: 'Ember',
+                img: 'icons/ember.webp',
+                held: 3,
+                available: true,
+              },
+            ],
+          },
+          {
+            index: 1,
+            id: 'silver',
+            kind: 'component',
+            name: 'Silver Ingot',
+            img: 'icons/silver.webp',
+            icon: null,
+            colorToken: null,
+            need: 1,
+            available: false,
+            candidates: [],
+          },
+        ],
+      },
+    ],
+    requirements: [
+      {
+        groupId: 'choice',
+        name: 'Metal',
+        selectedOptionIndex: 0,
+        selectedItemId: 'Item.ember',
+        option: {
+          index: 0,
+          id: 'iron',
+          kind: 'component',
+          name: 'Iron Ingot',
+          img: 'icons/iron.webp',
+          icon: null,
+          colorToken: null,
+          need: 1,
+          available: true,
+          candidates: [
+            {
+              itemId: 'Item.ember',
+              name: 'Ember',
+              img: 'icons/ember.webp',
+              held: 3,
+              available: true,
+            },
+          ],
+        },
+      },
+      {
+        groupId: 'essence',
+        name: 'Essence',
+        selectedOptionIndex: 0,
+        selectedItemId: null,
+        option: {
+          index: 0,
+          id: 'fire',
+          kind: 'essence',
+          name: 'Fire essence',
+          img: null,
+          icon: 'fas fa-fire',
+          colorToken: 'ember',
+          need: 2,
+          available: true,
+          candidates: [],
+        },
       },
     ],
     essencePool: {
-      requirements: [{ groupId: 'essence', essenceId: 'fire', need: 2, delivered: 2, owned: 3, satisfied: true }],
+      requirements: [
+        {
+          groupId: 'essence',
+          essenceId: 'fire',
+          name: 'Fire',
+          icon: 'fas fa-fire',
+          colorToken: 'ember',
+          need: 2,
+          delivered: 2,
+          owned: 3,
+          satisfied: true,
+        },
+      ],
       carriers: [{ itemKey: 'Item.ember', name: 'Ember', img: 'icons/ember.webp', perUnit: { fire: 1 }, ownedUnits: 3, allocatedUnits: 2 }],
       allocation: { 'Item.ember': 2 },
       suggested: { 'Item.ember': 2 },
