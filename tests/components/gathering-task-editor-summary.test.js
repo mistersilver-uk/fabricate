@@ -98,5 +98,16 @@ describe('Selected gathering task — drops summary lives in the inspector', () 
     assert.ok(editorSource.includes('<RecipeResultGroupCard'));
     assert.equal(editorSource.includes('checkOutcomeIds'), false);
     assert.ok(rootSource.includes("editingGatheringTask?.resolutionMode || 'd100'"));
+    assert.ok(
+      rootSource.includes(
+        'Edit identity, availability, resolution, and results for the selected gathering task.'
+      )
+    );
+  });
+
+  it('renders active result validation beside the result editor', () => {
+    assert.ok(editorSource.includes('resultValidationErrors = []'));
+    assert.ok(editorSource.includes('data-gathering-task-results-validation'));
+    assert.ok(rootSource.includes('resultValidationErrors={gatheringTaskValidation.resultErrors'));
   });
 });

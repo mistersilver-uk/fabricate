@@ -3757,12 +3757,25 @@
   // `tests/manager-full-width-gate.test.js` asserts set equality between these and the
   // stylesheet's own, so a route released here and not there (or the reverse) fails at test
   // time rather than as a dead 300px strip.
+  function isGatheringTaskFullWidth(view, context) {
+    return view === 'gathering-task-edit' && context.resultGroupTaskMode === true;
+  }
+
   const FULL_WIDTH_VIEWS = Object.freeze([
     {
       id: 'environment-edit',
       layoutClass: 'full-width-2-track',
       selector: '.fabricate-manager[data-manager-view="environment-edit"] .manager-body',
       predicate: (view) => view === 'environment-edit',
+    },
+    {
+      // ROUTE + EDITOR MODE. d100 keeps its drop inspector; Direct and Check own all of
+      // their result authoring in the main pane, so the shared inspector has no content.
+      id: 'gathering-task-edit',
+      layoutClass: 'full-width-2-track',
+      selector:
+        '.fabricate-manager[data-manager-view="gathering-task-edit"][data-gathering-task-layout="results"] .manager-body',
+      predicate: isGatheringTaskFullWidth,
     },
     {
       // A FAMILY, not a token: `checks` became four child routes plus a retained redirect
@@ -3898,12 +3911,6 @@
       predicate: (view) => view === 'world-vocabulary',
     },
   ]);
-  // The ONE read of the set. `null` means the route keeps its inspector.
-  const fullWidthLayout = $derived(
-    FULL_WIDTH_VIEWS.find((entry) =>
-      entry.predicate(currentView, { travelTab: activeTravelTab })
-    ) ?? null
-  );
   // Which sub-item the rail marks as current, and the `data-world-rules-tab` marker the CSS and
   // the View Lab read.
   const worldRulesTab = $derived(
@@ -4774,6 +4781,21 @@
       null
   );
   const editingGatheringTask = $derived(gatheringTaskDraft || selectedGatheringTask);
+  const gatheringTaskResolutionMode = $derived(editingGatheringTask?.resolutionMode || 'd100');
+  function isGatheringResultGroupMode(mode) {
+    return ['straight', 'routed'].includes(mode);
+  }
+  // The ONE read of the full-width set. `null` means the route keeps its inspector. Gathering
+  // passes its selected task mode into this same decision so aside suppression and track release
+  // cannot disagree during a mode switch.
+  const fullWidthLayout = $derived(
+    FULL_WIDTH_VIEWS.find((entry) =>
+      entry.predicate(currentView, {
+        travelTab: activeTravelTab,
+        resultGroupTaskMode: isGatheringResultGroupMode(gatheringTaskResolutionMode),
+      })
+    ) ?? null
+  );
   const gatheringTaskRoutedOutcomeTiers = $derived.by(() =>
     routedTierOptionsForPolicy(
       selectedSystem?.gatheringCraftingCheck?.routed,
@@ -5713,7 +5735,7 @@
     if (currentView === 'gathering-task-edit')
       return text(
         'FABRICATE.Admin.Manager.Environment.Tasks.EditSubtitle',
-        'Edit availability, identity, and drop rules for the selected gathering task.'
+        'Edit identity, availability, resolution, and results for the selected gathering task.'
       );
     if (currentView === 'gathering-event-edit')
       return text(
@@ -10263,6 +10285,9 @@
 <div
   class="fabricate-manager"
   data-manager-view={currentView}
+  data-gathering-task-layout={fullWidthLayout?.id === 'gathering-task-edit'
+    ? 'results'
+    : undefined}
   data-world-travel-tab={worldTravelTabAttribute}
   data-world-rules-tab={isWorldRulesRoute ? worldRulesTab : undefined}
 >
@@ -13109,8 +13134,9 @@
         task={editingGatheringTask}
         staminaEnabled={selectedGatheringTaskStaminaEnabled}
         nodesEnabled={selectedGatheringTaskNodesEnabled}
-        resolutionMode={editingGatheringTask?.resolutionMode || 'd100'}
+        resolutionMode={gatheringTaskResolutionMode}
         routedOutcomeTiers={gatheringTaskRoutedOutcomeTiers}
+        resultValidationErrors={gatheringTaskValidation.resultErrors || []}
         {itemCards}
         managedItemOptions={selectedSystem.managedItemOptions || []}
         weatherOptions={gatheringConditionOptions('weather')}

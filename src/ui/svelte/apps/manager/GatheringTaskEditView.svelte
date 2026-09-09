@@ -27,6 +27,7 @@
     nodesEnabled = false,
     resolutionMode = null,
     routedOutcomeTiers = [],
+    resultValidationErrors = [],
     itemCards = [],
     managedItemOptions = [],
     weatherOptions = [],
@@ -69,6 +70,11 @@
         : 'd100'
   );
   const resultGroups = $derived(Array.isArray(task?.resultGroups) ? task.resultGroups : []);
+  const activeResultValidationErrors = $derived(
+    (Array.isArray(resultValidationErrors) ? resultValidationErrors : [])
+      .map((error) => String(error || '').trim())
+      .filter(Boolean)
+  );
   const resolutionModeOptions = [
     {
       value: 'straight',
@@ -1892,6 +1898,21 @@
       {/if}
     </section>
 
+    {#snippet resultValidationSummary()}
+      {#if activeResultValidationErrors.length > 0}
+        <div class="manager-warning-band" data-gathering-task-results-validation>
+          <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+          <div>
+            <ul>
+              {#each activeResultValidationErrors as error, index (index)}
+                <li>{error}</li>
+              {/each}
+            </ul>
+          </div>
+        </div>
+      {/if}
+    {/snippet}
+
     {#if taskResolutionMode === 'straight'}
       <section class="manager-task-results-card" data-gathering-task-results="straight">
         {@render taskCardHeader(
@@ -1901,6 +1922,7 @@
             'Direct gathering awards every item in this one result set without a yield roll.'
           )
         )}
+        {@render resultValidationSummary()}
         <RecipeResultsSection
           resultGroups={resultGroups}
           componentOptions={managedItemOptions}
@@ -1917,6 +1939,7 @@
             'Name each result set after a gathering-check tier. Matching ignores surrounding spaces and letter case.'
           )
         )}
+        {@render resultValidationSummary()}
 
         {#if routedTierMatches.length === 0}
           <div class="manager-warning-band" data-gathering-routed-no-tiers>

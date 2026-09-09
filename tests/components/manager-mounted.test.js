@@ -3343,6 +3343,8 @@ function createStore(calls = [], options = {}) {
       calls.push(['addGatheringLibraryTask', systemId]);
       return { id: 'task-new', name: 'New Gathering Task', dropRows: [] };
     },
+    validateGatheringLibraryTask: (task) =>
+      options.gatheringTaskValidation?.(task) || { valid: true, errors: [], resultErrors: [] },
     updateGatheringLibraryTask: (systemId, taskId, updates = {}) => {
       calls.push(['updateGatheringLibraryTask', systemId, taskId, updates]);
       // The two failure branches the root's save path can take. Without these the fixture
@@ -19203,6 +19205,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     mountManager(calls, {
       taskResultGroups: retainedGroups,
       gatheringResolutionMode: 'progressive',
+      gatheringTaskValidation: (task) =>
+        task?.resolutionMode === 'straight'
+          ? {
+              valid: false,
+              errors: ['Direct mode requires exactly one non-empty result group'],
+              resultErrors: ['Direct mode requires exactly one non-empty result group'],
+            }
+          : { valid: true, errors: [], resultErrors: [] },
       gatheringCraftingCheck: {
         routed: {
           type: 'relative',
@@ -19236,6 +19246,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.ok(target.querySelector('[data-gathering-task-drops-table]'));
     assert.ok(!target.querySelector('[data-gathering-task-results]'));
+    assert.ok(target.querySelector('.manager-inspector'), 'd100 keeps the drop inspector');
+    assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, undefined);
 
     const straight = modeGroup.querySelector('input[value="straight"]');
     straight.checked = true;
@@ -19246,6 +19258,18 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('[data-recipe-result-item]'));
     assert.ok(target.textContent.includes('Iron Ore'), 'straight results are visible after acting');
     assert.ok(!target.querySelector('[data-gathering-task-drops-table]'));
+    assert.equal(
+      target.querySelector('.manager-inspector'),
+      null,
+      'Direct suppresses the entire unused inspector'
+    );
+    assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, 'results');
+    assert.ok(
+      target
+        .querySelector('[data-gathering-task-results-validation]')
+        ?.textContent.includes('Direct mode requires exactly one non-empty result group'),
+      'the blocking reason is rendered beside Direct results'
+    );
     assert.ok(
       !target.querySelector('[data-gathering-task-drop-inspector]'),
       'inactive d100 rows do not keep their inspector active'
@@ -19259,6 +19283,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     assert.ok(target.querySelector('[data-gathering-task-results="routed"]'));
+    assert.equal(
+      target.querySelector('.manager-inspector'),
+      null,
+      'Check suppresses the entire unused inspector'
+    );
+    assert.equal(target.querySelector('.fabricate-manager').dataset.gatheringTaskLayout, 'results');
     assert.deepEqual(
       Array.from(target.querySelectorAll('[data-gathering-routed-tier-status]')).map((row) => [
         row.dataset.gatheringRoutedTierStatus,

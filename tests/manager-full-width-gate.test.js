@@ -108,7 +108,9 @@ function classifyStylesheet() {
     for (const selector of splitTopLevel(rule.prelude, ',')) {
       if (!isManagerBodySubject(selector)) continue;
       const collapsed = selector.includes('.is-rail-collapsed');
-      const base = selector.replaceAll('.is-rail-collapsed', '');
+      const base = selector
+        .replaceAll('.is-rail-collapsed', '')
+        .replaceAll(/\s+/g, ' ');
       const routeId = routeIdOf(base);
       let layoutClass = 'shared-3-track';
       if (tracks === 2) layoutClass = 'full-width-2-track';
@@ -224,6 +226,27 @@ test('every entry\'s PREDICATE answers for its own id', () => {
   // mirroring how `SELF_OWNED_THREE_TRACK` above names its members: an exemption that merely
   // skipped them would let either be rewritten into anything.
   assertPredicatesMatchTheirIds(rootSource);
+});
+
+test('the gathering task editor releases its inspector track only for result-group modes', () => {
+  const entry = REGISTRY.find(candidate => candidate.id === 'gathering-task-edit');
+  assert.ok(entry, 'gathering-task-edit should have a mode-dependent full-width entry');
+  assert.equal(entry.predicate, 'isGatheringTaskFullWidth');
+  assert.match(
+    rootSource,
+    /function isGatheringTaskFullWidth\(view, context\) \{\s*return view === 'gathering-task-edit' && context\.resultGroupTaskMode === true;/,
+    'the gathering-task predicate should require the editor route and result-group mode'
+  );
+  assert.match(
+    rootSource,
+    /resultGroupTaskMode:\s*isGatheringResultGroupMode\(gatheringTaskResolutionMode\)/,
+    'the full-width derivation should receive the selected task mode'
+  );
+  assert.match(
+    rootSource,
+    /data-gathering-task-layout=\{fullWidthLayout\?\.id === 'gathering-task-edit'\s*\? 'results'/,
+    'the stylesheet selector should be driven by the same fullWidthLayout decision'
+  );
 });
 
 test('every registry entry names a route the router can actually reach', () => {
