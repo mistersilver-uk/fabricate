@@ -2462,9 +2462,7 @@ export function createAdminStore(services) {
         const written = Object.fromEntries(Object.keys(patch).map((key) => [key, saved[key]]));
         if (get(toolDraftDirty)) {
           toolDraft.update((draft) => ({ ...draft, ...written }));
-          toolDraftBaseline.update((baseline) =>
-            baseline ? { ...baseline, ...written } : baseline
-          );
+          toolDraftBaseline.update((baseline) => (baseline ? { ...baseline, ...written } : baseline));
         } else {
           // THE UNION, NOT THE RECORD THE MANAGER HANDED BACK (issue 1373). `saved` is the raw
           // in-system record, so re-seeding a clean draft from it would put every inheriting
@@ -2530,12 +2528,7 @@ export function createAdminStore(services) {
    * @param {string} [systemId]
    * @returns {Promise<boolean>}
    */
-  async function setToolSectionInherited(
-    toolId,
-    section,
-    inherit,
-    systemId = get(selectedSystemId)
-  ) {
+  async function setToolSectionInherited(toolId, section, inherit, systemId = get(selectedSystemId)) {
     const target = String(toolId || '').trim();
     const system = String(systemId || '').trim();
     if (!target || !system || typeof inherit !== 'boolean') return false;
@@ -6014,7 +6007,9 @@ export function createAdminStore(services) {
     const system = systemManager?.getSystem?.(systemId);
     if (!system) return false;
     const existing = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
-    const essenceDefinitions = existing.filter((def) => String(def?.id ?? '').trim() !== entityId);
+    const essenceDefinitions = existing.filter(
+      (def) => String(def?.id ?? '').trim() !== entityId
+    );
     if (essenceDefinitions.length === existing.length) return false;
     await systemManager.updateSystem(systemId, { essenceDefinitions });
     return true;
