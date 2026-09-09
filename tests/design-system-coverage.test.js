@@ -131,27 +131,32 @@ test('the library has the exact structure the parser assumes', () => {
   // specimen. RE-MEASURED after the edit rather than incremented: the same change gave two
   // existing blocks a per-name API section, which moves no count here, and gave section 14 four
   // routing rows and section 16 three re-measured rows, which move none either.
-  assert.equal(library.blockCount, 53, 'spec-head block count');
+  // 59 as of the library's player-run-surfaces revision (issue 1495, 2026-09-09): six new specimen
+  // blocks — `<RunActionBar>`, `<WorldClockChip>`, `<SlotRow> <SlotTile> <ChoiceOptionList>`,
+  // `<EssencePool>`, `<RunProgress> <StageNav> <StageCard>` and `<YieldScale> <OutcomeLadder>` —
+  // carrying eleven names, every one of them target. RE-MEASURED by importing this parser: the
+  // same revision added six routing rows and three migration rows, and moved no other count.
+  assert.equal(library.blockCount, 59, 'spec-head block count');
   assert.equal(
     library.headingCount,
-    53,
+    59,
     'the one-heading-per-block relation broke: a block with two h4s double-counts its entry, and ' +
       'a block with none drops it out of the set entirely'
   );
-  assert.equal(library.names.length, 61, 'distinct primitive names');
+  assert.equal(library.names.length, 72, 'distinct primitive names');
   assert.equal(
     library.nameOccurrences,
-    61,
+    72,
     'occurrences no longer equal distinct names, so one primitive is now named by two entries ' +
       'and the set has a duplicate'
   );
-  assert.equal(library.headings.length - library.nonPrimitiveHeadings.length, 33, 'naming blocks');
+  assert.equal(library.headings.length - library.nonPrimitiveHeadings.length, 39, 'naming blocks');
   assert.equal(library.nonPrimitiveHeadings.length, 20, 'section-prose blocks');
 
   // The only pair that pins the ANCHOR as narrower than a file-wide scan. If the parser were ever
   // widened to the whole file these two would collapse to 69 and 0, and every set comparison below
   // would quietly start counting the ruled-out register as part of the vocabulary.
-  assert.equal(library.fileWideNames.length, 72, 'file-wide primitive-shaped names');
+  assert.equal(library.fileWideNames.length, 83, 'file-wide primitive-shaped names');
   assert.equal(library.namesOutsideHeadings.length, 11, 'names outside every spec-head heading');
 });
 
@@ -179,7 +184,7 @@ const NON_PRIMITIVE_HEADINGS = [
   'The two sets',
   'Routed by ingredients',
   'Routed by check',
-  'Simple and alchemy — the reserved failure set',
+  'Simple and alchemy — the reserved failure group',
   'What each mode allows',
   'A · Browse screen',
   'B · Editor screen',
@@ -250,7 +255,7 @@ test('every manifest library name resolves to a library entry', () => {
 });
 
 /**
- * The 28 library entries with no shipped implementation.
+ * The 39 library entries with no shipped implementation.
  *
  * Not a debt list to be paid down in one change and not a ceiling: it is the specified-but-unbuilt
  * quadrant of the conformance question, and it moves in BOTH directions — down when a primitive is
@@ -269,12 +274,12 @@ test('every manifest library name resolves to a library entry', () => {
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard',
-  'ChoiceGroup', 'DataTable', 'InfoStrip', 'ListRow',
-  'LogList', 'Menu', 'Meter', 'NavSidebar', 'PageHeader',
+  'ChoiceGroup', 'ChoiceOptionList', 'DataTable', 'EssencePool', 'InfoStrip', 'ListRow',
+  'LogList', 'Menu', 'Meter', 'NavSidebar', 'OutcomeLadder', 'PageHeader',
   'PickerRow', 'Rail', 'RequirementChooser', 'RuleRow',
-  'RuleSentence', 'Search', 'SetPicker', 'SortableList',
-  'StageBars', 'TierTrack', 'ValidationList', 'ValidationSummary',
-  'ViewToggle', 'Well', 'XrefList',
+  'RuleSentence', 'RunActionBar', 'RunProgress', 'Search', 'SetPicker', 'SlotRow', 'SlotTile', 'SortableList',
+  'StageBars', 'StageCard', 'StageNav', 'TierTrack', 'ValidationList', 'ValidationSummary',
+  'ViewToggle', 'Well', 'WorldClockChip', 'XrefList', 'YieldScale',
 ];
 
 test('every library entry is either recorded as shipped or recorded as unbuilt', () => {
