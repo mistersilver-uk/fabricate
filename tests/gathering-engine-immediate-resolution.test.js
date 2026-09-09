@@ -173,6 +173,14 @@ function routedTask(overrides = {}) {
   };
 }
 
+function straightTask(overrides = {}) {
+  return routedTask({
+    resolutionMode: 'straight',
+    dropRows: [{ id: 'inactive-drop', componentId: 'comp-c', quantity: 99, dropRate: 100 }],
+    ...overrides
+  });
+}
+
 class FakeActor {
   constructor({ id = 'actor-1', uuid = 'Actor.actor-1', name = 'Gatherer' } = {}) {
     this.id = id;
@@ -277,6 +285,53 @@ test('immediate routed success creates result items and writes succeeded termina
     assert.equal(calls.createTerminalRun[0][3].checkResult.success, true);
   } finally {
     delete globalThis.Roll;
+  }
+});
+
+test('immediate straight resolution awards its sole result group without a check or yield roll', async () => {
+  const calls = {};
+  const task = straightTask();
+  const createdResults = [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }];
+  const engine = makeEngine({ task, createdResults, calls });
+
+  const result = await engine.startAttempt({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: 'task-a'
+  });
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.state, 'succeeded');
+  assert.deepEqual(calls.evaluateCheck, []);
+  assert.deepEqual(calls.resolveProgressive, []);
+  assert.deepEqual(calls.createResults[0].resultGroups, task.resultGroups);
+  assert.deepEqual(result.createdResults, createdResults);
+  assert.equal(calls.createTerminalRun[0][3].checkResult, undefined);
+});
+
+test('straight validation rejects empty groups or multiple groups before terminal side effects', async () => {
+  for (const resultGroups of [
+    [],
+    [{ ...routedTask().resultGroups[0], results: [] }],
+    [
+      routedTask().resultGroups[0],
+      { ...routedTask().resultGroups[0], id: 'group-b', name: 'Copper' }
+    ]
+  ]) {
+    const calls = {};
+    const engine = makeEngine({ task: straightTask({ resultGroups }), calls });
+
+    const result = await engine.startAttempt({
+      viewer,
+      actor,
+      environmentId: 'env-a',
+      taskId: 'task-a'
+    });
+
+    assert.equal(result.accepted, false);
+    assert.deepEqual(codes(result), ['TASK_MISCONFIGURED']);
+    assertNoTerminalSideEffects(calls);
   }
 });
 
@@ -1128,6 +1183,31 @@ test('_resolveRoutedFormulaOutcome: a winning tier with no matching result group
     assert.deepEqual(outcome.resultGroups, []);
     // The roll is still reported, so the GM can see which tier failed to route.
     assert.equal(outcome.checkResult.outcome, 'Iron');
+  } finally {
+    delete globalThis.Roll;
+  }
+});
+
+test('_resolveRoutedFormulaOutcome: duplicate normalized tier-name matches are MISCONFIGURED', async () => {
+  const task = routedTask({
+    resultGroups: [
+      routedTask().resultGroups[0],
+      { ...routedTask().resultGroups[0], id: 'group-duplicate', name: ' iron ' }
+    ]
+  });
+  const routed = routedSystemCheck().routed;
+  stubRoll(18, [{ number: 1, faces: 20, total: 18 }]);
+  try {
+    const engine = makeEngine({ task });
+    const outcome = await engine._resolveRoutedFormulaOutcome({
+      routed,
+      rollFormula: routed.rollFormula,
+      actor,
+      task
+    });
+
+    assert.equal(outcome.status, 'misconfigured');
+    assert.equal(outcome.code, 'ROUTED_TIER_AMBIGUOUS');
   } finally {
     delete globalThis.Roll;
   }

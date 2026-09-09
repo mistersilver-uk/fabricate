@@ -524,6 +524,85 @@ test('task and event libraries match environments by tags and global conditions'
   );
 });
 
+test('library task composition preserves task-owned resolution mode and result groups', () => {
+  const resultGroups = [
+    {
+      id: 'group-herbs',
+      name: 'Herbs',
+      results: [
+        {
+          id: 'result-herb',
+          componentId: 'herb',
+          quantity: 2,
+          propertyMacroUuid: 'Macro.herb-properties'
+        }
+      ]
+    }
+  ];
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': {
+          economy: { resolutionMode: 'd100' },
+          tasks: [
+            {
+              id: 'task-straight',
+              name: 'Pick Herbs',
+              resolutionMode: 'straight',
+              resultGroups,
+              dropRows: [
+                { id: 'inactive-drop', componentId: 'sand', quantity: 9, dropRate: 100 }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  });
+
+  const [task] = service.composeEnvironment(environment(), system).tasks;
+
+  assert.equal(task.resolutionMode, 'straight');
+  assert.deepEqual(task.resultGroups, [
+    {
+      ...resultGroups[0],
+      results: [
+        {
+          ...resultGroups[0].results[0],
+          systemItemId: 'herb',
+          itemUuid: null
+        }
+      ]
+    }
+  ]);
+  assert.equal(task.dropRows[0].id, 'inactive-drop', 'inactive mode data remains stored');
+});
+
+test('library task composition defaults an absent task resolution mode to d100', () => {
+  const { service } = makeRichState({
+    config: {
+      systems: {
+        'system-a': {
+          economy: { resolutionMode: 'straight' },
+          tasks: [
+            {
+              id: 'task-legacy',
+              name: 'Legacy Forage',
+              dropRows: [
+                { id: 'drop-herb', componentId: 'herb', quantity: 1, dropRate: 50 }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  });
+
+  const [task] = service.composeEnvironment(environment(), system).tasks;
+
+  assert.equal(task.resolutionMode, 'd100', 'economy mode never overrides the task default');
+});
+
 test('composeEnvironment carries the system eventVisibility rule onto composed.rules', () => {
   const { service } = makeRichState({
     config: {
