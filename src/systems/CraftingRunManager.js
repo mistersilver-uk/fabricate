@@ -1,4 +1,18 @@
 import { RunContainerManagerBase } from './runContainerStore.js';
+import {
+  observeExecutionJournal,
+  persistExecutionJournalTransition,
+} from './runExecutionJournal.js';
+import {
+  assertRunLifecycleMutation,
+  buildNewRunLifecycleFields,
+  getRunLifecycleContract,
+  incrementRunRevision,
+  persistCompletionMode,
+  persistPausedRun,
+  persistResumedRun,
+  RunLifecycleError,
+} from './runLifecycleState.js';
 import { selectWritableActors } from './writableActors.js';
 
 const HISTORY_LIMIT = 50;
@@ -99,10 +113,11 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return runs.find((run) => run.recipeId === recipeId) || null;
   }
 
-  async createRun(actor, recipe, componentSourceActors = [], userId = null) {
+  async createRun(actor, recipe, componentSourceActors = [], userId = null, lifecycle = {}) {
     const container = this._getContainer(actor);
     const runId = foundry.utils.randomID();
     const stepStates = this._buildStepStates(recipe);
+    const lifecycleFields = buildNewRunLifecycleFields(lifecycle);
     const run = {
       id: runId,
       actorUuid: actor.uuid,
@@ -116,6 +131,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
       currentStepIndex: 0,
       steps: stepStates,
       componentSourceActorUuids: componentSourceActors.map((a) => a.uuid),
+      ...lifecycleFields,
     };
 
     container.active[runId] = run;
@@ -123,9 +139,11 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return run;
   }
 
-  async updateRun(actor, run) {
+  async updateRun(actor, run, { expectedRevision = undefined } = {}) {
     const container = this._getContainer(actor);
     if (!container.active[run.id]) return null;
+    this._assertRunMutation(run, { expectedRevision });
+    incrementRunRevision(run);
     run.updatedAt = this._nowWorldTime();
     container.active[run.id] = run;
     await this._persist(actor, container);
@@ -133,6 +151,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   async markStepWaitingForTime(actor, run, stepIndex, timeRequirement) {
+    this._assertRunMutation(run);
     const seconds = this._durationToSeconds(timeRequirement);
     if (seconds <= 0) return run;
 
@@ -197,6 +216,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * @returns {Promise<object|null>} the updated run, or null if the step index is invalid
    */
   async markStepPrepared(actor, run, stepIndex, prepared = {}) {
+    this._assertRunMutation(run);
     const step = run.steps?.[stepIndex];
     if (!step) return null;
     step.preparedConsumption = {
@@ -237,6 +257,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * @returns {Promise<object>} the updated run
    */
   async armCollapsedChainGate(actor, run, seconds) {
+    this._assertRunMutation(run);
     const total = Number(seconds);
     if (!Number.isFinite(total) || total <= 0) return run;
     const worldTime = this._nowWorldTime();
@@ -259,12 +280,20 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   canProceedTimeGate(run, stepIndex, worldTime = this._nowWorldTime()) {
+    if (getRunLifecycleContract(run) === 'unsupported' || run?.pauseState) return false;
+    if (
+      run?.executionJournal?.status !== undefined &&
+      run.executionJournal.status !== 'committed'
+    ) {
+      return false;
+    }
     const step = run.steps?.[stepIndex];
     if (!step?.timeGate) return true;
     return Number(worldTime) >= Number(step.timeGate.availableAt || 0);
   }
 
   async markStepInProgress(actor, run, stepIndex) {
+    this._assertRunMutation(run);
     const worldTime = this._nowWorldTime();
     const step = run.steps?.[stepIndex];
     if (!step) return run;
@@ -278,6 +307,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   async completeStepSuccess(actor, run, stepIndex, payload = {}) {
+    this._assertRunMutation(run);
     const worldTime = this._nowWorldTime();
     const step = run.steps?.[stepIndex];
     if (!step) return run;
@@ -309,6 +339,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   async completeStepFailure(actor, run, stepIndex, reason = 'Crafting check failed', payload = {}) {
+    this._assertRunMutation(run);
     const worldTime = this._nowWorldTime();
     const step = run.steps?.[stepIndex];
     if (!step) return run;
@@ -329,11 +360,13 @@ export class CraftingRunManager extends RunContainerManagerBase {
   async completeRun(actor, run, status = 'succeeded') {
     const container = this._getContainer(actor);
     if (!container.active?.[run.id]) return run;
+    this._assertRunMutation(run);
 
     run.status = status;
     run.currentStepIndex = null;
     run.updatedAt = this._nowWorldTime();
     run.finishedAt = this._nowWorldTime();
+    incrementRunRevision(run);
 
     delete container.active[run.id];
     // Never archive a run that already has a history entry: a duplicate id would
@@ -375,6 +408,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     const container = this._getContainer(actor);
     const run = container.active?.[runId];
     if (!run) return null;
+    this._assertRunMutation(run);
     delete container.active[runId];
     await this._persist(actor, container);
     return run;
@@ -432,23 +466,122 @@ export class CraftingRunManager extends RunContainerManagerBase {
       let dirty = false;
 
       for (const run of Object.values(container.active || {})) {
-        if (run.status !== 'waitingTime') continue;
-        const idx = Number(run.currentStepIndex);
-        if (!Number.isFinite(idx)) continue;
-        const step = run.steps?.[idx];
-        if (!step?.timeGate) continue;
-        if (Number(worldTime) < Number(step.timeGate.availableAt || 0)) continue;
+        const step = this._maturedWaitingStep(run, worldTime);
+        if (!step) continue;
 
         run.status = 'inProgress';
         step.status = 'inProgress';
         step.updatedAt = Number(worldTime);
         run.updatedAt = Number(worldTime);
+        incrementRunRevision(run);
         dirty = true;
       }
 
       if (dirty) {
         await this._persist(actor, container);
       }
+    }
+  }
+
+  _maturedWaitingStep(run, worldTime) {
+    if (run.status !== 'waitingTime') return null;
+    if (getRunLifecycleContract(run) === 'unsupported') return null;
+    if (run.pauseState) return null;
+    if (run.executionJournal && run.executionJournal.status !== 'committed') return null;
+    const index = Number(run.currentStepIndex);
+    if (!Number.isFinite(index)) return null;
+    const step = run.steps?.[index];
+    if (!step?.timeGate) return null;
+    if (Number(worldTime) < Number(step.timeGate.availableAt || 0)) return null;
+    return step;
+  }
+
+  async setCompletionMode(actor, runId, completionMode, { expectedRevision = undefined } = {}) {
+    return persistCompletionMode(this._locateRunPersistence(actor, runId), completionMode, {
+      expectedRevision,
+    });
+  }
+
+  async pauseRun(actor, runId, { expectedRevision = undefined } = {}) {
+    return persistPausedRun(this._locateRunPersistence(actor, runId), { expectedRevision });
+  }
+
+  async resumeRun(actor, runId, { expectedRevision = undefined } = {}) {
+    return persistResumedRun(this._locateRunPersistence(actor, runId), { expectedRevision });
+  }
+
+  async setStepSelectionPlan(
+    actor,
+    runId,
+    stepIndex,
+    selection = {},
+    { expectedRevision = undefined } = {}
+  ) {
+    const location = this._locateRunPersistence(actor, runId);
+    if (!location) return null;
+    const run = location.run;
+    this._assertRunMutation(run, { currentOnly: true, expectedRevision });
+    const index = Number(stepIndex);
+    const step = run.steps?.[index];
+    if (!step || index !== Number(run.currentStepIndex)) {
+      throw new RunLifecycleError(
+        'Selections may only change on the current crafting step',
+        'STALE_RUN_STAGE'
+      );
+    }
+    step.selectionPlan = buildSelectionPlan(selection);
+    step.selectedIngredientSetId = step.selectionPlan.selectedIngredientSetId;
+    if (selection.selectedRequirementSnapshot !== undefined) {
+      step.selectedRequirementSnapshot = cloneJson(selection.selectedRequirementSnapshot);
+    }
+    step.updatedAt = this._nowWorldTime();
+    incrementRunRevision(run);
+    return location.persist();
+  }
+
+  async updateExecutionJournal(actor, runId, transition, { expectedRevision = undefined } = {}) {
+    return persistExecutionJournalTransition(
+      this._locateRunPersistence(actor, runId, { activeOnly: false }),
+      transition,
+      { expectedRevision }
+    );
+  }
+
+  _locateRunPersistence(actor, runId, { activeOnly = true } = {}) {
+    const container = cloneJson(this._getContainer(actor));
+    const location = findRunLocation(container, runId);
+    if (!location || (activeOnly && location.terminal)) return null;
+    const run = location.run;
+    const currentStep = () => {
+      const index = Number(run.currentStepIndex);
+      return Number.isSafeInteger(index) ? run.steps?.[index] : null;
+    };
+    return {
+      run,
+      now: () => this._nowWorldTime(),
+      getTimeGate: () => currentStep()?.timeGate || null,
+      touchTimeGate: () => {
+        const step = currentStep();
+        if (step) step.updatedAt = this._nowWorldTime();
+      },
+      assertMutation: (options) => this._assertRunMutation(run, options),
+      persist: async () => {
+        run.updatedAt = this._nowWorldTime();
+        await this._persist(actor, container);
+        return run;
+      },
+    };
+  }
+
+  _assertRunMutation(run, { allowExecutionJournal = false, ...options } = {}) {
+    assertRunLifecycleMutation(run, options);
+    if (!run?.executionJournal) return;
+    const journal = observeExecutionJournal(run.executionJournal);
+    if (!allowExecutionJournal && journal.status === 'planned') {
+      throw new RunLifecycleError(
+        'The run already has an execution in progress',
+        'EXECUTION_IN_PROGRESS'
+      );
     }
   }
 
@@ -610,4 +743,33 @@ export class CraftingRunManager extends RunContainerManagerBase {
     }
     return pruned;
   }
+}
+
+function buildSelectionPlan(selection) {
+  return {
+    selectedIngredientSetId: stringOrNull(selection.selectedIngredientSetId),
+    ingredientOptionOverrides: cloneObject(selection.ingredientOptionOverrides),
+    ingredientEssenceAllocation: cloneObject(selection.ingredientEssenceAllocation),
+  };
+}
+
+function cloneObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? cloneJson(value) : {};
+}
+
+function findRunLocation(container, runId) {
+  const id = String(runId ?? '').trim();
+  if (!id) return null;
+  if (container.active?.[id]) return { run: container.active[id], terminal: false };
+  const run = (container.history || []).find((entry) => entry?.id === id);
+  return run ? { run, terminal: true } : null;
+}
+
+function stringOrNull(value) {
+  const normalized = String(value ?? '').trim();
+  return normalized || null;
+}
+
+function cloneJson(value) {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
