@@ -858,14 +858,24 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // shell, and each draws its pager's per-page trigger CLOSED, where the conversion is a button
   // with a chevron.
   //
-  // TWO entries, because `showTick` is a CONFIGURATION and no one frame holds both of its values.
-  // `manager-recipes-bulk-edit-check-tier` is the ticked, grouped, hinted list — the densest
-  // composition any caller reaches — and `player-inventory-page-size` is the TICKLESS one, which
-  // is the polarity no other frame in the registry holds: issue 1511 added three more open player
-  // panels and every one of them ticks, so this pair is still the only place a change to the tick
-  // gutter, to the group heading's inset or to the panel band can be read in both of its states.
-  // It is a player frame as well, which is a second portal host with its own per-site trigger
-  // rules, but that is no longer what makes it the entry — the absent gutter is.
+  // THREE entries. The first two are a polarity pair, because `showTick` is a CONFIGURATION and
+  // no one frame holds both of its values: `manager-recipes-bulk-edit-check-tier` is the ticked,
+  // grouped, hinted list — the densest composition any caller reaches — and
+  // `player-inventory-page-size` is the TICKLESS one, which is the polarity no other frame in the
+  // registry holds: issue 1511 added three more open player panels and every one of them ticks,
+  // so this pair is still the only place a change to the tick gutter, to the group heading's
+  // inset or to the panel band can be read in both of its states. It is a player frame as well,
+  // which is a second portal host with its own per-site trigger rules, but that is no longer what
+  // makes it the entry — the absent gutter is.
+  //
+  // The third is the LABELLED FORM, and it was added at issue 1510 because that change swapped
+  // the form's host element — `<Field as="label">` to `<Field as="div">`, so the caption is no
+  // longer a hit target and the trigger is named by pointing at it — and neither frame above
+  // draws a caption at all. `interactables-manager-region-open` is the promote card's
+  // `<Select label="Region">` with its panel open at this window's full-width trigger, so the
+  // caption, the trigger and the panel are all in one frame; the change that repaired the form
+  // touched twelve shipped call sites without editing one of them, which is exactly the shape of
+  // change a published frame is for.
   //
   // ADDITIVE, like every entry here: `selectRenderFileCases` still adds the representative pair,
   // which is what keeps the trigger's own CLOSED treatment — the form nine pagers draw — in the
@@ -877,6 +887,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/components/Select.svelte': Object.freeze([
     'manager-recipes-bulk-edit-check-tier',
     'player-inventory-page-size',
+    'interactables-manager-region-open',
   ]),
   // The essence SOURCE picker (issue 1503), whose panel moved wholesale onto the primitive above
   // — a new backdrop rung, `--fab-shadow-lg`, a 10px radius, the primitive's search row and list,
@@ -2121,6 +2132,13 @@ export const VIEW_LAB_CASES = Object.freeze([
   // data-driven lists this phase converted, and both are measured instead by
   // `tests/components/manager-select-conversion-rendered.test.js`, which mounts their real
   // components against the real sheet.
+  //
+  // ONE CLOSED-STATE FRAME JOINS THEM: `world-prerequisites-condition-row`. Its route's ordinary
+  // closed frame (`world-prerequisites` above) draws the list with every item COLLAPSED, so the
+  // condition row the conversion moved appears in no frame at all except the open-panel one that
+  // occludes it. A converted control's closed treatment is the state a GM reads for all but a
+  // moment, and where the ordinary `mapChangedFilesToCases` frame does not reach it, the registry
+  // owes it a case rather than an assumption.
   managerCase({
     id: 'world-currency-strategy-list',
     label: 'Manager — World Currency spend strategy list',
@@ -2168,18 +2186,60 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-prerequisite-operator]' },
     ],
     expectView: 'world-prerequisites',
-    // The tick element on the row itself, not merely the ticked class on the panel: a run of
-    // single-line rows with an empty gutter is exactly the frame this one exists to be read
-    // against.
+    // The tick element ON THE SELECTED ROW, which is the claim the panel's own class does not
+    // make. `.fabricate-select-popover-ticked` says the list RESERVES a gutter; naming a tick
+    // inside a row that `-ticked` already selected only re-asserts it. What a reader of this
+    // frame needs is that the row `aria-selected="true"` names is the row DRAWING the tick — the
+    // gutter is reserved, occupied, and occupied in the right place — because a run of
+    // single-line rows with an empty gutter, or with the mark on the wrong row, is exactly the
+    // regression this frame exists to be read against.
     expectSelector:
       '.fabricate-manager > .fabricate-select-popover.fabricate-select-popover-ticked ' +
-      '[data-popover-option="isTrue"]:has(.fabricate-select-tick)',
+      '[role="option"][aria-selected="true"] .fabricate-select-tick',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/system\/CharacterPrerequisitesCard\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/world\/WorldPrerequisitesTab\.svelte$/,
     ],
+  }),
+  managerCase({
+    // THE CONVERTED ROW WITH ITS LIST SHUT (issue 1510). Its sibling above is the only frame in
+    // the registry that draws this control, and it draws it OPEN — the panel occludes the row it
+    // belongs to, so the trigger's own closed treatment inside the condition row (its box in a
+    // `flex: 1 1 160px` cell, its chevron, its baseline against the path and value inputs beside
+    // it) is not readable in any published frame. That is the state a GM sees for all but a
+    // moment, and it is the state the demotion moved: the caller's wrapper was a `<label>` and is
+    // a `Field as="div"` behind a `visually-hidden` caption now, with the trigger's width stated
+    // by the caller's own scoped counterpart.
+    //
+    // The steps are the operator list's own, minus its last: opening the panel is exactly what
+    // this case must not do. The trailing `scroll` is what puts the expanded item in the PNG —
+    // `frame.screenshot()` does not scroll a nested overflow container, so without it every
+    // assertion passes on a frame that shows the list header alone.
+    id: 'world-prerequisites-condition-row',
+    label: 'Manager — World Character prerequisite condition row, operator closed',
+    smokeLabels: [],
+    // `beyond`: the smoke never expands a prerequisite item, so there is no counterpart frame
+    // this one could fall short of and no label it could claim.
+    reaches: 'beyond',
+    steps: [
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-prerequisites', press: 'Enter' },
+      { selector: '.manager-prerequisite-item [data-toggle-prerequisite]' },
+      { selector: '[data-world-prerequisites-page]', scroll: true },
+    ],
+    expectView: 'world-prerequisites',
+    // BOTH halves matter. `[data-prerequisite-operator]` is the caller's own hook and
+    // `.fabricate-select-trigger` is the primitive's class, so the pair asserts that the hook is
+    // still ON the converted trigger rather than on a wrapper — which is what a caller that
+    // reached for a wrapper instead of `triggerData` would produce — and the ancestor asserts the
+    // row it sits in still exists under the class its width counterpart is anchored at.
+    expectSelector:
+      '.manager-prerequisite-condition [data-prerequisite-operator].fabricate-select-trigger',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/system\/CharacterPrerequisitesCard\.svelte$/],
   }),
   managerCase({
     id: 'world-modifiers',

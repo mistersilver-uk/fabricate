@@ -11,7 +11,8 @@
   report are ONE implementation of "manager modal dialog" rather than two. This file
   owns only the mapping body. Each per-folder row mirrors the compact
   RecipeRoutingAssignment + SearchablePopover "assign X per Y" pattern: a folder name, a
-  `tabular-nums` item-count badge, a category `<select>` with an inline "＋ New" (the
+  `tabular-nums` item-count badge, a category `<Select>` (the app's own option list, issue
+  1510) with an inline "＋ New" (the
   shared InlineVocabularyAdd), a tags multi-assign (RecipeRoutingAssignment chips +
   popover), and a per-row Skip.
 
@@ -556,7 +557,24 @@
      `align-items: flex-end`, so the trigger hugs its value rather than filling a column — which
      is the row's intended shape — and without a floor choosing General after a long category
      name would visibly shrink the control and re-flow the New button beside it. 140px is the
-     figure the `<select>` carried, kept rather than re-derived. */
+     figure the `<select>` carried, kept rather than re-derived.
+
+     AND THE FLOOR DECIDES THE PANEL'S CEILING, which is the accepted cost of keeping the hug.
+     `anchoredPopover` resolves the band as `clamp(max(triggerWidth, minWidth), minWidth,
+     maxWidth)`, and this caller states neither bound, so it takes the `form` rung's 240/340: a
+     140px trigger resolves to `clamp(max(140, 240), 240, 340)` = 240px, and the panel never
+     widens with the list because the trigger never widens with the value. So a long enough
+     category name ellipsises: measured in Chromium on
+     `tests/fixtures/manager-select/?subject=import`, the row draws 38 characters of
+     "Alchemical reagents and rare herbs from the deep wood" at 500 12px Arial before its
+     `text-overflow` takes over. The exact count is text-dependent — it is a width, not a
+     character budget. Accepted rather than fixed here:
+     raising `maxWidth` would not help while the trigger is the floor, widening the trigger would
+     undo the row's intended shape, and the categories are world-authored so no figure is the
+     right one for every world. It is also the one converted list in this phase that no View Lab
+     case can photograph — this modal opens only on a folder or compendium drop, and the runner
+     has no `drop` verb — so it is recorded here where the rule is, and measured by
+     `tests/components/manager-select-conversion-rendered.test.js`. */
   :global(.manager-field.manager-import-mapping-category .fabricate-select-trigger) {
     min-width: 140px;
     font-size: var(--fab-recipe-control-font);
