@@ -806,7 +806,7 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 231;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 230;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.

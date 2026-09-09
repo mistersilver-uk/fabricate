@@ -50,6 +50,8 @@
    - filtered: the filtered-to-nothing treatment — a quieter, wider-padded panel for
      "your filters match nothing", which is not an absence of content and deliberately
      skips the icon/title apparatus while keeping ONE dashed panel vocabulary.
+   - field: default false; sizes a short placeholder to full control width and 34px height.
+     Pair with inline for availability fields; the dashed edge and typography stay intact.
    - contextClass: extra class(es) whose rules live in the global sheet because they
      describe how a specific container places this panel (fill, min-height). Never use it
      for appearance — add a prop here instead.
@@ -101,6 +103,7 @@
     hint = '',
     compact = false,
     inline = false,
+    field = false,
     note = false,
     filtered = false,
     contextClass = '',
@@ -129,6 +132,7 @@
   class="manager-empty {contextClass}"
   class:is-compact={compact}
   class:is-inline={inline}
+  class:is-field={field}
   class:is-note={note}
   class:is-filtered={filtered}
   {...hookAttributes}
@@ -294,6 +298,12 @@
   .manager-empty.is-inline p {
     max-width: none;
     font-size: 11.5px;
+  }
+
+  .manager-empty.is-field {
+    width: 100%;
+    height: 34px;
+    padding: var(--fab-space-1) var(--fab-space-2);
   }
 
   /* ── THE POPOVER NOTE (issue 1373) ────────────────────────────────────────────────────

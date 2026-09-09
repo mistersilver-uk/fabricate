@@ -397,6 +397,8 @@ describe('world Tools Catalogue (issue 1373)', () => {
       const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
       const toggle = target.querySelector('[data-world-tool-row-enabled="hammer"]');
       assert.ok(Boolean(toggle), 'every world tool row carries the switch');
+      assert.ok(toggle.classList.contains('fabricate-toggle'), 'the shared switch owns its paint');
+      assert.ok(Boolean(toggle.querySelector('.manager-status-toggle-track .manager-status-toggle-knob')));
       assert.equal(
         toggle.getAttribute('aria-pressed'),
         'true',
@@ -404,27 +406,39 @@ describe('world Tools Catalogue (issue 1373)', () => {
       );
     });
 
-    it('draws OFF and writes the INVERSE through the tool-family action', async () => {
+    it('reflects both states and writes each inverse without selecting or opening the row', async () => {
       const calls = [];
+      const opened = [];
+      const enabledScope = scopeFor();
+      const disabledCorpus = corpus();
+      disabledCorpus.defaults[0].enabled = false;
+      const disabledScope = projectWorldScopeEntity({
+        entityType: 'tool',
+        corpus: disabledCorpus,
+        systems: SYSTEMS,
+      });
       const target = await harness.mount({
-        scope: projectWorldScopeEntity({
-          entityType: 'tool',
-          corpus: {
-            ...corpus(),
-            defaults: [
-              { id: 'hammer', enabled: false, breakage: { mode: 'limitedUses', maxUses: 2 } },
-              { id: 'orphan' },
-            ],
-          },
-          systems: SYSTEMS,
-        }),
+        scope: disabledScope,
         systems: SYSTEMS,
         actions: { setWorldEnabled: (id, enabled) => calls.push([id, enabled]) },
+        onOpenEntry: (id) => opened.push(id),
       });
-      const toggle = target.querySelector('[data-world-tool-row-enabled="hammer"]');
-      assert.equal(toggle.getAttribute('aria-pressed'), 'false');
-      toggle.click();
-      assert.deepEqual(calls, [['hammer', true]], 'the click writes the OPPOSITE of what is drawn');
+      for (const enabled of [false, true]) {
+        await harness.setProps({ scope: enabled ? enabledScope : disabledScope });
+        const toggle = target.querySelector('[data-world-tool-row-enabled="hammer"]');
+        assert.equal(toggle.getAttribute('aria-pressed'), String(enabled));
+        assert.ok(toggle.classList.contains(enabled ? 'is-on' : 'is-off'));
+        assert.equal(
+          toggle.getAttribute('aria-label'),
+          `${enabled ? 'Disable' : 'Enable'} Smith Hammer for every crafting system`
+        );
+        toggle.click();
+        await harness.setProps({});
+        assert.ok(Boolean(target.querySelector('[data-scoped-list-inspector-state="resting"]')));
+        assert.equal(target.querySelector('[data-scoped-list-select="hammer"]').checked, false);
+      }
+      assert.deepEqual(calls, [['hammer', true], ['hammer', false]]);
+      assert.deepEqual(opened, [], 'the switch does not activate Edit tool');
     });
   });
 

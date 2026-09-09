@@ -1119,6 +1119,113 @@ test('the two alert frames assert their alert is inside the box that clips it', 
   assert.match(driver, /for \(const expectation of expectContained\)/);
 });
 
+test('resource-node interval evidence reaches over-time controls at both required window sizes', () => {
+  const editorPath = 'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte';
+  const selected = mapChangedFilesToCases([editorPath]).map((viewCase) => viewCase.id);
+  for (const [suffix, width, height] of [['normal', 1280, 820], ['narrow', 1000, 720]]) {
+    const id = `manager-gathering-task-node-interval-${suffix}`;
+    const viewCase = getCaseById(id);
+    assert.ok(viewCase, `${id} must exercise the node-enabled system`);
+    assert.ok(selected.includes(id), `${id} must be selected when its editor changes`);
+    assert.equal(viewCase.query.system, 'lab-smithing');
+    assert.equal(viewCase.expectView, 'gathering-task-edit');
+    assert.deepEqual(viewCase.position, { width, height });
+    assert.ok(viewCase.steps.some((step) => step.selector?.includes('sm-task-prospect')));
+    assert.deepEqual(viewCase.steps.slice(-3), [
+      { selector: '[data-gathering-task-node-respawn]', select: 'overTime' },
+      { selector: '[data-gathering-task-node-interval]', fill: '1440' },
+      { selector: '[data-gathering-task-nodes]', scroll: true },
+    ]);
+    assert.equal(
+      viewCase.expectSelector,
+      '[data-gathering-task-node-respawn] option[value="overTime"]:checked'
+    );
+    assert.equal(viewCase.expectVisible, '[data-gathering-task-node-interval]');
+    assert.equal(viewCase.expectCenterHit, '[data-gathering-task-node-interval]');
+    assert.equal(viewCase.expectNoHorizontalOverflow, '[data-gathering-task-nodes]');
+    for (const target of [
+      '[data-gathering-task-node-count]',
+      '.manager-task-node-interval-row .fab-stepper',
+      '[data-gathering-task-node-interval]',
+      '[data-gathering-task-node-interval-unit]',
+    ]) {
+      assert.ok(viewCase.expectContained.some((entry) =>
+        entry.container === '[data-gathering-task-nodes]' && entry.target === target
+      ), `${id} must keep ${target} inside the node card`);
+    }
+  }
+});
+
+test('gathering feedback evidence reaches selected tools and all-empty fields at both sizes', () => {
+  const selected = mapChangedFilesToCases([
+    'src/ui/svelte/apps/manager/GatheringTaskEditView.svelte',
+    'src/ui/svelte/apps/manager/GatheringEventEditView.svelte',
+  ]).map((entry) => entry.id);
+  const emptyStateCases = mapChangedFilesToCases([
+    'src/ui/svelte/apps/manager/EmptyState.svelte',
+  ]).map((entry) => entry.id);
+  for (const [suffix, width, height] of [['normal', 1280, 820], ['narrow', 1000, 720]]) {
+    for (const state of ['task-availability', 'task-tools', 'event-availability']) {
+      const id = `manager-gathering-${state}-feedback-${suffix}`;
+      const viewCase = getCaseById(id);
+      const kind = state.startsWith('task') ? 'task' : 'event';
+      assert.ok(viewCase, id);
+      assert.ok(selected.includes(id));
+      if (state.endsWith('availability')) assert.ok(emptyStateCases.includes(id));
+      assert.deepEqual(viewCase.position, { width, height });
+      assert.equal(viewCase.expectView, `gathering-${kind}-edit`);
+      for (const field of ['biomes', 'timeOfDay', 'weather']) {
+        assert.ok(viewCase.expectSelector.includes(
+          `[data-gathering-${kind}-availability-pills="${field}"] .manager-empty.is-field`
+        ));
+        assert.ok(viewCase.steps.some((step) =>
+          step.selector === `[data-gathering-${kind}-availability-pill="${field}"] [data-chip-remove]` &&
+          step.press === 'Space'
+        ), `${id} must return ${field} to empty through keyboard removal`);
+      }
+      if (kind === 'task') {
+        assert.ok(viewCase.steps.some((step) =>
+          step.selector === '[data-gathering-task-required-tools-card="hb-tool-mortar"]' &&
+          step.press === 'Enter'
+        ), `${id} must actually select its required tool`);
+        assert.ok(viewCase.expectSelector.includes('[data-gathering-task-required-tool-pill="hb-tool-mortar"] img'));
+      }
+      assert.equal(viewCase.steps.at(-1).scroll, true);
+      assert.ok(viewCase.expectContained.length >= 2);
+    }
+  }
+});
+
+test('environment empty membership evidence clears the actual fixture and is selected by its caller', () => {
+  const selected = mapChangedFilesToCases([
+    'src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte',
+  ]).map((entry) => entry.id);
+  const grove = content.environments.find((entry) => entry.id === 'hb-env-grove');
+  assert.deepEqual(grove.includedRealmIds, ['hb-realm-verdant']);
+  assert.deepEqual(grove.biomes, ['forest']);
+  for (const [suffix, width, height] of [['normal', 1280, 820], ['narrow', 1000, 720]]) {
+    const id = `manager-environment-empty-membership-${suffix}`;
+    const viewCase = getCaseById(id);
+    assert.ok(selected.includes(id));
+    assert.deepEqual(viewCase.position, { width, height });
+    assert.equal(viewCase.query.system, 'lab-herbalism');
+    assert.equal(viewCase.expectView, 'environment-edit');
+    assert.ok(viewCase.steps.some((step) => step.selector === '[data-gathering-realm-toggle]'));
+    for (const [kind, member] of [['realm', grove.includedRealmIds[0]], ['biome', grove.biomes[0]]]) {
+      assert.equal(viewCase.steps.filter((step) =>
+        step.selector === `[data-environment-${kind}-pill="${member}"] [data-chip-remove]` &&
+        step.press === 'Space'
+      ).length, 2, `${id} clears, adds, then removes the last ${kind}`);
+      assert.ok(viewCase.steps.some((step) => step.select === member));
+    }
+    assert.equal(viewCase.expectContained.length, 4);
+    for (const entry of viewCase.expectContained.filter(({ target }) => target.includes('.manager-empty'))) {
+      assert.ok(viewCase.expectSelector.includes(entry.target));
+    }
+    assert.deepEqual(viewCase.steps.at(-1), { selector: '[data-overview-section="context"]', scroll: true });
+  }
+});
+
 test('every combination-rule value the registry targets is a real MODIFIER_POLICIES member', () => {
   // Ten selectors in this registry pin a rule option by its VALUE, and NOTHING else could
   // see them go stale. The token check above strips attribute values before extracting

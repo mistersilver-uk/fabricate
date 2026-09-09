@@ -311,6 +311,7 @@
                 {:else}
                   {#if availableRealms.length > 0}
                     <select
+                      class="manager-environment-membership-add"
                       aria-label={text(
                         'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddRealm',
                         'Add realm'
@@ -371,6 +372,7 @@
                            `note` is the popover form and releases the panel entirely. -->
                       <EmptyState
                         inline
+                        field
                         hint={text(
                           'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.NoRealms',
                           'No realms selected'
@@ -425,6 +427,7 @@
             </p>
             {#if availableBiomes.length > 0}
               <select
+                class="manager-environment-membership-add"
                 aria-label={text(
                   'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.AddBiome',
                   'Add biome'
@@ -476,6 +479,7 @@
                      not a muted span (issue 1515). -->
                 <EmptyState
                   inline
+                  field
                   hint={text(
                     'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.NoBiomes',
                     'No biomes selected'
@@ -555,3 +559,9 @@
     </div>
   {/if}
 </section>
+
+<style>
+  .manager-environment-membership-add {
+    height: 34px;
+  }
+</style>
