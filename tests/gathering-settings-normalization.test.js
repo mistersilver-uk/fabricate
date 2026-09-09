@@ -187,6 +187,159 @@ test('admin gathering task load and save preserve task mode and canonical result
   assert.equal(task.resultGroups[0].results[0].propertyMacroUuid, 'Macro.properties');
 });
 
+test('admin gathering task validation reads only the selected result source', async () => {
+  const system = makeSystem({
+    features: { gathering: true },
+    gatheringCraftingCheck: {
+      failureResultPolicy: 'never',
+      routed: {
+        type: 'relative',
+        relativeOutcomes: [
+          { id: 'rich', name: 'Rich Vein', success: true, dc: 5 },
+          { id: 'miss', name: 'Miss', success: false, dc: 0 }
+        ],
+        fixedOutcomes: []
+      }
+    }
+  });
+  const store = createAdminStore(createServices(system));
+  await store.selectSystem('sys1');
+
+  const invalidInactiveDrops = [{ id: 'inactive', enabled: false, quantity: 1 }];
+  const richResult = { id: 'ore', componentId: 'ore', quantity: 2 };
+  const straight = {
+    id: 'straight',
+    name: 'Mine ore',
+    resolutionMode: 'straight',
+    dropRows: invalidInactiveDrops,
+    resultGroups: [{ id: 'results', name: 'Ore', results: [richResult] }]
+  };
+  assert.deepEqual(store.validateGatheringLibraryTask(straight), {
+    valid: true,
+    errors: [],
+    resultErrors: []
+  });
+
+  const invalidD100Results = {
+    ...straight,
+    resolutionMode: 'd100',
+    dropRows: [{ id: 'drop', itemUuid: 'Item.ore', quantity: 1, dropRate: 100 }],
+    resultGroups: [{ id: 'ignored', name: '', results: [{ quantity: 0 }] }]
+  };
+  assert.deepEqual(store.validateGatheringLibraryTask(invalidD100Results), {
+    valid: true,
+    errors: [],
+    resultErrors: []
+  });
+
+  const routed = {
+    ...straight,
+    resolutionMode: 'routed',
+    resultGroups: [{ id: 'rich', name: '  rich vein  ', results: [richResult] }]
+  };
+  assert.equal(
+    store.validateGatheringLibraryTask(routed).valid,
+    true,
+    'a failure tier may have no result group'
+  );
+  const duplicate = store.validateGatheringLibraryTask({
+    ...routed,
+    resultGroups: [...routed.resultGroups, { ...routed.resultGroups[0], id: 'rich-copy' }]
+  });
+  assert.equal(duplicate.valid, false);
+  assert.ok(duplicate.resultErrors.some(error => error.includes('Rich Vein')));
+
+  for (const quantity of [-1, '2', Number.POSITIVE_INFINITY]) {
+    const invalidQuantity = store.validateGatheringLibraryTask({
+      ...routed,
+      resultGroups: [
+        {
+          ...routed.resultGroups[0],
+          results: [{ ...richResult, quantity }]
+        }
+      ]
+    });
+    assert.equal(invalidQuantity.valid, false, `quantity ${String(quantity)} is invalid`);
+  }
+  assert.equal(
+    store.validateGatheringLibraryTask({
+      ...straight,
+      resultGroups: [{ id: 'empty', name: 'Empty', results: [] }]
+    }).valid,
+    false,
+    'Direct requires its one result group to contain a result'
+  );
+  assert.equal(
+    store.validateGatheringLibraryTask({
+      ...straight,
+      resultGroups: [straight.resultGroups[0], { ...straight.resultGroups[0], id: 'second' }]
+    }).valid,
+    false,
+    'Direct rejects multiple result groups'
+  );
+
+  system.gatheringCraftingCheck.failureResultPolicy = 'perRecord';
+  const withFailure = {
+    ...routed,
+    resultGroups: [
+      ...routed.resultGroups,
+      { id: 'miss', name: 'Miss', results: [{ id: 'dust', componentId: 'dust', quantity: 1 }] }
+    ]
+  };
+  assert.equal(store.validateGatheringLibraryTask(withFailure).valid, true);
+  const duplicateFailure = store.validateGatheringLibraryTask({
+    ...withFailure,
+    resultGroups: [...withFailure.resultGroups, { ...withFailure.resultGroups[1], id: 'miss-copy' }]
+  });
+  assert.equal(duplicateFailure.valid, false);
+  assert.ok(duplicateFailure.resultErrors.some(error => error.includes('failure tier "Miss"')));
+});
+
+test('admin gathering task validation rejects invalid active results before persistence', async () => {
+  let gatheringConfig = {
+    systems: {
+      sys1: {
+        tasks: [
+          {
+            id: 'task-straight',
+            name: 'Mine ore',
+            resolutionMode: 'straight',
+            dropRows: [],
+            resultGroups: [
+              {
+                id: 'results',
+                name: 'Ore',
+                results: [{ id: 'ore', componentId: 'ore', quantity: 0 }]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  };
+  let writeCount = 0;
+  const services = createServices(makeSystem({ features: { gathering: true } }), [], [], {
+    getSetting: key => (key === 'gatheringConfig' ? gatheringConfig : ''),
+    setSetting: async (key, value) => {
+      if (key !== 'gatheringConfig') return;
+      writeCount += 1;
+      gatheringConfig = structuredClone(value);
+    }
+  });
+  const store = createAdminStore(services);
+  await store.selectSystem('sys1');
+  const normalized = get(store.viewState).gatheringConfig.systems.sys1.tasks[0];
+
+  const validation = store.validateGatheringLibraryTask(normalized);
+  assert.equal(validation.valid, false);
+  assert.ok(validation.resultErrors.some(error => error.includes('positive finite number')));
+  assert.equal(
+    await store.updateGatheringLibraryTask('sys1', 'task-straight', { name: 'Still invalid' }),
+    false
+  );
+  assert.equal(writeCount, 0, 'an invalid active result never reaches persistence');
+});
+
 test('admin production reporting reads only the active gathering result source', async () => {
   const gatheringConfig = {
     systems: {
