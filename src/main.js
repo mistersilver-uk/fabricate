@@ -61,6 +61,7 @@ import { applyBulkChatVisibility } from './systems/bulkChatVisibility.js';
 import { AlchemyListingBuilder } from './systems/AlchemyListingBuilder.js';
 import {
   evaluatePreparedCraftingCheck,
+  evaluatePreparedRunCheck,
   postCheckRollHandoff,
   resolveCheckFormulaDisplay,
   runFormulaPassFail,
@@ -69,7 +70,10 @@ import {
 import { createFoundryJournalRunAuthority } from './systems/journalRunAuthority.js';
 import {
   JOURNAL_RUN_SOCKET_KIND,
+  createGatheringJournalRunOperations,
   createJournalRunCommandService,
+  installCraftingJournalRunAuthority,
+  installGatheringJournalRunAuthority,
 } from './systems/journalRunCommands.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
@@ -463,7 +467,9 @@ function createCraftingJournalOperations(fabricate, getService) {
       const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
       if (!componentSourceActors) return { required: false, blocked: 'source-actor-not-found' };
       const describe = fabricate.craftingEngine?.describeVersionedStageCheck;
-      if (typeof describe !== 'function') return { required: false };
+      if (typeof describe !== 'function') {
+        return { required: false, blocked: 'unsupported-operation' };
+      }
       return describe.call(fabricate.craftingEngine, {
         actor,
         componentSourceActors,
@@ -513,7 +519,6 @@ function createCraftingJournalOperations(fabricate, getService) {
       if (typeof cancel !== 'function') return { success: false, reason: 'unsupported-operation' };
       return cancel.call(fabricate.craftingEngine, {
         actor,
-        componentSourceActors,
         runId: run.id,
         expectedRevision,
         executionGrant,
@@ -546,80 +551,20 @@ function createCraftingJournalOperations(fabricate, getService) {
   };
 }
 
-function installCraftingJournalAuthority(fabricate, service) {
-  fabricate.craftingEngine?.installVersionedRunAuthority?.({
-    requestStart: ({
-      activityKind = 'crafting',
-      actor,
-      sourceActors,
-      recipeId,
-      selectionPlan,
-      completionMode,
-      craftingSystemId,
-      submittedItems,
-    }) =>
-      service.executeJournalRunCommand({
-        actorUuid: actor?.uuid,
-        runType: 'crafting',
-        runId: '',
-        expectedRevision: 0,
-        action: 'start',
-        payload: {
-          activityKind,
-          recipeId,
-          selectionPlan,
-          completionMode,
-          craftingSystemId,
-          submittedItems: Array.isArray(submittedItems)
-            ? submittedItems.map((record) => ({
-                itemUuid: record?.itemUuid ?? record?.item?.uuid ?? null,
-                componentId: record?.componentId ?? null,
-              }))
-            : [],
-          sourceActorUuids: (sourceActors ?? []).map((source) => source?.uuid).filter(Boolean),
-        },
-      }),
-    requestExecute: ({
-      actor,
-      componentSourceActors,
-      runId,
-      expectedRevision,
-      selectionPlan,
-      trigger = 'manual',
-    }) =>
-      service.executeJournalRunCommand({
-        actorUuid: actor?.uuid,
-        runType: 'crafting',
-        runId,
-        expectedRevision,
-        action: 'execute',
-        payload: {
-          selectionPlan,
-          trigger,
-          sourceActorUuids: (componentSourceActors ?? []).map((source) => source?.uuid).filter(Boolean),
-        },
-      }),
-    requestCancel: ({ actor, componentSourceActors, runId, expectedRevision }) =>
-      service.executeJournalRunCommand({
-        actorUuid: actor?.uuid,
-        runType: 'crafting',
-        runId,
-        expectedRevision,
-        action: 'cancel',
-        payload: {
-          sourceActorUuids: (componentSourceActors ?? []).map((source) => source?.uuid).filter(Boolean),
-        },
-      }),
-    consumeExecutionGrant: (grant, context) => service.consumeExecutionGrant(grant, context),
-  });
-}
-
 function createJournalCommandsForFabricate(fabricate) {
   const authority = createFoundryJournalRunAuthority();
   let service = null;
   service = createJournalRunCommandService({
     authority,
-    operations: { crafting: createCraftingJournalOperations(fabricate, () => service) },
+    operations: {
+      crafting: createCraftingJournalOperations(fabricate, () => service),
+      gathering: createGatheringJournalRunOperations({
+        getEngine: () => gatheringEngine,
+        runManager: fabricate.gatheringRunManager,
+        getService: () => service,
+        getUser: (userId) => game.users?.get(userId) ?? null,
+      }),
+    },
     currentUser: () => game.user,
     activeGM: () => game.users?.activeGM ?? null,
     getUser: (userId) => game.users?.get(userId) ?? null,
@@ -637,7 +582,7 @@ function createJournalCommandsForFabricate(fabricate) {
     setDismissals: (value) => setSetting(SETTING_KEYS.JOURNAL_RUN_DISMISSALS, value),
     onDismissalsChanged: (payload) => Hooks.callAll('fabricate.journalDismissalsChanged', payload),
   });
-  installCraftingJournalAuthority(fabricate, service);
+  installCraftingJournalRunAuthority({ engine: fabricate.craftingEngine, service });
   void authority.refreshAvailability();
   return service;
 }
@@ -1875,6 +1820,11 @@ class Fabricate {
           behaviorId: ref?.behaviorId,
           update
         })
+    });
+    installGatheringJournalRunAuthority({
+      engine: gatheringEngine,
+      service: this.journalRunCommands,
+      evaluatePreparedRunCheck,
     });
     // Issue 901. A blind run's secret state — the drawn task, its start-time
     // snapshot, and its provisional node reservation — lives in the
@@ -3732,6 +3682,7 @@ class Fabricate {
     // post; omitted/false for macros/automation so they stay silent (no API break).
     return await this.craft(craftingActor, recipeId, {
       componentSourceActors: sources,
+      lifecycleVersion: 1,
       ingredientSetId,
       // Per-group player option overrides (issue 552); null keeps default resolution.
       ingredientOptionOverrides,
@@ -4292,6 +4243,7 @@ class Fabricate {
     }
     return await this.craftingEngine.craftAlchemy(craftingActor, sources, submittedItems, {
       craftingSystemId,
+      lifecycleVersion: 1,
       interactive,
     });
   }
@@ -4536,6 +4488,14 @@ class Fabricate {
     // the engine falls back to selectableActors[0] and silently mis-gates the
     // attempt — the player-app "nothing happens" bug. See _withRememberedActorDefault.
     const withRememberedActor = this._withRememberedActorDefault(options);
+    const selectableActors = getGatheringSelectableActors({ viewer: game.user });
+    const selectedActor = withRememberedActor.actor ?? (
+      withRememberedActor.rememberedActorId
+        ? selectableActors.find((actor) =>
+            [actor?.id, actor?.uuid].includes(withRememberedActor.rememberedActorId)) ?? null
+        : (selectableActors[0] ?? null)
+    );
+    Object.assign(withRememberedActor, { actor: selectedActor, lifecycleVersion: 1 });
 
     // `requestStart`, not `startAttempt`: a blind timed start this client may not
     // write is routed to the active GM before any task is drawn (issue 901). Every

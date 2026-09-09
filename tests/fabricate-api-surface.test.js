@@ -320,3 +320,25 @@ test('Fabricate exposes the versioned Journal command and per-user dismissal sea
     'embedded authority-claim release should refresh the synchronous availability cache'
   );
 });
+
+test('player-facing starts explicitly select the current journal lifecycle', () => {
+  assert.match(
+    mainSource,
+    /async craftRecipe[\s\S]*?return await this\.craft\([\s\S]*?lifecycleVersion:\s*1,[\s\S]*?\n\s*}\);/,
+    'craftRecipe should start a versioned crafting run'
+  );
+  assert.match(
+    mainSource,
+    /async submitAlchemyAttempt[\s\S]*?this\.craftingEngine\.craftAlchemy\([\s\S]*?lifecycleVersion:\s*1,[\s\S]*?\n\s*}\);/,
+    'submitAlchemyAttempt should start a versioned alchemy run'
+  );
+  assert.match(
+    mainSource,
+    /startGatheringAttempt[\s\S]*?selectedActor[\s\S]*?actor:\s*selectedActor,\s*lifecycleVersion:\s*1[\s\S]*?'requestStart'/,
+    'startGatheringAttempt should start a versioned gathering run'
+  );
+  assert.ok(
+    mainSource.includes('installGatheringJournalRunAuthority({'),
+    'the constructed gathering engine should receive the journal authority adapter'
+  );
+});

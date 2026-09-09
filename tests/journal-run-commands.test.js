@@ -3,13 +3,17 @@ import { describe, it } from 'node:test';
 
 import {
   JOURNAL_RUN_SOCKET_KIND,
+  createGatheringJournalRunOperations,
   journalRunDismissalKey,
   createJournalRunCommandService,
+  installCraftingJournalRunAuthority,
+  installGatheringJournalRunAuthority,
 } from '../src/systems/journalRunCommands.js';
 
 function commandHarness({
   currentUserId = 'player',
   activeGMId = 'gm',
+  getActiveGM = null,
   timeoutMs = 20,
   run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' },
   getDismissals = () => ({}),
@@ -43,7 +47,7 @@ function commandHarness({
       consumeExecutionGrant: (grant) => grant?.grant === true,
     },
     currentUser: () => users.get(currentUserId),
-    activeGM: () => users.get(activeGMId) ?? null,
+    activeGM: () => getActiveGM?.() ?? users.get(activeGMId) ?? null,
     getUser: (userId) => users.get(userId) ?? null,
     resolveUuid: async (uuid) => (uuid === actor.uuid ? actor : null),
     emit: (message) => emitted.push(message),
@@ -65,6 +69,306 @@ function commandHarness({
 }
 
 describe('journal run command protocol', () => {
+  it('installs exact crafting and gathering request adapters on the current engines', async () => {
+    const commands = [];
+    const service = {
+      async executeJournalRunCommand(command) {
+        commands.push(command);
+        return command;
+      },
+      consumeExecutionGrant: (grant, context) => ({ grant, context }),
+    };
+    const crafting = {
+      installVersionedRunAuthority(authority) {
+        this.authority = authority;
+      },
+    };
+    const gathering = {
+      installVersionedRunAuthority(authority) {
+        this.authority = authority;
+      },
+    };
+    const evaluatePreparedRunCheck = () => ({ engineEvaluated: true });
+
+    installCraftingJournalRunAuthority({ engine: crafting, service });
+    installGatheringJournalRunAuthority({
+      engine: gathering,
+      service,
+      evaluatePreparedRunCheck,
+    });
+
+    await crafting.authority.requestExecute({
+      actor: { uuid: 'Actor.crafter' },
+      runId: 'craft-run',
+      expectedRevision: 7,
+      componentSourceActorUuids: ['Actor.source'],
+      trigger: 'worldTime',
+    });
+    await gathering.authority.requestStart({
+      actor: { uuid: 'Actor.gatherer' },
+      rememberedActorId: 'gatherer',
+      environmentId: 'forest',
+      taskId: 'herbs',
+      presentTools: { systemId: 'survival', componentIds: ['sickle'] },
+      interactableRef: { sceneId: 's', regionId: 'r', behaviorId: 'b' },
+      completionMode: 'manual',
+    });
+    await gathering.authority.requestCancel({
+      actor: { uuid: 'Actor.gatherer' },
+      runId: 'gather-run',
+      expectedRevision: 4,
+    });
+
+    assert.deepEqual(commands, [
+      {
+        actorUuid: 'Actor.crafter',
+        runType: 'crafting',
+        runId: 'craft-run',
+        expectedRevision: 7,
+        action: 'execute',
+        payload: {
+          selectionPlan: undefined,
+          trigger: 'worldTime',
+          sourceActorUuids: ['Actor.source'],
+        },
+      },
+      {
+        actorUuid: 'Actor.gatherer',
+        runType: 'gathering',
+        runId: '',
+        expectedRevision: 0,
+        action: 'start',
+        payload: {
+          rememberedActorId: 'gatherer',
+          environmentId: 'forest',
+          taskId: 'herbs',
+          presentTools: { systemId: 'survival', componentIds: ['sickle'] },
+          interactableRef: { sceneId: 's', regionId: 'r', behaviorId: 'b' },
+          completionMode: 'manual',
+        },
+      },
+      {
+        actorUuid: 'Actor.gatherer',
+        runType: 'gathering',
+        runId: 'gather-run',
+        expectedRevision: 4,
+        action: 'cancel',
+        payload: {},
+      },
+    ]);
+    assert.deepEqual(
+      gathering.authority.evaluatePreparedRunCheck({}, {}, {}),
+      { engineEvaluated: true }
+    );
+    assert.throws(
+      () => installGatheringJournalRunAuthority({
+        engine: {},
+        service,
+        evaluatePreparedRunCheck,
+      }),
+      /adapter is unavailable/,
+      'a missing production engine adapter must fail during composition'
+    );
+  });
+
+  it('routes gathering start, execute, automatic execute, and cancel through the command service', async () => {
+    const calls = [];
+    let installedAuthority = null;
+    const run = {
+      id: 'gather-run',
+      lifecycleVersion: 1,
+      runRevision: 3,
+      status: 'waiting',
+    };
+    const engine = {
+      installVersionedRunAuthority(authority) {
+        installedAuthority = authority;
+      },
+      async startVersionedRun(args) {
+        calls.push(['start', args]);
+        return { success: true, runId: 'new-run', status: 'waiting', runRevision: 1 };
+      },
+      async describeVersionedStageCheck(args) {
+        calls.push(['describe', args]);
+        return { required: false, publicPrompt: {}, privateEvaluation: {} };
+      },
+      async executeVersionedStage(args) {
+        calls.push(['execute', args]);
+        return {
+          success: true,
+          runId: args.runId,
+          status: 'completed',
+          runRevision: args.expectedRevision + 1,
+          terminal: true,
+        };
+      },
+      async cancelVersionedRun(args) {
+        calls.push(['cancel', args]);
+        return {
+          success: true,
+          accepted: true,
+          cancelled: true,
+          refunded: false,
+          restoredCount: 0,
+          run: { ...run, status: 'cancelled', runRevision: 4 },
+        };
+      },
+    };
+    const runManager = {
+      invalidateCache() {},
+      getRun: () => run,
+      getActiveRun: () => run,
+      async pauseRun(actor, runId, options) {
+        calls.push(['pause', { actor, runId, options }]);
+        return { ...run, status: 'paused', runRevision: 4 };
+      },
+      async setCompletionMode(actor, runId, value, options) {
+        calls.push(['setCompletionMode', { actor, runId, value, options }]);
+        return { ...run, completionMode: value, runRevision: 4 };
+      },
+    };
+    const operations = createGatheringJournalRunOperations({
+      engine,
+      runManager,
+      getService: () => service,
+      getUser: (id) => ({ id, isGM: id === 'gm' }),
+    });
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      run,
+      operations: { gathering: operations },
+    });
+    installGatheringJournalRunAuthority({
+      engine,
+      service,
+      evaluatePreparedRunCheck: () => ({ engineEvaluated: true }),
+    });
+
+    const actor = { uuid: 'Actor.a' };
+    const started = await installedAuthority.requestStart({
+      actor,
+      rememberedActorId: 'a',
+      environmentId: 'forest',
+      taskId: 'herbs',
+      completionMode: 'manual',
+    });
+    const executed = await installedAuthority.requestExecute({
+      actor,
+      runId: run.id,
+      expectedRevision: 3,
+      trigger: 'manual',
+    });
+    const automatic = await installedAuthority.requestExecute({
+      actor,
+      runId: run.id,
+      expectedRevision: 3,
+      trigger: 'worldTime',
+    });
+    const cancelled = await installedAuthority.requestCancel({
+      actor,
+      runId: run.id,
+      expectedRevision: 3,
+    });
+    const paused = await service.executeJournalRunCommand({
+      actorUuid: actor.uuid,
+      runType: 'gathering',
+      runId: run.id,
+      expectedRevision: 3,
+      action: 'pause',
+    });
+    const completionMode = await service.executeJournalRunCommand({
+      actorUuid: actor.uuid,
+      runType: 'gathering',
+      runId: run.id,
+      expectedRevision: 3,
+      action: 'setCompletionMode',
+      payload: { completionMode: 'worldTime' },
+    });
+    const unsupportedSelection = await service.executeJournalRunCommand({
+      actorUuid: actor.uuid,
+      runType: 'gathering',
+      runId: run.id,
+      expectedRevision: 3,
+      action: 'setSelection',
+      payload: { selectionPlan: {} },
+    });
+
+    assert.equal(started.runId, 'new-run');
+    assert.equal(executed.status, 'completed');
+    assert.equal(automatic.status, 'completed');
+    assert.equal(cancelled.cancelled, true);
+    assert.equal(cancelled.refunded, false);
+    assert.equal(cancelled.restoredCount, 0);
+    assert.equal(paused.success, true);
+    assert.equal(completionMode.success, true);
+    assert.equal(unsupportedSelection.reason, 'unsupported-operation');
+    assert.equal(calls.filter(([kind]) => kind === 'start').length, 1);
+    assert.deepEqual(
+      calls.filter(([kind]) => kind === 'execute').map(([, args]) => args.trigger),
+      ['manual', 'worldTime']
+    );
+    assert.equal(calls.filter(([kind]) => kind === 'cancel').length, 1);
+    assert.equal(calls[0][1].viewer.id, 'gm');
+  });
+
+  it('keeps a gathering secret-check result and engine details out of the reply', async () => {
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3, status: 'waiting' };
+    let posts = 0;
+    const engine = {
+      describeVersionedStageCheck: async () => ({
+        required: true,
+        publicPrompt: { label: 'Unknown task', mode: 'routedByCheck' },
+        privateEvaluation: { rollFormula: '1d20+12', secret: true },
+      }),
+      evaluatePreparedVersionedCheck: async () => ({
+        engineEvaluated: true,
+        secret: true,
+        success: true,
+        outcome: 'hidden-result',
+        value: 27,
+        data: { total: 27, diceGroups: [{ group: '1d20', results: [15] }] },
+      }),
+      executeVersionedStage: async () => ({
+        success: true,
+        runId: run.id,
+        status: 'completed',
+        runRevision: 4,
+        message: '27: hidden-result',
+        results: [{ uuid: 'Item.secret' }],
+      }),
+    };
+    const operations = createGatheringJournalRunOperations({
+      engine,
+      runManager: { getRun: () => run },
+      getService: () => service,
+      getUser: () => ({ id: 'gm', isGM: true }),
+    });
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      run,
+      operations: { gathering: operations },
+      promptCheck: async () => ({ confirmed: true }),
+      postRollHandoff: async () => { posts += 1; },
+    });
+    const response = await service.executeJournalRunCommand({
+      actorUuid: 'Actor.a',
+      runType: 'gathering',
+      runId: run.id,
+      expectedRevision: 3,
+      action: 'execute',
+    });
+
+    assert.deepEqual(response, {
+      success: true,
+      runId: run.id,
+      status: 'completed',
+      runRevision: 4,
+      secret: true,
+      reason: null,
+    });
+    assert.equal(posts, 0);
+  });
+
   it('accepts a command only from the server-attested sender and re-resolves ownership', async () => {
     const { service } = commandHarness({ currentUserId: 'gm' });
     const reply = await service.handleSocketMessage(
@@ -160,6 +464,40 @@ describe('journal run command protocol', () => {
       'player'
     );
     assert.deepEqual(reply, { success: false, reason: 'stale-run', currentRevision: 3 });
+  });
+
+  it('does not invoke the mutation when the elected GM changes during context resolution', async () => {
+    let activeGmId = 'gm';
+    let mutations = 0;
+    const run = { id: 'run-1', lifecycleVersion: 1, runRevision: 3 };
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      getActiveGM: () => ({ id: activeGmId, isGM: true }),
+      operations: {
+        crafting: {
+          getRun: async () => {
+            activeGmId = 'replacement-gm';
+            return run;
+          },
+          execute: async () => (++mutations, { success: true }),
+        },
+      },
+    });
+    const response = await service.handleRequest(
+      {
+        requestId: 'election-change',
+        sessionId: 'one',
+        actorUuid: 'Actor.a',
+        runType: 'crafting',
+        runId: run.id,
+        expectedRevision: 3,
+        action: 'execute',
+      },
+      'player'
+    );
+
+    assert.deepEqual(response, { success: false, reason: 'active-gm-required' });
+    assert.equal(mutations, 0);
   });
 
   it('fails closed for unsupported run operations with zero effects', async () => {
