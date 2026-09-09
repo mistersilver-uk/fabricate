@@ -834,10 +834,19 @@ export class CraftingEngine {
         minutes: seconds / 60,
       });
     }
+    const canExecuteImmediately = await this._canExecuteVersionedStageImmediately({
+      run: current,
+      actor,
+      componentSourceActors: sourceActors,
+      recipe,
+      step,
+      selectedSet,
+    });
     return {
       ...versionedTransitionResult(current, { success: true, disposition: 'started' }),
       started: true,
       requiresExecution: current.status !== 'waitingTime',
+      canExecuteImmediately,
     };
   }
 
@@ -1092,6 +1101,64 @@ export class CraftingEngine {
       };
     }
     return null;
+  }
+
+  async _canExecuteVersionedStageImmediately({
+    run,
+    actor,
+    componentSourceActors,
+    recipe,
+    step,
+    selectedSet,
+  }) {
+    if (run?.status === 'waitingTime' || run?.pauseState) return false;
+    const stepIndex = Number(run?.currentStepIndex);
+    const selectionPlan = run?.steps?.[stepIndex]?.selectionPlan ?? {};
+    if (!this._versionedSelectionInputsComplete(selectedSet, selectionPlan, step)) return false;
+    try {
+      const prepared = await this._prepareVersionedStage({
+        run,
+        actor,
+        componentSourceActors,
+        recipe,
+        step,
+        selectedSet,
+        selectionPlan,
+      });
+      if (!prepared.valid) return false;
+    } catch {
+      return false;
+    }
+    const activeCheck = resolveActiveCraftingCheckFormula(this._getRecipeSystem(recipe));
+    return !activeCheck.requiresCheck || activeCheck.checkUsable;
+  }
+
+  _versionedSelectionInputsComplete(selectedSet, selectionPlan, step) {
+    const groups = Array.isArray(selectedSet?.ingredientGroups) ? selectedSet.ingredientGroups : [];
+    const overrides = selectionPlan?.ingredientOptionOverrides;
+    let requiresEssenceAllocation = Object.keys(selectedSet?.essences ?? {}).length > 0;
+    for (const group of groups) {
+      const options = Array.isArray(group?.options) ? group.options : [];
+      const selectedIndex = Number(overrides?.[group?.id]?.optionIndex);
+      if (
+        options.length > 1 &&
+        (!Number.isInteger(selectedIndex) || selectedIndex < 0 || selectedIndex >= options.length)
+      ) {
+        return false;
+      }
+      const selected = options[Number.isInteger(selectedIndex) ? selectedIndex : 0];
+      if (selected?.match?.type === 'essence') requiresEssenceAllocation = true;
+    }
+    if (!requiresEssenceAllocation) return true;
+    const allocation = this._scopedEssenceAllocation(
+      selectionPlan?.ingredientEssenceAllocation,
+      step,
+      selectedSet
+    );
+    return (
+      allocation !== null &&
+      Object.values(allocation).some((units) => Number.isFinite(Number(units)) && Number(units) > 0)
+    );
   }
 
   async _prepareVersionedStage({

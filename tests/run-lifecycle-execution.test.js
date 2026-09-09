@@ -415,7 +415,30 @@ function setupEngineFixture() {
   };
   const runManager = new CraftingRunManager();
   const engine = new CraftingEngine(recipeManager, runManager);
-  return { engine, recipe, runManager };
+  return { engine, ingredientSet, recipe, recipeManager, runManager };
+}
+
+function makeCurrentStageImmediate(recipe) {
+  const step = recipe.getExecutionSteps()[0];
+  recipe.getExecutionSteps = () => [{ ...step, timeRequirement: null }];
+}
+
+async function startReadyVersionedRun({ engine, recipe, actor, source, selectionPlan = {} }) {
+  engine.installVersionedRunAuthority({
+    consumeExecutionGrant: async () => ({ operationId: `start-${actor.id}` }),
+  });
+  return engine.startVersionedRun({
+    viewer: game.user,
+    actor,
+    sourceActors: [source],
+    recipeId: recipe.id,
+    selectionPlan: {
+      selectedIngredientSetId: 'set-1',
+      ...selectionPlan,
+    },
+    requestId: `request-${actor.id}`,
+    executionGrant: `grant-${actor.id}`,
+  });
 }
 
 test('CraftingEngine versioned start arms a timed stage with exact intent and zero consumption', async () => {
@@ -449,6 +472,7 @@ test('CraftingEngine versioned start arms a timed stage with exact intent and ze
 
   assert.equal(started.success, true);
   assert.equal(started.waiting, true);
+  assert.equal(started.canExecuteImmediately, false);
   assert.equal(deletes, 0);
   runManager.invalidateCache();
   const persisted = runManager.getActiveRun(actor, started.runId);
@@ -459,6 +483,155 @@ test('CraftingEngine versioned start arms a timed stage with exact intent and ze
   assert.deepEqual(persisted.steps[0].selectedRequirementSnapshot.ingredients[3], {
     currency: { unit: 'gp', amount: 5 },
   });
+});
+
+test('CraftingEngine reports a read-only prepared stage as immediately executable', async () => {
+  const { engine, recipe, runManager } = setupEngineFixture();
+  makeCurrentStageImmediate(recipe);
+  const actor = new FakeActor('ready-crafter');
+  const source = new FakeActor('ready-source');
+  const prepare = engine._prepareVersionedStage.bind(engine);
+  let preparations = 0;
+  engine._prepareVersionedStage = async (args) => {
+    preparations += 1;
+    return prepare(args);
+  };
+  engine._consumeIngredients = async () => {
+    throw new Error('readiness must not consume ingredients');
+  };
+
+  const started = await startReadyVersionedRun({ engine, recipe, actor, source });
+
+  assert.equal(started.success, true);
+  assert.equal(started.waiting, false);
+  assert.equal(started.canExecuteImmediately, true);
+  assert.equal(preparations, 1);
+  assert.equal(runManager.getActiveRuns(actor).length, 1);
+  assert.equal(runManager.getActiveRun(actor, started.runId).executionJournal, undefined);
+});
+
+test('CraftingEngine keeps immediate execution false for unresolved stage inputs', async () => {
+  const blockers = [
+    {
+      name: 'materials',
+      configure({ recipeManager }) {
+        recipeManager.canCraft = () => ({
+          canCraft: false,
+          missing: { ingredients: [], essences: [], tools: [] },
+        });
+      },
+    },
+    {
+      name: 'choice',
+      configure({ ingredientSet }) {
+        ingredientSet.ingredientGroups = [
+          { id: 'brew-base', options: [{ match: { type: 'component' } }, { match: { type: 'tag' } }] },
+        ];
+      },
+    },
+    {
+      name: 'essence',
+      configure({ ingredientSet }) {
+        ingredientSet.ingredientGroups = [
+          { id: 'solar-carrier', options: [{ match: { type: 'essence', essenceId: 'solar' } }] },
+        ];
+      },
+    },
+    {
+      name: 'currency',
+      configure({ engine, recipe }) {
+        recipe.currencyCost = { currencies: [{ name: 'gp', cost: 5 }] };
+        engine.itemPilesIntegration = {
+          isEnabled: () => true,
+          canAfford: async () => false,
+          deductCurrency: async () => {
+            throw new Error('readiness must not spend currency');
+          },
+        };
+        game.fabricate.getCraftingSystemManager = () => ({
+          getSystem: () => ({ resolutionMode: 'simple' }),
+        });
+      },
+    },
+    {
+      name: 'tool',
+      configure({ recipeManager }) {
+        recipeManager.getToolsForSet = () => [{ id: 'mortar', componentId: 'mortar' }];
+        recipeManager.toolMatchesItem = () => false;
+      },
+    },
+    {
+      name: 'required check configuration',
+      configure() {
+        game.fabricate.getCraftingSystemManager = () => ({
+          getSystem: () => ({
+            resolutionMode: 'progressive',
+            craftingCheck: { progressive: { rollFormula: '' } },
+          }),
+        });
+      },
+    },
+  ];
+
+  for (const blocker of blockers) {
+    const fixture = setupEngineFixture();
+    makeCurrentStageImmediate(fixture.recipe);
+    blocker.configure(fixture);
+    const actor = new FakeActor(`${blocker.name}-crafter`);
+    const source = new FakeActor(`${blocker.name}-source`);
+
+    const started = await startReadyVersionedRun({
+      engine: fixture.engine,
+      recipe: fixture.recipe,
+      actor,
+      source,
+    });
+
+    assert.equal(started.success, true, blocker.name);
+    assert.equal(started.canExecuteImmediately, false, blocker.name);
+    assert.equal(fixture.runManager.getActiveRuns(actor).length, 1, blocker.name);
+  }
+});
+
+test('CraftingEngine allows supplied choices to continue into a manual check prompt', async () => {
+  const fixture = setupEngineFixture();
+  makeCurrentStageImmediate(fixture.recipe);
+  fixture.ingredientSet.ingredientGroups = [
+    { id: 'brew-base', options: [{ match: { type: 'component' } }, { match: { type: 'tag' } }] },
+  ];
+  game.fabricate.getCraftingSystemManager = () => ({
+    getSystem: () => ({
+      resolutionMode: 'simple',
+      craftingCheck: { simple: { rollFormula: '1d20' } },
+    }),
+  });
+  const actor = new FakeActor('prompt-crafter');
+  const source = new FakeActor('prompt-source');
+  const originalRoll = globalThis.Roll;
+  let rolls = 0;
+  globalThis.Roll = class {
+    constructor() {
+      rolls += 1;
+    }
+  };
+
+  let started;
+  try {
+    started = await startReadyVersionedRun({
+      engine: fixture.engine,
+      recipe: fixture.recipe,
+      actor,
+      source,
+      selectionPlan: { ingredientOptionOverrides: { 'brew-base': { optionIndex: 1 } } },
+    });
+  } finally {
+    if (originalRoll === undefined) delete globalThis.Roll;
+    else globalThis.Roll = originalRoll;
+  }
+
+  assert.equal(started.success, true);
+  assert.equal(started.canExecuteImmediately, true);
+  assert.equal(rolls, 0);
 });
 
 test('CraftingEngine refuses inaccessible normal starts before persistence without revealing why', async () => {
