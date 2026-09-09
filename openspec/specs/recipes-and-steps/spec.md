@@ -138,6 +138,29 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
 
 ## Execution Lifecycle
 
+### Versioned Run Execution
+
+New applicable crafting and alchemy runs use lifecycle version 1, as defined in `data-models/spec.md`.
+Only an absent version selects the legacy contract; unsupported present versions are preserved and refuse mutation.
+The versioned rules in this section supersede arm-time consumption and cancellation refunds for those new runs alone.
+
+- Arming a timed stage persists its scoped choices and full selected authored-requirement snapshot without spending editable materials or currency.
+- Execution re-resolves the current run, revision, source actors, selected ingredient set, inventory, Tools and requirements under the authoritative operation.
+Fixed ingredients, alternatives and essence carriers share the canonical physical-item allocation, so one unit cannot fund two requirements.
+- Each irreversible spending, award and publication operation persists its applying phase before invocation and its actual receipt before the next operation.
+Ambiguous writes preserve recovery evidence and cannot be replayed or automatically compensated.
+History distinguishes authored requirements, actual spending, actual rolls and actual awards.
+- New runs default to manual completion.
+An actively counting-down stage without a player check may retain a world-time completion preference even while editable requirements remain unresolved.
+Automatic execution uses the same guarded operation as manual execution and stops without spending when choices, materials, currency, essence allocation or a player check require input, or validation fails.
+The preference survives that blocker; world-time jumps cannot bypass a check or execute a stage twice.
+- Pausing freezes remaining world time and retains choices; resuming reanchors readiness.
+Paused runs cannot advance manually or through world-time processing, but may be cancelled.
+- Versioned cancellation forfeits elapsed time and preserves completed-stage spending and awards.
+Unconsumed materials remain untouched; legacy consumption and refund behavior and salvage remain unchanged.
+- A recipe-less alchemy fizzle persists its versioned terminal-history execution journal before recording a dead end or consuming submitted items.
+It honors the existing consume-on-failure policy and history visibility rules without revealing a recipe or replaying uncertain effects.
+
 ### Start or Resume
 
 1. Resolve recipe and active step.
