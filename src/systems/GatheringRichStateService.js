@@ -9,6 +9,7 @@ import {
 } from './gatheringComposition.js';
 import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { depleteNodeOnce, normalizeNodeConfig } from './gatheringNodeConfig.js';
+import { normalizeGatheringResultGroups } from './gatheringResultGroups.js';
 import { GatheringNodeService } from './GatheringNodeService.js';
 import {
   cloneJson,
@@ -117,10 +118,9 @@ function resolveDropModifierMode(systemMode) {
 // compat mapping in normalizeGatheringEconomy (legacy `mode` ⇒ stamina/nodes
 // flags). The canonical state is the two independent booleans, not this enum.
 const ECONOMY_MODES = new Set(['none', 'stamina', 'nodes']);
-// System-level gathering resolution mode. `d100` is the only currently implemented
-// resolution; `progressive`/`routed` are modelled but unimplemented (the manager
-// shows them disabled). It is GM config, not part of the player listing payload.
+// Legacy system-level economy setting. Task resolution is selected independently.
 const GATHERING_RESOLUTION_MODES = new Set(['d100', 'progressive', 'routed']);
+const GATHERING_TASK_RESOLUTION_MODES = new Set(['straight', 'd100', 'progressive', 'routed']);
 // Stamina regeneration over world time.
 const STAMINA_REGEN_POLICIES = new Set(['none', 'overTime']);
 // Legacy stamina-regen policy mapped onto the unified `overTime` term. The 1.2.0
@@ -1491,7 +1491,7 @@ export class GatheringRichStateService {
       description: normalized.description,
       img: normalized.img,
       enabled: normalized.enabled,
-      resolutionMode: 'd100',
+      resolutionMode: normalized.resolutionMode,
       itemSelectionMode: normalized.itemSelectionMode,
       dropRows: normalized.dropRows.map((row) =>
         applyDropRateAdjustment(row, rowAdjustments[row.id])
@@ -1501,10 +1501,7 @@ export class GatheringRichStateService {
         ? cloneJson(normalized.staminaCostModifiers)
         : [],
       gatheringModifier: normalized.gatheringModifier,
-      // resultGroups is read by the routed path (GatheringEngine.matchResultGroupsByName
-      // and normalizeList(task.resultGroups)[0]); dormant until #683 ships routed
-      // resolution, but must stay carried so that path is not broken on arrival.
-      resultGroups: [{ id: `${normalized.id}-d100`, name: normalized.name, results: [] }],
+      resultGroups: cloneJson(normalized.resultGroups),
       // THE TASK'S OWN CHECK-MODIFIER PICK (issue 1095) MUST SURVIVE COMPOSITION.
       // `normalizeLibraryTask` above and `_normalizeGatheringTask` (adminStore) are the two
       // mirrored LIBRARY normalizers, but this literal is a THIRD whitelist rebuild and it
@@ -1524,9 +1521,7 @@ export class GatheringRichStateService {
       // field correct on disk and dead at roll time — the exact third-mirror failure
       // `checkModifierIds` above records.
       ...authoredFailureOutcome(normalized.failureOutcome),
-      // Per-task routed-check DC override (issue 904). resolutionMode stays hardcoded
-      // to 'd100' above — routed gathering is disabled ("Coming soon") pending #683 —
-      // so this plumbing is deliberately dormant until routed resolution ships.
+      // Per-task routed-check DC override (issue 904).
       dcOverride: normalized.dcOverride,
       catalysts: [],
       toolIds: Array.isArray(normalized.toolIds) ? [...normalized.toolIds] : [],
@@ -2030,8 +2025,9 @@ function withSystemCurrentCondition(systems, kind, current) {
 }
 
 function normalizeLibraryTask(task = {}) {
+  const id = stringOrFallback(task.id, `task-${normalizeTag(task.name) || 'gather'}`);
   return {
-    id: stringOrFallback(task.id, `task-${normalizeTag(task.name) || 'gather'}`),
+    id,
     name: stringOrFallback(task.name, 'Gather'),
     description: stringOrFallback(task.description, ''),
     img: stringOrFallback(task.img, 'icons/svg/item-bag.svg'),
@@ -2042,6 +2038,10 @@ function normalizeLibraryTask(task = {}) {
     itemSelectionMode: LEGACY_DROP_SELECTION_MODES.has(task.itemSelectionMode)
       ? task.itemSelectionMode
       : 'highestRankedDrop',
+    resolutionMode: GATHERING_TASK_RESOLUTION_MODES.has(task.resolutionMode)
+      ? task.resolutionMode
+      : 'd100',
+    resultGroups: normalizeGatheringResultGroups(task.resultGroups, { fallbackPrefix: id }),
     dropRows: normalizeList(task.dropRows ?? task.itemDrops).map(normalizeItemDrop),
     staminaCost: nonNegativeNumber(task.staminaCost, 0),
     staminaCostModifiers: normalizeCharacterModifierReferenceList(task.staminaCostModifiers),

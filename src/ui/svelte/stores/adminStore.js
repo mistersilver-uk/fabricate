@@ -101,6 +101,7 @@ import {
 } from '../../../systems/gatheringComposition.js';
 import { evaluateEnvironmentMatch } from '../../../systems/gatheringMatch.js';
 import { normalizeNodeConfig, normalizeNodeRuntime } from '../../../systems/gatheringNodeConfig.js';
+import { normalizeGatheringResultGroups } from '../../../systems/gatheringResultGroups.js';
 import { Tool } from '../../../models/Tool.js';
 import { classifyModeChange } from '../../../migration/migrateRecipeForModeChange.js';
 import { DEFAULT_GATHERING_EVENT_IMG } from '../../../gatheringImageDefaults.js';
@@ -210,7 +211,7 @@ const RESOLUTION_MODE_LABEL_KEYS = {
 
 const BASE_TABS = new Set(['systems', 'items', 'recipes', 'rules', 'graph']);
 const ENVIRONMENTS_TAB = 'environments';
-const TASK_RESOLUTION_MODES = new Set(['routed', 'progressive']);
+const TASK_RESOLUTION_MODES = new Set(['straight', 'd100', 'progressive', 'routed']);
 const TASK_PROGRESSIVE_AWARD_MODES = new Set(['equal', 'partial', 'exceed']);
 const TASK_TIME_UNITS = ['minutes', 'hours', 'days', 'months', 'years'];
 const TASK_FAILURE_OUTCOME_MODES = new Set(['text', 'macro']);
@@ -856,6 +857,11 @@ function _normalizeGatheringTask(task = {}, randomID = _fallbackRandomID) {
     weather: _normalizeGatheringConditionIdList(task.weather),
     timeOfDay: _normalizeGatheringConditionIdList(task.timeOfDay),
     itemSelectionMode: task.itemSelectionMode === 'allDrops' ? 'allDrops' : 'highestRankedDrop',
+    resolutionMode: TASK_RESOLUTION_MODES.has(task.resolutionMode) ? task.resolutionMode : 'd100',
+    resultGroups: normalizeGatheringResultGroups(task.resultGroups, {
+      createId: () => randomID(),
+      fallbackPrefix: id,
+    }),
     dropRows: (Array.isArray(task.dropRows ?? task.itemDrops)
       ? (task.dropRows ?? task.itemDrops)
       : []
@@ -2456,7 +2462,9 @@ export function createAdminStore(services) {
         const written = Object.fromEntries(Object.keys(patch).map((key) => [key, saved[key]]));
         if (get(toolDraftDirty)) {
           toolDraft.update((draft) => ({ ...draft, ...written }));
-          toolDraftBaseline.update((baseline) => (baseline ? { ...baseline, ...written } : baseline));
+          toolDraftBaseline.update((baseline) =>
+            baseline ? { ...baseline, ...written } : baseline
+          );
         } else {
           // THE UNION, NOT THE RECORD THE MANAGER HANDED BACK (issue 1373). `saved` is the raw
           // in-system record, so re-seeding a clean draft from it would put every inheriting
@@ -2522,7 +2530,12 @@ export function createAdminStore(services) {
    * @param {string} [systemId]
    * @returns {Promise<boolean>}
    */
-  async function setToolSectionInherited(toolId, section, inherit, systemId = get(selectedSystemId)) {
+  async function setToolSectionInherited(
+    toolId,
+    section,
+    inherit,
+    systemId = get(selectedSystemId)
+  ) {
     const target = String(toolId || '').trim();
     const system = String(systemId || '').trim();
     if (!target || !system || typeof inherit !== 'boolean') return false;
@@ -5594,13 +5607,10 @@ export function createAdminStore(services) {
    * from. So the component a task requires is one join away, and reading `task.toolIds` as
    * component ids would key every reference by a Tool id no component carries.
    *
-   * ── AND WHY ITS PRODUCTION IS READ OFF `dropRows`, NOT `resultGroups` ─────────────────────
-   * A STORED gathering task carries `dropRows` — `_normalizeGatheringTask` is an allowlist rebuild
-   * that emits it from `task.dropRows ?? task.itemDrops` and emits no `resultGroups` at all.
-   * `resultGroups` is minted at COMPOSITION time, with `results: []`, and stays empty until issue
-   * 683. A `resultGroups` read therefore compiles, runs, iterates nothing, and reports no gathering
-   * production on any world — which is what this leg did until round 2, invisibly, because the
-   * projection does not yet render `producedBy`.
+   * ── HOW GATHERING PRODUCTION SELECTS ITS ACTIVE SOURCE ─────────────────────────────────────
+   * Legacy/`d100` tasks produce from `dropRows`; straight, progressive, and routed tasks produce
+   * from `resultGroups`. Both shapes stay persisted for lossless mode changes, while reporting
+   * follows only the task's active mode.
    *
    * @returns {Record<string, {recipeCount: number, recipeCountBySystem: Record<string, number>,
    *   requiredBy: Array<object>, producedBy: Array<object>}>} keyed by world component id.
@@ -5663,10 +5673,7 @@ export function createAdminStore(services) {
           const componentId = componentIdByToolId.get(String(raw ?? '').trim());
           if (componentId) reference(componentId, 'requiredBy', named);
         }
-        // `itemDrops` is the legacy alias the normalizer itself accepts, so a corpus written
-        // before the rename still answers here rather than reporting nothing.
-        const dropRows = task?.dropRows ?? task?.itemDrops;
-        for (const row of Array.isArray(dropRows) ? dropRows : []) {
+        for (const row of _gatheringProductionResults(task)) {
           // `componentId ?? systemItemId` is the pair `normalizeItemDrop` coalesces, so a row
           // authored under either name reaches the same component.
           const componentId = String(row?.componentId ?? row?.systemItemId ?? '').trim();
@@ -5675,6 +5682,17 @@ export function createAdminStore(services) {
       }
     }
     return usage;
+  }
+
+  function _gatheringProductionResults(task) {
+    const mode = TASK_RESOLUTION_MODES.has(task?.resolutionMode) ? task.resolutionMode : 'd100';
+    if (mode === 'd100') {
+      const rows = task?.dropRows ?? task?.itemDrops;
+      return Array.isArray(rows) ? rows : [];
+    }
+    return (Array.isArray(task?.resultGroups) ? task.resultGroups : []).flatMap((group) =>
+      Array.isArray(group?.results) ? group.results : []
+    );
   }
 
   function buildWorldScopeState() {
@@ -5996,9 +6014,7 @@ export function createAdminStore(services) {
     const system = systemManager?.getSystem?.(systemId);
     if (!system) return false;
     const existing = Array.isArray(system.essenceDefinitions) ? system.essenceDefinitions : [];
-    const essenceDefinitions = existing.filter(
-      (def) => String(def?.id ?? '').trim() !== entityId
-    );
+    const essenceDefinitions = existing.filter((def) => String(def?.id ?? '').trim() !== entityId);
     if (essenceDefinitions.length === existing.length) return false;
     await systemManager.updateSystem(systemId, { essenceDefinitions });
     return true;

@@ -257,6 +257,35 @@ test('processWorldTime completes matured waitingTime run as succeeded and moves 
   }
 });
 
+test('processWorldTime resolves a matured straight task without a check or d100 yield', async () => {
+  resetActor();
+  let worldTime = 1000;
+  const runManager = makeRunManager({ now: () => worldTime });
+  const task = timedTask({
+    resolutionMode: 'straight',
+    dropRows: [{ id: 'inactive-drop', componentId: 'comp-a', quantity: 99, dropRate: 100 }]
+  });
+  const createdResults = [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }];
+  await createWaitingRun(runManager);
+  worldTime = 1060;
+  const calls = {};
+  const engine = makeEngine({
+    runManager,
+    environments: [environment(task)],
+    createdResults,
+    calls
+  });
+
+  const result = await engine.processWorldTime(worldTime);
+
+  assert.equal(result.completed.length, 1);
+  assert.equal(result.completed[0].state, 'succeeded');
+  assert.deepEqual(calls.evaluateCheck, []);
+  assert.deepEqual(calls.createResults[0].resultGroups, task.resultGroups);
+  assert.deepEqual(runManager.getRunHistory(actor)[0].createdResults, createdResults);
+  assert.equal(runManager.getRunHistory(actor)[0].checkResult, undefined);
+});
+
 test('processWorldTime completes matured failure without results and applies feedback after history persistence', async () => {
   resetActor();
   let worldTime = 1000;

@@ -853,12 +853,13 @@ export class GatheringEngine {
       });
     }
 
-    const outcome =
-      task.resolutionMode === 'd100'
-        ? await this._resolveD100Outcome({ viewer, actor, system, environment, task })
-        : task.resolutionMode === 'progressive'
-          ? await this._resolveProgressiveOutcome({ viewer, actor, system, environment, task })
-          : await this._resolveRoutedOutcome({ viewer, actor, system, environment, task });
+    const outcome = await this._resolveTaskOutcome({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+    });
     if (outcome.status === 'misconfigured') {
       return this._clearMisconfiguredWaitingRun({
         viewer,
@@ -2741,26 +2742,14 @@ export class GatheringEngine {
     interactableRef = null,
     interactive = false,
   }) {
-    const outcome =
-      task.resolutionMode === 'd100'
-        ? await this._resolveD100Outcome({ viewer, actor, system, environment, task, interactive })
-        : task.resolutionMode === 'progressive'
-          ? await this._resolveProgressiveOutcome({
-              viewer,
-              actor,
-              system,
-              environment,
-              task,
-              interactive,
-            })
-          : await this._resolveRoutedOutcome({
-              viewer,
-              actor,
-              system,
-              environment,
-              task,
-              interactive,
-            });
+    const outcome = await this._resolveTaskOutcome({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      interactive,
+    });
 
     // The player dismissed the interactive roll dialog: a user choice, not a
     // blocked attempt. Return a quiet, non-notifying result BEFORE any run
@@ -2903,6 +2892,30 @@ export class GatheringEngine {
       checkResult,
       complications,
     });
+  }
+
+  async _resolveTaskOutcome({ viewer, actor, system, environment, task, interactive = false }) {
+    if (task.resolutionMode === 'straight') {
+      return {
+        status: 'succeeded',
+        resultGroups: normalizeList(task.resultGroups),
+        checkResult: null,
+      };
+    }
+    if (task.resolutionMode === 'd100') {
+      return this._resolveD100Outcome({ viewer, actor, system, environment, task, interactive });
+    }
+    if (task.resolutionMode === 'progressive') {
+      return this._resolveProgressiveOutcome({
+        viewer,
+        actor,
+        system,
+        environment,
+        task,
+        interactive,
+      });
+    }
+    return this._resolveRoutedOutcome({ actor, system, task, interactive });
   }
 
   async _terminalSideEffectPlan({
@@ -3179,13 +3192,7 @@ export class GatheringEngine {
     interactive = false,
   }) {
     const dc = this._resolveGatheringRoutedDc(routed, task);
-    // THIS SEAM IS DORMANT (issue 1095, decision 8) — unreachable, not dead. No
-    // GM-selectable configuration reaches it today: `_libraryTaskToRuntimeTask` hardcodes
-    // `resolutionMode: 'd100'` pending issue 683 and `GatheringEconomyView` renders both
-    // formula-rolled modes `disabled`. The check-modifier context lands here now so the
-    // capability is complete when 683 flips the switch, and so this path is not the one
-    // place the shape was forgotten. Gathering has no tool-bonus seam, so nothing is
-    // appended before the modifier term (a named out-of-scope follow-up on issue 1093).
+    // Gathering has no tool-bonus seam, so nothing is appended before the modifier term.
     const craftingModifier = buildCheckModifierContext(system, 'gathering', task);
     const rolled = await runFormulaRouted({
       formula: rollFormula,
@@ -3244,13 +3251,21 @@ export class GatheringEngine {
             firstOnly: false,
           })
         : [];
+      const matchError = outcomeName
+        ? routedGroupMatchError({
+            outcomeName,
+            matched: failureGroups,
+            task,
+            checkResult,
+            allowMissing: true,
+          })
+        : null;
+      if (matchError) return matchError;
       return normalizeTerminalOutcome(
         { status: 'failed', outcome: outcomeName, resultGroups: failureGroups, checkResult },
         { retainFailureResultGroups: true }
       );
     }
-    // Gathering keeps ALL same-named groups (`firstOnly: false`); the per-system
-    // routing key (the success tier name) stays in the caller above.
     const matched = matchResultGroupsByName(outcomeName, normalizeList(task.resultGroups), {
       firstOnly: false,
     });
@@ -3270,17 +3285,8 @@ export class GatheringEngine {
     // A group that EXISTS and is empty is deliberate authoring ("this tier succeeds and
     // awards nothing") and is left alone: it matches by name, so it never reaches here,
     // and it renders the explicit nothing-found card from issue 1027.
-    if (matched.length === 0) {
-      return misconfiguredOutcome({
-        code: 'ROUTED_TIER_UNROUTED',
-        checkResult,
-        diagnostic: {
-          code: 'ROUTED_TIER_UNROUTED',
-          messageKey: 'FABRICATE.Gathering.Diagnostics.RoutedTierUnrouted',
-          message: `Gathering success tier "${outcomeName}" has no result group of that name on task "${task?.name || task?.id || 'unnamed'}"`,
-        },
-      });
-    }
+    const matchError = routedGroupMatchError({ outcomeName, matched, task, checkResult });
+    if (matchError) return matchError;
     return normalizeTerminalOutcome({
       status: 'succeeded',
       outcome: outcomeName,
@@ -4519,17 +4525,35 @@ function normalizeVisibilityResult(result) {
   };
 }
 
+function routedGroupMatchError({ outcomeName, matched, task, checkResult, allowMissing = false }) {
+  if (matched.length === 1 || (allowMissing && matched.length === 0)) return null;
+  const missing = matched.length === 0;
+  const code = missing ? 'ROUTED_TIER_UNROUTED' : 'ROUTED_TIER_AMBIGUOUS';
+  return misconfiguredOutcome({
+    code,
+    checkResult,
+    diagnostic: {
+      code,
+      ...(missing && { messageKey: 'FABRICATE.Gathering.Diagnostics.RoutedTierUnrouted' }),
+      message: missing
+        ? `Gathering success tier "${outcomeName}" has no result group of that name on task "${task?.name || task?.id || 'unnamed'}"`
+        : `Gathering tier "${outcomeName}" matches more than one result group on task "${task?.name || task?.id || 'unnamed'}"`,
+    },
+  });
+}
+
 function validateTaskConfiguration(task, system = null) {
   const errors = [];
   const resolutionMode = stringOrNull(task?.resolutionMode);
   const resultGroups = normalizeList(task?.resultGroups);
 
   if (
+    resolutionMode !== 'straight' &&
     resolutionMode !== 'routed' &&
     resolutionMode !== 'progressive' &&
     resolutionMode !== 'd100'
   ) {
-    errors.push('Gathering task requires a routed, progressive, or d100 resolution mode');
+    errors.push('Gathering task requires a straight, d100, progressive, or routed resolution mode');
     return errors;
   }
 
@@ -4559,6 +4583,15 @@ function validateTaskConfiguration(task, system = null) {
       if (!Number.isFinite(quantity) || quantity <= 0) {
         errors.push('D100 gathering item drop rows require positive quantity');
       }
+    }
+  }
+
+  if (resolutionMode === 'straight') {
+    if (resultGroups.length !== 1) {
+      errors.push('Straight gathering task requires exactly one result group');
+    }
+    if (resultGroups.length === 1 && normalizeList(resultGroups[0]?.results).length === 0) {
+      errors.push('Straight gathering task requires at least one result');
     }
   }
 
