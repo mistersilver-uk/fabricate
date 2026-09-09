@@ -44,17 +44,18 @@ export class CraftingLifecycleExecutor {
       ? getCommittedExecutionOutcome(persisted.executionJournal, requestId)
       : null;
     if (committed) return { run: persisted, outcome: committed, receipts: {} };
-    const run = this._currentRun(actor, runId);
-    this._assertExecutable(run, expectedRevision);
+    const existingJournal = persisted.executionJournal
+      ? observeExecutionJournal(persisted.executionJournal)
+      : null;
+    const resuming = existingJournal?.status === 'planned';
+    const run = resuming ? persisted : this._currentRun(actor, runId);
+    this._assertExecutable(run, expectedRevision, { resuming });
 
     const resolvedOperation =
       typeof operation === 'function' ? await operation({ actor, run, trusted }) : operation;
     const executable = normalizeOperation(resolvedOperation);
     await executable.validateTrusted?.(trusted);
     let current = run;
-    const existingJournal = current.executionJournal
-      ? observeExecutionJournal(current.executionJournal)
-      : null;
     let receipts = {};
     if (existingJournal?.status === 'planned') {
       assertResumableOperation(existingJournal, executable, trusted.operationId, requestId);
@@ -93,6 +94,7 @@ export class CraftingLifecycleExecutor {
         },
       });
     }
+    await executable.hydrate?.({ receipts: { ...receipts }, resumed: resuming });
 
     for (const effect of executable.effects) {
       const persisted = observeExecutionJournal(current.executionJournal).effects.find(
@@ -172,7 +174,7 @@ export class CraftingLifecycleExecutor {
     return run;
   }
 
-  _assertExecutable(run, expectedRevision) {
+  _assertExecutable(run, expectedRevision, { resuming = false } = {}) {
     const contract = getRunLifecycleContract(run);
     if (contract !== 'current') {
       throw executionError(
@@ -189,7 +191,7 @@ export class CraftingLifecycleExecutor {
     if (Number(expectedRevision) !== Number(run.runRevision)) {
       throw executionError('The crafting run revision is stale', 'STALE_RUN_REVISION');
     }
-    if (!Number.isSafeInteger(Number(run.currentStepIndex))) {
+    if (!resuming && !Number.isSafeInteger(Number(run.currentStepIndex))) {
       throw executionError('The crafting run has no executable stage', 'STALE_RUN_STAGE');
     }
   }
@@ -259,6 +261,7 @@ function normalizeOperation(operation) {
     intent: cloneJson(operation.intent) ?? null,
     effects,
     outcome: operation.outcome ?? null,
+    hydrate: typeof operation.hydrate === 'function' ? operation.hydrate : null,
     validateTrusted:
       typeof operation.validateTrusted === 'function' ? operation.validateTrusted : null,
   };

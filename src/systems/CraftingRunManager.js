@@ -659,6 +659,71 @@ export class CraftingRunManager extends RunContainerManagerBase {
     );
   }
 
+  async reconstructVersionedExecutions({ operationId = null, orphaned = false } = {}) {
+    const normalizedOperationId = String(operationId ?? '').trim();
+    const operationScope = normalizedOperationId.length > 0;
+    if (operationScope === (orphaned === true)) {
+      throw new RunLifecycleError(
+        'Execution reconstruction requires exactly one authority recovery scope',
+        'INVALID_RECOVERY_SCOPE'
+      );
+    }
+
+    const candidates = [];
+    for (const actor of selectWritableActors(game.actors)) {
+      this.invalidateCache(actor.id);
+      const container = this._getContainer(actor);
+      const runs = [
+        ...Object.values(container.active || {}),
+        ...(Array.isArray(container.history) ? container.history : []),
+      ];
+      for (const run of runs) {
+        if (getRunLifecycleContract(run) !== 'current' || !run?.executionJournal) continue;
+        const journal = observeExecutionJournal(run.executionJournal);
+        if (operationScope && journal.operationId !== normalizedOperationId) continue;
+        if (
+          journal.status !== 'planned' ||
+          journal.effects.every((effect) => effect.phase !== 'applying')
+        ) {
+          continue;
+        }
+        candidates.push({ actor, runId: run.id, expectedRevision: run.runRevision });
+      }
+    }
+
+    const runs = [];
+    for (const candidate of candidates) {
+      const reconstructed = await this.updateExecutionJournal(
+        candidate.actor,
+        candidate.runId,
+        { type: 'reconstructAfterReload' },
+        { expectedRevision: candidate.expectedRevision }
+      );
+      if (!reconstructed) {
+        throw new RunLifecycleError(
+          'An execution disappeared during recovery reconstruction',
+          'STALE_RUN_REVISION'
+        );
+      }
+      runs.push({
+        actorUuid: candidate.actor.uuid,
+        runId: reconstructed.id,
+        status: reconstructed.status,
+        runRevision: reconstructed.runRevision,
+        journalStatus: reconstructed.executionJournal.status,
+      });
+    }
+
+    return {
+      success: true,
+      scope: operationScope ? 'operation' : 'orphaned',
+      operationId: operationScope ? normalizedOperationId : null,
+      inspected: candidates.length,
+      reconstructed: runs.length,
+      runs,
+    };
+  }
+
   _locateRunPersistence(actor, runId, { activeOnly = true } = {}) {
     this.invalidateCache(actor.id);
     const container = cloneJson(this._getContainer(actor));

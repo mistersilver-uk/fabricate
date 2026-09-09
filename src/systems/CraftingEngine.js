@@ -75,7 +75,7 @@ import {
 } from './itemStackQuantity.js';
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
-import { getCommittedExecutionOutcome } from './runExecutionJournal.js';
+import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
 import { buildSalvageChatContent } from './SalvageChatCard.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
@@ -760,6 +760,7 @@ export class CraftingEngine {
   }
 
   async startVersionedRun({
+    viewer,
     actor,
     sourceActors,
     recipeId,
@@ -768,7 +769,7 @@ export class CraftingEngine {
     executionGrant,
     requestId,
   }) {
-    await this._consumeVersionedGrant(executionGrant, {
+    const trusted = await this._consumeVersionedGrant(executionGrant, {
       operation: 'start',
       actor,
       runId: null,
@@ -780,6 +781,23 @@ export class CraftingEngine {
     if (!runManager || !recipe) return versionedFailure('The crafting recipe is unavailable.');
     if (!actor || !Array.isArray(sourceActors) || sourceActors.length === 0) {
       return versionedFailure('The crafting actor and component sources are required.');
+    }
+    const trustedAlchemyMatch =
+      trusted?.matched === true &&
+      trusted?.activityKind === 'alchemy' &&
+      String(trusted?.recipeId ?? '') === String(recipe.id);
+    if (!trustedAlchemyMatch) {
+      const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
+      const guard =
+        viewer && typeof visibilityService?.guardCraftStart === 'function'
+          ? visibilityService.guardCraftStart({
+              viewer,
+              recipe,
+              craftingActor: actor,
+              componentSourceActors: sourceActors,
+            })
+          : null;
+      if (guard?.craftable !== true) return versionedFailure('Crafting is unavailable.');
     }
     const validation = recipe.validate?.() ?? { valid: true, errors: [] };
     if (!validation.valid) {
@@ -856,23 +874,30 @@ export class CraftingEngine {
       });
       return versionedTransitionResult(duplicate.run, duplicate.outcome);
     }
-    const run = runManager.getActiveRun(actor, runId);
+    const journal = persisted?.executionJournal
+      ? observeExecutionJournal(persisted.executionJournal)
+      : null;
+    const resuming =
+      journal?.status === 'planned' &&
+      journal.requestId === String(requestId ?? '').trim() &&
+      journal.effects.every((effect) => effect.phase !== 'applying');
+    const run = resuming ? persisted : runManager.getActiveRun(actor, runId);
     if (!run) return versionedFailure('There is no in-progress craft to execute.');
     const recipe = this.recipeManager?.getRecipe?.(run.recipeId) ?? null;
     if (!recipe) return versionedFailure('The crafting recipe is unavailable.');
-    const step = this._executionSteps(recipe)[Number(run.currentStepIndex)];
+    const stepIndex = resuming ? Number(journal.intent?.stepIndex) : Number(run.currentStepIndex);
+    const step = this._executionSteps(recipe)[stepIndex];
     if (!step) return versionedFailure('There is no active crafting step available.');
-    const persistedSelection =
-      selectionPlan || run.steps?.[run.currentStepIndex]?.selectionPlan || {};
+    const persistedSelection = selectionPlan || run.steps?.[stepIndex]?.selectionPlan || {};
     const selectedSet = this._selectedIngredientSet(
       step,
       persistedSelection.selectedIngredientSetId
     );
     if (!selectedSet)
       return versionedFailure('The selected crafting requirements are unavailable.');
-    const gate = run.steps?.[run.currentStepIndex]?.timeGate;
+    const gate = run.steps?.[stepIndex]?.timeGate;
     const durationSeconds = runManager.durationToSeconds(step.timeRequirement);
-    if (!gate && durationSeconds > 0 && this._timeRequirementsEnabled(recipe)) {
+    if (!resuming && !gate && durationSeconds > 0 && this._timeRequirementsEnabled(recipe)) {
       await this._consumeVersionedGrant(executionGrant, {
         operation: 'execute',
         actor,
@@ -900,10 +925,10 @@ export class CraftingEngine {
         requiresExecution: false,
       };
     }
-    if (!this._versionedGateReady(run)) {
+    if (!resuming && !this._versionedGateReady(run)) {
       return versionedFailure('The crafting step is still in progress.');
     }
-    if (trigger === 'worldTime') {
+    if (!resuming && trigger === 'worldTime') {
       const blocker = this._automaticStageBlocker(run, recipe, step, selectedSet);
       if (blocker) {
         return {
@@ -913,15 +938,25 @@ export class CraftingEngine {
         };
       }
     }
-    const prepared = await this._prepareVersionedStage({
-      run,
-      actor,
-      componentSourceActors,
-      recipe,
-      step,
-      selectedSet,
-      selectionPlan: persistedSelection,
-    });
+    const prepared = resuming
+      ? this._reconstructVersionedStagePreparation({
+          run,
+          actor,
+          componentSourceActors,
+          recipe,
+          step,
+          selectedSet,
+          journal,
+        })
+      : await this._prepareVersionedStage({
+          run,
+          actor,
+          componentSourceActors,
+          recipe,
+          step,
+          selectedSet,
+          selectionPlan: persistedSelection,
+        });
     if (!prepared.valid) return versionedFailure(prepared.message);
     const executor = new CraftingLifecycleExecutor({
       runManager,
@@ -935,19 +970,21 @@ export class CraftingEngine {
         expectedRevision,
         requestId,
         executionGrant,
-        selectionPlan: {
-          ...persistedSelection,
-          selectedIngredientSetId: selectedSet.id,
-          selectedRequirementSnapshot: snapshotRequirementSet(selectedSet),
-        },
+        selectionPlan: resuming
+          ? null
+          : {
+              ...persistedSelection,
+              selectedIngredientSetId: selectedSet.id,
+              selectedRequirementSnapshot: snapshotRequirementSet(selectedSet),
+            },
         operation: ({ trusted }) =>
           this._buildVersionedStageOperation({
             actor,
             componentSourceActors,
-            run,
             runId,
             recipe,
             step,
+            stepIndex,
             selectedSet,
             prepared,
             trusted,
@@ -1159,16 +1196,81 @@ export class CraftingEngine {
       toolValidation,
       currencySpends,
       resolveComponent,
+      step,
+      selectedSet,
+    };
+  }
+
+  _reconstructVersionedStagePreparation({
+    run,
+    actor,
+    componentSourceActors,
+    recipe,
+    step,
+    selectedSet,
+    journal,
+  }) {
+    if (
+      !sameStringSet(
+        run?.componentSourceActorUuids,
+        (componentSourceActors || []).map((source) => source?.uuid).filter(Boolean)
+      )
+    ) {
+      return {
+        valid: false,
+        message: 'The crafting component sources changed after the run started.',
+      };
+    }
+    const executionRecipe = this._buildStepRecipeView(recipe, step);
+    const resolveComponent =
+      this._getRecipeSystem(recipe)?.resolutionMode === 'alchemy'
+        ? resolveAlchemySubmissionComponent
+        : undefined;
+    const effects = new Map(journal.effects.map((effect) => [effect.effectId, effect]));
+    const toolEffect = effects.get('apply-tools');
+    const toolDefinitions = this.recipeManager.getToolsForSet?.(executionRecipe, selectedSet) ?? [];
+    const toolPairs = (toolEffect?.planned || []).map((itemUuid, index) => {
+      const item = findItemByUuid([actor, ...(componentSourceActors || [])], itemUuid);
+      if (!item && toolEffect.phase !== 'applied') {
+        throw new CraftingLifecycleExecutionError(
+          'A planned crafting tool is no longer available',
+          'STAGE_RECONSTRUCTION_FAILED'
+        );
+      }
+      return {
+        item: item ?? rehydrateVersionedItem({ itemUuid }),
+        tool: toolDefinitions[index] ?? null,
+      };
+    });
+    const currencySpends = cloneJsonValue(effects.get('spend-currency')?.planned) ?? [];
+    return {
+      valid: true,
+      plan: {
+        recipeId: recipe.id,
+        stepId: step.id ?? null,
+        selectedIngredientSetId: selectedSet.id,
+        items: cloneJsonValue(effects.get('consume-ingredients')?.planned) ?? [],
+        currencySpends,
+        toolItemUuids: cloneJsonValue(toolEffect?.planned) ?? [],
+      },
+      toolItems: toolPairs.map((entry) => entry.item),
+      executionRecipe,
+      craftSelection: { plan: [] },
+      toolValidation: { valid: true, tools: toolPairs },
+      currencySpends,
+      resolveComponent,
+      step,
+      selectedSet,
     };
   }
 
   _buildVersionedStageOperation({
     actor,
     componentSourceActors,
-    run,
     runId,
     recipe,
     step,
+    stepIndex,
     selectedSet,
     prepared,
     trusted,
@@ -1213,8 +1315,13 @@ export class CraftingEngine {
       consumedItems: [],
       usedTools: [],
       resultItems: [],
+      resultRecords: [],
       resolutionMeta: null,
       firedComplications: null,
+      currencySettlement: null,
+      resolvedEssences: null,
+      essenceEnabled: null,
+      toolPairs: [...prepared.toolValidation.tools],
     };
     const effects = [];
 
@@ -1225,7 +1332,11 @@ export class CraftingEngine {
         planned: prepared.plan.items,
         apply: async () => {
           state.consumedItems = await this._consumeIngredients(prepared.craftSelection.plan);
-          return { items: state.consumedItems.map(mapConsumedIngredientRef) };
+          return this._versionedConsumptionReceipt(
+            state,
+            prepared.executionRecipe,
+            prepared.resolveComponent
+          );
         },
       });
       if (isAlchemy && alchemySubmittedItems.length > 0) {
@@ -1238,7 +1349,11 @@ export class CraftingEngine {
               isAlchemyAttempt: true,
               alchemySubmittedItems,
             });
-            return { items: state.consumedItems.map(mapConsumedIngredientRef) };
+            return this._versionedConsumptionReceipt(
+              state,
+              prepared.executionRecipe,
+              prepared.resolveComponent
+            );
           },
         });
       }
@@ -1247,14 +1362,16 @@ export class CraftingEngine {
           effectId: 'spend-currency',
           kind: 'spendCurrency',
           planned: cloneJsonValue(prepared.currencySpends),
-          apply: async () =>
-            cloneJsonValue(
+          apply: async () => {
+            state.currencySettlement = cloneJsonValue(
               await this._spendCraftCurrencyVersioned(
                 actor,
                 prepared.executionRecipe,
                 prepared.currencySpends
               )
-            ),
+            );
+            return state.currencySettlement;
+          },
         });
       }
     }
@@ -1280,7 +1397,10 @@ export class CraftingEngine {
               triggerId: decision.triggerId,
             }
           );
-          return { tools: cloneJsonValue(state.usedTools) };
+          return {
+            tools: cloneJsonValue(state.usedTools),
+            resolvedTools: state.toolPairs.map(snapshotVersionedToolPair),
+          };
         },
       });
     }
@@ -1309,14 +1429,22 @@ export class CraftingEngine {
             step,
             selectedSet,
             state.consumedItems,
-            prepared.toolValidation.tools,
+            state.toolPairs,
             checkResult,
             null,
-            { resolveComponent: prepared.resolveComponent }
+            {
+              precomputedEssences: state.resolvedEssences,
+              essenceEnabled: state.essenceEnabled,
+              resolveComponent: prepared.resolveComponent,
+            }
           );
           state.resultItems = created.items;
           state.resolutionMeta = created.resolutionMeta;
-          return { results: state.resultItems.map((item) => craftedResultRecord(item, actor)) };
+          state.resultRecords = state.resultItems.map((item) => craftedResultRecord(item, actor));
+          return {
+            results: state.resultRecords,
+            resolutionMeta: cloneJsonValue(state.resolutionMeta) ?? null,
+          };
         },
       });
     }
@@ -1324,7 +1452,7 @@ export class CraftingEngine {
     effects.push({
       effectId: 'finalize-stage',
       kind: 'finalizeCraftingStage',
-      planned: { runId, stepIndex: run.currentStepIndex, succeeded },
+      planned: { runId, stepIndex, succeeded },
       apply: async ({ trusted: effectTrusted }) => {
         const current = this._freshVersionedRun(actor, runId);
         const payload = {
@@ -1338,7 +1466,7 @@ export class CraftingEngine {
           },
           consumedIngredients: state.consumedItems.map(mapConsumedIngredientRef),
           usedTools: state.usedTools,
-          createdResults: state.resultItems.map((item) => craftedResultRecord(item, actor)),
+          createdResults: state.resultRecords,
         };
         const options = {
           expectedRevision: current.runRevision,
@@ -1380,16 +1508,66 @@ export class CraftingEngine {
       isAlchemy,
     });
     return {
-      intent: { stepIndex: run.currentStepIndex, recipeId: recipe.id, trigger },
+      intent: { stepIndex, recipeId: recipe.id, trigger },
       effects,
+      hydrate: ({ receipts }) => this._hydrateVersionedStageState(state, receipts),
       outcome: () => ({
         success: succeeded,
         disposition: succeeded ? 'succeeded' : 'failed',
-        createdResultUuids: state.resultItems
-          .map((item) => item?.uuid ?? item?.id ?? null)
-          .filter(Boolean),
+        createdResultUuids: state.resultRecords.map((record) => record.itemUuid).filter(Boolean),
       }),
     };
+  }
+
+  _versionedConsumptionReceipt(state, recipe, resolveComponent) {
+    const { resolvedEssences } = this._buildEssenceContext(
+      state.consumedItems,
+      recipe,
+      null,
+      resolveComponent
+    );
+    state.resolvedEssences = resolvedEssences;
+    state.essenceEnabled = this._snapshotEssenceEnabled(
+      resolvedEssences,
+      this._getRecipeSystem(recipe)
+    );
+    return {
+      items: state.consumedItems.map(mapConsumedIngredientRef),
+      consumedItems: state.consumedItems.map(snapshotVersionedConsumedItem),
+      resolvedEssences: cloneJsonValue(state.resolvedEssences),
+      essenceEnabled: cloneJsonValue(state.essenceEnabled),
+    };
+  }
+
+  _hydrateVersionedStageState(state, receipts) {
+    const consumption = receipts['consume-alchemy-extras'] ?? receipts['consume-ingredients'];
+    if (consumption) {
+      const snapshots = consumption.consumedItems ?? consumption.items ?? [];
+      state.consumedItems = snapshots.map(rehydrateVersionedConsumedItem);
+      state.resolvedEssences = cloneJsonValue(consumption.resolvedEssences) ?? null;
+      state.essenceEnabled = cloneJsonValue(consumption.essenceEnabled) ?? null;
+    }
+    const toolReceipt = receipts['apply-tools'];
+    if (toolReceipt) {
+      state.usedTools = cloneJsonValue(toolReceipt.tools) ?? [];
+      if (Array.isArray(toolReceipt.resolvedTools)) {
+        state.toolPairs = toolReceipt.resolvedTools.map(rehydrateVersionedToolPair);
+      }
+    }
+    if (receipts['spend-currency']) {
+      state.currencySettlement = cloneJsonValue(receipts['spend-currency']);
+    }
+    const awardReceipt = receipts['award-results'];
+    if (awardReceipt) {
+      state.resultRecords = cloneJsonValue(awardReceipt.results) ?? [];
+      state.resultItems = state.resultRecords.map(rehydrateVersionedResultItem);
+      state.resolutionMeta = cloneJsonValue(awardReceipt.resolutionMeta) ?? null;
+    }
+    if (receipts['fire-complications']) {
+      state.firedComplications = {
+        fired: cloneJsonValue(receipts['fire-complications'].fired) ?? [],
+      };
+    }
   }
 
   _appendVersionedPostEffects(
@@ -1453,7 +1631,7 @@ export class CraftingEngine {
           craftingActor: actor,
           recipe,
           consumedIngredients: state.consumedItems,
-          tools: prepared.toolValidation.tools,
+          tools: state.toolPairs,
           createdResults: state.resultItems,
           failureReason: succeeded ? null : checkResult.message || 'Crafting check failed',
           rollValue: rollTotalForCard(checkResult),
@@ -8478,6 +8656,87 @@ export class CraftingEngine {
 function snapshotRequirementSet(ingredientSet) {
   const source = ingredientSet?.toJSON?.() ?? ingredientSet;
   return cloneJsonValue(source) ?? null;
+}
+
+function snapshotVersionedItem(item) {
+  const data =
+    cloneJsonValue(item?.toObject?.()) ??
+    cloneJsonValue({
+      _id: item?.id ?? null,
+      name: item?.name ?? null,
+      img: item?.img ?? null,
+      type: item?.type ?? null,
+      system: item?.system ?? {},
+      flags: item?.flags ?? {},
+    });
+  return {
+    actorUuid: item?.parent?.uuid ?? null,
+    itemUuid: item?.uuid ?? item?.id ?? null,
+    data,
+  };
+}
+
+function rehydrateVersionedItem(snapshot = {}) {
+  const data = cloneJsonValue(snapshot.data) ?? {};
+  return {
+    ...data,
+    id: data._id ?? snapshot.itemId ?? snapshot.itemUuid ?? null,
+    uuid: snapshot.itemUuid ?? data.uuid ?? data._id ?? null,
+    name: data.name ?? snapshot.name ?? null,
+    img: data.img ?? snapshot.img ?? null,
+    parent: snapshot.actorUuid ? { uuid: snapshot.actorUuid } : null,
+    toObject: () => cloneJsonValue(data),
+  };
+}
+
+function snapshotVersionedConsumedItem({ item, quantity, ingredient }) {
+  return {
+    ...snapshotVersionedItem(item),
+    quantity: Number(quantity) || 0,
+    ingredient: cloneJsonValue(ingredient) ?? null,
+  };
+}
+
+function rehydrateVersionedConsumedItem(snapshot) {
+  return {
+    item: rehydrateVersionedItem(snapshot),
+    quantity: Number(snapshot?.quantity) || 0,
+    ingredient: cloneJsonValue(snapshot?.ingredient) ?? null,
+  };
+}
+
+function snapshotVersionedToolPair({ item, tool }) {
+  return {
+    item: snapshotVersionedItem(item),
+    tool: cloneJsonValue(tool?.toJSON?.() ?? tool) ?? null,
+  };
+}
+
+function rehydrateVersionedToolPair(snapshot) {
+  return {
+    item: rehydrateVersionedItem(snapshot?.item),
+    tool: cloneJsonValue(snapshot?.tool) ?? null,
+  };
+}
+
+function rehydrateVersionedResultItem(record) {
+  const item = rehydrateVersionedItem({
+    actorUuid: record?.actorUuid,
+    itemUuid: record?.itemUuid,
+    name: record?.name,
+    img: record?.img,
+  });
+  return tagAwardedQuantity(item, Number(record?.quantity) || 1);
+}
+
+function findItemByUuid(actors, itemUuid) {
+  for (const actor of actors || []) {
+    const item = [...(actor?.items || [])].find(
+      (candidate) => candidate?.uuid === itemUuid || candidate?.id === itemUuid
+    );
+    if (item) return item;
+  }
+  return null;
 }
 
 function versionedTransitionResult(run, outcome = {}) {
