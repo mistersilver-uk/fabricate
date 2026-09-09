@@ -5,6 +5,10 @@ import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
 import { GatheringRichStateService } from '../src/systems/GatheringRichStateService.js';
 import {
+  evaluatePreparedRunCheck,
+  postCheckRollHandoff
+} from '../src/systems/checkRoll.js';
+import {
   createGatheringJournalRunOperations,
   createJournalRunCommandService,
   installGatheringJournalRunAuthority
@@ -1021,6 +1025,21 @@ test('versioned routed collection describes and consumes only the GM-resolved ch
   });
   worldTime = 1060;
   const evaluations = [];
+  const expectedSpeaker = {
+    scene: 'scene-1',
+    token: 'token-gatherer',
+    actor: actor.id,
+    alias: actor.name
+  };
+  const originalChatMessage = globalThis.ChatMessage;
+  globalThis.ChatMessage = {
+    getSpeaker: ({ actor: speakerActor }) => ({
+      scene: 'scene-1',
+      token: 'token-gatherer',
+      actor: speakerActor.id,
+      alias: speakerActor.name
+    })
+  };
   const engine = makeEngine({
     runManager,
     getRunViewer: async () => viewer,
@@ -1032,32 +1051,73 @@ test('versioned routed collection describes and consumes only the GM-resolved ch
           ? { resolvedCheckResult: { success: true, outcome: 'Iron', value: 21, data: {} } }
           : {})
       }),
-      evaluatePreparedRunCheck: (...args) => {
+      evaluatePreparedRunCheck: async (...args) => {
         evaluations.push(args);
-        return { engineEvaluated: true, success: true, outcome: 'Iron', value: 21, data: {} };
+        return evaluatePreparedRunCheck(...args);
       }
     }
   });
 
-  const descriptor = await engine.describeVersionedStageCheck({
-    actor,
-    runId: active.id,
-    preparationGrant: { token: 'prepare' },
-    requestId: 'request-prepare'
-  });
-  assert.equal(descriptor.required, true);
-  assert.equal(descriptor.publicPrompt.mode, 'routedByCheck');
-  assert.equal(descriptor.privateEvaluation.slot, 'routed');
-  assert.equal(descriptor.privateEvaluation.secret, false);
+  const originalRoll = globalThis.Roll;
+  const posts = [];
+  class PreparedRoll {
+    constructor(formula) {
+      this.formula = formula;
+      this.total = 18;
+      this.dice = [];
+    }
+    async evaluate() {
+      return this;
+    }
+    toJSON() {
+      return { formula: this.formula, total: this.total, terms: [] };
+    }
+  }
+  class ReconstructedRoll {
+    static fromData(data) {
+      assert.equal(data.formula, '1d20');
+      return new ReconstructedRoll();
+    }
+    async toMessage(messageData, options) {
+      posts.push({ messageData, options });
+    }
+  }
+  globalThis.Roll = PreparedRoll;
+  try {
+    const descriptor = await engine.describeVersionedStageCheck({
+      actor,
+      runId: active.id,
+      preparationGrant: { token: 'prepare' },
+      requestId: 'request-prepare'
+    });
+    assert.equal(descriptor.required, true);
+    assert.equal(descriptor.publicPrompt.mode, 'routedByCheck');
+    assert.equal(descriptor.privateEvaluation.slot, 'routed');
+    assert.equal(descriptor.privateEvaluation.secret, false);
+    assert.deepEqual(descriptor.privateEvaluation.speaker, expectedSpeaker);
+    assert.equal(descriptor.privateEvaluation.flavor, 'Gather Iron — Gathering check (DC 15)');
 
-  const evaluated = await engine.evaluatePreparedVersionedCheck({
-    actor,
-    privateEvaluation: descriptor.privateEvaluation,
-    decision: { situationalBonus: 1 }
-  });
-  assert.equal(evaluated.engineEvaluated, true);
-  assert.equal(evaluations[0][0].taskId, 'task-a');
-  assert.equal(evaluations[0][1], actor);
+    const privateEvaluation = JSON.parse(JSON.stringify(descriptor.privateEvaluation));
+    const evaluated = await engine.evaluatePreparedVersionedCheck({
+      actor,
+      privateEvaluation,
+      decision: { bonus: '1' }
+    });
+    assert.equal(evaluated.engineEvaluated, true);
+    assert.equal(evaluations[0][0].taskId, 'task-a');
+    assert.equal(evaluations[0][1], actor);
+
+    const handoff = JSON.parse(JSON.stringify(evaluated.rollHandoff));
+    const posted = await postCheckRollHandoff(handoff, { Roll: ReconstructedRoll });
+    assert.equal(posted.success, true);
+    assert.deepEqual(posts[0].messageData.speaker, expectedSpeaker);
+    assert.equal(posts[0].messageData.flavor, 'Gather Iron — Gathering check (DC 15)');
+  } finally {
+    if (originalRoll === undefined) delete globalThis.Roll;
+    else globalThis.Roll = originalRoll;
+    if (originalChatMessage === undefined) delete globalThis.ChatMessage;
+    else globalThis.ChatMessage = originalChatMessage;
+  }
 
   const result = await engine.executeVersionedStage({
     actor,
@@ -1082,6 +1142,22 @@ test('versioned blind check preparation keeps task identity and roll terms priva
   const task = timedTask();
   const env = environment(task, { selectionMode: 'blind' });
   worldTime = 1060;
+  const expectedSpeaker = {
+    scene: 'scene-1',
+    token: 'token-gatherer',
+    actor: actor.id,
+    alias: actor.name
+  };
+  const originalChatMessage = globalThis.ChatMessage;
+  globalThis.ChatMessage = {
+    create: () => {},
+    getSpeaker: ({ actor: speakerActor }) => ({
+      scene: 'scene-1',
+      token: 'token-gatherer',
+      actor: speakerActor.id,
+      alias: speakerActor.name
+    })
+  };
   const engine = makeEngine({
     runManager,
     environments: [env],
@@ -1109,18 +1185,62 @@ test('versioned blind check preparation keeps task identity and roll terms priva
     }
   });
 
-  const descriptor = await engine.describeVersionedStageCheck({
-    actor,
-    runId: active.id,
-    preparationGrant: { token: 'blind-prepare' },
-    requestId: 'request-blind-prepare'
-  });
+  const originalRoll = globalThis.Roll;
+  const messages = [];
+  globalThis.Roll = class {
+    constructor(formula) {
+      this.formula = formula;
+      this.total = 18;
+      this.dice = [];
+    }
+    async evaluate() {
+      return this;
+    }
+    async toMessage(messageData, options) {
+      messages.push({ messageData, options });
+    }
+  };
+  try {
+    const descriptor = await engine.describeVersionedStageCheck({
+      actor,
+      runId: active.id,
+      preparationGrant: { token: 'blind-prepare' },
+      requestId: 'request-blind-prepare'
+    });
 
-  assert.equal(descriptor.publicPrompt.label, 'FABRICATE.Gathering.BlindTaskLabel');
-  assert.equal(descriptor.publicPrompt.mode, 'routedByCheck');
-  assert.equal(descriptor.privateEvaluation.secret, true);
-  assert.equal(descriptor.privateEvaluation.taskId, task.id);
-  assert.equal('rollFormula' in descriptor.publicPrompt, false);
+    assert.equal(descriptor.publicPrompt.label, 'FABRICATE.Gathering.BlindTaskLabel');
+    assert.equal(descriptor.publicPrompt.mode, 'routedByCheck');
+    assert.equal(descriptor.privateEvaluation.secret, true);
+    assert.equal(descriptor.privateEvaluation.taskId, task.id);
+    assert.deepEqual(descriptor.privateEvaluation.speaker, expectedSpeaker);
+    assert.equal(
+      descriptor.privateEvaluation.flavor,
+      'FABRICATE.Gathering.BlindTaskLabel — Gathering check (DC 15)'
+    );
+    assert.equal(descriptor.privateEvaluation.flavor.includes(task.name), false);
+    assert.equal('rollFormula' in descriptor.publicPrompt, false);
+
+    const evaluated = await evaluatePreparedRunCheck(
+      JSON.parse(JSON.stringify(descriptor.privateEvaluation)),
+      actor,
+      {},
+      { secret: true, failureMessage: 'Gathering check failed' }
+    );
+    assert.equal(evaluated.rollHandoff, undefined);
+    assert.equal(JSON.stringify(evaluated).includes(task.name), false);
+    assert.equal(messages.length, 1);
+    assert.deepEqual(messages[0].messageData.speaker, expectedSpeaker);
+    assert.equal(
+      messages[0].messageData.flavor,
+      'FABRICATE.Gathering.BlindTaskLabel — Gathering check (DC 15)'
+    );
+    assert.equal(messages[0].messageData.flavor.includes(task.name), false);
+  } finally {
+    if (originalRoll === undefined) delete globalThis.Roll;
+    else globalThis.Roll = originalRoll;
+    if (originalChatMessage === undefined) delete globalThis.ChatMessage;
+    else globalThis.ChatMessage = originalChatMessage;
+  }
 });
 
 test('ambiguous versioned award requires recovery and is never replayed', async () => {

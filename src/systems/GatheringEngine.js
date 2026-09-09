@@ -832,10 +832,12 @@ export class GatheringEngine {
     const slot = mode === 'routed' ? 'routed' : mode === 'progressive' ? 'progressive' : null;
     const checkMode = mode === 'routed' ? 'routedByCheck' : mode;
     const dc = mode === 'routed' ? this._resolveGatheringRoutedDc(config, task) : null;
+    const label = secret ? this.localize(BLIND_TASK_LABEL_KEY) : stringOrEmpty(task?.name);
+    const dcLabel = Number.isFinite(dc) ? ` (DC ${dc})` : '';
     return {
       required: requiresCheck,
       publicPrompt: {
-        label: secret ? this.localize(BLIND_TASK_LABEL_KEY) : stringOrEmpty(task?.name),
+        label,
         mode: checkMode,
         allowsSituationalModifier: Boolean(rollFormula),
         allowAdvantage: Boolean(rollFormula && /(?:^|\W)d20(?:\W|$)/i.test(rollFormula)),
@@ -843,6 +845,8 @@ export class GatheringEngine {
       privateEvaluation: {
         secret,
         actorUuid: stringOrNull(actor?.uuid),
+        flavor: `${label ? `${label} — ` : ''}Gathering check${dcLabel}`,
+        speaker: cloneJson(globalThis.ChatMessage?.getSpeaker?.({ actor })) ?? null,
         craftingSystemId: stringOrNull(system?.id),
         environmentId: stringOrNull(environment?.id),
         taskId: stringOrNull(task?.id),
