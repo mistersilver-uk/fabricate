@@ -74,7 +74,7 @@ Resolve the roster with this procedure — it is mechanical, not a judgment call
 4. Record the union in the issue delta's `### Resolved Roster` section, split by stage (plan-review, post-implementation review, docs loop).
 5. **Prune a path-signal role whose row fired on prose alone** at the post-implementation review and docs-loop stages: take the row-intersected `git diff`, and when every hunk in it changes only comments, JSDoc or docblocks, Markdown prose, a `file:line` cite or a count — no executable line, no selector, no assertion, no requirement sentence — and the intersected diff is at or below the post-implementation `SMALL_MAX`, the row does not spawn; `fabricate_reviewer`'s reconciliation already reads those hunks.
 The driver records the pruned role and the hunks it measured in the handoff.
-The always row, every plan-review spawn, and any hunk that adds or changes a requirement sentence under `openspec/specs/**` are never pruned.
+The always row, the paired docs-loop row (`fabricate_docs_writer` + `fabricate_domain_expert`), every plan-review spawn, and any hunk that adds or changes a requirement sentence under `openspec/specs/**` are never pruned.
 
 | Signal                                                                                                                            | Agent(s)                                                                                         | Stage                                    |
 |-----------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|------------------------------------------|
@@ -240,17 +240,18 @@ Rule 6: `medium`.
 **Model-tier floors.**
 Applied after the base model tier; they only ever raise it, and every floor clamps at `large`.
 
-- A mutable lane's model tier never decreases across revisions of the same `(family, stage)`; a read-only confirmation round is exempt, per the override below.
+- A lane's model tier never decreases across revisions of the same `(family, stage)`; a disposition-only confirmation round is exempt, per the override below.
 The floor is the **highest model tier at which the lane actually executed** in a previous revision — not the model tier it was originally resolved to.
 Without this, a lane that resolved `small`, escalated, and completed at `medium` would re-resolve to `small` from the same unchanged facts next revision and pay the identical wasted spawn again, since the ladder itself has no memory.
 - A revision carrying an unresolved finding forward is floored one model tier above the previous revision's executed model tier.
 - A lane whose keyed path set includes `openspec/specs/**` floors at `medium`.
 
 **Confirmation-round override.**
-A read-only review role — `fabricate_reviewer`, `fabricate_ux_designer`, `fabricate_quality_engineer`, `fabricate_domain_expert`, `foundry_integrator` — spawned at revision 2 or later with a brief marked *disposition-only* resolves `medium`, overriding rules 1 to 4 and both revision floors above.
+A review role spawned into a read-only lane — `fabricate_reviewer`, `fabricate_ux_designer`, `fabricate_quality_engineer`, `fabricate_domain_expert`, `foundry_integrator` — at revision 2 or later, with a brief marked *disposition-only* (the assignment-brief field in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`), resolves `medium`, overriding rules 1 to 4 and both revision floors above.
 Its scope is fixed by construction: it dispositions its OWN prior findings against a driver-supplied immutable artifact and reports only defects the revision itself introduced, so the reading is narrow whatever the first round's path set was.
 A mutable lane never takes the override, `ESCALATE_TIER` stays available to the confirmation spawn, and a confirmation round that returns a NEW `HIGH` finding re-enters the loop as a fresh revision at the ladder's own resolution.
 The first round of every loop stays at the ladder's resolution, because that is the round that has to find the defects.
+The override is applied by the driver on top of the mechanical ladder; `selectModelTier` in `scripts/lib/agentModelTiers.js` models the ladder and its floors only.
 
 #### `ESCALATE_TIER`
 
@@ -287,7 +288,9 @@ Three loops run until acceptance, each capped at 3 revisions before escalating t
 **Each loop runs ONE full round by default.**
 After round one the driver applies every mechanical finding itself — a finding that names exact replacement text, an anchor, a count, or a roster entry — into the next revision of the delta or the branch, and spawns a further round only as a *confirmation round*: disposition-only, scoped to the roles whose findings were not mechanical or whose `HIGH` finding the driver disputes, at model tier `medium` (see the confirmation-round override under [Model tier routing](#model-tier-routing)).
 A role whose round-one findings were all `LOW`, or none, is not re-spawned; the driver confirms its concern from evidence — the gate run, the artifact, the mutation control — and records that in the handoff.
-Rounds two and three therefore exist for disputed or non-mechanical findings, not as a second reading of the whole plan or diff, and the three-revision cap is the stop condition rather than the expected path:
+Findings carry a severity — `HIGH` (the change would ship a defect or red a gate), `MEDIUM` (a decision is wrong or unjustified), `LOW` (wording, an anchor, a count) — and every review role grades by that scale; the quality engineer's severity guide in `.agents/skills/fabricate-quality-engineer/SKILL.md` is the same three rungs applied to defects.
+A loop's acceptance condition is therefore that every finding is applied or dispositioned, not that a fresh `APPROVED` exists for the final artifact; the approval of record at [Final maintainer handoff](#final-maintainer-handoff) is the last round's verdict plus the driver's recorded disposition of the findings it applied, and a `BLOCKED` verdict is never self-cleared.
+Rounds two and three therefore exist for disputed or non-mechanical findings, not as a second reading of the whole plan or diff, and the three-revision cap is the stop condition rather than the expected path.
 
 In every loop, reviewers return their verdicts to the driver, which acts on them and summarizes outcomes to the user.
 Reviewers do not post verdicts (or other workflow notes) as GitHub issue or PR comments.
@@ -302,7 +305,7 @@ Each emits `APPROVED / NEEDS_CHANGES / BLOCKED` against the delta, returning its
 The driver rewrites the delta block in place, applying the mechanical findings itself, and spawns a confirmation round only for a reviewer whose finding it could not apply mechanically or disputes; when every remaining finding is applied or dispositioned, the plan is accepted and implementation starts.
 2. **Implementation review loop.** The driver spawns the implementer to ship changes — including the canonical spec changes under `openspec/specs/` that the delta requires — then spawns `fabricate_reviewer` plus any post-implementation reviewers from the routing table to emit verdicts.
 Reviewers compare the actual `openspec/specs/` diff against the proposed delta in the issue and confirm a faithful realization (or flag a justified deviation to reconcile).
-The implementer addresses `NEEDS_CHANGES` in one fix lane for every reviewer's findings; the driver then spawns a disposition-only confirmation round at `medium` for the roles that raised non-`LOW` findings, confirms the rest from evidence, and proceeds when every finding is resolved or recorded as a Deviation.
+The implementer addresses `NEEDS_CHANGES` in one fix lane for every reviewer's findings; the driver then spawns the confirmation round for the roles the rule above retains, confirms the rest from evidence, and proceeds when every finding is resolved or recorded as a Deviation.
 3. **Documentation iteration loop.** Triggered whenever the change touches behaviour or any documented API surface.
 The driver spawns the paired `fabricate_domain_expert` (updates `DOMAIN.md` and canonical specs against the diff, and reconciles the issue delta — updating it and its `Deviations` note when implementation justifiably diverged) and `fabricate_docs_writer` (updates JSDoc and the Jekyll site to match the shipped canonical spec).
 Each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES`.

@@ -83,23 +83,23 @@ Keep the delta concrete, using the block's sections (`### Proposal`, `### Design
 7. **Plan review loop.** From a clean committed coordinator baseline, the driver may create detached planning and plan-review lanes using the preliminary roster derived from the current affected-file proposal; approval is not a prerequisite for these read-only lanes.
 The driver runs the plan-review agents in parallel against the issue delta.
 Each emits `APPROVED / NEEDS_CHANGES / BLOCKED` to the driver — reviewers do not post verdicts as issue or PR comments.
-The driver rewrites the delta block in response to `NEEDS_CHANGES` and re-runs the affected reviewers.
+The driver applies the mechanical findings to the delta block itself and re-spawns a reviewer only as a disposition-only confirmation round at model tier `medium`, per `AGENTS.md`'s **Iteration cycles**.
 Treat any `BLOCKED` verdict as a stop condition.
 Hard cap: 3 plan revisions before escalating.
-8. Update the visible plan with `update_plan` once all plan reviewers approve.
+8. Update the visible plan with `update_plan` once every plan-review finding is applied or dispositioned.
 9. Before mutable implementation fan-out, require an approved delta, the final roster, a clean committed coordinator baseline, disjoint path ownership, and integrated dependencies, then create each assigned lane according to `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`.
 For every spawn of a model-tiered family, resolve exactly one model tier first, keyed on the `(family token, stage, revision)` triple, by applying the ladder in `AGENTS.md` to the facts already held at that point, then record the resolved model tier and those facts in the lane brief.
 10. **Implementation review loop.** The driver hands off to the implementer with explicit file ownership; the implementer makes the canonical spec changes under `openspec/specs/` that the delta's `### Spec Deltas` require.
 When the implementer reports done, the driver runs `fabricate_reviewer` plus any post-implementation reviewers from the resolved roster, supplying them the issue delta alongside the diff.
 Reviewers compare the actual `openspec/specs/` diff against the proposed delta and confirm a faithful realization (or flag a justified deviation for reconciliation).
-Loop on `NEEDS_CHANGES` until every reviewer emits `APPROVED`.
+Loop on `NEEDS_CHANGES` until every finding is applied, dispositioned by a confirmation round, or recorded as a Deviation, per `AGENTS.md`'s **Iteration cycles**.
 Hard cap: 3 implementation revisions.
 11. **Documentation iteration loop.** If the change touches behaviour, public API, hooks, settings, or any JSDoc/Jekyll-documented surface, the driver runs the paired `fabricate_domain_expert` + `fabricate_docs_writer` loop:
 
 - domain-expert updates `DOMAIN.md` and canonical specs against the diff, and reconciles the issue delta — updating the `openspec-delta` block (and its `### Deviations` note) when the shipped canonical spec justifiably differs from the proposed delta;
 - docs-writer updates JSDoc and the Jekyll site under `docs/` to match the shipped canonical spec;
 - each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES` against the diff;
-- loop until both emit `DOCS APPROVED`.
+- loop until both emit `DOCS APPROVED` — one full round, then disposition-only confirmation.
 Hard cap: 3 docs revisions.
 
 1. Ensure the driver has integrated the completed lane commits into the coordinator branch and represented them with a draft PR targeting `main`; feedback updates go through retained or fresh revision lanes and then the same integration branch and PR unless the user explicitly asks for a replacement.

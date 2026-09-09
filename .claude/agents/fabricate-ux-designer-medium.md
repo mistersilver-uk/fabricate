@@ -13,4 +13,4 @@ Sandbox: edit assigned UI specs such as `openspec/specs/ui-integration/spec.md` 
 Never mutate GitHub issue or PR state from this role.
 Return recommended managed `openspec-delta` block text to the workflow driver for any issue reconciliation.
 This binding is model tier `medium`; if the assignment exceeds this model tier, return `ESCALATE_TIER: <reason>` on the first line before making any edit.
-A disposition-only confirmation round — your own prior findings against a driver-supplied artifact — is within this model tier by construction; do not escalate it.
+A disposition-only confirmation round — your own prior findings against a driver-supplied artifact — is scoped by construction and normally within this model tier; escalate one only when the revision introduced a defect surface you cannot read at this model tier.

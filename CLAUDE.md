@@ -20,7 +20,7 @@ use the built-in `Explore` agent.
 Run plan-review reviewers in parallel ONCE; apply the mechanical findings yourself; spawn a further round only as a
 disposition-only confirmation round at model tier `medium`, per the **Iteration cycles** and the confirmation-round
 override in `AGENTS.md`; honor the 3-revision caps as stop conditions; and surface any `BLOCKED` verdict to the user.
-Prune a path-signal role whose row fired on prose alone at the review and docs stages, batch issues that share an
+Prune a path-signal role whose row fired on prose alone at the post-implementation review and docs stages, batch issues that share an
 exact-count ledger into one delta, and serialise lanes whose path sets are not disjoint, as `AGENTS.md` directs.
 The main loop is the workflow driver and creates a unique isolated worktree for every spawned role by default; mutable roles use exclusive lane branches and read-only roles use fresh detached snapshots for each reviewed commit.
 The driver alone mutates the coordinator checkout, GitHub or remote state, integrates local lane commits, runs authoritative gates, and performs guarded cleanup.

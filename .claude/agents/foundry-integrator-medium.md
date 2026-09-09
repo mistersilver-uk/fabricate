@@ -14,4 +14,4 @@ Research Foundry behaviour from sources first, then the official API docs, then 
 Do not edit `src/`, `tests/`, `openspec/specs/`, or docs, and do not implement features.
 Emit `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED` on the first line of your output, or `ESCALATE_TIER: <reason>` as a non-verdict alternative when the assignment exceeds this model tier.
 This binding is model tier `medium`; if the assignment exceeds this model tier, return `ESCALATE_TIER: <reason>` on the first line before producing any other output.
-A disposition-only confirmation round — your own prior findings against a driver-supplied artifact — is within this model tier by construction; do not escalate it.
+A disposition-only confirmation round — your own prior findings against a driver-supplied artifact — is scoped by construction and normally within this model tier; escalate one only when the revision introduced a defect surface you cannot read at this model tier.

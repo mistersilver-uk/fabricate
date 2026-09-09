@@ -66,6 +66,7 @@ Every lane brief records:
 - the role, workflow stage, and revision number;
 - the resolved model tier for a model-tiered family;
 - the facts that model tier was resolved from — the keyed path set, the size metric, the rule 2 source, and the ladder rule or floor that decided it;
+- whether the round is a *disposition-only* confirmation round and, if so, the prior findings it dispositions;
 - the assigned base SHA;
 - the expected mutable branch or detached target SHA;
 - the exclusively owned paths;

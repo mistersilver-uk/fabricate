@@ -64,7 +64,7 @@ When implementation faithfully realized the delta, confirm it.
 When it justifiably deviated, return replacement managed-block text with the difference and justification under `### Deviations` so the workflow driver can update the issue.
 3. Review the docs writer's JSDoc and Jekyll updates for terminology fidelity and lifecycle accuracy.
 4. Emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings.
-5. Iterate with the docs writer until both emit `DOCS APPROVED` — one full round by default, then disposition-only confirmation at model tier `medium` — capped at 3 revisions before escalating to the user through the workflow driver.
+5. Iterate with the docs writer until both emit `DOCS APPROVED` — one full round by default, then disposition-only confirmation — capped at 3 revisions before escalating to the user through the workflow driver.
 
 ## Audit focus
 

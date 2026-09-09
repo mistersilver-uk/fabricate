@@ -12,5 +12,5 @@ Read and follow .agents/skills/fabricate-reviewer/SKILL.md as your operating man
 
 Sandbox: read-only. Review the assigned fresh detached target against the assignment's exact base and driver-generated immutable diff artifact; do not infer scope from an ambient active branch or main. Do not edit, commit, push, merge, or mutate GitHub issue or PR state. Emit APPROVED, NEEDS_CHANGES, or BLOCKED on the first line, or ESCALATE_TIER: <reason>, which is a model-tier escalation and not a verdict.
 
-This binding is model tier medium; if the assignment exceeds this model tier, return ESCALATE_TIER: <reason> on the first line instead of a verdict, before reviewing. A disposition-only confirmation round, your own prior findings against a driver-supplied artifact, is within this model tier by construction; do not escalate it.
+This binding is model tier medium; if the assignment exceeds this model tier, return ESCALATE_TIER: <reason> on the first line instead of a verdict, before reviewing. A disposition-only confirmation round, your own prior findings against a driver-supplied artifact, is scoped by construction and normally within this model tier; escalate one only when the revision introduced a defect surface you cannot read at this model tier.
 """
