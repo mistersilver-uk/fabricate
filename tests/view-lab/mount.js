@@ -132,6 +132,7 @@ function readParams() {
     // three manager surfaces exist only for a system in the right visibility mode - clicking to
     // them is impossible when the rail entry is not rendered at all.
     system: params.get('system') ?? null,
+    gatheringTaskMode: params.get('gatheringTaskMode') ?? null,
     // TWO things, and the name says only the second: a world seeded with NO crafting systems,
     // and the persisted selection cleared through the real admin store after construction. Both
     // halves are needed, because a Manager refresh resolves an empty selection back to the first
@@ -1017,6 +1018,7 @@ async function boot() {
         noAuthoredWorldComponents: params.noAuthoredWorldComponents,
         longTravelLabels: params.longTravelLabels,
         noInteractables: params.noInteractables,
+        gatheringTaskMode: params.gatheringTaskMode,
       });
   if (params.longDowntimeLabels) applyLongDowntimeLocalization(world);
   const localize = world ? world.localize : (key) => key;
