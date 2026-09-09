@@ -613,11 +613,26 @@ export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 2;
  * the tab order. The row is a `listitem` now and the thing a keyboard reaches is the identity
  * `<button>` inside it, so there is no role-bearing focus target left to declare. Only ONE of the
  * four converted browse views appears here because only this one's row had a `tabindex` at all.
+ *
+ * 18 -> 17 at issue 1517's review round, and this row was paid down by a change that was not
+ * about it. `apps/manager/ToolEditView.svelte | 1` is DELETED: the Tool editor's tab panel is the
+ * destination a ROUTE-ONLY validation row falls back to — a row that names a tab and no control
+ * leaves focus on a button the route change unmounts, and `<body>` is where every Foundry
+ * keybinding is live — so it had to become focusable programmatically and declare itself. It was
+ * the one panel in the manager carrying `tabindex="0"`, an empty scroll container in the Tab order
+ * between the strip and the first field, and it is now `-1` with `data-keyboard-focus="true"`,
+ * which is exactly the remedy this gate's own message prescribes. The row is DELETED rather than
+ * left banked, because `assertRatchet` reports an un-banked pay-down as VANISHED and fails on it
+ * as loudly as on a regression: a baseline is an exact set in both directions.
+ *
+ * The four sibling panels that gained the same pair in that change — the recipe, recipe-item,
+ * essence and Checks panels — never entered this population at all: it reads a STATIC
+ * `tabindex="0"` beside an interactive role, and all four went straight to `-1`.
  */
 export const KNOWN_ROLE_FOCUS_TARGETS = knownDebt('roleFocusTargets');
 
 /** @see KNOWN_ROLE_FOCUS_TARGETS */
-export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 18;
+export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 17;
 
 /**
  * A `<button>` outside any `<form>` that does not declare `data-keyboard-focus`, keyed `file`.

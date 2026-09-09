@@ -310,7 +310,6 @@
     "src/ui/svelte/apps/manager/GatheringMapLinksTab.svelte | 1",
     "src/ui/svelte/apps/manager/GatheringRealmsTab.svelte | 1",
     "src/ui/svelte/apps/manager/GatheringTaskEditView.svelte | 1",
-    "src/ui/svelte/apps/manager/ToolEditView.svelte | 1",
     "src/ui/svelte/apps/manager/downtime/WorldDowntimePreview.svelte | 1",
     "src/ui/svelte/apps/manager/environment/CompositionList.svelte | 4",
     "src/ui/svelte/apps/manager/recipe/RecipeStepAccordion.svelte | 1"

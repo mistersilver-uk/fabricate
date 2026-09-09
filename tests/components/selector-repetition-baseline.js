@@ -29,7 +29,7 @@
  * rather than these 112, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,052 `(at-context, selector)` keys, of which 2,940 appear exactly
+ * Unfiltered, the sheet holds 3,046 `(at-context, selector)` keys, of which 2,934 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -41,8 +41,55 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,571 rules at that head, 112 repeated keys and 229 appearances
+ * printed from. The sheet holds 2,565 rules at that head, 112 repeated keys and 229 appearances
  * between them; five keys appear three times and none appears four or more.
+ *
+ * ISSUE 1517 PHASE 3 RE-KEYED NO ROW AND MOVED THE THREE CONTEXTUAL FIGURES, by adding ONE rule
+ * of six selectors and deleting none. The rule paints `[data-validation-focused]`, the transient
+ * mark a validation row's focus action stamps on the control it lands on, and it is written FLAT
+ * over the module focus pair's own element list — `a`, `button`, `input`, `select`, `textarea`
+ * each as `.fabricate <el>[data-validation-focused]`, plus `.fabricate [tabindex][…]` — because a
+ * single `.fabricate [data-validation-focused]` selector is (0,2,0) and would lose outright to the
+ * (0,2,1) and (0,3,0) `:focus` reset above it, painting nothing at all. So the six selectors are
+ * the point of the rule rather than a stylistic expansion of it.
+ *
+ * All six are singletons in both keyings — measured — because no other rule in the sheet names
+ * `[data-validation-focused]` at all, so the repeated table is untouched and `pinnedTotal` stays
+ * 243 across 119 rows. The rule count rises by one and the key and singleton counts each rise by
+ * six, which is the plain shape: one added rule, six added keys, none of them shared.
+ *
+ * ISSUE 1517 PHASE 6 RE-KEYED NO ROW AND MOVED THE THREE CONTEXTUAL FIGURES DOWNWARD, which is
+ * the mirror of Phase 3 above: it deletes EIGHT rule blocks of twelve selectors and adds none.
+ * The blocks are the environment editor Validation tab own family — its issue list, its check
+ * list, its check rows and their two satisfied/unsatisfied glyph re-tones, its issue row and
+ * that row title — plus the dead `manager-environment-layer` family that shared three of those
+ * selector lists and was the reason a dead family survived a dead-rule sweep at all. The tab was
+ * converted onto `EditorValidationSurface`, so every class the blocks named stopped being
+ * emitted, and `styles-dead-classes.test.js` named all eight before the deletion.
+ *
+ * All twelve are singletons in both keyings, measured rather than assumed, because no rule
+ * outside that family names any of those classes: the rule count falls by eight, the key and
+ * singleton counts each fall by twelve, and `pinnedTotal` STAYS 243 across 119 rows. Re-derived
+ * by running the census, not predicted from the diff.
+ *
+ * ISSUE 1517's REVIEW ROUND SPLIT ONE OF PHASE 3'S OWN SELECTOR LISTS, AND MOVED ONE FIGURE.
+ * The six-selector mark rule is now two rules — the five TYPED selectors keeping the repaint's
+ * outward `outline-offset: 2px`, and the `[tabindex]` one taking `-2px` — because a `[tabindex]`
+ * destination is a card or a section spanning the full width of `.manager-editor-tab-panel`,
+ * which is `overflow: auto` with no left padding, so an outward ring had its left arm clipped
+ * away. Measured at pixel level in Chromium, both ways, in `validation-focus.test.js`.
+ *
+ * A SPLIT ADDS A RULE WITHOUT ADDING A KEY, which is the shape issue 1509 phases 1 and 3 recorded
+ * six times over: both halves were already their own keys and each still appears exactly once. So
+ * the rule count alone rises by one and the key and singleton counts do not move, while
+ * `pinnedTotal` is untouched. Re-derived by running the census.
+ *
+ * RESTACKED ONTO ISSUE 1515 (PR 1634) BEFORE MERGE, and the three contextual figures were
+ * RE-DERIVED at the restacked head rather than carried over: the sheet holds 2,565 rules, 3,046
+ * keys and 2,934 singletons, with the repeated table exactly as issue 1515 left it — 112 rows and
+ * a `pinnedTotal` of 229 — because none of the three entries above touches a repeated key. The
+ * per-phase movements the three entries describe were measured on the pre-restack base and are
+ * kept as the record of what each phase did; the figures the gate asserts are the ones here.
  *
  * ISSUE 1515 DELETED TWO ROWS, which is a shape none of the entries below took: every one of them
  * left the repeated table alone. `.fabricate-manager .manager-section-header` was written twice at

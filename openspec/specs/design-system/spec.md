@@ -1254,6 +1254,8 @@ The shared count, status and verdict vocabulary lives once, under `FABRICATE.Adm
 That shared wording is the ENABLE-GATED one — `Blocks enable`, `Cannot be enabled`, `Saves and enables` — because most of these records are things a GM enables.
 A surface whose record has no enable gate localizes the words that gate colours, and only those: a recipe item is used rather than enabled, so it says `Block` and `Cannot be used` and takes every other word from the shared home.
 The counts are a closed, ordered vocabulary the surface owns — pass, then warning, then blocking — and a site reports the subset it can answer rather than choosing an order or inventing a fourth.
+The count rail, the verdict and the rendered rows are one reading of one state.
+The surface is HANDED its counts, so the rule belongs to the site: the site derives the counts from the rows it renders, rather than reading the evaluation a second time, so a rail cannot report a state its own list contradicts.
 "The subset it can answer" bars inventing a FIGURE as surely as it bars inventing a word: a count a surface's own report cannot derive is omitted, never shown as a zero or against a denominator the report does not hold.
 The system overview route is the worked case — it reports warning and blocking, omits pass because its report counts ISSUES rather than checks run and so has nothing to derive one from, and gives a severity outside the three, such as `info`, no chip of its own.
 That route is outside this requirement's scope for the reason recorded below, and the subset rule still binds it, because it reaches the route through the VOCABULARY this paragraph closes rather than through the arrangement the requirement fixes — a closed vocabulary is closed wherever its words are used.
