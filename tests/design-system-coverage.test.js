@@ -852,6 +852,10 @@ const UNDOCUMENTED_ROWS = [
   'src/ui/svelte/apps/manager/downtime/WorldDowntimeTabs.svelte',
   'src/ui/svelte/apps/manager/environment/CompositionList.svelte',
   'src/ui/svelte/apps/manager/recipe-item/RecipeItemLimitsTab.svelte',
+  // Issue 1648 reuses these domain authoring compositions across crafting and gathering.
+  // The manifest records their new shared membership and why no generic library entry applies.
+  'src/ui/svelte/apps/manager/recipe/RecipeResultGroupCard.svelte',
+  'src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte',
   'src/ui/svelte/components/ActionMenu.svelte',
   'src/ui/svelte/components/ArmedDangerButton.svelte',
   'src/ui/svelte/components/ChanceSlider.svelte',

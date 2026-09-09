@@ -333,6 +333,47 @@ export const BROAD_SIGNAL_PATTERN = new RegExp(
  * `manager-gathering-stamina-rolls` for years and no case has ever had that id.
  */
 export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
+  // Issue 1648: each run control maps to a state that actually renders it.
+  'src/ui/svelte/components/RunActionBar.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-ready-single',
+    'fabricate-journal-lifecycle-cancel-confirmation',
+    'fabricate-journal-lifecycle-paused',
+  ]),
+  'src/ui/svelte/components/WorldClockChip.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-ready-single',
+  ]),
+  'src/ui/svelte/components/SlotRow.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-waiting-open-choice',
+    'fabricate-journal-lifecycle-material-shortage',
+  ]),
+  'src/ui/svelte/components/SlotTile.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-waiting-open-choice',
+    'fabricate-journal-lifecycle-material-shortage',
+  ]),
+  'src/ui/svelte/components/ChoiceOptionList.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-waiting-open-choice',
+  ]),
+  'src/ui/svelte/components/EssencePool.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-essence-shared',
+  ]),
+  'src/ui/svelte/components/RunProgress.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-past-stage',
+  ]),
+  'src/ui/svelte/components/StageNav.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-past-stage',
+    'fabricate-journal-lifecycle-future-stage',
+  ]),
+  'src/ui/svelte/components/StageCard.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-ready-single',
+    'fabricate-journal-lifecycle-past-stage',
+    'fabricate-journal-lifecycle-future-stage',
+  ]),
+  'src/ui/svelte/components/YieldScale.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-gathering-d100',
+  ]),
+  'src/ui/svelte/components/OutcomeLadder.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-gathering-check',
+  ]),
   // The shared icon picker (issue 1269). Everything it presents — the pinned resolved row, the
   // row labels, the popover's own geometry — exists ONLY in the open popover, and neither
   // representative frame opens one. This is the one case whose steps click an icon-picker trigger.
@@ -1397,6 +1438,102 @@ function playerCase(entry) {
 
 function responsiveLayout(containerSelector, gridSelector) {
   return { containerSelector, gridSelector, maxContentBoxInlineSize: 960 };
+}
+
+/** Journal lifecycle fixtures use persisted records; steps operate the real controls. */
+function journalLifecycleCases() {
+  const states = [
+    'ready-single',
+    'waiting-auto-eligible',
+    'waiting-open-choice',
+    'material-shortage',
+    'ingredient-route',
+    'check-route',
+    'essence-shared',
+    'paused',
+    'cancel-confirmation',
+    'past-stage',
+    'future-stage',
+    'gathering-straight',
+    'gathering-d100',
+    'gathering-check',
+    'finished-success',
+    'finished-failure',
+    'finished-cancelled',
+    'active-page-two',
+    'finished-page-two',
+    'filter-paused',
+    'empty-search',
+    'automatic-completion',
+    'automatic-blocker',
+    'dismissal',
+    'redacted-owner',
+    'alchemy',
+    'salvage',
+    'legacy',
+    'loading',
+    'error-retry',
+    'no-actor-empty',
+    'stale-action',
+    'command-timeout',
+    'authority-unavailable',
+    'roll-cancelled',
+    'unsupported-version',
+    'recovery-required',
+    'wide',
+    'narrow',
+  ];
+  const steps = {
+    'waiting-open-choice': [{ selector: '[data-slot-row] button.fab-slot-tile' }],
+    'cancel-confirmation': [{ selector: '[data-run-action="cancel-arm"]' }],
+    'past-stage': [{ selector: '[data-stage-nav-index="0"]' }],
+    'future-stage': [{ selector: '[data-stage-nav-index="2"]' }],
+    'active-page-two': [
+      { selector: '[data-journal-list="active"] [data-pagination-next]' },
+      { selector: '[data-run-id="lab-v1-active-5"]' },
+    ],
+    'finished-page-two': [
+      { selector: '[data-journal-list="finished"] [data-pagination-next]' },
+      { selector: '[data-history-run-id="lab-v1-finished-5"]' },
+    ],
+    'filter-paused': [{ selector: '[data-journal-status-filter] input[value="paused"]' }],
+    'empty-search': [{ selector: '[data-journal-search] input', fill: 'No matching Journal run' }],
+    dismissal: [{ selector: '[data-journal-dismiss]' }],
+    'stale-action': [{ selector: '[data-run-action="primary"]' }],
+    'command-timeout': [{ selector: '[data-run-action="primary"]' }],
+    'roll-cancelled': [{ selector: '[data-run-action="primary"]' }],
+  };
+  const expected = {
+    loading: '[data-journal-state="loading"]',
+    'error-retry': '[data-journal-state="error"]',
+    'no-actor-empty': '[data-journal-state="empty"]',
+    'cancel-confirmation': '[data-run-cancel-decision]',
+    'waiting-open-choice': '[data-choice-options]',
+    'past-stage': '[data-stage-nav-return]',
+    'future-stage': '[data-stage-nav-return]',
+    'gathering-d100': '[data-yield-scale]',
+    'gathering-check': '[data-outcome-ladder]',
+    'essence-shared': '[data-essence-pool]',
+    'recovery-required': '[data-journal-recovery]',
+  };
+  return states.map((state) =>
+    playerCase({
+      id: `fabricate-journal-lifecycle-${state}`,
+      label: `Player Journal — ${state.replaceAll('-', ' ')}`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      query: { tab: 'journal', journalCaseState: state },
+      position: { width: state === 'narrow' ? 900 : 1240, height: 880 },
+      steps: steps[state] ?? [],
+      expectSelector: expected[state] ?? '[data-journal-state="populated"]',
+      kinds: ['player', 'journal', ...(state === 'narrow' ? ['responsive'] : [])],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/journal\//,
+        /^src\/ui\/svelte\/stores\/journalStore/,
+        /^src\/systems\/RunJournalBuilder\.js$/,
+      ],
+    })
+  );
 }
 
 /**
@@ -8972,8 +9109,47 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringTaskEditView)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
     ],
   }),
+  ...['selector', 'straight', 'routed'].map((mode) =>
+    managerCase({
+      id: `manager-gathering-task-editor-${mode}-narrow`,
+      label: `Manager — Gathering task ${mode}, narrow`,
+      smokeLabels: [],
+      reaches: 'beyond',
+      position: { width: 1000, height: 720 },
+      query: {
+        system: 'lab-herbalism',
+        gatheringTaskMode: mode === 'selector' ? 'straight' : mode,
+      },
+      steps: [
+        'Gathering',
+        { selector: '#manager-gathering-nav-tasks' },
+        {
+          selector:
+            '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
+        },
+        {
+          selector:
+            mode === 'selector'
+              ? '[data-gathering-task-resolution]'
+              : '[data-gathering-task-results]',
+          scroll: true,
+        },
+      ],
+      expectView: 'gathering-task-edit',
+      expectSelector:
+        mode === 'selector'
+          ? '[data-gathering-task-resolution-mode]'
+          : `[data-gathering-task-results="${mode}"]`,
+      kinds: ['manager', 'environments', 'responsive'],
+      sourceMatches: [
+        /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringTaskEditView)\.svelte$/,
+        /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
+      ],
+    })
+  ),
   managerCase({
     id: 'manager-gathering-task-editor-routed',
     label: 'Manager — Gathering task Matched check yields',
@@ -8994,6 +9170,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringTaskEditView)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
     ],
   }),
   managerCase({
@@ -9016,6 +9193,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['manager', 'environments'],
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(CraftingSystemManagerRoot|GatheringTaskEditView)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/recipe\/Recipe(ResultGroupCard|ResultsSection)\.svelte$/,
     ],
   }),
   managerCase({
@@ -13536,6 +13714,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [/^src\/ui\/svelte\/apps\/journal\//, /^src\/ui\/svelte\/stores\/journalStore/],
   }),
   ...journalBlindRunCases(),
+  ...journalLifecycleCases(),
   // ───────────────────────────────────────────────────────────────────────────────────────────────
   // Coverage matrix — states the live smoke does NOT photograph.
   //
