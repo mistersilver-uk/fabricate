@@ -116,17 +116,24 @@
   const showActions = $derived(
     !terminal && (run?.manualAdvance === true || Object.values(run?.actions ?? {}).some(Boolean))
   );
-  const guidance = $derived(
-    run?.activityKind === 'gathering'
-      ? localize('FABRICATE.App.Journal.WhatToExpect.Gathering')
-      : run?.runType === 'salvage'
-        ? localize('FABRICATE.App.Journal.WhatToExpect.Salvage')
-        : localize(
-            run?.multiStep
-              ? 'FABRICATE.App.Journal.WhatToExpect.Crafting'
-              : 'FABRICATE.App.Journal.WhatToExpect.CraftingSingleStep'
-          )
+  const currentHasCheck = $derived(
+    Boolean(currentStage?.detail?.checkLabel || currentStage?.lastCheckResult)
   );
+  const guidanceKey = $derived.by(() => {
+    if (run?.activityKind === 'gathering')
+      return run?.lifecycleContract === 'current'
+        ? 'FABRICATE.App.Journal.WhatToExpect.GatheringManual'
+        : 'FABRICATE.App.Journal.WhatToExpect.Gathering';
+    if (run?.runType === 'salvage') return 'FABRICATE.App.Journal.WhatToExpect.Salvage';
+    if (run?.lifecycleContract === 'current' && !currentHasCheck)
+      return run?.multiStep
+        ? 'FABRICATE.App.Journal.WhatToExpect.CraftingNoCheck'
+        : 'FABRICATE.App.Journal.WhatToExpect.CraftingSingleStepNoCheck';
+    return run?.multiStep
+      ? 'FABRICATE.App.Journal.WhatToExpect.Crafting'
+      : 'FABRICATE.App.Journal.WhatToExpect.CraftingSingleStep';
+  });
+  const guidance = $derived(localize(guidanceKey));
 
   function stageState(index) {
     if (terminal || index < currentIndex) return 'past';

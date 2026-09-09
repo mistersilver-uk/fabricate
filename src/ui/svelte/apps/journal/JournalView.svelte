@@ -130,6 +130,8 @@
             <div class="journal-kind-field">
               <Select
                 size="form"
+                minWidth={240}
+                maxWidth={340}
                 value={journal?.kindFilter ?? 'all'}
                 options={kindOptions}
                 ariaLabel={localize('FABRICATE.App.Journal.Filters.Kind.Label')}
@@ -246,6 +248,9 @@
     min-width: 0;
   }
   .journal-kind-field > :global(.fabricate-select) {
+    width: 100%;
+  }
+  .journal-kind-field > :global(.fabricate-select .fabricate-select-trigger) {
     width: 100%;
   }
   .journal-browse-lists {

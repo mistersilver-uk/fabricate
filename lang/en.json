@@ -1036,7 +1036,10 @@
           "Title": "What to expect",
           "Crafting": "This is a crafting run. Trigger the next step when its time gate has passed; each step rolls its crafting check and the run completes (or fails) once the final step resolves.",
           "CraftingSingleStep": "This is a crafting run. Once its time gate has passed, finish crafting to roll its crafting check — the run completes (or fails) on that result.",
+          "CraftingNoCheck": "This crafting run has no check. Trigger each step once its time gate has passed; the run completes after the final step.",
+          "CraftingSingleStepNoCheck": "This crafting run has no check. Once its time gate has passed, finish crafting to complete the run.",
           "Gathering": "This is a gathering run. It resolves automatically as world time advances — no action is needed from you.",
+          "GatheringManual": "This gathering run waits for you when a step is ready. Once its time gate has passed, use the available action to resolve it.",
           "Salvage": "This is a salvage run. It resolves automatically as world time advances — no action is needed from you."
         },
         "RecentResults": {
@@ -1070,7 +1073,7 @@
         "Stage": {
           "Number": "Stage {index}",
           "Requirement": "Requirement {n}",
-          "Requirements": "Authored requirements",
+          "Requirements": "This run consumes",
           "RequirementsHint": "Choose how to meet this stage before it runs.",
           "Locked": "This stage is read-only.",
           "Choose": "Choose an ingredient",
