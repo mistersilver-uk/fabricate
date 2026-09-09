@@ -185,7 +185,8 @@ Issue 1518 and issue 1520 are the changes that turn all six from claims into fac
 The same file discharges the CHAIN half as well, and the chain is what the two sentences above record as the reason the field family was unreachable rather than merely un-imported.
 It renders eight `<Select>`s that each pass a `label`, so `labelled` computes TRUE and `Select`'s own `<Field as="label">` renders — putting the `.fabricate-field` box, its element-typed chrome and its focus pair on a screen through a component that never writes `Field` at its call site.
 A family reached only through another primitive is reached, so the `Pagination` chain above describes ONE caller's shape rather than a property of the capability, and eight labelled selects in one window are the counter-case.
-The sentence it qualifies still stands as written, because it is scoped to the PLAYER application, whose only `<Select>` is still the pager's unlabelled inline one; what the interactables config window changes is the corpus that statement is true of, not the statement.
+The sentence it qualifies still stands as written, because it is scoped to the PLAYER application, whose `<Select>`s are all unlabelled inline ones: the pager's, and the six that issue 1511 converted, every one of which passes `ariaLabelledBy` at a caption its caller already draws rather than a `label`, so `labelled` computes false at all seven and the `<Field as="label">` form still never renders there.
+What the interactables config window changes is the corpus that statement is true of, not the statement.
 The fifth phase discharged three more, and their importer paths are recorded because the claim is about where an importer lives rather than about how many there are.
 `src/ui/svelte/apps/InteractableBrowserRoot.svelte` imports `ManagerSearchField` and `ManagerToolbar` from `src/ui/svelte/components/` and renders the browser's search pill inside its filter bar; `src/ui/svelte/apps/interactables/InteractablesManagerRoot.svelte` imports `InspectorCard` from the same directory and renders the promote panel as one.
 Both paths lie outside `apps/manager/` and `components/`, which is the whole of what the claim asked for.
@@ -286,12 +287,13 @@ The chrome a primitive declares is the PAIR, not the repaint alone: a `:focus` r
 Foundry core paints every focused button with an outline and a glow of its own, and the module reset removes that only inside a Fabricate window; a primitive that declared the repaint alone would lay its ring OVER core's treatment in any host carrying no Fabricate root, rather than replacing it.
 The module pair is (0,2,1) and a family pair is (0,2,0), so wherever a Fabricate root is an ancestor the module pair wins; because the declarations are copied from it verbatim, nothing moves, and what the family pair paints is the host that has no Fabricate root.
 The strip half is declared ABOVE the repaint, because the two tie on specificity and a keyboard-focused control matches both.
-Scoping that third one to buttons is load-bearing: a form reaching the pager's `<select>` would tie the player app's own select ring at equal specificity, win on source order, and delete the inset treatment that exists because an outset outline on a select is clipped by an overflow-clipped container.
+Scoping that third one to buttons is load-bearing, and it now reads as history plus a standing rule: a form reaching a `<select>` would tie the module ring's own `select` member at equal specificity and decide that state by source order, and while the player app declared a ring of its own it would have deleted an INSET treatment that existed because an outset outline on a select is clipped by an overflow-clipped container.
 A primitive declaring its own chrome must not, in doing so, displace an area's chrome for a control it does not own.
 A family that ALREADY declares its own pair re-roots that pair IN PLACE, at unchanged specificity and unchanged declarations, rather than adding a second one at the family root.
 `StatusToggle`'s pair is at (0,3,0) and its repaint carries a `box-shadow: none` the module repaint does not; both survive the re-root unchanged, and a second pair at the root would have been a new rule rather than the same rule moved.
 `Field` is the second instance of the scoping rule the pager's `select` states above.
-Its pair covers `input` and `textarea` and excludes `select`, because at (0,2,1) a `select` leg would tie `.fabricate-app select:focus-visible` and win on source order, deleting the inset ring that exists precisely because an outset outline on a select is clipped.
+Its pair covers `input` and `textarea` and excludes `select`, and the exclusion outlived the reason it was written for: at (0,2,1) a `select` leg tied `.fabricate-app select:focus-visible` and won on source order, deleting the inset ring that stopped a clipped outline, and that rule went with the player app's last native select at issue 1511.
+What keeps the exclusion is narrower and still true — the only selects a `Field` can host are the manager's, which take the module ring at `fabricate.css:1101` until the manager's selects convert, issue 1510's sweep and the root's own convergence at issue 1357 — and a leg here would be family chrome for a control this primitive is about to stop hosting entirely.
 The STRIP half is declared on the element that can TAKE focus, which is not always the element the repaint paints.
 A `:has()` ring on a non-focusable host pairs with a strip on the descendant control it watches: the checkbox host of `StatusToggle` paints its ring on the `label` through `:has()` and strips the host's own treatment on the transparent `input` inside it, so one pair spans two elements while strip-above-repaint still holds.
 
@@ -1189,8 +1191,18 @@ A converted control keeps the identity handles its drivers address it by, and th
 The `data-*` hook a capture step, a mounted test and the smoke drive the control by moves onto the control's TRIGGER, because a hook forwarded to the wrapper around it would still resolve and would silently point one element too high.
 And each option ROW carries its own identity handle — including a sentinel whose value is the empty string, because a picker that omits the handle on a falsy value leaves its default row unaddressable, which is the one row a "leave unchanged" list most needs a driver to be able to click.
 
+A WRAPPING `<label>` IS DEMOTED TO A NON-LABELLING WRAPPER carrying the same class when the select it contains converts — a `<span>` where the class already sets `display`, a `<div>` or `Field as="div"` where it does not — and the trigger is named by `aria-labelledby` pointed at that same caption.
+The reason is the click, not the name: a `<label>` forwards a caption click into the control it wraps, the converted control is a `<button>` whose activation toggles a portaled panel, and that panel's outside-click dismissal listens on `mousedown` while it is open — so with the list open, the caption's own `mousedown` dismisses it and the forwarded click re-opens it, and the caption can never close the list.
+The caption keeps its class and its layout and stops being a hit target, which is the accepted cost.
+This rule REPLACES an earlier explanation that said a `<label>` cannot name a `<button>` at all; a `<button>` is labelable and the primitive's own labelled form relies on exactly that containment, so the conclusion was right and the ground beneath it was not.
+
 A shared skin that a conversion appears to strand is NARROWED onto its remaining native carrier rather than deleted, until the last carrier converts.
 Deleting it early drops a still-shipping control to the platform's own treatment, which is the defect this requirement exists to remove.
+The player app's shared select skin is the first one to reach the end of that rule rather than to be narrowed by it.
+Three rules under `.fabricate-app` themed the closed control, its option list and its focus ring, and all three are DELETED with the app's last native select, because no select is rendered under `.fabricate-app` any more — the shared play-surface class the player window and the three interactables windows all emit.
+That is the rule's reach and therefore the right test: the manager's remaining selects and the four `DialogV2` bodies carry their own skins, the dialog root being `.fabricate-roll-prompt-dialog` and the body root `.fabricate-roll-prompt`, and neither ever inherited this one.
+The carriers a root's skin answers for are this repository's own markup under that root; a companion module renders its own DOM inside the player host and styles it itself.
+Deletion is right exactly when no carrier is left, and the check is the carrier rather than the calendar.
 
 There is ONE exception, and it is structural rather than discretionary: a select inside a Foundry-owned dialog body.
 `DialogV2` cleans its content and re-serialises it through `innerHTML`, so no mounted component and no attached listener survives, its callers read their value back through `form.elements`, and its `dialog` element has no application root to portal into.
@@ -1201,7 +1213,7 @@ An element is exempted only by the mechanism `tests/components/design-system-deb
 The figure is the RATCHET'S PIN rather than a prose count, so it cannot drift from what the gate measures: `KNOWN_NATIVE_SELECT_TOTAL` stands at 78 elements across 28 `.svelte` files, baselined row by row in `tests/components/design-system-known-debt.json`, plus four written into JavaScript dialog bodies.
 Both numerals are asserted against those constants by `tests/components/design-system-debt-ratchets.test.js`, because this sentence has rotted once already.
 It was 100 across 39 before those three shared controls converted and 84 across 33 before the player app's six, and no file carries the marker.
-The one component long counted as a stated exception, `InventorySystemSelector.svelte`, carries a DOCBLOCK rather than the marker and is baselined with the rest.
+The one component long counted as a stated exception, `InventorySystemSelector.svelte`, carried a DOCBLOCK rather than the marker and was baselined with the rest; it converted at issue 1511 and its docblock reason went with the element it justified, which is what withdrawing that precedence looks like in practice rather than in principle.
 
 The selected tick is CONFIGURABLE and is a property of the list rather than of an option: it earns its column where options are close cousins and a reader must confirm which is live AND the trigger's own label does not settle it, and is dropped where the trigger already states the value and the list is short.
 It ships and is exercised in BOTH polarities: kept for the scoped catalogue's lane filters and sort key, and for the bulk panel's check-tier list where two INSTRUCTIONS sit beside named tiers; dropped for the pager's page size and the bulk panel's category axis.
@@ -1499,6 +1511,10 @@ A control caption — a one-line sentence documenting the control directly above
 The deciding question is whether the sentence states something about the WORLD or captions a CONTROL: a callout owns the standing statement, which is true whether or not anything is drawn beside it, while a caption documents a control and says nothing about the world.
 Measured at the gathering tab's event-chance hint: routed through the callout the line rendered 432.3x44.39 against the 432.3x15 its bare paragraph draws, wrapping a border, a soft fill and a 12px inset around a caption for the 6px track above it.
 It stays a bare line until a second independent caller justifies naming the shape.
+
+A converted select's KICKER-SHAPED caption is recorded as a caption the `Kicker` primitive does not serve, and is not to be re-proposed as one.
+The deciding difference is TYPE: `Kicker` draws an 8.5px eyebrow at `0.11em` tracking and these captions are 10px at `0.08em`, a different ramp step at a different tracking, so adoption would be a visible change to a caption the conversion is not otherwise touching.
+The second difference is structural and smaller — `Kicker` forwards no `id` and takes no rest spread, so it cannot be the `aria-labelledby` target the trigger's accessible name now comes from — and it is second because it is a one-prop fix where the type is a design decision.
 
 #### Scenario: A ruled-out candidate is re-proposed
 
