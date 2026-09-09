@@ -241,6 +241,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/SlotRow.svelte',
     'src/ui/svelte/components/EssencePool.svelte',
     'src/ui/svelte/components/RunProgress.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/StageNav.svelte',
     'src/ui/svelte/components/StageCard.svelte',
     'src/ui/svelte/components/YieldScale.svelte',

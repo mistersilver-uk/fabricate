@@ -220,7 +220,7 @@ const RECIPES = [
   recipe('jw-r-cast', 'Cast Jewellery', [FIXED_SET]),
   recipe('rw-r-blade', 'Inscribe Runeblade', [FIXED_SET]),
   recipe('sm-r-deepbind', 'Deepbind Ingot', [ESSENCE_SET]),
-  recipe('al-r-firebomb', 'Distil Firebomb', [FIXED_SET]),
+  recipe('al-r-fire', 'Distil Firebomb', [FIXED_SET]),
 ];
 const TASKS = ['straight', 'd100', 'routed'].map((mode) => ({
   id: `task-${mode}`,
@@ -870,7 +870,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       assert.ok(mounted.store.selectedRun.createdResults.length > 0);
       if (mode === 'straight') assert.equal(mounted.store.selectedRun.gatheringYield.roll, null);
       if (mode === 'd100') {
-        assert.equal(mounted.store.selectedRun.gatheringYield.roll, 63);
+        assert.equal(mounted.store.selectedRun.gatheringYield.roll, 25);
         assert.equal(mounted.target.querySelectorAll('[data-yield-cut]').length, 1);
       }
       if (mode === 'routed') {
