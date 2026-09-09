@@ -76,8 +76,13 @@
     min-width: 0;
   }
   :global(.journal-list-section .manager-pagination) {
+    flex-wrap: nowrap;
+    gap: var(--fab-space-2);
     padding: var(--fab-space-2) 0 0;
     border-top: 1px solid var(--fab-border);
     background: transparent;
+  }
+  :global(.journal-list-section .manager-pagination-page) {
+    display: none;
   }
 </style>

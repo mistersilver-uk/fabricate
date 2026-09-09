@@ -1008,6 +1008,19 @@
           "WhenPassed": "Ready to continue once enough world time has passed.",
           "WhenPassedFinal": "Ready to finish once enough world time has passed."
         },
+        "Summary": {
+          "Time": "Time",
+          "Needs": "Needs",
+          "Left": "Left",
+          "ReadyAt": "Ready at",
+          "None": "None",
+          "Check": "Check",
+          "NoCheck": "No check",
+          "DecidedBy": "Decided by",
+          "NothingToRoll": "Nothing to roll",
+          "SimplyCompletes": "It simply completes",
+          "Outcome": "Outcome"
+        },
         "About": {
           "Title": "About this run",
           "Started": "Started",
@@ -1087,7 +1100,9 @@
           "Awarded": "Awarded at {chance}%",
           "Missed": "Not awarded at {chance}%",
           "Received": "Received",
-          "AwardedChip": "Awarded"
+          "AwardedChip": "Awarded",
+          "LoadingPreview": "Working out your current chances…",
+          "PreviewError": "Current chances could not be loaded. Showing the authored chances."
         },
         "Record": {
           "Title": "Run record",

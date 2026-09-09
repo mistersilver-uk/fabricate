@@ -63,7 +63,7 @@
     onclick={activate}
     onkeydown={onKey}
   >
-    <Medallion art={img} alt="" size={32} />
+    <Medallion art={img} alt="" size={30} />
     <div class="journal-history-copy">
       <span class="journal-history-name" {title}>{title}</span>
       <div class="journal-history-meta">

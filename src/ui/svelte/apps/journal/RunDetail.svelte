@@ -6,6 +6,7 @@
   import { worldTimeLabel } from '../../util/worldTimeLabel.js';
   import Callout from '../manager/Callout.svelte';
   import Chip from '../../components/Chip.svelte';
+  import InspectorCard from '../../components/InspectorCard.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import Notice from '../../components/Notice.svelte';
   import OutcomeLadder from '../../components/OutcomeLadder.svelte';
@@ -50,6 +51,10 @@
   const yieldEntries = $derived(
     Array.isArray(gatheringYield?.entries) ? gatheringYield.entries : []
   );
+  let personalizedYieldEntries = $state(null);
+  let yieldPreviewLoading = $state(false);
+  let yieldPreviewError = $state(false);
+  const displayedYieldEntries = $derived(personalizedYieldEntries ?? yieldEntries);
   const outcomeTiers = $derived(Array.isArray(gatheringYield?.tiers) ? gatheringYield.tiers : []);
   const resolutionModeLabel = $derived(
     gatheringYield?.mode
@@ -67,6 +72,29 @@
       chance: 100,
       qty: Number(result.quantity) || 1,
     }))
+  );
+  const requiredSeconds = $derived(
+    Number(gate?.requiredSeconds ?? viewedStage?.detail?.requiredSeconds) || 0
+  );
+  const availableAt = $derived(Number(gate?.availableAt));
+  const remainingTime = $derived(
+    Number.isFinite(availableAt) && availableAt > now
+      ? formatDurationHMS(availableAt - now)
+      : localize('FABRICATE.App.Journal.Summary.None')
+  );
+  const readyAtLabel = $derived(calendarLabel(gate?.availableAt));
+  const checkLabel = $derived(
+    String(
+      viewedStage?.detail?.checkLabel ??
+        (['d100', 'routed'].includes(gatheringYield?.mode) ? resolutionModeLabel : '')
+    )
+  );
+  const checkOutcome = $derived(
+    viewedStage?.lastCheckResult
+      ? formatRoll(viewedStage.lastCheckResult)
+      : gatheringYield?.roll != null
+        ? String(gatheringYield.roll)
+        : ''
   );
 
   const showActions = $derived(
@@ -171,12 +199,76 @@
       });
     return facts;
   }
+
+  function personalizedChance(drop) {
+    const raw = Number(drop?.finalDropRate ?? drop?.finalChance);
+    if (!Number.isFinite(raw)) return null;
+    return Math.min(100, Math.max(0, raw <= 1 ? raw * 100 : raw));
+  }
+
+  function applyPersonalizedDrops(entries, breakdown) {
+    const byId = new Map(
+      (Array.isArray(breakdown?.drops) ? breakdown.drops : []).map((drop) => [
+        String(drop?.id ?? ''),
+        drop,
+      ])
+    );
+    return entries.map((entry) => {
+      const chance = personalizedChance(byId.get(String(entry?.id ?? '')));
+      return chance == null ? entry : { ...entry, chance };
+    });
+  }
+
+  $effect(() => {
+    const entries = yieldEntries;
+    const canPersonalize =
+      !terminal &&
+      run?.redacted !== true &&
+      run?.blindSecretPreview !== true &&
+      run?.activityKind === 'gathering' &&
+      gatheringYield?.mode === 'd100' &&
+      Boolean(run?.environmentId) &&
+      Boolean(run?.taskId) &&
+      typeof services?.getGatheringDropBreakdown === 'function';
+    if (!canPersonalize) {
+      personalizedYieldEntries = null;
+      yieldPreviewLoading = false;
+      yieldPreviewError = false;
+      return;
+    }
+    let cancelled = false;
+    personalizedYieldEntries = null;
+    yieldPreviewLoading = true;
+    yieldPreviewError = false;
+    Promise.resolve()
+      .then(() =>
+        services.getGatheringDropBreakdown({
+          environmentId: run.environmentId,
+          taskId: run.taskId,
+          rememberedActorId: services?.actorBar?.selectedActorId ?? null,
+        })
+      )
+      .then((breakdown) => {
+        if (cancelled) return;
+        personalizedYieldEntries = applyPersonalizedDrops(entries, breakdown);
+        yieldPreviewLoading = false;
+      })
+      .catch(() => {
+        if (cancelled) return;
+        personalizedYieldEntries = null;
+        yieldPreviewLoading = false;
+        yieldPreviewError = true;
+      });
+    return () => {
+      cancelled = true;
+    };
+  });
 </script>
 
 <article class="journal-detail" data-journal-detail data-run-key={run?.key ?? run?.id}>
   <header class="journal-detail-header">
     <div class="journal-detail-identity">
-      <Medallion art={run?.img ?? ''} icon="fas fa-hammer" alt="" size={52} />
+      <Medallion art={run?.img ?? ''} icon="fas fa-hammer" alt="" size={38} />
       <div>
         <h2>{run?.names?.title ?? ''}</h2>
         <div class="journal-detail-meta">
@@ -232,6 +324,52 @@
     />
   {/if}
 
+  <div class="journal-detail-summary" data-journal-summary>
+    <InspectorCard class="journal-summary-card" data-journal-summary-card="time">
+      <h3>{localize('FABRICATE.App.Journal.Summary.Time')}</h3>
+      <JournalFactRow
+        icon="fa-clock"
+        label={localize('FABRICATE.App.Journal.Summary.Needs')}
+        value={requiredSeconds > 0
+          ? formatDurationHMS(requiredSeconds)
+          : localize('FABRICATE.App.Journal.Summary.None')}
+      />
+      <JournalFactRow
+        icon="fa-hourglass-half"
+        label={localize('FABRICATE.App.Journal.Summary.Left')}
+        value={remainingTime}
+      />
+      {#if readyAtLabel}<JournalFactRow
+          icon="fa-calendar"
+          label={localize('FABRICATE.App.Journal.Summary.ReadyAt')}
+          value={readyAtLabel}
+        />{/if}
+    </InspectorCard>
+    <InspectorCard class="journal-summary-card" data-journal-summary-card="check">
+      <h3>
+        {localize(
+          checkLabel
+            ? 'FABRICATE.App.Journal.Summary.Check'
+            : 'FABRICATE.App.Journal.Summary.NoCheck'
+        )}
+      </h3>
+      <JournalFactRow
+        icon={checkLabel ? 'fa-dice-d20' : 'fa-circle-check'}
+        label={localize(
+          checkLabel
+            ? 'FABRICATE.App.Journal.Summary.DecidedBy'
+            : 'FABRICATE.App.Journal.Summary.NothingToRoll'
+        )}
+        value={checkLabel || localize('FABRICATE.App.Journal.Summary.SimplyCompletes')}
+      />
+      {#if checkOutcome}<JournalFactRow
+          icon="fa-check"
+          label={localize('FABRICATE.App.Journal.Summary.Outcome')}
+          value={checkOutcome}
+        />{/if}
+    </InspectorCard>
+  </div>
+
   {#if stages.length > 0}
     <section class="journal-detail-stages" data-journal-stages>
       <RunProgress
@@ -274,6 +412,7 @@
             tone: stageState(viewedIndex) === 'past' ? 'positive' : 'neutral',
           }}
           facts={stageFacts(viewedStage)}
+          showHeading={stages.length > 1}
         >
           {#snippet body()}
             <StepDetails
@@ -294,6 +433,7 @@
       availableAt={gate.availableAt}
       hintKey={run?.isFinalStep ? 'FABRICATE.App.Journal.TimeRemaining.WhenPassedFinal' : undefined}
       {services}
+      {now}
     />{/if}
 
   {#if gatheringYield?.mode === 'routed' && outcomeTiers.length > 0}
@@ -302,9 +442,24 @@
       emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
       label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
     />
-  {:else if gatheringYield && yieldEntries.length > 0}
+  {:else if gatheringYield && displayedYieldEntries.length > 0}
+    {#if yieldPreviewLoading}
+      <Notice
+        tone="info"
+        title={localize('FABRICATE.App.Journal.Yields.LoadingPreview')}
+        dataAttr="data-journal-yield-loading"
+        dataValue="true"
+      />
+    {:else if yieldPreviewError}
+      <Notice
+        tone="warning"
+        title={localize('FABRICATE.App.Journal.Yields.PreviewError')}
+        dataAttr="data-journal-yield-error"
+        dataValue="true"
+      />
+    {/if}
     <YieldScale
-      entries={yieldEntries}
+      entries={displayedYieldEntries}
       roll={gatheringYield.roll}
       label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
       labels={{
@@ -380,7 +535,7 @@
     display: grid;
     gap: var(--fab-space-4);
     min-width: 0;
-    padding: var(--fab-space-4);
+    padding: var(--fab-space-6);
   }
   .journal-detail-header {
     display: flex;
@@ -398,7 +553,9 @@
   .journal-detail-identity h2 {
     margin: 0 0 var(--fab-space-1);
     color: var(--fab-text);
-    font-size: 18px;
+    font-family: var(--fab-font-serif);
+    font-size: 22px;
+    font-weight: 600;
   }
   .journal-detail-meta {
     display: flex;
@@ -411,6 +568,21 @@
   .journal-detail-stages {
     display: grid;
     gap: var(--fab-space-3);
+  }
+  .journal-detail-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fab-space-3);
+  }
+  .journal-detail-summary :global(.journal-summary-card) {
+    min-width: 0;
+  }
+  .journal-detail-summary h3 {
+    margin: 0 0 var(--fab-space-1);
+    color: var(--fab-text-subtle);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
   .journal-detail-record {
     display: grid;

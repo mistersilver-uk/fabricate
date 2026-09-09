@@ -44,6 +44,7 @@ const harness = createMountedComponentHarness({
     component('StageCard'),
     component('YieldScale'),
     component('OutcomeLadder'),
+    component('InspectorCard'),
     'src/ui/svelte/apps/journal/JournalCard.svelte',
     'src/ui/svelte/apps/journal/JournalListShell.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
@@ -128,6 +129,11 @@ function makeServices(journal) {
   };
 }
 
+async function settle() {
+  await new Promise((resolvePromise) => setImmediate(resolvePromise));
+  flushSync();
+}
+
 describe('JournalView mounted behavior', () => {
   before(() => harness.setup());
   afterEach(() => harness.remount());
@@ -177,15 +183,18 @@ describe('JournalView mounted behavior', () => {
     assert.equal(target.querySelectorAll('.journal-list-footer .manager-pagination').length, 2);
     assert.ok(target.querySelector('[data-journal-detail]'));
     assert.ok(target.querySelector('[data-journal-time-remaining]'));
+    assert.equal(target.querySelectorAll('[data-journal-summary-card]').length, 2);
     assert.ok(!target.querySelector('.journal-view-column-right'));
     assert.ok(!target.querySelector('[data-journal-card="recent"]'));
   });
 
   it('operates search, kind, status, and both independent sort controls', async () => {
     const run = makeGatheringRun();
+    const finished = makeSucceededRun();
     const { store, calls } = makeJournal({
-      activePageItems: [run], activeRuns: [run], activeCount: 1,
+      activePageItems: [run], activeRuns: [run], activeCount: 9,
       activeCounts: { all: 4, ready: 1, waiting: 2, paused: 1 },
+      historyPageItems: [finished], historyCount: 9,
     });
     const target = await harness.mount({ services: makeServices(store) });
 
@@ -196,12 +205,20 @@ describe('JournalView mounted behavior', () => {
     target.querySelector('[data-journal-status-filter] input[value="ready"]').click();
     chooseSelectOption(target, '[data-journal-sort="active"]', 'newest');
     chooseSelectOption(target, '[data-journal-sort="history"]', 'oldest');
+    target.querySelector('[data-journal-list="active"] [data-pagination-next]').click();
+    target.querySelector('[data-journal-list="finished"] [data-pagination-next]').click();
+    chooseSelectOption(target, '[data-journal-list="active"] [data-pagination-size]', 6);
+    chooseSelectOption(target, '[data-journal-list="finished"] [data-pagination-size]', 6);
 
     assert.deepEqual(calls.search, ['herb']);
     assert.deepEqual(calls.kind, ['gathering']);
     assert.deepEqual(calls.status, ['ready']);
     assert.deepEqual(calls.activeSort, ['newest']);
     assert.deepEqual(calls.historySort, ['oldest']);
+    assert.deepEqual(calls.activePage, [1]);
+    assert.deepEqual(calls.historyPage, [1]);
+    assert.deepEqual(calls.activeSize, [6]);
+    assert.deepEqual(calls.historySize, [6]);
     assert.equal(target.querySelector('[data-segment-badge="4"]').textContent, '4');
   });
 
@@ -268,7 +285,9 @@ describe('JournalView mounted behavior', () => {
     const single = makeCraftingRun({ steps: [run.steps[0]], stepCount: 1, multiStep: false });
     const { store: singleStore } = makeJournal({ selectedRun: single, selectedRunKey: single.key });
     const singleTarget = await harness.mount({ services: makeServices(singleStore) });
-    assert.equal(singleTarget.querySelector('[data-stage-nav]'), null);
+    assert.ok(!singleTarget.querySelector('[data-stage-nav]'));
+    assert.ok(!singleTarget.querySelector('.fab-stage-card-heading'));
+    assert.ok(singleTarget.querySelector('.fab-stage-card-body'), 'the single stage body remains rendered');
 
     harness.remount();
     const futureStep = {
@@ -430,6 +449,112 @@ describe('JournalView mounted behavior', () => {
     assert.ok(straightTarget.querySelector('[data-yield-entry="ore"]'));
     assert.equal(straightTarget.querySelector('[data-yield-cut]'), null);
     assert.match(straightTarget.querySelector('[data-journal-record]').textContent, /Mode\.straight/u);
+  });
+
+  it('personalizes active d100 chances without replacing terminal evidence', async () => {
+    const active = makeGatheringRun({
+      environmentId: 'env-1',
+      gatheringYield: {
+        mode: 'd100',
+        entries: [{ id: 'herb', name: 'Moon herb', qty: 2, chance: 30 }],
+        roll: null,
+        tiers: [],
+      },
+    });
+    const { store } = makeJournal({ selectedRun: active, selectedRunKey: active.key });
+    const calls = [];
+    let resolveBreakdown;
+    const services = {
+      ...makeServices(store),
+      getGatheringDropBreakdown: (options) => {
+        calls.push(options);
+        return new Promise((resolvePromise) => {
+          resolveBreakdown = resolvePromise;
+        });
+      },
+    };
+    const target = await harness.mount({ services });
+    await settle();
+    assert.ok(target.querySelector('[data-journal-yield-loading]'));
+    resolveBreakdown({ drops: [{ id: 'herb', finalChance: 0.72 }] });
+    await settle();
+    assert.deepEqual(calls, [{ environmentId: 'env-1', taskId: 'task-1', rememberedActorId: 'Actor.actor-1' }]);
+    assert.match(target.querySelector('[data-yield-entry="herb"]').textContent, /72%/);
+
+    harness.remount();
+    const terminal = makeGatheringRun({
+      derivedStatus: 'succeeded',
+      status: 'succeeded',
+      finishedAt: 100,
+      environmentId: 'env-1',
+      gatheringYield: {
+        mode: 'd100',
+        entries: [{ id: 'herb', name: 'Moon herb', qty: 2, chance: 41 }],
+        roll: 40,
+        tiers: [],
+      },
+    });
+    const { store: terminalStore } = makeJournal({ selectedRun: terminal, selectedRunKey: terminal.key });
+    const terminalTarget = await harness.mount({ services: { ...services, journal: terminalStore } });
+    await settle();
+    assert.equal(calls.length, 1, 'terminal evidence does not request a live preview');
+    assert.match(terminalTarget.querySelector('[data-yield-entry="herb"]').textContent, /41%/);
+
+    harness.remount();
+    const redacted = makeGatheringRun({
+      redacted: true,
+      environmentId: 'env-1',
+      gatheringYield: active.gatheringYield,
+    });
+    const { store: redactedStore } = makeJournal({ selectedRun: redacted, selectedRunKey: redacted.key });
+    const redactedTarget = await harness.mount({ services: { ...services, journal: redactedStore } });
+    await settle();
+    assert.equal(calls.length, 1, 'redacted runs never request personalized evidence');
+    assert.ok(!redactedTarget.querySelector('[data-journal-yield-loading]'));
+  });
+
+  it('reports a personalized gathering preview failure and keeps the authored scale visible', async () => {
+    const run = makeGatheringRun({
+      environmentId: 'env-1',
+      gatheringYield: {
+        mode: 'd100',
+        entries: [{ id: 'herb', name: 'Moon herb', qty: 2, chance: 30 }],
+        roll: null,
+        tiers: [],
+      },
+    });
+    const { store } = makeJournal({ selectedRun: run, selectedRunKey: run.key });
+    const target = await harness.mount({
+      services: {
+        ...makeServices(store),
+        getGatheringDropBreakdown: () => Promise.reject(new Error('unavailable')),
+      },
+    });
+    await settle();
+    assert.ok(target.querySelector('[data-journal-yield-error]'));
+    assert.match(target.querySelector('[data-yield-entry="herb"]').textContent, /30%/);
+  });
+
+  it('hides a matured time callout while retaining time and no-check facts', async () => {
+    const base = makeCraftingRun();
+    const step = {
+      ...base.steps[0],
+      detail: { ...base.steps[0].detail, checkLabel: null },
+      timeGate: { availableAt: 100, initiatedAt: 0, requiredSeconds: 100 },
+    };
+    const run = makeCraftingRun({
+      derivedStatus: 'ready',
+      steps: [step],
+      currentStep: step,
+      stepCount: 1,
+      multiStep: false,
+      timeGate: step.timeGate,
+    });
+    const { store } = makeJournal({ worldTime: 200, selectedRun: run, selectedRunKey: run.key });
+    const target = await harness.mount({ services: makeServices(store) });
+    assert.ok(!target.querySelector('[data-journal-time-remaining]'));
+    assert.equal(target.querySelectorAll('[data-journal-summary-card]').length, 2);
+    assert.match(target.querySelector('[data-journal-summary-card="check"]').textContent, /NoCheck|No check/u);
   });
 
   it('shows recovery evidence without disclosing selection internals on a redacted owner run', async () => {
