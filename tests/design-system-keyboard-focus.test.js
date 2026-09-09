@@ -277,12 +277,13 @@ describe('design system: a programmatic focus target declares itself focused to 
   //
   // ALL FOUR FIGURES ARE RE-DERIVED AT ISSUE 1517's REVIEW ROUNDS, by printing the populations
   // this file's own walk returns. They were 24 / 21 / 290 before the first of them and 41 / 20 /
-  // 273 after it — re-derived once and still two out on the largest population, which is the
-  // point: a count in prose is a measurement with no gate on it. The 42nd focus target is the
-  // environment editor's tab panel, declared at issue 1517's docs round when that editor became
-  // the sixth host of the validation row action. The clauses below assert FLOORS rather than these
-  // numbers, on purpose — a population is meant to shrink as the primitives absorb it — so the
-  // prose is what has to be re-measured rather than what fails.
+  // 273 after it — re-derived once and STILL one out on the largest population, which counts 272.
+  // That is the point: a count in prose is a measurement with no gate on it, and one pass of
+  // re-deriving it is not proof that it landed. The 42nd focus target is the environment editor's
+  // tab panel, declared at issue 1517's docs round when that editor became the sixth host of the
+  // validation row action. The clauses below assert FLOORS rather than these numbers, on purpose
+  // — a population is meant to shrink as the primitives absorb it — so the prose is what has to
+  // be re-measured rather than what fails.
   //
   // The consequence is identical in all three cases and is not about the element handling keys.
   // `KeyboardManager#hasFocus` returns false, so EVERY Foundry keybinding fires while the element

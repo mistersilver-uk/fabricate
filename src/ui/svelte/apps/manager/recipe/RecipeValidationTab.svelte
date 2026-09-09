@@ -223,8 +223,11 @@
   //  - `stepsNamed` has no `CHECK_TO_ISSUES` entry, so an unnamed step in a multi-step recipe
   //    paints an amber row that raised no issue, and the old warnings count could not see it:
   //    the rail read "Warnings: 0" and the verdict read "All clear" over an amber row.
-  //  - a `blocks: 'enable'` issue graded `warning` draws a BLOCK row and was counted as a
-  //    warning, which is the same divergence the environment editor's rail had.
+  //  - a `blocks: 'enable'` issue graded `warning` draws a BLOCK row and WOULD be counted as a
+  //    warning — the divergence the environment editor's rail actually had. This producer cannot
+  //    reach it today, because all seven of `recipeReadiness.js`'s `blocks: 'enable'` issues are
+  //    also `severity: 'critical'`; reading the row's own status forecloses it here rather than
+  //    repairing it, so the pair cannot part the day one of those is graded `warning`.
   //
   // `countRecipeReadiness` tallies the SAME row states the list above is built from, so the two
   // cannot disagree by construction rather than by convention — and the editor shell's tab badge
