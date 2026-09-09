@@ -881,19 +881,33 @@
                       <p class="manager-card-title manager-currency-subunit-heading">
                         {text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnits', 'Sub-units')}
                       </p>
-                      {#if (unit.contains || []).length > 0}
-                        <!-- THE AMOUNT IS NOT A CHIP, and the chip around it is (issue 1515).
-                             A number a GM can change is a stepper and never a badge, so the
-                             `<input type="number">` keeps its own control and only its class
-                             moves out of the retiring availability family; what carries it is a
-                             removable membership token, which is the primitive. -->
-                        <div
-                          class="manager-chip-row"
-                          aria-label={text(
-                            'FABRICATE.Admin.Manager.CurrencyUnits.SubUnits',
-                            'Sub-units'
-                          )}
-                        >
+                      <!-- THE AMOUNT IS NOT A CHIP, and the chip around it is (issue 1515).
+                           A number a GM can change is a stepper and never a badge, so the
+                           `<input type="number">` keeps its own control and only its class
+                           moves out of the retiring availability family; what carries it is a
+                           removable membership token, which is the primitive.
+
+                           THE ROW IS ALSO THE LAST RUNG OF THE CHIP'S FOCUS LADDER, which is why
+                           it is rendered in BOTH states rather than only when it holds chips.
+                           `Chip` takes its focus destination before it removes the chip - the
+                           next remove control, else the previous one, else the nearest
+                           `[data-chip-remove-fallback]` - and the Add sub-unit control above
+                           carries that hook only while an ELIGIBLE unit remains to add. Remove
+                           the last sub-unit in a two-unit world and the add row is a warning
+                           note instead, so the ladder ran out and focus fell to `<body>`. A row
+                           that appeared only alongside chips could not be that rung either: it
+                           would be resolved, focused, and then replaced in the same removal. -->
+                      <div
+                        class="manager-chip-row"
+                        tabindex="-1"
+                        data-keyboard-focus="true"
+                        data-chip-remove-fallback=""
+                        aria-label={text(
+                          'FABRICATE.Admin.Manager.CurrencyUnits.SubUnits',
+                          'Sub-units'
+                        )}
+                      >
+                        {#if (unit.contains || []).length > 0}
                           {#each unit.contains as contained (contained.unitId)}
                             <Chip
                               tone="info"
@@ -920,15 +934,15 @@
                               />
                             </Chip>
                           {/each}
-                        </div>
-                      {:else}
-                        <p class="manager-muted">
-                          {text(
-                            'FABRICATE.Admin.Manager.CurrencyUnits.NoSubUnits',
-                            'This unit is a base denomination.'
-                          )}
-                        </p>
-                      {/if}
+                        {:else}
+                          <p class="manager-muted">
+                            {text(
+                              'FABRICATE.Admin.Manager.CurrencyUnits.NoSubUnits',
+                              'This unit is a base denomination.'
+                            )}
+                          </p>
+                        {/if}
+                      </div>
                       <p
                         class="visually-hidden"
                         aria-live="polite"
@@ -1007,6 +1021,7 @@
                       'Edit currency unit'
                     )}
                     onclick={() => (currencyExpandedUnitId = unit.id)}
+                    data-world-currency-unit-expand={unit.id}
                   >
                     <i class="fa-solid fa-pen" aria-hidden="true"></i>
                   </IconButton>

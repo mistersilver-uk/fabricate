@@ -978,16 +978,16 @@
                     <ActionMenu
                       items={rowMenuItems()}
                       triggerLabel={text(
-                        'FABRICATE.Admin.Manager.Environment.Actions',
-                        'Environment actions'
-                      )}
+                        'FABRICATE.Admin.Manager.Environment.ActionsFor',
+                        'Environment actions for {name}'
+                      ).replace('{name}', environmentName(displayEnvironment))}
                       triggerTitle={text(
                         'FABRICATE.Admin.Manager.Environment.Actions',
                         'Environment actions'
                       )}
                       onSelect={(action) => {
                         if (action === 'duplicate') onDuplicateEnvironment(environment.id);
-                        else onDeleteEnvironment(environment.id);
+                        else if (action === 'delete') onDeleteEnvironment(environment.id);
                       }}
                     />
                   </span>

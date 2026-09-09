@@ -552,16 +552,16 @@
               <ActionMenu
                 items={rowMenuItems()}
                 triggerLabel={text(
-                  'FABRICATE.Admin.Manager.Environment.Events.Actions',
-                  'Event actions'
-                )}
+                  'FABRICATE.Admin.Manager.Environment.Events.ActionsFor',
+                  'Gathering event actions for {name}'
+                ).replace('{name}', eventName(event))}
                 triggerTitle={text(
                   'FABRICATE.Admin.Manager.Environment.Events.Actions',
-                  'Event actions'
+                  'Gathering event actions'
                 )}
                 onSelect={(action) => {
                   if (action === 'duplicate') onDuplicateEvent(selectedSystemId, event.id);
-                  else onDeleteEvent(selectedSystemId, event.id);
+                  else if (action === 'delete') onDeleteEvent(selectedSystemId, event.id);
                 }}
               />
             </span>

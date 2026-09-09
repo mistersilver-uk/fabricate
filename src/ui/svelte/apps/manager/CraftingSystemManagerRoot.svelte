@@ -5329,8 +5329,11 @@
   // Six manager routes used to draw their own `manager-section-header` — kicker, title and hint —
   // directly under this shell's header, so each of the six rendered TWO page headings. The section
   // headers are deleted and the shell states the whole heading; the eyebrow is the part of it that
-  // had nowhere else to go, because it names the SCOPE the route is acting inside rather than the
-  // route itself.
+  // had nowhere else to go, because it names the CONTEXT the `<h1>` beneath it is read in rather
+  // than restating the route. Usually that context is the scope the route acts inside — the
+  // selected system on `access`, `crafting-settings` and `environments`, and `WORLD / every
+  // system` on `world`. On `systems` there is no narrower scope than the manager itself, so it
+  // names the ACTIVITY instead ("Browse"), which is the same job done with the only word left.
   //
   // A ROUTE THAT RETURNS THE EMPTY STRING RENDERS NO EYEBROW, and `system-edit` is deliberately
   // one of them: its `<h1>` now carries the selected system's name and its breadcrumb already

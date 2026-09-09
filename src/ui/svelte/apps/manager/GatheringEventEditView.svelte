@@ -467,16 +467,27 @@
                 'Current tags'
               )}</span
             >
-            <!-- THE DANGER TAG IS NOT A CHIP, and it is the one member of this family that does
-                 not converge (issue 1515). Its six levels are a RAMP -
+            <!-- THE DANGER TAG IS NOT A CHIP YET, and it is a TRACKED DIVERGENCE rather than an
+                 impossibility (issue 1515). Its six levels are a RAMP -
                  `.manager-danger-tag-pill.is-safe` through `.is-extreme` in
                  `styles/fabricate.css`, four of which MIX two semantic families per level - and
-                 no `Chip` tone states a mix. Routing it through the primitive would not merely
-                 fail to reproduce the ramp: that sheet imports at `layer(modules)` while the
-                 primitive's scoped block is unlayered, so the chip's own fill would WIN over
-                 all six rules and the danger level would stop being visible at all. The remove
-                 control is re-pointed into this pill's OWN family instead, so the availability
-                 sweep can take that family without un-styling this row. -->
+                 no `Chip` tone states a mix.
+
+                 An earlier note here claimed the conversion could not work at all, because
+                 `styles/fabricate.css` imports at `layer(modules)` while the primitive's scoped
+                 block is unlayered, so the chip's own fill would beat all six rules. That is
+                 true of a rule in the SHEET and false of the route the family actually has: the
+                 biome chip beside this one is a `<Chip tint=… style=…>` that delivers a
+                 per-record colour through an inline `--fab-chip-color`, and an inline custom
+                 property outranks every layered and unlayered rule alike. So the ramp IS
+                 expressible.
+
+                 What it is NOT is in scope here. Six ramp levels, four of them two-family mixes,
+                 have to be authored as chip tints and re-measured against the design system
+                 before the pill can be retired, and this change's remit was the availability
+                 sweep beside it. The remove control is re-pointed into this pill's OWN family
+                 instead, so that sweep can take the shared family without un-styling this row,
+                 and the re-skin is left as named debt rather than as a refusal. -->
             <div class="manager-chip-row" data-gathering-event-danger-pills>
               {#if dangerTags.length > 0}
                 {#each dangerTags as tag (tag)}

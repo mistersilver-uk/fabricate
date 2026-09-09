@@ -337,11 +337,14 @@
               </IconButton>
               <ActionMenu
                 items={rowMenuItems()}
-                triggerLabel={text('FABRICATE.Admin.Manager.SystemActions', 'System actions')}
+                triggerLabel={text(
+                  'FABRICATE.Admin.Manager.SystemActionsFor',
+                  'System actions for {name}'
+                ).replace('{name}', systemDisplayLabel(system, systemLabels))}
                 triggerTitle={text('FABRICATE.Admin.Manager.SystemActions', 'System actions')}
                 onSelect={(action) => {
                   if (action === 'export') onExportSystem(system.id);
-                  else onDeleteSystem(system.id);
+                  else if (action === 'delete') onDeleteSystem(system.id);
                 }}
               />
             </span>

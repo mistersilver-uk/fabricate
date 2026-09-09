@@ -226,6 +226,17 @@
      not own. Deleting the focused element drops focus to `<body>`, which is the unfocused
      state above plus a keyboard user stranded at the top of the document.
 
+     THE ADD TRIGGER IS OFTEN CONDITIONAL, SO THE CALLER OWES A SECOND HOOK (issue 1515). Four
+     shipped sets hung the hook on a control that renders only while there is something left to
+     add — a `<select>` of unselected realms, a library search, an Add sub-unit button — so
+     removing the LAST chip with no source left was exactly the state in which the ladder ran
+     out. The rung that cannot disappear is the CHIP ROW itself, carrying `tabindex="-1"` and
+     the same hook, and it has to be rendered in the empty state too: a row that appears only
+     alongside chips is resolved, focused and then replaced in the same removal. Both hooks
+     coexist — the search runs outwards from the chip and takes the first match in document
+     order at the nearest ancestor holding one, so a trigger beside the row still wins while it
+     exists.
+
      THE LIVE REGION IS THE CALLER’S, and a bare chip cannot own one. Neither adding nor
      removing a member moves focus into the row, so an editable set owes ONE
      `aria-live="polite"` summary beside it; a region wrapped around the row announces each

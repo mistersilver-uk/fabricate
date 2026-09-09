@@ -529,16 +529,16 @@
               <ActionMenu
                 items={rowMenuItems()}
                 triggerLabel={text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.Actions',
-                  'Gathering task actions'
-                )}
+                  'FABRICATE.Admin.Manager.Environment.Tasks.ActionsFor',
+                  'Gathering task actions for {name}'
+                ).replace('{name}', taskName(task))}
                 triggerTitle={text(
                   'FABRICATE.Admin.Manager.Environment.Tasks.Actions',
                   'Gathering task actions'
                 )}
                 onSelect={(action) => {
                   if (action === 'duplicate') onDuplicateTask(selectedSystemId, task.id);
-                  else onDeleteTask(selectedSystemId, task.id);
+                  else if (action === 'delete') onDeleteTask(selectedSystemId, task.id);
                 }}
               />
             </span>

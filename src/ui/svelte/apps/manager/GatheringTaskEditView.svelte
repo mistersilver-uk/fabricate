@@ -1583,16 +1583,29 @@
       </div>
 
       <div class="manager-task-required-tools-attached" data-gathering-task-required-tools-attached>
-        {#if attachedToolEntries.length === 0}
-          <EmptyState
-            inline
-            hint={text(
-              'FABRICATE.Admin.Manager.Environment.Tasks.RequiredToolsEmpty',
-              'No tools required.'
-            )}
-          />
-        {:else}
-          <div class="manager-chip-row">
+        <!-- THE ROW IS THE LAST RUNG OF THE CHIP'S FOCUS LADDER (issue 1515), which is why it is
+             rendered in BOTH states rather than only when it holds chips. `Chip` takes its focus
+             destination before it removes the chip - the next remove control, else the previous
+             one, else the nearest `[data-chip-remove-fallback]` - and the library search below
+             carries that hook only while this system HAS a tool library. Remove the last required
+             tool in a system with none and the ladder ran out and focus fell to `<body>`. A row
+             that appeared only alongside chips could not be that rung either: it would be
+             resolved, focused, and then replaced by the empty state in the same removal. -->
+        <div
+          class="manager-chip-row"
+          tabindex="-1"
+          data-keyboard-focus="true"
+          data-chip-remove-fallback=""
+        >
+          {#if attachedToolEntries.length === 0}
+            <EmptyState
+              inline
+              hint={text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.RequiredToolsEmpty',
+                'No tools required.'
+              )}
+            />
+          {:else}
             {#each attachedToolEntries as entry (entry.id)}
               {#if entry.tool}
                 <Chip
@@ -1632,8 +1645,8 @@
                 >
               {/if}
             {/each}
-          </div>
-        {/if}
+          {/if}
+        </div>
         <p class="visually-hidden" aria-live="polite" data-gathering-task-required-tools-status>
           {requiredToolsSummary()}
         </p>
@@ -1641,6 +1654,13 @@
 
       {#if libraryToolList.length > 0}
         <div class="manager-task-required-tools-search">
+          <!-- THE FOCUS HOOK RIDES `inputAttrs`, NOT THE REST SPREAD (issue 1515). This
+               component's rest spread lands on the `<label>` and only `inputAttrs` reaches the
+               `<input>` inside it, so the hook used to name a `<label>` - which `Chip` would
+               then call `.focus()` on, and which is focusable only through the browser's own
+               label delegation. `Chip`'s contract says the caller owns this destination and
+               says nothing about delegation, and no test covered it. The input is the control
+               the GM lands on, so the hook goes where the control is. -->
           <ManagerSearchField
             compact
             value={toolSearchTerm}
@@ -1654,7 +1674,7 @@
               'Search tools by name'
             )}
             data-gathering-task-required-tools-search=""
-            data-chip-remove-fallback=""
+            inputAttrs={{ 'data-chip-remove-fallback': '' }}
           />
         </div>
       {/if}

@@ -120,7 +120,15 @@
   // The error is never surfaced from inside this component — it has no Foundry
   // notification path at all — which is what makes the seam stubbable in a mounted
   // test and keeps the suppression invariant enforceable.
-  let flashMessage = $state('');
+  //
+  // TWO PARTS SINCE ISSUE 1515, because the vehicle is a `<Notice>` and its specimen draws a
+  // `title` naming what happened over a quieter `detail` saying why. The store hands the sink
+  // both — `localizeRecipeActivationParts` builds each half from its own material rather than
+  // cutting the one-line message at a colon a translation is free to move — and the one-line
+  // string stays the fallback for any refusal that is not an activation error (a persistence
+  // failure, or a raw `error.message`), which carries no name/reasons split to make.
+  let flashTitle = $state('');
+  let flashDetail = $state('');
 
   // A REFUSAL COUNTER, WHICH THE SHARED NOTICE MAKES NECESSARY (issue 1515). `Notice` owns its
   // own dismissal — `library.html:1079` declares `dismissable` as a boolean with no caller to
@@ -134,10 +142,12 @@
   let flashToken = $state(0);
 
   function handleToggleEnabled(recipe) {
-    flashMessage = '';
+    flashTitle = '';
+    flashDetail = '';
     onToggleEnabled(recipe.id, recipe.enabled === false, {
-      onBlocked: (message) => {
-        flashMessage = message;
+      onBlocked: (message, parts) => {
+        flashTitle = parts?.title || message;
+        flashDetail = parts?.title ? parts.detail : '';
         flashToken += 1;
       },
     });
@@ -484,12 +494,17 @@
   -->
   <div class="manager-recipe-notice">
     {#key flashToken}
-      {#if flashMessage}
+      {#if flashTitle}
+        <!-- NO `icon`, DELIBERATELY (issue 1515). `Notice` ships a per-tone default glyph and the
+             danger tone's default IS the specimen's danger mark; passing one here re-stated the
+             primitive's own choice from a call site, which is the drift the default exists to
+             prevent. The prop stays for the two accent callers whose glyph the specimen does not
+             declare. -->
         <Notice
           blocking
           tone="danger"
-          icon="fas fa-circle-exclamation"
-          title={flashMessage}
+          title={flashTitle}
+          detail={flashDetail}
           dismissable
           dismissLabel={text('FABRICATE.Admin.Manager.Recipe.DismissFlash', 'Dismiss')}
           dataAttr="data-recipe-flash"

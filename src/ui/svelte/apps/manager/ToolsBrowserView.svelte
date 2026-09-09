@@ -9,6 +9,7 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SegmentedControl from './SegmentedControl.svelte';
   import { projectToolRow, toolSearchText } from './tools/toolStudio.js';
   import {
     breakModeSourcePill,
@@ -258,24 +259,29 @@
     })
   );
 
+  // THE COHORT SEGMENTS, in the shape the shared segmented control reads (issue 1515). The primitive
+  // localizes each label itself, so the options carry `labelKey` / `fallback` rather than
+  // already-resolved text, and the tally rides its `count` slot instead of being baked into the
+  // copy — which is why `Tools.FilterInSystem` and `Tools.FilterAllWorld` no longer interpolate
+  // a `{count}`. `Overriding` supplies no count and renders none: the slot omits a non-finite
+  // value rather than drawing `NaN`.
   const membershipFilters = $derived([
     {
-      id: 'in',
-      label: text(
-        'FABRICATE.Admin.Manager.Tools.FilterInSystem',
-        'In this system ({count})'
-      ).replace('{count}', String(memberRows.length)),
+      value: 'in',
+      labelKey: 'FABRICATE.Admin.Manager.Tools.FilterInSystem',
+      fallback: 'In this system',
+      count: memberRows.length,
     },
     {
-      id: 'all',
-      label: text(
-        'FABRICATE.Admin.Manager.Tools.FilterAllWorld',
-        'All world tools ({count})'
-      ).replace('{count}', String(memberRows.length + ghostRows.length)),
+      value: 'all',
+      labelKey: 'FABRICATE.Admin.Manager.Tools.FilterAllWorld',
+      fallback: 'All world tools',
+      count: memberRows.length + ghostRows.length,
     },
     {
-      id: 'over',
-      label: text('FABRICATE.Admin.Manager.Tools.FilterOverriding', 'Overriding'),
+      value: 'over',
+      labelKey: 'FABRICATE.Admin.Manager.Tools.FilterOverriding',
+      fallback: 'Overriding',
     },
   ]);
 
@@ -523,34 +529,37 @@
           placeholder={text('FABRICATE.Admin.Manager.Tools.Search', 'Search tools')}
           ariaLabel={text('FABRICATE.Admin.Manager.Tools.Search', 'Search tools')}
         />
-        <div
-          class="manager-tools-membership-filter"
-          role="radiogroup"
-          aria-label={text(
+        <!--
+          THE COHORT SWITCH IS THE SHARED SEGMENTED CONTROL (issue 1515), not a fourth copy of
+          it. This view hand-rolled the radiogroup and painted it with twenty-eight lines of
+          scoped CSS that re-derived the primitive's own track, segment, selected fill and
+          visually-hidden radio — the same control the sibling `ComponentsBrowserView` cohort
+          switch already renders through the same primitive at `density="compact" tone="accent"`,
+          which is why the props below match it. (Spelled without its angle bracket deliberately:
+          `screenshot-capture-scoping.test.js` scans this directory for opening tags of the
+          primitive, and a mention in prose is counted as one and swallows the real span below.) The two `data-*` hooks are kept verbatim through
+          the primitive's `dataAttr` / `optionDataAttr` channels; note that `dataAttr` stamps
+          `true` on the TRACK rather than the current value, so the selected segment is read from
+          its radio (`[data-tool-membership-option="…"] input:checked`) rather than from the
+          track's attribute or the retired `.is-selected` class.
+        -->
+        <SegmentedControl
+          options={membershipFilters}
+          value={membershipFilter}
+          density="compact"
+          tone="accent"
+          groupName="tool-membership-filter"
+          dataAttr="data-tool-membership-filter"
+          optionDataAttr="data-tool-membership-option"
+          ariaLabel={text(
             'FABRICATE.Admin.Manager.Tools.FilterLabel',
             'Which Tools this list shows'
           )}
-          data-tool-membership-filter={membershipFilter}
-        >
-          {#each membershipFilters as option (option.id)}
-            <label
-              class:is-selected={membershipFilter === option.id}
-              data-tool-membership-option={option.id}
-            >
-              <input
-                type="radio"
-                name="tool-membership-filter"
-                value={option.id}
-                checked={membershipFilter === option.id}
-                onchange={() => {
-                  ui.membershipFilter = option.id;
-                  ui.pageIndex = 0;
-                }}
-              />
-              <span>{option.label}</span>
-            </label>
-          {/each}
-        </div>
+          onChange={(next) => {
+            ui.membershipFilter = next;
+            ui.pageIndex = 0;
+          }}
+        />
       </ManagerToolbar>
     </section>
 
@@ -1008,44 +1017,6 @@
     font-weight: 600;
     letter-spacing: 0.07em;
     text-transform: uppercase;
-  }
-
-  .manager-tools-membership-filter {
-    display: flex;
-    flex: 0 1 auto;
-    flex-wrap: wrap;
-    gap: var(--fab-space-2xs);
-    padding: var(--fab-space-2xs);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    min-width: 0;
-  }
-
-  .manager-tools-membership-filter label {
-    display: inline-flex;
-    align-items: center;
-    padding: var(--fab-space-chip) var(--fab-space-2);
-    border-radius: 6px;
-    color: var(--fab-text-muted);
-    font-size: 0.66rem;
-    font-weight: 600;
-    line-height: 1.2;
-    cursor: pointer;
-  }
-
-  .manager-tools-membership-filter label.is-selected {
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-  }
-
-  /* The radio itself carries the state and the keyboard behaviour; the label paints it.
-     Sized to 1px rather than `display: none` so it stays focusable. */
-  .manager-tools-membership-filter input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
   }
 
   .manager-tools-sort-row {
