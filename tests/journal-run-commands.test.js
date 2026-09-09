@@ -1112,7 +1112,7 @@ describe('journal run command protocol', () => {
 
   it('dismisses only terminal history into the user setting and never mutates the run', async () => {
     let stored = {};
-    const terminal = { id: 'run-1', lifecycleVersion: 1, runRevision: 4, status: 'completed' };
+    const terminal = { id: 'run-1', lifecycleVersion: 1, runRevision: 4, status: 'succeeded' };
     const { service } = commandHarness({
       run: terminal,
       getDismissals: () => stored,
@@ -1125,7 +1125,7 @@ describe('journal run command protocol', () => {
     });
     assert.equal(result.success, true);
     assert.equal(Object.keys(stored).length, 1);
-    assert.equal(terminal.status, 'completed', 'history is untouched');
+    assert.equal(terminal.status, 'succeeded', 'history is untouched');
     assert.ok(service.getDismissedJournalRunKeys({ actorUuid: 'Actor.a', viewerId: 'player' }).has(result.key));
 
     const active = commandHarness({ run: { ...terminal, status: 'waiting' } });
