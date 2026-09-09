@@ -329,6 +329,11 @@ test('player-facing starts explicitly select the current journal lifecycle', () 
   );
   assert.match(
     mainSource,
+    /executeCommand: \(command\) => this\.executeJournalRunCommand\(command\),\s*resolveUuid: \(uuid\) => globalThis\.fromUuid\?\.\(uuid\),/,
+    'a ready public craft should execute through the command service and hydrate result UUIDs locally'
+  );
+  assert.match(
+    mainSource,
     /async craftRecipe[\s\S]*?return await this\.craft\([\s\S]*?lifecycleVersion:\s*1,[\s\S]*?\n\s*}\);/,
     'craftRecipe should start a versioned crafting run'
   );

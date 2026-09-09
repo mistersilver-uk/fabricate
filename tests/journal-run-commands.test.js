@@ -107,6 +107,143 @@ describe('journal run command protocol', () => {
     assert.equal(Object.hasOwn(calls[2][4], 'lifecycleVersion'), false);
   });
 
+  it('executes a ready fully-selected public craft under a second authority request', async () => {
+    const commands = [];
+    const resultItem = { uuid: 'Item.result' };
+    const result = await executePublicCraft({
+      engine: {
+        craft: async () => ({
+          success: true,
+          runId: 'run-1',
+          runRevision: 2,
+          requiresExecution: true,
+          canExecuteImmediately: true,
+        }),
+      },
+      runManager: { getActiveRun: () => null },
+      actor: { uuid: 'Actor.a' },
+      sourceActors: [{ uuid: 'Actor.a' }, { uuid: 'Actor.source' }],
+      recipe: { id: 'recipe' },
+      ingredientSetId: 'set-1',
+      options: {
+        ingredientOptionOverrides: { ore: 'iron' },
+        ingredientEssenceAllocation: { fire: 2 },
+      },
+      executeCommand: async (command) => {
+        commands.push(command);
+        return {
+          success: true,
+          runId: command.runId,
+          runRevision: 5,
+          terminal: true,
+          createdResultUuids: [resultItem.uuid, 'Item.not-propagated'],
+        };
+      },
+      resolveUuid: async (uuid) => {
+        if (uuid === resultItem.uuid) return resultItem;
+        throw new Error('document has not propagated');
+      },
+    });
+
+    assert.deepEqual(commands, [{
+      actorUuid: 'Actor.a',
+      runType: 'crafting',
+      runId: 'run-1',
+      expectedRevision: 2,
+      action: 'execute',
+      payload: {
+        selectionPlan: {
+          selectedIngredientSetId: 'set-1',
+          ingredientOptionOverrides: { ore: 'iron' },
+          ingredientEssenceAllocation: { fire: 2 },
+        },
+        trigger: 'manual',
+        sourceActorUuids: ['Actor.a', 'Actor.source'],
+      },
+    }]);
+    assert.deepEqual(result.results, [resultItem]);
+  });
+
+  it('leaves waiting and unresolved-choice public crafts editable without stage execution', async () => {
+    for (const started of [
+      { success: true, runId: 'waiting', requiresExecution: false, canExecuteImmediately: false },
+      { success: true, runId: 'choices', requiresExecution: true, canExecuteImmediately: false },
+    ]) {
+      let executions = 0;
+      const result = await executePublicCraft({
+        engine: { craft: async () => started },
+        runManager: { getActiveRun: () => null },
+        actor: { uuid: 'Actor.a' },
+        sourceActors: [{ uuid: 'Actor.a' }],
+        recipe: { id: 'recipe' },
+        executeCommand: async () => (++executions, { success: true }),
+      });
+      assert.equal(result, started);
+      assert.equal(executions, 0);
+    }
+  });
+
+  it('routes an immediately-ready manual check through the normal player prompt', async () => {
+    let prompts = 0;
+    let executions = 0;
+    const resultItem = { uuid: 'Item.checked-result' };
+    const run = { id: 'checked-run', lifecycleVersion: 1, runRevision: 2, status: 'waiting' };
+    const { service, actor } = commandHarness({
+      currentUserId: 'gm',
+      run,
+      promptCheck: async () => (++prompts, { confirmed: true, bonus: '2' }),
+      operations: {
+        crafting: {
+          getRun: () => run,
+          describeCheck: async () => ({
+            required: true,
+            publicPrompt: { label: 'Forge', allowsSituationalModifier: true },
+            privateEvaluation: { recipeId: 'recipe', rollFormula: '1d20' },
+          }),
+          evaluateCheck: async () => ({
+            engineEvaluated: true,
+            success: true,
+            outcome: null,
+            value: 16,
+            data: {},
+          }),
+          execute: async () => (
+            ++executions,
+            {
+              success: true,
+              runId: run.id,
+              runRevision: 4,
+              terminal: true,
+              createdResultUuids: [resultItem.uuid],
+            }
+          ),
+        },
+      },
+    });
+
+    const result = await executePublicCraft({
+      engine: {
+        craft: async () => ({
+          success: true,
+          runId: run.id,
+          runRevision: run.runRevision,
+          requiresExecution: true,
+          canExecuteImmediately: true,
+        }),
+      },
+      runManager: { getActiveRun: () => null },
+      actor,
+      sourceActors: [actor],
+      recipe: { id: 'recipe' },
+      executeCommand: (command) => service.executeJournalRunCommand(command),
+      resolveUuid: async (uuid) => uuid === resultItem.uuid ? resultItem : null,
+    });
+
+    assert.equal(prompts, 1);
+    assert.equal(executions, 1);
+    assert.deepEqual(result.results, [resultItem]);
+  });
+
   it('composes both persisted managers into one fail-closed reconstruction callback', async () => {
     const scopes = [];
     const reconstruct = createJournalExecutionReconstructor({
@@ -479,7 +616,15 @@ describe('journal run command protocol', () => {
       currentUserId: 'gm',
       operations: {
         crafting: {
-          start: async (args) => (startArgs = args, { success: true, runId: 'new-run' }),
+          start: async (args) => (
+            startArgs = args,
+            {
+              success: true,
+              runId: 'new-run',
+              requiresExecution: true,
+              canExecuteImmediately: true,
+            }
+          ),
         },
       },
     });
@@ -494,6 +639,8 @@ describe('journal run command protocol', () => {
     });
 
     assert.equal(response.success, true);
+    assert.equal(response.requiresExecution, true);
+    assert.equal(response.canExecuteImmediately, true);
     assert.equal(startArgs.sender.id, 'gm');
     assert.equal(startArgs.senderId, 'gm');
   });

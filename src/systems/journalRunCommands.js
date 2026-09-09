@@ -113,6 +113,8 @@ export async function executePublicCraft({
   recipe,
   ingredientSetId = null,
   options = {},
+  executeCommand = null,
+  resolveUuid = null,
 } = {}) {
   if (typeof engine?.craft !== 'function') return operationUnavailable();
   const requestedRunId = validText(options?.runId) ? options.runId : null;
@@ -125,7 +127,52 @@ export async function executePublicCraft({
   } else {
     routedOptions.lifecycleVersion = 1;
   }
-  return engine.craft(actor, sourceActors, recipe, ingredientSetId, routedOptions);
+  const started = await engine.craft(actor, sourceActors, recipe, ingredientSetId, routedOptions);
+  if (
+    started?.success !== true ||
+    started.requiresExecution !== true ||
+    started.canExecuteImmediately !== true ||
+    !validText(started.runId)
+  ) {
+    return started;
+  }
+  if (typeof executeCommand !== 'function') {
+    return {
+      ...started,
+      success: false,
+      authorityUnavailable: true,
+      reason: 'execute-command-unavailable',
+    };
+  }
+  const settled = await executeCommand({
+    actorUuid: actor?.uuid,
+    runType: 'crafting',
+    runId: started.runId,
+    expectedRevision: started.runRevision,
+    action: 'execute',
+    payload: {
+      selectionPlan: {
+        selectedIngredientSetId: ingredientSetId,
+        ingredientOptionOverrides: options?.ingredientOptionOverrides,
+        ingredientEssenceAllocation: options?.ingredientEssenceAllocation,
+      },
+      trigger: 'manual',
+      sourceActorUuids: actorUuidList(sourceActors),
+    },
+  });
+  if (!Array.isArray(settled?.createdResultUuids) || typeof resolveUuid !== 'function') {
+    return settled;
+  }
+  const results = await Promise.all(
+    settled.createdResultUuids.map(async (uuid) => {
+      try {
+        return await resolveUuid(uuid);
+      } catch {
+        return null;
+      }
+    })
+  );
+  return { ...settled, results: results.filter(Boolean) };
 }
 
 /** Compose both persisted run managers into the authority's reconstruction boundary. */
@@ -420,6 +467,12 @@ function serializedOperationResult(result, { secret = false, runId = '' } = {}) 
     partialRefund: source.partialRefund === true,
     restoredCount: Number.isFinite(source.restoredCount) ? source.restoredCount : 0,
     consumed: source.consumed === true,
+    ...(Object.hasOwn(source, 'requiresExecution') && {
+      requiresExecution: source.requiresExecution === true,
+    }),
+    ...(Object.hasOwn(source, 'canExecuteImmediately') && {
+      canExecuteImmediately: source.canExecuteImmediately === true,
+    }),
     createdResultUuids:
       source.createdResultUuids ?? results.map((item) => item?.uuid).filter(validText),
   };

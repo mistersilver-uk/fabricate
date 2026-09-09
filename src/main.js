@@ -5124,6 +5124,8 @@ class Fabricate {
       recipe,
       ingredientSetId,
       options,
+      executeCommand: (command) => this.executeJournalRunCommand(command),
+      resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
     });
   }
 
