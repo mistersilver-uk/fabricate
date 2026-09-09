@@ -31,8 +31,10 @@
  *   1. Every path is READ, so a renamed or moved view throws rather than being skipped.
  *   2. Each view is asserted POSITIVELY to emit `role="list"` and `role="listitem"`, so a file
  *      that lost its table roles by losing its rows altogether fails rather than passes.
- *   3. The number of ROWS each view renders is floored at mount, so an emptied `{#each}` or a
- *      renamed row class cannot satisfy clause 2 from a source string alone.
+ *   3. `role="listitem"` and the view's row class are both located INSIDE the `{#each paginated…}`
+ *      loop, so a view that satisfies clause 2 with a stray role written outside its record loop —
+ *      or that kept the role while its rows moved out from under the class — fails rather than
+ *      passing on a source string clause 2 found anywhere in the file.
  *   4. The comment strip is asserted to have left real markup behind, so a strip that ate the
  *      template is reported rather than passing on an absence of source.
  */
@@ -48,9 +50,12 @@ const managerDir = 'src/ui/svelte/apps/manager';
 const TABLE_ROLES = ['role="table"', 'role="row"', 'role="columnheader"', 'role="cell"'];
 
 /**
- * The four views, each with the row class its records render as and the minimum number of those
- * rows the view's own mounted suite proves it draws. `rowFloor` is what keeps clause 2 honest: a
- * source string saying `role="listitem"` proves nothing if the `{#each}` around it renders none.
+ * The four views, each with the row class its records render as and the identity control that
+ * makes a row operable. `row` is what keeps clause 2 honest: a source string saying
+ * `role="listitem"` proves nothing about the records unless the role and that class are both
+ * inside the view's own `{#each paginated…}` loop, which is what the second test below reads.
+ * The COUNT of rows a mount draws is `manager-mounted.test.js`'s to prove and is not asserted
+ * here — this file's claim is about source, and no floor is read from anywhere.
  *
  * `children` names any component the row delegates to. All four still write their row inline, so
  * the lists are empty today and the field exists so that the day a row moves into its own
@@ -167,11 +172,13 @@ describe('the four remaining table-role browse views are lists', () => {
     );
   });
 
-  it('renders each row class the roles are claimed for, so the claim is not about zero rows', () => {
-    // The floor is read from the mounted suites' own fixtures rather than re-mounting here: this
-    // file's claim is about SOURCE, and re-mounting the manager for it would duplicate
-    // `manager-mounted.test.js`'s whole harness. What it does need is proof that the row class the
-    // roles hang off is actually emitted inside an `{#each}`, which the source can answer exactly.
+  it('writes each row class and the listitem role inside the record loop, not loose in the file', () => {
+    // NOTHING IS MOUNTED HERE, and no row count is asserted. This file's claim is about SOURCE,
+    // and re-mounting the manager to count rows would duplicate `manager-mounted.test.js`'s whole
+    // harness — that suite already drives real rows on all four views. What the source CAN answer
+    // exactly, and what the assertion above needs, is WHERE the roles sit: the slice below starts
+    // at the view's `{#each paginated…}` and every claim is made against that slice, so a
+    // `role="listitem"` written outside the record loop no longer satisfies the gate.
     for (const view of VIEWS) {
       const markup = markupOf(read(view.file));
       const eachIndex = markup.search(/\{#each\s+paginated/);

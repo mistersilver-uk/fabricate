@@ -30,6 +30,17 @@
   `tests/fixtures/searchable-popover/CapabilityHost.svelte`: every component gate in this
   repository (`lint:svelte`, `format:check`, `check-svelte-warnings.mjs`, the source-contract and
   area-scope readers) enumerates `src/**/*.svelte`, and a fixture is not a shipped call site.
+
+  THAT PLACEMENT HAS ONE COST, AND IT IS RECORDED RATHER THAN PAID BY SURPRISE. `UI_PATH_PATTERN`
+  in `scripts/lib/viewLabCases.js` is UNANCHORED on its extension leg — `\.(svelte|css)$` — so
+  `isUiFile` answers true for this path even though it is outside `src/ui/`. A change confined to
+  this fixture therefore ARMS the screenshot-evidence gate, and because no case's `sourceMatches`
+  names it, the selection falls back to `fabricate-app-shell` — a frame of the player window,
+  which contains nothing this file renders. `CapabilityHost.svelte` carries the same property.
+  The cost is one irrelevant published frame on a fixture-only diff, which is cheaper than the
+  alternatives: anchoring the pattern to `src/` would silently stop selecting the `styles/` and
+  root-level `.svelte` files it is there to catch, and moving the fixture into `src/` would put a
+  test-only component inside every gate that enumerates shipped call sites. Do not relocate it.
 -->
 <script>
   import Chip from '../../../src/ui/svelte/components/Chip.svelte';

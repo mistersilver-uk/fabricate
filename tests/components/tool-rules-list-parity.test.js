@@ -60,6 +60,7 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ToolsBrowserView.svelte',
   'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
 ].map((path) => scopedComponentCss(resolve(repoRoot, path)));
@@ -202,9 +203,9 @@ const LIST_SCREEN = `
         <section class="manager-tools-library-card" data-manager-tools-search>
           <section class="fabricate-filter-bar manager-toolbar" aria-label="Which Tools this list shows" data-probe="filter-bar">
             <label class="fabricate-search manager-search"><i class="fas fa-search"></i><input type="search" data-probe="search" placeholder="Search tools"></label>
-            <div class="manager-tools-membership-filter" role="radiogroup" data-tool-membership-filter="in">
-              <label class="is-selected"><input type="radio" name="b" checked><span>In this system (3)</span></label>
-              <label><input type="radio" name="b"><span>All world tools (11)</span></label>
+            <div class="manager-segmented is-compact is-accent" role="radiogroup" data-tool-membership-filter="true">
+              <label class="manager-segment is-active" data-tool-membership-option="in"><input type="radio" class="manager-segment-input" name="b" checked><span class="manager-segment-label">In this system</span><span class="manager-segment-count">3</span></label>
+              <label class="manager-segment" data-tool-membership-option="all"><input type="radio" class="manager-segment-input" name="b"><span class="manager-segment-label">All world tools</span><span class="manager-segment-count">11</span></label>
             </div>
           </section>
         </section>
@@ -527,9 +528,12 @@ test('the Tools browser renders its search and its filter through the shared bar
       'ARE that band, and a control left outside it is a second bar the recipe does not have'
   );
   assert.ok(
-    inBar('class="manager-tools-membership-filter"'),
+    inBar('dataAttr="data-tool-membership-filter"'),
     'the membership filter renders inside the filter bar for the same reason - it narrows the ' +
-      'list below, which is what a filter is'
+      'list below, which is what a filter is. It is addressed by the `<SegmentedControl>` prop ' +
+      'that stamps its hook rather than by the retired `manager-tools-membership-filter` class: ' +
+      'issue 1515 replaced this view`s hand-rolled radiogroup with the shared primitive, and a ' +
+      'class assertion left behind would have gone on passing against the deleted markup`s name'
   );
 
   // THE SEGMENTED CONTROL IS NOT IN THE BAR, and that is a routing decision rather than an

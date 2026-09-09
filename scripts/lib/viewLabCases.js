@@ -908,14 +908,20 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // Every other environment and component frame draws the trigger closed, where the whole
   // conversion is an unchanged 34px icon button.
   //
-  // Still uncovered, and named rather than left to be discovered: the DANGER item (`is-danger`,
-  // the red Exclude / Remove from environment) and the DISABLED note ("Enable in library first").
-  // Both live in menus this frame does not open — the danger verb in an Included row's menu, the
-  // note on a library-disabled row — and only one menu can be open in one frame, so neither can be
-  // added here without a case that opens a different row. A change to either treatment publishes
-  // this frame and it does not contain them.
+  // TWO entries as of issue 1515, and the second is a different CALLER rather than a second view of
+  // the same one. `manager-systems-row-menu-open` opens a BROWSE ROW's menu — the shape the four
+  // converted browse views render, whose items are a two-verb Duplicate/Export plus a danger
+  // Delete — while the environment frame opens a COMPOSITION row's, with seven verbs and a
+  // disabled note among them. A change to this component reaches both callers, so it publishes
+  // one frame of each.
+  //
+  // The browse frame also carries the DANGER item (`is-danger`, the red Delete), which the note
+  // below used to record as uncovered. Still uncovered: the DISABLED note ("Enable in library
+  // first"), which lives on a library-disabled composition row, and only one menu can be open in
+  // one frame — so it needs a case that opens a different row than either of these.
   'src/ui/svelte/components/ActionMenu.svelte': Object.freeze([
     'manager-environment-edit-automatic-force-add',
+    'manager-systems-row-menu-open',
   ]),
   // The pill multi-select (issue 1458), whose add menu became a `SearchablePopover` in the same
   // change. It sits under `components/`, so the directory leg of `BROAD_SIGNAL_PATTERN` claims it
@@ -1636,6 +1642,43 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    // A BROWSE ROW'S OVERFLOW MENU, OPEN (issue 1515). The four browse views traded their loose
+    // Duplicate/Export/Delete buttons for one shared `<ActionMenu>` per row, and every published
+    // frame of all four draws that trigger CLOSED - where the conversion is an unchanged 34px icon
+    // button and nothing about it is visible. The registry held exactly one open-menu frame,
+    // `manager-environment-edit-automatic-force-add`, and it opens a COMPOSITION row's menu inside
+    // the environment editor, which is a different caller with different items.
+    //
+    // THE SYSTEMS LIBRARY IS THE ROW CHOSEN, because it is the manager's default route: the case
+    // needs no query and no navigation step, so the only thing between the mount and the state is
+    // the click this case is about.
+    //
+    // The panel is PORTALED to `.fabricate-manager`, so it is a sibling of the browse pane rather
+    // than a descendant of the row that opened it; a row-scoped `expectSelector` would wait forever
+    // and take every frame in the run with it. See the environment case's note.
+    id: 'manager-systems-row-menu-open',
+    label: 'Manager — System library row menu open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      {
+        selector:
+          '.manager-system-row[data-system-id="lab-smithing"] .manager-icon-button[aria-haspopup="menu"]',
+      },
+    ],
+    expectView: 'systems',
+    // THE PANEL'S OWN ACCESSIBLE NAME IS THE ASSERTION, not merely the panel. `ActionMenu` gives
+    // the panel its trigger's name, and issue 1515's review made that name RECORD-IDENTIFIED — so
+    // this selector fails both when the menu does not open and when every row goes back to
+    // announcing the same generic "System actions". The `^=` is what keeps it about the template
+    // rather than about the lab world's system names.
+    expectSelector:
+      '.fabricate-manager .fabricate-action-menu-panel[role="menu"][aria-label^="System actions for"]',
+    kinds: ['manager', 'systems'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/],
+  }),
+  managerCase({
     id: 'manager-systems-empty',
     label: 'Manager — System library empty',
     // `beyond`: the live smoke seeds a crafting system before it opens the manager at all, so no
@@ -1988,6 +2031,43 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-world-currency-units]', scroll: true },
     ],
     expectView: 'world-currency',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
+  }),
+  managerCase({
+    // THE SUB-UNIT CHIP, WHICH NO FRAME HELD (issue 1515). The three currency cases above all
+    // photograph the ladder COLLAPSED - a summary row per unit - and the sub-unit membership token
+    // renders only inside an EXPANDED unit's editor. So the one control this change converted onto
+    // `<Chip>` on this screen, a removable token wrapping an editable `<input type="number">`, was
+    // unphotographed while three frames of the screen it lives on were published.
+    //
+    // A FOURTH CASE RATHER THAN A STEP ON ONE OF THE THREE. All three are `exact`, meaning they
+    // reach the same state as a named smoke frame; adding an expand step to one would make the lab
+    // frame and its counterpart show different states, which is the pairing those cases exist to
+    // hold. This one claims no smoke label and states `beyond`.
+    //
+    // GOLD, because the lab's ladder gives it a sub-unit (`10 sp`) and a super-unit above it, so
+    // the frame shows the chip in a unit that is neither end of the chain.
+    id: 'manager-world-currency-subunit-expanded',
+    label: 'Manager — World Currency sub-unit chip expanded',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-currency', press: 'Enter' },
+      { selector: '[data-world-currency-unit-expand="gp"]' },
+      {
+        selector: '[data-world-currency-unit="gp"] [data-world-currency-subunit="sp"]',
+        scroll: true,
+      },
+    ],
+    expectView: 'world-currency',
+    // The chip itself, inside the unit that owns it. The section around it renders for any
+    // expanded unit and would be satisfied by the empty "This unit is a base denomination." state
+    // the chip row now also draws.
+    expectSelector:
+      '.fabricate-manager [data-world-currency-unit="gp"] [data-world-currency-subunit="sp"]',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
@@ -8726,6 +8806,13 @@ export const VIEW_LAB_CASES = Object.freeze([
         selector:
           '[data-gathering-event-id="hb-event-wolves"] .manager-icon-button[aria-label^="Edit"]',
       },
+      // THE DANGER PILLS INTO FRAME (issue 1515). The Danger tags card sits below the fold on
+      // this editor, and `frame.screenshot()` does not scroll a nested overflow container - so the
+      // one control on this screen that did NOT converge onto the shared chip, and whose six-level
+      // ramp is the reason it did not, was in no published frame at all while the converted chips
+      // beside it were in several. Scrolling to it puts the pill and the converted availability
+      // chips in one photograph, which is what makes the divergence checkable rather than asserted.
+      { selector: '[data-gathering-event-danger-pills]', scroll: true },
     ],
     expectView: 'gathering-event-edit',
     kinds: ['manager', 'environments'],
@@ -10319,7 +10406,12 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-tool-membership-option="over"]' },
     ],
     expectView: 'tools',
-    expectSelector: '[data-tool-membership-filter="over"] [data-tool-membership-option="over"]',
+    // The track's `data-tool-membership-filter` stamps `true` rather than the live value since
+    // issue 1515 put this control on the shared segmented primitive, so readiness is the third
+    // segment being LIT - the class the primitive derives from its `value` prop, which is the one
+    // reading the component has to re-render to satisfy. `input:checked` would report the click
+    // itself rather than the state it produced.
+    expectSelector: '[data-tool-membership-option="over"].is-active',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
     sourceMatches: [...TOOL_LIST_MATCHES],

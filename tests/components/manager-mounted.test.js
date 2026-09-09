@@ -15246,11 +15246,32 @@ describe('CraftingSystemManager mounted behavior', () => {
     // more buttons in the row. They name the COMMAND, not the row: `ActionMenu`'s `label` is the
     // `menuitem`'s accessible name as well as its visible text, and the shipped callers that
     // predate this conversion spell it generically. The row is named by the trigger the menu was
-    // opened from — which this helper addresses by, so the binding is still asserted here.
+    // opened from — which this helper addresses by, so the binding is still asserted here, and
+    // the clause below pins that the trigger really does carry the record's name.
     assert.deepEqual(await rowMenuCommands('[data-environment-id="env-forest"]'), [
       'Duplicate environment',
       'Delete environment',
     ]);
+    // AND THE TRIGGER NAMES THE RECORD (issue 1515, review round 1). The items are generic, so
+    // the ONLY thing telling a screen-reader user which row they are on is the trigger's own
+    // accessible name — and every row announced the identical "Environment actions", which the
+    // route header's action group also announces. Read as a SET of two, because a per-row check
+    // against one expected string passes just as well when every row says the same thing.
+    assert.deepEqual(
+      [...target.querySelectorAll('.manager-environment-row')].map((row) =>
+        row.querySelector('[aria-haspopup="menu"]').getAttribute('aria-label')
+      ),
+      ['Environment actions for Moonlit Forest', 'Environment actions for Quiet Cavern'],
+      'each row menu trigger is named for the record it acts on'
+    );
+    // The hover tooltip stays generic: it appears beside the row the pointer is already on, so a
+    // name there restates what the GM can see.
+    assert.deepEqual(
+      [...target.querySelectorAll('.manager-environment-row')].map((row) =>
+        row.querySelector('[aria-haspopup="menu"]').getAttribute('title')
+      ),
+      ['Environment actions', 'Environment actions']
+    );
     assert.equal(
       forestRow.querySelector('.manager-environment-reorder-stack'),
       null,
@@ -20658,21 +20679,51 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
+    // THE COPY AND THE TALLY ARE TWO ELEMENTS SINCE THE CONVERSION (issue 1515). The counts used
+    // to be baked into the label string (`All world tools (3)`); `<SegmentedControl>` draws them
+    // in its own `count` slot, so the words and the numerals are read separately rather than
+    // through one `textContent` that would now report `All world tools3`.
     assert.deepEqual(
-      [...target.querySelectorAll('[data-tool-membership-option]')].map((option) =>
-        option.textContent.trim()
+      [...target.querySelectorAll('[data-tool-membership-option] .manager-segment-label')].map(
+        (label) => label.textContent.trim()
       ),
-      ['In this system (0)', 'All world tools (3)', 'Overriding'],
-      'the segment states a cohort of three against a membership of none'
+      ['In this system', 'All world tools', 'Overriding'],
+      'the three cohort segments name themselves without their tallies'
+    );
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-tool-membership-option]')].map(
+        (option) => option.querySelector('.manager-segment-count')?.textContent.trim() ?? null
+      ),
+      ['0', '3', null],
+      'the segment states a cohort of three against a membership of none, and `Overriding` ' +
+        'renders no tally at all rather than a zero it cannot derive'
     );
 
     target.querySelector('[data-tool-membership-option="all"] input').click();
     await tick();
     flushSync();
 
-    assert.equal(
-      target.querySelector('[data-tool-membership-filter]').dataset.toolMembershipFilter,
-      'all'
+    // SELECTION IS READ FROM THE PRIMITIVE'S OWN STATE, not from the track's data attribute and not
+    // from the radio's `checked` (issue 1515). Three readings were available and two of them are
+    // wrong here:
+    //
+    //   - `data-tool-membership-filter` is `dataAttr`, which the primitive stamps `true` on the
+    //     track rather than the current value, so the retired `="all"` reading now passes for
+    //     every cohort;
+    //   - `input.checked` is written by the synthetic click ITSELF and by the browser's own radio
+    //     group exclusivity, so it reports the click rather than the component. Measured: pinning
+    //     `value` to a constant `'in'` — which is the whole defect this clause exists to catch —
+    //     leaves both `checked` readings unchanged and the suite green.
+    //
+    // `is-active` is the segment class the primitive derives FROM `value`, so it is the one
+    // reading the component has to re-render to satisfy. Read as the whole selected SET, because
+    // a per-segment check cannot see a track that lit two.
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-tool-membership-option]')]
+        .filter((option) => option.classList.contains('is-active'))
+        .map((option) => option.dataset.toolMembershipOption),
+      ['all'],
+      'exactly one segment is lit, and it is the widened cohort'
     );
     assert.deepEqual(libraryRowStates(), WIDENED_GHOST_ROWS);
     assert.ok(!target.querySelector('[data-tool-library-empty]'));
@@ -23416,6 +23467,19 @@ describe('CraftingSystemManager mounted behavior', () => {
       validationTab.querySelector('.manager-environment-tab-badge.is-warning')?.textContent.trim(),
       '1'
     );
+    // AND IN THE ORDER THE SURFACE BENEATH THE TAB READS THEM (issue 1515). The counts row on the
+    // validation surface was reconciled to the design system's closed, ordered vocabulary - pass,
+    // then warning, then blocking - so a tab strip badging blocking-then-warning above it would
+    // state one screen's two figures in two orders. Read as a SEQUENCE of tones rather than by
+    // querying each tone in turn, which is what the two clauses above do and is exactly why the
+    // wrong order passed them.
+    assert.deepEqual(
+      [...validationTab.querySelectorAll('.manager-environment-tab-badge')].map((badge) =>
+        badge.classList.contains('is-warning') ? 'warning' : 'blocking'
+      ),
+      ['warning', 'blocking'],
+      'the tab badges run warning then blocking, as the counts row below them does'
+    );
   });
 
   it('renders the kind-grouped validation list on the Validation tab and deep-links an issue', async () => {
@@ -23454,9 +23518,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the counts row is a direct child of the validation surface, not of a page header'
     );
     // THE VOCABULARY IS CLOSED AND THIS SURFACE RENDERS THE SUBSET IT CAN SUPPLY — the maintainer
-    // ruling of 2026-09-08 on issue 1515, applying `openspec/specs/design-system/spec.md:1268`
-    // ("the validation surface ... carries passing, warning and blocking counts") and its ordering
-    // twin at `:1199` ("the pass, warning and blocking counts in that order").
+    // ruling of 2026-09-08 on issue 1515, applying `openspec/specs/design-system/spec.md`'s
+    // requirement "One blocking notice, and non-blocking notices stack" ("the validation surface
+    // ... carries passing, warning and blocking counts") and its ordering twin under "Validation
+    // is one screen everywhere" ("the pass, warning and blocking counts in that order"). Cited by
+    // REQUIREMENT rather than by line: both line cites had already rotted by the time the review
+    // read them, which is what a line number into a growing spec file does.
     //
     // The report this surface draws is `evaluateSystemValidation`'s, which counts ISSUES and never
     // checks run, so no passing figure is derivable and none is invented: the row is `warning` then

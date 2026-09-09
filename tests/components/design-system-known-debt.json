@@ -231,7 +231,7 @@
     "src/ui/svelte/apps/manager/RosterRow.svelte | border-radius | 8px | 1",
     "src/ui/svelte/components/SearchablePopover.svelte | border-radius | 8px | 1",
     "src/ui/svelte/apps/manager/SegmentedControl.svelte | border-radius | 8px | 1",
-    "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | border-radius | 8px | 3",
+    "src/ui/svelte/apps/manager/ToolsBrowserView.svelte | border-radius | 8px | 2",
     "src/ui/svelte/apps/manager/checks/CheckOutcomePreview.svelte | border-radius | 8px | 1",
     "src/ui/svelte/apps/manager/checks/CraftingModifierCatalogueCard.svelte | border-radius | 8px | 1",
     "src/ui/svelte/apps/manager/component/ComponentComplicationsSection.svelte | border-radius | 10px | 1",

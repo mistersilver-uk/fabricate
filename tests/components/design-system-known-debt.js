@@ -457,11 +457,20 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * currency sub-unit pill's own r5 rule goes with the pill, which is the shared chip now and
  * draws the ladder's own corner from the primitive's scoped block.
  *
- * Re-derived from the JSON at this head rather than reasoned about.
+ * 284 -> 283 with issue 1515's review round 1: `apps/manager/ToolsBrowserView.svelte | 8px` 3 -> 2.
+ * The Tools cohort switch was a hand-rolled radiogroup with its own r8 track, and the track goes
+ * with the rule as the control becomes `<SegmentedControl density="compact" tone="accent">` — the
+ * shared primitive draws the corner from its own scoped block, so restating one here would be a
+ * second copy of a value this file no longer owns. The row SURVIVES on the file's other two 8px
+ * corners, neither of which is a segmented track. The same deletion also took a 6px segment
+ * corner, which is a published rung and never had a row.
+ *
+ * Re-derived from the JSON at this head rather than reasoned about, by the two-run procedure: the
+ * row was banked first and the assertion reported the total the tree actually holds.
  *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 284;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 283;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.

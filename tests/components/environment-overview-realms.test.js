@@ -63,6 +63,7 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     // ERR_MODULE_NOT_FOUND and node reports every test here as `# cancelled`.
     writeCompiledSvelte('src/ui/svelte/components/Chip.svelte');
     writeCompiledSvelte('src/ui/svelte/components/Field.svelte');
+    writeCompiledSvelte('src/ui/svelte/apps/manager/EmptyState.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/environment/CompositionModeControl.svelte');
     writeCompiledSvelte('src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte');
     const mod = await import(pathToFileURL(join(tempRoot, 'src/ui/svelte/apps/manager/environment/EnvironmentOverviewTab.svelte.js')).href);
@@ -190,6 +191,49 @@ describe('EnvironmentOverviewTab multi-realm selector', () => {
     assert.ok(
       tokened.getAttribute('style').startsWith('--fab-chip-color: var(--fab-tag-sage)'),
       `an unauthored biome still reads its palette token, got ${tokened.getAttribute('style')}`
+    );
+    remount();
+  });
+
+  it('keeps focus in the row when the LAST chip is removed and no add control is left', async () => {
+    // THE LADDER RAN OUT (issue 1515). `Chip` resolves its focus destination BEFORE it removes
+    // the chip: the next chip's remove control, else the previous chip's, else the nearest
+    // enclosing `[data-chip-remove-fallback]`. This row hung that hook on its add-`<select>`,
+    // which renders only while an UNSELECTED realm remains — so with one realm in the world and
+    // that realm selected there was no next chip, no previous chip and no select, and removing
+    // the last chip dropped focus to `<body>`. That is the unfocused-window state (Space pauses
+    // the game, the arrows pan the canvas) with the keyboard user stranded at the top of the
+    // document. The row itself is the rung that cannot disappear.
+    await mountTab(baseProps({
+      realmsEnabled: true,
+      realmRecords: [{ id: 'r1', name: 'Verdant' }],
+      environment: { id: 'env-1', name: 'Moonlit Forest', enabled: true, biomes: [], includedRealmIds: ['r1'] }
+    }));
+
+    const field = target.querySelector('[data-environment-field="includedRealmIds"]');
+    assert.equal(
+      field.querySelector('select'),
+      null,
+      'the precondition IS the defect: every realm is selected, so the add control is gone'
+    );
+
+    // STATIC CLAUSE FIRST, because happy-dom will focus anything it is asked to and would report
+    // `activeElement` as the row even if the row were a plain `<div>` no browser could focus.
+    // The attribute pair is what makes the destination real in a browser.
+    const row = field.querySelector('.manager-chip-row');
+    assert.ok(Boolean(row), 'the row renders');
+    assert.ok(row.hasAttribute('data-chip-remove-fallback'), 'the row carries the fallback hook');
+    assert.equal(row.getAttribute('tabindex'), '-1', 'and is focusable without taking a tab stop');
+
+    const chips = field.querySelectorAll('[data-environment-realm-pill]');
+    assert.equal(chips.length, 1, 'exactly one chip, so there is no sibling to fall back to');
+    field.querySelector('[data-environment-realm-pill] [data-chip-remove]').click();
+    await tick();
+    flushSync();
+
+    assert.ok(
+      document.activeElement === row,
+      `focus stayed in the row rather than falling to <body>, got ${document.activeElement?.tagName}.${document.activeElement?.className}`
     );
     remount();
   });

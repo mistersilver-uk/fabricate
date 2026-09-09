@@ -942,6 +942,29 @@ describe('RecipesBrowserView lifted browser state', () => {
     root.querySelector('[data-notice-dismiss]').click();
     flushSync();
     assert.ok(!root.querySelector('[data-recipe-flash]'), 'the flash is dismissible');
+
+    // THE REFUSAL ARRIVES AS TWO PARTS WHEN THE STORE CAN BUILD THEM (issue 1515). An activation
+    // error carries a recipe name and coded issues, so `adminStore` hands the sink a
+    // `{ title, detail }` pair beside the one-line string and the notice draws the name in its
+    // title and the reasons in its detail. Read from the primitive's OWN two elements rather than
+    // from the strip's `textContent`, which cannot tell a split notice from an unsplit one.
+    calls[0].options.onBlocked('Cannot enable recipe "Iron Sword": It has no result groups.', {
+      title: 'Cannot enable recipe "Iron Sword"',
+      detail: 'It has no result groups.'
+    });
+    flushSync();
+
+    const split = root.querySelector('[data-recipe-flash]');
+    assert.equal(
+      split.querySelector('.fab-notice-title').textContent.trim(),
+      'Cannot enable recipe "Iron Sword"',
+      'the title names what happened, without the reasons trailing it'
+    );
+    assert.equal(
+      split.querySelector('.fab-notice-detail').textContent.trim(),
+      'It has no result groups.',
+      'and the reasons are the detail line the specimen draws beneath it'
+    );
   });
 
   it('never reaches for a Foundry notification itself', async () => {
