@@ -393,9 +393,19 @@ describe('run primitives mounted behavior', () => {
     });
     const card = future.querySelector('[data-stage-card]');
     assert.equal(card.getAttribute('data-stage-state'), 'future');
+    assert.ok(card.querySelector('.fab-stage-card-heading'), 'headings remain on by default');
     assert.ok(!card.querySelector('button'), 'a future stage is inert');
     expectGeometry('StageCard', '.fab-stage-card', [/border-radius:\s*9px/u]);
     expectGeometry('StageCard', '.fab-stage-card.is-inactive', [/background:\s*transparent/u, /border:\s*1px dashed/u]);
+
+    stageCardHarness.remount();
+    const headingless = await stageCardHarness.mount({
+      stage: { name: 'Only stage' },
+      current: true,
+      state: 'current',
+      showHeading: false,
+    });
+    assert.ok(!headingless.querySelector('.fab-stage-card-heading'), 'a single-stage caller can suppress redundant numbering');
   });
 
   it('sorts the d100 scale commonest first and inserts exactly one roll cut', async () => {

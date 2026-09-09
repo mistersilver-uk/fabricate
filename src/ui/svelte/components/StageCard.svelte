@@ -10,6 +10,7 @@
     tag = null,
     facts = [],
     body = null,
+    showHeading = true,
   } = $props();
 
   const completed = $derived(state === 'past' || state === 'done' || stage?.status === 'done');
@@ -20,23 +21,24 @@
   class="fab-stage-card"
   class:is-current={current}
   class:is-inactive={!current}
+  class:is-headingless={!showHeading}
   data-stage-card={index}
   data-stage-state={state}
 >
-  <header class="fab-stage-card-heading">
-    <span class="fab-stage-card-number" class:is-complete={completed} class:is-paused={paused}>
-      {#if completed}<i class="fas fa-check" aria-hidden="true"></i>
-      {:else if paused}<i class="fas fa-pause" aria-hidden="true"></i>
-      {:else}{index + 1}{/if}
-    </span>
-    <span class="fab-stage-card-identity">
-      <span class="fab-stage-card-name">{stage.name}</span>
-      {#if stage.summary}<span class="fab-stage-card-summary">{stage.summary}</span>{/if}
-    </span>
-    {#if tag?.label}
-      <Chip density="list" tone={tag.tone || (paused ? 'warning' : 'positive')}>{tag.label}</Chip>
-    {/if}
-  </header>
+  {#if showHeading}<header class="fab-stage-card-heading">
+      <span class="fab-stage-card-number" class:is-complete={completed} class:is-paused={paused}>
+        {#if completed}<i class="fas fa-check" aria-hidden="true"></i>
+        {:else if paused}<i class="fas fa-pause" aria-hidden="true"></i>
+        {:else}{index + 1}{/if}
+      </span>
+      <span class="fab-stage-card-identity">
+        <span class="fab-stage-card-name">{stage.name}</span>
+        {#if stage.summary}<span class="fab-stage-card-summary">{stage.summary}</span>{/if}
+      </span>
+      {#if tag?.label}
+        <Chip density="list" tone={tag.tone || (paused ? 'warning' : 'positive')}>{tag.label}</Chip>
+      {/if}
+    </header>{/if}
 
   {#if current && body}
     <div class="fab-stage-card-body">{@render body(stage)}</div>
@@ -137,6 +139,11 @@
   .fab-stage-card-body {
     padding-top: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
+  }
+
+  .fab-stage-card.is-headingless .fab-stage-card-body {
+    padding: var(--fab-space-3);
+    border-top: 0;
   }
 
   .fab-stage-card-fact {

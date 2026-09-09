@@ -86,7 +86,7 @@ describe('JournalView layout + effects', () => {
     );
     assert.ok(
       viewSource.includes('.journal-search-field {\n    display: grid;'),
-      'the search caption and primitive use grid so the primitive flex basis cannot grow the header'
+      'the search wrapper uses grid so the primitive flex basis cannot grow the header'
     );
     assert.ok(
       viewSource.includes(
@@ -97,7 +97,13 @@ describe('JournalView layout + effects', () => {
     assert.ok(viewSource.includes('<ManagerSearchField'));
     assert.ok(viewSource.includes('class="journal-search-control"'));
     assert.ok(viewSource.includes('size="38"'));
-    assert.ok(viewSource.includes('<Field as="div" class="journal-kind-field">'));
+    assert.ok(viewSource.includes('<div class="journal-kind-field">'));
+    assert.equal(viewSource.includes("import Field from '../../components/Field.svelte'"), false);
+    assert.equal(viewSource.includes('Filters.SearchKicker'), false, 'the accessible search name is not duplicated as a visible kicker');
+    assert.ok(
+      viewSource.includes('.journal-browse-controls {\n    display: grid;\n    grid-template-columns: minmax(0, 1fr);'),
+      'search and kind remain full-width stacked controls'
+    );
     assert.ok(viewSource.includes('journal?.activePageItems'));
     assert.ok(viewSource.includes('onPageChange={(value) => journal?.setActivePage?.(value)}'));
     assert.ok(viewSource.includes('onPageChange={(value) => journal?.setHistoryPage?.(value)}'));

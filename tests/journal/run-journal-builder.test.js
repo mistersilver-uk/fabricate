@@ -474,6 +474,7 @@ test('gathering runs pass through with null steps and re-mapped *WorldTime field
   assert.equal(run.updatedAt, 150);
   assert.equal(run.derivedStatus, 'waiting');
   assert.equal(run.taskId, 'task-a');
+  assert.equal(run.environmentId, null);
 });
 
 test('gathering run resolves task name + image via getGatheringTask (no persisted label)', () => {
@@ -497,6 +498,7 @@ test('gathering run resolves task name + image via getGatheringTask (no persiste
 
   assert.equal(run.names.title, 'Mine Iron Ore', 'friendly task name, not the raw id');
   assert.equal(run.img, 'icons/tools/pick.webp', 'task image, not the generic default');
+  assert.equal(run.environmentId, 'env-1', 'visible gathering context can request a personalized preview');
 });
 
 test('gathering run falls back to the raw taskId + default image when the task is unresolved', () => {
@@ -733,6 +735,7 @@ test('gathering yield prefers the persisted task snapshot and hides opaque blind
   assert.equal(playerRuns[0].gatheringYield.mode, 'd100');
   assert.equal(playerRuns[0].gatheringYield.entries[0].chance, 25);
   assert.equal(playerRuns[1].gatheringYield, null);
+  assert.equal(playerRuns[1].environmentId, null, 'opaque blind runs expose no preview context');
   assert.equal(JSON.stringify(playerRuns[1]).includes('Secret Herb'), false);
   assert.equal(JSON.stringify(playerRuns[1]).includes('90'), false);
 

@@ -1,7 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize, subscribeSceneChange, subscribeWorldTime } from '../../util/foundryBridge.js';
-  import Field from '../../components/Field.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import Notice from '../../components/Notice.svelte';
   import Select from '../../components/Select.svelte';
@@ -118,7 +117,6 @@
         <aside class="journal-browse" aria-label={localize('FABRICATE.App.Journal.Browse.Label')}>
           <div class="journal-browse-controls">
             <div class="journal-search-field">
-              <span>{localize('FABRICATE.App.Journal.Filters.SearchKicker')}</span>
               <ManagerSearchField
                 class="journal-search-control"
                 size="38"
@@ -129,8 +127,7 @@
                 data-journal-search
               />
             </div>
-            <Field as="div" class="journal-kind-field">
-              <span>{localize('FABRICATE.App.Journal.Filters.Kind.Label')}</span>
+            <div class="journal-kind-field">
               <Select
                 size="form"
                 value={journal?.kindFilter ?? 'all'}
@@ -139,7 +136,7 @@
                 triggerData={{ 'data-journal-kind-filter': true }}
                 onChange={(value) => journal?.setKindFilter?.(value)}
               />
-            </Field>
+            </div>
           </div>
           <SegmentedControl
             options={statusOptions}
@@ -235,23 +232,21 @@
   }
   .journal-browse-controls {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 138px;
-    align-items: end;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--fab-space-2);
   }
   .journal-search-field {
     display: grid;
-    gap: var(--fab-space-chip);
     min-width: 0;
-    color: var(--fab-text);
-    font-size: 0.82rem;
-    font-weight: 700;
   }
   .journal-search-field > :global(.journal-search-control) {
     min-width: 0;
   }
-  :global(.journal-kind-field) {
+  .journal-kind-field {
     min-width: 0;
+  }
+  .journal-kind-field > :global(.fabricate-select) {
+    width: 100%;
   }
   .journal-browse-lists {
     display: grid;
@@ -294,12 +289,6 @@
     .journal-detail-pane {
       min-height: 220px;
       overflow: visible;
-    }
-  }
-
-  @container fabricate-journal (max-width: 560px) {
-    .journal-browse-controls {
-      grid-template-columns: 1fr;
     }
   }
 </style>
