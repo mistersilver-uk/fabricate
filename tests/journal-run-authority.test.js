@@ -110,6 +110,43 @@ describe('journal run authority ledger', () => {
     assert.ok(writeIndex > -1 && releaseIndex > writeIndex, 'settlement is durable before release');
   });
 
+  it('releases the acquired claim and performs no work when the elected GM changes', async () => {
+    let activeGmId = 'gm';
+    let claim = null;
+    let handlerCalls = 0;
+    const ledger = { id: 'ledger', state: { version: 1, requests: {}, prepareTokens: {} } };
+    const authority = createJournalRunAuthority({
+      currentUser: () => ({ id: 'gm', isGM: true }),
+      activeGM: () => ({ id: activeGmId, isGM: true }),
+      listLedgers: async () => [ledger],
+      createLedger: async () => ledger,
+      readState: async () => structuredClone(ledger.state),
+      writeState: async (_entry, state) => { ledger.state = structuredClone(state); },
+      createClaim: async (_entry, source) => {
+        claim = { id: JOURNAL_RUN_CLAIM_PAGE_ID, ...source };
+        activeGmId = 'replacement-gm';
+        return claim;
+      },
+      readClaim: async () => claim,
+      deleteClaim: async (_entry, claimId) => {
+        if (claim?.claimId !== claimId) return false;
+        claim = null;
+        return true;
+      },
+      randomId: () => 'claim-id',
+    });
+
+    const response = await authority.run(
+      { requestId: 'changed-election', senderId: 'player', sessionId: 'one' },
+      async () => (++handlerCalls, { success: true })
+    );
+
+    assert.deepEqual(response, { success: false, reason: 'active-gm-required' });
+    assert.equal(handlerCalls, 0);
+    assert.equal(claim, null);
+    assert.deepEqual(ledger.state.requests, {});
+  });
+
   it('returns a durable settled response for duplicate delivery without replay', async () => {
     const world = sharedAuthorityWorld();
     const authority = world.realm();

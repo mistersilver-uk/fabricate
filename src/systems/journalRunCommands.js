@@ -84,6 +84,261 @@ function terminalRun(run) {
   );
 }
 
+function operationUnavailable() {
+  return failure('unsupported-operation');
+}
+
+function actorUuidList(actors, fallbackUuids = []) {
+  const resolved = Array.isArray(actors)
+    ? actors.map((actor) => actor?.uuid).filter(validText)
+    : [];
+  if (resolved.length > 0) return resolved;
+  return Array.isArray(fallbackUuids) ? fallbackUuids.filter(validText) : [];
+}
+
+function installEngineAuthority(engine, authority) {
+  if (typeof engine?.installVersionedRunAuthority !== 'function') {
+    throw new TypeError('The versioned run engine authority adapter is unavailable');
+  }
+  engine.installVersionedRunAuthority(authority);
+  return engine;
+}
+
+/** Install the crafting engine's current-lifecycle requests through the command service. */
+export function installCraftingJournalRunAuthority({ engine, service } = {}) {
+  if (typeof service?.executeJournalRunCommand !== 'function') {
+    throw new TypeError('The journal run command service is unavailable');
+  }
+  return installEngineAuthority(engine, {
+    requestStart: ({
+      activityKind = 'crafting',
+      actor,
+      sourceActors,
+      recipeId,
+      selectionPlan,
+      completionMode,
+      craftingSystemId,
+      submittedItems,
+    }) =>
+      service.executeJournalRunCommand({
+        actorUuid: actor?.uuid,
+        runType: 'crafting',
+        runId: '',
+        expectedRevision: 0,
+        action: 'start',
+        payload: {
+          activityKind,
+          recipeId,
+          selectionPlan,
+          completionMode,
+          craftingSystemId,
+          submittedItems: Array.isArray(submittedItems)
+            ? submittedItems.map((record) => ({
+                itemUuid: record?.itemUuid ?? record?.item?.uuid ?? null,
+                componentId: record?.componentId ?? null,
+              }))
+            : [],
+          sourceActorUuids: actorUuidList(sourceActors),
+        },
+      }),
+    requestExecute: ({
+      actor,
+      componentSourceActors,
+      componentSourceActorUuids,
+      runId,
+      expectedRevision,
+      selectionPlan,
+      trigger = 'manual',
+    }) =>
+      service.executeJournalRunCommand({
+        actorUuid: actor?.uuid,
+        runType: 'crafting',
+        runId,
+        expectedRevision,
+        action: 'execute',
+        payload: {
+          selectionPlan,
+          trigger,
+          sourceActorUuids: actorUuidList(componentSourceActors, componentSourceActorUuids),
+        },
+      }),
+    requestCancel: ({
+      actor,
+      componentSourceActors,
+      componentSourceActorUuids,
+      runId,
+      expectedRevision,
+    }) =>
+      service.executeJournalRunCommand({
+        actorUuid: actor?.uuid,
+        runType: 'crafting',
+        runId,
+        expectedRevision,
+        action: 'cancel',
+        payload: {
+          sourceActorUuids: actorUuidList(componentSourceActors, componentSourceActorUuids),
+        },
+      }),
+    consumeExecutionGrant: (grant, context) => service.consumeExecutionGrant(grant, context),
+  });
+}
+
+/** Install the gathering engine's current-lifecycle requests through the command service. */
+export function installGatheringJournalRunAuthority({
+  engine,
+  service,
+  evaluatePreparedRunCheck,
+} = {}) {
+  if (
+    typeof service?.executeJournalRunCommand !== 'function' ||
+    typeof evaluatePreparedRunCheck !== 'function'
+  ) {
+    throw new TypeError('The gathering journal authority collaborators are unavailable');
+  }
+  return installEngineAuthority(engine, {
+    requestStart: ({
+      actor,
+      rememberedActorId,
+      environmentId,
+      taskId,
+      presentTools,
+      interactableRef,
+      completionMode = 'manual',
+    }) =>
+      service.executeJournalRunCommand({
+        actorUuid: actor?.uuid,
+        runType: 'gathering',
+        runId: '',
+        expectedRevision: 0,
+        action: 'start',
+        payload: {
+          rememberedActorId,
+          environmentId,
+          taskId,
+          presentTools,
+          interactableRef,
+          completionMode,
+        },
+      }),
+    requestExecute: ({ actor, runId, expectedRevision, trigger = 'manual' }) =>
+      service.executeJournalRunCommand({
+        actorUuid: actor?.uuid,
+        runType: 'gathering',
+        runId,
+        expectedRevision,
+        action: 'execute',
+        payload: { trigger },
+      }),
+    requestCancel: ({ actor, runId, expectedRevision }) =>
+      service.executeJournalRunCommand({
+        actorUuid: actor?.uuid,
+        runType: 'gathering',
+        runId,
+        expectedRevision,
+        action: 'cancel',
+        payload: {},
+      }),
+    consumeExecutionGrant: (grant, context) => service.consumeExecutionGrant(grant, context),
+    evaluatePreparedRunCheck,
+  });
+}
+
+/** Build the gathering side of the explicit journal operation registry. */
+export function createGatheringJournalRunOperations({
+  engine,
+  getEngine,
+  runManager,
+  getService,
+  getUser,
+} = {}) {
+  const currentEngine = () => getEngine?.() ?? engine ?? null;
+  const managerMutation = async (args, operation, method, values = []) => {
+    if (typeof runManager?.[method] !== 'function') return operationUnavailable();
+    const trusted = getService?.()?.consumeExecutionGrant?.(args.executionGrant, {
+      operation,
+      actor: args.actor,
+      runId: args.runId,
+      expectedRevision: args.expectedRevision,
+      requestId: args.requestId,
+    });
+    if (!trusted) return failure('execution-grant-invalid');
+    const result = await runManager[method](args.actor, args.runId, ...values, {
+      expectedRevision: args.expectedRevision,
+    });
+    return result ? { success: true, run: result } : failure('run-not-found');
+  };
+  return {
+    getRun: ({ actor, runId }) => {
+      runManager?.invalidateCache?.(actor?.id);
+      return runManager?.getRun?.(actor, runId) ?? runManager?.getActiveRun?.(actor, runId) ?? null;
+    },
+    start: ({ actor, payload, executionGrant, requestId, senderId }) => {
+      const runtime = currentEngine();
+      if (typeof runtime?.startVersionedRun !== 'function') return operationUnavailable();
+      return runtime.startVersionedRun({
+        viewer: getUser?.(senderId) ?? null,
+        actor,
+        rememberedActorId: payload.rememberedActorId,
+        environmentId: payload.environmentId,
+        taskId: payload.taskId,
+        presentTools: payload.presentTools,
+        interactableRef: payload.interactableRef,
+        completionMode: payload.completionMode ?? 'manual',
+        executionGrant,
+        requestId,
+      });
+    },
+    describeCheck: ({ actor, run, preparationGrant, requestId }) => {
+      const runtime = currentEngine();
+      if (typeof runtime?.describeVersionedStageCheck !== 'function') {
+        return { required: false, blocked: 'unsupported-operation' };
+      }
+      return runtime.describeVersionedStageCheck({
+        actor,
+        runId: run.id,
+        preparationGrant,
+        requestId,
+      });
+    },
+    evaluateCheck: ({ actor, privateEvaluation, decision }) => {
+      const runtime = currentEngine();
+      if (typeof runtime?.evaluatePreparedVersionedCheck !== 'function') {
+        return operationUnavailable();
+      }
+      return runtime.evaluatePreparedVersionedCheck({ actor, privateEvaluation, decision });
+    },
+    execute: ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
+      const runtime = currentEngine();
+      if (typeof runtime?.executeVersionedStage !== 'function') return operationUnavailable();
+      return runtime.executeVersionedStage({
+        actor,
+        runId: run.id,
+        expectedRevision,
+        executionGrant,
+        requestId,
+        trigger: payload.trigger === 'worldTime' ? 'worldTime' : 'manual',
+      });
+    },
+    cancel: ({ actor, run, executionGrant, requestId, expectedRevision }) => {
+      const runtime = currentEngine();
+      if (typeof runtime?.cancelVersionedRun !== 'function') return operationUnavailable();
+      return runtime.cancelVersionedRun({
+        actor,
+        runId: run.id,
+        expectedRevision,
+        executionGrant,
+        requestId,
+      });
+    },
+    pause: (args) => managerMutation(args, 'pause', 'pauseRun'),
+    resume: (args) => managerMutation(args, 'resume', 'resumeRun'),
+    setCompletionMode: (args) =>
+      managerMutation(args, 'setCompletionMode', 'setCompletionMode', [
+        args.payload.completionMode,
+      ]),
+  };
+}
+
 function serializedOperationResult(result, { secret = false, runId = '' } = {}) {
   const source = result && typeof result === 'object' ? result : failure('operation-unavailable');
   const run = source.run && typeof source.run === 'object' ? source.run : {};
@@ -111,6 +366,12 @@ function serializedOperationResult(result, { secret = false, runId = '' } = {}) 
     authorityUnavailable: source.authorityUnavailable === true,
     automaticBlocked: source.automaticBlocked === true,
     blocker: source.blocker ?? null,
+    accepted: source.accepted === true,
+    cancelled: source.cancelled === true,
+    refunded: source.refunded === true,
+    partialRefund: source.partialRefund === true,
+    restoredCount: Number.isFinite(source.restoredCount) ? source.restoredCount : 0,
+    consumed: source.consumed === true,
     createdResultUuids:
       source.createdResultUuids ?? results.map((item) => item?.uuid).filter(validText),
   };
@@ -139,6 +400,10 @@ export function createJournalRunCommandService({
 }) {
   const sessionId = randomId();
   const pending = new Map();
+  const currentRealmIsActiveGm = () => {
+    const user = currentUser?.();
+    return user?.isGM === true && Boolean(user.id) && user.id === activeGM?.()?.id;
+  };
 
   async function resolveCommandContext(request, senderId) {
     const sender = getUser?.(senderId) ?? null;
@@ -299,6 +564,7 @@ export function createJournalRunCommandService({
 
     const method = operation[executionOperation];
     if (typeof method !== 'function') return failure('unsupported-operation');
+    if (!currentRealmIsActiveGm()) return failure('active-gm-required');
     const executionBinding =
       request.action === 'start'
         ? { ...binding, operation: executionOperation, runId: null, expectedRevision: null }
@@ -319,6 +585,7 @@ export function createJournalRunCommandService({
       executionGrant,
       requestId: request.requestId,
       senderId: request.senderId,
+      sender: context.sender,
     });
     const response = serializedOperationResult(result, {
       secret: secretCheck,
@@ -332,7 +599,7 @@ export function createJournalRunCommandService({
 
   async function handleRequest(request, senderId) {
     if (!validRequest(request)) return failure('invalid-command');
-    if (currentUser?.()?.id !== activeGM?.()?.id || currentUser?.()?.isGM !== true) {
+    if (!currentRealmIsActiveGm()) {
       return failure('active-gm-required');
     }
     return authority.run({ ...request, senderId }, async (helpers) => {
@@ -362,7 +629,7 @@ export function createJournalRunCommandService({
       return acceptReply(payload, senderId);
     }
     if (payload?.kind !== JOURNAL_RUN_SOCKET_KIND.REQUEST) return null;
-    if (currentUser?.()?.id !== activeGM?.()?.id || currentUser?.()?.isGM !== true) return null;
+    if (!currentRealmIsActiveGm()) return null;
     const response = await handleRequest(payload, senderId);
     // A second tab for the same elected GM has the same attested sender id. Its losing claim
     // response must stay silent or it can beat the winning tab's eventual settled reply.

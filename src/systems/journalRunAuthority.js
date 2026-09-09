@@ -218,6 +218,13 @@ export function createJournalRunAuthority({
         return unavailable(acquired.reason);
       }
       const { ledger, claimId } = acquired;
+      if (!activeGmMatches(currentUser?.(), activeGM?.())) {
+        const released = await deleteClaim(ledger, claimId);
+        cachedAvailability = released
+          ? { available: false, reason: 'active-gm-required' }
+          : { available: false, reason: 'claim-release-failed' };
+        return unavailable(released ? 'active-gm-required' : 'claim-release-failed');
+      }
       const state = normalizedState(await readState(ledger));
       const prior = state.requests[request.requestId];
       if (prior && (prior.senderId !== request.senderId || prior.sessionId !== request.sessionId)) {
