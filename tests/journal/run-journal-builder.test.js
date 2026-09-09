@@ -9,6 +9,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
 import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
 import { runStatusPresentation } from '../../src/ui/svelte/apps/journal/journalRunStatus.js';
 
@@ -147,6 +148,7 @@ function makeBuilder({
   ingredientMatchesItem = null,
   getDismissedRunKeys = null,
   getJournalActionAvailability = null,
+  resolutionModeService = null,
 } = {}) {
   return new RunJournalBuilder({
     craftingRunManager: {
@@ -165,7 +167,7 @@ function makeBuilder({
       getRecipe: (id) => (id === recipe.id ? recipe : null),
       ingredientMatchesItem,
     },
-    resolutionModeService: { getMode: () => mode },
+    resolutionModeService: resolutionModeService ?? { getMode: () => mode },
     recipeVisibility,
     getSystem: (id) => (id === system.id ? system : null),
     getTool: (systemId, toolId) => {
@@ -398,6 +400,323 @@ test('aggregates createdResults across steps', () => {
   assert.equal(run.createdResultCount, 1);
   assert.equal(run.createdResults[0].itemUuid, 'Item.z');
   assert.equal(run.createdResults[0].quantity, 1);
+});
+
+test('active simple crafting previews current authored yields without rewriting past, future, or history', () => {
+  const system = {
+    ...SYSTEM,
+    resolutionMode: 'simple',
+    craftingCheck: { simple: { rollFormula: '', dc: 15 } },
+    components: [{ id: 'blade', name: 'Sword Blade', img: 'icons/blade.webp' }],
+  };
+  const resultGroup = {
+    id: 'success',
+    name: 'Success',
+    results: [{ id: 'blade-result', componentId: 'blade', quantity: 2 }],
+  };
+  const recipe = {
+    ...RECIPE,
+    steps: [{ id: 'past' }, { id: 'current' }, { id: 'future' }],
+    getExecutionSteps: () => [
+      { id: 'past', resultGroups: [resultGroup] },
+      { id: 'current', resultGroups: [resultGroup] },
+      { id: 'future', resultGroups: [resultGroup] },
+    ],
+  };
+  const run = activeCraftingRun({
+    currentStepIndex: 1,
+    steps: [
+      { stepId: 'past', status: 'succeeded', createdResults: [{ componentId: 'blade', quantity: 1 }] },
+      { stepId: 'current', status: 'inProgress' },
+      { stepId: 'future', status: 'pending' },
+    ],
+  });
+  const resolutionModeService = new ResolutionModeService({ getSystem: () => system });
+  const builder = makeBuilder({
+    active: [run],
+    history: [terminalCraftingRun()],
+    recipe,
+    system,
+    resolutionModeService,
+    getComponent: (_systemId, id) => system.components.find((entry) => entry.id === id),
+  });
+
+  const listing = builder.buildListing({ actor: ACTOR, viewer: PLAYER });
+  const active = listing.activeRuns[0];
+  assert.deepEqual(active.craftingYield, {
+    source: 'preview',
+    stageIndex: 1,
+    mode: 'simple',
+    presentation: 'entries',
+    entries: [
+      {
+        id: 'blade-result',
+        name: 'Sword Blade',
+        art: 'icons/blade.webp',
+        qty: 2,
+        chance: 100,
+      },
+    ],
+    tiers: [],
+    progressive: null,
+  });
+  assert.equal(active.steps[0].craftingYield, null, 'past stages use their recorded awards');
+  assert.equal(active.steps[1].craftingYield, active.craftingYield);
+  assert.equal(active.steps[2].craftingYield, null, 'future choices cannot be treated as selected');
+  assert.equal(listing.history[0].craftingYield, null, 'terminal entries retain actual awards only');
+});
+
+test('routed-by-ingredients crafting previews the persisted selected route', () => {
+  const system = { ...SYSTEM, resolutionMode: 'routedByIngredients' };
+  const recipe = {
+    ...SINGLE_STEP_RECIPE,
+    getExecutionSteps: () => [
+      {
+        id: 's0',
+        ingredientSets: [
+          { id: 'iron-set', resultGroupId: 'iron-results' },
+          { id: 'silver-set', resultGroupId: 'silver-results' },
+        ],
+        resultGroups: [
+          {
+            id: 'iron-results',
+            name: 'Iron',
+            results: [{ id: 'iron', componentId: 'iron', quantity: 1 }],
+          },
+          {
+            id: 'silver-results',
+            name: 'Silver',
+            results: [{ id: 'silver', componentId: 'silver', quantity: 3 }],
+          },
+        ],
+      },
+    ],
+  };
+  const run = activeSingleStepRun({
+    steps: [
+      {
+        stepId: 's0',
+        status: 'inProgress',
+        selectionPlan: { selectedIngredientSetId: 'silver-set' },
+        selectedRequirementSnapshot: { id: 'silver-set', resultGroupId: 'silver-results' },
+      },
+    ],
+  });
+  const resolutionModeService = new ResolutionModeService({ getSystem: () => system });
+  const preview = makeBuilder({
+    active: [run],
+    recipe,
+    system,
+    resolutionModeService,
+    getComponent: (_systemId, id) => ({ id, name: `${id} component` }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].craftingYield;
+
+  assert.equal(preview.mode, 'routedByIngredients');
+  assert.equal(preview.presentation, 'entries');
+  assert.deepEqual(preview.entries, [
+    { id: 'silver', name: 'silver component', qty: 3, chance: 100 },
+  ]);
+});
+
+test('routed-by-check crafting projects the authored outcome ladder through resolution routing', () => {
+  const system = {
+    ...SYSTEM,
+    resolutionMode: 'routedByCheck',
+    craftingCheck: {
+      failureResultPolicy: 'never',
+      routed: {
+        type: 'relative',
+        dc: 12,
+        thresholdMode: 'meet',
+        relativeOutcomes: [
+          { id: 'setback', name: 'Setback', success: false, dc: -3 },
+          { id: 'masterwork', name: 'Masterwork', success: true, dc: 4 },
+        ],
+      },
+    },
+  };
+  const recipe = {
+    ...SINGLE_STEP_RECIPE,
+    getExecutionSteps: () => [
+      {
+        id: 's0',
+        resultGroups: [
+          {
+            id: 'failure-results',
+            name: 'Setback',
+            checkOutcomeIds: ['setback'],
+            results: [{ id: 'scrap', componentId: 'scrap', quantity: 1 }],
+          },
+          {
+            id: 'success-results',
+            name: 'Masterwork',
+            checkOutcomeIds: ['masterwork'],
+            results: [{ id: 'sword', componentId: 'sword', quantity: 2 }],
+          },
+        ],
+      },
+    ],
+  };
+  const resolutionModeService = new ResolutionModeService({ getSystem: () => system });
+  const preview = makeBuilder({
+    active: [activeSingleStepRun({ steps: [{ stepId: 's0', status: 'inProgress' }] })],
+    recipe,
+    system,
+    resolutionModeService,
+    getComponent: (_systemId, id) => ({ id, name: id }),
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].craftingYield;
+
+  assert.deepEqual(preview, {
+    source: 'preview',
+    stageIndex: 0,
+    mode: 'routedByCheck',
+    presentation: 'tiers',
+    entries: [],
+    tiers: [
+      { id: 'setback', name: 'Setback', band: '9+', fail: true, yields: [] },
+      {
+        id: 'masterwork',
+        name: 'Masterwork',
+        band: '16+',
+        fail: false,
+        yields: [{ id: 'sword', name: 'sword', quantity: '×2' }],
+      },
+    ],
+    progressive: null,
+  });
+});
+
+test('progressive crafting keeps ordered difficulty-budget stages distinct from chances and tiers', () => {
+  const system = {
+    ...SYSTEM,
+    resolutionMode: 'progressive',
+    craftingCheck: { progressive: { rollFormula: '2d6', awardMode: 'partial' } },
+    components: [
+      { id: 'pommel', name: 'Pommel', img: 'icons/pommel.webp', difficulty: 2 },
+      { id: 'blade', name: 'Blade', img: 'icons/blade.webp', difficulty: 5 },
+    ],
+  };
+  const recipe = {
+    ...SINGLE_STEP_RECIPE,
+    getExecutionSteps: () => [
+      {
+        id: 's0',
+        resultGroups: [
+          {
+            id: 'progression',
+            results: [
+              { id: 'blade-result', componentId: 'blade' },
+              { id: 'pommel-result', componentId: 'pommel' },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const resolutionModeService = new ResolutionModeService(
+    { getSystem: () => system },
+    { getPlayerResultOrder: () => ['pommel-result', 'blade-result'] }
+  );
+  const preview = makeBuilder({
+    active: [activeSingleStepRun({ steps: [{ stepId: 's0', status: 'inProgress' }] })],
+    recipe,
+    system,
+    resolutionModeService,
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0].craftingYield;
+
+  assert.equal(preview.presentation, 'progressive');
+  assert.deepEqual(preview.entries, []);
+  assert.deepEqual(preview.tiers, []);
+  assert.deepEqual(preview.progressive, {
+    awardMode: 'partial',
+    stages: [
+      {
+        id: 'pommel-result',
+        name: 'Pommel',
+        art: 'icons/pommel.webp',
+        quantity: '×1',
+        cost: 2,
+      },
+      {
+        id: 'blade-result',
+        name: 'Blade',
+        art: 'icons/blade.webp',
+        quantity: '×1',
+        cost: 5,
+      },
+    ],
+  });
+  assert.equal(JSON.stringify(preview).includes('chance'), false);
+});
+
+test('alchemy preview follows its check mode while redaction and missing references fail closed', () => {
+  const system = {
+    ...SYSTEM,
+    resolutionMode: 'alchemy',
+    alchemy: { checkMode: 'tiered' },
+    craftingCheck: {
+      routed: {
+        type: 'fixed',
+        fixedOutcomes: [{ id: 'fine', name: 'Fine', success: true, start: 10, end: 14 }],
+      },
+    },
+  };
+  const recipe = {
+    ...SINGLE_STEP_RECIPE,
+    getExecutionSteps: () => [
+      {
+        id: 's0',
+        resultGroups: [
+          {
+            id: 'fine-results',
+            name: 'Fine',
+            checkOutcomeIds: ['fine'],
+            results: [{ id: 'potion', componentId: 'potion', quantity: 1 }],
+          },
+        ],
+      },
+    ],
+  };
+  const resolutionModeService = new ResolutionModeService({ getSystem: () => system });
+  const options = {
+    active: [activeSingleStepRun({ steps: [{ stepId: 's0', status: 'inProgress' }] })],
+    recipe,
+    system,
+    resolutionModeService,
+    getComponent: (_systemId, id) => ({ id, name: 'Fine Potion' }),
+  };
+  const visible = makeBuilder(options).buildListing({ actor: ACTOR, viewer: GM }).activeRuns[0];
+  assert.equal(visible.activityKind, 'alchemy');
+  assert.equal(visible.craftingYield.mode, 'alchemy');
+  assert.equal(visible.craftingYield.presentation, 'tiers');
+  assert.deepEqual(visible.craftingYield.tiers[0].yields, [
+    { id: 'potion', name: 'Fine Potion', quantity: '×1' },
+  ]);
+
+  const directSystem = {
+    ...system,
+    alchemy: { checkMode: 'none' },
+  };
+  const direct = makeBuilder({
+    ...options,
+    system: directSystem,
+    resolutionModeService: new ResolutionModeService({ getSystem: () => directSystem }),
+  }).buildListing({ actor: ACTOR, viewer: GM }).activeRuns[0];
+  assert.equal(direct.craftingYield.presentation, 'entries');
+  assert.deepEqual(direct.craftingYield.entries, [
+    { id: 'potion', name: 'Fine Potion', qty: 1, chance: 100 },
+  ]);
+
+  const hidden = makeBuilder({
+    ...options,
+    recipeVisibility: { evaluateRecipeAccess: () => ({ visible: false }) },
+  }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+  assert.equal(hidden.craftingYield, null);
+  assert.equal(JSON.stringify(hidden).includes('Fine Potion'), false);
+
+  const missing = makeBuilder({ ...options, recipe: { ...recipe, getExecutionSteps: () => [] } })
+    .buildListing({ actor: ACTOR, viewer: GM }).activeRuns[0];
+  assert.equal(missing.craftingYield, null);
 });
 
 test('redacts an undiscovered recipe for a non-GM viewer but not for a GM', () => {
