@@ -272,6 +272,40 @@ test('CraftingRunManager freezes and resumes v1 gates while preserving legacy wo
   );
 });
 
+test('CraftingRunManager leaves matured v1 gates untouched and lists only authoritative auto candidates', async () => {
+  setupGlobals(1000);
+  const actor = new FakeActor('Due crafter');
+  game.actors = [actor];
+  const manager = new CraftingRunManager();
+  const current = await manager.createRun(actor, singleStepRecipe('current-due'), [actor], 'user-1', {
+    lifecycleVersion: 1,
+    completionMode: 'worldTime',
+  });
+  await manager.markStepWaitingForTime(actor, current, 0, { minutes: 1 });
+  const legacy = await manager.createRun(actor, singleStepRecipe('legacy-due'), [actor], 'user-1');
+  await manager.markStepWaitingForTime(actor, legacy, 0, { minutes: 1 });
+
+  await manager.processWorldTime(1060);
+  manager.invalidateCache(actor.id);
+  assert.equal(manager.getActiveRun(actor, current.id).status, 'waitingTime');
+  assert.equal(manager.getActiveRun(actor, current.id).runRevision, 1);
+  assert.equal(manager.getActiveRun(actor, legacy.id).status, 'inProgress');
+  assert.deepEqual(
+    manager.listDueVersionedRuns(1060).map(({ actor: dueActor, ...candidate }) => ({
+      actorUuid: dueActor.uuid,
+      ...candidate,
+    })),
+    [
+      {
+        actorUuid: actor.uuid,
+        runId: current.id,
+        expectedRevision: 1,
+        componentSourceActorUuids: [actor.uuid],
+      },
+    ]
+  );
+});
+
 test('CraftingRunManager allows a paused v1 run to be cancelled', async () => {
   setupGlobals(1000);
   const actor = new FakeActor('Cancelled paused crafter');
@@ -818,6 +852,37 @@ test('CraftingRunManager: recordFizzle archives a failed recipe-less entry strai
   const history = manager.getRunHistory(actor);
   assert.equal(history.length, 1, 'the fizzle is recorded in history');
   assert.equal(history[0].id, entry.id);
+});
+
+test('CraftingRunManager plans a recipe-less v1 fizzle in history before effects', async () => {
+  setupGlobals(1000);
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Versioned fizzle');
+  const entry = await manager.planVersionedFizzle(actor, {
+    craftingSystemId: 'system-alc',
+    userId: 'user-1',
+    componentSourceActorUuids: ['Actor.source'],
+    operationId: 'fizzle-operation',
+    requestId: 'fizzle-request',
+    effects: [{ effectId: 'consume-1', kind: 'consumeAlchemyItem', planned: { quantity: 1 } }],
+  });
+
+  assert.equal(entry.lifecycleVersion, 1);
+  assert.equal(entry.recipeId, null);
+  assert.equal(entry.executionJournal.status, 'planned');
+  assert.equal(entry.executionJournal.effects[0].phase, 'planned');
+  assert.equal(entry.runRevision, 0);
+  assert.equal(manager.getActiveRun(actor, entry.id), null);
+  assert.equal(manager.getRun(actor, entry.id).id, entry.id);
+
+  const duplicate = await manager.planVersionedFizzle(actor, {
+    craftingSystemId: 'system-alc',
+    operationId: 'fizzle-operation',
+    requestId: 'fizzle-request',
+    effects: [],
+  });
+  assert.equal(duplicate.id, entry.id);
+  assert.equal(manager.getRunHistory(actor).length, 1);
 });
 
 test('CraftingRunManager: recordFizzle records unconditionally (no showAttemptHistoryToPlayers gate)', async () => {

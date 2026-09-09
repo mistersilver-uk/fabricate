@@ -2,6 +2,7 @@ import { RunContainerManagerBase } from './runContainerStore.js';
 import {
   observeExecutionJournal,
   persistExecutionJournalTransition,
+  transitionExecutionJournal,
 } from './runExecutionJournal.js';
 import {
   assertRunLifecycleMutation,
@@ -139,7 +140,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return run;
   }
 
-  async updateRun(actor, run, { expectedRevision = undefined, executionOperationId = null } = {}) {
+  async updateRun(actor, run, { expectedRevision, executionOperationId = null } = {}) {
     const isCurrentLifecycle = getRunLifecycleContract(run) === 'current';
     if (isCurrentLifecycle) this.invalidateCache(actor.id);
     const container = this._getContainer(actor);
@@ -485,6 +486,60 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return entry;
   }
 
+  async planVersionedFizzle(
+    actor,
+    {
+      craftingSystemId = null,
+      userId = null,
+      componentSourceActorUuids = [],
+      operationId,
+      requestId,
+      effects = [],
+    } = {}
+  ) {
+    this.invalidateCache(actor.id);
+    const container = this._getContainer(actor);
+    const duplicate = (container.history || []).find(
+      (run) =>
+        getRunLifecycleContract(run) === 'current' &&
+        run?.isFizzle === true &&
+        run?.executionJournal?.requestId === String(requestId ?? '').trim()
+    );
+    if (duplicate) return duplicate;
+    const now = this._nowWorldTime();
+    const entry = {
+      id: foundry.utils.randomID(),
+      actorUuid: actor.uuid,
+      userId: userId || game.user?.id || null,
+      craftingSystemId: craftingSystemId ?? null,
+      recipeId: null,
+      isFizzle: true,
+      activityKind: 'alchemy',
+      status: 'failed',
+      startedAt: now,
+      updatedAt: now,
+      finishedAt: now,
+      currentStepIndex: null,
+      steps: [],
+      componentSourceActorUuids: [...componentSourceActorUuids],
+      ...buildNewRunLifecycleFields({ lifecycleVersion: 1, completionMode: 'manual' }),
+    };
+    entry.executionJournal = transitionExecutionJournal(undefined, {
+      type: 'plan',
+      plan: {
+        operationId,
+        requestId,
+        baseRunRevision: entry.runRevision,
+        intent: { activityKind: 'alchemy', craftingSystemId },
+        effects,
+      },
+    });
+    container.history.unshift(entry);
+    if (container.history.length > HISTORY_LIMIT) container.history.length = HISTORY_LIMIT;
+    await this._persist(actor, container);
+    return entry;
+  }
+
   async processWorldTime(worldTime = this._nowWorldTime()) {
     // Timed resume only (issue 656): driven from the synced updateWorldTime hook, and
     // flipping waitingTime→inProgress triggers _persist → actor.setFlag, a broadcast
@@ -515,7 +570,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
 
   _maturedWaitingStep(run, worldTime) {
     if (run.status !== 'waitingTime') return null;
-    if (getRunLifecycleContract(run) === 'unsupported') return null;
+    if (getRunLifecycleContract(run) !== 'legacy') return null;
     if (run.pauseState) return null;
     if (run.executionJournal && run.executionJournal.status !== 'committed') return null;
     const index = Number(run.currentStepIndex);
@@ -526,27 +581,52 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return step;
   }
 
-  async setCompletionMode(actor, runId, completionMode, { expectedRevision = undefined } = {}) {
+  listDueVersionedRuns(worldTime = this._nowWorldTime()) {
+    const due = [];
+    for (const actor of game.actors || []) {
+      this.invalidateCache(actor.id);
+      const container = this._getContainer(actor);
+      for (const run of Object.values(container.active || {})) {
+        if (!this._dueVersionedStep(run, worldTime)) continue;
+        due.push({
+          actor,
+          runId: run.id,
+          expectedRevision: run.runRevision,
+          componentSourceActorUuids: [...(run.componentSourceActorUuids || [])],
+        });
+      }
+    }
+    return due;
+  }
+
+  _dueVersionedStep(run, worldTime) {
+    if (getRunLifecycleContract(run) !== 'current') return null;
+    if (run.status !== 'waitingTime' || run.completionMode !== 'worldTime' || run.pauseState) {
+      return null;
+    }
+    if (run.executionJournal && run.executionJournal.status !== 'committed') return null;
+    const index = Number(run.currentStepIndex);
+    if (!Number.isSafeInteger(index)) return null;
+    const step = run.steps?.[index];
+    if (!step?.timeGate || Number(worldTime) < Number(step.timeGate.availableAt || 0)) return null;
+    return step;
+  }
+
+  async setCompletionMode(actor, runId, completionMode, { expectedRevision } = {}) {
     return persistCompletionMode(this._locateRunPersistence(actor, runId), completionMode, {
       expectedRevision,
     });
   }
 
-  async pauseRun(actor, runId, { expectedRevision = undefined } = {}) {
+  async pauseRun(actor, runId, { expectedRevision } = {}) {
     return persistPausedRun(this._locateRunPersistence(actor, runId), { expectedRevision });
   }
 
-  async resumeRun(actor, runId, { expectedRevision = undefined } = {}) {
+  async resumeRun(actor, runId, { expectedRevision } = {}) {
     return persistResumedRun(this._locateRunPersistence(actor, runId), { expectedRevision });
   }
 
-  async setStepSelectionPlan(
-    actor,
-    runId,
-    stepIndex,
-    selection = {},
-    { expectedRevision = undefined } = {}
-  ) {
+  async setStepSelectionPlan(actor, runId, stepIndex, selection = {}, { expectedRevision } = {}) {
     const location = this._locateRunPersistence(actor, runId);
     if (!location) return null;
     const run = location.run;
@@ -569,7 +649,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     return location.persist();
   }
 
-  async updateExecutionJournal(actor, runId, transition, { expectedRevision = undefined } = {}) {
+  async updateExecutionJournal(actor, runId, transition, { expectedRevision } = {}) {
     return persistExecutionJournalTransition(
       this._locateRunPersistence(actor, runId, { activeOnly: false }),
       transition,
