@@ -165,7 +165,15 @@ const FIXTURE = `
               <span class="manager-component-stat-label" data-m="stat-label">Tags</span>
             </div>
           </div>
-          <span class="manager-availability-pill is-tag" data-m="tag-pill"><span>metal</span></span>
+          <!-- Tags in effect, as ComponentBrowserInspector renders it: the shared Chip at
+               density="inspector" inside manager-chip-row. It was a hand-copy of
+               .manager-availability-pill.is-tag until issue 1515, which is a class the inspector
+               stopped emitting and whose rule that change swept - the mirror rot this file's
+               header records, caught by the area-scope gate rather than by this one.
+               (No backticks in here - this whole block is a JS template literal.) -->
+          <div class="manager-chip-row" data-component-tag-list>
+            <span class="manager-chip is-tag is-inspector" data-m="tag-pill">metal</span>
+          </div>
         </section>
 
         <!--
@@ -466,7 +474,12 @@ const EXPECTED = {
   'inspector-flavour': 11.52, // 0.72rem — the description, whole
   'stat-value': 14.72, // 0.92rem serif, tabular figures
   'stat-label': 9.92, // 0.62rem
-  'tag-pill': 12.16, // 0.76rem — the shared availability pill, now purple via `is-tag`
+  // 10px, and a REAL change (issue 1515). The role used to measure a hand-copy of
+  // `.manager-availability-pill.is-tag` at 0.76rem; the inspector renders the shared `Chip` at
+  // `density="inspector"`, whose own scoped rule states 10px, and the fixture now names what
+  // the product draws. `proto:5663` draws this pill at `font: 600 10px`, so the role moves ONTO
+  // the reference rather than away from it.
+  'tag-pill': 10,
   // ── The editor column.
   'panel-title': 16, // 1rem — prototype panel h3 14px serif
   'panel-sub': 12.48, // 0.78rem — prototype panel sub 10px sans

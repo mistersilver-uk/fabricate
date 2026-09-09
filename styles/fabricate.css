@@ -8355,21 +8355,24 @@
   padding-right: var(--fab-space-1);
 }
 
-/* A component TAG (issue 676). The pill vehicle is Gathering's, and the component
-   editor's tag pills inherited its unmapped default — the AMBER `--fab-warning` fill
-   below — which reads as a warning on a plain authored tag. Tags are purple, so they
-   get the mapping the other three facets already have. */
-.fabricate-manager .manager-availability-pill.is-tag { --fab-chip-color: var(--fab-purple); }
+/* A check modifier (issue 770), and the pill family's ONE surviving facet (issue 1515).
+   The TAG facet (issue 676) and the BIOME facet went with the sweep: the component editor
+   draws its authored tags as `<Chip>` and the gathering browsers draw their biomes as a
+   tinted `<Chip>`, so both mappings named an element nothing emits any more.
 
-/* A check modifier (issue 770). Like a component tag, this pill reuses Gathering's
-   vehicle; left unmapped it would inherit the AMBER `--fab-warning` fill, which reads
-   as a warning on a plain authored catalogue entry. A modifier is a neutral, additive
-   concept, so it gets the informational (blue) accent. */
-.fabricate-manager .manager-availability-pill.is-modifier { --fab-chip-color: var(--fab-info); }
+   THE THREE RULES COLLAPSE INTO ONE because the sweep left them with the same single
+   selector, which `no-duplicate-selectors` refuses, and the merge is a proved no-op rather
+   than a re-skin: `--fab-chip-color` is set on the same element it was set on before and
+   the two `color-mix` declarations are carried verbatim, so the fill and the border resolve
+   to the values they resolved to. Rooted at the class `ModifierPillSelect.svelte` emits,
+   like the rest of the family below.
 
-.fabricate-manager .manager-availability-pill.is-tag,
-.fabricate-manager .manager-availability-pill.is-modifier,
-.fabricate-manager .manager-availability-pill.is-biome {
+   Left unmapped this pill would inherit the AMBER `--fab-warning` fill, which reads as a
+   warning on a plain authored catalogue entry. A modifier is a neutral, additive concept,
+   so it gets the informational (blue) accent. */
+.fabricate-pill-select .manager-availability-pill.is-modifier {
+  --fab-chip-color: var(--fab-info);
+
   background: color-mix(in srgb, var(--fab-chip-color, var(--fab-warning)) 16%, var(--fab-bg-3));
   border-color: color-mix(in srgb, var(--fab-chip-color, var(--fab-warning)) 50%, transparent);
 }
@@ -15010,16 +15013,36 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-availability-multi {
+/* THE PILL SELECT'S FAMILY, ROOTED AT THE CLASS THE PRIMITIVE EMITS (issue 1515).
+   `ModifierPillSelect.svelte` is the family's only emitter now that the six manager views
+   that hand-wrote it at 37 sites render their destination primitives instead, so these
+   rules root at `fabricate-pill-select` — a class only that component writes, on its own
+   `<Field>` root — and the control paints wherever it is mounted rather than only inside
+   the manager. The sheet is page-global, so the application root could not simply be
+   dropped; a namespace class is the replacement `tests/styles-namespacing.test.js` allows.
+
+   SPECIFICITY IS PRESERVED RULE FOR RULE. Every re-rooted selector keeps the rank it had:
+   the root pair stays (0,2,0) by qualifying the namespace class with the family class on
+   the same element, and each descendant stays (0,2,0) — or (0,3,0) for a state pair —
+   with the namespace root standing exactly where `.fabricate-manager` stood.
+
+   THE TWO ALIASES KEEP THEIR APPLICATION ROOT, because they are the manager's vocabulary
+   and not this primitive's. `.manager-condition-menu-button` is the two gathering editors'
+   condition-picker trigger and `.manager-danger-tag-remove` the event editor's danger-tag
+   dismiss; each is hand-written by a view that can only ever render inside
+   `.fabricate-manager`, so the ancestor is free for both, and re-rooting either at a class
+   its own markup never carries would un-style it.
+
+   THE MENU BLOCK BELOW IS NOT PART OF THIS RE-ROOT and deliberately stays where it is:
+   `.manager-availability-menu`, `-option` and `-empty` are the hand-rolled listbox this
+   control replaced with `SearchablePopover`, nothing emits them, and they are owned by
+   issue 1480 through the named exemption in `tests/styles-dead-classes.test.js` because
+   `manager-layout.test.js` measures the option row as REFERENCE GEOMETRY. */
+.fabricate-pill-select.manager-availability-multi {
   min-width: 0;
 }
 
-.fabricate-manager .manager-availability-picker {
-  position: relative;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-availability-menu-button,
+.fabricate-pill-select .manager-availability-menu-button,
 .fabricate-manager .manager-condition-menu-button {
   display: flex;
   align-items: center;
@@ -15036,8 +15059,8 @@
   font-weight: 700;
 }
 
-.fabricate-manager .manager-availability-menu-button:hover,
-.fabricate-manager .manager-availability-menu-button:focus-visible,
+.fabricate-pill-select .manager-availability-menu-button:hover,
+.fabricate-pill-select .manager-availability-menu-button:focus-visible,
 .fabricate-manager .manager-condition-menu-button:hover,
 .fabricate-manager .manager-condition-menu-button:focus-visible {
   border-color: var(--fab-warning-border);
@@ -15083,8 +15106,12 @@
   outline: none;
 }
 
-.fabricate-manager .manager-availability-option i,
-.fabricate-manager .manager-availability-pill > i {
+/* The option row's glyph, which stays with the menu block above for its reason. It shared
+   one selector list with the pill's glyph rule until issue 1515; the two are SPLIT rather
+   than left joined, because a dead selector sharing a list with a live one is invisible to
+   `deadRuleBlocks` — a block is dead only when EVERY selector in it is — so joining them
+   would have hidden this one from the gate that owns it. */
+.fabricate-manager .manager-availability-option i {
   color: var(--fab-warning-text);
   text-align: center;
 }
@@ -15095,14 +15122,19 @@
   font-size: 0.78rem;
 }
 
-.fabricate-manager .manager-availability-pill-row {
+.fabricate-pill-select .manager-availability-pill > i {
+  color: var(--fab-warning-text);
+  text-align: center;
+}
+
+.fabricate-pill-select .manager-availability-pill-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--fab-space-chip);
   min-width: 0;
 }
 
-.fabricate-manager .manager-availability-pill {
+.fabricate-pill-select .manager-availability-pill {
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-chip);
@@ -15117,14 +15149,14 @@
   font-weight: 700;
 }
 
-.fabricate-manager .manager-availability-pill span {
+.fabricate-pill-select .manager-availability-pill span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-availability-remove,
+.fabricate-pill-select .manager-availability-remove,
 .fabricate-manager .manager-danger-tag-remove {
   display: inline-flex;
   align-items: center;
@@ -15138,8 +15170,8 @@
   background: transparent;
 }
 
-.fabricate-manager .manager-availability-remove:hover,
-.fabricate-manager .manager-availability-remove:focus-visible,
+.fabricate-pill-select .manager-availability-remove:hover,
+.fabricate-pill-select .manager-availability-remove:focus-visible,
 .fabricate-manager .manager-danger-tag-remove:hover,
 .fabricate-manager .manager-danger-tag-remove:focus-visible {
   color: var(--fab-danger-text);
@@ -15147,7 +15179,7 @@
   outline: none;
 }
 
-.fabricate-manager .manager-availability-any {
+.fabricate-pill-select .manager-availability-any {
   min-height: 28px;
   display: inline-flex;
   align-items: center;

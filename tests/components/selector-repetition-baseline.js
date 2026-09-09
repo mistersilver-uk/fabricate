@@ -25,11 +25,11 @@
  * all, and the chain joined by ` >> ` when a rule is nested. The at-context is part of the key
  * because two rules under different conditions are never the same rule: the same selector inside
  * a `@container` and at the top level is two different pieces of authoring, and merging them is
- * not a thing that can be done. Keyed on the selector ALONE the sheet holds 208 repeated selectors
- * rather than these 114, and both figures are published so a reader can tell which produced a pin.
+ * not a thing that can be done. Keyed on the selector ALONE the sheet holds 206 repeated selectors
+ * rather than these 112, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,052 `(at-context, selector)` keys, of which 2,938 appear exactly
+ * Unfiltered, the sheet holds 3,049 `(at-context, selector)` keys, of which 2,937 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -41,7 +41,7 @@
  * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,572 rules at that head, 114 repeated keys and 233 appearances
+ * printed from. The sheet holds 2,570 rules at that head, 112 repeated keys and 229 appearances
  * between them; five keys appear three times and none appears four or more.
  *
  * ISSUE 1515 DELETED TWO ROWS, which is a shape none of the entries below took: every one of them
@@ -120,6 +120,29 @@
  * the four `> span` members had to be deleted rather than re-rooted. They select the primitive's
  * own track and knob at (0,2,1) and (0,2,2) against the family's (0,2,0), so leaving them would
  * have re-skinned a shared switch from one caller's block with every gate green.
+ *
+ * ISSUE 1515 PHASE 8 MOVES THE REPEATED TABLE DOWN AGAIN, BY TWO ROWS, AND ONE OF THEM VANISHES
+ * FOR A REASON NO EARLIER ENTRY HERE HAS: a stylelint rule made the merge compulsory.
+ * `.manager-availability-pill.is-tag` was written twice at the top level, once alone for the
+ * facet's `--fab-chip-color` and once as a member of the three-selector list that mixed it into a
+ * fill and an edge, exactly as the three facets phase 7 removed were; nothing emits it and both
+ * halves go. `.is-modifier` is the other shape entirely. It is still emitted, by the one component
+ * that keeps the family, but the sweep took its two SIBLINGS out of that three-selector list and
+ * left the list stating the one selector its own one-liner already stated — the duplicate
+ * `no-duplicate-selectors` rejects. So the two rules are MERGED at the earlier position, with
+ * `--fab-chip-color` set on the same element and the two `color-mix` declarations carried
+ * verbatim, and a selector that appeared twice now appears once.
+ *
+ * The three CONTEXTUAL figures move by three different amounts again. FOUR rules are deleted —
+ * the tag one-liner, the declared-and-never-emitted `.manager-availability-picker`, and one of the
+ * merged pair — and ONE arrives: the pill's leading-glyph rule is SPLIT out of the list it shared
+ * with the dead menu option's, because a dead selector sitting beside a live one is invisible to
+ * `deadRuleBlocks`, which calls a block dead only when EVERY selector in it is. Net: the rule
+ * count falls by two to 2,570, the key count falls by three to 3,049 as `.is-tag`, `.is-biome` and
+ * `-picker` leave, the singleton count falls by one to 2,937 — it loses those last two and gains
+ * `.is-modifier`, now written once — and `pinnedTotal` falls to 229 across 112 rows. The
+ * re-rooting itself moves NONE of them: every one of the eleven surviving selectors is renamed
+ * from `.fabricate-manager` to `.fabricate-pill-select` one for one.
  *
  * ISSUE 1520 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting eight
  * rule blocks and adding one. Deleted: the per-area Foundry-core focus-ring copies carried by the
@@ -343,6 +366,6 @@ export const SELECTOR_REPETITION_BASELINE = checkedRows(TABLE.rows);
  *
  * `assertRatchet` asserts exactly that and throws before any comparison if the two disagree, so
  * this is the one figure a reviewer can check against the issue without reading the table. At the
- * measured commit it is 233 across 114 rows.
+ * measured commit it is 229 across 112 rows.
  */
 export const SELECTOR_REPETITION_TOTAL = TABLE.pinnedTotal;

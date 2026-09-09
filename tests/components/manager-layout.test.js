@@ -515,7 +515,13 @@ test('manager character modifier search suggestions render with availability-sty
           <main class="fabricate-manager">
             <div class="harness-grid">
               <section>
-                <div class="harness-availability-anchor">
+                <!-- The availability menu’s own root rides this anchor since issue 1515: the
+                     trigger’s rule is rooted at .fabricate-pill-select now, so a copy without
+                     the namespace root would measure an unstyled button. The two classes are the
+                     primitive’s own; the option rows below keep theirs, which stay
+                     application-rooted under issue 1480. (No backticks in here — this whole
+                     block is a JS template literal.) -->
+                <div class="harness-availability-anchor fabricate-pill-select manager-availability-multi">
                   <button type="button" class="manager-availability-menu-button">
                     <span>Biomes</span>
                     <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>

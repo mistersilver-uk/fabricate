@@ -41,10 +41,16 @@ const SHEET = 'styles/fabricate.css';
  * The one exemption, and it is temporary.
  *
  * `manager-layout.test.js` uses `.manager-availability-option` as REFERENCE GEOMETRY, so the
- * availability menu's four classes are owned by issue 1480 rather than by the sweep that wrote
+ * availability menu's three classes are owned by issue 1480 rather than by the sweep that wrote
  * this gate: deleting them here would have taken that test's measuring stick with them. Issue 1480
  * is open with no pull request. When it lands, delete this constant — the gate goes red if the
  * rules are still there and nothing renders them, which is the correct prompt.
+ *
+ * THREE, NOT FOUR, SINCE ISSUE 1515: `.manager-availability-picker` was the fourth, declared here
+ * and emitted nowhere, and that change swept it. The exemption also stopped being the only thing
+ * standing between this gate and the rest of the family, because the same change RE-ROOTED every
+ * class the primitive still writes at `fabricate-pill-select`; what the prefix now covers is the
+ * hand-rolled listbox `SearchablePopover` replaced, and nothing else.
  */
 const AVAILABILITY_MENU_PREFIX = 'manager-availability-';
 

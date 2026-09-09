@@ -1,5 +1,5 @@
 {
-  "pinnedTotal": 233,
+  "pinnedTotal": 229,
   "rows": [
     {
       "key": "(top level) | .fabricate-button.manager-button",
@@ -51,14 +51,6 @@
     },
     {
       "key": "(top level) | .fabricate-manager .form-group textarea",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-availability-pill.is-modifier",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-availability-pill.is-tag",
       "count": 2
     },
     {

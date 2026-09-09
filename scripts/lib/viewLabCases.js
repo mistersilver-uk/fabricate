@@ -1045,10 +1045,11 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   //
   // Three frames, one per surface the sweeps touch:
   //
-  //  - `manager-gathering-task-editor-normal` is the `.manager-availability-*` family. The task
-  //    editor's availability card is where that family renders densest — biomes, time-of-day and
-  //    weather pills side by side under their pickers — and it is already this registry's
-  //    `Field.svelte` frame for the same density reason.
+  //  - `manager-gathering-task-editor-normal` is the availability card's chip run, which was the
+  //    `.manager-availability-*` family until issue 1515 routed it to `<Chip>`. The task editor is
+  //    where that run renders densest — biome, time-of-day and weather tokens side by side under
+  //    their pickers — and it is already this registry's `Field.svelte` frame for the same
+  //    density reason.
   //  - `manager-world-downtime-tracking` is the rail marker family, EXPANDED. Its first step
   //    clicks `#manager-world-nav-downtime`, and `openWorldDowntime` sets
   //    `railGroupUserExpanded.worldDowntime`, so the frame carries the whole group at once: the

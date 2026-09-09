@@ -560,10 +560,20 @@ const MANAGER_DIRECTORY = 'src/ui/svelte/apps/manager/';
  * clauses below check it against the manifest and against the area-scope gate independently. Derive
  * it from either one and the check becomes a tautology over that one.
  *
- * Three from issue 1502, six from issue 1508, five from issue 1509. `ArmedDangerButton` moved into
+ * Three from issue 1502, six from issue 1508, five from issue 1509, one from issue 1515.
+ * `ArmedDangerButton` moved into
  * the shared directory at issue 1509 and is deliberately ABSENT: it gained no root of its own,
  * because the family it writes is `ManagerButton`'s and is already rooted, so it has no area-scope
  * entry to find and a `fabricate-danger-button` would own no rule at all.
+ *
+ * `ModifierPillSelect` is the issue-1515 arrival, and it is the one row here whose re-root was
+ * REFUSED first and recorded as a deferral. Its family was written by the primitive AND
+ * hand-written by six manager views at 37 further sites, none of them inside a
+ * `ModifierPillSelect`, so a root class on the component would have reached none of them; issue
+ * 1515 routed all 37 to their destination primitives and the re-root landed in the same change.
+ * The enrolment is what makes the `scope` flip beneath it mean anything: without this row the
+ * flip removes the manifest row from the manager-only population above and nothing takes its
+ * place, which is a gate the change quietly leaves.
  */
 const RE_ROOTED_ROWS = [
   'src/ui/svelte/components/ChanceSlider.svelte',
@@ -576,6 +586,7 @@ const RE_ROOTED_ROWS = [
   'src/ui/svelte/components/ManagerButton.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
+  'src/ui/svelte/components/ModifierPillSelect.svelte',
   'src/ui/svelte/components/Pagination.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
@@ -671,9 +682,9 @@ test('every re-rooted family carries a shared scope and an entry in the gate tha
   const byPath = new Map(DESIGN_SYSTEM_PRIMITIVES.map((row) => [row.path, row]));
   const entries = areaScopeGateComponents();
   assert.ok(
-    entries.size >= 20,
-    `the area-scope gate reader found only ${entries.size} component paths, against the 21 that ` +
-      'file holds across 20 entries. The reader has stopped matching and the clause below passes ' +
+    entries.size >= 21,
+    `the area-scope gate reader found only ${entries.size} component paths, against the 22 that ` +
+      'file holds across 21 entries. The reader has stopped matching and the clause below passes ' +
       'on nothing.'
   );
 
