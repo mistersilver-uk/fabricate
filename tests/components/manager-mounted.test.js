@@ -40,6 +40,10 @@ import { getModifierExpressionSuggestions } from '../../src/config/modifierExpre
 // bulk-selection block below waits on it rather than restating the number, so a change to the
 // rule cannot leave these tests quietly asserting the un-delayed state.
 import { ANNOUNCE_AFTER_FOCUS_MS } from '../../src/ui/svelte/util/announceAfterFocus.js';
+import {
+  railCounts as sharedRailCounts,
+  tallyMatchingRail as sharedTallyMatchingRail,
+} from '../helpers/validationSurfaceReadings.js';
 import { createManagerExtensionsRegistry } from '../../src/ui/managerExtensions.js';
 import { createPlayerExtensionsRegistry } from '../../src/ui/playerExtensions.js';
 import { MANAGER_HOOKS } from '../../src/config/hooks.js';
@@ -22948,25 +22952,12 @@ describe('CraftingSystemManager mounted behavior', () => {
     return target;
   }
 
-  /** The rail's three tiles, as numbers, keyed by the count they report. */
-  const railCounts = () =>
-    Object.fromEntries(
-      Array.from(target.querySelectorAll('[data-editor-validation-count]')).map((tile) => [
-        tile.getAttribute('data-editor-validation-count'),
-        Number(tile.textContent.trim()),
-      ])
-    );
-
-  /** The SAME question asked of the rendered rows: how many of each status is drawn. */
-  const rowStatusTally = () => {
-    const tally = { passing: 0, warnings: 0, blocking: 0 };
-    for (const row of target.querySelectorAll('[data-validation-group] .manager-recipe-val-row')) {
-      if (row.classList.contains('is-pass')) tally.passing += 1;
-      if (row.classList.contains('is-warn')) tally.warnings += 1;
-      if (row.classList.contains('is-block')) tally.blocking += 1;
-    }
-    return tally;
-  };
+  // Both readers are the SHARED ones (issue 1517, review r3). Three suites compare a rail with
+  // its own rows, and the comparison only means anything while all three read the two sides the
+  // same way — so the readers live in `tests/helpers/validationSurfaceReadings.js` and this
+  // suite's `target` is bound to them here.
+  const railCounts = () => sharedRailCounts(target);
+  const rowStatusTally = () => sharedTallyMatchingRail(target);
 
   const verdict = () => target.querySelector('[data-editor-validation-summary]');
 

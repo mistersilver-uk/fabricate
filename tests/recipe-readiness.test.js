@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { evaluateRecipeReadiness, blocksEnable } from '../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
+import { evaluateRecipeReadiness, blocksEnable, recipeValidationRowStates } from '../src/ui/svelte/apps/manager/recipe/recipeReadiness.js';
 
 function check(checks, id) {
   return checks.find(entry => entry.id === id);
@@ -651,5 +651,30 @@ describe('evaluateRecipeReadiness routed check-mode warnings', () => {
     assert.equal(issues.some(i => i.id === 'unproducedOutcomeTier'), false);
     assert.equal(check(checks, 'routedResultGroupsRouted').satisfied, true);
     assert.equal(check(checks, 'routedOutcomeTiersProduced').satisfied, true);
+  });
+});
+
+describe('recipeValidationRowStates', () => {
+  it('gives a row that BLOCKS ENABLING the block word even when its severity is only a warning', () => {
+    // THE ORDERING THIS EXISTS FOR, and it is unreachable from `evaluateRecipeReadiness` today:
+    // all seven of its `blocks: 'enable'` issues are also `severity: 'critical'`, so severity
+    // alone would answer correctly for every one of them. That is exactly why the clause needs a
+    // synthetic issue rather than a recipe — a rule with no reachable case is a rule nothing can
+    // tell from its own absence, and the environment editor's rail is where the same pairing DID
+    // ship: `noAvailableTasks` is graded `warning` on a disabled environment and blocks enabling
+    // in both states, and reading severity alone told that GM the environment "Saves and enables".
+    const [row] = recipeValidationRowStates({
+      checks: [{ id: 'hasName', satisfied: false }],
+      issues: [{ id: 'noName', severity: 'warning', blocks: 'enable' }]
+    });
+    assert.equal(row.status, 'block', 'the block word is literally "Blocks enable", which is what that field says');
+  });
+
+  it('leaves an ordinary warning a warning, so the clause above is not simply blocking everything', () => {
+    const [row] = recipeValidationRowStates({
+      checks: [{ id: 'hasName', satisfied: false }],
+      issues: [{ id: 'noName', severity: 'warning' }]
+    });
+    assert.equal(row.status, 'warn');
   });
 });

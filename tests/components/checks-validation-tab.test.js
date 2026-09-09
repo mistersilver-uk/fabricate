@@ -7,6 +7,7 @@ import {
   CHECKS_TREE_RAW_MODULES,
 } from '../helpers/checksHarnessModules.js';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { railCounts, tallyMatchingRail } from '../helpers/validationSurfaceReadings.js';
 import {
   describeValidationAddressPairing,
   describeValidationHostContract,
@@ -213,6 +214,39 @@ describe('ChecksValidationTab (mounted)', () => {
     assert.ok(
       !target.querySelector('[data-issue]'),
       'a clean check lists no issue rows at all'
+    );
+    harness.remount();
+  });
+
+  it('counts the synthesised result row of a subsystem with no tick and no issue', async () => {
+    // THE STATE THE RAIL'S REWRITE WAS FOR, and nothing in this file reached it before. A
+    // subsystem whose mode rolls no check at all — `mode: 'none'` on gathering — returns NO
+    // checks and NO issues from `evaluateCheckReadiness`, so `rowsFor` synthesises the
+    // "No issues detected." PASS row rather than drawing a heading over emptiness. The old rail
+    // counted `readiness.checks.filter(satisfied)` and the issues, which is zero of each: the
+    // GM read "Passing: 0" above a green row saying everything was fine.
+    //
+    // It is the SECOND of the two divergences the rewrite closed; the first — an unsatisfied
+    // check whose subsystem raises no matching issue — needs a check the evaluator can fail
+    // without also raising something, and this producer has none today.
+    const target = await harness.mount({
+      sections: [{ subsystem: 'gathering', mode: 'none', check: {} }],
+    });
+
+    assert.ok(
+      Boolean(target.querySelector('[data-checks-no-issues="gathering"]')),
+      'the group states its result rather than rendering a heading over nothing'
+    );
+    assert.equal(
+      target.querySelector('[data-editor-validation-count="passing"]').textContent.trim(),
+      '1',
+      'and the rail counts that row, where it read 0'
+    );
+    assert.deepEqual(
+      tallyMatchingRail(target),
+      railCounts(target),
+      'the rail is a TALLY OF THE ROWS, so the two cannot disagree - which is the whole defect: ' +
+        'a count is a reading of a result, and there were two readings'
     );
     harness.remount();
   });

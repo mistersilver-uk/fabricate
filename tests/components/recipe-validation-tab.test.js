@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
 import { describeValidationHostContract } from '../helpers/validationAddressContracts.js';
+import { railCounts, tallyMatchingRail } from '../helpers/validationSurfaceReadings.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../..');
@@ -96,26 +97,6 @@ describe('RecipeValidationTab (mounted)', () => {
     ]
   };
 
-  /** The rail's tiles, as numbers, keyed by the count each one reports. */
-  const railCounts = (target) =>
-    Object.fromEntries(
-      Array.from(target.querySelectorAll('[data-editor-validation-count]')).map((tile) => [
-        tile.getAttribute('data-editor-validation-count'),
-        Number(tile.textContent.trim())
-      ])
-    );
-
-  /** The SAME question asked of the rendered rows: how many of each status is drawn. */
-  const rowStatusTally = (target) => {
-    const tally = { passing: 0, warnings: 0, blocking: 0 };
-    for (const row of target.querySelectorAll('[data-validation-group] .manager-recipe-val-row')) {
-      if (row.classList.contains('is-pass')) tally.passing += 1;
-      if (row.classList.contains('is-warn')) tally.warnings += 1;
-      if (row.classList.contains('is-block')) tally.blocking += 1;
-    }
-    return tally;
-  };
-
   it('counts an unsatisfied check that raises NO issue, and does not call it all clear', async () => {
     const target = await harness.mount({ recipe: unnamedStepRecipe });
 
@@ -132,7 +113,7 @@ describe('RecipeValidationTab (mounted)', () => {
     );
     assert.equal(railCounts(target).warnings, 1, 'and the rail counts it, where it read 0');
     assert.deepEqual(
-      rowStatusTally(target),
+      tallyMatchingRail(target),
       railCounts(target),
       'the rail is a TALLY OF THE ROWS, so the two cannot disagree - which is the whole defect: ' +
         'a count is a reading of a result, and there were two readings'
