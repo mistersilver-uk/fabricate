@@ -59,6 +59,17 @@ function unavailable(reason, extras = {}) {
   return { success: false, reason, ...extras };
 }
 
+function createSecureRandomId(webCrypto) {
+  return () => {
+    if (typeof webCrypto?.randomUUID === 'function') return webCrypto.randomUUID();
+    if (typeof webCrypto?.getRandomValues !== 'function') {
+      throw new Error('Secure random ID API unavailable');
+    }
+    const bytes = webCrypto.getRandomValues(new Uint8Array(16));
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  };
+}
+
 /**
  * Durable run-command arbitration. Foundry access is supplied at this boundary so tests can
  * model two browser realms sharing one server-side embedded-document database.
@@ -82,6 +93,15 @@ export function createJournalRunAuthority({
   let recoveryReady = false;
   const grants = new WeakMap();
   const createdGrantRecords = new Set();
+
+  function nextRandomId() {
+    try {
+      const id = randomId?.();
+      return typeof id === 'string' && id.length > 0 ? id : null;
+    } catch {
+      return null;
+    }
+  }
 
   async function ledgerResult() {
     const gm = activeGM?.();
@@ -173,7 +193,12 @@ export function createJournalRunAuthority({
       const availability = await refreshAvailability();
       return availability.available ? { success: true } : unavailable(availability.reason);
     }
-    const requestId = `boot-${randomId()}`;
+    const bootId = nextRandomId();
+    if (!bootId) {
+      cachedAvailability = { available: false, reason: 'secure-random-unavailable' };
+      return unavailable('secure-random-unavailable');
+    }
+    const requestId = `boot-${bootId}`;
     const acquired = await acquire({ requestId });
     if (!acquired.success) {
       cachedAvailability = { available: false, reason: acquired.reason };
@@ -264,7 +289,8 @@ export function createJournalRunAuthority({
     if (!activeGmMatches(currentUser?.(), activeGM?.())) return unavailable('active-gm-required');
     const ledgerCheck = await ledgerResult();
     if (!ledgerCheck.success) return ledgerCheck;
-    const claimId = randomId();
+    const claimId = nextRandomId();
+    if (!claimId) return unavailable('secure-random-unavailable');
     try {
       const claim = await createClaim(ledgerCheck.ledger, {
         _id: JOURNAL_RUN_CLAIM_PAGE_ID,
@@ -282,7 +308,8 @@ export function createJournalRunAuthority({
   function tokenHelpers({ state, request, persist }) {
     return {
       issuePrepareToken(binding, { expiresAt } = {}) {
-        const token = randomId();
+        const token = nextRandomId();
+        if (!token) throw new Error('Secure random ID API unavailable');
         state.prepareTokens[token] = {
           status: 'active',
           binding: { ...binding, senderId: request.senderId },
@@ -497,10 +524,8 @@ export function createJournalRunAuthority({
 export function createFoundryJournalRunAuthority({
   game = globalThis.game,
   JournalEntry = globalThis.JournalEntry,
-  randomId = () =>
-    globalThis.foundry?.utils?.randomID?.() ??
-    globalThis.crypto?.randomUUID?.() ??
-    `${Date.now()}${Math.random()}`,
+  crypto = globalThis.crypto,
+  randomId = createSecureRandomId(crypto),
   now = () => Date.now(),
   reconstructExecutions = null,
 } = {}) {
