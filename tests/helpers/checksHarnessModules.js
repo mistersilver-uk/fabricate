@@ -21,6 +21,8 @@
  * naming a deleted module while this one moved on.
  */
 
+import { SELECT_COMPILED_MODULES } from './svelte-component-harness.js';
+
 /**
  * Raw `.js` modules the checks editor tree imports directly or transitively.
  *
@@ -156,6 +158,13 @@ export const CHECKS_TREE_RAW_MODULES = Object.freeze([
  * @type {ReadonlyArray<string>}
  */
 export const CHECKS_TREE_COMPILED_MODULES = Object.freeze([
+  // THE APP'S ONE SELECT AND ITS WHOLE COMPILED CLOSURE (issue 1510), spread rather than copied.
+  // The manager's non-root selects render `components/Select.svelte` now, so any tree holding one
+  // reaches `Field`, `Chip`, `EmptyState`, `ManagerButton` and `SearchablePopover` through it as
+  // well as directly. The spread is the route because a missing `.svelte` HANGS a suite and is
+  // reported as `# cancelled`, never `# fail`, and five suites carrying five hand-written copies
+  // of the same six paths is exactly the drift this manifest was centralised to remove.
+  ...SELECT_COMPILED_MODULES,
   'src/ui/svelte/components/IconPicker.svelte',
   'src/ui/svelte/components/ModifierPillSelect.svelte',
   // `SelectionCheckbox` and `StatusPill` left this closure with issue 1096's parity round: the

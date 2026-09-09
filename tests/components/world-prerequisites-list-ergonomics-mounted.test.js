@@ -2,8 +2,18 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { describe, it, before, after, afterEach } from 'node:test';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
 import { assertNoElement } from '../helpers/svelte-dom.js';
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  closeSelectPanel,
+  selectOptionLabels,
+  selectOptionValues,
+} from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -41,6 +51,10 @@ const harness = createMountedComponentHarness({
     'src/systems/characterPrerequisites.js',
   ],
   compiledModules: [
+    // THE APP'S ONE SELECT AND ITS WHOLE COMPILED CLOSURE (issue 1510), spread rather than copied.
+    // This tree renders `components/Select.svelte` now, and a `.svelte` the tree renders but the
+    // harness omits HANGS the suite (`# cancelled`) rather than failing it.
+    ...SELECT_COMPILED_MODULES,
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled) rather
     // than failing it, so every one is named.
     'src/ui/svelte/components/IconPicker.svelte',
@@ -286,5 +300,110 @@ describe('world character-prerequisite list ergonomics (mounted, issue 768)', ()
         .querySelector('.manager-prerequisite-body'),
       'a bumped nonce re-opens the SAME id'
     );
+  });
+
+  it('offers the comparison operators as the app’s own list, named by the row’s own caption', async () => {
+    // FIRST COVERAGE OF `[data-prerequisite-operator]` (issue 1510). The operator control had no
+    // mounted assertion at all before this change — the row's path and value inputs were
+    // covered and the comparison between them was not — so a conversion could have reordered the
+    // operators, changed the `symbol · label` join or unnamed the control, and nothing would
+    // have said so.
+    const root = await harness.mount({ library: PREREQUISITES, onUpdate: () => {} });
+    const row = root.querySelector('[data-world-character-prerequisite="pre-trained"]');
+    row.querySelector('[data-toggle-prerequisite]').dispatchEvent(clickEvent());
+    await flushRender();
+
+    const operator =
+      '[data-world-character-prerequisite="pre-trained"] [data-prerequisite-operator]';
+    assert.deepEqual(selectOptionValues(root, operator), [
+      'eq',
+      'neq',
+      'gt',
+      'gte',
+      'lt',
+      'lte',
+      'isTrue',
+      'isFalse',
+      'exists',
+    ]);
+    // THE LABELS ARE THE `<option>` TEXT, VERBATIM: a comparison operator renders as
+    // `symbol · label` and a valueless one as its label alone, which is the join the template
+    // performed inline before the conversion moved it into a derived option list.
+    assert.deepEqual(selectOptionLabels(root, operator), [
+      '= · equals',
+      '≠ · not equals',
+      '> · greater than',
+      '≥ · at least',
+      '< · less than',
+      '≤ · at most',
+      'is true',
+      'is false',
+      'exists',
+    ]);
+    closeSelectPanel(root, operator);
+
+    // THE NAME IS UNCHANGED and reached a different way. The wrapper was a `<Field as="label">`
+    // whose containment named the control by its `visually-hidden` caption; it is `as="div"` now
+    // and the caption is POINTED at. The caption stays hidden rather than adopting the
+    // primitive's visible `label=` form, because this row already carries a "Condition" heading.
+    assert.equal(assertSelectHasResolvedName(root, operator), 'Operator');
+    assert.ok(
+      root
+        .querySelector(operator)
+        .closest('.manager-prerequisite-operator')
+        .querySelector('span.visually-hidden'),
+      'and the caption is still the hidden one, so no new copy appears on the row'
+    );
+    assert.ok(
+      !root.querySelector(operator).closest('label'),
+      'no `<label>` survives around the trigger: a caption click on one could never close the ' +
+        'list it opened'
+    );
+  });
+
+  it('routes an operator change through the caller’s own typed value, and hides the value field', async () => {
+    const updates = [];
+    const root = await harness.mount({
+      library: PREREQUISITES,
+      onUpdate: (id, patch) => updates.push([id, patch]),
+    });
+    const row = root.querySelector('[data-world-character-prerequisite="pre-trained"]');
+    row.querySelector('[data-toggle-prerequisite]').dispatchEvent(clickEvent());
+    await flushRender();
+
+    const operator =
+      '[data-world-character-prerequisite="pre-trained"] [data-prerequisite-operator]';
+    assert.ok(
+      row.querySelector('[data-prerequisite-value]'),
+      'a comparison operator takes a value'
+    );
+
+    chooseSelectOption(root, operator, 'isTrue');
+    await flushRender();
+    assert.deepEqual(updates, [['pre-trained', { op: 'isTrue' }]]);
+  });
+
+  it('gives every row’s operator control its OWN caption to point at', async () => {
+    // A single component-level caption id would name every row in the library the same way, and
+    // nothing in the primitive reports that: it was given a name prop, so it does not warn, and
+    // the resolved name would be correct on every row while pointing every trigger at the first.
+    const root = await harness.mount({ library: PREREQUISITES, onUpdate: () => {} });
+    // ONE ROW AT A TIME, which is the card's own accordion contract: opening the second closes
+    // the first, so each pointer is read while its row is the open one rather than from a tree
+    // holding both.
+    const pointers = [];
+    for (const id of ['pre-trained', 'pre-open']) {
+      root
+        .querySelector(`[data-world-character-prerequisite="${id}"] [data-toggle-prerequisite]`)
+        .dispatchEvent(clickEvent());
+      await flushRender();
+      pointers.push(
+        root
+          .querySelector(`[data-world-character-prerequisite="${id}"] [data-prerequisite-operator]`)
+          ?.getAttribute('aria-labelledby')
+      );
+    }
+    assert.ok(pointers.every(Boolean), 'both rows point at a caption');
+    assert.notEqual(pointers[0], pointers[1], 'and at DIFFERENT captions, one per row');
   });
 });

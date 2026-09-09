@@ -1,7 +1,11 @@
 import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
+import { assertSelectHasResolvedName, openSelectPanel } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -31,6 +35,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayHost.js'
   ],
   compiledModules: [
+    // THE APP'S ONE SELECT AND ITS WHOLE COMPILED CLOSURE (issue 1510), spread rather than copied.
+    // This tree renders `components/Select.svelte` now, and a `.svelte` the tree renders but the
+    // harness omits HANGS the suite (`# cancelled`) rather than failing it.
+    ...SELECT_COMPILED_MODULES,
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the
     // harness omits HANGS the suite (# cancelled) rather than failing it.
     'src/ui/svelte/components/Chip.svelte',
@@ -77,14 +85,33 @@ function expandUnit(root, unitId) {
   editButton.dispatchEvent(new globalThis.window.Event('click', { bubbles: true }));
 }
 
+/**
+ * The rows the expanded unit's sub-unit builder OFFERS, read from its open panel (issue 1510).
+ *
+ * The control is the shared `<Select>` now, so there are no `<option>` elements to read and the
+ * rows are not descendants of the trigger at all: `SearchablePopover` PORTALS the panel to the
+ * nearest application root, which in a mounted suite is the harness's own mount target. The
+ * trigger is still scoped per unit, because two expanded units would each render one.
+ *
+ * The builder's control carries no `data-*` hook of its own — it is captioned by the primitive's
+ * own labelled form and addressed structurally, exactly as it was before the conversion.
+ *
+ * @param {HTMLElement} root The harness mount target, which is the portal host.
+ * @param {string} unitId The expanded currency unit.
+ * @returns {Array<{value: string, text: string}>} The offered rows, in rendered order.
+ */
 function subUnitOptionTexts(root, unitId) {
-  const select = root.querySelector(
-    `[data-world-currency-unit="${unitId}"] .manager-currency-subunit-builder select`
-  );
-  assert.ok(select, `sub-unit builder select for ${unitId} exists`);
-  return [...select.querySelectorAll('option')].map((option) => ({
-    value: option.value,
-    text: option.textContent
+  const trigger = `[data-world-currency-unit="${unitId}"] .manager-currency-subunit-builder .fabricate-select-trigger`;
+  assert.ok(root.querySelector(trigger), `sub-unit builder control for ${unitId} exists`);
+  // THE NAME, pinned against its pre-conversion value. The wrapper this control sat in was a
+  // `<Field as="label">` whose containment named it "Add sub-unit"; the primitive's own labelled
+  // form now renders that caption and points the trigger at it, so the announced name is the
+  // same string reached a different way.
+  assert.equal(assertSelectHasResolvedName(root, trigger), 'Add sub-unit');
+  const panel = openSelectPanel(root, trigger);
+  return [...panel.querySelectorAll('[role="option"]')].map((row) => ({
+    value: row.getAttribute('data-popover-option') ?? '',
+    text: row.textContent.replaceAll(/\s+/gu, ' ').trim()
   }));
 }
 

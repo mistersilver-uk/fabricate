@@ -64,7 +64,9 @@ import { createServices, makeSystem } from '../helpers/adminStoreServices.js';
 // panel PORTALED onto the manager root rather than a `change` on a native `<select>`. Every
 // lookup is therefore rooted on the mount target and not on the control's own container.
 import {
+  assertSelectHasResolvedName,
   chooseSelectOption,
+  selectOptionLabels,
   selectOptionValues,
   selectTriggerText,
 } from '../helpers/select-control.js';
@@ -24095,21 +24097,30 @@ describe('CraftingSystemManager mounted behavior', () => {
       },
     });
 
-    const strategy = target.querySelector('[data-world-currency-strategy-select]');
-    assert.ok(strategy, 'spend-strategy select should render');
-    const optionValues = [...strategy.querySelectorAll('option')].map((option) => option.value);
+    const strategy = '[data-world-currency-strategy-select]';
+    assert.ok(target.querySelector(strategy), 'the spend-strategy control should render');
     assert.deepEqual(
-      optionValues,
+      selectOptionValues(target, strategy),
       ['actorProperty', 'actorInventory', 'macro'],
-      'three peer spend strategies should be offered'
+      'three peer spend strategies should be offered, in their pre-conversion order'
     );
-    // The single shared strategy hint reflects the selected strategy.
+    assert.deepEqual(
+      selectOptionLabels(target, strategy),
+      ['Actor data path', 'Actor inventory', 'Macro'],
+      'and the same rendered text the `<option>` elements drew, fallback strings included'
+    );
+    // THE NAME NARROWED, DELIBERATELY, and this is where that is recorded (issue 1510). The
+    // wrapper was a `<Field as="label">` holding the caption, the control AND the strategy hint,
+    // so the containment named this control "Spend strategy" plus the whole hint paragraph — a
+    // name that CHANGED every time the GM changed the value, because the hint reflects the
+    // strategy. The demoted `Field as="div"` points at the caption alone.
+    assert.equal(assertSelectHasResolvedName(target, strategy), 'Spend strategy');
+    // The single shared strategy hint reflects the selected strategy, and stays where it is.
     assert.ok(
       target.querySelector('[data-world-currency-strategy-hint]'),
       'a strategy hint should render'
     );
-    strategy.value = 'macro';
-    strategy.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, strategy, 'macro');
     await tick();
     flushSync();
     assert.ok(calls.some((call) => call[0] === 'setCurrencySpendStrategy' && call[1] === 'macro'));
@@ -24311,7 +24322,14 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
     const builder = card.querySelector('.manager-currency-subunit-builder');
     if (!builder) return [];
-    return [...builder.querySelectorAll('select option')].map((option) => option.value);
+    // THE ROWS OF THE OPEN PANEL, not `<option>` children (issue 1510). This control is the
+    // shared `<Select>` now and `SearchablePopover` PORTALS its list onto the application root,
+    // so the rows are not descendants of the builder at all. The old query returned an EMPTY
+    // array after the conversion, and the three "must not be offered" clauses below passed
+    // vacuously on it — the one positive clause is what caught it.
+    const trigger = `[data-world-currency-unit="${expandUnitId}"] .manager-currency-subunit-builder .fabricate-select-trigger`;
+    if (!target.querySelector(trigger)) return [];
+    return selectOptionValues(target, trigger);
   }
 
   it('drives the add-sub-unit dropdown from disjoint reachable sets for chain, diamond, and cross-parent cases', async () => {

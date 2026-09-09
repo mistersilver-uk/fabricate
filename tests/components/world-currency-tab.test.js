@@ -2,7 +2,16 @@ import { describe, it, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import {
+  SELECT_COMPILED_MODULES,
+  createMountedComponentHarness,
+} from '../helpers/svelte-component-harness.js';
+import {
+  assertSelectHasResolvedName,
+  closeSelectPanel,
+  selectOptionLabels,
+  selectOptionValues,
+} from '../helpers/select-control.js';
 import { assertNoElement } from '../helpers/svelte-dom.js';
 import { installLangBackedI18n } from '../helpers/langBackedI18n.js';
 
@@ -38,6 +47,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/overlayHost.js'
   ],
   compiledModules: [
+    // THE APP'S ONE SELECT AND ITS WHOLE COMPILED CLOSURE (issue 1510), spread rather than copied.
+    // This tree renders `components/Select.svelte` now, and a `.svelte` the tree renders but the
+    // harness omits HANGS the suite (`# cancelled`) rather than failing it.
+    ...SELECT_COMPILED_MODULES,
     // A `.svelte` the tree renders but the harness omits HANGS the suite (# cancelled) rather
     // than failing it, so every one is named.
     'src/ui/svelte/components/Chip.svelte',
@@ -410,5 +423,55 @@ describe('WorldCurrencyTab validation copy (issue 1493)', () => {
         `the ${leaf} fallback must read exactly what lang/en.json ships`
       );
     }
+  });
+
+  it('names both converted currency controls by their captions, and keeps their option lists', async () => {
+    // THE PROVIDER CONTROL'S FIRST MOUNTED COVERAGE (issue 1510), and the pin for BOTH names this
+    // change touched. The strategy control's wrapper demoted to `Field as="div"`; the provider's
+    // was DELETED, its caption and its hint riding the primitive's own `label=`/`hint=` form —
+    // which is `hint`'s first caller in the corpus.
+    const root = await harness.mount({
+      currencyUnits: UNITS,
+      currencySpendStrategy: 'actorInventory',
+      currencyProviderId: 'dnd5e-inventory',
+      currencyProviderOptions: [
+        { id: 'dnd5e-inventory', label: 'D&D 5e actor inventory currency' },
+        { id: 'pf2e-inventory', label: 'Pathfinder 2e actor inventory currency' },
+      ],
+    });
+
+    const provider = '[data-world-currency-provider-select]';
+    assert.deepEqual(selectOptionValues(root, provider), ['dnd5e-inventory', 'pf2e-inventory']);
+    assert.deepEqual(selectOptionLabels(root, provider), [
+      'D&D 5e actor inventory currency',
+      'Pathfinder 2e actor inventory currency',
+    ]);
+    closeSelectPanel(root, provider);
+
+    // BOTH NAMES NARROWED, DELIBERATELY, and this is the assertion that records it. Each wrapper
+    // was a `<Field as="label">` holding the caption, the control AND a hint, so the containment
+    // named each control by its caption plus the whole hint paragraph — and for the strategy that
+    // name CHANGED with the value, because the hint reflects the chosen strategy. Both are named
+    // by their caption alone now.
+    assert.equal(assertSelectHasResolvedName(root, provider), 'Provider');
+    assert.equal(
+      assertSelectHasResolvedName(root, '[data-world-currency-strategy-select]'),
+      'Spend strategy'
+    );
+
+    // The provider's hint is the primitive's own note line, after the control rather than inside
+    // the name, and the strategy's stayed the caller's hooked `<small>`.
+    assert.ok(
+      root.querySelector(provider).closest('.manager-field').querySelector('.fabricate-select-note'),
+      'the provider hint renders through `hint=`, under the control'
+    );
+    assert.ok(
+      root.querySelector('[data-world-currency-strategy-hint]'),
+      'and the strategy hint stays the caller`s own hooked element'
+    );
+    assert.ok(
+      !root.querySelector(`${provider}`).closest('label'),
+      'no `<label>` survives around either trigger'
+    );
   });
 });

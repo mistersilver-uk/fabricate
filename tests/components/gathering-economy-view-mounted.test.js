@@ -12,6 +12,14 @@ import {
   createSvelteCompiler,
 } from '../helpers/svelte-component-harness.js';
 import { stepMigratedNumberField } from '../helpers/numericKeyboardStep.js';
+import {
+  assertSelectHasResolvedName,
+  chooseSelectOption,
+  closeSelectPanel,
+  selectOptionLabels,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -84,6 +92,13 @@ function makeServices(initialEconomy, actors = []) {
 
 async function mountView(props) {
   target = document.createElement('div');
+  // THE APPLICATION ROOT, and it is load-bearing since issue 1510 (issue 1504's rule, arriving
+  // at this suite). The regeneration controls are the shared `<Select>` now, and
+  // `SearchablePopover` PORTALS its panel to the nearest `.fabricate-manager` or
+  // `.fabricate-app` — falling back to `<body>` with a console error when it finds neither. This
+  // view's production host is the manager, so the mount target says so; without the class every
+  // panel lookup in this file would miss and the failure would read as "opened no panel".
+  target.className = 'fabricate-manager';
   document.body.appendChild(target);
   mounted = mount(GatheringEconomyView, { target, props });
   flushSync();
@@ -546,6 +561,85 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
       'and Current keeps the keyboard-stepped value rather than being nulled'
     );
     assert.notEqual(calls.setStamina[0].current, null, 'a cosmetic-zero field never persists null');
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+  });
+
+  it('offers the regeneration policy and unit as the app’s own lists, named by their captions', async () => {
+    // FIRST COVERAGE OF BOTH CONTROLS (issue 1510). `[data-economy-regen-policy]` and
+    // `[data-economy-regen-unit]` had no mounted assertion at all before this change: the regen
+    // card's amount field was covered and the two selects beside it were not, so a conversion
+    // could have reordered, relabelled or unnamed either of them and nothing would have said so.
+    const { services } = makeServices(
+      {
+        stamina: { enabled: true, regen: { policy: 'overTime', unit: 'hours', amount: '2' } },
+        nodes: { enabled: false },
+      },
+      []
+    );
+    await mountView({ services, systemId: 'sys-1' });
+
+    const policy = '[data-economy-regen-policy]';
+    const unit = '[data-economy-regen-unit]';
+    assert.deepEqual(selectOptionValues(target, policy), ['none', 'overTime']);
+    assert.deepEqual(selectOptionLabels(target, policy), ['Manual only', 'Over world time']);
+    // CLOSE IT BEFORE OPENING THE NEXT. Nothing dismisses a panel in a mounted suite: the
+    // dismisser listens on `mousedown` and `.click()` fires none, so both panels would sit in the
+    // portal host at once and the class-first lookup would return the policy list for the unit
+    // trigger. The helper reports that as a mismatched `aria-controls` rather than as an option
+    // this control does not offer, which is how this line came to exist.
+    closeSelectPanel(target, policy);
+    assert.deepEqual(selectOptionValues(target, unit), ['minutes', 'hours', 'days', 'weeks']);
+    // THE LABEL IS THE `<option>`'s OWN TEXT, resolved the same way. This harness stubs
+    // `localize` to return the key, so `text(key, fallback)` yields the fallback — which for the
+    // unit list is the unit id itself, exactly as it was before the conversion. The SHIPPED copy
+    // is `Economy.Unit.*`'s singular capitalised forms ("Minute", "Hour", "Day", "Week"), so the
+    // row still reads "Every [3] Minute"; that is measured against the real `lang/en.json` in
+    // `tests/components/manager-select-conversion-rendered.test.js`, which is the only harness
+    // here that loads it. `DurationUnitPlural` exists and is deliberately NOT adopted: a copy
+    // change is not this conversion's to make.
+    assert.deepEqual(selectOptionLabels(target, unit), ['minutes', 'hours', 'days', 'weeks']);
+
+    // Both wrappers were deleted rather than demoted: each existed only to caption its select, so
+    // the caption rides the primitive's own `label=` form. The announced name is unchanged.
+    closeSelectPanel(target, unit);
+    assert.equal(assertSelectHasResolvedName(target, policy), 'Regeneration');
+    assert.equal(assertSelectHasResolvedName(target, unit), 'Per');
+    assert.equal(selectTriggerText(target, unit), 'hours');
+
+    unmount(mounted);
+    mounted = null;
+    target.remove();
+  });
+
+  it('routes a regeneration unit change through the caller’s own typed value', async () => {
+    const { services, calls } = makeServices(
+      {
+        stamina: { enabled: true, regen: { policy: 'overTime', unit: 'hours', amount: '2' } },
+        nodes: { enabled: false },
+      },
+      []
+    );
+    await mountView({ services, systemId: 'sys-1' });
+
+    chooseSelectOption(target, '[data-economy-regen-unit]', 'days');
+    flushSync();
+    assert.equal(
+      calls.setEconomy.at(-1).economy.stamina.regen.unit,
+      'days',
+      '`onChange` hands back the caller’s OWN value, so no call site coerces a string'
+    );
+
+    // And the policy control still gates the branch its sibling renders in.
+    chooseSelectOption(target, '[data-economy-regen-policy]', 'none');
+    flushSync();
+    assert.equal(calls.setEconomy.at(-1).economy.stamina.regen.policy, 'none');
+    assert.ok(
+      !target.querySelector('[data-economy-regen-unit]'),
+      'the unit control belongs to the over-time branch and leaves with it'
+    );
+
     unmount(mounted);
     mounted = null;
     target.remove();
