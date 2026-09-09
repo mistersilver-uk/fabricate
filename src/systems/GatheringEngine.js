@@ -528,6 +528,18 @@ export class GatheringEngine {
         'INVALID_COMPLETION_MODE'
       );
     }
+    this.runManager?.invalidateCache?.(idOf(actor));
+    const retainedStart = this._findVersionedStartRun({
+      actor,
+      operationId: trusted.operationId,
+      requestId,
+    });
+    if (retainedStart) {
+      const committed = getCommittedExecutionOutcome(retainedStart.executionJournal, requestId);
+      if (committed) return committed;
+      await this._markVersionedGatheringRecovery(actor, retainedStart, trusted.operationId);
+      throw gatheringLifecycleError('The gathering start requires recovery', 'RECOVERY_REQUIRED');
+    }
     const result = await this.startAttempt(
       {
         viewer,
@@ -548,6 +560,22 @@ export class GatheringEngine {
       }
     );
     return asVersionedGatheringResult(result);
+  }
+
+  _findVersionedStartRun({ actor, operationId, requestId }) {
+    const runs = [
+      ...normalizeList(this.runManager?.getActiveRuns?.(actor)),
+      ...normalizeList(this.runManager?.getRunHistory?.(actor)),
+    ];
+    return (
+      runs.find(
+        (run) =>
+          getRunLifecycleContract(run) === 'current' &&
+          run.executionJournal?.operationId === operationId &&
+          run.executionJournal?.requestId === String(requestId ?? '').trim() &&
+          run.executionJournal?.intent?.trigger === 'start'
+      ) ?? null
+    );
   }
 
   async describeVersionedStageCheck({ actor, runId, preparationGrant, requestId } = {}) {
@@ -617,14 +645,35 @@ export class GatheringEngine {
     const resolvedRun = this._hydrateBlindWaitingRun(run);
     const resolved = this._resolveWaitingRunContext({ actor, run: resolvedRun });
     if (resolved.missingReference) {
-      return versionedGatheringFailure('The gathering references are stale.');
+      const viewer = await this._viewerForRun({ actor, run: resolvedRun });
+      return asVersionedGatheringResult(
+        await this._cancelInvalidVersionedRun({
+          viewer,
+          actor,
+          run,
+          resolved,
+          reason: resolved.missingReference,
+          versionedContext: { operationId: trusted.operationId, requestId, trigger },
+        })
+      );
     }
     const resolvedTools = this._resolveTaskTools({
       environment: resolved.environment,
       task: resolved.task,
     });
     if (this._hasBlockedToolReferences(resolvedTools)) {
-      return versionedGatheringFailure('The gathering tool references are stale.');
+      const viewer = await this._viewerForRun({ actor, run: resolvedRun });
+      return asVersionedGatheringResult(
+        await this._clearInvalidVersionedRun({
+          viewer,
+          actor,
+          run,
+          environment: resolved.environment,
+          task: resolved.task,
+          errors: ['The gathering tool references are stale.'],
+          versionedContext: { operationId: trusted.operationId, requestId, trigger },
+        })
+      );
     }
     if (resolvedTools.tools.length > 0) {
       const viewer = await this._viewerForRun({ actor, run: resolvedRun });
@@ -656,7 +705,7 @@ export class GatheringEngine {
 
     const result = await this._processMaturedWaitingRun({
       actor,
-      run: resolvedRun,
+      run,
       versionedContext: {
         operationId: trusted.operationId,
         requestId,
@@ -890,10 +939,7 @@ export class GatheringEngine {
       actor,
       run: this._hydrateBlindWaitingRun(run),
     });
-    if (resolved.missingReference) {
-      throw gatheringLifecycleError('The gathering references are stale', 'STALE_RUN_STAGE');
-    }
-    if (gatheringTaskRequiresPlayerCheck(resolved.task)) {
+    if (!resolved.missingReference && gatheringTaskRequiresPlayerCheck(resolved.task)) {
       throw gatheringLifecycleError(
         'Automatic gathering stopped for a required player check',
         'AUTOMATIC_CHECK_REQUIRED'
@@ -912,7 +958,7 @@ export class GatheringEngine {
       expectedRevision: run.runRevision,
       trigger: 'worldTime',
     });
-    if (result?.success === false) {
+    if (result?.success === false && !['cancelled', 'cleared'].includes(result?.state)) {
       throw gatheringLifecycleError(
         stringOrNull(result.message) || 'Automatic gathering execution was refused',
         stringOrNull(result.code) || 'AUTOMATIC_EXECUTION_REFUSED'
@@ -1240,7 +1286,14 @@ export class GatheringEngine {
     const resolved = this._resolveWaitingRunContext({ actor, run: resolvedRun });
     if (resolved.missingReference) {
       if (versionedContext) {
-        return versionedGatheringFailure('The gathering references are stale.');
+        return this._cancelInvalidVersionedRun({
+          viewer,
+          actor,
+          run,
+          resolved,
+          reason: resolved.missingReference,
+          versionedContext,
+        });
       }
       return this._cancelMissingReferenceRun({ viewer, actor, run: resolvedRun, resolved });
     }
@@ -1249,7 +1302,15 @@ export class GatheringEngine {
     const configuration = this._validateStartTask(task, system);
     if (configuration.valid !== true) {
       if (versionedContext) {
-        return versionedGatheringFailure('The gathering task configuration is invalid.');
+        return this._clearInvalidVersionedRun({
+          viewer,
+          actor,
+          run,
+          environment,
+          task,
+          errors: configuration.errors,
+          versionedContext,
+        });
       }
       return this._clearMisconfiguredWaitingRun({
         viewer,
@@ -1271,7 +1332,15 @@ export class GatheringEngine {
     });
     if (outcome.status === 'misconfigured') {
       if (versionedContext) {
-        return versionedGatheringFailure('The gathering outcome could not be resolved.');
+        return this._clearInvalidVersionedRun({
+          viewer,
+          actor,
+          run,
+          environment,
+          task,
+          outcome,
+          versionedContext,
+        });
       }
       return this._clearMisconfiguredWaitingRun({
         viewer,
@@ -1295,7 +1364,15 @@ export class GatheringEngine {
     });
     if (plan.status === 'misconfigured') {
       if (versionedContext) {
-        return versionedGatheringFailure('The gathering effects could not be planned.');
+        return this._clearInvalidVersionedRun({
+          viewer,
+          actor,
+          run,
+          environment,
+          task,
+          outcome: plan,
+          versionedContext,
+        });
       }
       return this._clearMisconfiguredWaitingRun({
         viewer,
@@ -2846,45 +2923,20 @@ export class GatheringEngine {
       : null;
     if (blindGuard) return blindGuard;
 
-    try {
-      const run = await this.runManager.createRun(actor, runData);
-      const secret = await this._recordBlindRunSecret({
-        run,
-        actor,
-        system,
-        environment,
-        task,
-        interactableRef,
-        opaqueBlind,
-      });
-      if (secret === false) {
-        await this.runManager.clearActiveRun(actor, run.id);
-        return versionedGatheringFailure('The blind gathering run could not be recorded.');
-      }
-      const richEvidence = await this._commitRichAttempt({
-        actor,
-        system,
-        environment,
-        task: waitingStartCommitTask(task, opaqueBlind),
-        outcome: { status: 'inProgress' },
-        viewer,
-        interactableRef,
-        phase: 'waitingStart',
-      });
-      const readyRun = mergeRunEconomyEvidence(run, richEvidence);
-      return this._startedVersionedReadyStart({
-        viewer,
-        actor,
-        system,
-        environment,
-        task,
-        run: readyRun,
-      });
-    } catch (error) {
-      return versionedGatheringFailure(
-        stringOrNull(error?.message) || 'The gathering run could not be started.'
-      );
-    }
+    return this._persistAndApplyVersionedStart({
+      viewer,
+      actor,
+      system,
+      environment,
+      task,
+      interactableRef,
+      opaqueBlind,
+      versionedContext,
+      status: 'inProgress',
+      createRun: (executionPlan) => this.runManager.createRun(actor, runData, { executionPlan }),
+      buildResponse: (run) =>
+        this._startedVersionedReadyStart({ viewer, actor, system, environment, task, run }),
+    });
   }
 
   async _startWaitingAttempt({
@@ -2930,6 +2982,24 @@ export class GatheringEngine {
       : null;
     if (blindGuard) return blindGuard;
     const timeRequirement = normalizeTimeRequirement(task.timeRequirement);
+
+    if (versionedContext) {
+      return this._persistAndApplyVersionedStart({
+        viewer,
+        actor,
+        system,
+        environment,
+        task,
+        interactableRef,
+        opaqueBlind,
+        versionedContext,
+        status: 'waitingTime',
+        createRun: (executionPlan) =>
+          this.runManager.createWaitingRun(actor, runData, timeRequirement, { executionPlan }),
+        buildResponse: (run) =>
+          this._startedWaitingStart({ viewer, actor, system, environment, task, run }),
+      });
+    }
 
     try {
       const run = await this.runManager.createWaitingRun(actor, runData, timeRequirement);
@@ -3029,6 +3099,97 @@ export class GatheringEngine {
         }),
       });
     }
+  }
+
+  async _persistAndApplyVersionedStart({
+    viewer,
+    actor,
+    system,
+    environment,
+    task,
+    interactableRef,
+    opaqueBlind,
+    versionedContext,
+    status,
+    createRun,
+    buildResponse,
+  }) {
+    const state = { run: null, richEvidence: null };
+    const definitions = [];
+    if (opaqueBlind) {
+      definitions.push(
+        versionedEffect('blind', 'recordGatheringBlindRun', null, async () => {
+          const stored = await this._recordBlindRunSecret({
+            run: state.run,
+            actor,
+            system,
+            environment,
+            task,
+            interactableRef,
+            opaqueBlind,
+          });
+          if (stored === false) {
+            throw gatheringLifecycleError(
+              'The blind gathering run could not be recorded',
+              'BLIND_RUN_NOT_RECORDED'
+            );
+          }
+          return {
+            recorded: true,
+            reservationUnits: Number(stored?.reservation?.units) || 0,
+          };
+        })
+      );
+    }
+    definitions.push(
+      versionedEffect('economy', 'commitGatheringEconomy', { phase: 'waitingStart' }, async () => {
+        state.richEvidence = await this._commitRichAttempt({
+          actor,
+          system,
+          environment,
+          task: waitingStartCommitTask(task, opaqueBlind),
+          outcome: { status },
+          viewer,
+          interactableRef,
+          phase: 'waitingStart',
+        });
+        return opaqueBlind
+          ? redactRichEvidence(state.richEvidence || {}, { viewer })
+          : (cloneJson(state.richEvidence) ?? null);
+      })
+    );
+    const executionPlan = {
+      operationId: versionedContext.operationId,
+      requestId: versionedContext.requestId,
+      baseRunRevision: 0,
+      intent: {
+        activity: 'gathering',
+        trigger: 'start',
+        status,
+        taskId: opaqueBlind ? 'blind' : stringOrNull(task.id),
+      },
+      effects: definitions.map(({ effectId, kind, planned }) => ({ effectId, kind, planned })),
+    };
+    state.run = await createRun(executionPlan);
+    for (const definition of definitions) {
+      await this._applyVersionedGatheringEffect({
+        actor,
+        definition,
+        operationId: versionedContext.operationId,
+        state,
+      });
+    }
+    const response = buildResponse(mergeRunEconomyEvidence(state.run, state.richEvidence));
+    state.run = await this.runManager.updateExecutionJournal(
+      actor,
+      state.run.id,
+      { type: 'commit', outcome: versionedJournalOutcome(response) },
+      {
+        expectedRevision: state.run.runRevision,
+        executionOperationId: versionedContext.operationId,
+      }
+    );
+    return buildResponse(mergeRunEconomyEvidence(state.run, state.richEvidence));
   }
 
   /**
@@ -4832,6 +4993,169 @@ export class GatheringEngine {
     };
   }
 
+  async _cancelInvalidVersionedRun({ viewer, actor, run, resolved, reason, versionedContext }) {
+    const persistence = this._cancelledRunWriteData({
+      run,
+      environment: resolved.environment,
+      viewer,
+    });
+    const state = { run: null };
+    const definitions = [
+      versionedEffect('reservation', 'releaseGatheringReservation', null, async () => {
+        const released = await this._releaseBlindReservation(run);
+        return {
+          released: Boolean(released),
+          reservationUnits: Number(released?.reservation?.units) || 0,
+        };
+      }),
+    ];
+    const executionPlan = {
+      operationId: versionedContext.operationId,
+      requestId: versionedContext.requestId,
+      baseRunRevision: run.runRevision,
+      intent: {
+        activity: 'gathering',
+        trigger: versionedContext.trigger || 'manual',
+        status: 'cancelled',
+        reason: 'missingReference',
+        taskId: persistence.opaqueBlind ? 'blind' : stringOrNull(run.taskId),
+      },
+      effects: definitions.map(({ effectId, kind, planned }) => ({ effectId, kind, planned })),
+    };
+    state.run = await this.runManager.completeRun(actor, run, 'cancelled', persistence.payload, {
+      terminalRunData: persistence.terminalRunData,
+      executionPlan,
+      expectedRevision: run.runRevision,
+      executionOperationId: versionedContext.operationId,
+    });
+    if (!state.run) {
+      throw gatheringLifecycleError(
+        'Gathering cancellation history was not written',
+        'TERMINAL_HISTORY_NOT_WRITTEN'
+      );
+    }
+    for (const definition of definitions) {
+      await this._applyVersionedGatheringEffect({
+        actor,
+        definition,
+        operationId: versionedContext.operationId,
+        state,
+      });
+    }
+    let response = this._timedCancellation({
+      viewer,
+      actor,
+      run,
+      cancelledRun: state.run,
+      reason,
+      environment: resolved.environment ?? null,
+    });
+    state.run = await this.runManager.updateExecutionJournal(
+      actor,
+      state.run.id,
+      { type: 'commit', outcome: versionedJournalOutcome(response) },
+      {
+        expectedRevision: state.run.runRevision,
+        executionOperationId: versionedContext.operationId,
+      }
+    );
+    response = this._timedCancellation({
+      viewer,
+      actor,
+      run,
+      cancelledRun: state.run,
+      reason,
+      environment: resolved.environment ?? null,
+    });
+    return response;
+  }
+
+  async _clearInvalidVersionedRun({
+    viewer,
+    actor,
+    run,
+    environment,
+    task,
+    errors = null,
+    outcome = null,
+    versionedContext,
+  }) {
+    const definitions = [
+      versionedEffect('reservation', 'releaseGatheringReservation', null, async () => {
+        const released = await this._releaseBlindReservation(run);
+        return {
+          released: Boolean(released),
+          reservationUnits: Number(released?.reservation?.units) || 0,
+        };
+      }),
+      versionedEffect('cleanup', 'clearInvalidGatheringRun', null, async () => null),
+    ];
+    const executionPlan = {
+      operationId: versionedContext.operationId,
+      requestId: versionedContext.requestId,
+      baseRunRevision: run.runRevision,
+      intent: {
+        activity: 'gathering',
+        trigger: versionedContext.trigger || 'manual',
+        status: 'cleared',
+        reason: 'misconfigured',
+        taskId: isBlindWaitingTaskId(run.taskId) ? 'blind' : stringOrNull(run.taskId),
+      },
+      effects: definitions.map(({ effectId, kind, planned }) => ({ effectId, kind, planned })),
+    };
+    const state = {
+      run: await this.runManager.updateExecutionJournal(
+        actor,
+        run.id,
+        { type: 'plan', plan: executionPlan },
+        { expectedRevision: run.runRevision, executionOperationId: versionedContext.operationId }
+      ),
+    };
+    await this._applyVersionedGatheringEffect({
+      actor,
+      definition: definitions[0],
+      operationId: versionedContext.operationId,
+      state,
+    });
+    state.run = await this.runManager.updateExecutionJournal(
+      actor,
+      state.run.id,
+      { type: 'effectApplying', effectId: 'cleanup' },
+      {
+        expectedRevision: state.run.runRevision,
+        executionOperationId: versionedContext.operationId,
+      }
+    );
+    try {
+      const cleared = await this.runManager.clearActiveRun(actor, state.run.id, {
+        expectedRevision: state.run.runRevision,
+        executionOperationId: versionedContext.operationId,
+      });
+      if (!cleared) {
+        throw gatheringLifecycleError(
+          'Gathering invalid-run cleanup was not written',
+          'RUN_CLEANUP_NOT_WRITTEN'
+        );
+      }
+    } catch (error) {
+      await this._markVersionedGatheringRecovery(actor, state.run, versionedContext.operationId);
+      throw gatheringLifecycleError(
+        'Gathering invalid-run cleanup requires recovery',
+        'RECOVERY_REQUIRED',
+        error
+      );
+    }
+    return this._misconfiguredWaitingResult({
+      viewer,
+      actor,
+      run,
+      environment,
+      task,
+      errors,
+      outcome,
+    });
+  }
+
   async _clearMisconfiguredWaitingRun({
     viewer,
     actor,
@@ -4854,6 +5178,18 @@ export class GatheringEngine {
     }
 
     await this.runManager.clearActiveRun(actor, run.id);
+    return this._misconfiguredWaitingResult({
+      viewer,
+      actor,
+      run,
+      environment,
+      task,
+      errors,
+      outcome,
+    });
+  }
+
+  _misconfiguredWaitingResult({ viewer, actor, run, environment, task, errors, outcome }) {
     const reason = this._blockedReason('TASK_MISCONFIGURED', {
       data: this._terminalMisconfigurationData({
         environment,
@@ -4883,38 +5219,47 @@ export class GatheringEngine {
     };
   }
 
+  _cancelledRunWriteData({ run, environment, viewer }) {
+    const opaqueBlind =
+      isBlindWaitingTaskId(run?.taskId) ||
+      Boolean(environment && this._isOpaqueBlindTask({ environment, viewer }));
+    const economyEvidence = opaqueBlind
+      ? redactRichEvidence(run?.economyEvidence || {})
+      : stripRuntimeSnapshotFromRun({ economyEvidence: run?.economyEvidence || {} })
+          .economyEvidence;
+    return {
+      opaqueBlind,
+      terminalRunData: opaqueBlind
+        ? {
+            craftingSystemId: stringOrNull(run?.craftingSystemId),
+            environmentId: stringOrNull(run?.environmentId),
+            taskId: 'blind',
+          }
+        : undefined,
+      payload: opaqueBlind
+        ? {
+            economyEvidence,
+            createdResults: [],
+            usedTools: [],
+            checkResult: { blind: true, status: 'cancelled' },
+          }
+        : { economyEvidence },
+    };
+  }
+
   async _cancelMissingReferenceRun({ viewer, actor, run, resolved }) {
     // A cancelled run is terminal for the pool: release its provisional claim
     // without the real `nodeRuntime` count ever having moved (issue 901).
     await this._releaseBlindReservation(run);
-    const opaqueBlind =
-      resolved.environment &&
-      this._isOpaqueBlindTask({ environment: resolved.environment, viewer });
-    const cancellationPayload = {
-      economyEvidence: opaqueBlind
-        ? redactRichEvidence(run?.economyEvidence || {})
-        : stripRuntimeSnapshotFromRun({ economyEvidence: run?.economyEvidence || {} })
-            .economyEvidence,
-    };
-    const cancelledRun = await this.runManager.cancelRun(
-      actor,
-      run.id,
-      opaqueBlind
-        ? {
-            terminalRunData: {
-              craftingSystemId: stringOrNull(run?.craftingSystemId),
-              environmentId: stringOrNull(run?.environmentId),
-              taskId: 'blind',
-            },
-            payload: {
-              ...cancellationPayload,
-              createdResults: [],
-              usedTools: [],
-              checkResult: { blind: true, status: 'cancelled' },
-            },
-          }
-        : { payload: cancellationPayload }
-    );
+    const persistence = this._cancelledRunWriteData({
+      run,
+      environment: resolved.environment,
+      viewer,
+    });
+    const cancelledRun = await this.runManager.cancelRun(actor, run.id, {
+      terminalRunData: persistence.terminalRunData,
+      payload: persistence.payload,
+    });
     if (!cancelledRun) {
       throw Object.assign(new Error('Timed gathering cancellation history was not written'), {
         code: 'TERMINAL_HISTORY_NOT_WRITTEN',
@@ -4932,7 +5277,9 @@ export class GatheringEngine {
   }
 
   _timedCancellation({ viewer, actor, run, cancelledRun, reason, environment = null }) {
-    const opaqueBlind = environment && this._isOpaqueBlindTask({ environment, viewer });
+    const opaqueBlind =
+      isBlindWaitingTaskId(run?.taskId) ||
+      Boolean(environment && this._isOpaqueBlindTask({ environment, viewer }));
     return {
       accepted: true,
       started: true,
