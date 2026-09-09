@@ -536,6 +536,7 @@ test('gathering yield projects straight and d100 authored previews without repla
     resolutionMode: 'd100',
     dropRows: [
       { id: 'moss-row', componentId: 'moss', quantity: 2, dropRate: 65, enabled: true },
+      { id: 'reed-row', name: 'Bog Reed', quantity: 1, dropRate: 40, enabled: true },
       { id: 'disabled-row', componentId: 'secret', quantity: 9, dropRate: 100, enabled: false },
     ],
   };
@@ -545,7 +546,15 @@ test('gathering yield projects straight and d100 authored previews without repla
     environmentId: 'env-1',
     taskId: 'd100-task',
     status: 'succeeded',
-    checkResult: { provider: 'd100', items: [{ id: 'moss-row', roll: 42, finalDropRate: 71 }] },
+    checkResult: {
+      provider: 'd100',
+      roll: 42,
+      items: [{ id: 'moss-row', roll: 42, finalDropRate: 71 }],
+      itemRows: [
+        { id: 'moss-row', roll: 42, finalDropRate: 71, dropped: true },
+        { id: 'reed-row', roll: 42, finalDropRate: 23, dropped: false },
+      ],
+    },
     createdResults: [{ componentId: 'moss', quantity: 2, name: 'Bog Moss', img: 'icons/moss.webp' }],
   };
   const listing = makeBuilder({
@@ -591,6 +600,12 @@ test('gathering yield projects straight and d100 authored previews without repla
         art: 'icons/moss.webp',
         qty: 2,
         chance: 71,
+      },
+      {
+        id: 'reed-row',
+        name: 'Bog Reed',
+        qty: 1,
+        chance: 23,
       },
     ],
     roll: 42,
@@ -699,7 +714,12 @@ test('gathering yield prefers the persisted task snapshot and hides opaque blind
       environmentId: 'env-1',
       taskId: 'blind:env-1',
       status: 'waitingTime',
-      checkResult: { provider: 'd100', items: [{ id: 'secret-herb', roll: 7 }] },
+      checkResult: {
+        provider: 'd100',
+        roll: 7,
+        items: [],
+        itemRows: [{ id: 'secret-herb', roll: 7, finalDropRate: 90, dropped: false }],
+      },
     },
   ];
   const builder = makeBuilder({

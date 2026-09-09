@@ -4259,6 +4259,8 @@ export class GatheringEngine {
       characterModifierSnapshot: resolved?.characterModifierSnapshot || null,
       checkResult: {
         provider: 'd100',
+        roll: Number.isFinite(resolved?.roll) ? resolved.roll : null,
+        itemRows: normalizeList(resolved?.itemRows),
         items: normalizeList(resolved?.items),
         events: normalizeList(resolved?.events),
         eventPolicy: stringOrNull(resolved?.eventPolicy),

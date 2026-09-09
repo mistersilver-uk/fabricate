@@ -1191,6 +1191,16 @@ test('one d100 decides every drop row, while events roll independently', async (
 
   assert.equal(result.accepted, true);
   const { items, events } = calls.terminal[0].payload.checkResult;
+  const { roll, itemRows } = calls.terminal[0].payload.checkResult;
+  assert.equal(roll, 50, 'the shared item roll is retained independently of awards');
+  assert.deepEqual(
+    itemRows.map(row => [row.id, row.roll, row.dropped]),
+    [
+      ['drop-common', 50, false],
+      ['drop-rare', 50, true]
+    ],
+    'every evaluated row retains the same shared roll, including misses'
+  );
   assert.deepEqual(items.map(row => row.id), ['drop-rare'], 'only the row the one roll cleared');
   assert.deepEqual(
     [...new Set(items.map(row => row.roll))],
@@ -1257,6 +1267,11 @@ test('d100 resolution applies system gathering rules over legacy task and enviro
   assert.deepEqual(
     calls.terminal[0].payload.checkResult.items.map((row) => row.id),
     ['drop-first', 'drop-second']
+  );
+  assert.deepEqual(
+    calls.terminal[0].payload.checkResult.itemRows.map((row) => row.id),
+    ['drop-first', 'drop-second', 'drop-third'],
+    'selection-limited rows remain evidence and never become awards'
   );
   assert.deepEqual(
     calls.terminal[0].payload.checkResult.events.map((row) => row.id),
@@ -1416,6 +1431,11 @@ test('drop resolution clamps negative condition modifiers at zero drop chance', 
   });
 
   assert.deepEqual(result.items, []);
+  assert.equal(result.roll, 100);
+  assert.deepEqual(
+    result.itemRows.map((row) => [row.id, row.finalDropRate, row.dropped]),
+    [['drop-zero', 0, false]]
+  );
 });
 
 test('gathering start validation accepts zero drop chance rows', async () => {

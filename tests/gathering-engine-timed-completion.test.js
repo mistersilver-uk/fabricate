@@ -849,6 +849,55 @@ test('non-blind timed task resolves from its start-time mode and results after l
   ]);
 });
 
+test('timed d100 history retains the shared roll and every evaluated row when nothing drops', async () => {
+  resetActor();
+  let worldTime = 1000;
+  const runManager = makeRunManager({ now: () => worldTime });
+  const task = nodesLibraryTask({
+    dropRows: [
+      {
+        id: 'row-missed',
+        componentId: 'comp-a',
+        quantity: 2,
+        dropRate: 5,
+        enabled: true
+      }
+    ]
+  });
+  const env = environment([], {
+    compositionMode: 'automatic',
+    tasks: [],
+    conditions: { weather: 'rain' }
+  });
+  const environments = [env];
+  const richState = makeNodesRichState(environments, {
+    tasks: [task],
+    rollD100: () => 50
+  });
+  const engine = makeEngine({ runManager, environments, richState });
+
+  const started = await engine.startAttempt({
+    viewer,
+    actor,
+    environmentId: 'env-a',
+    taskId: task.id
+  });
+  assert.equal(started.state, 'waitingTime');
+  worldTime = 1060;
+
+  const result = await engine.processWorldTime(worldTime);
+  const history = runManager.getRunHistory(actor)[0];
+
+  assert.equal(result.completed.length, 1);
+  assert.deepEqual(history.createdResults, []);
+  assert.deepEqual(history.checkResult.items, []);
+  assert.equal(history.checkResult.roll, 50);
+  assert.deepEqual(
+    history.checkResult.itemRows.map((row) => [row.id, row.roll, row.finalDropRate, row.dropped]),
+    [['row-missed', 50, 5, false]]
+  );
+});
+
 test('matured legacy run rejects an invalid live result quantity before terminal side effects', async () => {
   resetActor();
   let worldTime = 1000;

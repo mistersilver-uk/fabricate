@@ -1405,8 +1405,11 @@ export class RunJournalBuilder {
   }
 
   _d100YieldEntries(task, run, systemId) {
+    const evaluatedRows = Array.isArray(run?.checkResult?.itemRows)
+      ? run.checkResult.itemRows
+      : normalizeList(run?.checkResult?.items);
     const actualById = new Map(
-      normalizeList(run?.checkResult?.items)
+      evaluatedRows
         .filter((item) => stringOrNull(item?.id))
         .map((item) => [stringOrNull(item.id), item])
     );
@@ -1659,7 +1662,7 @@ export class RunJournalBuilder {
       appliedEffectCount: effects.filter((effect) => effect.phase === 'applied').length,
       effectCount: effects.length,
       effects,
-      ...((status === 'recoveryRequired') && { required: true }),
+      ...(status === 'recoveryRequired' && { required: true }),
     };
   }
 }
@@ -1705,6 +1708,8 @@ function routedOutcomeBand(outcome, routed, task) {
     const end = numberOrNull(outcome?.end) ?? start;
     return start === end ? String(start) : `${start}–${end}`;
   }
+  // Mirrors GatheringEngine._resolveGatheringRoutedDc exactly: a finite task
+  // override, then the routed slot's DC, then its canonical legacy fallback.
   const baseDc = numberOrNull(task?.dcOverride) ?? numberOrNull(routed?.dc) ?? 15;
   const threshold = baseDc + (numberOrNull(outcome?.dc) ?? 0);
   return routed?.thresholdMode === 'exceed' ? `>${threshold}` : `${threshold}+`;
