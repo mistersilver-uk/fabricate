@@ -50,6 +50,10 @@ When the workflow driver routes a plan for domain review (change touches `src/mo
 Plan review runs in a fresh detached read-only lane.
 Do not edit files or GitHub state while reviewing a plan, and return the verdict plus any recommended managed-block text to the workflow driver.
 
+**Confirmation round (revision 2 or later, brief marked disposition-only).**
+Keep to your own prior findings: mark each `RESOLVED`, `RESOLVED-WITH-NIT` (give the exact text the driver applies) or `UNRESOLVED` (say what is still wrong), then add ONE section, "New, introduced by the revision", for defects the revision itself created; raise nothing else.
+The driver runs these rounds at model tier `medium`, because the scope is fixed by your own earlier verdict rather than by the change's path set.
+
 ## Documentation iteration loop
 
 When the workflow driver routes the change into the documentation loop (behaviour change, public API, hooks, settings, or any JSDoc/Jekyll-documented surface), pair with `fabricate_docs_writer`:
@@ -60,7 +64,7 @@ When implementation faithfully realized the delta, confirm it.
 When it justifiably deviated, return replacement managed-block text with the difference and justification under `### Deviations` so the workflow driver can update the issue.
 3. Review the docs writer's JSDoc and Jekyll updates for terminology fidelity and lifecycle accuracy.
 4. Emit `DOCS APPROVED` or `DOCS NEEDS_CHANGES` with concrete findings.
-5. Iterate with the docs writer until both emit `DOCS APPROVED`, capped at 3 revisions before escalating to the user through the workflow driver.
+5. Iterate with the docs writer until both emit `DOCS APPROVED` — one full round by default, then disposition-only confirmation at model tier `medium` — capped at 3 revisions before escalating to the user through the workflow driver.
 
 ## Audit focus
 

@@ -1,5 +1,5 @@
 name = "fabricate_quality_engineer_medium"
-description = "Find Fabricate defects, edge cases, test gaps, and unreliable UI behavior. Bound to the medium model tier, selected by the workflow driver, for a single-file change spanning multiple functions, objects, or structures."
+description = "Find Fabricate defects, edge cases, test gaps, and unreliable UI behavior. Bound to the medium model tier, selected by the workflow driver, for a single-file change spanning multiple functions, objects, or structures. Also the binding for every disposition-only confirmation round, whatever model tier the first round ran at."
 model = "gpt-5.6-terra"
 model_reasoning_effort = "medium"
 sandbox_mode = "danger-full-access"
@@ -12,5 +12,5 @@ Read and follow .agents/skills/fabricate-quality-engineer/SKILL.md as your opera
 
 Sandbox: do not modify src/, tests/, or styles/. Record findings as issue-ready defect/test-gap notes; edit only the workflow or documentation files you own. Keep evidence (file:line, repro, impact, severity) for every finding.
 
-This binding is model tier medium; if the assignment exceeds this model tier, return ESCALATE_TIER: <reason> on the first line before making any edit.
+This binding is model tier medium; if the assignment exceeds this model tier, return ESCALATE_TIER: <reason> on the first line before making any edit. A disposition-only confirmation round, your own prior findings against a driver-supplied artifact, is within this model tier by construction; do not escalate it.
 """

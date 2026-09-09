@@ -29,7 +29,7 @@ The **workflow driver** is the top-level loop — Codex's depth-0 prompt agent o
 A spawned `fabricate_orchestrator` is a read-only planning helper.
 It inspects the supplied repository and issue context, resolves the roster, and returns a complete draft or replacement `openspec-delta` managed block for the driver to apply.
 It never edits files, commits, pushes, manages worktrees, mutates GitHub state, or spawns another agent.
-Each loop iterates until acceptance or hits a 3-revision cap; at the cap, halt and surface findings to the user.
+Each loop runs one full round by default; the driver applies mechanical findings itself and spawns only disposition-only confirmation rounds at model tier `medium` after that, per `AGENTS.md`'s **Iteration cycles**; the 3-revision cap is the stop condition — at the cap, halt and surface findings to the user.
 Every spawned role uses the isolated lane lifecycle in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` by default.
 The driver retains exclusive authority over the coordinator checkout, integration, GitHub and remote mutations, authoritative gates, and lane cleanup.
 The numbered state-machine procedure belongs to the driver; a spawned helper performs only its read-only planning analysis and handoff portions from the context in its brief.
@@ -41,7 +41,10 @@ It prioritizes the earliest honestly reviewable PR while preserving mandatory sa
 
 - Front-load cheap checks before expensive or delegated work: branch and base freshness, affected paths and resolved roster, PR title and commitlint compliance, existing CI and external-check state, and screenshot scope.
 - Treat one mechanically valid evidence run as satisfying every gate it directly covers, and record or retain that evidence instead of repeating equivalent checks ceremonially.
-- Repeat a reviewer only when the commit or artifact it reviews materially changes within its owned concern, or when one of its findings remains unresolved.
+- Repeat a reviewer only when the commit or artifact it reviews materially changes within its owned concern, or when one of its findings remains unresolved — and then as a disposition-only confirmation round at model tier `medium`, scoped to its own prior findings, never as a second full reading.
+- Apply mechanical findings yourself: a finding that names exact replacement text, an anchor, a count or a roster entry goes straight into the next delta revision or the fix brief, and does not cost a reviewer spawn to confirm.
+- Prune a path-signal role at the post-implementation and docs stages when its row fired on prose alone (comments, docblocks, cites, counts; no executable line, selector, assertion or requirement sentence; at or below the stage's `SMALL_MAX`), per step 5 of `AGENTS.md`'s **Auto-spawn routing**; record the pruned role in the handoff.
+- Plan issues that share an exact-count ledger as one delta and one PR chain, and run changes as parallel lanes only when their path sets are disjoint from each other's pinned ledgers, sheet regions and registry prose; otherwise sequence them on one rail.
 - Do not invalidate an approval merely because issue or PR metadata changed or a rebase is patch-equivalent for the reviewed concern.
 - When repeat review is required, use a fresh detached lane pinned to the exact target and supply an immutable base-relative artifact.
 - Monitor each delegated lane for observable progress, such as tool output, a status report, a diff, or a commit.

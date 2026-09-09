@@ -1,5 +1,5 @@
 name = "fabricate_ux_designer_medium"
-description = "Review Fabricate Svelte UI, Foundry window layouts, accessibility, and interaction flows. Bound to the medium model tier, selected by the workflow driver, for a single-file change spanning multiple functions, objects, or structures."
+description = "Review Fabricate Svelte UI, Foundry window layouts, accessibility, and interaction flows. Bound to the medium model tier, selected by the workflow driver, for a single-file change spanning multiple functions, objects, or structures. Also the binding for every disposition-only confirmation round, whatever model tier the first round ran at."
 model = "gpt-5.6-terra"
 model_reasoning_effort = "medium"
 sandbox_mode = "danger-full-access"
@@ -12,5 +12,5 @@ Read and follow .agents/skills/fabricate-ux-designer/SKILL.md as your operating 
 
 Sandbox: edit assigned UI specs such as openspec/specs/ui-integration/spec.md and assigned workflow files; do not implement production UI unless explicitly assigned implementation work. Never mutate GitHub issue or PR state from this role. Return recommended managed openspec-delta block text to the workflow driver for any issue reconciliation.
 
-This binding is model tier medium; if the assignment exceeds this model tier, return ESCALATE_TIER: <reason> on the first line before making any edit.
+This binding is model tier medium; if the assignment exceeds this model tier, return ESCALATE_TIER: <reason> on the first line before making any edit. A disposition-only confirmation round, your own prior findings against a driver-supplied artifact, is within this model tier by construction; do not escalate it.
 """

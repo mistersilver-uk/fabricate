@@ -19,6 +19,8 @@ See `openspec/README.md` for the block format and rules.
 - Treat `openspec/specs/*/spec.md` as the canonical specification source of truth.
 - Route quick-start documentation changes to `docs/help/quickstart.md` only.
 - Non-trivial UI plans include a `Reference surfaces / reuse inventory` and follow `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`.
+- **Batch siblings that share an exact-count ledger.** Two issues whose planned path sets both touch the same pinned ledger — `tests/components/design-system-known-debt.json`, `tests/components/selector-repetition-baseline.json`, `tests/components/spacing-known-literals.json`, `tests/components/control-height-known-literals.js`, or the View Lab registry-total prose that `tests/view-lab-cases.test.js` pins — are planned as ONE delta and delivered as one PR chain, with the phases ordered so each commit boundary re-derives the pins once.
+Planned separately, every one of those PRs restacks onto the other's merge and re-derives the same pins again, which is pure overhead with no review value.
 
 ## Default Agentic Workflow
 
@@ -45,6 +47,7 @@ One mechanically valid evidence run satisfies every gate it directly covers, so 
 A reviewer repeats only when its owned concern materially changed or an unresolved finding remains; issue or PR metadata edits and patch-equivalent rebases do not invalidate approval.
 The driver front-loads cheap checks for branch and base freshness, affected paths and roster, PR title and commitlint, existing CI state, and screenshot scope.
 The driver timeboxes delegated lanes: after about 60 seconds without observable progress it requests status once, and after another about 60 seconds it interrupts and reassigns the work or continues locally within driver authority.
+**Parallel lanes only where the path sets are disjoint.** The driver runs two changes as parallel lanes or teams only when neither touches the other's pinned ledgers, shared stylesheet regions, or registry-total prose; changes that share any of those run on one rail, sequenced, because each concurrent PR costs a restack with conflict resolution and pin re-derivation at the tip, and that restack has cost more than the parallelism saved.
 
 ### Isolated worktree execution
 
@@ -69,6 +72,9 @@ Resolve the roster with this procedure — it is mechanical, not a judgment call
 2. Match every path against every row's signal below; a path-signal row matches when any changed path matches any of its globs, and a content-signal row (Foundry identifiers, competitor questions, PR investigation) matches on the diff content or request text instead.
 3. Take the union of every matching row's agents — multi-select, never single-pick; the "any non-trivial task" row always applies.
 4. Record the union in the issue delta's `### Resolved Roster` section, split by stage (plan-review, post-implementation review, docs loop).
+5. **Prune a path-signal role whose row fired on prose alone** at the post-implementation review and docs-loop stages: take the row-intersected `git diff`, and when every hunk in it changes only comments, JSDoc or docblocks, Markdown prose, a `file:line` cite or a count — no executable line, no selector, no assertion, no requirement sentence — and the intersected diff is at or below the post-implementation `SMALL_MAX`, the row does not spawn; `fabricate_reviewer`'s reconciliation already reads those hunks.
+The driver records the pruned role and the hunks it measured in the handoff.
+The always row, every plan-review spawn, and any hunk that adds or changes a requirement sentence under `openspec/specs/**` are never pruned.
 
 | Signal                                                                                                                            | Agent(s)                                                                                         | Stage                                    |
 |-----------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|------------------------------------------|
@@ -234,11 +240,17 @@ Rule 6: `medium`.
 **Model-tier floors.**
 Applied after the base model tier; they only ever raise it, and every floor clamps at `large`.
 
-- A lane's model tier never decreases across revisions of the same `(family, stage)`.
+- A mutable lane's model tier never decreases across revisions of the same `(family, stage)`; a read-only confirmation round is exempt, per the override below.
 The floor is the **highest model tier at which the lane actually executed** in a previous revision — not the model tier it was originally resolved to.
 Without this, a lane that resolved `small`, escalated, and completed at `medium` would re-resolve to `small` from the same unchanged facts next revision and pay the identical wasted spawn again, since the ladder itself has no memory.
 - A revision carrying an unresolved finding forward is floored one model tier above the previous revision's executed model tier.
 - A lane whose keyed path set includes `openspec/specs/**` floors at `medium`.
+
+**Confirmation-round override.**
+A read-only review role — `fabricate_reviewer`, `fabricate_ux_designer`, `fabricate_quality_engineer`, `fabricate_domain_expert`, `foundry_integrator` — spawned at revision 2 or later with a brief marked *disposition-only* resolves `medium`, overriding rules 1 to 4 and both revision floors above.
+Its scope is fixed by construction: it dispositions its OWN prior findings against a driver-supplied immutable artifact and reports only defects the revision itself introduced, so the reading is narrow whatever the first round's path set was.
+A mutable lane never takes the override, `ESCALATE_TIER` stays available to the confirmation spawn, and a confirmation round that returns a NEW `HIGH` finding re-enters the loop as a fresh revision at the ladder's own resolution.
+The first round of every loop stays at the ladder's resolution, because that is the round that has to find the defects.
 
 #### `ESCALATE_TIER`
 
@@ -271,7 +283,11 @@ The default-up rule, the executed-model-tier floor, the once-per-revision bound,
 
 ### Iteration cycles
 
-Three loops run until acceptance, each capped at 3 revisions before escalating to the user:
+Three loops run until acceptance, each capped at 3 revisions before escalating to the user.
+**Each loop runs ONE full round by default.**
+After round one the driver applies every mechanical finding itself — a finding that names exact replacement text, an anchor, a count, or a roster entry — into the next revision of the delta or the branch, and spawns a further round only as a *confirmation round*: disposition-only, scoped to the roles whose findings were not mechanical or whose `HIGH` finding the driver disputes, at model tier `medium` (see the confirmation-round override under [Model tier routing](#model-tier-routing)).
+A role whose round-one findings were all `LOW`, or none, is not re-spawned; the driver confirms its concern from evidence — the gate run, the artifact, the mutation control — and records that in the handoff.
+Rounds two and three therefore exist for disputed or non-mechanical findings, not as a second reading of the whole plan or diff, and the three-revision cap is the stop condition rather than the expected path:
 
 In every loop, reviewers return their verdicts to the driver, which acts on them and summarizes outcomes to the user.
 Reviewers do not post verdicts (or other workflow notes) as GitHub issue or PR comments.
@@ -283,10 +299,10 @@ See [Model tier routing](#model-tier-routing).
 
 1. **Plan review loop.** The driver drafts the OpenSpec delta in the issue's `openspec-delta` block (delegating to a `fabricate_orchestrator` planning agent when useful), then spawns the plan-review agents matched by the routing table.
 Each emits `APPROVED / NEEDS_CHANGES / BLOCKED` against the delta, returning its verdict to the driver rather than commenting on the issue.
-The driver rewrites the delta block in place until every plan reviewer approves.
+The driver rewrites the delta block in place, applying the mechanical findings itself, and spawns a confirmation round only for a reviewer whose finding it could not apply mechanically or disputes; when every remaining finding is applied or dispositioned, the plan is accepted and implementation starts.
 2. **Implementation review loop.** The driver spawns the implementer to ship changes — including the canonical spec changes under `openspec/specs/` that the delta requires — then spawns `fabricate_reviewer` plus any post-implementation reviewers from the routing table to emit verdicts.
 Reviewers compare the actual `openspec/specs/` diff against the proposed delta in the issue and confirm a faithful realization (or flag a justified deviation to reconcile).
-The implementer addresses `NEEDS_CHANGES` until every reviewer emits `APPROVED`.
+The implementer addresses `NEEDS_CHANGES` in one fix lane for every reviewer's findings; the driver then spawns a disposition-only confirmation round at `medium` for the roles that raised non-`LOW` findings, confirms the rest from evidence, and proceeds when every finding is resolved or recorded as a Deviation.
 3. **Documentation iteration loop.** Triggered whenever the change touches behaviour or any documented API surface.
 The driver spawns the paired `fabricate_domain_expert` (updates `DOMAIN.md` and canonical specs against the diff, and reconciles the issue delta — updating it and its `Deviations` note when implementation justifiably diverged) and `fabricate_docs_writer` (updates JSDoc and the Jekyll site to match the shipped canonical spec).
 Each then reviews the other's output and emits `DOCS APPROVED / DOCS NEEDS_CHANGES`.
