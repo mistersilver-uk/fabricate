@@ -588,11 +588,13 @@ export class CraftingRunManager extends RunContainerManagerBase {
       const container = this._getContainer(actor);
       for (const run of Object.values(container.active || {})) {
         if (!this._dueVersionedStep(run, worldTime)) continue;
+        const currentStepIndex = Number(run.currentStepIndex);
         due.push({
           actor,
           runId: run.id,
           expectedRevision: run.runRevision,
           componentSourceActorUuids: [...(run.componentSourceActorUuids || [])],
+          maximumAttempts: Math.max(1, (run.steps?.length || 0) - currentStepIndex),
         });
       }
     }

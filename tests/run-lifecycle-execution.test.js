@@ -952,3 +952,40 @@ test('CraftingEngine delegates due world-time runs to authority without pre-muta
   assert.equal(runManager.getActiveRun(actor, started.runId).runRevision, started.runRevision);
   assert.equal(runManager.getActiveRun(actor, started.runId).status, 'waitingTime');
 });
+
+test('CraftingEngine bounds world-time jump continuation by the remaining finite stage count', async () => {
+  const requests = [];
+  const engine = new CraftingEngine();
+  engine.craftingRunManager = {
+    listDueVersionedRuns: () => [
+      {
+        actor: { id: 'actor-1' },
+        runId: 'run-1',
+        expectedRevision: 4,
+        componentSourceActorUuids: ['Actor.source'],
+        maximumAttempts: 3,
+      },
+    ],
+  };
+  engine.installVersionedRunAuthority({
+    requestExecute: async (request) => {
+      requests.push(request);
+      return {
+        success: true,
+        runId: request.runId,
+        status: 'inProgress',
+        runRevision: request.expectedRevision + 1,
+        terminal: false,
+      };
+    },
+  });
+
+  const results = await engine.processVersionedWorldTime({ worldTime: 5000 });
+
+  assert.deepEqual(
+    requests.map((request) => request.expectedRevision),
+    [4, 5, 6]
+  );
+  assert.equal(results.length, 3);
+  assert.equal(requests.every((request) => request.trigger === 'worldTime'), true);
+});

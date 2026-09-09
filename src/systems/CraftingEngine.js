@@ -468,15 +468,29 @@ export class CraftingEngine {
     const candidates = this._craftingRunManager()?.listDueVersionedRuns?.(worldTime) ?? [];
     const results = [];
     for (const candidate of candidates) {
-      results.push(
-        await requestExecute({
+      let expectedRevision = candidate.expectedRevision;
+      const maximumAttempts = Math.max(1, Number(candidate.maximumAttempts) || 1);
+      for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
+        const result = await requestExecute({
           actor: candidate.actor,
           runId: candidate.runId,
-          expectedRevision: candidate.expectedRevision,
+          expectedRevision,
           componentSourceActorUuids: candidate.componentSourceActorUuids,
           trigger: 'worldTime',
-        })
-      );
+        });
+        results.push(result);
+        const nextRevision = Number(result?.runRevision);
+        if (
+          result?.success !== true ||
+          result?.terminal === true ||
+          result?.status !== 'inProgress' ||
+          !Number.isSafeInteger(nextRevision) ||
+          nextRevision <= Number(expectedRevision)
+        ) {
+          break;
+        }
+        expectedRevision = nextRevision;
+      }
     }
     return results;
   }
