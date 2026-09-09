@@ -205,6 +205,17 @@
  * re-rooting itself moves NONE of them: every one of the eleven surviving selectors is renamed
  * from `.fabricate-manager` to `.fabricate-pill-select` one for one.
  *
+ * ISSUE 1511 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, and it is the
+ * first change to move them by deleting an APPLICATION ROOT'S element theme rather than a
+ * primitive's or an area's copy of one. The player app's last native select converted, so
+ * `.fabricate-app select:focus-visible`, `.fabricate-app select` and `.fabricate-app select
+ * option` had no carrier left and were deleted outright: three rules, three selectors, every one
+ * of them a singleton in both keyings, because no other rule shares a list with any of them. The
+ * rule count falls by three and the key and singleton counts each fall by three, while
+ * `pinnedTotal` STAYS 243 across 119 rows. The change adds no sheet rule at all — the two width
+ * treatments the conversion needs live in the callers' own scoped blocks — so there is nothing on
+ * the other side of the ledger to net against. Re-derived by running the census, not predicted.
+ *
  * ISSUE 1520 MOVED THE THREE CONTEXTUAL FIGURES AND NONE OF THE REPEATED ONES, by deleting eight
  * rule blocks and adding one. Deleted: the per-area Foundry-core focus-ring copies carried by the
  * interactable browser, the interactable config sheet and the interactables manager — a reset and

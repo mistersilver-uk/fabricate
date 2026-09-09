@@ -8,7 +8,9 @@
   list body is supplied as children; the empty state replaces it when `isEmpty`.
 -->
 <script>
+  import { localize } from '../../util/foundryBridge.js';
   import EmptyState from '../manager/EmptyState.svelte';
+  import Select from '../../components/Select.svelte';
 
   let {
     titleId = '',
@@ -24,6 +26,24 @@
     emptyText = '',
     children,
   } = $props();
+
+  // MANDATORY HERE, not defensive. This component renders TWICE on one screen - Active Runs above
+  // History - so a fixed caption id would give both triggers the same `aria-labelledby` target
+  // and the second one would be named by the first one's caption.
+  const instanceId = $props.id();
+  const sortCaptionId = `${instanceId}-sort`;
+
+  /*
+   * EXACTLY ONE OF THE TWO NAMING PROPS, and which one depends on the caller's own caption.
+   *
+   * `sortLabel` defaults to `''`, and `aria-labelledby` pointed at an EMPTY span produces no
+   * accessible name and no warning at all: the primitive warns only when all three naming props
+   * are absent, and a non-empty id string satisfies that check while naming nothing. So a caller
+   * that draws no caption is named by a string instead, and the two are never passed together -
+   * a labelledby wins over a label wherever both are present, which would leave the string as
+   * dead text free to drift from the caption it duplicates.
+   */
+  const captionedByLabel = $derived(String(sortLabel ?? '').trim() !== '');
 </script>
 
 <section class="journal-list-section" aria-labelledby={titleId}>
@@ -31,18 +51,24 @@
     <h3 id={titleId} class="journal-list-title">
       {title}{#if count !== null}<span class="journal-list-count">{count}</span>{/if}
     </h3>
-    <label class="journal-sort">
-      <span class="journal-sort-label">{sortLabel}</span>
-      <select
-        data-journal-sort={kind}
+    <!-- A `<span>` RATHER THAN THE `<label>` THIS WAS (issue 1511). The control is a `<button>`
+         toggling a portaled panel now, and a `<label>` forwards a caption click into it: with the
+         list open, the caption's own mousedown dismisses the panel and the forwarded click
+         re-opens it, so the caption could never close the list. The hook keeps its dynamic value
+         and rides onto the trigger through `triggerData`, which is what keeps two instances on
+         one screen distinguishable. -->
+    <span class="journal-sort">
+      <span class="journal-sort-label" id={sortCaptionId}>{sortLabel}</span>
+      <Select
+        size="inline"
         value={sortValue}
-        onchange={(event) => onSortChange?.(event.currentTarget.value)}
-      >
-        {#each sortOptions as option (option.value)}
-          <option value={option.value}>{option.label}</option>
-        {/each}
-      </select>
-    </label>
+        options={sortOptions}
+        ariaLabelledBy={captionedByLabel ? sortCaptionId : ''}
+        ariaLabel={captionedByLabel ? '' : localize('FABRICATE.App.Journal.Sort.Fallback')}
+        triggerData={{ 'data-journal-sort': kind }}
+        onChange={(next) => onSortChange?.(next)}
+      />
+    </span>
   </header>
 
   <div class="journal-list-body" class:is-empty={isEmpty}>
@@ -128,8 +154,20 @@
     color: var(--fab-text-muted);
   }
 
-  /* The closed/open select chrome is themed globally (.fabricate-app select +
-     option) so every player-app dropdown is consistent. */
+  /* A WIDTH FLOOR AT THE WIDEST SORT LABEL (issue 1511). A `<select>` sized itself to its widest
+     option; the `<button>` that replaces it hugs the one it is showing, so switching from
+     "Soonest Ready" to "Newest" would shrink the control and shuffle the title beside it. The
+     floor is that widest label's measured width - "Soonest Ready", 115.80px under Foundry's own
+     Signika at the `inline` rung's 11.5px and 124.14px under the Arial fallback the repository's
+     Chromium gates render against, so the floor is set past the wider of the two and no further.
+     It stops there rather than being rounded up generously: the header row is `flex-wrap: wrap`
+     with `justify-content: space-between`, so an over-sized floor wraps the title off its own row
+     rather than widening the control. Measured, that row wraps between a 140px and a 160px floor
+     at the 280px column minimum, so 126 keeps a clear margin at both ends. Ancestor-qualified,
+     because a leading bare `:global()` is document-wide. */
+  .journal-sort :global(.fabricate-select-trigger) {
+    min-width: 126px;
+  }
 
   /* THE WRAPPER ONLY: the one property that is the column's layout. See the markup. */
   .journal-list-empty {

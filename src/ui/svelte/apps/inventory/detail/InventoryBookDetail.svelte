@@ -24,6 +24,7 @@
 -->
 <script>
   import Medallion from '../../../components/Medallion.svelte';
+  import Select from '../../../components/Select.svelte';
   import EmptyState from '../../manager/EmptyState.svelte';
   import { resolveCraftingArt } from '../../../util/craftingArtResolution.js';
   import { localize } from '../../../util/foundryBridge.js';
@@ -164,9 +165,20 @@
     recipeSearch = event.currentTarget.value;
     recipePage = 0;
   }
-  function onRecipePageSize(event) {
-    const value = Number(event.currentTarget.value);
-    recipePageSize = RECIPE_PAGE_SIZES.includes(value) ? value : RECIPE_PAGE_SIZES[0];
+  // The caption the trigger is named by, per instance: two book inspectors can render in one
+  // document (the GM preview beside the player's), so the id is minted rather than fixed.
+  const instanceId = $props.id();
+  const pageSizeCaptionId = `${instanceId}-recipe-page-size`;
+
+  const recipePageSizeOptions = RECIPE_PAGE_SIZES.map((size) => ({
+    value: size,
+    label: String(size),
+  }));
+
+  // `Select` hands back the caller's OWN typed value, so this arrives as the number the option
+  // carried rather than as the string a `<select>`'s `value` gave the old handler to parse.
+  function chooseRecipePageSize(size) {
+    recipePageSize = RECIPE_PAGE_SIZES.includes(size) ? size : RECIPE_PAGE_SIZES[0];
     recipePage = 0;
   }
 </script>
@@ -372,18 +384,26 @@
         </ul>
         {#if filteredRecipes.length > RECIPE_PAGE_SIZES[0]}
           <div class="inventory-detail-recipe-pager" data-inventory-recipe-pager>
-            <label class="inventory-detail-recipe-pagesize">
-              <span>{localize('FABRICATE.App.Inventory.Detail.RecipesPerPage')}</span>
-              <select
-                value={recipePageSize}
-                onchange={onRecipePageSize}
-                aria-label={localize('FABRICATE.App.Inventory.Detail.RecipesPerPage')}
+            <!-- A `<span>` RATHER THAN THE `<label>` THIS WAS (issue 1511), for the reason the
+                 canonical rule states: a `<label>` forwards a caption click into the `<button>`
+                 the control now is, and with the panel open that click could only re-open the
+                 list its own mousedown had just dismissed. `showTick={false}` because this is
+                 the same page-size choice `Pagination` draws unticked - the trigger already
+                 states the value, and the three rows are digits rather than close cousins. -->
+            <span class="inventory-detail-recipe-pagesize">
+              <span id={pageSizeCaptionId}
+                >{localize('FABRICATE.App.Inventory.Detail.RecipesPerPage')}</span
               >
-                {#each RECIPE_PAGE_SIZES as size (size)}
-                  <option value={size}>{size}</option>
-                {/each}
-              </select>
-            </label>
+              <Select
+                size="inline"
+                showTick={false}
+                value={recipePageSize}
+                options={recipePageSizeOptions}
+                ariaLabelledBy={pageSizeCaptionId}
+                triggerData={{ 'data-inventory-page-size': '' }}
+                onChange={chooseRecipePageSize}
+              />
+            </span>
             <InventoryDetailPager
               list={filteredRecipes}
               sectionKey="recipes"
@@ -655,12 +675,17 @@
     color: var(--fab-text-muted);
   }
 
-  .inventory-detail-recipe-pagesize select {
-    padding: 2px 6px;
-    border: 1px solid var(--fab-border);
-    border-radius: 6px;
-    background: var(--fab-surface);
-    color: var(--fab-text);
-    font-size: 11px;
+  /* A WIDTH FLOOR AT THE WIDEST OPTION (issue 1511). The three values are 6, 9 and 12, so a
+     content-hugging `<button>` would be one digit narrower on two of them and would squeeze the
+     pager beside it every time the value changed - this row is `justify-content: space-between`
+     and declares no `flex-wrap`, so its risk is a squeezed sibling rather than a wrapped row.
+     The floor is the measured width of the trigger showing `12`, taken in both faces and set at
+     the wider: 56.48px under Foundry's own Signika at the `inline` rung's 11.5px, 58.30px under
+     the Arial fallback the repository's Chromium gates render against. Everything else about the
+     control - height, corner, fill, type, focus - is the `inline` rung's, against the 6px corner
+     and `--fab-surface` fill this block used to declare. Ancestor-qualified, because a leading
+     bare `:global()` reaches the whole document. */
+  .inventory-detail-recipe-pagesize :global(.fabricate-select-trigger) {
+    min-width: 60px;
   }
 </style>

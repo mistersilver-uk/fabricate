@@ -8,6 +8,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import Select from '../../components/Select.svelte';
   import RecipeListRow from './RecipeListRow.svelte';
 
   let {
@@ -49,16 +50,50 @@
   );
   const favouriteSet = $derived(new Set(Array.isArray(favouriteIds) ? favouriteIds : []));
 
+  // THE TWO FILTERS' CAPTION IDS, per instance. `$props.id()` is what keeps two browsers on one
+  // screen from pointing both of their triggers at the same caption.
+  const instanceId = $props.id();
+  const categoryCaptionId = `${instanceId}-category-filter`;
+  const systemCaptionId = `${instanceId}-system-filter`;
+
+  /**
+   * THE PANEL'S CEILING FOR A FULL-WIDTH TRIGGER (issue 1511).
+   *
+   * The `inline` rung's own band tops out at 240px and this trigger spans the browse column, so
+   * without a ceiling of its own each filter would drop a list narrower than the control it drops
+   * from - the defect `Select.svelte`'s band table records. The layout resolves
+   * `clamp(max(triggerWidth, minWidth), minWidth, maxWidth)` and is bounded again by the overlay
+   * host's own width, so a generous ceiling costs nothing: the panel still tracks the trigger.
+   *
+   * ONE FIGURE FOR THE WIDEST REACHABLE TRIGGER, measured rather than guessed. The browse column
+   * is `minmax(280px, 1fr)` of a 1fr/1.5fr/1fr grid that reflows to a single column at the
+   * container's 960px breakpoint, so the two ends of the range are 280px at the column minimum
+   * and 906px in the reflowed single column at the supported 1024px window floor. Past the
+   * breakpoint a `1fr` column keeps growing with the window - a maximised ultra-wide frame puts
+   * a 3376px container's left column at 946px - so the ceiling is set above BOTH rather than at
+   * either, which is why it is one generous number and not a breakpoint-shaped pair.
+   */
+  const FILTER_PANEL_MAX_WIDTH = 1024;
+
+  const categoryOptions = $derived([
+    { value: '', label: localize('FABRICATE.App.Crafting.Browser.AllCategories') },
+    ...categories.map((category) => ({ value: category.id, label: category.name })),
+  ]);
+  const systemOptions = $derived([
+    { value: '', label: localize('FABRICATE.App.Crafting.Browser.AllSystems') },
+    ...systems.map((system) => ({ value: system.id, label: system.name })),
+  ]);
+
   function onInput(event) {
     onSearch?.(event.currentTarget.value);
   }
-  function onSystemInput(event) {
-    const value = event.currentTarget.value;
-    onSystemChange?.(value === '' ? null : value);
+  // The sentinel row hands back `''` exactly as the `<option value="">` it replaces did, so the
+  // null-for-unfiltered contract the store reads is unchanged by the conversion.
+  function chooseSystem(next) {
+    onSystemChange?.(next === '' ? null : next);
   }
-  function onCategoryInput(event) {
-    const value = event.currentTarget.value;
-    onCategoryChange?.(value === '' ? null : value);
+  function chooseCategory(next) {
+    onCategoryChange?.(next === '' ? null : next);
   }
 </script>
 
@@ -102,38 +137,44 @@
         </button>
       </div>
       {#if categories.length > 0}
-        <label class="crafting-browser-filter-category">
-          <span class="crafting-browser-filter-label"
+        <!-- A `<span>` RATHER THAN THE `<label>` THIS WAS (issue 1511). The wrapper keeps its
+             class and its column layout; what it stops being is a click target. A `<label>`
+             forwards a caption click into the control it wraps, and the control is now a
+             `<button>` toggling a portaled panel whose outside-click dismissal listens on
+             `mousedown` while it is open - so with the list open the caption's own mousedown
+             dismisses it and the forwarded click re-opens it, and the caption could never close
+             the list. The trigger is named by that caption through `aria-labelledby`, which is
+             what names the panel it opens as well. -->
+        <span class="crafting-browser-filter-category">
+          <span class="crafting-browser-filter-label" id={categoryCaptionId}
             >{localize('FABRICATE.App.Crafting.Browser.CategoryFilterLabel')}</span
           >
-          <select
+          <Select
+            size="inline"
             value={categoryFilter ?? ''}
-            aria-label={localize('FABRICATE.App.Crafting.Browser.CategoryFilterLabel')}
-            onchange={onCategoryInput}
-          >
-            <option value="">{localize('FABRICATE.App.Crafting.Browser.AllCategories')}</option>
-            {#each categories as category (category.id)}
-              <option value={category.id}>{category.name}</option>
-            {/each}
-          </select>
-        </label>
+            options={categoryOptions}
+            ariaLabelledBy={categoryCaptionId}
+            maxWidth={FILTER_PANEL_MAX_WIDTH}
+            triggerData={{ 'data-crafting-category-filter': '' }}
+            onChange={chooseCategory}
+          />
+        </span>
       {/if}
       {#if systems.length > 0}
-        <label class="crafting-browser-filter-system">
-          <span class="crafting-browser-filter-label"
+        <span class="crafting-browser-filter-system">
+          <span class="crafting-browser-filter-label" id={systemCaptionId}
             >{localize('FABRICATE.App.Crafting.Browser.SystemFilterLabel')}</span
           >
-          <select
+          <Select
+            size="inline"
             value={systemFilter ?? ''}
-            aria-label={localize('FABRICATE.App.Crafting.Browser.SystemFilterLabel')}
-            onchange={onSystemInput}
-          >
-            <option value="">{localize('FABRICATE.App.Crafting.Browser.AllSystems')}</option>
-            {#each systems as system (system.id)}
-              <option value={system.id}>{system.name}</option>
-            {/each}
-          </select>
-        </label>
+            options={systemOptions}
+            ariaLabelledBy={systemCaptionId}
+            maxWidth={FILTER_PANEL_MAX_WIDTH}
+            triggerData={{ 'data-crafting-system-filter': '' }}
+            onChange={chooseSystem}
+          />
+        </span>
       {/if}
     </div>
   </header>
@@ -286,23 +327,28 @@
     color: var(--fab-text-muted);
   }
 
-  .crafting-browser-filter-system select,
-  .crafting-browser-filter-category select {
-    box-sizing: border-box;
-    width: 100%;
-    height: 30px;
-    padding: 0 8px;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface);
-    color: var(--fab-text);
-    font-size: 12px;
-  }
+  /* THE TRIGGER'S BOX, STATED HERE AND ONLY HERE (issue 1511). Height, corner, border, type and
+     the focus treatment now come from the sheet's `.fabricate-select*` family - the `inline`
+     rung's 30px and 7px against the 30px and 8px this block declared. Two properties are not the
+     family's and stay this file's, under the licence `Select.svelte`'s own note grants a call
+     site for its per-site skin:
 
-  .crafting-browser-filter-system select:focus-visible,
-  .crafting-browser-filter-category select:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
+     WIDTH, because core stretched a `<select>` to the column with its own `width: 100%` while a
+     `<button>` hugs its current value - so without this the two filters would resize every time a
+     player chose a longer category, and the column would read as two ragged controls under a
+     full-width search field.
+
+     FILL, because `--fab-surface` is this column's control fill: the pager one row below restates
+     it for the same reason, and taking the rung's `--fab-bg-2` here would put three different
+     control fills - soft on the search field and the toggles, bg-2 here, surface on the pager -
+     into one 280px column.
+
+     ANCESTOR-QUALIFIED, not a leading bare `:global()`. A bare one is document-wide and would
+     reach the pager's own trigger one row below, which deliberately refuses a width floor. */
+  .crafting-browser-filter-category :global(.fabricate-select-trigger),
+  .crafting-browser-filter-system :global(.fabricate-select-trigger) {
+    width: 100%;
+    background: var(--fab-surface);
   }
 
   .crafting-browser-list {

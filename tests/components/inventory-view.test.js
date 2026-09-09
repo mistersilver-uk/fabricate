@@ -15,6 +15,13 @@ import {
 import { chipToneOf } from '../helpers/chipTone.js';
 import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
 import {
+  chooseSelectOption,
+  openSelectPanel,
+  selectOptionLabels,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
+import {
   SYS_A,
   SYS_B,
   multiSystemCardRow,
@@ -139,6 +146,46 @@ function makeItem() {
       { kind: 'gathering', recipeId: null, name: 'Harvest Beast', img: null },
     ],
     contributors: [],
+  };
+}
+
+/**
+ * A recipe-item "book" teaching more than one page's worth of recipes.
+ *
+ * SEVEN, deliberately: `InventoryBookDetail` renders its pager — and therefore its page-size
+ * control — only when the filtered list is LONGER than the first page size, which is 6. Six would
+ * put the control behind its own render guard and leave the clause below asserting nothing.
+ *
+ * @returns {object} an inventory row the detail routes to the book body.
+ */
+function makeBookItem() {
+  return {
+    key: 'sys:book1',
+    componentId: 'book1',
+    systemId: 'sys',
+    name: 'Tome of Distillation',
+    img: 'icons/book.webp',
+    icon: null,
+    tags: [],
+    tier: null,
+    isEssenceSource: false,
+    isTool: false,
+    isRecipeItem: true,
+    learnable: true,
+    totalQuantity: 1,
+    sources: [{ actorId: 'a1', actorName: 'Akra', actorImg: null, quantity: 1 }],
+    essences: [],
+    usedBy: [],
+    producedBy: [],
+    requiredFor: [],
+    contributors: [],
+    recipes: Array.from({ length: 7 }, (unused, index) => ({
+      id: `br${index}`,
+      name: `Book Recipe ${index}`,
+      img: null,
+      description: '',
+      learned: false,
+    })),
   };
 }
 
@@ -2278,26 +2325,46 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
     assert.match(detail.textContent, /Fire/, 'essence content (Info leaf)');
   });
 
-  it('multi-system card: renders a <select> drop-down with one option per participation', async () => {
+  it('multi-system card: renders the app’s own drop-down with one row per participation', async () => {
     const { services } = makeServices(multiSystemCardRow());
     const target = await harness.mount({ services });
     await settle();
 
-    const select = target.querySelector('[data-inventory-system-select]');
-    assert.ok(select, 'the selector is a native <select> drop-down');
-    assert.equal(select.tagName, 'SELECT', 'a value choice, not a radiogroup toggle');
-    const opts = select.querySelectorAll('option');
-    assert.equal(opts.length, 2, 'one option per participation');
-    // The label is associated with the select (a11y).
-    assert.ok(
-      target.querySelector('label[for="inventory-system-selector-select"]'),
-      'a <label for> is associated with the select'
+    // THE HOOK SURVIVED THE CONVERSION (issue 1511). It was an attribute on the `<select>` and
+    // rides `triggerData` onto the trigger button now, which is what keeps the smoke's own
+    // `[data-inventory-system-select]` visibility wait resolving without Docker to prove it.
+    const trigger = target.querySelector('[data-inventory-system-select]');
+    assert.ok(Boolean(trigger), 'the selector still answers to its stable hook');
+    assert.equal(trigger.tagName, 'BUTTON', 'the control is the primitive’s combobox trigger');
+    assert.equal(
+      trigger.getAttribute('role'),
+      'combobox',
+      'a value choice over a listbox, not a radiogroup toggle'
     );
-    // The primary (System A) is the selected value, and options read as the system NAME.
-    const optionByValue = (id) =>
-      [...opts].find((option) => (option.value || option.getAttribute('value')) === id);
-    assert.ok(optionByValue(SYS_A)?.selected, 'the salvageable-biased primary is selected');
-    assert.match(optionByValue(SYS_A).textContent, new RegExp(SYS_A), 'option reads as the system name');
+
+    // NAMED BY THE CAPTION, not by the `for`/`id` pair this was the app's only instance of.
+    // There is no `id`-bearing labelable element left for a `for` to address.
+    const caption = target.querySelector('.inventory-system-selector-label');
+    assert.ok(Boolean(caption), 'the caption still renders');
+    assert.equal(caption.tagName, 'SPAN', 'the label is demoted to a span');
+    assert.equal(
+      trigger.getAttribute('aria-labelledby'),
+      caption.id,
+      'the trigger is named by that caption'
+    );
+    assert.ok(!target.querySelector('label[for="inventory-system-selector-select"]'), 'the for/id pair is gone');
+
+    assert.deepEqual(
+      selectOptionValues(target, '[data-inventory-system-select]'),
+      [SYS_A, SYS_B],
+      'one row per participation, each addressable by its own system id'
+    );
+    assert.match(
+      selectTriggerText(target, '[data-inventory-system-select]'),
+      new RegExp(SYS_A),
+      'the trigger states the salvageable-biased primary, reading as the system NAME'
+    );
+
     // The primary participation's name/essence scope the body.
     const detail = target.querySelector(`[data-inventory-detail="${SYS_A}:cA"]`);
     assert.match(detail.textContent, /Air Shard/, 'header name is the primary participation');
@@ -2312,11 +2379,90 @@ describe('InventoryView (mounted) — one card per unified physical stack (issue
     const target = await harness.mount({ services });
     await settle();
 
-    const select = target.querySelector('[data-inventory-system-select]');
-    select.value = SYS_B;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    chooseSelectOption(target, '[data-inventory-system-select]', SYS_B);
     await settle();
     assert.deepEqual(picks, [SYS_B], 'the drop-down drives the store selection');
+  });
+
+  it('pages a book’s recipes through an UNTICKED app-drawn list, floored so a digit does not resize it', async () => {
+    const { services } = makeServices(makeBookItem());
+    const target = await harness.mount({ services });
+    await settle();
+
+    const hook = '[data-inventory-page-size]';
+    const trigger = target.querySelector(hook);
+    assert.ok(Boolean(trigger), 'the page-size control renders past its six-recipe guard');
+    assert.equal(target.querySelector('.inventory-detail-recipe-pagesize').tagName, 'SPAN', 'wrapper demoted');
+    const caption = target.querySelector('.inventory-detail-recipe-pagesize span[id]');
+    assert.ok(Boolean(caption), 'the bare caption span gained an id');
+    assert.equal(trigger.getAttribute('aria-labelledby'), caption.id, 'and names the trigger');
+
+    // UNTICKED, which is `showTick={false}` reaching the panel's own class list. This is the same
+    // page-size choice `Pagination` draws unticked, and the polarity is a PROP rather than a
+    // variant, so it is worth an assertion that the caller passed it.
+    const panel = openSelectPanel(target, hook);
+    assert.ok(
+      !panel.classList.contains('fabricate-select-popover-ticked'),
+      'the page-size list drops the tick column, as `Pagination` draws the same control'
+    );
+
+    assert.deepEqual(
+      selectOptionLabels(target, hook),
+      ['6', '9', '12'],
+      'the three published page sizes, rendered as their own digits'
+    );
+    assert.equal(
+      target.querySelectorAll('[data-inventory-learn-recipe]').length,
+      6,
+      'the first page holds six of the seven recipes'
+    );
+
+    chooseSelectOption(target, hook, 12);
+    await settle();
+    assert.equal(
+      target.querySelectorAll('[data-inventory-learn-recipe]').length,
+      7,
+      'choosing 12 hands the caller the NUMBER it declared, not a string of it, so the whole ' +
+        'book fits one page'
+    );
+    assert.equal(
+      selectTriggerText(target, hook),
+      '12',
+      'and the trigger states the chosen value'
+    );
+  });
+
+  it('sorts the inventory through the app’s own list, named by the caption beside it', async () => {
+    const { services, store } = makeServices(makeItem());
+    const sorts = [];
+    store.setSort = (next) => sorts.push(next);
+    const target = await harness.mount({ services });
+    await settle();
+
+    const trigger = target.querySelector('[data-inventory-sort]');
+    assert.ok(Boolean(trigger), 'the sort control answers to its own hook');
+    const caption = target.querySelector('.inventory-sort-label');
+    assert.ok(Boolean(caption), 'the caption still renders');
+    assert.equal(caption.tagName, 'SPAN', 'and its wrapper is demoted with it');
+    assert.equal(target.querySelector('.inventory-sort').tagName, 'SPAN', 'the wrapper is a span');
+    assert.equal(
+      trigger.getAttribute('aria-labelledby'),
+      caption.id,
+      'the trigger takes its name from that caption'
+    );
+    assert.ok(
+      !trigger.getAttribute('aria-label'),
+      'and not from the duplicated aria-label the <select> carried, which is deleted'
+    );
+
+    assert.deepEqual(
+      selectOptionValues(target, '[data-inventory-sort]'),
+      ['name', 'quantity', 'type'],
+      'the three sort keys, in the order the component declares them'
+    );
+    chooseSelectOption(target, '[data-inventory-sort]', 'quantity');
+    await settle();
+    assert.deepEqual(sorts, ['quantity'], 'choosing a row forwards the sort key');
   });
 
   it('with System B selected, the whole body scopes to System B (name + essence + salvage)', async () => {

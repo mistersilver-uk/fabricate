@@ -19,6 +19,11 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
 import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
+import {
+  chooseSelectOption,
+  selectOptionValues,
+  selectTriggerText,
+} from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -75,6 +80,27 @@ const harness = createMountedComponentHarness({
   // mount of this component can reach, and every `target.querySelector` for a row would miss.
   rootClass: 'fabricate-app',
   componentPath: 'src/ui/svelte/apps/journal/JournalView.svelte'
+});
+
+/**
+ * The list shell ON ITS OWN, because one of its states is unreachable through `JournalView`.
+ *
+ * `sortLabel` defaults to `''` and both production callers pass a localized string, so the
+ * fallback branch — the one that names the trigger with `ariaLabel` instead of pointing
+ * `ariaLabelledBy` at an empty caption — has no route through the view. A second harness over the
+ * same shared bundles is cheaper than a second FILE, and cheaper than a prop the component does
+ * not otherwise need.
+ */
+const shellHarness = createMountedComponentHarness({
+  repoRoot,
+  tmpPrefix: 'fabricate-journal-list-shell-',
+  rawModules: [...SEARCHABLE_POPOVER_RAW_MODULES],
+  compiledModules: [
+    ...SELECT_COMPILED_MODULES,
+    'src/ui/svelte/apps/journal/JournalListShell.svelte'
+  ],
+  rootClass: 'fabricate-app',
+  componentPath: 'src/ui/svelte/apps/journal/JournalListShell.svelte'
 });
 
 function makeJournal(overrides = {}) {
@@ -490,6 +516,133 @@ describe('JournalView primitive adoption (issue 1514)', () => {
       box.textContent,
       /TimeRemaining\.WhenPassed/,
       'the "ready once time passes" line is the callout body'
+    );
+  });
+  it('sorts each list through the app’s own option list, one caption per instance', async () => {
+    // TWO INSTANCES OF ONE COMPONENT ON ONE SCREEN, which is why `JournalListShell` mints its
+    // caption id from `$props.id()` rather than declaring one. A fixed id would give both
+    // triggers the same `aria-labelledby` target and the History control would be announced as
+    // "Sort" for Active Runs.
+    const active = [];
+    const history = [];
+    const { store } = makeJournal({
+      activeRuns: [makeCraftingRun()],
+      historyPageItems: [makeSucceededRun()],
+      historyCount: 1,
+      setActiveSort: (next) => active.push(next),
+      setHistorySort: (next) => history.push(next),
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+
+    const triggers = [...target.querySelectorAll('[data-journal-sort]')];
+    assert.equal(triggers.length, 2, 'both list regions draw their own sort control');
+    assert.deepEqual(
+      triggers.map((trigger) => trigger.getAttribute('data-journal-sort')),
+      ['active', 'history'],
+      'the dynamic hook value rides `triggerData` onto each trigger, so the two stay ' +
+        'distinguishable to a capture step and to a smoke assertion'
+    );
+    const named = triggers.map((trigger) => trigger.getAttribute('aria-labelledby'));
+    assert.ok(named.every(Boolean), 'each trigger is named by a caption');
+    assert.notEqual(named[0], named[1], 'and the two captions are different elements');
+    for (const [index, id] of named.entries()) {
+      // `getElementById` rather than a `#id` selector: `$props.id()` mints an id that can begin
+      // with a digit, which is a valid id and an invalid selector, and happy-dom exposes no
+      // `CSS.escape`.
+      const caption = target.ownerDocument.getElementById(id);
+      assert.ok(Boolean(caption), `the caption ${id} that names trigger ${index} is rendered`);
+      assert.ok(
+        caption.textContent.trim().length > 0,
+        'and it has text: an `aria-labelledby` to an EMPTY span is no accessible name at all, ' +
+          'and the primitive does not warn about one'
+      );
+    }
+    assert.ok(
+      triggers.every((trigger) => !trigger.getAttribute('aria-label')),
+      'no trigger carries both naming routes, which the primitive refuses'
+    );
+
+    assert.deepEqual(
+      selectOptionValues(target, '[data-journal-sort="active"]'),
+      ['soonestReady', 'newest'],
+      'the Active Runs keys'
+    );
+    assert.equal(
+      selectTriggerText(target, '[data-journal-sort="active"]'),
+      'FABRICATE.App.Journal.ActiveRuns.Sort.SoonestReady',
+      'the trigger states the live key rather than a placeholder'
+    );
+    chooseSelectOption(target, '[data-journal-sort="active"]', 'newest');
+    assert.deepEqual(active, ['newest'], 'the Active Runs list forwards its own key');
+    assert.deepEqual(history, [], 'and does not drive its sibling');
+
+    chooseSelectOption(target, '[data-journal-sort="history"]', 'oldest');
+    assert.deepEqual(history, ['oldest'], 'the History list forwards its own key');
+  });
+
+  it('demotes each sort wrapper to a span, so the caption cannot re-open the list it closed', async () => {
+    const { store } = makeJournal({ activeRuns: [makeCraftingRun()] });
+    const target = await harness.mount({ services: makeServices(store) });
+
+    const wrappers = [...target.querySelectorAll('.journal-sort')];
+    assert.equal(wrappers.length, 2, 'both wrappers survive with their class');
+    assert.ok(
+      wrappers.every((wrapper) => wrapper.tagName === 'SPAN'),
+      'and both are spans: a `<label>` forwards a caption click into the trigger, so with the ' +
+        'panel open its own mousedown would dismiss the list and the forwarded click re-open it'
+    );
+    assert.ok(!target.querySelector('label.journal-sort'), 'no label wrapper is left');
+  });
+});
+describe('JournalListShell naming without a caption (issue 1511)', () => {
+  before(() => shellHarness.setup());
+  afterEach(() => shellHarness.remount());
+  after(() => shellHarness.teardown());
+
+  const SORT_OPTIONS = [
+    { value: 'newest', label: 'Newest' },
+    { value: 'oldest', label: 'Oldest' }
+  ];
+
+  it('names the trigger by its caption when one is drawn', async () => {
+    const target = await shellHarness.mount({
+      kind: 'history',
+      title: 'History',
+      sortLabel: 'Sort',
+      sortValue: 'newest',
+      sortOptions: SORT_OPTIONS
+    });
+    const trigger = target.querySelector('[data-journal-sort="history"]');
+    const caption = target.querySelector('.journal-sort-label');
+    assert.equal(caption.textContent.trim(), 'Sort', 'the caption is drawn');
+    assert.equal(trigger.getAttribute('aria-labelledby'), caption.id, 'and it names the trigger');
+    assert.ok(!trigger.getAttribute('aria-label'), 'exactly one naming route, never both');
+  });
+
+  it('falls back to a localized string when the caption would be empty', async () => {
+    // THE STATE THE DEFAULT PRODUCES, and the reason it needs a clause of its own: an
+    // `aria-labelledby` pointed at an EMPTY span computes no accessible name AND raises no
+    // warning — the primitive warns only when all three naming props are absent, and a non-empty
+    // id string satisfies that check while naming nothing. So the fallback is a decision at the
+    // call site rather than something the primitive can catch.
+    const target = await shellHarness.mount({
+      kind: 'active',
+      title: 'Active Runs',
+      sortLabel: '',
+      sortValue: 'newest',
+      sortOptions: SORT_OPTIONS
+    });
+    const trigger = target.querySelector('[data-journal-sort="active"]');
+    assert.ok(Boolean(trigger), 'the control still renders');
+    assert.equal(
+      trigger.getAttribute('aria-label'),
+      'FABRICATE.App.Journal.Sort.Fallback',
+      'the trigger is named by the localized fallback key, read through `localize` so ' +
+        '`lang-keys-no-orphans` can see the reference'
+    );
+    assert.ok(
+      !trigger.getAttribute('aria-labelledby'),
+      'and NOT by the empty caption beside it, which would be a name of zero characters'
     );
   });
 });

@@ -235,9 +235,11 @@ export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 26;
  * `svelte/compiler`. A raw text grep over the same corpus says 140 in 48 files, because it counts
  * docblock prose and CSS — the parse is the pin, and the discrepancy is the reason why.
  *
- * No file carries the `<!-- native select: … -->` marker today. `BulkEditSelect.svelte` and
- * `InventorySystemSelector.svelte` each carry a DOCBLOCK reason, which is not the marker and does
- * not exempt them; they are baselined like the rest.
+ * No file carries the `<!-- native select: … -->` marker today. `BulkEditSelect.svelte` carries a
+ * DOCBLOCK reason, which is not the marker and does not exempt it; it is baselined like the rest.
+ * `InventorySystemSelector.svelte` carried one too until issue 1511, and what happened to it is
+ * the point of the distinction: the docblock went with the element it justified rather than
+ * outliving it as an exemption.
  *
  * ONE ROW WAS ADDED AFTER THAT MEASUREMENT, at issue 1392: the World Vocabulary screen's sort
  * key, `scoped/WorldVocabularyPage.svelte`. It is the FIRST growth this table has taken since it
@@ -280,11 +282,26 @@ export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 26;
  * DELETED because all four elements now render `components/Select.svelte`. The file count falls
  * 35 -> 33 with them, and NO interactables row is left in this table - the three canvas windows
  * carry no native select between them.
+ *
+ * 84 -> 78 with issue 1511, and the player app leaves the table entirely: `apps/crafting/
+ * RecipeBrowser.svelte | 2`, `apps/inventory/InventoryFilters.svelte | 1`,
+ * `apps/inventory/detail/InventoryBookDetail.svelte | 1`,
+ * `apps/inventory/detail/InventorySystemSelector.svelte | 1` and
+ * `apps/journal/JournalListShell.svelte | 1` are DELETED because all six elements now render
+ * `components/Select.svelte`. The file count falls 33 -> 28 with them.
+ *
+ * WHAT THAT PAYMENT ALSO BOUGHT, which no figure in this table records: the three
+ * `.fabricate-app select` rules in `styles/fabricate.css` themed a control the player app no
+ * longer renders, so they were DELETED rather than narrowed. A debt row is paid down when the
+ * element goes; a THEME for that element is only dischargeable when the LAST carrier under its
+ * root goes, and this is the first row-set in this table whose payment emptied a root. Every
+ * remaining row is the manager's (issue 1510's sweep and the root's own convergence, issue 1357)
+ * except `WorldVocabularyPage.svelte | 1`, which is the manager's too.
  */
 export const KNOWN_NATIVE_SELECT_ELEMENTS = knownDebt('nativeSelectElements');
 
 /** @see KNOWN_NATIVE_SELECT_ELEMENTS */
-export const KNOWN_NATIVE_SELECT_TOTAL = 84;
+export const KNOWN_NATIVE_SELECT_TOTAL = 78;
 
 /**
  * A native `<select>` written into a JavaScript template string, keyed `file`.
@@ -468,9 +485,17 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * Re-derived from the JSON at this head rather than reasoned about, by the two-run procedure: the
  * row was banked first and the assertion reported the total the tree actually holds.
  *
+ * 283 → 281 with issue 1511, two occurrences over two rows, both paid by the same conversion:
+ * `crafting/RecipeBrowser.svelte | 8px` 3 → 2 as the two browse filters' own select rule goes and
+ * the trigger takes the `inline` rung's 7px, the row SURVIVING on the filter toggles' 8px; and
+ * `inventory/InventoryFilters.svelte | 8px` 1 → 0, DELETED, that file's only off-ladder corner
+ * having been the sort select's. The two other converted files moved a corner without moving a
+ * row: `InventoryBookDetail`'s page-size select and the journal sort both drew 6px, a published
+ * rung, and both are 7px now.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 283;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 281;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.

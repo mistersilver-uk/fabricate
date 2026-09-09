@@ -9,12 +9,15 @@
   THE KIND FILTER IS THE SHARED `SegmentedControl` (issue 1514), drawn as a pill run
   in the soft-accent family. It was five `aria-pressed` buttons in a `role="group"`
   and is now one radiogroup, which is the semantics a one-of-N choice has; see the
-  markup below for the two props that reproduce its construction and its paint. The
-  search field and the sort select are NOT converted here: they belong to the controls issue
-  and the player-selects issue respectively.
+  markup below for the two props that reproduce its construction and its paint.
+
+  THE SORT CONTROL IS THE SHARED `Select` (issue 1511), so the list it opens is the app's own
+  rather than the operating system's. The search field is still NOT converted: it belongs to the
+  controls issue.
 -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import Select from '../../components/Select.svelte';
   import SegmentedControl from '../manager/SegmentedControl.svelte';
 
   let {
@@ -67,11 +70,17 @@
     PILLS.map((pill) => ({ ...pill, count: Number(counts?.[pill.value] ?? 0) }))
   );
 
+  // The caption this control is named by, per instance: the inventory header can be rendered
+  // twice on one screen by the GM preview, and two triggers must not share one caption id.
+  const instanceId = $props.id();
+  const sortCaptionId = `${instanceId}-sort`;
+
+  const sortOptions = $derived(
+    SORTS.map((option) => ({ value: option.id, label: localize(option.labelKey) }))
+  );
+
   function onInput(event) {
     onSearch?.(event.currentTarget.value);
-  }
-  function onSortInput(event) {
-    onSort?.(event.currentTarget.value);
   }
 </script>
 
@@ -112,20 +121,24 @@
       tone="accent-soft"
     />
 
-    <label class="inventory-sort">
-      <span class="inventory-sort-label"
+    <!-- A `<span>` RATHER THAN THE `<label>` THIS WAS (issue 1511): the control is a `<button>`
+         toggling a portaled panel, and a `<label>` forwards a caption click into it, so with the
+         list open the caption's own mousedown would dismiss the panel and the forwarded click
+         would re-open it. The caption keeps its class and names the trigger through
+         `aria-labelledby` instead of through the deleted `aria-label` that duplicated it. -->
+    <span class="inventory-sort">
+      <span class="inventory-sort-label" id={sortCaptionId}
         >{localize('FABRICATE.App.Inventory.Filters.SortLabel')}</span
       >
-      <select
+      <Select
+        size="inline"
         value={sort}
-        aria-label={localize('FABRICATE.App.Inventory.Filters.SortLabel')}
-        onchange={onSortInput}
-      >
-        {#each SORTS as option (option.id)}
-          <option value={option.id}>{localize(option.labelKey)}</option>
-        {/each}
-      </select>
-    </label>
+        options={sortOptions}
+        ariaLabelledBy={sortCaptionId}
+        triggerData={{ 'data-inventory-sort': '' }}
+        onChange={(next) => onSort?.(next)}
+      />
+    </span>
   </div>
 </div>
 
@@ -183,20 +196,20 @@
     white-space: nowrap;
   }
 
-  .inventory-sort select {
-    box-sizing: border-box;
-    height: 28px;
-    padding: 0 8px;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface);
-    color: var(--fab-text-secondary);
-    font-size: 11px;
-    font-weight: 500;
-  }
+  /* A WIDTH FLOOR, AND WHY THIS ROW CAN ABSORB ONE (issue 1511). Height, corner, fill, type and
+     the focus treatment are the `inline` rung's now; the one property left to this file is the
+     width, because a `<select>` sized itself to its widest option while a `<button>` hugs the
+     one it is showing - so choosing Type after Quantity would visibly shrink the control and
+     shuffle the pill run beside it. The floor is the measured width of the widest of the three
+     `SORTS` labels - `Quantity` - so every value renders at one width. MEASURED IN BOTH FACES
+     and floored at the wider: 86.58px under Foundry's own Signika at the `inline` rung's 11.5px,
+     88.33px under the Arial fallback the repository's Chromium gates render against.
 
-  .inventory-sort select:focus-visible {
-    outline: 2px solid var(--fab-accent);
-    outline-offset: 2px;
+     The row is `flex-wrap: wrap` with `justify-content: space-between`, which is what makes an
+     over-sized floor wrap the pill run rather than widen the control - so the figure is the
+     measured widest label and not a round number above it. Ancestor-qualified, because a leading
+     bare `:global()` would reach every trigger in the document. */
+  .inventory-sort :global(.fabricate-select-trigger) {
+    min-width: 90px;
   }
 </style>

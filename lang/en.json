@@ -965,6 +965,9 @@
             "Oldest": "Oldest"
           }
         },
+        "Sort": {
+          "Fallback": "Sort"
+        },
         "Countdown": {
           "ReadyToContinue": "Ready to continue",
           "ReadyToFinish": "Ready to finish",

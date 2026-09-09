@@ -1048,8 +1048,9 @@
    `:is()` takes its most specific argument, here `[tabindex]` - and would newly beat every
    component ring in the sheet.
 
-   Written at the EARLIER of the two donor positions, which is what keeps
-   `.fabricate-app select:focus-visible` below following the ring and still winning. */
+   Written at the EARLIER of the two donor positions, which is what kept
+   `.fabricate-app select:focus-visible` below the ring and still winning until that rule was
+   deleted with the player app's last native select (issue 1511). */
 .fabricate a:focus,
 .fabricate button:focus,
 .fabricate input:focus,
@@ -1249,37 +1250,6 @@
 
 .fabricate .fab-cluster[data-gap='3'] {
   --fab-cluster-gap: var(--fab-space-3);
-}
-
-/* Focus ring for <select> controls. A select can sit flush against the edge of
-   an overflow-clipped container (the Journal left column's two 50% list halves),
-   where an OUTSET outline (offset 2px) is clipped on that side and reads as a
-   one-sided "flash" when the control gains :focus-visible after its popup closes;
-   an inset outline does not track the border-radius cleanly on the rounded
-   corners. An inset box-shadow ring follows the border-radius exactly and is
-   drawn entirely inside the border box, so it is never clipped and looks correct
-   on every edge and corner while staying accessible. */
-.fabricate-app select:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 2px var(--fab-accent);
-}
-
-/* Theme player-app <select> controls (and their open option list) so they read
-   as Fabricate dropdowns instead of Foundry's default yellow-on-light text. The
-   solid --fab-bg-1 background matches the GM manager selects, which read the
-   same token; the option rule themes the popup list. The
-   app root's `color-scheme: dark` makes the native popup chrome + highlight dark
-   too. Tokenized; namespaced under .fabricate-app. */
-.fabricate-app select {
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
-  border: 1px solid var(--fab-border);
-  border-radius: 6px;
-}
-
-.fabricate-app select option {
-  color: var(--fab-text);
-  background: var(--fab-bg-1);
 }
 
 /* Journal "Trigger Next Step" primary button. The player app has no .is-primary
@@ -1698,9 +1668,10 @@
   not the control itself. `.fabricate-manager select` themes the CLOSED field, so a
   manager dropdown looks right until it is opened — at which point the option list fell
   back to the browser's default white-on-light chrome, in all 75 native selects the
-  manager renders. The player app has had `.fabricate-app select option` since forever
-  (see the rule near the top of this file); the manager root is `.fabricate-manager` and
-  has simply never carried `.fabricate-app`, so it never inherited the fix.
+  manager renders. The player app carried `.fabricate-app select option` from the beginning and
+  no longer needs it, because issue 1511 moved all six of its selects onto the app's own option
+  list; the manager root is `.fabricate-manager`, has never carried `.fabricate-app`, and so
+  never inherited the fix.
 
   Why no gate caught it: a native select's popup is painted by the browser, NOT into the
   page DOM, so Playwright cannot screenshot it and no smoke frame can ever contain it.
@@ -5903,11 +5874,13 @@
    on the primitive. The declarations are the module ring's verbatim (`.fabricate
    <element>:focus-visible`, issue 1501), so nothing moves where that ring already reaches.
 
-   BUTTONS ONLY, deliberately. An `:is(button, select)` form is (0,2,1) too, TIES
-   `.fabricate-app select:focus-visible` and wins on source order — which would delete that
-   rule's `outline: none` + inset `box-shadow` and reinstate the clipped-outline defect on
-   the per-page select that it exists to prevent. The `<select>` keeps the area ring in both
-   apps (issues 1504 and 1510). The arrows are `<IconButton>`s and take that primitive's
+   BUTTONS ONLY, deliberately. An `:is(button, select)` form is (0,2,1) too and would tie the
+   module ring, deciding that state by source order; it was written when the tie was with the
+   player app's own `.fabricate-app select:focus-visible`, whose inset `box-shadow` stopped a
+   clipped outline on the per-page select, and that rule was deleted with the player app's last
+   native select (issue 1511). This family renders no select at all now, and a manager select
+   keeps the area ring until the manager's selects convert — issue 1510's sweep and the root's
+   own convergence (issue 1357). The arrows are `<IconButton>`s and take that primitive's
    ring as well; this rule is not redundant, because it also covers a non-IconButton button
    in the pager. */
 .fabricate-pagination button:focus-visible {
@@ -10912,12 +10885,14 @@
    ring, which is (0,2,1) too and sits earlier, so nothing moves where that ring already reaches;
    what this is FOR is the bare host.
 
-   `input` AND `textarea` ONLY, and the exclusion of `select` is load-bearing.
-   `.fabricate-field :is(input, select, textarea):focus-visible` would be (0,2,1), TIE
-   `.fabricate-app select:focus-visible` near the top of this file and win on source order —
-   deleting the inset `box-shadow` ring that exists precisely because an outset outline on a
-   select is clipped by an overflow-clipped container. A select in a Field keeps the area ring
-   (issues 1504 and 1510). */
+   `input` AND `textarea` ONLY, and the exclusion of `select` outlived its first reason.
+   `.fabricate-field :is(input, select, textarea):focus-visible` would be (0,2,1) and would once
+   have tied `.fabricate-app select:focus-visible` near the top of this file and won on source
+   order, deleting an inset `box-shadow` ring that existed because an outset outline on a select
+   is clipped by an overflow-clipped container; that rule went with the player app's last native
+   select (issue 1511). The only select a Field can host now is the manager's, which keeps the
+   module ring until the manager's selects convert — issue 1510's sweep and the root's own
+   convergence (issue 1357). */
 .fabricate-field input:focus-visible,
 .fabricate-field textarea:focus-visible {
   outline: 2px solid var(--fab-accent);
@@ -22444,8 +22419,9 @@
    orange ring, the second restores a 2px accent OUTSET outline — and the specimen's focus
    state is "border to accent-border, no glow". So this rule has to beat the SUPPLYING half,
    which (0,3,0) does outright. Because the winning rule draws no outset ring, the clipped-edge
-   defect that `.fabricate-app select:focus-visible`'s INSET ring exists for cannot arise for a
-   converted player control: there is no ring to clip. */
+   defect that the player app's deleted INSET select ring existed for cannot arise for a
+   converted control at all — which is what let that rule be deleted rather than narrowed when
+   the last player select converted (issue 1511). */
 .fabricate-select .fabricate-select-trigger:focus-visible {
   outline: none;
   border-color: var(--fab-accent-border);
