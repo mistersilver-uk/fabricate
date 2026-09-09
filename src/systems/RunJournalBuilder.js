@@ -11,9 +11,9 @@ import {
   stringOrEmpty,
   stringOrNull,
 } from './gatheringEngineInternals.js';
+import { readStackQuantity } from './itemStackQuantity.js';
 import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
-import { readStackQuantity } from './itemStackQuantity.js';
 import { resolvedEssencesFor } from './scopedEntityReads.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
@@ -725,7 +725,7 @@ export class RunJournalBuilder {
   }
 
   _availabilitySnapshot({ actor, run, recipe, fallback }) {
-    let componentSourceActors = [];
+    let componentSourceActors;
     try {
       componentSourceActors = normalizeList(this._getComponentSourceActors({ actor, run }));
     } catch {
@@ -1659,7 +1659,7 @@ export class RunJournalBuilder {
       appliedEffectCount: effects.filter((effect) => effect.phase === 'applied').length,
       effectCount: effects.length,
       effects,
-      ...(status === 'recoveryRequired' ? { required: true } : {}),
+      ...((status === 'recoveryRequired') && { required: true }),
     };
   }
 }
@@ -1710,11 +1710,6 @@ function routedOutcomeBand(outcome, routed, task) {
   return routed?.thresholdMode === 'exceed' ? `>${threshold}` : `${threshold}+`;
 }
 
-function normalizeOptionIndex(value) {
-  const index = Number(value);
-  return Number.isSafeInteger(index) && index >= 0 ? index : 0;
-}
-
 function selectedIngredientIndex(group, optionOverrides, selection) {
   const options = normalizeList(group?.options);
   const groupId = stringOrNull(group?.id);
@@ -1724,7 +1719,7 @@ function selectedIngredientIndex(group, optionOverrides, selection) {
     options.includes(ingredient)
   );
   const selectedIndex = options.indexOf(selected);
-  return selectedIndex >= 0 ? selectedIndex : 0;
+  return Math.max(selectedIndex, 0);
 }
 
 function ingredientKind(option) {
