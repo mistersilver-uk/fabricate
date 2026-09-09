@@ -1210,6 +1210,7 @@ const NATIVE_ELEMENT_TYPED_SELECT_LOCATORS = Object.freeze([
 
 test('no capture producer drives a converted select by an element-typed locator', () => {
   const offenders = [];
+  const seen = new Set();
   let elementTyped = 0;
   for (const producer of CAPTURE_PRODUCERS) {
     for (const match of producer.source.matchAll(/\.selectOption\(/gu)) {
@@ -1217,11 +1218,20 @@ test('no capture producer drives a converted select by an element-typed locator'
       // from several hops still ends on the one that names the element being driven. Reading the
       // last quoted STRING instead picks up a comment or a fragment of the surrounding source,
       // because the window is a character window rather than a parse.
+      //
+      // THE BODY IS "ANY RUN THAT IS NOT THE OPENING QUOTE", not "no quote of any kind". An
+      // aria-typed locator is written `'select[aria-label="…"]'` — a DOUBLE quote inside a
+      // SINGLE-quoted argument — and a `[^'"`]*` body cannot cross it, so the hop failed to match
+      // and every one of those drives read as the empty string. Four of the six element-typed
+      // drives in the harness are that shape, `elementTyped` measured 2 where it should measure
+      // 6, and the two aria entries in the allowlist below were dead. `(?:(?!\1).)*` is the
+      // backreference-aware body: it excludes only the quote character that opened the argument.
       const chain = producer.source.slice(Math.max(0, match.index - 400), match.index);
-      const hops = [...chain.matchAll(/\.locator\((['"`])([^'"`]*)\1\)/gu)];
+      const hops = [...chain.matchAll(/\.locator\((['"`])((?:(?!\1).)*)\1\)/gu)];
       const locator = hops.at(-1)?.[2] ?? '';
       if (!NATIVE_SELECT_ELEMENT_TOKEN.test(locator)) continue;
       elementTyped += 1;
+      seen.add(locator);
       if (NATIVE_ELEMENT_TYPED_SELECT_LOCATORS.includes(locator)) continue;
       offenders.push(`${producer.path}: \`${locator}\``);
     }
@@ -1231,6 +1241,18 @@ test('no capture producer drives a converted select by an element-typed locator'
     'no capture producer drives any select by an element-typed locator, so the `select` element ' +
       'token test above is quantifying over nothing. If the last one has converted, delete this ' +
       'clause and its allowlist rather than leaving them green.'
+  );
+  // THE ALLOWLIST'S OWN DRIFT GUARD, and the clause that would have caught the regex above. An
+  // allowlist entry that matches no drive is not a harmless spare: it is either a locator that
+  // was rewritten without the entry being retired, or — as it was here — evidence that the scan
+  // cannot see the shape the entry describes. Shrink-only means an entry leaves when its control
+  // converts, and this is what makes "leaves" observable.
+  assert.deepEqual(
+    NATIVE_ELEMENT_TYPED_SELECT_LOCATORS.filter((locator) => !seen.has(locator)),
+    [],
+    'these allowlist entries match no element-typed drive in any capture producer. Either the ' +
+      'drive was rewritten and the entry must be deleted with it, or the scan has stopped ' +
+      'reaching the shape the entry names and the ban is passing on a producer it cannot read.'
   );
   assert.deepEqual(
     offenders,
@@ -1270,6 +1292,66 @@ test('no capture producer reads a converted select back with an <input>-only API
     'these capture steps read a CONVERTED control back with `.inputValue()`, which throws on the ' +
       '`<button role="combobox">` it now is. Read the trigger`s rendered text, or assert the ' +
       'state the choice produced:\n  ' + offenders.join('\n  ')
+  );
+});
+
+/**
+ * Every `.test.js` under `tests/`, with `tests/helpers/select-control.js` deliberately absent.
+ *
+ * That module is where the two-click idiom is DEFINED, so it names a converted hook beside a
+ * `[data-popover-option` on purpose and is the one file the clause below must not judge.
+ *
+ * @returns {Array<{path: string, source: string}>}
+ */
+function suiteSources() {
+  const suites = [];
+  for (const entry of readdirSync('tests', { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.test.js')) continue;
+    const path = join(entry.parentPath, entry.name);
+    suites.push({ path, source: readFileSync(path, 'utf8') });
+  }
+  return suites;
+}
+
+test('no suite drives a converted select by an inline open-then-click of its own', () => {
+  // ACCEPTANCE 3'S SECOND HALF, and the reason it is a character window rather than a parse: in
+  // the reimplementation this exists to catch, the trigger hook and the option row sit on
+  // DIFFERENT lines — `openSelectPanel`'s two steps written out by hand — so a line-level scan
+  // sees neither beside the other. A legitimate post-open assertion naturally sits inside the
+  // same window as the helper call that opened the panel, so naming `chooseSelectOption(` or
+  // `openSelectPanel(` in the window is what tells the two apart.
+  //
+  // The idiom matters more than the keystrokes it saves. A hand-rolled open-then-click hard-codes
+  // the panel's portal root, its option-row attribute and its trigger class at every site, so the
+  // primitive cannot change any of the three without a sweep — which is exactly the position the
+  // capture producers were in before this conversion, and what the two helpers exist to prevent.
+  const WINDOW = 400;
+  const offenders = [];
+  let windows = 0;
+  for (const suite of suiteSources()) {
+    if (suite.path.endsWith('select-control.js')) continue;
+    for (const match of suite.source.matchAll(/\[data-popover-option/gu)) {
+      const before = suite.source.slice(Math.max(0, match.index - WINDOW), match.index);
+      windows += 1;
+      if (before.includes('chooseSelectOption(') || before.includes('openSelectPanel(')) continue;
+      for (const hook of CONVERTED_SELECT_HOOKS) {
+        if (!before.includes(hook)) continue;
+        offenders.push(`${suite.path}: \`${hook}\` is opened and clicked inline`);
+      }
+    }
+  }
+  assert.ok(
+    windows > 0,
+    'no suite mentions `[data-popover-option` at all, so this clause is quantifying over nothing'
+  );
+  assert.deepEqual(
+    offenders,
+    [],
+    'these suites reach a CONVERTED select by opening its trigger and clicking an option row ' +
+      'themselves, rather than through `tests/helpers/select-control.js`. The helper owns the ' +
+      'panel`s portal root, its option attribute and its trigger class; a site that spells them ' +
+      'out pins the primitive`s internals at that site and has to be swept when they ' +
+      'change:\n  ' + offenders.join('\n  ')
   );
 });
 

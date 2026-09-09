@@ -13,7 +13,6 @@
  */
 
 import { COMPONENT_SCOPE_LEAF_MODULES } from './componentScopeMountModules.js';
-import { SELECT_COMPILED_MODULES } from './svelte-component-harness.js';
 
 /**
  * Raw (uncompiled) modules the harness copies into the temp tree verbatim.
@@ -94,13 +93,6 @@ export const COMPONENT_EDIT_VIEW_RAW_MODULES = Object.freeze([
  * omits does not fail — it HANGS, and is reported as `# cancelled`, never `# fail`.
  */
 export const COMPONENT_EDIT_VIEW_COMPILED_MODULES = Object.freeze([
-  // THE APP'S ONE SELECT AND ITS WHOLE COMPILED CLOSURE (issue 1510), spread rather than copied.
-  // The manager's non-root selects render `components/Select.svelte` now, so any tree holding one
-  // reaches `Field`, `Chip`, `EmptyState`, `ManagerButton` and `SearchablePopover` through it as
-  // well as directly. The spread is the route because a missing `.svelte` HANGS a suite and is
-  // reported as `# cancelled`, never `# fail`, and five suites carrying five hand-written copies
-  // of the same six paths is exactly the drift `svelte-component-harness.js` centralised it for.
-  ...SELECT_COMPILED_MODULES,
   // The catalogue ATTRIBUTION BANNER and the shared inherit row (issue 1371), both composed by
   // the two system-scope component screens.
   'src/ui/svelte/apps/manager/scoped/SharedDefinitionCallout.svelte',
