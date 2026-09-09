@@ -223,7 +223,7 @@ export class GatheringRunManager {
     const container = cloneContainer(this._getContainer(actor));
     const activeRun = container.active[String(run.id)];
     if (!activeRun) return null;
-    this._assertRunMutation(activeRun);
+    this._assertRunMutation(activeRun, { allowPaused: status === 'cancelled' });
 
     const now = this._now();
     const completed = this._normalizeRun(
@@ -290,6 +290,7 @@ export class GatheringRunManager {
   }
 
   _locateRunPersistence(actor, runId, { activeOnly = true } = {}) {
+    this.invalidateCache(actorKey(actor));
     const container = cloneContainer(this._getContainer(actor));
     const location = findRun(container, runId, { activeOnly });
     if (!location) return null;
@@ -469,12 +470,15 @@ export class GatheringRunManager {
       let dirty = false;
 
       for (const [runId, run] of Object.entries(container.active)) {
+        if (getRunLifecycleContract(run) === 'unsupported') continue;
         if (!predicate(run)) continue;
         delete container.active[runId];
         dirty = true;
       }
 
-      const nextHistory = container.history.filter((run) => !predicate(run));
+      const nextHistory = container.history.filter(
+        (run) => getRunLifecycleContract(run) === 'unsupported' || !predicate(run)
+      );
       if (nextHistory.length !== container.history.length) {
         container.history = nextHistory;
         dirty = true;

@@ -140,8 +140,17 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   async updateRun(actor, run, { expectedRevision = undefined } = {}) {
+    const isCurrentLifecycle = getRunLifecycleContract(run) === 'current';
+    if (isCurrentLifecycle) this.invalidateCache(actor.id);
     const container = this._getContainer(actor);
-    if (!container.active[run.id]) return null;
+    const persistedRun = container.active[run.id];
+    if (!persistedRun) return null;
+    if (isCurrentLifecycle) {
+      this._assertRunMutation(persistedRun, { expectedRevision: run.runRevision });
+      if (expectedRevision !== undefined) {
+        this._assertRunMutation(persistedRun, { expectedRevision });
+      }
+    }
     this._assertRunMutation(run, { expectedRevision });
     incrementRunRevision(run);
     run.updatedAt = this._nowWorldTime();
@@ -360,7 +369,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
   async completeRun(actor, run, status = 'succeeded') {
     const container = this._getContainer(actor);
     if (!container.active?.[run.id]) return run;
-    this._assertRunMutation(run);
+    this._assertRunMutation(run, { allowPaused: status === 'cancelled' });
 
     run.status = status;
     run.currentStepIndex = null;
@@ -548,6 +557,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   _locateRunPersistence(actor, runId, { activeOnly = true } = {}) {
+    this.invalidateCache(actor.id);
     const container = cloneJson(this._getContainer(actor));
     const location = findRunLocation(container, runId);
     if (!location || (activeOnly && location.terminal)) return null;
@@ -593,13 +603,14 @@ export class CraftingRunManager extends RunContainerManagerBase {
       let dirty = false;
 
       for (const [runId, run] of Object.entries(container.active || {})) {
+        if (getRunLifecycleContract(run) === 'unsupported') continue;
         if (run?.craftingSystemId !== target) continue;
         delete container.active[runId];
         dirty = true;
       }
 
       const nextHistory = (container.history || []).filter(
-        (run) => run?.craftingSystemId !== target
+        (run) => getRunLifecycleContract(run) === 'unsupported' || run?.craftingSystemId !== target
       );
       if (nextHistory.length !== (container.history || []).length) {
         container.history = nextHistory;
@@ -636,12 +647,15 @@ export class CraftingRunManager extends RunContainerManagerBase {
       let dirty = false;
 
       for (const [runId, run] of Object.entries(container.active || {})) {
+        if (getRunLifecycleContract(run) === 'unsupported') continue;
         if (!dropActiveRun(run)) continue;
         delete container.active[runId];
         dirty = true;
       }
 
-      const nextHistory = (container.history || []).filter((run) => keepHistoryEntry(run));
+      const nextHistory = (container.history || []).filter(
+        (run) => getRunLifecycleContract(run) === 'unsupported' || keepHistoryEntry(run)
+      );
       if (nextHistory.length !== (container.history || []).length) {
         container.history = nextHistory;
         dirty = true;
@@ -726,6 +740,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
       let dirty = false;
 
       for (const [runId, run] of Object.entries(container.active || {})) {
+        if (getRunLifecycleContract(run) === 'unsupported') continue;
         const recipe = run?.recipeId ? resolveRecipe(run.recipeId) : null;
         if (!recipe) continue;
         const steps =

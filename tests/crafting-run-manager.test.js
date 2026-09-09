@@ -205,6 +205,10 @@ test('CraftingRunManager freezes and resumes v1 gates while preserving legacy wo
   const paused = await manager.pauseRun(actor, run.id, { expectedRevision: 1 });
   assert.deepEqual(paused.pauseState, { pausedAt: 1030, remainingSeconds: 90 });
   assert.equal(paused.runRevision, 2);
+  await assert.rejects(
+    () => manager.markStepInProgress(actor, paused, 0),
+    (error) => error.code === 'RUN_PAUSED'
+  );
 
   await manager.processWorldTime(5000);
   assert.equal(manager.getActiveRun(actor, run.id).status, 'waitingTime');
@@ -222,6 +226,48 @@ test('CraftingRunManager freezes and resumes v1 gates while preserving legacy wo
   );
 });
 
+test('CraftingRunManager allows a paused v1 run to be cancelled', async () => {
+  setupGlobals(1000);
+  const actor = new FakeActor('Cancelled paused crafter');
+  const manager = new CraftingRunManager();
+  const run = await manager.createRun(actor, singleStepRecipe('cancel-paused'), [actor], 'user-1', {
+    lifecycleVersion: 1,
+  });
+  await manager.markStepWaitingForTime(actor, run, 0, { minutes: 2 });
+  await manager.pauseRun(actor, run.id, { expectedRevision: 1 });
+
+  const cancelled = await manager.cancelRun(actor, run.id);
+
+  assert.equal(cancelled.status, 'cancelled');
+  assert.equal(manager.getActiveRun(actor, run.id), null);
+});
+
+test('CraftingRunManager rejects a v1 update built from a stale manager cache', async () => {
+  setupGlobals(1000);
+  const actor = new FakeActor('Concurrent crafter');
+  const firstManager = new CraftingRunManager();
+  const secondManager = new CraftingRunManager();
+  const created = await firstManager.createRun(
+    actor,
+    singleStepRecipe('concurrent'),
+    [actor],
+    'user-1',
+    { lifecycleVersion: 1 }
+  );
+  const staleRun = secondManager.getActiveRun(actor, created.id);
+
+  await firstManager.setCompletionMode(actor, created.id, 'worldTime', { expectedRevision: 0 });
+  staleRun.status = 'waitingTime';
+
+  await assert.rejects(
+    () => secondManager.updateRun(actor, staleRun),
+    (error) => error.code === 'STALE_RUN_REVISION'
+  );
+  secondManager.invalidateCache();
+  assert.equal(secondManager.getActiveRun(actor, created.id).completionMode, 'worldTime');
+  assert.equal(secondManager.getActiveRun(actor, created.id).status, 'inProgress');
+});
+
 test('CraftingRunManager preserves unsupported lifecycle records and refuses mutations without writes', async () => {
   setupGlobals(1000);
   const actor = new FakeActor('Future crafter');
@@ -231,20 +277,35 @@ test('CraftingRunManager preserves unsupported lifecycle records and refuses mut
         future: {
           id: 'future',
           lifecycleVersion: 2,
+          craftingSystemId: 'system-future',
+          recipeId: 'recipe-future',
           status: 'waitingTime',
           currentStepIndex: 0,
+          pauseState: { futureShape: true },
+          executionJournal: { futureJournal: true },
           steps: [
             {
               stepId: 'step-1',
               status: 'waitingTime',
               timeGate: { initiatedAt: 0, requiredSeconds: 10, availableAt: 10 },
+              selectionPlan: { futureSelection: true },
             },
           ],
         },
       },
-      history: [],
+      history: [
+        {
+          id: 'future-history',
+          lifecycleVersion: 2,
+          craftingSystemId: 'system-future',
+          recipeId: 'recipe-future',
+          status: 'futureTerminal',
+          futureState: { opaque: ['keep-me'] },
+        },
+      ],
     },
   };
+  const originalContainer = structuredClone(actor._flags.fabricate['fabricate.craftingRuns']);
   let writes = 0;
   const originalSetFlag = actor.setFlag.bind(actor);
   actor.setFlag = async (...args) => {
@@ -255,6 +316,10 @@ test('CraftingRunManager preserves unsupported lifecycle records and refuses mut
   const manager = new CraftingRunManager();
 
   await manager.processWorldTime(1000);
+  await manager.removeRunsForSystem('system-future');
+  await manager.cleanupInvalidRuns(new Set(), new Set());
+  await manager.removeRunsForRecipes(['recipe-future']);
+  assert.equal(await manager.pruneInstantaneousActiveRuns(() => singleStepRecipe('future')), 0);
   assert.equal(manager.getActiveRun(actor, 'future').status, 'waitingTime');
   await assert.rejects(
     () => manager.cancelRun(actor, 'future'),
@@ -262,6 +327,7 @@ test('CraftingRunManager preserves unsupported lifecycle records and refuses mut
   );
   assert.equal(writes, 0);
   assert.equal(manager.getActiveRun(actor, 'future').lifecycleVersion, 2);
+  assert.deepEqual(actor._flags.fabricate['fabricate.craftingRuns'], originalContainer);
 });
 
 test('CraftingRunManager: getRun and history limit helpers work for active + historical entries', async () => {

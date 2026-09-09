@@ -220,6 +220,10 @@ test('GatheringRunManager preserves explicit lifecycle v1 state and pause prefer
   const paused = await runs.pauseRun(actor, run.id, { expectedRevision: 0 });
   assert.deepEqual(paused.pauseState, { pausedAt: 1030, remainingSeconds: 90 });
   assert.deepEqual(runs.getMaturedWaitingRuns(5000), []);
+  await assert.rejects(
+    () => runs.completeRun(actor, paused, 'succeeded'),
+    (error) => error.code === 'RUN_PAUSED'
+  );
 
   now = 1130;
   const resumed = await runs.resumeRun(actor, run.id, { expectedRevision: 1 });
@@ -230,6 +234,44 @@ test('GatheringRunManager preserves explicit lifecycle v1 state and pause prefer
   const manual = await runs.setCompletionMode(actor, run.id, 'manual', { expectedRevision: 2 });
   assert.equal(manual.completionMode, 'manual');
   assert.equal(manual.runRevision, 3);
+});
+
+test('GatheringRunManager allows a paused v1 run to be cancelled', async () => {
+  const actor = new FakeActor();
+  const runs = manager();
+  const run = await runs.createWaitingRun(
+    actor,
+    runData({ lifecycleVersion: 1 }),
+    { requiredSeconds: 120, initiatedAt: 1000, availableAt: 1120 }
+  );
+  await runs.pauseRun(actor, run.id, { expectedRevision: 0 });
+
+  const cancelled = await runs.cancelRun(actor, run.id);
+
+  assert.equal(cancelled.status, 'cancelled');
+  assert.equal(runs.getActiveRun(actor, run.id), null);
+});
+
+test('GatheringRunManager checks v1 revisions against the fresh actor record', async () => {
+  const actor = new FakeActor();
+  const firstManager = manager();
+  const secondManager = manager();
+  const created = await firstManager.createWaitingRun(
+    actor,
+    runData({ lifecycleVersion: 1 }),
+    { requiredSeconds: 120, initiatedAt: 1000, availableAt: 1120 }
+  );
+  secondManager.getActiveRun(actor, created.id);
+
+  await firstManager.setCompletionMode(actor, created.id, 'worldTime', { expectedRevision: 0 });
+
+  await assert.rejects(
+    () => secondManager.pauseRun(actor, created.id, { expectedRevision: 0 }),
+    (error) => error.code === 'STALE_RUN_REVISION'
+  );
+  secondManager.invalidateCache();
+  assert.equal(secondManager.getActiveRun(actor, created.id).completionMode, 'worldTime');
+  assert.equal(secondManager.getActiveRun(actor, created.id).pauseState, undefined);
 });
 
 test('GatheringRunManager updates execution evidence in terminal history by run id', async () => {
@@ -292,18 +334,34 @@ test('GatheringRunManager preserves future lifecycle records and refuses mutatio
           futureState: { opaque: true },
         },
       },
-      history: [],
+      history: [
+        {
+          id: 'future-history',
+          lifecycleVersion: 2,
+          craftingSystemId: 'system-1',
+          environmentId: 'env-1',
+          taskId: 'task-history',
+          status: 'futureTerminal',
+          futureState: { opaque: ['keep-me'] },
+        },
+      ],
     },
   };
+  const originalContainer = structuredClone(actor.flags.fabricate.gatheringRuns);
   const runs = manager({ getActors: () => [actor] });
 
   assert.equal(runs.getActiveRun(actor, 'future').lifecycleVersion, 2);
   assert.deepEqual(runs.getMaturedWaitingRuns(100), []);
+  await runs.removeRunsForSystem('system-1');
+  await runs.removeRunsForEnvironment('env-1');
+  await runs.removeRunsForTask('task-1');
+  await runs.removeRunsForTask('task-history');
   await assert.rejects(
     () => runs.cancelRun(actor, 'future'),
     (error) => error.code === 'UNSUPPORTED_LIFECYCLE_VERSION'
   );
   assert.equal(actor.setFlagCalls.length, 0);
+  assert.deepEqual(actor.flags.fabricate.gatheringRuns, originalContainer);
 });
 
 test('GatheringRunManager keeps unsupported run data byte-shaped during unrelated writes', async () => {

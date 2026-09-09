@@ -38,7 +38,7 @@ export function preserveRunLifecycleFields(data = {}) {
 
 export function assertRunLifecycleMutation(
   run,
-  { currentOnly = false, expectedRevision = undefined } = {}
+  { currentOnly = false, expectedRevision = undefined, allowPaused = false } = {}
 ) {
   const contract = getRunLifecycleContract(run);
   if (contract === 'unsupported') throw unsupportedVersionError(run?.lifecycleVersion);
@@ -53,6 +53,9 @@ export function assertRunLifecycleMutation(
       'This run requires recovery before it can be changed',
       'EXECUTION_RECOVERY_REQUIRED'
     );
+  }
+  if (!allowPaused && contract === 'current' && run.pauseState) {
+    throw new RunLifecycleError('This run is paused', 'RUN_PAUSED');
   }
   if (expectedRevision !== undefined && contract === 'current') {
     const expected = Number(expectedRevision);
@@ -74,7 +77,7 @@ export function incrementRunRevision(run) {
 }
 
 export function applyCompletionMode(run, completionMode, options = {}) {
-  assertRunLifecycleMutation(run, { ...options, currentOnly: true });
+  assertRunLifecycleMutation(run, { ...options, currentOnly: true, allowPaused: true });
   if (!COMPLETION_MODES.has(completionMode)) {
     throw new RunLifecycleError(
       `Unsupported completion mode "${completionMode}"`,
@@ -86,7 +89,7 @@ export function applyCompletionMode(run, completionMode, options = {}) {
 }
 
 export function applyPause(run, { now, availableAt, expectedRevision = undefined } = {}) {
-  assertRunLifecycleMutation(run, { currentOnly: true, expectedRevision });
+  assertRunLifecycleMutation(run, { currentOnly: true, expectedRevision, allowPaused: true });
   if (run.pauseState) {
     throw new RunLifecycleError('The run is already paused', 'RUN_ALREADY_PAUSED');
   }
@@ -99,7 +102,7 @@ export function applyPause(run, { now, availableAt, expectedRevision = undefined
 }
 
 export function applyResume(run, { now, expectedRevision = undefined } = {}) {
-  assertRunLifecycleMutation(run, { currentOnly: true, expectedRevision });
+  assertRunLifecycleMutation(run, { currentOnly: true, expectedRevision, allowPaused: true });
   if (!run.pauseState) {
     throw new RunLifecycleError('The run is not paused', 'RUN_NOT_PAUSED');
   }
@@ -115,14 +118,14 @@ export function applyResume(run, { now, expectedRevision = undefined } = {}) {
 
 export async function persistCompletionMode(location, completionMode, options = {}) {
   if (!location) return null;
-  location.assertMutation({ ...options, currentOnly: true });
+  location.assertMutation({ ...options, currentOnly: true, allowPaused: true });
   applyCompletionMode(location.run, completionMode);
   return location.persist();
 }
 
 export async function persistPausedRun(location, options = {}) {
   if (!location) return null;
-  location.assertMutation({ ...options, currentOnly: true });
+  location.assertMutation({ ...options, currentOnly: true, allowPaused: true });
   const timeGate = location.getTimeGate();
   assertWaitingTimeGate(location.run, timeGate, 'RUN_NOT_PAUSABLE', 'paused');
   applyPause(location.run, {
@@ -134,7 +137,7 @@ export async function persistPausedRun(location, options = {}) {
 
 export async function persistResumedRun(location, options = {}) {
   if (!location) return null;
-  location.assertMutation({ ...options, currentOnly: true });
+  location.assertMutation({ ...options, currentOnly: true, allowPaused: true });
   const timeGate = location.getTimeGate();
   assertWaitingTimeGate(location.run, timeGate, 'RUN_NOT_RESUMABLE', 'resumed');
   const resumed = applyResume(location.run, { now: location.now() });
