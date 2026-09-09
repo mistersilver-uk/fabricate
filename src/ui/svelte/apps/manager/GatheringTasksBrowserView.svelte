@@ -8,6 +8,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import IconButton from '../../components/IconButton.svelte';
+  import ActionMenu from '../../components/ActionMenu.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
@@ -167,6 +168,11 @@
     return vocabularyEntry(kind, id).label;
   }
 
+  // THE FACET'S OWN FACE, ROUTED ONCE HERE (issue 1515). A biome carries an AUTHORED colour,
+  // so it takes the primitive's `tint` - "this chip IS that colour" - and the style string
+  // states the exact value, because a biome may hold a hex and `tint` validates bare
+  // `--fab-tag-*` keys only. Time of day and weather have no authored colour: their purple
+  // and amber are the family's, and they are stated as TONES so a theme owns them.
   function biomeChips(task) {
     const values = Array.isArray(task?.biomes) ? task.biomes : [];
     return values
@@ -176,6 +182,7 @@
         ...entry,
         kind: 'biome',
         key: `biome:${entry.id}`,
+        tint: entry.colorToken || 'sage',
         style: biomeChipStyle(entry),
       }));
   }
@@ -185,7 +192,7 @@
     return values
       .map((id) => conditionEntry('timeOfDay', id))
       .filter((entry) => entry.label)
-      .map((entry) => ({ ...entry, key: `timeOfDay:${entry.id}` }));
+      .map((entry) => ({ ...entry, key: `timeOfDay:${entry.id}`, tone: 'tag' }));
   }
 
   function weatherChips(task) {
@@ -193,7 +200,7 @@
     return values
       .map((id) => conditionEntry('weather', id))
       .filter((entry) => entry.label)
-      .map((entry) => ({ ...entry, key: `weather:${entry.id}` }));
+      .map((entry) => ({ ...entry, key: `weather:${entry.id}`, tone: 'warning' }));
   }
 
   function rowChips(task) {
@@ -205,6 +212,36 @@
       task?.name ||
         text('FABRICATE.Admin.Manager.Environment.Tasks.UnnamedTask', 'Unnamed gathering task')
     ).trim();
+  }
+
+  // The two commands that left the row's three-button cluster for the overflow menu (issue 1515).
+  // Edit stays an `<IconButton>` — it is the row's primary act — and Duplicate and Delete are
+  // built as data so the shared `<ActionMenu>` owns the trigger, the portaled panel and the
+  // keyboard contract that three loose buttons never had.
+  // THE MENU ITEMS NAME THE COMMAND, NOT THE ROW (issue 1515). `ActionMenu`'s `label` is both the
+  // visible text and the `menuitem`'s accessible name, and the shipped callers that predate this
+  // conversion — `ComponentBrowserInspector` and `environment/CompositionList` — both spell it as a
+  // generic verb ("Delete component", "Move up"). The row is identified by the trigger the menu was
+  // opened from, so repeating its name in every item widens the panel to restate what the reader
+  // just acted on. This is also why `Recipe.DuplicateNamed` and `Component.DeleteNamed` are already
+  // dead in `tests/lang-known-orphans.js`: the earlier conversions retired the same `{name}` copy.
+  function rowMenuItems() {
+    return [
+      {
+        id: 'duplicate',
+        label: text(
+          'FABRICATE.Admin.Manager.Environment.Tasks.Duplicate',
+          'Duplicate gathering task'
+        ),
+        icon: 'fas fa-copy',
+      },
+      {
+        id: 'delete',
+        label: text('FABRICATE.Admin.Manager.Environment.Tasks.Delete', 'Delete gathering task'),
+        icon: 'fas fa-trash',
+        danger: true,
+      },
+    ];
   }
 
   function taskImage(task) {
@@ -399,35 +436,33 @@
         >
       </EmptyState>
     {:else}
+      <!-- A LIST, NOT A TABLE (issue 1515): see `SystemsBrowserView` for the whole reasoning. The
+           column strip stays as the VISUAL header over the shared grid and is `aria-hidden`,
+           because a `columnheader` outside a `table` names nothing. -->
       <div
         class="manager-gathering-tasks-table"
-        role="table"
+        role="list"
         aria-label={text('FABRICATE.Admin.Manager.Environment.Tasks.TableShort', 'Gathering tasks')}
       >
-        <div class="manager-table-head manager-gathering-task-table-head" role="row">
-          <span role="columnheader"
+        <div class="manager-table-head manager-gathering-task-table-head" aria-hidden="true">
+          <span
             >{text('FABRICATE.Admin.Manager.Environment.Tasks.Column.Task', 'Gathering task')}</span
           >
-          <span role="columnheader"
-            >{text('FABRICATE.Admin.Manager.Environment.Tasks.Tags', 'Tags')}</span
-          >
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
-          <span role="columnheader"
-            >{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span
-          >
+          <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Tags', 'Tags')}</span>
+          <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
         </div>
         {#each paginatedTasks as task (task.id)}
           <div
             class={`manager-gathering-task-row ${selectedTaskId === task.id ? 'is-selected' : ''}`}
-            role="row"
-            aria-selected={selectedTaskId === task.id}
+            role="listitem"
+            aria-current={selectedTaskId === task.id ? 'true' : undefined}
             data-gathering-task-id={task.id}
           >
             <button
               type="button"
               class="manager-gathering-task-identity"
               onclick={() => onSelectTask(task.id)}
-              role="cell"
             >
               <img class="manager-gathering-task-thumb" src={taskImage(task)} alt="" />
               <span class="manager-system-copy">
@@ -443,16 +478,18 @@
                 {/if}
               </span>
             </button>
-            <div class="manager-gathering-task-tags-cell" role="cell" data-gathering-task-tags>
+            <div class="manager-gathering-task-tags-cell" data-gathering-task-tags>
               {#each rowChips(task) as chip (chip.key)}
-                <span class={`manager-availability-pill is-${chip.kind}`} style={chip.style}>
-                  <i class={chip.icon} aria-hidden="true"></i>
-                  <span>{chip.label}</span>
-                </span>
+                <Chip
+                  tone={chip.tone || ''}
+                  tint={chip.tint || ''}
+                  icon={chip.icon}
+                  style={chip.style}
+                  data-gathering-task-tag={chip.kind}>{chip.label}</Chip
+                >
               {/each}
             </div>
             <span
-              role="cell"
               class="manager-labeled-cell manager-status-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}
             >
@@ -473,7 +510,6 @@
               />
             </span>
             <span
-              role="cell"
               class="manager-action-group manager-labeled-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
             >
@@ -490,33 +526,21 @@
               >
                 <i class="fas fa-edit" aria-hidden="true"></i>
               </IconButton>
-              <IconButton
-                ariaLabel={text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.DuplicateNamed',
-                  'Duplicate {name}'
+              <ActionMenu
+                items={rowMenuItems()}
+                triggerLabel={text(
+                  'FABRICATE.Admin.Manager.Environment.Tasks.ActionsFor',
+                  'Gathering task actions for {name}'
                 ).replace('{name}', taskName(task))}
-                title={text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.Duplicate',
-                  'Duplicate gathering task'
+                triggerTitle={text(
+                  'FABRICATE.Admin.Manager.Environment.Tasks.Actions',
+                  'Gathering task actions'
                 )}
-                onclick={() => onDuplicateTask(selectedSystemId, task.id)}
-              >
-                <i class="fas fa-copy" aria-hidden="true"></i>
-              </IconButton>
-              <IconButton
-                class="is-danger"
-                ariaLabel={text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.DeleteNamed',
-                  'Delete {name}'
-                ).replace('{name}', taskName(task))}
-                title={text(
-                  'FABRICATE.Admin.Manager.Environment.Tasks.Delete',
-                  'Delete gathering task'
-                )}
-                onclick={() => onDeleteTask(selectedSystemId, task.id)}
-              >
-                <i class="fas fa-trash" aria-hidden="true"></i>
-              </IconButton>
+                onSelect={(action) => {
+                  if (action === 'duplicate') onDuplicateTask(selectedSystemId, task.id);
+                  else if (action === 'delete') onDeleteTask(selectedSystemId, task.id);
+                }}
+              />
             </span>
           </div>
         {/each}

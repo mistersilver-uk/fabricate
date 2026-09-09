@@ -3,10 +3,11 @@
   import Field from '../../components/Field.svelte';
   import ChanceSlider from '../../components/ChanceSlider.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
+  import Chip from '../../components/Chip.svelte';
   import EmptyState from './EmptyState.svelte';
   import { DEFAULT_GATHERING_EVENT_IMG } from '../../../../gatheringImageDefaults.js';
   import { dragDrop } from '../../actions/dragDrop.js';
-  import { localize, viewScene } from '../../util/foundryBridge.js';
+  import { formatList, localize, viewScene } from '../../util/foundryBridge.js';
   import { resolveDropData } from '../../util/dropUtils.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
   import { sceneDocumentImage } from '../../util/sceneImages.js';
@@ -215,6 +216,30 @@
     return text('FABRICATE.Admin.Manager.Environment.Events.AnyTimeTitle', 'Any Time');
   }
 
+  // ONE live region per host row, and it is the CALLER'S to own: `Chip.svelte`'s `removable`
+  // note records that a bare chip cannot have one, because neither adding nor removing a member
+  // moves focus into the row. This is the same summary `ModifierPillSelect` books beside its own
+  // pill row, restated on every change to the set rather than announced as an event: a region
+  // wrapped around the row would read each added chip's whole subtree - its remove control's
+  // label included - and say nothing at all on a removal, since `aria-relevant` defaults to
+  // `additions text`. The names come through the active language's list conventions.
+  function availabilitySummary(kind) {
+    const options = selectedConditionOptions(kind);
+    const body =
+      options.length > 0
+        ? formatList(options.map((option) => conditionLabel(option)))
+        : emptyAvailabilityLabel(kind);
+    return `${availabilityFieldLabel(kind)}: ${body}`;
+  }
+
+  // The danger-tag row's own region, on the same terms.
+  function dangerSummary() {
+    if (dangerTags.length === 0) {
+      return text('FABRICATE.Admin.Manager.Environment.Events.AnyDanger', 'Any danger profile');
+    }
+    return formatList(dangerTags.map((tag) => dangerLabel(tag)));
+  }
+
   function removeAvailabilityLabel(option) {
     return text(
       'FABRICATE.Admin.Manager.Environment.Events.RemoveAvailabilityCondition',
@@ -374,7 +399,7 @@
       </div>
       <div class="manager-task-availability-row" data-gathering-event-availability>
         {#each ['biomes', 'timeOfDay', 'weather'] as kind (kind)}
-          <Field as="div" class="manager-availability-multi" data-gathering-event-field={kind}>
+          <Field as="div" data-gathering-event-field={kind}>
             <span>{availabilityFieldLabel(kind)}</span>
             <!-- The add-condition menu is `SearchablePopover` (issue 1458), not a
                  hand-rolled trigger-plus-listbox. `showSearch={false}` because a menu of
@@ -389,41 +414,33 @@
               options={availabilityMenuOptions(kind)}
               showSearch={false}
               triggerHasPopup="listbox"
-              triggerClass="manager-availability-menu-button"
+              triggerClass="manager-condition-menu-button"
+              triggerData={{ 'data-chip-remove-fallback': '' }}
               triggerLabel={availabilityMenuLabel(kind)}
               dialogAriaLabel={availabilityFieldLabel(kind)}
               emptyHint={availabilityMenuLabel(kind)}
               onChoose={(id) => addAvailability(kind, id)}
             />
-            <div
-              class="manager-availability-pill-row"
-              data-gathering-event-availability-pills={kind}
-            >
+            <div class="manager-chip-row" data-gathering-event-availability-pills={kind}>
               {#if selectedConditionOptions(kind).length > 0}
                 {#each selectedConditionOptions(kind) as option (conditionId(option))}
-                  <span
-                    class="manager-availability-pill"
+                  <Chip
+                    tone="warning"
+                    icon={conditionIcon(option)}
+                    removable
+                    removeLabel={removeAvailabilityLabel(option)}
+                    onRemove={() => removeAvailability(kind, conditionId(option))}
                     data-gathering-event-availability-pill={kind}
-                    data-condition-id={conditionId(option)}
+                    data-condition-id={conditionId(option)}>{conditionLabel(option)}</Chip
                   >
-                    <i class={conditionIcon(option)} aria-hidden="true"></i>
-                    <span>{conditionLabel(option)}</span>
-                    <button
-                      type="button"
-                      class="manager-availability-remove"
-                      aria-label={removeAvailabilityLabel(option)}
-                      onclick={() => removeAvailability(kind, conditionId(option))}
-                    >
-                      <i class="fas fa-xmark" aria-hidden="true"></i>
-                    </button>
-                  </span>
                 {/each}
               {:else}
-                <span class="manager-muted manager-availability-any"
-                  >{emptyAvailabilityLabel(kind)}</span
-                >
+                <EmptyState inline hint={emptyAvailabilityLabel(kind)} />
               {/if}
             </div>
+            <p class="visually-hidden" aria-live="polite" data-gathering-event-availability-status>
+              {availabilitySummary(kind)}
+            </p>
           </Field>
         {/each}
       </div>
@@ -443,14 +460,35 @@
           </div>
         </div>
         <div class="manager-task-availability-row">
-          <Field as="div" class="manager-availability-multi">
+          <Field as="div">
             <span
               >{text(
                 'FABRICATE.Admin.Manager.Environment.Events.DangerTagsField',
                 'Current tags'
               )}</span
             >
-            <div class="manager-availability-pill-row" data-gathering-event-danger-pills>
+            <!-- THE DANGER TAG IS NOT A CHIP YET, and it is a TRACKED DIVERGENCE rather than an
+                 impossibility (issue 1515). Its six levels are a RAMP -
+                 `.manager-danger-tag-pill.is-safe` through `.is-extreme` in
+                 `styles/fabricate.css`, four of which MIX two semantic families per level - and
+                 no `Chip` tone states a mix.
+
+                 An earlier note here claimed the conversion could not work at all, because
+                 `styles/fabricate.css` imports at `layer(modules)` while the primitive's scoped
+                 block is unlayered, so the chip's own fill would beat all six rules. That is
+                 true of a rule in the SHEET and false of the route the family actually has: the
+                 biome chip beside this one is a `<Chip tint=… style=…>` that delivers a
+                 per-record colour through an inline `--fab-chip-color`, and an inline custom
+                 property outranks every layered and unlayered rule alike. So the ramp IS
+                 expressible.
+
+                 What it is NOT is in scope here. Six ramp levels, four of them two-family mixes,
+                 have to be authored as chip tints and re-measured against the design system
+                 before the pill can be retired, and this change's remit was the availability
+                 sweep beside it. The remove control is re-pointed into this pill's OWN family
+                 instead, so that sweep can take the shared family without un-styling this row,
+                 and the re-skin is left as named debt rather than as a refusal. -->
+            <div class="manager-chip-row" data-gathering-event-danger-pills>
               {#if dangerTags.length > 0}
                 {#each dangerTags as tag (tag)}
                   <span class={`manager-danger-tag-pill is-${tag}`} data-danger-tag={tag}>
@@ -458,7 +496,8 @@
                     <span>{dangerLabel(tag)}</span>
                     <button
                       type="button"
-                      class="manager-availability-remove"
+                      class="manager-danger-tag-remove"
+                      data-keyboard-focus="true"
                       aria-label={text(
                         'FABRICATE.Admin.Manager.Environment.Events.RemoveDangerTag',
                         'Remove {name}'
@@ -470,16 +509,20 @@
                   </span>
                 {/each}
               {:else}
-                <span class="manager-muted manager-availability-any"
-                  >{text(
+                <EmptyState
+                  inline
+                  hint={text(
                     'FABRICATE.Admin.Manager.Environment.Events.AnyDanger',
                     'Any danger profile'
-                  )}</span
-                >
+                  )}
+                />
               {/if}
             </div>
+            <p class="visually-hidden" aria-live="polite" data-gathering-event-danger-status>
+              {dangerSummary()}
+            </p>
             {#if suggestedDangerTags.length > 0}
-              <div class="manager-availability-pill-row" data-gathering-event-danger-suggestions>
+              <div class="manager-chip-row" data-gathering-event-danger-suggestions>
                 {#each suggestedDangerTags as tag (tag)}
                   <button
                     type="button"

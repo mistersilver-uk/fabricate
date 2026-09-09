@@ -20,7 +20,7 @@
   import Field from '../../../components/Field.svelte';
   import Chip from '../../../components/Chip.svelte';
   import EmptyState from '../EmptyState.svelte';
-  import { localize } from '../../../util/foundryBridge.js';
+  import { formatList, localize } from '../../../util/foundryBridge.js';
   import { dragDrop } from '../../../actions/dragDrop.js';
   import { resolveDropData } from '../../../util/dropUtils.js';
   import IconPicker from '../../../components/IconPicker.svelte';
@@ -270,6 +270,22 @@
   function currencyUnitLabel(unitId) {
     const unit = currencyUnits.find((entry) => entry.id === unitId);
     return unit?.label || unit?.abbreviation || unitId;
+  }
+
+  // ONE live region per host row, and it is the CALLER'S to own: `Chip.svelte`'s `removable`
+  // note records that a bare chip cannot have one, because neither adding nor removing a member
+  // moves focus into the row, and a region wrapped around the row would read each added chip's
+  // whole subtree on an add and say nothing at all on a removal. Restated on every change to
+  // the ladder, through the active language's list conventions.
+  function subUnitSummary(unit) {
+    const contained = Array.isArray(unit?.contains) ? unit.contains : [];
+    if (contained.length === 0) {
+      return text(
+        'FABRICATE.Admin.Manager.CurrencyUnits.NoSubUnits',
+        'This unit is a base denomination.'
+      );
+    }
+    return formatList(contained.map((entry) => currencyUnitLabel(entry.unitId)));
   }
 
   function currencyUnitIcon(unitId) {
@@ -826,6 +842,7 @@
                               'Add sub-unit'
                             )}
                             onclick={() => handleAddCurrencySubUnit(unit.id)}
+                            data-chip-remove-fallback=""
                           >
                             <i class="fa-solid fa-plus" aria-hidden="true"></i>
                           </IconButton>
@@ -864,26 +881,48 @@
                       <p class="manager-card-title manager-currency-subunit-heading">
                         {text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnits', 'Sub-units')}
                       </p>
-                      {#if (unit.contains || []).length > 0}
-                        <div
-                          class="manager-availability-pill-row"
-                          aria-label={text(
-                            'FABRICATE.Admin.Manager.CurrencyUnits.SubUnits',
-                            'Sub-units'
-                          )}
-                        >
+                      <!-- THE AMOUNT IS NOT A CHIP, and the chip around it is (issue 1515).
+                           A number a GM can change is a stepper and never a badge, so the
+                           `<input type="number">` keeps its own control and only its class
+                           moves out of the retiring availability family; what carries it is a
+                           removable membership token, which is the primitive.
+
+                           THE ROW IS ALSO THE LAST RUNG OF THE CHIP'S FOCUS LADDER, which is why
+                           it is rendered in BOTH states rather than only when it holds chips.
+                           `Chip` takes its focus destination before it removes the chip - the
+                           next remove control, else the previous one, else the nearest
+                           `[data-chip-remove-fallback]` - and the Add sub-unit control above
+                           carries that hook only while an ELIGIBLE unit remains to add. Remove
+                           the last sub-unit in a two-unit world and the add row is a warning
+                           note instead, so the ladder ran out and focus fell to `<body>`. A row
+                           that appeared only alongside chips could not be that rung either: it
+                           would be resolved, focused, and then replaced in the same removal. -->
+                      <div
+                        class="manager-chip-row"
+                        tabindex="-1"
+                        data-keyboard-focus="true"
+                        data-chip-remove-fallback=""
+                        aria-label={text(
+                          'FABRICATE.Admin.Manager.CurrencyUnits.SubUnits',
+                          'Sub-units'
+                        )}
+                      >
+                        {#if (unit.contains || []).length > 0}
                           {#each unit.contains as contained (contained.unitId)}
-                            <span
-                              class="manager-availability-pill is-currency"
+                            <Chip
+                              tone="info"
+                              icon={currencyUnitIcon(contained.unitId)}
+                              removable
+                              removeLabel={`${text('FABRICATE.Admin.Manager.CurrencyUnits.RemoveSubUnit', 'Remove sub-unit')} (${currencyUnitLabel(contained.unitId)})`}
+                              onRemove={() => onDeleteCurrencySubUnit(unit.id, contained.unitId)}
                               data-world-currency-subunit={contained.unitId}
                             >
-                              <i class={currencyUnitIcon(contained.unitId)} aria-hidden="true"></i>
                               <span>{currencyUnitLabel(contained.unitId)}</span>
                               <input
                                 type="number"
                                 min="1"
                                 step="1"
-                                class="manager-availability-pill-amount"
+                                class="manager-currency-subunit-amount"
                                 value={contained.amount}
                                 aria-label={`${currencyUnitLabel(contained.unitId)} ${text('FABRICATE.Admin.Manager.CurrencyUnits.SubUnitAmount', 'Sub-unit amount').toLowerCase()}`}
                                 oninput={(event) =>
@@ -893,25 +932,24 @@
                                     event.currentTarget.value
                                   )}
                               />
-                              <button
-                                type="button"
-                                class="manager-availability-remove"
-                                aria-label={`${text('FABRICATE.Admin.Manager.CurrencyUnits.RemoveSubUnit', 'Remove sub-unit')} (${currencyUnitLabel(contained.unitId)})`}
-                                onclick={() => onDeleteCurrencySubUnit(unit.id, contained.unitId)}
-                              >
-                                <i class="fas fa-xmark" aria-hidden="true"></i>
-                              </button>
-                            </span>
+                            </Chip>
                           {/each}
-                        </div>
-                      {:else}
-                        <p class="manager-muted">
-                          {text(
-                            'FABRICATE.Admin.Manager.CurrencyUnits.NoSubUnits',
-                            'This unit is a base denomination.'
-                          )}
-                        </p>
-                      {/if}
+                        {:else}
+                          <p class="manager-muted">
+                            {text(
+                              'FABRICATE.Admin.Manager.CurrencyUnits.NoSubUnits',
+                              'This unit is a base denomination.'
+                            )}
+                          </p>
+                        {/if}
+                      </div>
+                      <p
+                        class="visually-hidden"
+                        aria-live="polite"
+                        data-world-currency-subunit-status
+                      >
+                        {subUnitSummary(unit)}
+                      </p>
                     </div>
                   {/if}
 
@@ -983,6 +1021,7 @@
                       'Edit currency unit'
                     )}
                     onclick={() => (currencyExpandedUnitId = unit.id)}
+                    data-world-currency-unit-expand={unit.id}
                   >
                     <i class="fa-solid fa-pen" aria-hidden="true"></i>
                   </IconButton>

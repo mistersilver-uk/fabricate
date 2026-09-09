@@ -515,7 +515,13 @@ test('manager character modifier search suggestions render with availability-sty
           <main class="fabricate-manager">
             <div class="harness-grid">
               <section>
-                <div class="harness-availability-anchor">
+                <!-- The availability menu’s own root rides this anchor since issue 1515: the
+                     trigger’s rule is rooted at .fabricate-pill-select now, so a copy without
+                     the namespace root would measure an unstyled button. The two classes are the
+                     primitive’s own; the option rows below keep theirs, which stay
+                     application-rooted under issue 1480. (No backticks in here — this whole
+                     block is a JS template literal.) -->
+                <div class="harness-availability-anchor fabricate-pill-select manager-availability-multi">
                   <button type="button" class="manager-availability-menu-button">
                     <span>Biomes</span>
                     <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
@@ -4734,8 +4740,11 @@ test('manager system edit view defines scoped stable form and toggle layout', ()
   const mediumQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 1120px)'));
   const narrowQuery = css.slice(css.indexOf('@container fabricate-manager (max-width: 680px)'));
 
+  // ONE track since issue 1515 deleted this tab's duplicate page header: the scrolling form is
+  // the only child of `.manager-system-edit-main`, and a leading `auto` track would take it while
+  // the growing one sat empty.
   assert.ok(
-    mainBlock.includes('grid-template-rows: auto minmax(0, 1fr);'),
+    mainBlock.includes('grid-template-rows: minmax(0, 1fr);'),
     'system edit main should reserve scrollable form space'
   );
   assert.ok(
@@ -4978,11 +4987,16 @@ test('collapsed manager rail reclaims content width and keeps section nav as an 
     collapsedRailBlock.includes('padding:'),
     'collapsed rail should tighten its padding for the icon strip'
   );
+  // The hide rule lists each trailing marker by name as of issue 1515: the planned-view word
+  // and the premium chip used to inherit it by wearing `.manager-nav-count`.
   assert.ok(
     css.includes(
-      '.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-label,\n.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count {'
+      '.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-label,\n' +
+        '.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count,\n' +
+        '.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-planned,\n' +
+        '.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-premium {'
     ),
-    'collapsed rail should hide nav labels and counts to leave an icon-only strip'
+    'collapsed rail should hide nav labels and every trailing marker to leave an icon-only strip'
   );
   assert.ok(
     collapsedNavButtonBlock.includes('grid-template-columns: minmax(0, 1fr);'),
@@ -5287,15 +5301,26 @@ test('collapsed manager rail hides scope content but keeps its expand control an
     'the rail count should own its rule rather than borrowing (and undoing) the content chip'
   );
 
-  const collapsedHideIndex = css.indexOf(
-    '.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count {'
-  );
-  const groupedHideIndex = css.indexOf(
-    '.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-label,\n.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count {'
-  );
+  // The collapsed rail's hide rule NAMES every trailing marker it hides (issue 1515). The
+  // planned-view word and the premium chip used to inherit this hide by wearing
+  // `.manager-nav-count`, which is how a tier gate and a placeholder word came to be drawn
+  // through the record-count vehicle. Each has its own vehicle now, so the rule lists them.
+  const collapsedHideSelectors = [
+    '.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-label',
+    '.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count',
+    '.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-planned',
+    '.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-premium',
+  ];
   assert.ok(
-    collapsedHideIndex >= 0 || groupedHideIndex >= 0,
-    'collapsed rail must still hide the nav counts'
+    css.includes(collapsedHideSelectors.join(',\n') + ' {\n  display: none;\n}'),
+    'collapsed rail must hide the nav label and every trailing marker that reports on the row'
+  );
+  // Comments stripped: the rule this replaced NAMES the old compound in its own prose, and a
+  // negative control that a comment can satisfy tests nothing.
+  assert.equal(
+    withoutComments(css).includes('.manager-nav-count.manager-nav-premium'),
+    false,
+    'and the premium chip must not draw through the record-count vehicle again'
   );
 });
 
@@ -5327,7 +5352,7 @@ test('the manager titlebar caps the premium badge and keeps the status line on o
   // is a second thing to keep in step across all seven palettes. So the pair is asserted on
   // the shared rule, and the badge's own block is asserted NOT to restate it.
   const goldChipBlock =
-    /\.fabricate-manager \.manager-titlebar-badge,\s*\.fabricate-manager \.manager-nav-button \.manager-nav-count\.manager-nav-premium \{[\s\S]*?\}/.exec(
+    /\.fabricate-manager \.manager-titlebar-badge,\s*\.fabricate-manager \.manager-nav-premium \{[\s\S]*?\}/.exec(
       withoutComments(css)
     )?.[0] ?? '';
   assert.ok(
@@ -7815,7 +7840,6 @@ test('World Parties keeps its card scroller and sibling pager independently reac
         <div class="manager-body">
           <aside class="manager-rail"><nav class="manager-nav">${nav}</nav></aside>
           <main class="manager-main">
-            <section class="manager-section-header"><div class="manager-heading"><h2>World Parties</h2></div></section>
             <div class="manager-gathering-panel manager-travel-view is-parties-pane">${productContractMarkup}</div>
           </main>
         </div>
@@ -10461,7 +10485,7 @@ test('the rail Downtime premium mark renders as the shared gold badge chip', asy
       ` data-world-nav-item="downtime" id="${rowId}">` +
       `<i class="fas fa-hourglass-half"></i>` +
       `<span class="manager-nav-label">Downtime</span>` +
-      `<span class="manager-nav-count manager-nav-premium${chipModifier}" id="${chipId}">PREMIUM</span>` +
+      `<span class="manager-nav-premium${chipModifier}" id="${chipId}">PREMIUM</span>` +
       `</button>`;
     await page.setContent(
       `<style>${css}</style>` +
@@ -10692,7 +10716,7 @@ test('a rail label wraps at a space and ellipsises, and never splits a word', as
       `<button class="manager-nav-button manager-nav-parent manager-world-nav-item" id="${id}">` +
       `<i class="fas fa-hourglass-half"></i>` +
       `<span class="manager-nav-label">${label}</span>` +
-      `<span class="manager-nav-count manager-nav-premium">PREMIUM</span>` +
+      `<span class="manager-nav-premium">PREMIUM</span>` +
       `</button></div>`;
     await page.setContent(
       `<style>${css}</style>` +
@@ -10750,8 +10774,9 @@ test('a rail label wraps at a space and ellipsises, and never splits a word', as
 
 // -- Downtime rail tab badges, measured (issue 1302) --------------------------------------
 //
-// A companion's badge is a bare mono numeral in the sub-item's trailing track, and its label
-// is the companion's own and is not Core's to shorten. So the interesting question is not
+// A companion's badge is the ISSUE-SUMMARY vehicle in the sub-item's trailing track (issue
+// 1515 moved it off the record-count vehicle), and its label is the companion's own and is
+// not Core's to shorten. So the interesting question is not
 // whether the numeral fits — it is what YIELDS when it does not, and that is a computed-layout
 // fact no other harness in the repository can evaluate: happy-dom applies no stylesheet and
 // returns `0` for every box metric.
@@ -10768,15 +10793,25 @@ const managerRootPath = resolve(
 const managerRootSource = readFileSync(managerRootPath, 'utf8');
 
 function assertBadgeFixtureMirrorsComponent() {
-  assert.ok(
-    managerRootSource.includes('class="manager-nav-count"\n') &&
-      managerRootSource.includes('data-world-downtime-badge={item.id}'),
+  // BOTH Downtime badges are the ISSUE-SUMMARY vehicle (issue 1515). The sub-item badge was
+  // `.manager-nav-count`, which drew a companion's attention signal as a record count while
+  // the parent rollup — the SUM of exactly those badges — drew as the issue pill. Matched as
+  // ADJACENCY rather than as two independent `includes`, which any two unrelated lines satisfy
+  // now that both marks name the same class.
+  assert.match(
+    managerRootSource,
+    /class="manager-nav-issue-badge"\s+data-world-downtime-badge=\{item\.id\}/,
     'the sub-item badge fixture below must be the marker the component actually emits'
   );
-  assert.ok(
-    managerRootSource.includes('class="manager-nav-issue-badge"\n') &&
-      managerRootSource.includes('data-world-downtime-badge-total'),
+  assert.match(
+    managerRootSource,
+    /class="manager-nav-issue-badge"\s+data-world-downtime-badge-total/,
     'and so must the parent rollup fixture'
+  );
+  assert.equal(
+    /class="manager-nav-count"\s+data-world-downtime-badge/.test(managerRootSource),
+    false,
+    'and neither Downtime badge has gone back to the record-count vehicle'
   );
 }
 
@@ -10795,7 +10830,7 @@ function railPage(navMarkup, bodyClass = '') {
 const READ_ROW = `(id) => {
   const row = document.getElementById(id);
   const label = row.querySelector('.manager-nav-label');
-  const badge = row.querySelector('.manager-nav-count');
+  const badge = row.querySelector('.manager-nav-issue-badge');
   const range = document.createRange();
   range.selectNodeContents(label);
   const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top)));
@@ -10837,7 +10872,7 @@ test('a four-digit companion badge takes width from the LABEL, which never split
       `<button class="manager-nav-subitem manager-downtime-subitem" id="${id}">` +
       `<i class="fas fa-scroll"></i>` +
       `<span class="manager-nav-label">${label}</span>` +
-      `<span class="manager-nav-count" data-world-downtime-badge="${id}" role="img" ` +
+      `<span class="manager-nav-issue-badge" data-world-downtime-badge="${id}" role="img" ` +
       `aria-label="${count} waiting">${count}</span>` +
       `</button>`;
     await page.setContent(
@@ -10947,7 +10982,7 @@ test('the Downtime parent rollup keeps the row’s label on one line, and surviv
     const rollup =
       `<span class="manager-nav-issue-badge" data-world-downtime-badge-total role="img" ` +
       `aria-label="5 updates">5</span>`;
-    const chip = `<span class="manager-nav-count manager-nav-premium is-installed">PREMIUM</span>`;
+    const chip = `<span class="manager-nav-premium is-installed">PREMIUM</span>`;
     const nav =
       `<section class="manager-world-nav">` +
       parentRow('rollup', rollup) +
@@ -11028,7 +11063,7 @@ test('the Downtime parent rollup keeps the row’s label on one line, and surviv
     assert.equal(
       collapsed.chip.markDisplay,
       'none',
-      'the collapsed rail really did apply: the chip rides `.manager-nav-count`, which it hides'
+      'the collapsed rail really did apply: it names `.manager-nav-premium` in its hide rule'
     );
     assert.notEqual(collapsed.rollup.markDisplay, 'none', 'and the rollup survives that hide');
     assert.ok(

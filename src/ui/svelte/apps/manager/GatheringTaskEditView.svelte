@@ -12,7 +12,7 @@
   import Stepper from '../../components/Stepper.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import { stepperLabels } from '../../components/stepperLabels.js';
-  import { localize } from '../../util/foundryBridge.js';
+  import { formatList, localize } from '../../util/foundryBridge.js';
   import { dropRateTierClass, dropRateTierColor } from '../../util/dropRateTier.js';
   import IconButton from '../../components/IconButton.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
@@ -251,6 +251,26 @@
   // `componentId: null` (issue 561), so the component-only resolver this replaced
   // rendered "Unnamed tool" and the item-bag sentinel for a fully-populated tool
   // (issue 976).
+  // The required-tools row's live region, on the same terms as `availabilitySummary` above:
+  // one polite summary per host row, because a chip primitive cannot own one and a removal
+  // announces nothing without it. A stale entry has no tool to name, so it reads through the
+  // same deleted-tool copy its chip carries.
+  function requiredToolsSummary() {
+    if (attachedToolEntries.length === 0) {
+      return text(
+        'FABRICATE.Admin.Manager.Environment.Tasks.RequiredToolsEmpty',
+        'No tools required.'
+      );
+    }
+    return formatList(
+      attachedToolEntries.map((entry) =>
+        entry.tool
+          ? toolDisplayLabel(entry.tool)
+          : text('FABRICATE.Admin.Manager.Environment.Tasks.StaleToolChip', 'Deleted tool')
+      )
+    );
+  }
+
   function toolDisplayLabel(tool) {
     const label = String(tool?.label || '').trim();
     if (label) return label;
@@ -448,6 +468,23 @@
       return text('FABRICATE.Admin.Manager.Environment.Tasks.AnyBiomeTitle', 'Any Biome');
     }
     return text('FABRICATE.Admin.Manager.Environment.Tasks.AnyTimeTitle', 'Any Time');
+  }
+
+  // ONE live region per host row, and it is the CALLER'S to own: `Chip.svelte`'s `removable`
+  // note records that a bare chip cannot have one, because neither adding nor removing a member
+  // moves focus into the row. This is the same summary `ModifierPillSelect` books beside its own
+  // pill row, restated on every change to the set rather than announced as an event: a region
+  // wrapped around the row would read each added chip's whole subtree - its remove control's
+  // label included - and say nothing at all on a removal, since `aria-relevant` defaults to
+  // `additions text`. The names come through the active language's list conventions, because
+  // "3 selected" does not say WHICH three the row now shows.
+  function availabilitySummary(kind) {
+    const options = selectedConditionOptions(kind);
+    const body =
+      options.length > 0
+        ? formatList(options.map((option) => conditionLabel(option)))
+        : emptyAvailabilityLabel(kind);
+    return `${availabilityFieldLabel(kind)}: ${body}`;
   }
 
   function removeAvailabilityLabel(option) {
@@ -1013,7 +1050,7 @@
       </div>
       <div class="manager-task-availability-row" data-gathering-task-availability>
         {#each ['biomes', 'timeOfDay', 'weather'] as kind (kind)}
-          <Field as="div" class="manager-availability-multi" data-gathering-task-field={kind}>
+          <Field as="div" data-gathering-task-field={kind}>
             <span>{availabilityFieldLabel(kind)}</span>
             <!-- `SearchablePopover`, not a hand-rolled trigger-plus-listbox (issue 1458).
                  The same conversion as `GatheringEventEditView`'s, which this menu was a
@@ -1030,41 +1067,33 @@
               options={availabilityMenuOptions(kind)}
               showSearch={false}
               triggerHasPopup="listbox"
-              triggerClass="manager-availability-menu-button"
+              triggerClass="manager-condition-menu-button"
+              triggerData={{ 'data-chip-remove-fallback': '' }}
               triggerLabel={availabilityMenuLabel(kind)}
               dialogAriaLabel={availabilityFieldLabel(kind)}
               emptyHint={availabilityMenuLabel(kind)}
               onChoose={(id) => addAvailability(kind, id)}
             />
-            <div
-              class="manager-availability-pill-row"
-              data-gathering-task-availability-pills={kind}
-            >
+            <div class="manager-chip-row" data-gathering-task-availability-pills={kind}>
               {#if selectedConditionOptions(kind).length > 0}
                 {#each selectedConditionOptions(kind) as option (conditionId(option))}
-                  <span
-                    class="manager-availability-pill"
+                  <Chip
+                    tone="warning"
+                    icon={conditionIcon(option)}
+                    removable
+                    removeLabel={removeAvailabilityLabel(option)}
+                    onRemove={() => removeAvailability(kind, conditionId(option))}
                     data-gathering-task-availability-pill={kind}
-                    data-condition-id={conditionId(option)}
+                    data-condition-id={conditionId(option)}>{conditionLabel(option)}</Chip
                   >
-                    <i class={conditionIcon(option)} aria-hidden="true"></i>
-                    <span>{conditionLabel(option)}</span>
-                    <button
-                      type="button"
-                      class="manager-availability-remove"
-                      aria-label={removeAvailabilityLabel(option)}
-                      onclick={() => removeAvailability(kind, conditionId(option))}
-                    >
-                      <i class="fas fa-xmark" aria-hidden="true"></i>
-                    </button>
-                  </span>
                 {/each}
               {:else}
-                <span class="manager-muted manager-availability-any"
-                  >{emptyAvailabilityLabel(kind)}</span
-                >
+                <EmptyState inline hint={emptyAvailabilityLabel(kind)} />
               {/if}
             </div>
+            <p class="visually-hidden" aria-live="polite" data-gathering-task-availability-status>
+              {availabilitySummary(kind)}
+            </p>
           </Field>
         {/each}
       </div>
@@ -1554,19 +1583,40 @@
       </div>
 
       <div class="manager-task-required-tools-attached" data-gathering-task-required-tools-attached>
-        {#if attachedToolEntries.length === 0}
-          <span class="manager-muted manager-availability-any"
-            >{text(
-              'FABRICATE.Admin.Manager.Environment.Tasks.RequiredToolsEmpty',
-              'No tools required.'
-            )}</span
-          >
-        {:else}
-          <div class="manager-availability-pill-row">
+        <!-- THE ROW IS THE LAST RUNG OF THE CHIP'S FOCUS LADDER (issue 1515), which is why it is
+             rendered in BOTH states rather than only when it holds chips. `Chip` takes its focus
+             destination before it removes the chip - the next remove control, else the previous
+             one, else the nearest `[data-chip-remove-fallback]` - and the library search below
+             carries that hook only while this system HAS a tool library. Remove the last required
+             tool in a system with none and the ladder ran out and focus fell to `<body>`. A row
+             that appeared only alongside chips could not be that rung either: it would be
+             resolved, focused, and then replaced by the empty state in the same removal. -->
+        <div
+          class="manager-chip-row"
+          tabindex="-1"
+          data-keyboard-focus="true"
+          data-chip-remove-fallback=""
+        >
+          {#if attachedToolEntries.length === 0}
+            <EmptyState
+              inline
+              hint={text(
+                'FABRICATE.Admin.Manager.Environment.Tasks.RequiredToolsEmpty',
+                'No tools required.'
+              )}
+            />
+          {:else}
             {#each attachedToolEntries as entry (entry.id)}
               {#if entry.tool}
-                <span
-                  class="manager-availability-pill manager-required-tool-pill"
+                <Chip
+                  tone="warning"
+                  class="manager-required-tool-pill"
+                  removable
+                  removeLabel={text(
+                    'FABRICATE.Admin.Manager.Environment.Tasks.RemoveToolFromTask',
+                    'Remove {name} from required tools'
+                  ).replace('{name}', toolDisplayLabel(entry.tool))}
+                  onRemove={() => onRemoveToolReference(entry.id)}
                   data-gathering-task-required-tool-pill={entry.id}
                 >
                   <img
@@ -1575,50 +1625,42 @@
                     alt=""
                   />
                   <span>{toolDisplayLabel(entry.tool)}</span>
-                  <button
-                    type="button"
-                    class="manager-availability-remove"
-                    aria-label={text(
-                      'FABRICATE.Admin.Manager.Environment.Tasks.RemoveToolFromTask',
-                      'Remove {name} from required tools'
-                    ).replace('{name}', toolDisplayLabel(entry.tool))}
-                    onclick={() => onRemoveToolReference(entry.id)}
-                  >
-                    <i class="fas fa-xmark" aria-hidden="true"></i>
-                  </button>
-                </span>
+                </Chip>
               {:else}
-                <span
-                  class="manager-availability-pill manager-required-tool-pill is-stale"
+                <Chip
+                  tone="warning"
+                  icon="fas fa-triangle-exclamation"
+                  class="manager-required-tool-pill is-stale"
+                  removable
+                  removeLabel={text(
+                    'FABRICATE.Admin.Manager.Environment.Tasks.RemoveStaleToolFromTask',
+                    'Remove deleted tool reference'
+                  )}
+                  onRemove={() => onRemoveToolReference(entry.id)}
                   data-gathering-task-required-tool-pill={entry.id}
+                  >{text(
+                    'FABRICATE.Admin.Manager.Environment.Tasks.StaleToolChip',
+                    'Deleted tool'
+                  )}</Chip
                 >
-                  <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
-                  <span
-                    >{text(
-                      'FABRICATE.Admin.Manager.Environment.Tasks.StaleToolChip',
-                      'Deleted tool'
-                    )}</span
-                  >
-                  <button
-                    type="button"
-                    class="manager-availability-remove"
-                    aria-label={text(
-                      'FABRICATE.Admin.Manager.Environment.Tasks.RemoveStaleToolFromTask',
-                      'Remove deleted tool reference'
-                    )}
-                    onclick={() => onRemoveToolReference(entry.id)}
-                  >
-                    <i class="fas fa-xmark" aria-hidden="true"></i>
-                  </button>
-                </span>
               {/if}
             {/each}
-          </div>
-        {/if}
+          {/if}
+        </div>
+        <p class="visually-hidden" aria-live="polite" data-gathering-task-required-tools-status>
+          {requiredToolsSummary()}
+        </p>
       </div>
 
       {#if libraryToolList.length > 0}
         <div class="manager-task-required-tools-search">
+          <!-- THE FOCUS HOOK RIDES `inputAttrs`, NOT THE REST SPREAD (issue 1515). This
+               component's rest spread lands on the `<label>` and only `inputAttrs` reaches the
+               `<input>` inside it, so the hook used to name a `<label>` - which `Chip` would
+               then call `.focus()` on, and which is focusable only through the browser's own
+               label delegation. `Chip`'s contract says the caller owns this destination and
+               says nothing about delegation, and no test covered it. The input is the control
+               the GM lands on, so the hook goes where the control is. -->
           <ManagerSearchField
             compact
             value={toolSearchTerm}
@@ -1632,6 +1674,7 @@
               'Search tools by name'
             )}
             data-gathering-task-required-tools-search=""
+            inputAttrs={{ 'data-chip-remove-fallback': '' }}
           />
         </div>
       {/if}

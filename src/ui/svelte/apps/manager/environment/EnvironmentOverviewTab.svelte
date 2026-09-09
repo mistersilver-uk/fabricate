@@ -1,8 +1,10 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import Field from '../../../components/Field.svelte';
+  import Chip from '../../../components/Chip.svelte';
+  import EmptyState from '../EmptyState.svelte';
   import { DEFAULT_GATHERING_ENVIRONMENT_IMG } from '../../../../../gatheringImageDefaults.js';
-  import { localize } from '../../../util/foundryBridge.js';
+  import { formatList, localize } from '../../../util/foundryBridge.js';
   import { biomeChipStyle } from '../../../util/gatheringFormat.js';
   import CompositionModeControl from './CompositionModeControl.svelte';
   import StatusToggle from '../../../components/StatusToggle.svelte';
@@ -84,6 +86,21 @@
   function removeRealm(id) {
     onUpdate({ includedRealmIds: includedRealmIds.filter((value) => value !== id) });
   }
+  // ONE live region per host row, and it is the CALLER'S to own: `Chip.svelte`'s `removable`
+  // note records that a bare chip cannot have one, because neither adding nor removing a member
+  // moves focus into the row, and a region wrapped around the row would read each added chip's
+  // whole subtree on an add and say nothing at all on a removal. Restated on every change to
+  // the set, through the active language's list conventions, exactly as `ModifierPillSelect`
+  // states its own.
+  function realmSummary() {
+    if (includedRealmIds.length === 0) {
+      return text(
+        'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.NoRealms',
+        'No realms selected'
+      );
+    }
+    return formatList(includedRealmIds.map((id) => realmLabel(id)));
+  }
   const dangerLevelOptions = $derived(
     (Array.isArray(dangerOptions) && dangerOptions.length > 0 ? dangerOptions : DANGER_LEVELS)
       .map(dangerOption)
@@ -106,6 +123,16 @@
   function removeBiome(id) {
     onUpdate({ biomes: biomes.filter((value) => value !== id) });
   }
+  // The biome row's own region, on the same terms as `realmSummary` above.
+  function biomeSummary() {
+    if (biomes.length === 0) {
+      return text(
+        'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.NoBiomes',
+        'No biomes selected'
+      );
+    }
+    return formatList(biomes.map((id) => biomeLabel(id)));
+  }
 
   async function chooseImage() {
     if (typeof onPickImagePath !== 'function' || isSceneLinked) return;
@@ -119,6 +146,12 @@
   function biomeColorStyle(id) {
     const option = biomeOptions.find((entry) => optId(entry) === id);
     return biomeChipStyle(option);
+  }
+  // The palette key `Chip`'s `tint` validates, defaulting exactly as `biomeChipStyle` does so
+  // the two never disagree about which biome has no authored colour.
+  function biomeTintKey(id) {
+    const option = biomeOptions.find((entry) => optId(entry) === id);
+    return String(option?.colorToken || 'sage');
   }
   function dangerLabel(id) {
     const option = renderedDangerOptions.find((option) => option.id === id);
@@ -283,6 +316,7 @@
                         'Add realm'
                       )}
                       onchange={addRealm}
+                      data-chip-remove-fallback=""
                     >
                       <option value=""
                         >{text(
@@ -295,32 +329,58 @@
                       {/each}
                     </select>
                   {/if}
-                  <div class="manager-availability-pill-row">
+                  <!-- THE ROW IS THE LAST RUNG OF THE CHIP'S FOCUS LADDER (issue 1515).
+                       `Chip` takes the focus destination BEFORE it removes the chip - the next
+                       remove control, else the previous one, else the nearest
+                       `[data-chip-remove-fallback]` - and the `<select>` above carries that hook
+                       only while an unselected realm remains. Remove the LAST chip with every
+                       realm already selected and the select is gone, so the ladder ran out and
+                       focus fell to `<body>`: the unfocused-window state, with the keyboard user
+                       stranded at the top of the document. The row is always rendered inside this
+                       branch, so it is the rung that cannot disappear; `tabindex="-1"` is what
+                       makes it focusable without adding a tab stop. The select still wins while it
+                       exists, because the search runs outwards from the chip and finds both at the
+                       same ancestor in document order. -->
+                  <div
+                    class="manager-chip-row"
+                    tabindex="-1"
+                    data-keyboard-focus="true"
+                    data-chip-remove-fallback=""
+                    data-environment-field-pills="includedRealmIds"
+                  >
                     {#if includedRealmIds.length > 0}
                       {#each includedRealmIds as id (id)}
-                        <span class="manager-availability-pill is-realm">
-                          <span>{realmLabel(id)}</span>
-                          <button
-                            type="button"
-                            class="manager-availability-remove"
-                            aria-label={text(
-                              'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RemoveRealm',
-                              'Remove {name}'
-                            ).replace('{name}', realmLabel(id))}
-                            onclick={() => removeRealm(id)}
-                            ><i class="fas fa-xmark" aria-hidden="true"></i></button
-                          >
-                        </span>
+                        <Chip
+                          tone="info"
+                          removable
+                          removeLabel={text(
+                            'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RemoveRealm',
+                            'Remove {name}'
+                          ).replace('{name}', realmLabel(id))}
+                          onRemove={() => removeRealm(id)}
+                          data-environment-realm-pill={id}>{realmLabel(id)}</Chip
+                        >
                       {/each}
                     {:else}
-                      <span class="manager-muted"
-                        >{text(
+                      <!-- THE EMPTY BRANCH OF A CHIP ROW IS THE SHARED NO-STATE PRIMITIVE
+                           (issue 1515), in its `inline` one-line form - the same shape the
+                           gathering task and event editors already draw beside their own chip
+                           rows. A bare `<span class="manager-muted">` painted the sentence from
+                           a utility class instead, so this row said "nothing here" in a
+                           vocabulary no other empty on the screen uses. `inline`, never `note`:
+                           `note` is the popover form and releases the panel entirely. -->
+                      <EmptyState
+                        inline
+                        hint={text(
                           'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.NoRealms',
                           'No realms selected'
-                        )}</span
-                      >
+                        )}
+                      />
                     {/if}
                   </div>
+                  <p class="visually-hidden" aria-live="polite" data-environment-realm-status>
+                    {realmSummary()}
+                  </p>
                 {/if}
               </Field>
             {/if}
@@ -370,6 +430,7 @@
                   'Add biome'
                 )}
                 onchange={addBiome}
+                data-chip-remove-fallback=""
               >
                 <option value=""
                   >{text(
@@ -382,32 +443,49 @@
                 {/each}
               </select>
             {/if}
-            <div class="manager-availability-pill-row" data-environment-field="biomes">
+            <!-- `tint` AND a `style`, and both are load-bearing (issue 1515). `tint` is what
+                 arms the primitive's tinted face; the `style` states the colour that face
+                 reads, because a biome may carry an authored HEX rather than a palette key and
+                 `Chip`'s validator takes bare `--fab-tag-*` keys only. Both write the SAME
+                 custom property the primitive's own tint rides, and the rest spread lands after
+                 the primitive's own `style`, so the authored colour is the one that survives. -->
+            <!-- The realms row above records why the row itself is the last focus rung. -->
+            <div
+              class="manager-chip-row"
+              tabindex="-1"
+              data-keyboard-focus="true"
+              data-chip-remove-fallback=""
+              data-environment-field="biomes"
+            >
               {#if biomes.length > 0}
                 {#each biomes as id (id)}
-                  <span class="manager-availability-pill is-biome" style={biomeColorStyle(id)}>
-                    <span>{biomeLabel(id)}</span>
-                    <button
-                      type="button"
-                      class="manager-availability-remove"
-                      aria-label={text(
-                        'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RemoveBiome',
-                        'Remove {name}'
-                      ).replace('{name}', biomeLabel(id))}
-                      onclick={() => removeBiome(id)}
-                      ><i class="fas fa-xmark" aria-hidden="true"></i></button
-                    >
-                  </span>
+                  <Chip
+                    tint={biomeTintKey(id)}
+                    style={biomeColorStyle(id)}
+                    removable
+                    removeLabel={text(
+                      'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.RemoveBiome',
+                      'Remove {name}'
+                    ).replace('{name}', biomeLabel(id))}
+                    onRemove={() => removeBiome(id)}
+                    data-environment-biome-pill={id}>{biomeLabel(id)}</Chip
+                  >
                 {/each}
               {:else}
-                <span class="manager-muted"
-                  >{text(
+                <!-- The realms row's empty branch above records why this is the primitive and
+                     not a muted span (issue 1515). -->
+                <EmptyState
+                  inline
+                  hint={text(
                     'FABRICATE.Admin.Manager.EnvironmentEditor.Overview.NoBiomes',
                     'No biomes selected'
-                  )}</span
-                >
+                  )}
+                />
               {/if}
             </div>
+            <p class="visually-hidden" aria-live="polite" data-environment-biome-status>
+              {biomeSummary()}
+            </p>
           </Field>
         </div>
       </section>

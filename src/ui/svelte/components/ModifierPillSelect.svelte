@@ -2,11 +2,9 @@
 <!--
   A dropdown-plus-cancellable-pills multi-select (issue 770). Selected entries render
   as removable chips; a menu button opens a listbox of the still-unselected options.
-  Mirrors the gathering availability widget's markup so it inherits the shared
-  `manager-availability-*` styling for free (see GatheringEventEditView). Extracted as a
-  reusable leaf so the check-modifier "default set" (Checks tab) and a recipe's
-  "eligible modifiers" override (Recipe Overview tab) share one control instead of two
-  near-identical checkbox lists.
+  Extracted as a reusable leaf so the check-modifier "default set" (Checks tab) and a
+  recipe's "eligible modifiers" override (Recipe Overview tab) share one control instead
+  of two near-identical checkbox lists.
 
   Controlled: it renders `options`/`selectedIds` and emits a single toggle via
   `onToggle(id, nextSelected)`; the parent owns the resulting set write.
@@ -20,11 +18,17 @@
   `SearchablePopover`'s trigger and already declares the attribute there, so it is not
   restated here.
 
-  This component's own `manager-availability-*` family is deliberately NOT re-rooted by
-  issue 1508. Five manager views hand-write the same family at 37 further sites, one of
-  them outside any `ModifierPillSelect` at all, so rooting those rules at a class only this
-  primitive emits would un-style them; the re-root waits on the change that converts those
-  call sites (issue 1515).
+  ITS FAMILY IS RE-ROOTED AT `fabricate-pill-select` (issue 1515), the class this component
+  writes on its own root element and nothing else in the tree does. Issue 1508 deferred that
+  move on a measured premise: six manager views hand-wrote the same `manager-availability-*`
+  vocabulary at 37 further sites, none of them inside a `ModifierPillSelect`, so a root class
+  on this primitive would have reached none of them and un-styled all 37. Issue 1515 routed
+  every one of those sites to its destination primitive first — `<Chip removable>`, a
+  read-only `<Chip>`, an inline `<EmptyState>`, `manager-chip-row` and `<Field as="div">` —
+  which retired the premise rather than argued with it, and the re-root lands here in the
+  same change. The root rides on the `<Field>` this component renders, so that one element
+  carries `fabricate-field` and `fabricate-pill-select` together, exactly as
+  `RadioCardGroup`'s fieldset carries `fabricate-field` and `fabricate-option-cards`.
 -->
 <script>
   import Field from './Field.svelte';
@@ -202,7 +206,7 @@
 
 <Field
   as="div"
-  class="manager-availability-multi"
+  class="fabricate-pill-select manager-availability-multi"
   role="group"
   aria-labelledby={labelledBy || undefined}
   aria-describedby={describedBy || undefined}
@@ -213,10 +217,11 @@
        change, so hand-rolling a third copy of the same trigger-plus-listbox is exactly the
        duplication the primitive exists to close.
 
-       The `.manager-availability-picker` wrapper is GONE rather than kept: it declared
+       The picker WRAPPER this control used to render is GONE rather than kept: it declared
        `position: relative; min-width: 0`, which is `.manager-travel-picker`'s own declaration
-       verbatim, so keeping it would state the primitive's layout twice. `triggerAriaDisabled`
-       rather than `disabled` for the at-cap state, for the two reasons recorded above.
+       verbatim, so keeping it would state the primitive's layout twice. Its orphaned rule was
+       swept from the sheet by issue 1515. `triggerAriaDisabled` rather than `disabled` for the
+       at-cap state, for the two reasons recorded above.
 
        `data-modifier-pill-menu-button` rides `triggerData` with an EMPTY-STRING value, not as
        a bare attribute: a bare `data-x` on a component tag arrives in the rest spread as the

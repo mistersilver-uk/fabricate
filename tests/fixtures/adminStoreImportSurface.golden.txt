@@ -81,6 +81,7 @@ import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
 import {
   localizeRecipeActivationError,
+  localizeRecipeActivationParts,
   localizeRecipePersistenceError,
 } from '../../../utils/recipeActivationMessages.js';
 import { resolveRecipeAccessRoster } from '../../../utils/recipeAccessRoster.js';

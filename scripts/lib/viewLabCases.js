@@ -281,6 +281,22 @@ export const WORLD_TOOL_SEARCH_MISS_TERM = 'quenching trough';
  */
 export const WORLD_PARTIES_SEARCH_TERM = 'wagon';
 
+/**
+ * The literal typed into the Access route's PLAYERS roster search by
+ * `manager-access-recipe-roster-no-match`.
+ *
+ * EXPORTED for `WORLD_PARTIES_SEARCH_TERM`'s reason read the other way round: this term has to
+ * match NOTHING, and "nothing" is a fact about the seeded roster rather than about this case. A
+ * term that started matching a user renders a roster row where the frame's whole subject is the
+ * quiet line that stands in for one, and a frame showing a row where none was meant looks like a
+ * frame. `tests/view-lab-cases.test.js` runs it against the shim's own roster table.
+ *
+ * It sits outside every case region for the same reason the term above does.
+ *
+ * @type {string}
+ */
+export const ACCESS_ROSTER_SEARCH_MISS_TERM = 'zzz-no-such-user';
+
 export const BROAD_SIGNAL_PATTERN = new RegExp(
   [
     '^styles/',
@@ -892,14 +908,20 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // Every other environment and component frame draws the trigger closed, where the whole
   // conversion is an unchanged 34px icon button.
   //
-  // Still uncovered, and named rather than left to be discovered: the DANGER item (`is-danger`,
-  // the red Exclude / Remove from environment) and the DISABLED note ("Enable in library first").
-  // Both live in menus this frame does not open — the danger verb in an Included row's menu, the
-  // note on a library-disabled row — and only one menu can be open in one frame, so neither can be
-  // added here without a case that opens a different row. A change to either treatment publishes
-  // this frame and it does not contain them.
+  // TWO entries as of issue 1515, and the second is a different CALLER rather than a second view of
+  // the same one. `manager-systems-row-menu-open` opens a BROWSE ROW's menu — the shape the four
+  // converted browse views render, whose items are a two-verb Duplicate/Export plus a danger
+  // Delete — while the environment frame opens a COMPOSITION row's, with seven verbs and a
+  // disabled note among them. A change to this component reaches both callers, so it publishes
+  // one frame of each.
+  //
+  // The browse frame also carries the DANGER item (`is-danger`, the red Delete), which the note
+  // below used to record as uncovered. Still uncovered: the DISABLED note ("Enable in library
+  // first"), which lives on a library-disabled composition row, and only one menu can be open in
+  // one frame — so it needs a case that opens a different row than either of these.
   'src/ui/svelte/components/ActionMenu.svelte': Object.freeze([
     'manager-environment-edit-automatic-force-add',
+    'manager-systems-row-menu-open',
   ]),
   // The pill multi-select (issue 1458), whose add menu became a `SearchablePopover` in the same
   // change. It sits under `components/`, so the directory leg of `BROAD_SIGNAL_PATTERN` claims it
@@ -1006,6 +1028,56 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   'src/ui/svelte/apps/manager/Callout.svelte': Object.freeze([
     'manager-tool-parity-04-requirements-1280x720',
     'player-salvage',
+  ]),
+  // THE SHEET ITSELF, and the first entry here whose key is not a component (issue 1515).
+  //
+  // It is legal, and by the same rule every other entry obeys: `BROAD_SIGNAL_PATTERN`'s first
+  // alternative is `^styles/`, so `selectRenderFileCases` reaches this table for a stylesheet
+  // exactly as it does for a primitive. What made every existing key a component path is
+  // history, not a constraint — the table was written when the only unphotographed things were
+  // components.
+  //
+  // ONE ENTRY, NECESSARILY. A JavaScript object holds a path once, so "a second override for
+  // the other phase" is not a shape this table can take: a sheet change that moves two
+  // unrelated surfaces widens this ARRAY, it does not add a key. That is the answer to the
+  // question issue 1515's plan asks of this phase, and it is structural rather than a
+  // preference.
+  //
+  // A `styles/`-only change selected exactly the representative pair — `fabricate-app-shell`,
+  // the PLAYER window, and `manager-components-normal`, one browse list. Between them they draw
+  // no availability pill, no rail marker beyond the plain nav row, and no Downtime group at all,
+  // so the two sheet sweeps this change makes would each have published two frames that
+  // structurally cannot contain what they moved.
+  //
+  // Three frames, one per surface the sweeps touch:
+  //
+  //  - `manager-gathering-task-editor-normal` is the availability card's chip run, which was the
+  //    `.manager-availability-*` family until issue 1515 routed it to `<Chip>`. The task editor is
+  //    where that run renders densest — biome, time-of-day and weather tokens side by side under
+  //    their pickers — and it is already this registry's `Field.svelte` frame for the same
+  //    density reason.
+  //  - `manager-world-downtime-tracking` is the rail marker family, EXPANDED. Its first step
+  //    clicks `#manager-world-nav-downtime`, and `openWorldDowntime` sets
+  //    `railGroupUserExpanded.worldDowntime`, so the frame carries the whole group at once: the
+  //    parent row's PREMIUM chip, the sub-items' padlocks, and the `.manager-nav-callout`
+  //    premium-preview note that renders only while the group is open and no companion holds the
+  //    surface. No other frame in the registry draws that callout.
+  //  - `manager-world-downtime-collapsed` is the same group under the 56px rail, which is a
+  //    different set of rules rather than a smaller view of the same one: the collapsed rail
+  //    hides the labels, the toggle and the submenu, so a change to the collapsed treatment is
+  //    invisible in the expanded frame and vice versa.
+  //
+  // ADDITIVE, like every entry here: the representative pair is still selected, so a sheet
+  // change still publishes the player window and a manager browse list beside these three.
+  //
+  // It does NOT settle the thirteen cases that name `^styles/fabricate\.css$` in their own
+  // `sourceMatches` and are shadowed by the broad signal (`tests/design-system-primitives.test.js`
+  // registers them). Those are a separate adjudication, one case at a time, and honouring them
+  // wholesale is what would take a sheet change from two frames to fifteen.
+  'styles/fabricate.css': Object.freeze([
+    'manager-gathering-task-editor-normal',
+    'manager-world-downtime-tracking',
+    'manager-world-downtime-collapsed',
   ]),
 });
 
@@ -1554,8 +1626,57 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
       /^src\/ui\/svelte\/stores\/adminStore\.js$/,
-      /^src\/ui\/svelte\/apps\/manager\/Systems?(Browser|Overview)View\.svelte$/,
+      // `SystemsBrowserView` ALONE (issue 1515). This alternation used to read
+      // `Systems?(Browser|Overview)View`, which also claimed `SystemOverviewView.svelte` — and
+      // that component is the SYSTEM EDITOR'S VALIDATION TAB (`SystemEditView.svelte:569` is its
+      // only render site), not anything on the `systems` route. So the two cases carrying the
+      // alternation, this one and `manager-systems-empty`, were the frames an edit to the
+      // validation list published: both `expectView: 'systems'`, neither containing a single
+      // issue row. That is the failure this registry exists to prevent — a gate that reports
+      // SATISFIED on a photograph of the wrong screen — and it is worse than no claim at all,
+      // because a reader counting frames sees two.
+      //
+      // `manager-system-edit-validation` carries the `SystemOverviewView` claim now, and it is
+      // the one case that clicks `#system-tab-validation`.
+      /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
     ],
+  }),
+  managerCase({
+    // A BROWSE ROW'S OVERFLOW MENU, OPEN (issue 1515). The four browse views traded their loose
+    // Duplicate/Export/Delete buttons for one shared `<ActionMenu>` per row, and every published
+    // frame of all four draws that trigger CLOSED - where the conversion is an unchanged 34px icon
+    // button and nothing about it is visible. The registry held exactly one open-menu frame,
+    // `manager-environment-edit-automatic-force-add`, and it opens a COMPOSITION row's menu inside
+    // the environment editor, which is a different caller with different items.
+    //
+    // THE SYSTEMS LIBRARY IS THE ROW CHOSEN, because it is the manager's default route: the case
+    // needs no query and no navigation step, so the only thing between the mount and the state is
+    // the click this case is about.
+    //
+    // The panel is PORTALED to `.fabricate-manager`, so it is a sibling of the browse pane rather
+    // than a descendant of the row that opened it; a row-scoped `expectSelector` would wait forever
+    // and take every frame in the run with it. See the environment case's note.
+    id: 'manager-systems-row-menu-open',
+    label: 'Manager — System library row menu open',
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: {},
+    steps: [
+      {
+        selector:
+          '.manager-system-row[data-system-id="lab-smithing"] .manager-icon-button[aria-haspopup="menu"]',
+      },
+    ],
+    expectView: 'systems',
+    // THE PANEL'S OWN ACCESSIBLE NAME IS THE ASSERTION, not merely the panel. `ActionMenu` gives
+    // the panel its trigger's name, and issue 1515's review made that name RECORD-IDENTIFIED — so
+    // this selector fails both when the menu does not open and when every row goes back to
+    // announcing the same generic "System actions". The `^=` is what keeps it about the template
+    // rather than about the lab world's system names.
+    expectSelector:
+      '.fabricate-manager .fabricate-action-menu-panel[role="menu"][aria-label^="System actions for"]',
+    kinds: ['manager', 'systems'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/],
   }),
   managerCase({
     id: 'manager-systems-empty',
@@ -1590,9 +1711,12 @@ export const VIEW_LAB_CASES = Object.freeze([
     // entry would be unreachable. This case is reached instead through
     // `BROAD_SIGNAL_CASE_OVERRIDES`, which is the seam for exactly this condition: a primitive
     // whose changed presentation is absent from both representative frames.
+    // `SystemsBrowserView` alone, for the reason `manager-default-selection` records above: the
+    // retired `Systems?(Browser|Overview)View` alternation claimed the system editor's validation
+    // tab for a frame of the empty library, which cannot contain it.
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/CraftingSystemManagerRoot\.svelte$/,
-      /^src\/ui\/svelte\/apps\/manager\/Systems?(Browser|Overview)View\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/SystemsBrowserView\.svelte$/,
     ],
   }),
   managerCase({
@@ -1697,6 +1821,44 @@ export const VIEW_LAB_CASES = Object.freeze([
       // file routed by its own `BROAD_SIGNAL_CASE_OVERRIDES` entry, and `selectRenderFileCases`
       // skips a broad-signal file before it reads any case's `sourceMatches` at all.
       /^src\/ui\/svelte\/apps\/manager\/(CraftingEffectPanel|ItemPageInspector)\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-system-edit-validation',
+    label: 'Manager — System edit validation tab',
+    // THE VALIDATION TAB, WHICH HAD NO FRAME AT ALL (issue 1515). `SystemOverviewView.svelte`
+    // renders in exactly one place — `SystemEditView.svelte:569`, the `validation` branch of this
+    // route's two-tab panel — and every other `system-edit` case clicks `#system-tab-settings`
+    // instead, so a change to the issue list published a frame of the settings form. Two cases
+    // DID claim the component, `manager-default-selection` and `manager-systems-empty`, and both
+    // are `expectView: 'systems'` frames that cannot contain it; their claims are split off in
+    // the same change and land here.
+    //
+    // `beyond`: the smoke never opens this tab, so there is no counterpart frame to fall short
+    // of and no label to name.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // `lab-smithing` STATED rather than inherited from the seeded default, because the frame's
+    // whole content is that system's validation report: `sm-r-runeplate-draft` contributes a
+    // critical `noResultGroup` and a `disabledIncomplete` warning, and `sm-r-deepbind` a
+    // `requirementOverlap` warning. `tests/view-lab-cases.test.js` derives that report from
+    // `evaluateSystemValidation` over the fixture, so a fixture repair that empties it fails
+    // there rather than publishing the empty-state panel under a case named for the list.
+    query: { system: 'lab-smithing' },
+    steps: ['System Overview', { selector: '#system-tab-validation' }],
+    expectView: 'system-edit',
+    // THREE claims in one selector, because each alone publishes something this case is not.
+    // The counts row alone is satisfied by a zero-issue report; the group alone is satisfied by
+    // a card with no rows in it; and neither says the tab is the one on screen. Together they
+    // say the validation panel rendered, kept its severity counts, and drew a populated
+    // kind-grouped list — which is the surface Phase 3 of this change reconciles.
+    expectSelector:
+      '.fabricate-manager [data-system-overview]:has([data-system-overview-counts])' +
+      ' [data-system-overview-group="recipe"] .manager-system-overview-row',
+    kinds: ['manager', 'system-edit'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/SystemEditView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/SystemOverviewView\.svelte$/,
     ],
   }),
   managerCase({
@@ -1869,6 +2031,43 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-world-currency-units]', scroll: true },
     ],
     expectView: 'world-currency',
+    position: { width: 1280, height: 900 },
+    kinds: ['manager', 'world'],
+    sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
+  }),
+  managerCase({
+    // THE SUB-UNIT CHIP, WHICH NO FRAME HELD (issue 1515). The three currency cases above all
+    // photograph the ladder COLLAPSED - a summary row per unit - and the sub-unit membership token
+    // renders only inside an EXPANDED unit's editor. So the one control this change converted onto
+    // `<Chip>` on this screen, a removable token wrapping an editable `<input type="number">`, was
+    // unphotographed while three frames of the screen it lives on were published.
+    //
+    // A FOURTH CASE RATHER THAN A STEP ON ONE OF THE THREE. All three are `exact`, meaning they
+    // reach the same state as a named smoke frame; adding an expand step to one would make the lab
+    // frame and its counterpart show different states, which is the pairing those cases exist to
+    // hold. This one claims no smoke label and states `beyond`.
+    //
+    // GOLD, because the lab's ladder gives it a sub-unit (`10 sp`) and a super-unit above it, so
+    // the frame shows the chip in a unit that is neither end of the chain.
+    id: 'manager-world-currency-subunit-expanded',
+    label: 'Manager — World Currency sub-unit chip expanded',
+    reaches: 'beyond',
+    smokeLabels: [],
+    steps: [
+      { selector: '#manager-world-nav-rules', press: 'Enter' },
+      { selector: '#manager-rules-nav-currency', press: 'Enter' },
+      { selector: '[data-world-currency-unit-expand="gp"]' },
+      {
+        selector: '[data-world-currency-unit="gp"] [data-world-currency-subunit="sp"]',
+        scroll: true,
+      },
+    ],
+    expectView: 'world-currency',
+    // The chip itself, inside the unit that owns it. The section around it renders for any
+    // expanded unit and would be satisfied by the empty "This unit is a base denomination." state
+    // the chip row now also draws.
+    expectSelector:
+      '.fabricate-manager [data-world-currency-unit="gp"] [data-world-currency-subunit="sp"]',
     position: { width: 1280, height: 900 },
     kinds: ['manager', 'world'],
     sourceMatches: [/^src\/ui\/svelte\/apps\/manager\/world\/WorldCurrencyTab\.svelte$/],
@@ -4596,6 +4795,84 @@ export const VIEW_LAB_CASES = Object.freeze([
     ],
   }),
   managerCase({
+    id: 'manager-recipes-blocked-enable-flash',
+    label: 'Manager — Recipes blocked-enable flash',
+    // THE FLASH, WHICH NO CASE REACHED (issue 1515). `RecipesBrowserView.svelte` renders a
+    // dismissible `role="alert"` — a `<Notice blocking dismissable>` since this issue's sixth
+    // phase, in the position the design system fixes for a blocking notice on a browse screen,
+    // which is above the filter bar — and it exists only after a refusal:
+    // the view claims the store's blocked-enable message by handing it an `onBlocked` sink
+    // (`:124-130`), which SUPPRESSES the Foundry notification, so this element is the only place
+    // a GM is told why the switch did not move. Every other recipes frame is a resting browse
+    // surface and structurally cannot contain it.
+    //
+    // `beyond`: the smoke's recipe walk never presses a refused enable, so there is no
+    // counterpart frame and no label to name.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // `sm-r-runeplate-draft` is the lab's one OFF-and-un-enableable recipe — an incomplete
+    // shell with no result groups, which also requires the disabled `aether` essence — so its
+    // row's switch is the one gesture in the corpus that produces a refusal rather than a
+    // write. Clicking any other row's switch would DISABLE it, which is never gated, and the
+    // frame would be the plain browser under a case named for the alert.
+    //
+    // `tests/view-lab-cases.test.js` derives that premise from the fixture through
+    // `evaluateSystemValidation` rather than restating it, so a fixture repair that completes
+    // the recipe fails there instead of publishing a frame with no flash in it.
+    query: { system: 'lab-smithing' },
+    steps: [
+      'Crafting',
+      {
+        selector:
+          '.manager-recipe-row[data-recipe-id="sm-r-runeplate-draft"]' +
+          ' .manager-recipe-status .manager-status-toggle',
+      },
+    ],
+    expectView: 'recipes',
+    // The alert AND its dismiss control, because the flash is specified as dismissible and
+    // non-auto-hiding: an alert drawn without its control is a different contract from the one
+    // this frame is evidence for. The title line is required too — an empty notice is a lit
+    // container, and `flashMessage` is what gates the block at all.
+    //
+    // THE CLASS AND THE DISMISS HOOK ARE THE PRIMITIVE'S NOW (issue 1515). `<Notice>` takes no
+    // `class` and stamps no per-caller hook on the control it draws, so the three tokens that
+    // named the retired bespoke strip — `.manager-recipe-flash`, `.manager-recipe-flash-message`
+    // and `[data-recipe-flash-dismiss]` — are `.fab-notice`, `.fab-notice-title` and
+    // `[data-notice-dismiss]`. What the caller still owns is the `dataAttr` hook, which is what
+    // keeps THIS notice distinguishable from any other the route could grow.
+    expectSelector:
+      '.fabricate-manager .fab-notice[data-recipe-flash][role="alert"]' +
+      ':has(.fab-notice-title)' +
+      ' [data-notice-dismiss]',
+    // THE REFUSAL IS LOGGED, AND THE LOG IS THE STATE WORKING (issue 1515, driver capture).
+    // `adminStore.js`'s `toggleRecipeEnabled` catch reports the rejected write with
+    // `console.error` BEFORE it hands the localized message to this view's `onBlocked` sink, and
+    // the capture driver fails a render on any console error. So the one case in the registry
+    // that presses a refused write cannot render without declaring it.
+    //
+    // THE CALL SITE, not the error class. `/RecipeActivationError/` would also match, and would
+    // additionally tolerate that error logged from anywhere else in the render — a create path, a
+    // signature re-check, a future caller — which is a wider licence than this case needs. The
+    // store's own message prefix is a string literal at exactly one site, so this pattern
+    // tolerates that site and nothing else.
+    //
+    // It is an ASSERTION as much as a tolerance: `partitionConsoleErrors` fails the case when a
+    // declared pattern matches NOTHING, so a fixture repair that lets the enable succeed reds here
+    // rather than publishing the resting recipe browser under a case named for the flash.
+    allowedConsoleErrors: [/Fabricate \| Failed to toggle recipe enabled state/],
+    // THE FLASH HAS TO BE IN THE PICTURE, not merely in the DOM. It is the leading grid row of
+    // this route's `.manager-main` (`fabricate.css`), so it does not move with the row list —
+    // but the click that produces it auto-scrolls its target, and `expectSelector` cannot see
+    // where that left the frame. Stating the containment makes "the alert is in the photograph"
+    // a measurement.
+    expectContained: [{ container: '.manager-main', target: '[data-recipe-flash]' }],
+    kinds: ['manager', 'recipes'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/Recipe/,
+      /^src\/ui\/svelte\/apps\/manager\/recipes?\//,
+    ],
+  }),
+  managerCase({
     id: 'manager-recipes-narrow',
     label: 'Manager — Recipes narrow',
     smokeLabels: ['manager-recipes-narrow'],
@@ -6128,6 +6405,140 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
       /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-access-recipe-selected',
+    label: 'Manager — Recipe access rosters for a selected recipe',
+    // THE POPULATED HALF OF THE ACCESS INSPECTOR (issue 1515). `manager-recipe-edit-access-rail`
+    // is the only other frame of this route, and it rests on the aside's `{#if !recipe}` branch
+    // — the `Select a recipe` `EmptyState` at `GrantAccessInspector.svelte:199-207`. So every
+    // component the inspector actually exists to draw (the identity strip, the access summary,
+    // and both name-sorted rosters with their per-row switches) was unphotographed while the
+    // route LOOKED covered, which is worse than uncovered: a reader counting frames finds one.
+    //
+    // `beyond`: the smoke's crafting walk does not enter the Access route at all, so there is
+    // no counterpart frame and no label to name.
+    reaches: 'beyond',
+    smokeLabels: [],
+    // `lab-alchemy` is a `restricted` system, which is what makes the Access rail entry render
+    // at all; `al-r-elixir` is one of its five recipes, well inside the list's resting page size
+    // of ten, so the row is on screen without a filter or a pager step.
+    query: { system: 'lab-alchemy' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-access' },
+      { selector: '[data-access-row="al-r-elixir"]' },
+    ],
+    expectView: 'access',
+    // The inspector's POPULATED branch, proved by an element that exists only in it: the empty
+    // branch draws an `EmptyState` and nothing else, so `[data-access-inspector]` alone is
+    // satisfied by the frame this case exists to distinguish itself from. The summary line and
+    // a real roster row are both required — a roster head with no rows under it is the same
+    // silence in a different place.
+    expectSelector:
+      '.fabricate-manager [data-access-inspector]:has([data-access-summary])' +
+      ' [data-access-roster="characters"] [data-access-character-row]',
+    kinds: ['manager', 'access'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/RosterRow\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-access-recipe-roster-paged',
+    label: 'Manager — Recipe access players roster paged',
+    // THE ROSTER'S PAGER, WHICH NO CASE COULD REACH (issue 1515). `manager-access-recipe-selected`
+    // photographs the populated inspector against the resting lab world, whose `game.users.players`
+    // holds ONE non-GM user — so the Players roster is a single row, its pager is below its
+    // threshold and its own search field is not rendered at all. Two of the three things that
+    // roster does were therefore unphotographable for a fixture reason rather than a product one.
+    //
+    // `manyPlayers` is what answers it: `tests/view-lab/mount.js` asks the shim for the crowded
+    // roster, and ONLY the two cases that name the flag see it, so every other frame keeps the
+    // two-seat table it was photographed against.
+    //
+    // `beyond`: the smoke's crafting walk does not enter the Access route at all, so there is no
+    // counterpart frame and no label to name.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-alchemy', manyPlayers: '1' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-access' },
+      { selector: '[data-access-row="al-r-elixir"]' },
+    ],
+    expectView: 'access',
+    // A FULL PAGE OF SIX, which is the paged state stated as something the DOM can answer. The
+    // roster's page size is six and the seeded roster is eight, so a sixth row exists only when
+    // the crowded fixture reached this frame — one row is what the flagless world draws — and a
+    // roster of eight at a page size of six is two pages, which is what puts the bar beneath it.
+    //
+    // The arithmetic is not restated here: `tests/view-lab-cases.test.js` derives it from the
+    // shim's own roster table and from `GrantAccessInspector.svelte`'s own `ROSTER_PAGE_SIZE`, so
+    // a fixture that quietly fell to six would fail there rather than publish a full page with no
+    // bar under a case named for the bar.
+    //
+    // It names no pager element, and that is deliberate rather than weak: issue 1513 replaces this
+    // inspector's hand-rolled bar with the shared `<Pagination>` on a branch of its own, and the
+    // two draw disjoint hooks — so a selector naming either one fails the WHOLE capture depending
+    // on merge order. The rows are what both versions render identically.
+    expectSelector:
+      '.fabricate-manager [data-access-inspector] [data-access-roster="players"]' +
+      ' .manager-access-roster-rows [data-access-player-row]:nth-child(6)',
+    kinds: ['manager', 'access'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/RosterRow\.svelte$/,
+      // NO `Pagination.svelte` PATTERN, though this frame is the registry's only paged roster.
+      // That file is a BROAD SIGNAL, and `selectRenderFileCases` skips a broad-signal file before
+      // it consults any case's `sourceMatches` — so the declaration would be inert, which
+      // `tests/design-system-primitives.test.js` reports as a defect rather than tolerating.
+    ],
+  }),
+  managerCase({
+    id: 'manager-access-recipe-roster-no-match',
+    label: 'Manager — Recipe access players roster no match',
+    // THE PER-ROSTER NO-MATCH LINE (issue 1515), the second state the one-user roster made
+    // unreachable: the field that produces it renders only over a roster with something in it,
+    // and a roster of one has nothing a query can miss that the screen does not already show.
+    //
+    // It is the shared `EmptyState` in its QUIET form as of this phase — one line at the
+    // column's own scale, no dashed edge, no fill and no tile — which is what
+    // `openspec/specs/design-system/spec.md` rules for an emptiness inside a boundary the screen
+    // has already drawn. So this frame is also the only evidence that this inspector's last
+    // hand-rolled no-state message is gone.
+    //
+    // `beyond`, for the reason the paged case above states.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-alchemy', manyPlayers: '1' },
+    steps: [
+      'Crafting',
+      { selector: '#manager-crafting-nav-access' },
+      { selector: '[data-access-row="al-r-elixir"]' },
+      { selector: '[data-access-roster-search="players"]', fill: ACCESS_ROSTER_SEARCH_MISS_TERM },
+    ],
+    expectView: 'access',
+    // BOTH ROSTERS, because the claim is that ONE of them missed. The Characters roster is
+    // untouched by a query typed into the Players roster's own field — the two terms are separate
+    // state — so an inspector drawing the quiet line under Players AND real rows under Characters
+    // is the frame, while the same line with an empty inspector behind it would be a different
+    // and much less interesting one.
+    expectSelector:
+      '.fabricate-manager [data-access-inspector]' +
+      ':has([data-access-roster="characters"] [data-access-character-row])' +
+      ' [data-access-roster="players"] [data-access-roster-empty="players"]',
+    kinds: ['manager', 'access'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/AccessTabView\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/GrantAccessInspector\.svelte$/,
+      // NO `EmptyState.svelte` PATTERN, for the reason the paged case above records about
+      // `Pagination`: it is a broad signal, so the pattern could never be consulted. The `note`
+      // variant this frame draws already has an override frame of its own
+      // (`world-tool-entry-on-break-repair-tag-picker-empty`).
     ],
   }),
   managerCase({
@@ -8256,7 +8667,7 @@ export const VIEW_LAB_CASES = Object.freeze([
           '[data-gathering-task-id="hb-task-slowbloom"] .manager-icon-button[aria-label^="Edit"]',
       },
       { selector: '[data-gathering-task-availability]', scroll: true },
-      { selector: '[data-gathering-task-field="biomes"] .manager-availability-menu-button' },
+      { selector: '[data-gathering-task-field="biomes"] .manager-condition-menu-button' },
     ],
     expectView: 'gathering-task-edit',
     // The PORTALED panel, and an option inside it. Asserting the option alone would be satisfied
@@ -8395,6 +8806,13 @@ export const VIEW_LAB_CASES = Object.freeze([
         selector:
           '[data-gathering-event-id="hb-event-wolves"] .manager-icon-button[aria-label^="Edit"]',
       },
+      // THE DANGER PILLS INTO FRAME (issue 1515). The Danger tags card sits below the fold on
+      // this editor, and `frame.screenshot()` does not scroll a nested overflow container - so the
+      // one control on this screen that did NOT converge onto the shared chip, and whose six-level
+      // ramp is the reason it did not, was in no published frame at all while the converted chips
+      // beside it were in several. Scrolling to it puts the pill and the converted availability
+      // chips in one photograph, which is what makes the divergence checkable rather than asserted.
+      { selector: '[data-gathering-event-danger-pills]', scroll: true },
     ],
     expectView: 'gathering-event-edit',
     kinds: ['manager', 'environments'],
@@ -8548,7 +8966,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     query: { system: 'lab-smithing' },
     steps: [
       { selector: '#manager-world-nav-parties', press: 'Enter' },
-      { selector: '.manager-travel-parties-query', fill: WORLD_PARTIES_SEARCH_TERM },
+      { selector: '[data-manager-party-search]', fill: WORLD_PARTIES_SEARCH_TERM },
     ],
     expectView: 'world',
     // Both survivors on ONE page is the claim, and it is unreachable unfiltered: the five
@@ -8594,6 +9012,84 @@ export const VIEW_LAB_CASES = Object.freeze([
     sourceMatches: [
       /^src\/ui\/svelte\/apps\/manager\/(EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
       /^src\/ui\/svelte\/components\/Pagination\.svelte$/,
+    ],
+  }),
+  managerCase({
+    id: 'manager-world-parties-pane-alert',
+    label: 'Manager — World Parties refused enable',
+    // THE PANE ALERT, WHICH NO CASE REACHED (issue 1515). `GatheringPartiesTab.svelte:286-293`
+    // renders a `role="alert"` summary line, and it is the pane's ONLY channel for a travel
+    // write the store refused with no field to attach the reason to: `paneError` (`:138-140`)
+    // is `travelError` MINUS the two field errors the cards draw themselves, so a refusal
+    // routed to a card's own field renders there and never here.
+    //
+    // `setPartyEnabled` is the operation that produces it. `withSave` passes NO `fieldContext`
+    // for that call (`adminStore.js`), so `_travelErrorState` writes a summary and no field
+    // error at all — which is exactly the shape `paneError` is the only renderer of.
+    //
+    // `beyond`: no smoke walk presses a refused enable, so there is no counterpart frame and no
+    // label to name.
+    reaches: 'beyond',
+    smokeLabels: [],
+    query: { system: 'lab-smithing' },
+    // `lab-party-emberwatch` is DISABLED and holds two of the three characters that the enabled
+    // `lab-party` already holds, so enabling it violates `GatheringPartyStore`'s composite
+    // uniqueness invariant and the write is refused. It is the third of five cards at a page
+    // size of three, so it is on the resting page and needs no pager step.
+    //
+    // `tests/view-lab-cases.test.js` derives that collision from the seeded party list rather
+    // than restating it, so a fixture edit that makes the enable SUCCEED fails there instead of
+    // publishing a pane with no alert in it under a case named for one.
+    steps: [
+      { selector: '#manager-world-nav-parties', press: 'Enter' },
+      { selector: '[data-manager-party-enable="lab-party-emberwatch"]' },
+      // AND SCROLL BACK TO THE ALERT, which is the whole subject of the frame (issue 1515,
+      // driver capture). Playwright scrolls a click target into view, so pressing the third
+      // card's pill leaves the pane resting on that card — and the alert renders ABOVE the
+      // list, so the first capture of this case photographed a pane with the refusal message
+      // off the top edge. Every assertion passed: `expectSelector` resolves against the DOM and
+      // cannot see the scroll position.
+      //
+      // `world-component-catalogue-bulk` records the same defect from the other end and
+      // warns that `scroll` cannot fix it there, because `scrollIntoViewIfNeeded` is a no-op on
+      // an element already PARTLY in view. That is what makes it the right verb here and the
+      // wrong one there: this alert is entirely above the scroller's viewport, so the step is
+      // not a no-op, and scrolling minimally to it brings the pane's head into frame.
+      { selector: '[data-manager-party-summary-error]', scroll: true },
+    ],
+    expectView: 'world',
+    // The alert INSIDE the parties pane, not merely somewhere in the window: the same refusal
+    // reaches a card's own field error on a different operation, and that element is a
+    // different contract with a different owner. Scoping to the panel and naming the summary
+    // line's own hook is what keeps the two apart.
+    //
+    // THE CLASS IS THE PRIMITIVE'S NOW (issue 1515). The line is a `<Notice blocking>`, which
+    // takes no `class`, so `.manager-travel-parties-summary-error` is `.fab-notice`. The
+    // caller's own `dataAttr` hook is what still tells this notice from any other, and the
+    // `role` is what the conversion had to preserve rather than acquire.
+    expectSelector:
+      '[data-travel-panel="parties"]' +
+      ' .fab-notice[data-manager-party-summary-error][role="alert"]',
+    // IN THE PICTURE, not merely in the DOM. The container is the pane's own SCROLLER — the
+    // element `GatheringPartiesTab.svelte` binds as `scroller` and clips with `overflow` — so an
+    // alert scrolled above its viewport has a bounding box above the container's and fails here.
+    // Neither `expectSelector` nor `expectVisible` can see that: `isVisible()` asks about
+    // `display` and box size, not about the scroll offset, and both were green on the frame that
+    // did not contain the alert.
+    //
+    // Paired with the `scroll` step above rather than replacing it: the step puts the alert in
+    // frame and this proves it is still there when the shutter opens.
+    expectContained: [
+      {
+        container: '.manager-travel-parties-content',
+        target: '[data-manager-party-summary-error]',
+      },
+    ],
+    position: { width: 1330, height: 900 },
+    kinds: ['manager', 'environments', 'world'],
+    sourceMatches: [
+      /^src\/ui\/svelte\/apps\/manager\/(EnvironmentsBrowserView|GatheringPartiesTab)\.svelte$/,
+      /^src\/ui\/svelte\/apps\/manager\/Party/,
     ],
   }),
   managerCase({
@@ -9910,7 +10406,12 @@ export const VIEW_LAB_CASES = Object.freeze([
       { selector: '[data-tool-membership-option="over"]' },
     ],
     expectView: 'tools',
-    expectSelector: '[data-tool-membership-filter="over"] [data-tool-membership-option="over"]',
+    // The track's `data-tool-membership-filter` stamps `true` rather than the live value since
+    // issue 1515 put this control on the shared segmented primitive, so readiness is the third
+    // segment being LIT - the class the primitive derives from its `value` prop, which is the one
+    // reading the component has to re-render to satisfy. `input:checked` would report the click
+    // itself rather than the state it produced.
+    expectSelector: '[data-tool-membership-option="over"].is-active',
     position: { width: 1280, height: 720 },
     kinds: ['manager', 'tools'],
     sourceMatches: [...TOOL_LIST_MATCHES],
@@ -13615,6 +14116,75 @@ export function hasUiChanges(files = []) {
     return true;
   }
   return false;
+}
+
+/**
+ * Split a render's console errors into the ones a case DECLARED it would produce and the ones it
+ * did not.
+ *
+ * ── WHY A CASE MAY DECLARE AN ERROR AT ALL ─────────────────────────────────────────────────────
+ *
+ * `view-lab-screenshots.mjs` fails a render on ANY console error, and that gate is why the lab is
+ * trusted: a frame rendered over a thrown handler looks exactly like a frame rendered over a
+ * working one, and one such frame published as evidence is worth less than no frame. It has to
+ * stay the default.
+ *
+ * But a handful of states this registry photographs ARE a refusal, and the refusal is the subject.
+ * `manager-recipes-blocked-enable-flash` presses a switch the activation gate rejects, and
+ * `adminStore.js` reports that rejection with `console.error` before it hands the message to the
+ * view's flash. The error is the state working correctly. Nothing is broken, nothing is being
+ * tolerated, and lowering the store's log level to accommodate a screenshot harness would be a
+ * production change made for the lab's convenience — exactly backwards.
+ *
+ * So a case may name what it expects, by pattern, and NOTHING else changes: an error no pattern
+ * names is fatal exactly as before.
+ *
+ * ── AND WHY AN UNUSED ALLOWANCE IS ALSO FATAL ──────────────────────────────────────────────────
+ *
+ * This returns `unusedAllowances` as well, and the caller throws on it. A declared pattern that
+ * matched nothing is not harmless: it means the case no longer reaches the refusal it is named
+ * for — the recipe was completed, the gate was moved, the message was reworded — and the frame it
+ * publishes is the resting screen under a case named for the alert. That is the failure mode
+ * `BROAD_SIGNAL_CASE_OVERRIDES` records above as the one this repository keeps meeting:
+ * unreachable configuration looks identical to working configuration.
+ *
+ * Requiring the match turns the allowance into an ASSERTION. The field does not merely permit the
+ * error, it demands it, which is the only form in which "this case photographs a refusal" is
+ * checkable at all.
+ *
+ * THE `g` FLAG IS STRIPPED BEFORE MATCHING, and that is a correctness fix rather than tidiness.
+ * `RegExp#test` on a global pattern advances `lastIndex` and resumes from it on the next call, so
+ * an allowance that matched the first message would start mid-string on the second and could miss
+ * — surfacing as an "unused allowance" failure on a case that did produce its error, which reads
+ * as a fixture regression and is not one. The original is kept for the message, so a report still
+ * names the pattern the case actually declared.
+ *
+ * @param {string[]} messages Console errors collected during the render, in order.
+ * @param {RegExp[]} [allowed] The case's `allowedConsoleErrors`.
+ * @returns {{unmatched: string[], unusedAllowances: string[]}} Fatal messages, and the declared
+ *   patterns nothing matched.
+ */
+export function partitionConsoleErrors(messages = [], allowed = []) {
+  const patterns = [...allowed].map((pattern) => ({
+    label: String(pattern),
+    matcher: pattern.global
+      ? new RegExp(pattern.source, pattern.flags.replaceAll('g', ''))
+      : pattern,
+  }));
+  const matchedPatterns = new Set();
+  const unmatched = [];
+  for (const message of messages) {
+    const text = String(message);
+    const index = patterns.findIndex(({ matcher }) => matcher.test(text));
+    if (index === -1) unmatched.push(text);
+    else matchedPatterns.add(index);
+  }
+  return {
+    unmatched,
+    unusedAllowances: patterns
+      .filter((_, index) => !matchedPatterns.has(index))
+      .map(({ label }) => label),
+  };
 }
 
 export const caseIds = Object.freeze(VIEW_LAB_CASES.map((viewCase) => viewCase.id));

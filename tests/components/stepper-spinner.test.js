@@ -221,7 +221,7 @@ describe('numeric steppers suppress the native spinner (issue 1036)', () => {
         + 'that area, including the ones whose spinner is their only pointer affordance'
     );
     assert.ok(
-      !selectors.some((selector) => selector.includes('manager-availability-pill')),
+      !selectors.some((selector) => selector.includes('manager-currency-subunit-amount')),
       'R2 (the currency sub-unit amount) keeps its native spinner: it is a bare field in a chip '
         + 'with no other pointer-driven stepping affordance'
     );

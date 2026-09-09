@@ -108,6 +108,7 @@ import { DEFAULT_GATHERING_TASK_IMG } from '../../gatheringTaskDefaults.js';
 import { evaluateSystemValidation } from '../../../systems/systemValidation.js';
 import {
   localizeRecipeActivationError,
+  localizeRecipeActivationParts,
   localizeRecipePersistenceError,
 } from '../../../utils/recipeActivationMessages.js';
 import { resolveRecipeAccessRoster } from '../../../utils/recipeAccessRoster.js';
@@ -11023,7 +11024,7 @@ export function createAdminStore(services) {
    *
    * @param {string} recipeId
    * @param {boolean} enabled
-   * @param {{onBlocked?: (message: string) => void}} [options]
+   * @param {{onBlocked?: (message: string, parts: {title: string, detail: string}|null) => void}} [options]
    * @returns {Promise<boolean>} whether the write landed.
    */
   async function toggleRecipeEnabled(recipeId, enabled, options = {}) {
@@ -11050,8 +11051,13 @@ export function createAdminStore(services) {
         error?.message ||
         'Failed to update recipe';
 
-      if (typeof options?.onBlocked === 'function') options.onBlocked(message);
-      else services.notify?.error?.(message);
+      // The sink is handed the one-line message AND, when the refusal is an activation error, the
+      // same refusal as a `{ title, detail }` pair (issue 1515). The recipe library draws it in a
+      // `<Notice>`, whose specimen wants the two apart; every other caller — and the Foundry
+      // toast below — keeps taking the single string, so this is additive rather than a swap.
+      if (typeof options?.onBlocked === 'function') {
+        options.onBlocked(message, localizeRecipeActivationParts(error, services.localize));
+      } else services.notify?.error?.(message);
       return false;
     }
   }

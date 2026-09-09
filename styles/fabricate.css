@@ -1536,7 +1536,8 @@
            own `handleNumberKeydown` keeps the keyboard one. Its spinner IS suppressed,
            by the scoped rule at `.manager-drop-rate-percent`.
        R2  `apps/manager/world/WorldCurrencyTab.svelte`'s currency sub-unit amount — a bare field
-           inside a bordered `.manager-availability-pill.is-currency` chip, which is not a
+           inside the removable membership `Chip` that carries it (issue 1515; it was a
+           bordered `.manager-availability-pill.is-currency` before), which is not a
            form row and cannot hold a Stepper without widening every wrapping chip. It
            KEEPS its native spinner.
 
@@ -1881,6 +1882,17 @@
   reference's other eyebrow family, `proto:519` — and the Tools authority and create cards'
   0.64rem.
 */
+
+/*
+  THE PAGE HEADER'S EYEBROW WRAPPER (issue 1515). The eyebrow itself is `Kicker.svelte`, which
+  declares `margin: 0` and takes no `class` — a caller needing layout keeps its own element and
+  nests the primitive inside it. This is that element, and the only thing it owns is the gap
+  `.manager-kicker` below states in its own shorthand, on the scale rather than as a raw figure.
+*/
+.fabricate-manager .manager-page-kicker {
+  margin-bottom: var(--fab-space-2xs);
+}
+
 .fabricate-manager .manager-kicker {
   margin: 0 0 var(--fab-space-2xs);
   color: var(--fab-text-subtle);
@@ -2323,15 +2335,24 @@
 /*
   The 56px collapsed rail keeps ONLY the icon gutter. Every element the Studio rail
   adds has to opt out explicitly, or it blows the column out: the crafting-system card
-  content (above), the uppercase section label, and the mono count numerals. The scope
-  card's compact toggle remains so the rail can be expanded again.
+  content (above), the uppercase section label, and every trailing marker that reports on
+  the row's own contents rather than raising an alert. The scope card's compact toggle
+  remains so the rail can be expanded again.
+
+  The marker list names three classes rather than one because issue 1515 stopped the
+  planned-view word and the premium chip riding `.manager-nav-count` to inherit this hide.
+  Nothing about the collapsed rail changed; the hide simply names what it hides. The issue
+  summary is still deliberately absent — it is the only signal a collapsed parent has left —
+  and the dirty marker has its own rule beside its own vehicle.
 */
 .fabricate-manager .manager-body.is-rail-collapsed .manager-rail-title {
   display: none;
 }
 
 .fabricate-manager .manager-body.is-rail-collapsed .manager-nav-label,
-.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count {
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-count,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-planned,
+.fabricate-manager .manager-body.is-rail-collapsed .manager-nav-premium {
   display: none;
 }
 
@@ -2371,8 +2392,12 @@
   background: var(--fab-bg-2);
 }
 
+/* The settings tab's scrolling form, and nothing above it. The leading `auto` track was the
+   view's own duplicate page header (issue 1515); with that deleted the form is the only child,
+   and leaving two tracks put the form in the `auto` row and left the growing one empty — the
+   same failure the components pager and the tags workspace hit when their headers went. */
 .fabricate-manager .manager-system-edit-main {
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 
 /* Drop zone, toolbar, the LIST (which takes the slack), then the pager. The fourth
@@ -2403,18 +2428,35 @@
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
+/* Filter toolbar, then the LIST which takes the slack, then the pager (issue 1515). Named
+   explicitly rather than left to the shared `auto auto 1fr`, which was right while these two
+   routes drew their own duplicate page header ABOVE the toolbar and is wrong now that the page
+   header is the shell's alone: three children against three tracks hands the growing track to
+   the PAGER and pins the list to an `auto` row. Same failure family as the recipe library below
+   and the components pager above. */
+.fabricate-manager[data-manager-view="systems"] .manager-main,
+.fabricate-manager[data-manager-view="access"] .manager-main {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
 /*
   The recipe library (issue 643) is filter bar → list → pager, with no per-view page
   header of its own: the shell's `.manager-header` is the only one. The rows are named
   explicitly rather than left to the shared `auto auto 1fr`, which would have handed the
   `1fr` to the PAGER once the duplicate header went.
 
-  `position: relative` is the containing block for the blocked-enable flash, which floats
-  over the list instead of shoving every row down the page when it fires.
+  FOUR TRACKS AS OF ISSUE 1515, not three: the blocked-enable strip is a `<Notice>` in the
+  page's own flow now, in the position the design system fixes for a blocking notice on a
+  browse screen, and its slot is the leading `auto`. The slot is an unconditional child that is
+  empty until a refusal, so the row it occupies is zero-height at rest and no track moves.
+
+  `position: relative` STAYS, and is no longer described by the flash it was introduced for:
+  it is this route's containing block, and retiring the one absolutely positioned element that
+  named it is not a reason to stop declaring one for the rest of the route.
 */
 .fabricate-manager[data-manager-view="recipes"] .manager-main {
   position: relative;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
 /* Tab strip, then the scrolling vocabulary workspace which takes the slack. Named
@@ -5175,19 +5217,11 @@
   margin: 0;
 }
 
-.fabricate-manager .manager-availability-pill.is-currency {
-  min-height: 34px;
-  padding: var(--fab-space-2xs) var(--fab-space-2);
-  border-color: color-mix(in srgb, var(--fab-info) 50%, transparent);
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--fab-info) 16%, var(--fab-bg-3));
-}
-
-.fabricate-manager .manager-availability-pill.is-currency > i {
-  color: var(--fab-info);
-}
-
-.fabricate-manager .manager-availability-pill-amount {
+/* The sub-unit AMOUNT, which is not a chip and never was: a number a GM can change is an
+   editable control, so it keeps its own box inside the membership token that carries it. The
+   class moved out of the retiring `.manager-availability-*` family with the pill (issue 1515);
+   the geometry is unchanged. */
+.fabricate-manager .manager-currency-subunit-amount {
   width: 56px;
   min-width: 0;
   height: 25px;
@@ -5548,21 +5582,19 @@
   border: 0;
 }
 
-.fabricate-manager .manager-section-header,
+/*
+  ONE RULE, MERGED (issue 1515). The first four declarations were written in a LIST shared with
+  `.manager-section-header`, which is how the toolbar and the page header a view drew under it kept
+  the same padding and rule line. That second header is gone from all six views that drew one, so
+  the list holds one selector — and two rules stating the same single selector is the duplicate
+  `stylelint`'s `no-duplicate-selectors` rejects, where two differing LISTS were allowed by design.
+  Merged at the earlier position with the declarations in their original order, so the cascade is
+  unchanged.
+*/
 .fabricate-filter-bar.manager-toolbar {
   min-width: 0;
   padding: var(--fab-space-3);
   border-bottom: 1px solid var(--fab-border);
-}
-
-.fabricate-manager .manager-section-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--fab-space-3);
-}
-
-.fabricate-filter-bar.manager-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--fab-space-2);
@@ -7504,48 +7536,28 @@
   font-weight: 600;
 }
 
-/* The blocked-enable flash: an ERROR the GM must be able to read and dismiss. It
-   REPLACES the Foundry notification (which the store suppresses while this owns the
-   message), so it never auto-hides out from under them.
+/* The blocked-enable notice's SLOT (issue 1515). The strip itself is `<Notice>`, which paints
+   its own edge, fill, corner and type and declares `margin: 0` because separation from what
+   sits beneath a notice is the caller's layout — so what is left here is the caller's layout
+   and nothing else.
 
-   It is a TOAST, not a banner. In flow between the toolbar and the list it shoved every
-   row down the page the instant it appeared — the GM's eye followed the movement, not the
-   message, and the row they had just clicked was no longer under the cursor. It now floats
-   bottom-centre over the list (the recipes `.manager-main` is its containing block), on
-   the opaque `--fab-bg-0` so the rows beneath it stay legible as rows. */
-.fabricate-manager .manager-recipe-flash {
-  position: absolute;
-  bottom: 18px;
-  left: 50%;
-  z-index: 40;
-  transform: translateX(-50%);
-  display: flex;
-  gap: var(--fab-space-2);
-  align-items: center;
-  max-width: calc(100% - (2 * var(--fab-space-4)));
-  margin: 0;
-  padding: var(--fab-space-2) var(--fab-space-3);
-  border: 1px solid var(--fab-danger-border);
-  border-radius: 10px;
-  color: var(--fab-text);
-  background: var(--fab-bg-0);
-  box-shadow: 0 12px 40px var(--fab-overlay-dark-48);
-}
+   Four rules stood here before: a bespoke TOAST that floated bottom-centre over the list on
+   `--fab-bg-0`, plus its glyph, its message span and its dismiss button. All four are retired
+   with the conversion. `openspec/specs/design-system/spec.md` fixes a browse screen's element
+   order — a blocking notice sits between the page header and the filter bar — and this route
+   draws no per-view page header, so the notice is the first thing in the content region and
+   is in the page's own flow. What the toast was avoiding is answered by the position rather
+   than by leaving the flow: above the FILTER BAR it never lands between the row a GM just
+   clicked and the cursor.
 
-.fabricate-manager .manager-recipe-flash > i {
-  flex: 0 0 auto;
-  color: var(--fab-danger-text);
-}
-
-.fabricate-manager .manager-recipe-flash-message {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: 0.76rem;
-  font-weight: 600;
-}
-
-.fabricate-manager .manager-recipe-flash-dismiss {
-  flex: 0 0 auto;
+   THE INSET IS CONDITIONAL ON THE SLOT HOLDING SOMETHING. The slot is an unconditional grid
+   child (see the view's own comment for why a conditional one is a defect), so an
+   unconditional padding here would be dead space above the toolbar on every recipes frame.
+   `:has()` is how the slot asks; on an engine without it the whole rule is dropped and the
+   notice renders flush to the panel edge, which is a spacing shortfall rather than a
+   removed affordance. */
+.fabricate-manager .manager-recipe-notice:has(.fab-notice) {
+  padding: var(--fab-space-3) var(--fab-space-3) 0;
 }
 
 /* A flex row: identity grows, the badge run and the actions sit at the end. It WRAPS
@@ -7619,7 +7631,6 @@
   min-height: 72px;
   padding: var(--fab-space-3);
   color: var(--fab-text);
-  cursor: pointer;
 }
 
 .fabricate-manager .manager-system-row .manager-labeled-cell {
@@ -7654,7 +7665,6 @@
 
 .fabricate-manager .manager-system-row .manager-action-group {
   width: 100%;
-  cursor: default;
 }
 
 /* THE FAMILY'S BARE-ELEMENT TYPE BASELINE, at the family root ALONE (issue 1508). The switch's
@@ -8034,10 +8044,16 @@
   gap: var(--fab-space-3);
 }
 
+/* The system row's identity is a real `<button>` since issue 1515 — the row itself was a
+   handler-bearing `<div>` before it — so this reset now has to carry `height: auto` as well.
+   Foundry pins a fixed `height` on every `button` and used height resolves to
+   `max(height, min-height)`, so without it the two-line identity is cropped. Its four siblings
+   state the same pair in their own shared reset below, for the same reason. */
 .fabricate-manager .manager-system-identity {
   appearance: none;
   -webkit-appearance: none;
   width: 100%;
+  height: auto;
   padding: 0;
   border: 0;
   color: inherit;
@@ -8348,28 +8364,24 @@
   padding-right: var(--fab-space-1);
 }
 
-.fabricate-manager .manager-availability-pill.is-realm { --fab-chip-color: var(--fab-info); }
-.fabricate-manager .manager-availability-pill.is-weather { --fab-chip-color: var(--fab-warning); }
-.fabricate-manager .manager-availability-pill.is-timeOfDay { --fab-chip-color: var(--fab-purple); }
+/* A check modifier (issue 770), and the pill family's ONE surviving facet (issue 1515).
+   The TAG facet (issue 676) and the BIOME facet went with the sweep: the component editor
+   draws its authored tags as `<Chip>` and the gathering browsers draw their biomes as a
+   tinted `<Chip>`, so both mappings named an element nothing emits any more.
 
-/* A component TAG (issue 676). The pill vehicle is Gathering's, and the component
-   editor's tag pills inherited its unmapped default — the AMBER `--fab-warning` fill
-   below — which reads as a warning on a plain authored tag. Tags are purple, so they
-   get the mapping the other three facets already have. */
-.fabricate-manager .manager-availability-pill.is-tag { --fab-chip-color: var(--fab-purple); }
+   THE THREE RULES COLLAPSE INTO ONE because the sweep left them with the same single
+   selector, which `no-duplicate-selectors` refuses, and the merge is a proved no-op rather
+   than a re-skin: `--fab-chip-color` is set on the same element it was set on before and
+   the two `color-mix` declarations are carried verbatim, so the fill and the border resolve
+   to the values they resolved to. Rooted at the class `ModifierPillSelect.svelte` emits,
+   like the rest of the family below.
 
-/* A check modifier (issue 770). Like a component tag, this pill reuses Gathering's
-   vehicle; left unmapped it would inherit the AMBER `--fab-warning` fill, which reads
-   as a warning on a plain authored catalogue entry. A modifier is a neutral, additive
-   concept, so it gets the informational (blue) accent. */
-.fabricate-manager .manager-availability-pill.is-modifier { --fab-chip-color: var(--fab-info); }
+   Left unmapped this pill would inherit the AMBER `--fab-warning` fill, which reads as a
+   warning on a plain authored catalogue entry. A modifier is a neutral, additive concept,
+   so it gets the informational (blue) accent. */
+.fabricate-pill-select .manager-availability-pill.is-modifier {
+  --fab-chip-color: var(--fab-info);
 
-.fabricate-manager .manager-availability-pill.is-realm,
-.fabricate-manager .manager-availability-pill.is-weather,
-.fabricate-manager .manager-availability-pill.is-timeOfDay,
-.fabricate-manager .manager-availability-pill.is-tag,
-.fabricate-manager .manager-availability-pill.is-modifier,
-.fabricate-manager .manager-availability-pill.is-biome {
   background: color-mix(in srgb, var(--fab-chip-color, var(--fab-warning)) 16%, var(--fab-bg-3));
   border-color: color-mix(in srgb, var(--fab-chip-color, var(--fab-warning)) 50%, transparent);
 }
@@ -13581,20 +13593,28 @@
 }
 
 /*
-  The premium badge on the Downtime parent row. It rides `.manager-nav-count` so the
-  collapsed 56px rail hides it with every other trailing marker — this rule declares no
-  `display`, so that hide still wins — and re-tones from a mono numeral to the gold chip the
-  design draws, whose colour pair is stated once beside `.manager-titlebar-badge` above.
+  The premium badge on the Downtime parent row — A VEHICLE OF ITS OWN (issue 1515).
 
-  It is selected through `.manager-nav-button` (0,4,0) rather than on its own, because a later
-  rule in this sheet re-tones a nav count at lower weight — `.manager-nav-count` itself
-  (0,2,0). It won on source order against a single-class version, and the chip drew in the
-  subtle text colour at weight 600: bare tan lettering, not a badge. (Issue 1304 removed a
-  second tied rule this comment used to name — `.manager-nav-button.is-active
-  .manager-nav-count` — because it restated the base rule byte-for-byte; the tie it broke no
-  longer exists.)
+  It used to be `.manager-nav-count.manager-nav-premium`: a tier gate drawn through the
+  RECORD-COUNT vehicle and then re-toning away almost everything that vehicle declares. The
+  Rail Marker Family exists to forbid exactly that substitution, and by the end the count
+  class was buying one thing — the collapsed-rail hide — which that rule now names directly.
+  So the chip states its own box here instead of overriding another mark's.
+
+  `min-width: 0` is the one declaration it genuinely inherited rather than overrode, restated
+  so the collapsed and narrow-rail geometry is unchanged. `.manager-nav-count`'s `flex` and
+  `overflow-wrap` are NOT restated: both hosts are grid rows, so `flex` never applied here,
+  and no ancestor of a rail row sets `overflow-wrap`, so `normal` was already the used value.
+  Nor is `font-variant-numeric`, because this mark carries a word.
+
+  The `.manager-nav-button` ancestor went with the borrowed class. It was there to outrank a
+  two-class `.manager-nav-count` re-tone on a mark that no longer carries
+  `.manager-nav-count`, so the tie it existed to win can no longer arise, and no other rule in
+  this sheet selects a descendant span of a rail row.
 */
-.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium {
+.fabricate-manager .manager-nav-premium {
+  min-width: 0;
+
   /*
     `2px 5px`, one pixel tighter each side than the design's `2px 6px`. The design's rail row
     ends in an inert chevron; this one ends in a real 28px expand/collapse BUTTON, so the same
@@ -13604,7 +13624,7 @@
   padding: 2px 5px;
   border-radius: 4px;
 
-  /* A lettered mark, not a numeral: drop `.manager-nav-count`'s mono face. */
+  /* A lettered mark, not a numeral, so it takes the body face rather than the mono one. */
   font-family: inherit;
   font-size: 7.5px;
   letter-spacing: 0.08em;
@@ -13685,8 +13705,10 @@
   every nav row still carried a button-shaped badge and stood taller than the numeral
   needed. Its own rule owes nothing to the chip, so nothing has to be undone.
 
-  The disabled Graph row's "Soon" span is the one non-numeric `.manager-nav-count`. It
-  is dead UI and this change does not elevate it, so it simply reads as quiet text.
+  EVERY MARK ON THIS RULE IS A NUMERAL (issue 1515). The disabled planned-view row's "Soon"
+  used to be the one exception, which made this vehicle's own definition false wherever a
+  reader checked it; it is `.manager-nav-planned` below now, at this rule's size, colour and
+  weight but in the body face, and claiming no membership of the family.
 
   `--fab-text-subtle` measured 3.70:1 on the idle rail and 3.16:1 on `--fab-surface-active`
   across the default theme (issue 1304) — a 10px/600 numeral needs 4.5:1, so both grounds
@@ -13715,6 +13737,36 @@
 }
 
 /*
+  THE PLANNED-VIEW WORD, and deliberately NOT a member of the Rail Marker Family (issue 1515).
+
+  A disabled placeholder row says "Soon" where a live row says how many records sit behind it.
+  That word rode `.manager-nav-count`, which made the record-count vehicle's own definition — a
+  bare mono NUMERAL — false on one of the few rows a reader would check it against. It is not
+  an issue summary, not a dirty marker and not a tier gate either, so it takes a name outside
+  the four-mark family rather than a fifth membership in it.
+
+  Size, colour and weight are the count rule's, so the mark stays the same quiet trailing text
+  at the same rung. Three of that rule's declarations are dropped rather than copied, each
+  because this mark does not meet the condition the count states them for:
+  `font-variant-numeric` has no digits to align, `flex` never applied because both rail row
+  types are grid, and `overflow-wrap: normal` is already the used value on a rail row.
+
+  THE MONO FACE IS THE ONE THING THAT DOES CHANGE, and it is a correction rather than a
+  re-skin. `styles/fabricate.css` ships its mono face at 400 and 500 only, so mono at 600 is a
+  SYNTHESISED bold — the browser smears the 500 glyphs sideways — and the repo ratchets against
+  exactly that. A record count pays that cost for tabular numerals it needs; a word has no
+  numerals to align, so it takes the body face instead, which is the same reading the premium
+  chip's `font-family: inherit` above records for the other lettered mark on this rail.
+*/
+.fabricate-manager .manager-nav-planned {
+  min-width: 0;
+  color: var(--fab-text-secondary);
+  font-family: inherit;
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+/*
   issue 1304 removed the active-row re-tone that used to sit here —
   `.manager-nav-button.is-active .manager-nav-count` and `.manager-nav-subitem.is-active
   .manager-nav-count` — because both restated this rule's `color`/`font-weight` byte-for-byte.
@@ -13735,22 +13787,21 @@
   copy is a second thing to keep in step across all seven palettes. Each chip's own rule owns
   only its SCALE; the pair is here.
 
-  IT SITS HERE, under the count rule, because it used to tie on specificity with the
-  active-row count re-tone `.manager-nav-button.is-active .manager-nav-count` (also four
-  classes) — the Downtime row is always the active row on its own route, so that tie decided
-  this exact badge. Declared earlier, this block lost the tie on source order and the chip
-  drew as subtle tan lettering at weight 600 — the reported defect. Issue 1304 removed that
-  tied rule as dead code, so today this position beats the surviving two-class
-  `.manager-nav-count` on specificity alone and does not depend on order — left here rather
-  than moved, since moving it changes nothing and touching cascade position for no
-  behavioural reason is its own risk.
+  IT USED TO SIT HERE FOR A CASCADE REASON, and no longer needs one. While the rail chip was
+  `.manager-nav-count.manager-nav-premium` it competed with the count rule above and with an
+  active-row re-tone since deleted (issue 1304), and declaring this block earlier lost that
+  tie on source order: the chip drew as subtle tan lettering at weight 600, which was the
+  reported defect. Issue 1515 took the count class off the chip, so nothing above claims its
+  colour any more and this position is now ordinary rather than load-bearing. Left where it
+  is, because moving it changes nothing and moving cascade position for no behavioural reason
+  is its own risk.
 
   Neither rule uppercases in CSS, and that is now a shared decision rather than a divergence:
   both sources are the literal localized string `PREMIUM`, and uppercasing an already-uppercase
   word is how a translation gets shouted twice.
 */
 .fabricate-manager .manager-titlebar-badge,
-.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium {
+.fabricate-manager .manager-nav-premium {
   color: var(--fab-on-badge-gold);
   background: var(--fab-badge-gold);
   font-weight: 700;
@@ -13766,12 +13817,12 @@
   So it steps down — accent lettering on the accent tint, one weight lighter — rather than
   disappearing: removing it would lose the answer to "which of these rows is the premium one".
 
-  Five classes, so it beats the four-class gold rule above on weight and does not depend on
+  Three classes, so it beats the two-class gold rule above on weight and does not depend on
   staying below it. It restates ONLY the three declarations it overrides; the chip's shape,
   scale, padding and radius still come from `.manager-nav-premium` above, which is what keeps
   the row's label on one line in both states.
 */
-.fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium.is-installed {
+.fabricate-manager .manager-nav-premium.is-installed {
   color: var(--fab-accent);
   background: var(--fab-accent-soft);
   font-weight: 600;
@@ -13790,6 +13841,11 @@
 
   Distinguishing 2 from 3 by colour alone would fail every GM who cannot separate them, so
   the difference is carried by shape and by name and only reinforced by colour.
+
+  A COMPANION'S PER-TAB DOWNTIME BADGE IS VEHICLE 2 (issue 1515), not vehicle 1. The
+  discriminator is the one stated above: it carries a count AND names its unit in an
+  `aria-label`. It is also the addend of the Downtime parent's rollup, which has always drawn
+  through this rule, and a sum cannot be a different mark from the things it sums.
 */
 .fabricate-manager .manager-nav-issue-badge {
   flex: 0 0 auto;
@@ -15010,16 +15066,37 @@
   min-width: 0;
 }
 
-.fabricate-manager .manager-availability-multi {
+/* THE PILL SELECT'S FAMILY, ROOTED AT THE CLASS THE PRIMITIVE EMITS (issue 1515).
+   `ModifierPillSelect.svelte` is the family's only emitter now that the six manager views
+   that hand-wrote it at 37 sites render their destination primitives instead, so these
+   rules root at `fabricate-pill-select` — a class only that component writes, on its own
+   `<Field>` root — and the control paints wherever it is mounted rather than only inside
+   the manager. The sheet is page-global, so the application root could not simply be
+   dropped; a namespace class is the replacement `tests/styles-namespacing.test.js` allows.
+
+   SPECIFICITY IS PRESERVED RULE FOR RULE. Every re-rooted selector keeps the rank it had:
+   the root pair stays (0,2,0) by qualifying the namespace class with the family class on
+   the same element, and each descendant stays (0,2,0) — or (0,3,0) for a state pair —
+   with the namespace root standing exactly where `.fabricate-manager` stood.
+
+   THE TWO ALIASES KEEP THEIR APPLICATION ROOT, because they are the manager's vocabulary
+   and not this primitive's. `.manager-condition-menu-button` is the two gathering editors'
+   condition-picker trigger and `.manager-danger-tag-remove` the event editor's danger-tag
+   dismiss; each is hand-written by a view that can only ever render inside
+   `.fabricate-manager`, so the ancestor is free for both, and re-rooting either at a class
+   its own markup never carries would un-style it.
+
+   THE MENU BLOCK BELOW IS NOT PART OF THIS RE-ROOT and deliberately stays where it is:
+   `.manager-availability-menu`, `-option` and `-empty` are the hand-rolled listbox this
+   control replaced with `SearchablePopover`, nothing emits them, and they are owned by
+   issue 1480 through the named exemption in `tests/styles-dead-classes.test.js` because
+   `manager-layout.test.js` measures the option row as REFERENCE GEOMETRY. */
+.fabricate-pill-select.manager-availability-multi {
   min-width: 0;
 }
 
-.fabricate-manager .manager-availability-picker {
-  position: relative;
-  min-width: 0;
-}
-
-.fabricate-manager .manager-availability-menu-button {
+.fabricate-pill-select .manager-availability-menu-button,
+.fabricate-manager .manager-condition-menu-button {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -15035,8 +15112,10 @@
   font-weight: 700;
 }
 
-.fabricate-manager .manager-availability-menu-button:hover,
-.fabricate-manager .manager-availability-menu-button:focus-visible {
+.fabricate-pill-select .manager-availability-menu-button:hover,
+.fabricate-pill-select .manager-availability-menu-button:focus-visible,
+.fabricate-manager .manager-condition-menu-button:hover,
+.fabricate-manager .manager-condition-menu-button:focus-visible {
   border-color: var(--fab-warning-border);
   outline: none;
   box-shadow: 0 0 0 2px var(--fab-warning-soft);
@@ -15080,8 +15159,12 @@
   outline: none;
 }
 
-.fabricate-manager .manager-availability-option i,
-.fabricate-manager .manager-availability-pill > i {
+/* The option row's glyph, which stays with the menu block above for its reason. It shared
+   one selector list with the pill's glyph rule until issue 1515; the two are SPLIT rather
+   than left joined, because a dead selector sharing a list with a live one is invisible to
+   `deadRuleBlocks` — a block is dead only when EVERY selector in it is — so joining them
+   would have hidden this one from the gate that owns it. */
+.fabricate-manager .manager-availability-option i {
   color: var(--fab-warning-text);
   text-align: center;
 }
@@ -15092,14 +15175,19 @@
   font-size: 0.78rem;
 }
 
-.fabricate-manager .manager-availability-pill-row {
+.fabricate-pill-select .manager-availability-pill > i {
+  color: var(--fab-warning-text);
+  text-align: center;
+}
+
+.fabricate-pill-select .manager-availability-pill-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--fab-space-chip);
   min-width: 0;
 }
 
-.fabricate-manager .manager-availability-pill {
+.fabricate-pill-select .manager-availability-pill {
   display: inline-flex;
   align-items: center;
   gap: var(--fab-space-chip);
@@ -15114,14 +15202,15 @@
   font-weight: 700;
 }
 
-.fabricate-manager .manager-availability-pill span {
+.fabricate-pill-select .manager-availability-pill span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.fabricate-manager .manager-availability-remove {
+.fabricate-pill-select .manager-availability-remove,
+.fabricate-manager .manager-danger-tag-remove {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -15134,14 +15223,16 @@
   background: transparent;
 }
 
-.fabricate-manager .manager-availability-remove:hover,
-.fabricate-manager .manager-availability-remove:focus-visible {
+.fabricate-pill-select .manager-availability-remove:hover,
+.fabricate-pill-select .manager-availability-remove:focus-visible,
+.fabricate-manager .manager-danger-tag-remove:hover,
+.fabricate-manager .manager-danger-tag-remove:focus-visible {
   color: var(--fab-danger-text);
   background: var(--fab-danger-soft);
   outline: none;
 }
 
-.fabricate-manager .manager-availability-any {
+.fabricate-pill-select .manager-availability-any {
   min-height: 28px;
   display: inline-flex;
   align-items: center;
@@ -17002,7 +17093,12 @@
 
   .fabricate-manager[data-manager-view="world"][data-world-travel-tab="parties"] .manager-main {
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
+
+    /* ONE track, not two. The leading `auto` was the browse view's own duplicate page header
+       (issue 1515); with that deleted the Parties pane is the only child, and two tracks would
+       leave it in the `auto` row this rule exists to keep it OUT of — sized to max-content, which
+       is what carries the persistent footer off the bottom of the panel. */
+    grid-template-rows: minmax(0, 1fr);
     overflow: hidden;
   }
 
@@ -17255,8 +17351,7 @@
 }
 
 @container fabricate-manager (max-width: 680px) {
-  .fabricate-manager .manager-header,
-  .fabricate-manager .manager-section-header {
+  .fabricate-manager .manager-header {
     align-items: stretch;
     flex-direction: column;
   }
@@ -19293,7 +19388,7 @@
   line-height: 1.35;
 }
 
-.fabricate-manager .manager-environment-context-field .manager-availability-pill-row {
+.fabricate-manager .manager-environment-context-field .manager-chip-row {
   margin-top: var(--fab-space-2xs);
 }
 
@@ -19748,6 +19843,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--fab-space-4);
+}
+
+/* The counts rail's own inset. It used to inherit one from the `manager-section-header` it sat
+   inside (issue 1515); as a direct child of the flex surface it would otherwise sit hard against
+   the panel edge while every group below it is indented by its card padding. The horizontal
+   figure is that card padding, so the chips line up with the rows they count. */
+.fabricate-manager .manager-system-overview-counts {
+  padding: var(--fab-space-3) var(--fab-space-4) 0;
 }
 
 .fabricate-manager .manager-system-overview-group {
@@ -21693,9 +21796,16 @@
 }
 
 /*
-  COMPOSITE SEARCH FIELDS — the World > Parties actor search, add-a-member search and
-  parties search. Each is a bordered ROW holding a leading glyph, a borderless `<input>`
-  and a trailing control, so what a GM reads as "the field" is the row, not the input.
+  COMPOSITE SEARCH FIELDS — the World > Parties add-a-member search and the travel-actor
+  picker's inline field. Each is a bordered ROW holding a leading glyph, a borderless
+  `<input>` and a trailing control, so what a GM reads as "the field" is the row, not the
+  input.
+
+  THE PANE'S OWN PARTIES SEARCH LEFT THIS BLOCK AT ISSUE 1515. It is `ManagerSearchField`
+  now, and that family declares BOTH halves of this same pair for itself
+  (`.fabricate-search input:focus` and `.fabricate-search input:focus-visible`) around the
+  control it owns — so keeping a row-level ring for it would have drawn the treatment twice,
+  at two boundaries, on one field.
 
   The manager's default ring (`input:focus-visible { outline: 2px; outline-offset: 2px }`
   above) is drawn around the INPUT and pushed 2px further out, and Foundry's own
@@ -21713,8 +21823,7 @@
   engine keeps the manager's default 2px outline instead.
 */
 @supports selector(:has(*)) {
-  .fabricate-manager .manager-party-add-search .manager-party-add-query:focus-visible,
-  .fabricate-manager .manager-travel-parties-search .manager-travel-parties-query:focus-visible {
+  .fabricate-manager .manager-party-add-search .manager-party-add-query:focus-visible {
     outline: none;
   }
 
@@ -21725,9 +21834,7 @@
     outline: none;
   }
 
-  .fabricate-manager .manager-party-add-search:has(.manager-party-add-query:focus-visible),
-  .fabricate-manager
-    .manager-travel-parties-search:has(.manager-travel-parties-query:focus-visible) {
+  .fabricate-manager .manager-party-add-search:has(.manager-party-add-query:focus-visible) {
     border-color: var(--fab-accent);
     box-shadow: inset 0 0 0 1px var(--fab-accent);
   }
@@ -23464,11 +23571,12 @@
    So the caller's own container is named by a class the caller writes ON THAT SAME ELEMENT.
    The match set is identical, and that is measured rather than argued:
    `data-manager-tools-search` occurs on exactly two elements repo-wide —
-   `ToolsBrowserView.svelte:492` and `tool-rules-list-parity.test.js:187` — and BOTH carry
+   `ToolsBrowserView.svelte:515` and `tool-rules-list-parity.test.js:202` — and BOTH carry
    `manager-tools-library-card`; the class's only other two carriers
-   (`ToolsBrowserView.svelte:575`, `tool-rules-list-parity.test.js:200`, both
+   (`ToolsBrowserView.svelte:602`, `tool-rules-list-parity.test.js:217`, both
    `data-manager-tools-browser`) contain no `.manager-search`, because that file's single
-   `<ManagerSearchField>` is at `:493` inside this search card. Rank is unchanged for each —
+   `<ManagerSearchField>` is at `:519`, inside this search card and inside the
+   `ManagerToolbar` this card now wraps around it (issue 1515). Rank is unchanged for each —
    this rule (0,3,0), the input and the icon (0,3,1) — the position is unchanged, and the
    declarations are byte-identical. `tool-rules-list-parity.test.js` measures the input's 11.5px
    /500 type, 30px height and 8px radius on its own fixture, so the rewrite is CI-armed.
@@ -23591,8 +23699,13 @@
   text-align: left;
 }
 
-.fabricate-manager .manager-tools-select-target:focus-visible,
-.fabricate-manager .manager-tools-enabled-toggle:focus-visible {
+/* ONE LEG, NOT TWO (issue 1515). The row's enable switch is a `StatusToggle` now, and the
+   primitive's family already writes this exact pair — `.fabricate-toggle.manager-status-toggle:
+   focus-visible`, the same 2px accent outline at the same 2px offset — so a second copy under
+   this screen's own class would out-specify the family's ring with a byte-identical one and
+   make the switch's focus state a thing two files decide. The select target keeps the rule
+   because nothing else states its ring. */
+.fabricate-manager .manager-tools-select-target:focus-visible {
   outline: 2px solid var(--fab-accent);
   outline-offset: 2px;
 }
@@ -23657,53 +23770,24 @@
    `.manager-tools-library-actions` had a second block here stating only `padding-right`. It
    is merged into the one above, which is where the cluster's own geometry now lives. */
 
-.fabricate-manager .manager-tools-enabled-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-}
+/* ── THE ROW'S ENABLE SWITCH IS THE SHARED ONE, AND ITS FIVE-RULE SKIN IS GONE (issue 1515) ──
+   The Tools list drew this switch by hand — a 36px box, a 34x20 track and a 14px knob that
+   travelled 14px, in the accent on and the raised neutral off. Every one of those figures is
+   what `.fabricate-toggle.manager-status-toggle` already states for the whole manager, so the
+   control adopts the primitive and the copy is deleted rather than re-rooted.
 
-/* ONE ACCENT FOR BOTH POSITIONS (issue 1373), matching `.manager-status-toggle` above. This
-   row switch is hand-rolled rather than a `StatusToggle`, so it carried its own copy of the
-   defect the shared control had: off drew a bright neutral track and on drew a GREEN one, on a
-   screen where the selected row, the inherit switches and the segmented control all speak in
-   the accent. */
-.fabricate-manager .manager-tools-enabled-toggle > span:first-child {
-  position: relative;
-  display: block;
-  width: 34px;
-  height: 20px;
-  border: 1px solid var(--fab-border);
-  border-radius: 999px;
-  background: var(--fab-surface-raised);
-}
+   FOUR OF THE FIVE HAD TO GO, AND THAT IS A CASCADE FACT RATHER THAN TIDINESS. They select
+   `> span:first-child` and `> span:first-child > span`, which are exactly the track and knob
+   the primitive renders, at (0,2,1)/(0,2,2) against the family's (0,2,0) — so they would have
+   gone on winning against the primitive's own paint on this one screen, silently re-skinning
+   a shared control from a caller's block. `openspec/specs/design-system/spec.md`'s
+   element-and-rank exception is no help: it covers a deletion proved redundant, and a rule that
+   OUT-RANKS the primitive it sits over is the re-skin the exception names as out of scope.
 
-.fabricate-manager .manager-tools-enabled-toggle > span:first-child > span {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--fab-text-subtle);
-  transition: transform 120ms ease, background-color 150ms ease;
-}
-
-.fabricate-manager .manager-tools-enabled-toggle.is-on > span:first-child {
-  border-color: var(--fab-accent-border);
-  background: var(--fab-accent);
-}
-
-.fabricate-manager .manager-tools-enabled-toggle.is-on > span:first-child > span {
-  transform: translateX(14px);
-  background: var(--fab-on-accent);
-}
+   The one visible consequence is stated rather than left to be found: the button was pinned to
+   36px around a 34px track and the family sizes it to its content, so the switch is two pixels
+   narrower and the row's action cluster shifts by two. Colours, track, knob, travel and the
+   focus ring are the same declarations either way. */
 
 .fabricate-manager .manager-tool-browser-inspector {
   gap: 14px;

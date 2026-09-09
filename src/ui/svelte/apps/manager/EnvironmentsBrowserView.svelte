@@ -24,6 +24,7 @@
   import GatheringEconomyView from './GatheringEconomyView.svelte';
   import GatheringPartiesTab from './GatheringPartiesTab.svelte';
   import IconButton from '../../components/IconButton.svelte';
+  import ActionMenu from '../../components/ActionMenu.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
 
@@ -35,7 +36,6 @@
     environmentDraftDirty = false,
     environmentValidationCount = 0,
     selectedEnvironmentId = '',
-    selectedSystemName = '',
     selectedSystemId = '',
     gatheringConfig = null,
     sceneOptions = [],
@@ -43,7 +43,6 @@
     shouldUseEnvironmentDraftForDisplay = false,
     activeGatheringTab = 'environments',
     activeTravelTab = 'parties',
-    worldParties = false,
     services = null,
     selectedTaskId = '',
     selectedEventId = '',
@@ -251,9 +250,6 @@
       values: gatheringConfig?.vocabularies?.biomes || [],
     }
   );
-  const activeGatheringTabConfig = $derived(
-    gatheringTabs.find((tab) => tab.id === activeGatheringTab) || gatheringTabs[0]
-  );
   const biomeOptions = $derived(
     uniqueSorted(
       environmentList.flatMap((environment) =>
@@ -360,6 +356,33 @@
   function hasEnvironmentImage(environment) {
     const explicitImage = typeof environment?.img === 'string' ? environment.img.trim() : '';
     return Boolean(environmentSceneImage(environment) || explicitImage);
+  }
+
+  // The two commands that left the row's three-button cluster for the overflow menu (issue 1515).
+  // Edit stays an `<IconButton>` — it is the row's primary act — and Duplicate and Delete are
+  // built as data so the shared `<ActionMenu>` owns the trigger, the portaled panel and the
+  // keyboard contract that three loose buttons never had.
+  // THE MENU ITEMS NAME THE COMMAND, NOT THE ROW (issue 1515). `ActionMenu`'s `label` is both the
+  // visible text and the `menuitem`'s accessible name, and the shipped callers that predate this
+  // conversion — `ComponentBrowserInspector` and `environment/CompositionList` — both spell it as a
+  // generic verb ("Delete component", "Move up"). The row is identified by the trigger the menu was
+  // opened from, so repeating its name in every item widens the panel to restate what the reader
+  // just acted on. This is also why `Recipe.DuplicateNamed` and `Component.DeleteNamed` are already
+  // dead in `tests/lang-known-orphans.js`: the earlier conversions retired the same `{name}` copy.
+  function rowMenuItems() {
+    return [
+      {
+        id: 'duplicate',
+        label: text('FABRICATE.Admin.Manager.Environment.Duplicate', 'Duplicate environment'),
+        icon: 'fas fa-copy',
+      },
+      {
+        id: 'delete',
+        label: text('FABRICATE.Admin.Manager.Environment.Delete', 'Delete environment'),
+        icon: 'fas fa-trash',
+        danger: true,
+      },
+    ];
   }
 
   function environmentSelectionModeLabel(environment) {
@@ -625,48 +648,12 @@
   function conditionValues(setting) {
     return Array.isArray(setting?.values) ? setting.values : [];
   }
-
-  function gatheringHeaderTitle() {
-    if (activeGatheringTab === 'travel' && worldParties) {
-      return text('FABRICATE.Admin.Manager.World.PartiesTitle', 'World Parties');
-    }
-    const titleKey = activeGatheringTabConfig?.titleKey;
-    if (titleKey) return text(titleKey, activeGatheringTabConfig.titleFallback);
-    return text('FABRICATE.Admin.Manager.Environment.Library', 'Gathering environments');
-  }
-
-  function gatheringHeaderHint() {
-    if (activeGatheringTab === 'travel' && worldParties) {
-      return text(
-        'FABRICATE.Admin.Manager.World.PartiesHint',
-        'Create and manage parties shared across every crafting system.'
-      );
-    }
-    const hintKey = activeGatheringTabConfig?.hintKey;
-    if (hintKey) return text(hintKey, activeGatheringTabConfig.hintFallback);
-    return text(
-      'FABRICATE.Admin.Manager.Environment.LibraryHint',
-      'Browse scene-linked gathering environments and open the existing editor for task authoring.'
-    );
-  }
 </script>
 
 <main
   class="manager-main"
   aria-label={text('FABRICATE.Admin.Manager.Nav.Environments', 'Gathering')}
 >
-  <section class="manager-section-header">
-    <div class="manager-heading">
-      <p class="manager-kicker">
-        {worldParties
-          ? text('FABRICATE.Admin.Manager.World.PartiesKicker', 'WORLD / every system')
-          : selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
-      </p>
-      <h2 class="manager-title">{gatheringHeaderTitle()}</h2>
-      <p class="manager-subtitle">{gatheringHeaderHint()}</p>
-    </div>
-  </section>
-
   {#if activeGatheringTab === 'environments'}
     <div
       class="manager-gathering-panel manager-gathering-panel-environments"
@@ -866,42 +853,38 @@
             >
           </EmptyState>
         {:else}
+          <!-- A LIST, NOT A TABLE (issue 1515): see `SystemsBrowserView` for the whole
+               reasoning. The column strip stays as the VISUAL header over the shared grid and is
+               `aria-hidden`, because a `columnheader` outside a `table` names nothing. -->
           <div
             class="manager-environments-table"
-            role="table"
+            role="list"
             aria-label={text('FABRICATE.Admin.Manager.Environment.TableShort', 'Environments')}
           >
-            <div class="manager-table-head manager-environment-table-head" role="row">
-              <span role="columnheader"
+            <div class="manager-table-head manager-environment-table-head" aria-hidden="true">
+              <span
                 >{text(
                   'FABRICATE.Admin.Manager.Environment.Column.Environment',
                   'Environment'
                 )}</span
               >
-              <span role="columnheader"
-                >{text('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode')}</span
-              >
-              <span role="columnheader">{text('FABRICATE.Admin.Environments.Tasks', 'Tasks')}</span>
-              <span role="columnheader"
-                >{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span
-              >
-              <span role="columnheader"
-                >{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span
-              >
+              <span>{text('FABRICATE.Admin.Environments.SelectionMode', 'Selection mode')}</span>
+              <span>{text('FABRICATE.Admin.Environments.Tasks', 'Tasks')}</span>
+              <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
+              <span>{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
             </div>
             {#each paginatedEnvironments as environment (environment.id)}
               {@const displayEnvironment = environmentDisplay(environment)}
               <div
                 class={`manager-environment-row ${selectedEnvironmentId === environment.id ? 'is-selected' : ''}`}
-                role="row"
-                aria-selected={selectedEnvironmentId === environment.id}
+                role="listitem"
+                aria-current={selectedEnvironmentId === environment.id ? 'true' : undefined}
                 data-environment-id={environment.id}
               >
                 <button
                   type="button"
                   class="manager-environment-identity"
                   onclick={() => onSelectEnvironment(environment.id)}
-                  role="cell"
                 >
                   <img
                     class={`manager-environment-thumb ${hasEnvironmentImage(displayEnvironment) ? '' : 'is-fallback'}`}
@@ -938,7 +921,6 @@
                   </span>
                 </button>
                 <span
-                  role="cell"
                   class="manager-labeled-cell"
                   data-label={stackedLabel(
                     'FABRICATE.Admin.Environments.SelectionMode',
@@ -948,7 +930,6 @@
                   <Chip>{environmentSelectionModeLabel(displayEnvironment)}</Chip>
                 </span>
                 <span
-                  role="cell"
                   class="manager-labeled-cell"
                   data-label={stackedLabel('FABRICATE.Admin.Environments.Tasks', 'Tasks')}
                 >
@@ -957,7 +938,6 @@
                   >
                 </span>
                 <span
-                  role="cell"
                   class="manager-labeled-cell manager-status-cell"
                   data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}
                 >
@@ -981,7 +961,6 @@
                   />
                 </span>
                 <span
-                  role="cell"
                   class="manager-action-group manager-environment-actions manager-labeled-cell"
                   data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
                 >
@@ -996,33 +975,21 @@
                     >
                       <i class="fas fa-edit" aria-hidden="true"></i>
                     </IconButton>
-                    <IconButton
-                      ariaLabel={text(
-                        'FABRICATE.Admin.Manager.Environment.DuplicateNamed',
-                        'Duplicate {name}'
+                    <ActionMenu
+                      items={rowMenuItems()}
+                      triggerLabel={text(
+                        'FABRICATE.Admin.Manager.Environment.ActionsFor',
+                        'Environment actions for {name}'
                       ).replace('{name}', environmentName(displayEnvironment))}
-                      title={text(
-                        'FABRICATE.Admin.Manager.Environment.Duplicate',
-                        'Duplicate environment'
+                      triggerTitle={text(
+                        'FABRICATE.Admin.Manager.Environment.Actions',
+                        'Environment actions'
                       )}
-                      onclick={() => onDuplicateEnvironment(environment.id)}
-                    >
-                      <i class="fas fa-copy" aria-hidden="true"></i>
-                    </IconButton>
-                    <IconButton
-                      class="is-danger"
-                      ariaLabel={text(
-                        'FABRICATE.Admin.Manager.Environment.DeleteNamed',
-                        'Delete {name}'
-                      ).replace('{name}', environmentName(displayEnvironment))}
-                      title={text(
-                        'FABRICATE.Admin.Manager.Environment.Delete',
-                        'Delete environment'
-                      )}
-                      onclick={() => onDeleteEnvironment(environment.id)}
-                    >
-                      <i class="fas fa-trash" aria-hidden="true"></i>
-                    </IconButton>
+                      onSelect={(action) => {
+                        if (action === 'duplicate') onDuplicateEnvironment(environment.id);
+                        else if (action === 'delete') onDeleteEnvironment(environment.id);
+                      }}
+                    />
                   </span>
                 </span>
               </div>

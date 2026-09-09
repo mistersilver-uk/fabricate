@@ -281,16 +281,15 @@ export function isExemptSpacingPixels(pixels) {
 // `.actor-bar-stamina-track` and `.essence-pool-bar` keep a width and a display and no spacing at
 // all. What the primitives absorb is `var(--fab-space-*)` throughout, so the nine occupancies are
 // paid rather than relocated. Measured on the tree, not subtracted.
-// 844 -> 839 (issue 1513): the crafting sources picker's panel, its scroll box and its option row
-// are `SearchablePopover`'s elements now, and the three rules that declared them went with the
-// markup. ONE row SHRINKS and FOUR at one occupancy VANISH. The one that shrinks is
-// `ComponentSourcesBar | gap 10`, whose second occupancy was the option row's own gap; the bar's
-// own row gap is untouched. The four that vanish are `gap 2` and `padding 6` (the deleted scroll
-// box) and `padding 4` and `padding 8` (the deleted option row's one shorthand). `gap 6` is
-// UNMOVED and is the avatar row's, which this change does not touch. What the primitive absorbs
-// is `var(--fab-space-*)` throughout, so the five occupancies are paid rather than relocated.
-// Measured on the tree, not subtracted.
-export const KNOWN_RAW_SPACING_TOTAL = 839;
+// 844 -> 843 with issue 1515's sixth phase, one occupancy on one row, and the row VANISHES:
+// `GatheringPartiesTab | padding 11` was the parties search row's `padding: 0 11px`, the inset a
+// hand-built field needed around its own glyph and input. The row is layout only now — the field
+// is `ManagerSearchField`, which brings its own inset — so the literal is PAID by the conversion
+// rather than relocated. The file's `margin-bottom 11` and `margin 11` rows are untouched: the
+// first is still the row's separation from what follows it, and the second moved verbatim from
+// the deleted refusal `<p>` onto the wrapper that now holds a `<Notice>`, which is a caller-owned
+// margin the primitive declines to declare.
+export const KNOWN_RAW_SPACING_TOTAL = 838;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

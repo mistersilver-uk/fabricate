@@ -109,7 +109,7 @@ const CLASS_PROPS = Object.freeze([
 ]);
 
 /**
- * Eighteen shared primitives, each with the namespace roots it writes and the class family it owns.
+ * Twenty-one shared primitives, each with the namespace roots it writes and the class family it owns.
  *
  * The first five PORTAL a panel and so need one root on each side of the portal; the rest COMPOSE
  * their family in `<script>` rather than writing it in markup, or write it inline, and carry one
@@ -997,6 +997,62 @@ const PRIMITIVES = Object.freeze([
       Object.freeze({ anchor: 'manager-item-drop-zone', root: 'fabricate-link-field' }),
     ]),
   }),
+  Object.freeze({
+    // ── MODIFIERPILLSELECT (issue 1515). The dropdown-plus-removable-pills multi-select, rooted
+    // at the class it emits on the `<Field>` it renders as its own root.
+    //
+    // THE ENTRY THAT ARRIVED LAST AND WAS REFUSED LONGEST, and the reason is the one this file's
+    // ownership test encodes. `manager-availability-*` was WRITTEN by this primitive and ALSO
+    // hand-written by six manager views at 37 further sites, none of them inside a
+    // `ModifierPillSelect`, so a root class on this component would have reached none of them and
+    // this gate has no residue mechanism to record that with — its owned-and-app-rooted set is
+    // asserted EMPTY. Issue 1515 routed all 37 to their destination primitives first, which left
+    // this component the family's only emitter and made the re-root a move rather than a
+    // breakage. The deferral is therefore recorded as DISCHARGED here rather than deleted.
+    //
+    // ITS ROOT ELEMENT IS ANOTHER ENTRY'S, which `RadioCardGroup` was the first of: the component
+    // renders `<Field as="div">`, so one element carries `fabricate-field` and
+    // `fabricate-pill-select` together. The co-rooting clause below holds over BOTH pairs.
+    name: 'ModifierPillSelect',
+    components: Object.freeze(['src/ui/svelte/components/ModifierPillSelect.svelte']),
+    roots: Object.freeze(['fabricate-pill-select']),
+    // ONE prefix, token-terminated. The three classes the sheet still spells with it and this
+    // component does NOT write — `manager-availability-menu`, `-option` and `-empty`, the
+    // hand-rolled listbox `SearchablePopover` replaced — are outside the family for the reason
+    // `pickerSelectors` anchors on the WRITTEN names rather than on this pattern: nothing emits
+    // them, they are owned by issue 1480 through the named exemption in
+    // `tests/styles-dead-classes.test.js`, and they stay application-rooted with it.
+    family: 'manager-availability-[\\w-]+',
+    anchors: Object.freeze([
+      'manager-availability-multi',
+      // WRITTEN AS A `triggerClass`, which is emission by the same reading `IconPicker`'s
+      // `essence-icon-picker-trigger` gets: the value is a literal in this component's markup and
+      // the class reaches `SearchablePopover`'s trigger button, which is never portaled and is
+      // therefore always inside this primitive's own root.
+      'manager-availability-menu-button',
+      'manager-availability-pill-row',
+      'manager-availability-pill',
+      'manager-availability-remove',
+      'manager-availability-any',
+    ]),
+    // Measured at this commit: 6 written, 13 family selectors, 13 owned — 0 exempt and 0
+    // caller-CLASS compounds, so the owned and the re-rooted counts agree at 13. That ZERO is
+    // this entry's own measurement rather than a coincidence: the family had exactly one
+    // component-shaped consumer left after the routing phase, so no caller container names it.
+    // The two ALIASES the sheet still carries beside two of those rules —
+    // `.fabricate-manager .manager-condition-menu-button` and
+    // `.fabricate-manager .manager-danger-tag-remove` — are separate SELECTORS in the same lists
+    // and name no class this primitive writes, so they never enter the population at all.
+    writtenFloor: 5,
+    familyFloor: 11,
+    ownedFloor: 11,
+    // The ROOT-ELEMENT anchor. It matched ZERO fixture attributes before this change — measured —
+    // so this entry adds exactly the two root elements
+    // `re-rooted-controls-host-independence.test.js` writes for the two faces of the control.
+    mirrored: Object.freeze([
+      Object.freeze({ anchor: 'manager-availability-multi', root: 'fabricate-pill-select' }),
+    ]),
+  }),
 ]);
 
 const read = (file) => readFileSync(join(repoRoot, file), 'utf8');
@@ -1866,75 +1922,94 @@ test('the class-map reader is also what puts a PROP DEFAULT in the family, and i
   );
 });
 
+/**
+ * The entries whose ROOT ELEMENT is another entry's, so TWO namespace roots land on ONE element.
+ *
+ * `Field` hosts both of them, because both render a `<Field>` as their own root: `RadioCardGroup`
+ * as a `<fieldset>` (issue 1509 phase 3) and `ModifierPillSelect` as a `<div>` (issue 1515). The
+ * floors are the two families' measured populations in the sheet, minus a margin, and they are
+ * per pair rather than global — the guest families are two different sizes and one number would
+ * be vacuous for the larger of them.
+ */
+const CO_ROOTED_PAIRS = Object.freeze([
+  Object.freeze({ host: 'Field', guest: 'RadioCardGroup', hostFloor: 20, guestFloor: 40 }),
+  Object.freeze({ host: 'Field', guest: 'ModifierPillSelect', hostFloor: 20, guestFloor: 11 }),
+]);
+
 test('two namespace roots on one element stay disjoint families', () => {
-  // CLAUSE (e), NEW AT ISSUE 1509 PHASE 3, and it exists because `RadioCardGroup` is the first
+  // CLAUSE (e), NEW AT ISSUE 1509 PHASE 3, and it exists because `RadioCardGroup` was the first
   // entry whose ROOT ELEMENT is another entry's. It renders `<Field as="fieldset">`
   // unconditionally, so one element carries `fabricate-field` and `fabricate-option-cards`
-  // together.
+  // together. `ModifierPillSelect` is the second (issue 1515): it renders `<Field as="div">`, so
+  // its root carries `fabricate-field` and `fabricate-pill-select`. The clause is stated over
+  // both pairs rather than restated for the newcomer, because the hazard is the SHAPE and not
+  // either family.
   //
   // WHY THAT NEEDS AN INVARIANT RATHER THAN A NOTE. `isApplicationRoot` decides by NAME and by
   // EXACT membership in the entry's own `roots`, so to the `Field` entry `fabricate-option-cards`
-  // is an application root and to this entry `fabricate-field` is one. A single selector naming
+  // is an application root and to that entry `fabricate-field` is one. A single selector naming
   // BOTH would therefore be `gated` on both entries at once, and there is no form of it that
   // satisfies either: dropping one root un-roots that family, keeping both gates it.
   //
-  // The invariant that makes the pair safe is that no such selector exists, and it holds for a
+  // The invariant that makes a pair safe is that no such selector exists, and it holds for a
   // structural reason rather than by luck — the two family patterns cannot match the same class,
   // so neither family's selectors can enter the other's population at all. Both halves are
-  // asserted: the measured ZERO, and the pattern disjointness that keeps it zero.
-  const field = PRIMITIVES.find((entry) => entry.name === 'Field');
-  const optionCards = PRIMITIVES.find((entry) => entry.name === 'RadioCardGroup');
-  assert.ok(field && optionCards, 'both entries must exist for this clause to mean anything');
-
+  // asserted for each pair: the measured ZERO, and the pattern disjointness that keeps it zero.
   const namesAny = (selector, entry) => {
     const classes = classesOf(selector);
     const family = new RegExp(`^(?:${entry.family})$`);
     return classes.some((cls) => entry.roots.includes(cls) || family.test(cls));
   };
 
-  // NON-VACUITY FIRST: each family must have a real population in the sheet, or the intersection
-  // below is empty because both sides are.
-  const fieldSelectors = allSelectors().filter((selector) => namesAny(selector, field));
-  const optionSelectors = allSelectors().filter((selector) => namesAny(selector, optionCards));
-  assert.ok(
-    fieldSelectors.length >= 20,
-    `only ${fieldSelectors.length} selectors name the field family, so the intersection below is ` +
-      'empty for the wrong reason'
-  );
-  assert.ok(
-    optionSelectors.length >= 40,
-    `only ${optionSelectors.length} selectors name the option-cards family, so the intersection ` +
-      'below is empty for the wrong reason'
-  );
+  for (const pair of CO_ROOTED_PAIRS) {
+    const host = PRIMITIVES.find((entry) => entry.name === pair.host);
+    const guest = PRIMITIVES.find((entry) => entry.name === pair.guest);
+    assert.ok(host && guest, `both ${pair.host} and ${pair.guest} must exist for this clause`);
 
-  assert.deepEqual(
-    allSelectors().filter(
-      (selector) => namesAny(selector, field) && namesAny(selector, optionCards)
-    ),
-    [],
-    'a selector names both `Field`s family and `RadioCardGroup`s. The two are co-rooted on ONE ' +
-      'element — the fieldset — and each root is an APPLICATION root by name to the other entry, ' +
-      'so this selector is `gated` on both of them and no re-rooting form of it exists. Write it ' +
-      'against whichever family actually owns the declaration.'
-  );
+    // NON-VACUITY FIRST: each family must have a real population in the sheet, or the
+    // intersection below is empty because both sides are.
+    const hostSelectors = allSelectors().filter((selector) => namesAny(selector, host));
+    const guestSelectors = allSelectors().filter((selector) => namesAny(selector, guest));
+    assert.ok(
+      hostSelectors.length >= pair.hostFloor,
+      `only ${hostSelectors.length} selectors name the ${pair.host} family, so the intersection ` +
+        'below is empty for the wrong reason'
+    );
+    assert.ok(
+      guestSelectors.length >= pair.guestFloor,
+      `only ${guestSelectors.length} selectors name the ${pair.guest} family, so the ` +
+        'intersection below is empty for the wrong reason'
+    );
 
-  // AND THE PATTERNS THEMSELVES CANNOT OVERLAP, which is what keeps the zero above a property of
-  // the entries rather than of today's sheet.
-  const fieldFamily = new RegExp(`^(?:${field.family})$`);
-  const optionFamily = new RegExp(`^(?:${optionCards.family})$`);
-  for (const anchor of optionCards.anchors) {
-    assert.ok(
-      !fieldFamily.test(anchor),
-      `\`${anchor}\` matches the field family pattern, so an option-cards rule can enter the ` +
-        'field entry`s population and be judged by it'
+    assert.deepEqual(
+      allSelectors().filter(
+        (selector) => namesAny(selector, host) && namesAny(selector, guest)
+      ),
+      [],
+      `a selector names both \`${pair.host}\`s family and \`${pair.guest}\`s. The two are ` +
+        'co-rooted on ONE element, and each root is an APPLICATION root by name to the other ' +
+        'entry, so this selector is `gated` on both of them and no re-rooting form of it exists. ' +
+        'Write it against whichever family actually owns the declaration.'
     );
-  }
-  for (const anchor of field.anchors) {
-    assert.ok(
-      !optionFamily.test(anchor),
-      `\`${anchor}\` matches the option-cards family pattern, so a field rule can enter this ` +
-        'entry`s population and be judged by it'
-    );
+
+    // AND THE PATTERNS THEMSELVES CANNOT OVERLAP, which is what keeps the zero above a property
+    // of the entries rather than of today's sheet.
+    const hostFamily = new RegExp(`^(?:${host.family})$`);
+    const guestFamily = new RegExp(`^(?:${guest.family})$`);
+    for (const anchor of guest.anchors) {
+      assert.ok(
+        !hostFamily.test(anchor),
+        `\`${anchor}\` matches the ${pair.host} family pattern, so a ${pair.guest} rule can ` +
+          `enter the ${pair.host} entry\`s population and be judged by it`
+      );
+    }
+    for (const anchor of host.anchors) {
+      assert.ok(
+        !guestFamily.test(anchor),
+        `\`${anchor}\` matches the ${pair.guest} family pattern, so a ${pair.host} rule can ` +
+          `enter the ${pair.guest} entry\`s population and be judged by it`
+      );
+    }
   }
 });
 

@@ -17,7 +17,9 @@
 -->
 <script>
   import EmptyState from './EmptyState.svelte';
+  import Notice from '../../components/Notice.svelte';
   import Pagination from '../../components/Pagination.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import PartyExpandedBody from './PartyExpandedBody.svelte';
   import { tick } from 'svelte';
   import { localize } from '../../util/foundryBridge.js';
@@ -162,8 +164,10 @@
     scrollPaneToTop();
   }
 
-  function onSearchInput(event) {
-    searchTerm = event.currentTarget.value;
+  // `ManagerSearchField` hands its caller the NEXT VALUE rather than the event (issue 1515);
+  // it has already written the string, so this only has to react to it.
+  function onSearchInput(next) {
+    searchTerm = next;
     resetToFirstPage();
   }
 
@@ -256,22 +260,34 @@
       </EmptyState>
     {:else}
       {#if showSearch}
+        <!-- THE SHARED SEARCH FIELD (issue 1515), which `ManagerSearchField`'s own docblock
+             listed as one of five hand-rolled twins it declined to convert because doing so
+             "would be a re-skin rather than a conversion — a change with visible output and its
+             own review". This is that review: the row was a bordered 32px box holding a
+             `fa-magnifying-glass` and a borderless `<input>`, restating the shipped pill's
+             geometry in a second place at a second set of numbers.
+
+             WHAT THE ROW STILL OWNS IS THE MATCH COUNTER. The primitive is the field and
+             nothing else, so this element keeps its flex layout and its trailing live region —
+             the pane's only announcement that a query narrowed the list — and drops the border,
+             the height, the corner and the fill the field now paints for itself.
+
+             THE INPUT KEEPS BOTH OF ITS OWN ATTRIBUTES through `inputAttrs`, because the rest
+             spread belongs to the `<label>`: the capture hook the View Lab case types into, and
+             the `aria-describedby` that ties the field to that counter. -->
         <div class="manager-travel-parties-search">
-          <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-          <input
-            class="manager-travel-parties-query"
-            type="search"
+          <ManagerSearchField
             value={searchTerm}
-            oninput={onSearchInput}
+            onInput={onSearchInput}
             placeholder={text(
               'FABRICATE.Admin.Manager.World.Parties.Search.Placeholder',
               'Search by party, member or travel actor'
             )}
-            aria-label={text(
-              'FABRICATE.Admin.Manager.World.Parties.Search.Label',
-              'Search parties'
-            )}
-            aria-describedby="manager-world-parties-match-count"
+            ariaLabel={text('FABRICATE.Admin.Manager.World.Parties.Search.Label', 'Search parties')}
+            inputAttrs={{
+              'data-manager-party-search': '',
+              'aria-describedby': 'manager-world-parties-match-count',
+            }}
           />
           <span
             class="manager-travel-parties-count"
@@ -284,14 +300,21 @@
         </div>
       {/if}
 
+      <!-- THE PANE'S REFUSAL BANNER IS THE SHARED NOTICE (issue 1515). It already carried
+           `role="alert"`, and `openspec/specs/design-system/spec.md` routes a strip carrying
+           that role to a BLOCKING notice — the one form that keeps it — so this is a conversion
+           rather than a re-decision. The bespoke `<p>` restated the primitive's danger edge,
+           fill, corner and ink at its own numbers; what it could not restate is the glyph and
+           the type scale, which is why the two looked like two different things. -->
       {#if paneError}
-        <p
-          class="manager-travel-parties-summary-error"
-          data-manager-party-summary-error
-          role="alert"
-        >
-          {paneError}
-        </p>
+        <div class="manager-travel-parties-summary">
+          <Notice
+            blocking
+            tone="danger"
+            title={paneError}
+            dataAttr="data-manager-party-summary-error"
+          />
+        </div>
       {/if}
 
       {#if filteredParties.length === 0}
@@ -412,39 +435,16 @@
     line-height: 1.6;
   }
 
+  /* THE ROW IS LAYOUT NOW AND NOTHING ELSE (issue 1515). It used to BE the field — a bordered
+     32px box on `--fab-bg-0` at an 8px corner, holding a bare glyph and a borderless input
+     pinned to its height because Foundry core gives every input an `--input-height` that
+     overflows a hand-built row. `ManagerSearchField` paints all of that, at the shipped 34px
+     rung, so what is left here is a flex row holding the field and the match counter. */
   .manager-travel-parties-search {
     display: flex;
     align-items: center;
     gap: 8px;
-    height: 32px;
     margin-bottom: 11px;
-    padding: 0 11px;
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-bg-0);
-  }
-
-  .manager-travel-parties-search > i {
-    color: var(--fab-text-subtle);
-    font-size: 10px;
-  }
-
-  /* `align-self: stretch` with `height: auto` pins the input to the 32px ROW. Foundry
-     core gives every input its own `height: var(--input-height)`, which otherwise
-     overflows the row and drags the focus ring out with it. */
-  input.manager-travel-parties-query {
-    flex: 1;
-    align-self: stretch;
-    min-width: 0;
-    min-height: 0;
-    height: auto;
-    padding: 0;
-    border: none;
-    color: var(--fab-text);
-    background: transparent;
-    font-family: var(--font-primary);
-    font-size: 11.5px;
-    font-weight: 500;
   }
 
   .manager-travel-parties-count {
@@ -455,16 +455,12 @@
     font-weight: 500;
   }
 
-  .manager-travel-parties-summary-error {
+  /* The refusal banner's SLOT. `<Notice>` paints its own edge, fill, corner, glyph and type
+     and declares `margin: 0`, because separation from what sits beneath a notice is the
+     caller's layout — so this rule is the caller's layout and nothing else, at the same 11px
+     the bespoke `<p>` it replaces put between itself and the first card. */
+  .manager-travel-parties-summary {
     margin: 0 0 11px;
-    padding: var(--fab-space-2) var(--fab-space-3);
-    border: 1px solid var(--fab-danger-border);
-    border-radius: 8px;
-    color: var(--fab-danger-text);
-    background: var(--fab-danger-soft);
-    font-family: var(--font-primary);
-    font-size: 11px;
-    font-weight: 500;
   }
 
   .manager-travel-parties-list {

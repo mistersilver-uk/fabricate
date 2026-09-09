@@ -90,8 +90,12 @@ export function assertExpectedSelectorsPresent(metrics, expected, label) {
  * @type {Record<string, string[]>}
  */
 export const MANAGER_SURFACE_EXPECTED_SELECTORS = {
-  // System library browser — the systems table (harness clicks a system row).
-  'normal default selection': ['.manager-system-row'],
+  // System library browser — the systems list (harness clicks a system row). Issue 1515 turned
+  // the `role="table"` grid into a `role="list"` of `role="listitem"` rows and moved the row's
+  // click onto an identity `<button>`, exactly as the component and essence studios already had.
+  // `.manager-system-identity` is pinned alongside the row for that reason: it is the control the
+  // capture steps click, so losing it is a silent break the unit suite cannot see.
+  'normal default selection': ['.manager-system-row', '.manager-system-identity'],
 
   // Recipes browser (harness waits on `.manager-recipe-row`).
   'recipes normal': ['.manager-recipe-row'],
@@ -146,11 +150,19 @@ export const MANAGER_SURFACE_EXPECTED_SELECTORS = {
   'essence edit on craft': ['.manager-essence-edit-view'],
   'essence edit validation': ['.manager-essence-edit-view'],
 
-  // Environments browser (harness asserts `.manager-environment-row` count >= 1).
-  'environments normal': ['.manager-environment-row'],
+  // Environments browser (harness asserts `.manager-environment-row` count >= 1). Issue 1515
+  // converted this surface to a list too; `.manager-environments-table` pins the container that
+  // now carries `role="list"` and `.manager-environment-identity` the selecting button, both of
+  // which the harness already measures.
+  'environments normal': [
+    '.manager-environments-table',
+    '.manager-environment-row',
+    '.manager-environment-identity',
+  ],
   'environments stacked': ['.manager-environment-row'],
 
-  // Gathering events browser + editors.
+  // Gathering events browser + editors. The events browser became a list with the other three
+  // in issue 1515; its row class survives that deliberately, so it stays the pinned selector.
   'gathering events normal': ['.manager-gathering-event-row'],
   'gathering event editor normal': ['.manager-gathering-event-edit-view'],
   'gathering task editor normal': ['.manager-gathering-task-edit-view'],

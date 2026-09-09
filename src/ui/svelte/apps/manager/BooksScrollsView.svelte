@@ -47,6 +47,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import IconButton from '../../components/IconButton.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
+  import ManagerSearchField from '../../components/ManagerSearchField.svelte';
 
   let {
     recipeItems = [],
@@ -59,6 +60,7 @@
     onToggleEnabled = () => {},
   } = $props();
 
+  let searchTerm = $state('');
   let statusFilter = $state('all');
   let typeFilter = $state('all');
   let capFilter = $state('all');
@@ -188,8 +190,15 @@
     Array.from(new Set((recipeItems || []).map((item) => item?.derivedType || 'Book'))).sort()
   );
 
+  const normalizedSearch = $derived(searchTerm.trim().toLowerCase());
+
   const filteredItems = $derived(
     (recipeItems || []).filter((item) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        String(item?.resolvedName || '')
+          .toLowerCase()
+          .includes(normalizedSearch);
       const matchesStatus =
         statusFilter === 'all' ||
         (statusFilter === 'enabled' && item.enabled !== false) ||
@@ -199,12 +208,12 @@
         capFilter === 'all' ||
         (capFilter === 'limited' && capLimited(item)) ||
         (capFilter === 'unlimited' && !capLimited(item));
-      return matchesStatus && matchesType && matchesCap;
+      return matchesSearch && matchesStatus && matchesType && matchesCap;
     })
   );
 
   const filtersActive = $derived(
-    statusFilter !== 'all' || typeFilter !== 'all' || capFilter !== 'all'
+    normalizedSearch !== '' || statusFilter !== 'all' || typeFilter !== 'all' || capFilter !== 'all'
   );
 
   const paginatedItems = $derived(
@@ -222,9 +231,11 @@
   }
 
   function clearFilters() {
+    searchTerm = '';
     statusFilter = 'all';
     typeFilter = 'all';
     capFilter = 'all';
+    pageIndex = 0;
   }
 </script>
 
@@ -280,6 +291,16 @@
   <ManagerToolbar
     ariaLabel={text('FABRICATE.Admin.Manager.BooksScrolls.Filters', 'Recipe item filters')}
   >
+    <ManagerSearchField
+      value={searchTerm}
+      onInput={(next) => {
+        searchTerm = next;
+        pageIndex = 0;
+      }}
+      placeholder={text('FABRICATE.Admin.Manager.BooksScrolls.Search', 'Search recipe items')}
+      ariaLabel={text('FABRICATE.Admin.Manager.BooksScrolls.Search', 'Search recipe items')}
+      inputAttrs={{ 'data-books-scrolls-search': '' }}
+    />
     <label class="manager-filter">
       <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
       <select
@@ -423,6 +444,7 @@
             <button
               type="button"
               class="manager-books-scrolls-identity"
+              data-keyboard-focus="true"
               data-books-scrolls-select={item.id}
               aria-pressed={isSelected(item)}
               aria-label={text(

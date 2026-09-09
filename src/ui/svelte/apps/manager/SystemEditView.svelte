@@ -88,12 +88,20 @@
   const validationCounts = $derived(
     validationReport?.counts || { critical: 0, warning: 0, info: 0, blockers: 0 }
   );
+  // WARNING BEFORE BLOCKING, because the row beneath the tab reads that way (issue 1515).
+  // `openspec/specs/design-system/spec.md`'s requirement "Validation is one screen everywhere"
+  // closes the counts as an ORDERED vocabulary - pass, then warning, then blocking - and the
+  // system overview's counts row was reconciled to it in this change. These badges are the same
+  // two figures in the tab strip above that row, so a tab reading `blocking, warning` over a row
+  // reading `warning, blocking` would state one surface's counts in two orders. `critical` is
+  // the REPORT's severity name for the blocking fact; only the surface's own copy is governed by
+  // the vocabulary, so the badge stays keyed on it and renders last.
   const validationBadges = $derived([
-    ...(validationCounts.critical > 0
-      ? [{ label: String(validationCounts.critical), tone: 'danger' }]
-      : []),
     ...(validationCounts.warning > 0
       ? [{ label: String(validationCounts.warning), tone: 'warning' }]
+      : []),
+    ...(validationCounts.critical > 0
+      ? [{ label: String(validationCounts.critical), tone: 'danger' }]
       : []),
   ]);
   const tabBadges = $derived({ validation: validationBadges });
@@ -287,24 +295,6 @@
             class="manager-main manager-system-edit-main"
             aria-label={text('FABRICATE.Admin.Manager.SystemEdit.Title', 'System settings')}
           >
-            <section class="manager-section-header">
-              <div class="manager-heading">
-                <p class="manager-kicker">{selectedSystem.name}</p>
-                <h2 class="manager-title">
-                  {text(
-                    'FABRICATE.Admin.Manager.SystemEdit.EditBaseSettings',
-                    'Edit base settings'
-                  )}
-                </h2>
-                <p class="manager-subtitle">
-                  {text(
-                    'FABRICATE.Admin.Manager.SystemEdit.EditBaseSettingsHint',
-                    'Changes use the existing admin store persistence and confirmation flows.'
-                  )}
-                </p>
-              </div>
-            </section>
-
             <form class="manager-system-edit-form" onsubmit={handleSubmit}>
               {#if systemBlocked}
                 <div

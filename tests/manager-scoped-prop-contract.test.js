@@ -164,6 +164,13 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // that directory already render it, so a player window that mounts either draws it too.
   // The specifier changed, the dependency did not, and this list is spelled in specifiers.
   '../../components/Chip.svelte',
+  // ADDED BY ISSUE 1515 (decision D12), under the message below and not as drift. That change
+  // deleted the six per-route `manager-section-header` sections and gave the SHELL one page
+  // header per route, so the kicker line those sections used to draw is now the shell's to
+  // render — and it renders it through the shipped primitive rather than a second hand-rolled
+  // copy of its markup. The shell gained a dependency it genuinely did not have; this is that
+  // addition, declared.
+  '../../components/Kicker.svelte',
   '../../components/ManagerButton.svelte',
   '../../components/Medallion.svelte',
   '../../util/announceAfterFocus.js',

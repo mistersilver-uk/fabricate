@@ -219,9 +219,14 @@ export const KNOWN_OFF_TOKEN_SHADOWS = knownDebt('offTokenShadows');
  * halves, turns each of those rows into two. Same declarations, same ranks, same source order, one
  * more row apiece.
  *
+ * 27 -> 26 with issue 1515's sixth phase, and the row VANISHES rather than shrinking: the recipes
+ * blocked-enable flash was a bespoke TOAST wearing `0 12px 40px var(--fab-overlay-dark-48)`, and
+ * it is a `<Notice blocking>` in the page's own flow now. A notice is a bar rather than a floating
+ * object, so it needs no elevation at all — the debt is PAID by the conversion, not moved.
+ *
  * @see KNOWN_OFF_TOKEN_SHADOWS
  */
-export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 27;
+export const KNOWN_OFF_TOKEN_SHADOW_TOTAL = 26;
 
 /**
  * A native `<select>` rendered by a Svelte template, keyed `file`.
@@ -437,9 +442,35 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  * two, the remove overlay and the add trigger, and neither is a panel. Nothing else in the phase
  * touches a corner — the option row's own 6px was a published rung and never had a row.
  *
+ * 288 -> 285 with issue 1515's sixth phase (on top of issue 1513's 289 -> 288), three occurrences across two rows and every one of
+ * them a rule DELETED by a conversion rather than a value edited:
+ *
+ *  - `apps/manager/GatheringPartiesTab.svelte | 8px` 3 -> 1, which is TWO rules. The parties
+ *    search row drew its own r8 box and the pane's refusal banner drew another; the row is layout
+ *    only now, with `ManagerSearchField` drawing the pill at the ladder's own 6px, and the banner
+ *    is `<Notice>` at the specimen's r11. The row SURVIVES rather than vanishing because the same
+ *    file draws its create button at r8, and that is a button rather than a field or a banner.
+ *  - `styles/fabricate.css | 10px` 12 -> 11. The recipes blocked-enable toast's r10 goes with the
+ *    rule that drew it, into `<Notice>`'s own r11.
+ *
+ * 285 -> 284 with issue 1515's seventh phase: `styles/fabricate.css | 5px` 14 -> 13. The
+ * currency sub-unit pill's own r5 rule goes with the pill, which is the shared chip now and
+ * draws the ladder's own corner from the primitive's scoped block.
+ *
+ * 284 -> 283 with issue 1515's review round 1: `apps/manager/ToolsBrowserView.svelte | 8px` 3 -> 2.
+ * The Tools cohort switch was a hand-rolled radiogroup with its own r8 track, and the track goes
+ * with the rule as the control becomes `<SegmentedControl density="compact" tone="accent">` — the
+ * shared primitive draws the corner from its own scoped block, so restating one here would be a
+ * second copy of a value this file no longer owns. The row SURVIVES on the file's other two 8px
+ * corners, neither of which is a segmented track. The same deletion also took a 6px segment
+ * corner, which is a published rung and never had a row.
+ *
+ * Re-derived from the JSON at this head rather than reasoned about, by the two-run procedure: the
+ * row was banked first and the assertion reported the total the tree actually holds.
+ *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 288;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 283;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -575,11 +606,18 @@ export const KNOWN_EMPTY_NAME_BINDING_TOTAL = 2;
  * they were excluded twice over and no conversion of the tab strip could ever have cleared this
  * row. The panels are what a GM tabs into, each is its own scroll box, and until this phase
  * Foundry kept its own bindings live over both.
+ *
+ * 19 -> 18 with issue 1515's browse-list phase, and the population itself drops 21 -> 20.
+ * `apps/manager/SystemsBrowserView.svelte | 1` is DELETED rather than paid: the element was the
+ * system row `<div>`, which carried `role="row"` and `tabindex="0"` so a whole table row sat in
+ * the tab order. The row is a `listitem` now and the thing a keyboard reaches is the identity
+ * `<button>` inside it, so there is no role-bearing focus target left to declare. Only ONE of the
+ * four converted browse views appears here because only this one's row had a `tabindex` at all.
  */
 export const KNOWN_ROLE_FOCUS_TARGETS = knownDebt('roleFocusTargets');
 
 /** @see KNOWN_ROLE_FOCUS_TARGETS */
-export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 19;
+export const KNOWN_ROLE_FOCUS_TARGET_TOTAL = 18;
 
 /**
  * A `<button>` outside any `<form>` that does not declare `data-keyboard-focus`, keyed `file`.
@@ -682,9 +720,32 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  * spread this source-level scanner cannot see. Nothing is being banked that the scanner did not
  * measure — that trigger is deliberately still counted, exactly as the primitive's own is.
  *
+ * 241 -> 240 with issue 1515's fifth phase, and the row SHRINKS rather than leaving:
+ * `apps/manager/ToolsBrowserView.svelte` 5 -> 4. The Tools list's per-row enable switch is a
+ * `<StatusToggle>` now, and the primitive writes `data-keyboard-focus="true"` on its `button`
+ * host, so the debt is paid by conversion rather than by an attribute. The file's other four
+ * raw buttons — the sort-direction switch, the row's select target, and the row's `Edit rules`
+ * and `Add to system` routes — are unconverted and stay.
+ *
+ * 240 -> 239 with issue 1515's sixth phase, and the row VANISHES rather than shrinking:
+ * `apps/manager/BooksScrollsView.svelte` declared exactly one, the library row's identity
+ * `<button>`, and it carries `data-keyboard-focus="true"` now. That is the whole of that file's
+ * raw-button population, so the slot is closed rather than left open for the next author to fill.
+ *
+ * 239 -> 231 with issue 1515's seventh phase, across four files, three SHRINKING and one
+ * VANISHING. The availability pill family's hand-written remove crosses were eight raw
+ * `<button>` elements written four ways, and every one of them is the shared chip's own declared
+ * control now: `GatheringTaskEditView` 10 -> 7, `GatheringEventEditView` 5 -> 3,
+ * `environment/EnvironmentOverviewTab` 4 -> 2, and `world/WorldCurrencyTab` vanishes, its single
+ * raw button having been the currency sub-unit's remove cross. The debt is PAID by conversion
+ * rather than by an attribute, which is why three of the four slots close by that much and the
+ * fourth closes outright. The danger-tag row's cross is the one that does NOT convert - its six
+ * colour levels are a ramp no chip tone states - so it declares the attribute in place and is
+ * absent from these rows for that reason rather than for the other one.
+ *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 241;
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 231;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.

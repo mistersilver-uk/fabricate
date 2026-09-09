@@ -12,7 +12,6 @@
    - recipeCategories: [{ name, count }] for the Category filter.
    - recipeSearchTerm: current search term (owned by the parent).
    - selectedRecipeId: id of the highlighted recipe.
-   - selectedSystemName: kicker label.
    - onSearchChange(term): search input handler.
    - onSelectRecipe(id): row-select handler.
 -->
@@ -33,7 +32,6 @@
     recipeCategories = [],
     recipeSearchTerm = '',
     selectedRecipeId = '',
-    selectedSystemName = '',
     onSearchChange = () => {},
     onSelectRecipe = () => {},
   } = $props();
@@ -103,21 +101,6 @@
   class="manager-main"
   aria-label={text('FABRICATE.Admin.Manager.Access.Title', 'Recipe access')}
 >
-  <section class="manager-section-header">
-    <div class="manager-heading">
-      <p class="manager-kicker">
-        {selectedSystemName || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')}
-      </p>
-      <h2 class="manager-title">{text('FABRICATE.Admin.Manager.Access.Title', 'Recipe access')}</h2>
-      <p class="manager-subtitle">
-        {text(
-          'FABRICATE.Admin.Manager.Access.Hint',
-          'Grant individual recipes to specific characters or players. Only granted recipes are visible to them.'
-        )}
-      </p>
-    </div>
-  </section>
-
   <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.Access.Filters', 'Access filters')}>
     <ManagerSearchField
       value={recipeSearchTerm || ''}

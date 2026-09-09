@@ -49,7 +49,7 @@ import { chromium } from 'playwright';
 
 import { missingChromeMessage, resolveChromeCache } from './lib/foundryChromeCache.js';
 import { APP_CHROME, APP_CHROME_IDS, minimumViewportFor } from './lib/foundryChromeSpec.js';
-import { publishableCases } from './lib/viewLabCases.js';
+import { partitionConsoleErrors, publishableCases } from './lib/viewLabCases.js';
 import { groupFrames, renderIndexHtml, summarise } from './lib/viewLabIndex.js';
 import { assertViewLabLayout } from './lib/viewLabLayoutAssertion.js';
 
@@ -384,6 +384,11 @@ async function renderPage(
     expectNoHorizontalOverflow = null,
     expectOverflowY = null,
     expectScrollable = null,
+    // The console errors this case DECLARES it produces, as patterns. Empty for all but the
+    // handful of cases whose subject IS a refusal - see `partitionConsoleErrors`, which owns
+    // both halves of the rule: an undeclared error is fatal, and a declared one that never
+    // arrives is fatal too.
+    allowedConsoleErrors = [],
   }
 ) {
   const context = await browser.newContext(BROWSER_CONTEXT);
@@ -618,8 +623,23 @@ async function renderPage(
     const frame = page.locator(`[data-view-lab-frame="${appId}"]`);
     const buffer = await frame.screenshot({ animations: 'disabled', caret: 'hide' });
     const box = await frame.boundingBox();
-    if (consoleErrors.length > 0) {
-      throw new Error(`${label}: console errors during render:\n  ${consoleErrors.join('\n  ')}`);
+    const { unmatched, unusedAllowances } = partitionConsoleErrors(
+      consoleErrors,
+      allowedConsoleErrors
+    );
+    if (unmatched.length > 0) {
+      throw new Error(`${label}: console errors during render:\n  ${unmatched.join('\n  ')}`);
+    }
+    // A DECLARED ERROR THAT NEVER ARRIVED FAILS THE CASE. The allowance is an assertion, not a
+    // permission: the cases that carry one are photographing a refusal, so a pattern that matches
+    // nothing says the refusal stopped happening and the frame about to be written is the resting
+    // screen under a case named for the alert.
+    if (unusedAllowances.length > 0) {
+      throw new Error(
+        `${label}: declared allowedConsoleErrors that never matched:\n  ` +
+          `${unusedAllowances.join('\n  ')}\n` +
+          'the case no longer reaches the refusal it is named for, or the message was reworded.'
+      );
     }
     return { buffer, box };
   } finally {
@@ -881,6 +901,7 @@ async function commandApps() {
           expectNoHorizontalOverflow: viewCase.expectNoHorizontalOverflow ?? null,
           expectOverflowY: viewCase.expectOverflowY ?? null,
           expectScrollable: viewCase.expectScrollable ?? null,
+          allowedConsoleErrors: viewCase.allowedConsoleErrors ?? [],
         });
         if (viewCase.distinctEvidenceGroup) {
           const prior = distinctEvidence.get(viewCase.distinctEvidenceGroup) ?? [];

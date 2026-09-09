@@ -29,6 +29,10 @@ import { describeBrowserBulkSelection } from '../helpers/browserBulkSelectionCas
 import { chooseSelectOption } from '../helpers/select-control.js';
 // Issue 1506: the row and inspector states are chips, so the tone is the chip's own class.
 import { chipToneOf } from '../helpers/chipTone.js';
+// Issue 1515: the blocked-enable strip is a `<Notice>`, and the View Lab case that photographs
+// it names the primitive's own class and dismiss hook. Reading the case's selector here is what
+// makes that declaration a tested claim rather than one the capture discovers.
+import { getCaseById } from '../../scripts/lib/viewLabCases.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -85,6 +89,10 @@ const browser = createMountedComponentHarness({
     // rather than hoisted into RECIPE_PRIMITIVES.
     'src/ui/svelte/components/SelectionCheckbox.svelte',
     'src/ui/svelte/apps/manager/BulkSelectionToolbar.svelte',
+    // The blocked-enable strip is the shared `<Notice>` as of issue 1515. The inspector
+    // harness below renders none, so it is named here rather than hoisted; omitting it HANGS
+    // this suite (`# cancelled`) rather than failing it.
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/manager/RecipesBrowserView.svelte'
@@ -914,9 +922,49 @@ describe('RecipesBrowserView lifted browser state', () => {
     assert.equal(flash.getAttribute('role'), 'alert');
     assert.match(flash.textContent, /This recipe has no result groups\./);
 
-    root.querySelector('[data-recipe-flash-dismiss]').click();
+    // THE CAPTURE CASE'S OWN SELECTOR, resolved against the rendered strip. One bad
+    // `expectSelector` fails the WHOLE View Lab capture and publishes no frames at all, and
+    // nothing checks it until that run — so the frame's proof is proved here. It is READ from the
+    // case rather than restated: a copy would keep passing after the case started naming
+    // something else. Only the area root is stripped, which is the one part of it a mounted
+    // component has no shell to supply.
+    const captureSelector = getCaseById(
+      'manager-recipes-blocked-enable-flash'
+    ).expectSelector.replace('.fabricate-manager ', '');
+    assert.ok(
+      Boolean(root.querySelector(captureSelector)),
+      `the blocked-enable frame's selector matched nothing: ${captureSelector}`
+    );
+
+    // `<Notice dismissable>` stamps no per-caller hook on the control it draws, so the dismiss
+    // is addressed by the primitive's own `data-notice-dismiss` (issue 1515). What the caller
+    // still owns is the `dataAttr` hook on the root, which is what `[data-recipe-flash]` reads.
+    root.querySelector('[data-notice-dismiss]').click();
     flushSync();
-    assert.equal(root.querySelector('[data-recipe-flash]'), null, 'the flash is dismissible');
+    assert.ok(!root.querySelector('[data-recipe-flash]'), 'the flash is dismissible');
+
+    // THE REFUSAL ARRIVES AS TWO PARTS WHEN THE STORE CAN BUILD THEM (issue 1515). An activation
+    // error carries a recipe name and coded issues, so `adminStore` hands the sink a
+    // `{ title, detail }` pair beside the one-line string and the notice draws the name in its
+    // title and the reasons in its detail. Read from the primitive's OWN two elements rather than
+    // from the strip's `textContent`, which cannot tell a split notice from an unsplit one.
+    calls[0].options.onBlocked('Cannot enable recipe "Iron Sword": It has no result groups.', {
+      title: 'Cannot enable recipe "Iron Sword"',
+      detail: 'It has no result groups.'
+    });
+    flushSync();
+
+    const split = root.querySelector('[data-recipe-flash]');
+    assert.equal(
+      split.querySelector('.fab-notice-title').textContent.trim(),
+      'Cannot enable recipe "Iron Sword"',
+      'the title names what happened, without the reasons trailing it'
+    );
+    assert.equal(
+      split.querySelector('.fab-notice-detail').textContent.trim(),
+      'It has no result groups.',
+      'and the reasons are the detail line the specimen draws beneath it'
+    );
   });
 
   it('never reaches for a Foundry notification itself', async () => {

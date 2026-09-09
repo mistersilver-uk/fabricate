@@ -15,13 +15,18 @@ const lang = JSON.parse(readFileSync(langPath, 'utf8'));
 const css = readFileSync(cssPath, 'utf8');
 
 describe('GatheringTasksBrowserView card-style row', () => {
-  it('renders four column headers (Task / Tags / Status / Actions)', () => {
+  it('renders four column labels (Task / Tags / Status / Actions)', () => {
     const headBlockStart = browserSource.indexOf('manager-table-head manager-gathering-task-table-head');
     assert.ok(headBlockStart >= 0, 'head block should be present');
     const headBlockEnd = browserSource.indexOf('</div>', headBlockStart);
     const headBlock = browserSource.slice(headBlockStart, headBlockEnd);
-    const headerMatches = headBlock.match(/role="columnheader"/g) || [];
-    assert.equal(headerMatches.length, 4, 'expected four column headers');
+    // The strip is `aria-hidden` and its labels carry no role since issue 1515: the browser is a
+    // `role="list"` of `role="listitem"` rows, and a `columnheader` outside a table names nothing.
+    // It is still the four VISUAL labels over the four-column grid the rows share.
+    assert.ok(headBlock.includes('aria-hidden="true"'), 'the column strip should be aria-hidden');
+    assert.equal(headBlock.includes('role="columnheader"'), false, 'no column headers in a list');
+    const headerMatches = headBlock.match(/<span/g) || [];
+    assert.equal(headerMatches.length, 4, 'expected four column labels');
     assert.ok(headBlock.includes('FABRICATE.Admin.Manager.Environment.Tasks.Tags'), 'Tags column header should be present');
     for (const removed of ['Drops', 'Environments', 'Availability']) {
       assert.equal(
@@ -46,7 +51,10 @@ describe('GatheringTasksBrowserView card-style row', () => {
     assert.ok(browserSource.includes('weatherChips(task)'), 'weather chip helper should exist');
     assert.ok(browserSource.includes('rowChips(task)'), 'rowChips concatenates all dimensions');
     assert.ok(browserSource.includes('data-gathering-task-tags'), 'tags chip row exposes a data attribute');
-    assert.ok(/manager-availability-pill is-\$\{chip\.kind\}/.test(browserSource), 'chips render with per-kind variant class');
+    // BY THE FACET HOOK, NOT BY A VARIANT CLASS (issue 1515): the row chips render through the
+    // shared `Chip`, whose face is a `tone` or a `tint`, so the dimension is stated by the data
+    // attribute the row writes rather than by an `is-<facet>` class of the retired family.
+    assert.ok(/data-gathering-task-tag=\{chip\.kind\}/.test(browserSource), 'chips state their dimension through the row hook');
     assert.equal(browserSource.includes("' is-any'"), false, 'unrestricted dimensions render no chip (no is-any placeholder)');
     assert.equal(/function\s+anyChip\s*\(/.test(browserSource), false, 'anyChip helper should be removed');
   });

@@ -104,6 +104,13 @@
    - triggerLabel: the pre-localized accessible name. REQUIRED in the sense
      `design-system/spec.md` requires it of any icon-only control — the trigger renders
      a glyph and nothing else, so without it the control announces "button".
+     A caller rendering ONE menu per row of a list must name the RECORD in it (issue
+     1515): a list of twenty rows whose triggers all announce "System actions" gives a
+     screen-reader user twenty identically-named controls and no way to tell which row
+     they are on, and the route header's own action group announces that same phrase.
+     The four browse views compose it from a `{name}` template key. The menu ITEMS stay
+     generic — the trigger the menu was opened from is what identifies the row, so
+     repeating the name in every item restates what the reader just acted on.
    - triggerClass / triggerIcon / triggerTitle / triggerData: the trigger's extra
      class, glyph, native tooltip and `data-*` hooks. The trigger IS `<IconButton>`
      rather than a bare `<button class="manager-icon-button">`, so the primitive that
@@ -113,7 +120,12 @@
      own root, so a caller's popover-scoped hook has to ride the panel itself.
    - open: OPTIONAL `$bindable` open state, for a surface that must close the menu from
      outside itself.
-   - onSelect(id): called with the chosen item's id.
+   - onSelect(id): called with the chosen item's id. ROUTE IT BY EXPLICIT ID — one
+     `if`/`else if` per id and NO terminal `else` (issue 1515; the shipped precedent is
+     `environment/CompositionList.svelte`'s `runMenuAction`). A trailing bare `else` makes
+     the last branch the CATCH-ALL for every id this component was not told about, and the
+     last branch of a row menu is Delete: adding an item, renaming an id or a stale
+     `items` array then destroys the record instead of doing nothing.
 -->
 <script>
   import { tick } from 'svelte';

@@ -343,6 +343,23 @@ const LINK_FIELD_CLASSES = (() => {
   return match[1];
 })();
 
+/**
+ * The class list `ModifierPillSelect` hands `Field`, read out of its own markup (issue 1515).
+ *
+ * A plain literal attribute like `ChanceSlider`'s and `ItemDropZone`'s, so it is read the same
+ * way — but the element it lands on is `Field`'s, not this component's, so what the fieldset
+ * RENDERS is `Field`'s pair followed by this pair. That is `RadioCardGroup`'s shape exactly, and
+ * it is the second and last place in this file where TWO namespace roots land on ONE element.
+ */
+const PILL_SELECT_OWN_CLASSES = (() => {
+  const source = read('src/ui/svelte/components/ModifierPillSelect.svelte');
+  const match = source.match(/class="(fabricate-pill-select[^"]*)"/u);
+  assert.ok(match, 'ModifierPillSelect must write its family root at the head of the class it hands `Field`');
+  return match[1];
+})();
+
+const PILL_SELECT_CLASSES = `${FIELD_CLASSES} ${PILL_SELECT_OWN_CLASSES}`;
+
 const PAGINATION_CLASSES = (() => {
   const source = read('src/ui/svelte/components/Pagination.svelte');
   const match = source.match(/class="(fabricate-pagination[^"]*)"/);
@@ -353,7 +370,7 @@ const PAGINATION_CLASSES = (() => {
 // NON-VACUITY ON THE READS THEMSELVES. Every assertion in this file is about what the sheet does
 // to these three strings, so a read that quietly returned the wrong thing would leave the whole
 // file measuring an element the product does not render — passing, and proving nothing.
-test('the fourteen class strings under measurement are the ones the primitives emit', () => {
+test('the fifteen class strings under measurement are the ones the primitives emit', () => {
   assert.equal(MANAGER_BUTTON_CLASSES, 'fabricate-button manager-button fab-manager-button');
   assert.equal(ICON_BUTTON_CLASSES, 'fabricate-icon-button manager-icon-button');
   assert.equal(PAGINATION_CLASSES, 'fabricate-pagination manager-pagination');
@@ -386,6 +403,17 @@ test('the fourteen class strings under measurement are the ones the primitives e
     LINK_FIELD_CLASSES,
     'fabricate-link-field manager-item-drop-zone',
     'the link field emits its namespace root ahead of its own zone class'
+  );
+  assert.equal(
+    PILL_SELECT_CLASSES,
+    'fabricate-field manager-field fabricate-pill-select manager-availability-multi',
+    'the pill select emits `Field`s pair, then its own namespace root, then its family root'
+  );
+  assert.equal(
+    PILL_SELECT_OWN_CLASSES.split(/\s+/u)[0],
+    'fabricate-pill-select',
+    'ModifierPillSelect must declare its namespace root as the FIRST token of the class it hands ' +
+      '`Field`, which is where the area-scope gate`s markup reader takes it from'
   );
   assert.equal(
     OPTION_CARDS_OWN_CLASSES.split(/\s+/u)[0],
@@ -696,6 +724,43 @@ const CONTROLS = Object.freeze([
     markup: (host) =>
       `<div class="fabricate-link-field manager-item-drop-zone is-compact" data-manager-item-drop-zone="" data-probe="${host}-link-field-compact"><span class="manager-item-drop-zone-icon" aria-hidden="true" data-probe="${host}-link-field-compact-icon"><i class="fas fa-right-left"></i></span><span class="manager-item-drop-zone-copy" data-probe="${host}-link-field-compact-copy"><strong data-probe="${host}-link-field-compact-name">Drop an item to replace the source</strong><small data-probe="${host}-link-field-compact-hint">World item, compendium entry, or pack.</small></span></div>`,
   }),
+  // AND THE PROBE IS NOT THE ROOT FOR THE PILL SELECT EITHER (issue 1515). Its root is the
+  // `<Field as="div">` it renders, so that element carries `fabricate-field` and
+  // `fabricate-pill-select` together — the second and last co-rooted family here — and the
+  // controls this family owns are the add TRIGGER and the removable pill inside the row.
+  //
+  // TWO FACES, because the pill row is an `{#each}…{:else}`: a row of pills, or one quiet
+  // placeholder line. They share the root and the row and nothing else, and the placeholder is
+  // the only element that reaches the `manager-availability-any` rule, so a single fixture would
+  // leave one of the family's thirteen selectors unrendered.
+  //
+  // THE PLACEHOLDER IS THE RESIDUE, and the fixture states it rather than hiding it: it carries
+  // `manager-muted` beside the family class exactly as the component writes it, and
+  // `.fabricate-manager .manager-muted` is a (0,2,0) rule that gives it a colour, a `font-size`
+  // and a margin this family does not restate. So inside the manager that line is 0.78rem and
+  // outside it takes its type from its ancestor, and what the FAMILY promises about it — the
+  // 28px floor and the inline-flex centring — travels and is compared. `manager-muted` is the
+  // manager's vocabulary, not this primitive's; issue 1507 owns it.
+  Object.freeze({
+    id: 'pill-select',
+    classes: PILL_SELECT_CLASSES,
+    // OPTED OUT OF THE BOX COMPARISON, for the bordered rails' cause rather than one of its own:
+    // the trigger declares a 34px `min-height` under a 1px border and the pill a 28px one under
+    // another, so each is 2px taller wherever `box-sizing` falls to `content-box` and this
+    // column is solved from them. That is this core-less harness rather than Foundry, where
+    // core's `@layer reset` gives every host `border-box`, and the DECLARED values on both are
+    // compared in all three hosts instead.
+    comparesBox: false,
+    markup: (host) =>
+      `<div class="fabricate-field manager-field fabricate-pill-select manager-availability-multi" role="group" aria-label="Modifiers" data-probe="${host}-pill-select"><button type="button" class="manager-availability-menu-button" data-keyboard-focus="true" data-probe="${host}-pill-select-menu"><span>Add modifier</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button><div class="manager-availability-pill-row" data-probe="${host}-pill-select-row"><span class="manager-availability-pill is-modifier" data-probe="${host}-pill-select-pill"><i class="fas fa-dice-d20" aria-hidden="true" data-probe="${host}-pill-select-glyph"></i><span data-probe="${host}-pill-select-label">Medicine</span><button type="button" class="manager-availability-remove" data-keyboard-focus="true" aria-label="Remove Medicine" data-probe="${host}-pill-select-remove"><i class="fas fa-xmark" aria-hidden="true"></i></button></span></div></div>`,
+  }),
+  Object.freeze({
+    id: 'pill-select-empty',
+    classes: PILL_SELECT_CLASSES,
+    comparesBox: false,
+    markup: (host) =>
+      `<div class="fabricate-field manager-field fabricate-pill-select manager-availability-multi" role="group" aria-label="Modifiers" data-probe="${host}-pill-select-empty"><div class="manager-availability-pill-row" data-probe="${host}-pill-select-empty-row"><span class="manager-muted manager-availability-any" data-probe="${host}-pill-select-any">No modifiers selected.</span></div></div>`,
+  }),
 ]);
 
 /**
@@ -761,6 +826,17 @@ const EXTRA_PROBES = Object.freeze([
   'link-field-compact-copy',
   'link-field-compact-name',
   'link-field-compact-hint',
+  // AND THE PILL SELECT'S SIX (issue 1515). Every one of them is painted by a rule this change
+  // re-roots: the add trigger, the row, the pill, the pill's leading glyph, its truncating label
+  // span and its remove button, plus the placeholder line the empty face renders instead.
+  'pill-select-menu',
+  'pill-select-row',
+  'pill-select-pill',
+  'pill-select-glyph',
+  'pill-select-label',
+  'pill-select-remove',
+  'pill-select-empty-row',
+  'pill-select-any',
 ]);
 
 /**
@@ -832,6 +908,14 @@ const HOST_BOX_DEPENDENT_PROBES = Object.freeze([
   'toggle-card-copy',
   'toggle-card-title',
   'toggle-card-sub',
+  // AND THREE OF THE PILL SELECT'S (issue 1515), for the bordered rails' cause rather than three
+  // of their own. The add trigger declares a 34px `min-height` under a 1px border and the pill a
+  // 28px one under another, so each is 2px taller wherever `box-sizing` falls to `content-box`
+  // and the pill ROW is solved from the pill. Their DECLARED values are compared instead, in all
+  // three hosts, which is where the family's claim lives.
+  'pill-select-menu',
+  'pill-select-pill',
+  'pill-select-row',
 ]);
 
 /**
@@ -854,6 +938,18 @@ const HOST_BOX_DEPENDENT_PROBES = Object.freeze([
 const HOST_LEADING_PROBES = Object.freeze([
   'validation-copy',
   'validation-sub',
+  // AND THE PILL SELECT'S PLACEHOLDER LINE (issue 1515), for the identical reason a third time:
+  // it carries `manager-muted` beside the family class exactly as the component writes it, so
+  // inside the manager it is 0.78rem and outside it takes its size from its ancestor — which
+  // makes the line's own inline box a different WIDTH in the two. What the family declares about
+  // it, the 28px floor and the inline-flex centring, is compared in all three hosts.
+  'pill-select-any',
+  // AND THE ROW THAT HOLDS IT, whose own box follows the line's. `.fabricate-manager
+  // .manager-muted` declares a `--fab-space-2xs` TOP MARGIN as well as the size, and the row is
+  // a flex container solved from its one child, so it lays out 30 high inside the manager
+  // against the 28 the family's floor gives it everywhere else — measured, not predicted. The
+  // row's own declarations are compared in all three hosts; only its solved box is excluded.
+  'pill-select-empty-row',
   // AND THE STATUS CARD'S TWO, for the identical reason one family later (issue 1509 phase 4):
   // its sub-line also carries `manager-muted`, so inside the manager that line is 0.78rem with a
   // margin the family does not restate and outside it takes its size from its ancestor. The
@@ -875,6 +971,11 @@ const HOST_LEADING_PROBES = Object.freeze([
  */
 const GLYPH_ONLY_PROBES = Object.freeze([
   'validation-status',
+  // AND THE PILL'S LEADING GLYPH (issue 1515). It is an empty `<i>` whose whole rendered content
+  // is a Font Awesome ligature this core-less harness does not load, so it lays out at 0x0 in
+  // every host; what the family declares about it — the warning tone and the centring inside the
+  // pill's icon slot — is compared instead, in all three.
+  'pill-select-glyph',
   // AND THE LINK FIELD'S COMPACT GLYPH TILE (issue 1509 phase 4). The compact face's whole point
   // is that it does NOT show the art, so the family replaces the default face's 44x44 plate with
   // `width: auto; height: auto` and lets the glyph size itself — and the glyph is a Font Awesome
@@ -1772,6 +1873,94 @@ const LINK_FIELD_UUID_COMPARED = Object.freeze(['display', 'font-family', 'font-
 /** The action cluster, which is a gap and nothing else — the buttons are `IconButton`'s. */
 const LINK_FIELD_ACTIONS_COMPARED = Object.freeze(['display', 'gap']);
 
+/**
+ * What acceptance 2 compares on the pill select (issue 1515).
+ *
+ * The ROOT carries `Field`'s stacked column and this family's own `min-width: 0`, and the type it
+ * declares, so all four travel together. Everything else is one probe per element the family
+ * paints: the add TRIGGER's box and type, the row's wrapping flex, the PILL's band and the tinted
+ * fill and edge its `is-modifier` facet resolves through `--fab-chip-color`, the leading glyph's
+ * tone, the label's truncation contract, the remove button's 20x20 circle, and the placeholder
+ * line's 28px floor.
+ */
+const PILL_SELECT_ROOT_COMPARED = Object.freeze([
+  'display',
+  'flex-direction',
+  'gap',
+  'min-width',
+  'font-size',
+  'font-weight',
+]);
+
+const PILL_SELECT_MENU_COMPARED = Object.freeze([
+  'display',
+  'align-items',
+  'justify-content',
+  'gap',
+  'width',
+  'min-height',
+  'padding-top',
+  'padding-left',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'border-radius',
+  'color',
+  'background-color',
+  'font-size',
+  'font-weight',
+]);
+
+const PILL_SELECT_ROW_COMPARED = Object.freeze(['display', 'flex-wrap', 'gap', 'min-width']);
+
+const PILL_SELECT_PILL_COMPARED = Object.freeze([
+  'display',
+  'align-items',
+  'gap',
+  'min-height',
+  'max-width',
+  'padding-top',
+  'padding-right',
+  'padding-bottom',
+  'padding-left',
+  'border-top-width',
+  'border-top-style',
+  'border-top-color',
+  'border-radius',
+  'color',
+  'background-color',
+  'font-size',
+  'font-weight',
+]);
+
+/** The pill's leading glyph, whose whole family contribution is its tone and its centring. */
+const PILL_SELECT_GLYPH_COMPARED = Object.freeze(['color', 'text-align']);
+
+/** The label span, whose family contribution is the truncation contract and nothing else. */
+const PILL_SELECT_LABEL_COMPARED = Object.freeze([
+  'min-width',
+  'overflow',
+  'text-overflow',
+  'white-space',
+]);
+
+/** The remove control: a 20x20 borderless circle that keeps its hit box at every density. */
+const PILL_SELECT_REMOVE_COMPARED = Object.freeze([
+  'display',
+  'align-items',
+  'justify-content',
+  'width',
+  'height',
+  'padding-top',
+  'border-top-width',
+  'border-radius',
+  'color',
+  'background-color',
+]);
+
+/** The empty face's placeholder line — the family's own 28px floor and its centring. */
+const PILL_SELECT_ANY_COMPARED = Object.freeze(['min-height', 'display', 'align-items']);
+
 const COMPARED_BY_CONTROL = Object.freeze({
   pagination: COMPARED_PAGINATION,
   field: FIELD_COMPARED,
@@ -1842,6 +2031,16 @@ const COMPARED_BY_CONTROL = Object.freeze({
   'link-field-hint': LINK_FIELD_HINT_COMPARED,
   'link-field-compact-hint': LINK_FIELD_COMPACT_HINT_COMPARED,
   'link-field-actions': LINK_FIELD_ACTIONS_COMPARED,
+  'pill-select': PILL_SELECT_ROOT_COMPARED,
+  'pill-select-empty': PILL_SELECT_ROOT_COMPARED,
+  'pill-select-menu': PILL_SELECT_MENU_COMPARED,
+  'pill-select-row': PILL_SELECT_ROW_COMPARED,
+  'pill-select-empty-row': PILL_SELECT_ROW_COMPARED,
+  'pill-select-pill': PILL_SELECT_PILL_COMPARED,
+  'pill-select-glyph': PILL_SELECT_GLYPH_COMPARED,
+  'pill-select-label': PILL_SELECT_LABEL_COMPARED,
+  'pill-select-remove': PILL_SELECT_REMOVE_COMPARED,
+  'pill-select-any': PILL_SELECT_ANY_COMPARED,
 });
 
 /** Every property any control compares, which is what one page load has to collect. */

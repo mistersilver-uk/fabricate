@@ -44,6 +44,11 @@ const harness = createMountedComponentHarness({
     // ONE chip (issue 883) and ONE no-state primitive (issue 785).
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
+    // Issue 1515: the pane's search is the shared field and its refusal banner the shared
+    // notice. A component the tree renders and this list omits HANGS the suite (reported as
+    // `# cancelled`) rather than failing it.
+    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/apps/manager/RealmOverridePicker.svelte',
     'src/ui/svelte/apps/manager/PartyNameField.svelte',
     'src/ui/svelte/apps/manager/PartyMemberRow.svelte',
@@ -87,8 +92,11 @@ function cards(root) {
   return root.querySelectorAll('.manager-travel-parties-row');
 }
 
+// The hook on the INPUT (issue 1515). The field is `ManagerSearchField` now, whose `class`
+// prop lands on the `<label>` it renders, so the input is addressed by the `inputAttrs` hook
+// the pane passes through — the same one the View Lab case types into.
 function typeSearch(root, value) {
-  const input = root.querySelector('.manager-travel-parties-query');
+  const input = root.querySelector('[data-manager-party-search]');
   input.value = value;
   input.dispatchEvent(new window.Event('input', { bubbles: true }));
   flushSync();
@@ -112,11 +120,11 @@ describe('GatheringPartiesTab (mounted)', () => {
 
   it('suppresses the search bar at one party and shows it at two', async () => {
     let root = await mountTab({ parties: makeParties(1) });
-    assert.ok(!root.querySelector('.manager-travel-parties-query'), 'no search bar at one party');
+    assert.ok(!root.querySelector('[data-manager-party-search]'), 'no search bar at one party');
     harness.remount();
 
     root = await mountTab({ parties: makeParties(2) });
-    assert.ok(Boolean(root.querySelector('.manager-travel-parties-query')), 'search bar at two');
+    assert.ok(Boolean(root.querySelector('[data-manager-party-search]')), 'search bar at two');
   });
 
   it('reports MATCHED of TOTAL, not page of total', async () => {
@@ -244,7 +252,7 @@ describe('GatheringPartiesTab (mounted)', () => {
     // The second party is deleted upstream: the search bar unmounts with it, so the
     // query must go too or nothing left on screen can clear the no-match state.
     await harness.setProps({ parties: makeParties(1) });
-    assert.ok(!root.querySelector('.manager-travel-parties-query'), 'search bar is gone');
+    assert.ok(!root.querySelector('[data-manager-party-search]'), 'search bar is gone');
     assert.ok(!root.querySelector('[data-travel-parties-no-match]'), 'not stranded in no-match');
     assert.equal(cards(root).length, 1);
   });

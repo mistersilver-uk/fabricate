@@ -8,6 +8,7 @@
   import Pagination from '../../components/Pagination.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import IconButton from '../../components/IconButton.svelte';
+  import ActionMenu from '../../components/ActionMenu.svelte';
   import StatusToggle from '../../components/StatusToggle.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
   import ManagerToolbar from '../../components/ManagerToolbar.svelte';
@@ -192,6 +193,11 @@
     return text(key, tag.charAt(0).toUpperCase() + tag.slice(1));
   }
 
+  // THE FACET'S OWN FACE, ROUTED ONCE HERE (issue 1515). A biome carries an AUTHORED colour,
+  // so it takes the primitive's `tint` - "this chip IS that colour" - and the style string
+  // states the exact value, because a biome may hold a hex and `tint` validates bare
+  // `--fab-tag-*` keys only. Time of day and weather have no authored colour: their purple
+  // and amber are the family's, and they are stated as TONES so a theme owns them.
   function biomeChips(event) {
     const values = Array.isArray(event?.biomes) ? event.biomes : [];
     return values
@@ -201,7 +207,7 @@
         ...entry,
         kind: 'biome',
         key: `biome:${entry.id}`,
-        pillClass: 'manager-availability-pill is-biome',
+        tint: entry.colorToken || 'sage',
         style: biomeChipStyle(entry),
       }));
   }
@@ -214,7 +220,7 @@
       .map((entry) => ({
         ...entry,
         key: `timeOfDay:${entry.id}`,
-        pillClass: 'manager-availability-pill is-timeOfDay',
+        tone: 'tag',
       }));
   }
 
@@ -226,7 +232,7 @@
       .map((entry) => ({
         ...entry,
         key: `weather:${entry.id}`,
-        pillClass: 'manager-availability-pill is-weather',
+        tone: 'warning',
       }));
   }
 
@@ -263,6 +269,33 @@
       event?.name ||
         text('FABRICATE.Admin.Manager.Environment.Events.UnnamedEvent', 'Unnamed event')
     ).trim();
+  }
+
+  // The two commands that left the row's three-button cluster for the overflow menu (issue 1515).
+  // Edit stays an `<IconButton>` — it is the row's primary act — and Duplicate and Delete are
+  // built as data so the shared `<ActionMenu>` owns the trigger, the portaled panel and the
+  // keyboard contract that three loose buttons never had.
+  // THE MENU ITEMS NAME THE COMMAND, NOT THE ROW (issue 1515). `ActionMenu`'s `label` is both the
+  // visible text and the `menuitem`'s accessible name, and the shipped callers that predate this
+  // conversion — `ComponentBrowserInspector` and `environment/CompositionList` — both spell it as a
+  // generic verb ("Delete component", "Move up"). The row is identified by the trigger the menu was
+  // opened from, so repeating its name in every item widens the panel to restate what the reader
+  // just acted on. This is also why `Recipe.DuplicateNamed` and `Component.DeleteNamed` are already
+  // dead in `tests/lang-known-orphans.js`: the earlier conversions retired the same `{name}` copy.
+  function rowMenuItems() {
+    return [
+      {
+        id: 'duplicate',
+        label: text('FABRICATE.Admin.Manager.Environment.Events.Duplicate', 'Duplicate event'),
+        icon: 'fas fa-copy',
+      },
+      {
+        id: 'delete',
+        label: text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event'),
+        icon: 'fas fa-trash',
+        danger: true,
+      },
+    ];
   }
 
   function eventImage(event) {
@@ -406,38 +439,34 @@
         >
       </EmptyState>
     {:else}
+      <!-- A LIST, NOT A TABLE (issue 1515): see `SystemsBrowserView` for the whole reasoning. The
+           column strip stays as the VISUAL header over the shared grid and is `aria-hidden`,
+           because a `columnheader` outside a `table` names nothing. -->
       <div
         class="manager-gathering-events-table"
-        role="table"
+        role="list"
         aria-label={text(
           'FABRICATE.Admin.Manager.Environment.Events.TableShort',
           'Gathering events'
         )}
       >
-        <div class="manager-table-head manager-gathering-event-table-head" role="row">
-          <span role="columnheader"
-            >{text('FABRICATE.Admin.Manager.Environment.Events.Column.Event', 'Event')}</span
-          >
-          <span role="columnheader"
-            >{text('FABRICATE.Admin.Manager.Environment.Tasks.Tags', 'Tags')}</span
-          >
-          <span role="columnheader">{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
-          <span role="columnheader"
-            >{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span
-          >
+        <div class="manager-table-head manager-gathering-event-table-head" aria-hidden="true">
+          <span>{text('FABRICATE.Admin.Manager.Environment.Events.Column.Event', 'Event')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Environment.Tasks.Tags', 'Tags')}</span>
+          <span>{text('FABRICATE.Admin.Manager.StatusFilter', 'Status')}</span>
+          <span>{text('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}</span>
         </div>
         {#each paginatedEvents as event (event.id)}
           <div
             class={`manager-gathering-event-row ${selectedEventId === event.id ? 'is-selected' : ''}`}
-            role="row"
-            aria-selected={selectedEventId === event.id}
+            role="listitem"
+            aria-current={selectedEventId === event.id ? 'true' : undefined}
             data-gathering-event-id={event.id}
           >
             <button
               type="button"
               class="manager-gathering-event-identity"
               onclick={() => onSelectEvent(event.id)}
-              role="cell"
             >
               <img class="manager-gathering-event-thumb" src={eventImage(event)} alt="" />
               <span class="manager-system-copy">
@@ -453,16 +482,33 @@
                 {/if}
               </span>
             </button>
-            <div class="manager-gathering-event-tags-cell" role="cell" data-gathering-event-tags>
+            <div class="manager-gathering-event-tags-cell" data-gathering-event-tags>
+              <!-- THE DANGER TAG IS NOT A CHIP (issue 1515). Its six levels are a RAMP -
+                   `.manager-danger-tag-pill.is-safe` through `.is-extreme` in
+                   `styles/fabricate.css`, four of which MIX two semantic families per level -
+                   and no `Chip` tone states a mix. That sheet imports at `layer(modules)` while
+                   the primitive's scoped block is unlayered, so routing this pill through the
+                   primitive would not merely fail to reproduce the ramp: the chip's own fill
+                   would WIN over all six rules and the danger level would stop being visible.
+                   The three FACET chips beside it carry no such ramp and convert. -->
               {#each rowChips(event) as chip (chip.key)}
-                <span class={chip.pillClass} style={chip.style}>
-                  {#if chip.icon}<i class={chip.icon} aria-hidden="true"></i>{/if}
-                  <span>{chip.label}</span>
-                </span>
+                {#if chip.pillClass}
+                  <span class={chip.pillClass}>
+                    <i class={chip.icon} aria-hidden="true"></i>
+                    <span>{chip.label}</span>
+                  </span>
+                {:else}
+                  <Chip
+                    tone={chip.tone || ''}
+                    tint={chip.tint || ''}
+                    icon={chip.icon}
+                    style={chip.style}
+                    data-gathering-event-tag={chip.kind}>{chip.label}</Chip
+                  >
+                {/if}
               {/each}
             </div>
             <span
-              role="cell"
               class="manager-labeled-cell manager-status-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.StatusFilter', 'Status')}
             >
@@ -483,7 +529,6 @@
               />
             </span>
             <span
-              role="cell"
               class="manager-action-group manager-labeled-cell"
               data-label={stackedLabel('FABRICATE.Admin.Manager.Column.Actions', 'Actions')}
             >
@@ -497,30 +542,28 @@
               >
                 <i class="fas fa-edit" aria-hidden="true"></i>
               </IconButton>
-              <IconButton
-                ariaLabel={text(
-                  'FABRICATE.Admin.Manager.Environment.Events.DuplicateNamed',
-                  'Duplicate {name}'
+              <!--
+                THE ROW MENU IS NAMED FOR WHAT IT ACTS ON (issue 1515), mirroring the sibling
+                gathering-task browser. `Column.Actions` is the COLUMN's name and is right in the
+                head strip and the stacked-cell label above, where the surrounding row supplies the
+                subject; it is wrong as the accessible name of an icon-only trigger, which a screen
+                reader reads on its own and which every browse view would then announce identically.
+              -->
+              <ActionMenu
+                items={rowMenuItems()}
+                triggerLabel={text(
+                  'FABRICATE.Admin.Manager.Environment.Events.ActionsFor',
+                  'Gathering event actions for {name}'
                 ).replace('{name}', eventName(event))}
-                title={text(
-                  'FABRICATE.Admin.Manager.Environment.Events.Duplicate',
-                  'Duplicate event'
+                triggerTitle={text(
+                  'FABRICATE.Admin.Manager.Environment.Events.Actions',
+                  'Gathering event actions'
                 )}
-                onclick={() => onDuplicateEvent(selectedSystemId, event.id)}
-              >
-                <i class="fas fa-copy" aria-hidden="true"></i>
-              </IconButton>
-              <IconButton
-                class="is-danger"
-                ariaLabel={text(
-                  'FABRICATE.Admin.Manager.Environment.Events.DeleteNamed',
-                  'Delete {name}'
-                ).replace('{name}', eventName(event))}
-                title={text('FABRICATE.Admin.Manager.Environment.Events.Delete', 'Delete event')}
-                onclick={() => onDeleteEvent(selectedSystemId, event.id)}
-              >
-                <i class="fas fa-trash" aria-hidden="true"></i>
-              </IconButton>
+                onSelect={(action) => {
+                  if (action === 'duplicate') onDuplicateEvent(selectedSystemId, event.id);
+                  else if (action === 'delete') onDeleteEvent(selectedSystemId, event.id);
+                }}
+              />
             </span>
           </div>
         {/each}

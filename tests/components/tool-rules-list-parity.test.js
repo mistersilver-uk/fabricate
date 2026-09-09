@@ -60,6 +60,7 @@ const SCOPED_COMPONENTS = [
   'src/ui/svelte/components/Chip.svelte',
   'src/ui/svelte/apps/manager/IconFactRow.svelte',
   'src/ui/svelte/apps/manager/EmptyState.svelte',
+  'src/ui/svelte/apps/manager/SegmentedControl.svelte',
   'src/ui/svelte/apps/manager/ToolsBrowserView.svelte',
   'src/ui/svelte/apps/manager/tools/ToolBrowserInspector.svelte',
 ].map((path) => scopedComponentCss(resolve(repoRoot, path)));
@@ -139,8 +140,22 @@ function documentFor(body) {
 </html>`;
 }
 
-/** One list row, at whichever state the caller names. */
-function row(probe, extraClass, name) {
+/**
+ * One list row, at whichever state the caller names.
+ *
+ * THE ENABLE SWITCH IS DRAWN AS THE PRIMITIVE DRAWS IT (issue 1515) — the composed class
+ * string `StatusToggle.svelte` emits, its `-track` and its `-knob`, in that nesting. Written
+ * any other way this fixture would measure the hand-rolled tree the screen no longer renders,
+ * which is the stale-copy failure `status-toggle-source-contract.test.js` records for the
+ * suites that hand-write this control.
+ *
+ * @param {string} probe the probe prefix for this row's elements
+ * @param {string} extraClass the row's own state classes
+ * @param {string} name the Tool's name
+ * @param {boolean} [enabled] whether the row's switch is drawn on
+ * @returns {string} the row markup
+ */
+function row(probe, extraClass, name, enabled = false) {
   return `<article class="manager-tools-row ${extraClass}" data-manager-tool-id="${probe}" data-probe="${probe}">
     <button type="button" class="manager-tools-select-target">
       <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">
@@ -155,6 +170,7 @@ function row(probe, extraClass, name) {
     </button>
     <div class="manager-tools-library-actions">
       <span class="manager-tools-row-recipes" data-probe="${probe}-recipes"><strong>1</strong><small>Recipes</small></span>
+      <button type="button" class="fabricate-toggle manager-status-toggle manager-tools-enabled-toggle ${enabled ? 'is-on' : 'is-off'}" aria-pressed="${enabled}" aria-label="Enable Tool" data-probe="${probe}-switch"><span class="manager-status-toggle-track" aria-hidden="true" data-probe="${probe}-switch-track"><span class="manager-status-toggle-knob" data-probe="${probe}-switch-knob"></span></span></button>
       <button type="button" class="manager-tools-edit-rules" data-probe="${probe}-edit"><span>Edit rules</span><i class="fas fa-arrow-up-right-from-square"></i></button>
     </div>
   </article>`;
@@ -185,11 +201,13 @@ const LIST_SCREEN = `
           </div>
         </section>
         <section class="manager-tools-library-card" data-manager-tools-search>
-          <label class="fabricate-search manager-search"><i class="fas fa-search"></i><input type="search" data-probe="search" placeholder="Search tools"></label>
-          <div class="manager-tools-membership-filter" role="radiogroup" data-tool-membership-filter="in">
-            <label class="is-selected"><input type="radio" name="b" checked><span>In this system (3)</span></label>
-            <label><input type="radio" name="b"><span>All world tools (11)</span></label>
-          </div>
+          <section class="fabricate-filter-bar manager-toolbar" aria-label="Which Tools this list shows" data-probe="filter-bar">
+            <label class="fabricate-search manager-search"><i class="fas fa-search"></i><input type="search" data-probe="search" placeholder="Search tools"></label>
+            <div class="manager-segmented is-compact is-accent" role="radiogroup" data-tool-membership-filter="true">
+              <label class="manager-segment is-active" data-tool-membership-option="in"><input type="radio" class="manager-segment-input" name="b" checked><span class="manager-segment-label">In this system</span><span class="manager-segment-count">3</span></label>
+              <label class="manager-segment" data-tool-membership-option="all"><input type="radio" class="manager-segment-input" name="b"><span class="manager-segment-label">All world tools</span><span class="manager-segment-count">11</span></label>
+            </div>
+          </section>
         </section>
         <div class="manager-tools-sort-row" data-manager-tools-sort>
           <span class="manager-tools-sort-label" data-probe="sort-label">Sort by</span>
@@ -200,7 +218,7 @@ const LIST_SCREEN = `
         <section class="manager-tools-library-card" data-manager-tools-browser>
           <div class="manager-tools-library-scroll">
             <div class="manager-tools-library-list" role="list">
-              ${row('selected-still', 'is-selected', "Smith's Hammer")}
+              ${row('selected-still', 'is-selected', "Smith's Hammer", true)}
               ${row('selected-hovered', 'is-selected', "Smith's Anvil")}
               ${row('resting', '', 'Bellows')}
               ${row('resting-hovered', '', 'Tongs')}
@@ -304,6 +322,7 @@ const READ_PROBES = () =>
           borderTopColor: style.borderTopColor,
           borderRadius: style.borderTopLeftRadius,
           position: style.position,
+          display: style.display,
           justifyContent: style.justifyContent,
           gap: style.columnGap,
           rowGap: style.rowGap,
@@ -420,8 +439,9 @@ test('the Tools browser writes ONE search field, and it is inside the search car
   //
   // WHAT IT PROTECTS. Issue 1508 rewrote the Tools browser's three overrides from
   // `[data-manager-tools-search] .manager-search…` to
-  // `.manager-tools-library-card .manager-search…` (`styles/fabricate.css:23488`, `:23508`,
-  // `:23517`), on a measured premise: `data-manager-tools-search` and
+  // `.manager-tools-library-card .manager-search…` (`styles/fabricate.css:23520`, `:23540`,
+  // `:23549` — re-derived for issue 1515, which deleted rules above them), on a measured
+  // premise: `data-manager-tools-search` and
   // `.manager-tools-library-card` select the SAME `.manager-search` in this tree, because the
   // view writes exactly one search field and writes it inside the search card. A SECOND search
   // field anywhere under a `.manager-tools-library-card` — in the browser card, say — would take
@@ -463,6 +483,137 @@ test('the Tools browser writes ONE search field, and it is inside the search car
       'Outside it the attribute form and the class form stop selecting the same field, which is ' +
       'the premise the rewrite was measured on.'
   );
+});
+
+test('the Tools browser renders its search and its filter through the shared bar', () => {
+  // THE OTHER HALF OF THE CLAUSE ABOVE, and the reason it is source text rather than geometry.
+  // Issue 1515 moved this screen onto the browse archetype's filter bar, and the bar is a
+  // `<section>` INSIDE the search card rather than the card itself - because the three sheet
+  // rules the clause above protects are written `.manager-tools-library-card .manager-search...`
+  // and the card is where that class is. A later edit that promotes the bar to the card, or
+  // that leaves one of the two controls outside it, reads as tidying and is neither: the first
+  // takes the field out of the class's subtree, and the second puts a filter in the browse
+  // recipe's list band.
+  const viewPath = 'src/ui/svelte/apps/manager/ToolsBrowserView.svelte';
+  const source = readFileSync(resolve(repoRoot, viewPath), 'utf8');
+  const styleAt = source.indexOf('<style>');
+  const markup = source.slice(0, styleAt === -1 ? source.length : styleAt);
+
+  const bars = [...markup.matchAll(/<ManagerToolbar(?![\w-])/gu)];
+  assert.equal(bars.length, 1, `ToolsBrowserView renders ${bars.length} filter bars, not one`);
+
+  const cardOpens = '<section class="manager-tools-library-card" data-manager-tools-search>';
+  const cardAt = markup.indexOf(cardOpens);
+  const cardEnds = markup.indexOf('</section>', cardAt);
+  assert.ok(
+    cardAt >= 0 && cardEnds > cardAt,
+    'the search card was not found, so the span below is not a span'
+  );
+  assert.ok(
+    bars[0].index > cardAt && bars[0].index < cardEnds,
+    'the filter bar sits INSIDE the `data-manager-tools-search` card, not in place of it. The ' +
+      'card carries `manager-tools-library-card`, which is the class the three search ' +
+      'overrides in `styles/fabricate.css` reach the field through.'
+  );
+
+  const barEnds = markup.indexOf('</ManagerToolbar>', bars[0].index);
+  assert.ok(barEnds > bars[0].index, 'the filter bar closing tag was not found');
+  const inBar = (needle) => {
+    const at = markup.indexOf(needle, bars[0].index);
+    return at > bars[0].index && at < barEnds;
+  };
+  assert.ok(
+    inBar('<ManagerSearchField'),
+    'the search field renders inside the filter bar: a browse screen`s search and its filters ' +
+      'ARE that band, and a control left outside it is a second bar the recipe does not have'
+  );
+  assert.ok(
+    inBar('dataAttr="data-tool-membership-filter"'),
+    'the membership filter renders inside the filter bar for the same reason - it narrows the ' +
+      'list below, which is what a filter is. It is addressed by the `<SegmentedControl>` prop ' +
+      'that stamps its hook rather than by the retired `manager-tools-membership-filter` class: ' +
+      'issue 1515 replaced this view`s hand-rolled radiogroup with the shared primitive, and a ' +
+      'class assertion left behind would have gone on passing against the deleted markup`s name'
+  );
+
+  // THE SEGMENTED CONTROL IS NOT IN THE BAR, and that is a routing decision rather than an
+  // oversight. It authors `breakageSource` on the SYSTEM record - a setting, whose card sits
+  // above the bar - where a filter narrows the list beneath it. A later pass that swept it in
+  // for symmetry would put a writing control in a reading band.
+  const segmentsAt = markup.indexOf('class="manager-tools-authority-segments"');
+  assert.ok(segmentsAt >= 0, 'the authority segments were not found, so this proves nothing');
+  assert.ok(
+    segmentsAt < bars[0].index || segmentsAt > barEnds,
+    'the breakage-source segments are a SETTING and stay in their own card; only the search ' +
+      'and the membership filter are filters'
+  );
+});
+
+test('the row enable switch is the shared control rather than a copy of it', async () => {
+  // WHY THIS IS MEASURED AND NOT READ. Issue 1515 deleted five `styles/fabricate.css` rules
+  // that painted this switch under `.manager-tools-enabled-toggle`, four of them selecting
+  // `> span:first-child` and `> span:first-child > span` - which are exactly the track and the
+  // knob `StatusToggle` renders, at (0,2,1) and (0,2,2) against the family's (0,2,0). Left in
+  // place they would have gone on winning over the primitive's own paint on this one screen,
+  // and every source-level gate in the repository would have stayed green: the class is still
+  // written, the rules still parse, and the switch still looks like a switch.
+  //
+  // So the assertions below name the FAMILY's declarations. Restore any of the four and the
+  // track computes `block` where the primitive computes a flex box, or the button re-pins to
+  // the 36px the family sizes to content instead; either way this clause reds.
+  const { page, close } = await renderListScreen();
+  try {
+    const measured = await page.evaluate(READ_PROBES);
+    const tokens = await page.evaluate(READ_TOKENS, [
+      '--fab-accent',
+      '--fab-surface-raised',
+      '--fab-on-accent',
+      '--fab-text-subtle',
+    ]);
+
+    // The family sizes the button to its content - a 34px track - rather than pinning it to
+    // the 36px box the retired copy declared.
+    assert.equal(measured['resting-switch'].width, 34, 'the switch is the family box');
+    assert.equal(measured['resting-switch'].height, 24, 'and the family rung');
+
+    // `.fabricate-toggle .manager-status-toggle-track` is an `inline-flex`, blockified to
+    // `flex` as a flex item. The deleted copy declared `display: block`.
+    for (const probe of ['resting-switch-track', 'selected-still-switch-track']) {
+      assert.equal(measured[probe].display, 'flex', `${probe} is the primitive track box`);
+      assert.equal(measured[probe].width, 34, `${probe} is 34px wide`);
+      assert.equal(measured[probe].height, 20, `${probe} is 20px tall`);
+    }
+    for (const probe of ['resting-switch-knob', 'selected-still-switch-knob']) {
+      assert.equal(measured[probe].width, 14, `${probe} is the family 14px knob`);
+      assert.equal(measured[probe].height, 14, `${probe} is the family 14px knob`);
+    }
+
+    // BOTH POSITIONS COME FROM THE FAMILY'S `--fab-toggle-*` CUSTOM PROPERTIES, which is the
+    // mechanism the deleted rules bypassed by painting the track and knob directly. Named as
+    // tokens rather than as literals, for `theme-colour-contract.test.js`'s reason.
+    assert.equal(
+      measured['selected-still-switch-track'].background,
+      tokens['--fab-accent'],
+      'the ON track is the accent, through the family track custom property'
+    );
+    assert.equal(
+      measured['selected-still-switch-knob'].background,
+      tokens['--fab-on-accent'],
+      'and the ON knob is the on-accent ink'
+    );
+    assert.equal(
+      measured['resting-switch-track'].background,
+      tokens['--fab-surface-raised'],
+      'the OFF track is the raised neutral, not a second copy of it'
+    );
+    assert.equal(
+      measured['resting-switch-knob'].background,
+      tokens['--fab-text-subtle'],
+      'and the OFF knob is the subtle ink'
+    );
+  } finally {
+    await close();
+  }
 });
 
 test('the fixture layers the sheet the way Foundry does, or it proves nothing', async () => {

@@ -12,8 +12,12 @@ import assert from 'node:assert/strict';
 
 const { SignatureValidator } = await import('../src/systems/SignatureValidator.js');
 const { RecipeActivationError } = await import('../src/systems/RecipeActivationError.js');
-const { localizeRecipeActivationError, localizeActivationIssue, RECIPE_ACTIVATION_ISSUE_LABELS } =
-  await import('../src/utils/recipeActivationMessages.js');
+const {
+  localizeRecipeActivationError,
+  localizeRecipeActivationParts,
+  localizeActivationIssue,
+  RECIPE_ACTIVATION_ISSUE_LABELS,
+} = await import('../src/utils/recipeActivationMessages.js');
 
 // A Foundry-shaped random id (16 alphanumerics). The reporter saw two of these
 // leak into the toast ("set aZrvhxMlMBWxYFam" / "set ZskumdJApJlvdmvw").
@@ -231,6 +235,44 @@ test('localizeRecipeActivationError builds a localized, id-free toast from a Rec
 test('localizeRecipeActivationError returns null for a plain (non-activation) error', () => {
   assert.equal(
     localizeRecipeActivationError(new Error('boom'), (k) => k),
+    null
+  );
+});
+
+// The recipe library draws the refusal in a `<Notice>`, whose specimen wants a title naming what
+// happened over a detail saying why (issue 1515). The parts are built from their own material —
+// the name from the error, the reasons from the issues — so the title is asserted to hold NO
+// reason text and the detail to hold no name clause. Cutting the one-line message at its colon
+// would satisfy a "two non-empty strings" check and fail both of these.
+test('localizeRecipeActivationParts splits the refusal into a title and its reasons', () => {
+  const { system, recipes, components } = collidingSystem();
+  const { conflicts } = buildValidator(system, recipes, components).validateSystem('sys-alch');
+  const issues = conflicts.map((c) => ({ code: c.code, params: c.params, message: c.message }));
+  const error = new RecipeActivationError('Mana Potion', issues);
+
+  const localizeFn = (key, data) => {
+    const templates = {
+      'FABRICATE.Admin.Manager.RecipeActivation.CannotEnableTitle':
+        'Cannot enable recipe "{name}"',
+      'FABRICATE.Admin.Manager.RecipeActivation.IssueSignatureCollision':
+        'Recipe "{recipeA}" and recipe "{recipeB}" share components ({components}).',
+    };
+    const t = templates[key];
+    if (!t) return key;
+    return t.replace(/\{(\w+)\}/g, (m, k) => (data && data[k] != null ? String(data[k]) : m));
+  };
+
+  const parts = localizeRecipeActivationParts(error, localizeFn);
+  assert.equal(parts.title, 'Cannot enable recipe "Mana Potion"');
+  assert.ok(!parts.title.includes('share components'), 'no reason text rides the title');
+  assert.ok(parts.detail.includes('Ember Essence'), 'the detail carries the reasons');
+  assert.ok(!parts.detail.includes('Cannot enable'), 'and does not restate the title clause');
+  assert.doesNotMatch(parts.detail, FOUNDRY_ID_RE, `detail leaked an id: ${parts.detail}`);
+});
+
+test('localizeRecipeActivationParts returns null for a plain (non-activation) error', () => {
+  assert.equal(
+    localizeRecipeActivationParts(new Error('boom'), (k) => k),
     null
   );
 });

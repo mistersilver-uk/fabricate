@@ -45,6 +45,10 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/actions/anchoredPopover.js',
     'src/ui/svelte/util/overlayBounds.js',
     'src/ui/svelte/actions/dragDrop.js',
+    // `ActionMenu`'s own import-free leaves (issue 1515), reached only through the row menus the
+    // three browsers below now render. `portal.js` and `anchoredPopover.js` are already above.
+    'src/ui/svelte/util/overlayHost.js',
+    'src/ui/svelte/util/actionMenuLayout.js',
   ],
   compiledModules: [
     // Issue 1504: the shared `<Select>`'s whole compiled closure — also covers the manager's
@@ -52,6 +56,9 @@ const harness = createMountedComponentHarness({
     // the two gathering browsers it embeds.
     ...SELECT_COMPILED_MODULES,
     'src/ui/svelte/components/IconButton.svelte',
+    // THE shared overflow action menu (issue 1477). All three browsers in this tree render one
+    // per row since issue 1515, and it renders `IconButton` above as its trigger.
+    'src/ui/svelte/components/ActionMenu.svelte',
     'src/ui/svelte/components/StatusToggle.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/Stepper.svelte',
@@ -59,6 +66,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/ManagerColorPicker.svelte',
     'src/ui/svelte/components/ManagerColorPopover.svelte',
     'src/ui/svelte/components/ManagerSearchField.svelte',
+    // The parties pane's refusal banner is the shared notice as of issue 1515.
+    'src/ui/svelte/components/Notice.svelte',
     'src/ui/svelte/components/ManagerToolbar.svelte',
     'src/ui/svelte/apps/manager/GatheringTasksBrowserView.svelte',
     'src/ui/svelte/apps/manager/GatheringEventsBrowserView.svelte',

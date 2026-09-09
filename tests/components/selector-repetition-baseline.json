@@ -1,5 +1,5 @@
 {
-  "pinnedTotal": 243,
+  "pinnedTotal": 229,
   "rows": [
     {
       "key": "(top level) | .fabricate-button.manager-button",
@@ -30,10 +30,6 @@
       "count": 2
     },
     {
-      "key": "(top level) | .fabricate-filter-bar.manager-toolbar",
-      "count": 2
-    },
-    {
       "key": "(top level) | .fabricate-icon-button.manager-icon-button",
       "count": 2
     },
@@ -55,26 +51,6 @@
     },
     {
       "key": "(top level) | .fabricate-manager .form-group textarea",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-availability-pill.is-modifier",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-availability-pill.is-realm",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-availability-pill.is-tag",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-availability-pill.is-timeOfDay",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-availability-pill.is-weather",
       "count": 2
     },
     {
@@ -218,7 +194,7 @@
       "count": 2
     },
     {
-      "key": "(top level) | .fabricate-manager .manager-nav-button .manager-nav-count.manager-nav-premium",
+      "key": "(top level) | .fabricate-manager .manager-nav-premium",
       "count": 2
     },
     {
@@ -271,10 +247,6 @@
     },
     {
       "key": "(top level) | .fabricate-manager .manager-salvage-dc-card",
-      "count": 2
-    },
-    {
-      "key": "(top level) | .fabricate-manager .manager-section-header",
       "count": 2
     },
     {

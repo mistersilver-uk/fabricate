@@ -4,9 +4,12 @@
   import EmptyState from './EmptyState.svelte';
   import { localize } from '../../util/foundryBridge.js';
   import Pagination from '../../components/Pagination.svelte';
+  import StatusToggle from '../../components/StatusToggle.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
+  import ManagerToolbar from '../../components/ManagerToolbar.svelte';
   import ManagerSearchField from '../../components/ManagerSearchField.svelte';
+  import SegmentedControl from './SegmentedControl.svelte';
   import { projectToolRow, toolSearchText } from './tools/toolStudio.js';
   import {
     breakModeSourcePill,
@@ -256,24 +259,29 @@
     })
   );
 
+  // THE COHORT SEGMENTS, in the shape the shared segmented control reads (issue 1515). The primitive
+  // localizes each label itself, so the options carry `labelKey` / `fallback` rather than
+  // already-resolved text, and the tally rides its `count` slot instead of being baked into the
+  // copy — which is why `Tools.FilterInSystem` and `Tools.FilterAllWorld` no longer interpolate
+  // a `{count}`. `Overriding` supplies no count and renders none: the slot omits a non-finite
+  // value rather than drawing `NaN`.
   const membershipFilters = $derived([
     {
-      id: 'in',
-      label: text(
-        'FABRICATE.Admin.Manager.Tools.FilterInSystem',
-        'In this system ({count})'
-      ).replace('{count}', String(memberRows.length)),
+      value: 'in',
+      labelKey: 'FABRICATE.Admin.Manager.Tools.FilterInSystem',
+      fallback: 'In this system',
+      count: memberRows.length,
     },
     {
-      id: 'all',
-      label: text(
-        'FABRICATE.Admin.Manager.Tools.FilterAllWorld',
-        'All world tools ({count})'
-      ).replace('{count}', String(memberRows.length + ghostRows.length)),
+      value: 'all',
+      labelKey: 'FABRICATE.Admin.Manager.Tools.FilterAllWorld',
+      fallback: 'All world tools',
+      count: memberRows.length + ghostRows.length,
     },
     {
-      id: 'over',
-      label: text('FABRICATE.Admin.Manager.Tools.FilterOverriding', 'Overriding'),
+      value: 'over',
+      labelKey: 'FABRICATE.Admin.Manager.Tools.FilterOverriding',
+      fallback: 'Overriding',
     },
   ]);
 
@@ -489,44 +497,70 @@
       </div>
     </InspectorCard>
 
+    <!--
+      THE BROWSE ARCHETYPE'S FILTER BAR, INSIDE THIS SECTION RATHER THAN INSTEAD OF IT
+      (issue 1515). The two controls in this band are a SEARCH and a FILTER, which is what
+      `openspec/specs/design-system/spec.md`'s browse recipe puts in the filter bar, so they
+      render through `ManagerToolbar` like the other ten bars. The three segments above are a
+      SETTING - they author `breakageSource` on the system record rather than narrow this list -
+      so they stay in their own card and do not join the bar.
+
+      THE SECTION STAYS AND THE BAR NESTS INSIDE IT. `styles/fabricate.css`'s three Tools-browser
+      search overrides are written `.manager-tools-library-card .manager-search…`, and the rule
+      beside them records the premise: this view writes exactly one search field, inside the one
+      section carrying both `manager-tools-library-card` and `data-manager-tools-search`. Putting
+      the class on the bar instead would move the field out of a carrier the class names and take
+      those three rules with it. `tool-rules-list-parity.test.js` reads the source for both halves.
+
+      THE LANDMARK HAS ITS OWN NAME NOW. Every other bar is named `<Area>.Filters`
+      ("Component filters", "Access filters"), and this one reused the radiogroup's
+      `Tools.FilterLabel` for one phase only because `lang/en.json` was unowned then; the
+      duplicated announcement that produced - the band and the control inside it saying the same
+      sentence - is what the dedicated key retires (issue 1515).
+    -->
     <section class="manager-tools-library-card" data-manager-tools-search>
-      <ManagerSearchField
-        value={searchTerm}
-        onInput={(next) => {
-          ui.searchTerm = next;
-          ui.pageIndex = 0;
-        }}
-        placeholder={text('FABRICATE.Admin.Manager.Tools.Search', 'Search tools')}
-        ariaLabel={text('FABRICATE.Admin.Manager.Tools.Search', 'Search tools')}
-      />
-      <div
-        class="manager-tools-membership-filter"
-        role="radiogroup"
-        aria-label={text(
-          'FABRICATE.Admin.Manager.Tools.FilterLabel',
-          'Which Tools this list shows'
-        )}
-        data-tool-membership-filter={membershipFilter}
-      >
-        {#each membershipFilters as option (option.id)}
-          <label
-            class:is-selected={membershipFilter === option.id}
-            data-tool-membership-option={option.id}
-          >
-            <input
-              type="radio"
-              name="tool-membership-filter"
-              value={option.id}
-              checked={membershipFilter === option.id}
-              onchange={() => {
-                ui.membershipFilter = option.id;
-                ui.pageIndex = 0;
-              }}
-            />
-            <span>{option.label}</span>
-          </label>
-        {/each}
-      </div>
+      <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.Tools.Filters', 'Tool filters')}>
+        <ManagerSearchField
+          value={searchTerm}
+          onInput={(next) => {
+            ui.searchTerm = next;
+            ui.pageIndex = 0;
+          }}
+          placeholder={text('FABRICATE.Admin.Manager.Tools.Search', 'Search tools')}
+          ariaLabel={text('FABRICATE.Admin.Manager.Tools.Search', 'Search tools')}
+        />
+        <!--
+          THE COHORT SWITCH IS THE SHARED SEGMENTED CONTROL (issue 1515), not a fourth copy of
+          it. This view hand-rolled the radiogroup and painted it with twenty-eight lines of
+          scoped CSS that re-derived the primitive's own track, segment, selected fill and
+          visually-hidden radio — the same control the sibling `ComponentsBrowserView` cohort
+          switch already renders through the same primitive at `density="compact" tone="accent"`,
+          which is why the props below match it. (Spelled without its angle bracket deliberately:
+          `screenshot-capture-scoping.test.js` scans this directory for opening tags of the
+          primitive, and a mention in prose is counted as one and swallows the real span below.) The two `data-*` hooks are kept verbatim through
+          the primitive's `dataAttr` / `optionDataAttr` channels; note that `dataAttr` stamps
+          `true` on the TRACK rather than the current value, so the selected segment is read from
+          its radio (`[data-tool-membership-option="…"] input:checked`) rather than from the
+          track's attribute or the retired `.is-selected` class.
+        -->
+        <SegmentedControl
+          options={membershipFilters}
+          value={membershipFilter}
+          density="compact"
+          tone="accent"
+          groupName="tool-membership-filter"
+          dataAttr="data-tool-membership-filter"
+          optionDataAttr="data-tool-membership-option"
+          ariaLabel={text(
+            'FABRICATE.Admin.Manager.Tools.FilterLabel',
+            'Which Tools this list shows'
+          )}
+          onChange={(next) => {
+            ui.membershipFilter = next;
+            ui.pageIndex = 0;
+          }}
+        />
+      </ManagerToolbar>
     </section>
 
     <!--
@@ -775,18 +809,27 @@
                       composition exists to avoid.
                       It is also the only surface the Foundry smoke's Tool Studio phase drives
                       `toggleToolEnabled` through, so removing it deletes proven coverage.
+
+                      IT IS A `StatusToggle` RATHER THAN A HAND-ROLLED SWITCH (issue 1515), and
+                      the objection above does not reach that: it argues against replacing a
+                      writing control with a read-only PILL, and this is the same writing control
+                      through the primitive that owns the switch tree. `class` is composed rather
+                      than replaced, so `manager-tools-enabled-toggle` survives and neither the
+                      smoke's selector nor the View Lab's steps move.
+
+                      IT DOES NOT SATISFY the browse recipe's "a row's state renders as a status
+                      button rather than a toggle" clause. That clause wants a different control,
+                      no browse surface in the app meets it today, and closing it is a successor
+                      rather than a side effect of this conversion.
                     -->
-                    <button
-                      type="button"
-                      class={`manager-tools-enabled-toggle ${row.enabled ? 'is-on' : ''}`}
-                      aria-pressed={row.enabled}
-                      aria-label={row.enabled
+                    <StatusToggle
+                      class="manager-tools-enabled-toggle"
+                      on={row.enabled}
+                      ariaLabel={row.enabled
                         ? text('FABRICATE.Admin.Manager.Tools.Disable', 'Disable Tool')
                         : text('FABRICATE.Admin.Manager.Tools.Enable', 'Enable Tool')}
                       onclick={() => onToggleToolEnabled(entry.id, !row.enabled)}
-                    >
-                      <span aria-hidden="true"><span></span></span>
-                    </button>
+                    />
                   {/if}
                   {#if entry.member}
                     <!-- A LABELLED, BORDERED BUTTON rather than a bare pen: the row leads
@@ -900,13 +943,16 @@
      and the result count share the second. The rules live HERE rather than in
      `styles/fabricate.css` so `VIEW_RECIPES` maps a change to the tool views alone; the
      search field's own geometry is already stated in the global sheet under
-     `[data-manager-tools-search]` and is reused rather than restated. */
-  [data-manager-tools-search] {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--fab-space-2);
-  }
+     `.manager-tools-library-card` and is reused rather than restated.
+
+     THE FIRST ROW'S OWN BOX IS GONE FROM HERE (issue 1515). This block used to make
+     `[data-manager-tools-search]` the wrapping, centred, `--fab-space-2` flex row itself; the
+     row is now `ManagerToolbar`'s, which states the same wrap, the same centring and the same
+     gap for every browse screen. Keeping a copy would have been a second source of truth for
+     one box — and a WRONG one the moment it applied, because the section now holds a single
+     child and `flex-direction: row` with `align-items: center` sizes that child to its content
+     instead of to the section. What remains here is the field's own grow, which is this
+     screen's and not the bar's. */
 
   /* `:global()` ON THE FIELD HALF ONLY (issue 1039). `.manager-search` now sits on a
      `<ManagerSearchField>` tag rather than on an element this component writes, so Svelte
@@ -971,44 +1017,6 @@
     font-weight: 600;
     letter-spacing: 0.07em;
     text-transform: uppercase;
-  }
-
-  .manager-tools-membership-filter {
-    display: flex;
-    flex: 0 1 auto;
-    flex-wrap: wrap;
-    gap: var(--fab-space-2xs);
-    padding: var(--fab-space-2xs);
-    border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
-    min-width: 0;
-  }
-
-  .manager-tools-membership-filter label {
-    display: inline-flex;
-    align-items: center;
-    padding: var(--fab-space-chip) var(--fab-space-2);
-    border-radius: 6px;
-    color: var(--fab-text-muted);
-    font-size: 0.66rem;
-    font-weight: 600;
-    line-height: 1.2;
-    cursor: pointer;
-  }
-
-  .manager-tools-membership-filter label.is-selected {
-    background: var(--fab-accent);
-    color: var(--fab-on-accent);
-  }
-
-  /* The radio itself carries the state and the keyboard behaviour; the label paints it.
-     Sized to 1px rather than `display: none` so it stays focusable. */
-  .manager-tools-membership-filter input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
   }
 
   .manager-tools-sort-row {

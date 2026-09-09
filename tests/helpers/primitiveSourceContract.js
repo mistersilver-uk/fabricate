@@ -68,16 +68,49 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import path from 'node:path';
 
-import { collectSources, repoRoot } from './sourceScan.js';
+import { collectSources, repoRoot, stripComments } from './sourceScan.js';
 import { withoutComments } from './stepperSourceContract.js';
 import { openingTagsNamed } from './svelteTagScan.js';
+
+/**
+ * Blank the `//` comments inside a component's `<script>` blocks, and only there.
+ *
+ * `withoutComments` deliberately leaves `//` alone, because removing to end of line deletes real
+ * code wherever a URL appears. That exemption is safe over MARKUP and wrong over SCRIPT, and the
+ * difference produced a phantom offender: issue 1515's four browse views each explain in a `//`
+ * docblock that "Edit stays an `<IconButton>`", and the call-site scan below read that prose as a
+ * bare `<IconButton>` tag with no `ariaLabel` — four screens reported as missing an accessible
+ * name while every real call site in them carried one. Rewriting the prose would have been the
+ * wrong repair: the fix belongs in the reader, or the next comment that names a tag reopens it.
+ *
+ * `stripComments` is the repo's quote-aware stripper (`sourceScan.js`), so a `//` inside a string
+ * literal — the `https://…` case the blanket rule was avoiding — survives. Confining it to
+ * `<script>` bodies is what makes it safe rather than merely careful: a `//` in MARKUP is not a
+ * comment at all, and unquoted markup text is where a bare URL could still appear. Measured over
+ * the whole `src/**` `.svelte` corpus this changes 9 lines that are not whole-line comments, and
+ * every one of them is a genuine trailing `//` comment.
+ *
+ * Positions are preserved (comment characters become spaces), so the `{}`-depth tag scan reads the
+ * same offsets it did before.
+ *
+ * @param {string} source
+ * @returns {string}
+ */
+function withoutScriptComments(source) {
+  return source.replaceAll(
+    /(<script\b[^>]*>)([\s\S]*?)(<\/script>)/g,
+    (_match, open, body, close) => `${open}${stripComments(body)}${close}`
+  );
+}
 
 /**
  * A component's markup: `<style>` blocks removed as well as comments.
  *
  * The order matters — comments go first, so a `<style>` mentioned inside a docblock cannot open
  * a region that swallows the markup after it. That is not hypothetical: a line-based scan
- * written during issue 1422 did exactly that and mis-filed two real call sites as CSS.
+ * written during issue 1422 did exactly that and mis-filed two real call sites as CSS. The
+ * `<script>` pass sits between them for the same reason, and reads the tags `withoutComments`
+ * has already resolved rather than ones a comment could have opened.
  *
  * Stripping `<style>` at all is a deliberate scope line. Components legitimately name the
  * contract class in a `:global(…)` rule repairing a scoped rule a conversion killed, and
@@ -90,7 +123,7 @@ import { openingTagsNamed } from './svelteTagScan.js';
  * @returns {string}
  */
 function markupOf(source) {
-  return withoutComments(source).replace(/<style[\s\S]*?<\/style>/g, '');
+  return withoutScriptComments(withoutComments(source)).replace(/<style[\s\S]*?<\/style>/g, '');
 }
 
 /**

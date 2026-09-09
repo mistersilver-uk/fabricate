@@ -63,8 +63,10 @@
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import path from 'node:path';
 
 import { definePrimitiveSourceContract } from './helpers/primitiveSourceContract.js';
+import { collectSources, repoRoot } from './helpers/sourceScan.js';
 
 /** The class only the primitive may write. */
 const CONTRACT_CLASS = 'manager-icon-button';
@@ -90,12 +92,13 @@ const PRIMITIVE = 'src/ui/svelte/components/IconButton.svelte';
 const CLASS_EXCEPTIONS = Object.freeze([
   Object.freeze({
     file: PRIMITIVE,
-    count: 2,
+    count: 1,
     why:
       'the primitive itself, which writes the class once so that no call site has to ' +
-      'remember it. The count is 2 rather than 1 because a `//` note on the `class` prop ' +
-      'names the token in prose, and `withoutComments` deliberately does not strip `//` ' +
-      'comments — a `//` stripper deletes real code wherever a URL appears',
+      'remember it. The count was 2 while a `//` note on the `class` prop naming the token ' +
+      'in prose counted alongside the emission; issue 1515 taught the shared reader to blank ' +
+      '`//` comments inside `<script>` — quote-aware, and confined to script so a bare URL in ' +
+      'markup survives — so the count is now exactly the one place that writes it',
   }),
   Object.freeze({
     file: 'src/ui/svelte/apps/manager/CraftingSystemManagerRoot.svelte',
@@ -257,5 +260,41 @@ test('every icon button is given an accessible name', () => {
       'nothing else. It is invisible on screen, so no frame and no geometry probe can catch ' +
       'it — `design-system/spec.md:173-177` requires the name to be a REQUIRED prop:\n  ' +
       offenders.join('\n  ')
+  );
+});
+
+test('a tag NAMED in a `//` comment is not read as a call site', () => {
+  // THE CONTROL FOR THE CORPUS READER, rather than for the primitive. The clause above reads
+  // ATTRIBUTES out of tag text, so everything it reports rests on what the reader decided a tag
+  // IS — and a reader that mistakes prose for markup produces the one failure shape that cannot
+  // be repaired by the code it accuses. Issue 1515 hit exactly that: the four browse views each
+  // explain in a `//` docblock that "Edit stays an `<IconButton>`", and the reader returned that
+  // phrase as a bare `<IconButton>` opening tag with no `ariaLabel` — four screens reported as
+  // nameless while every real call site in them carried a name. The repair belonged in
+  // `markupOf`, which now blanks `//` comments inside `<script>`; this clause is what stops it
+  // being reverted, or being defeated by the next comment that names a tag.
+  contract.assertCallSitesAlive();
+
+  // NON-VACUITY, and it is the whole clause: read from the RAW tree rather than from the corpus,
+  // because the corpus is the thing under test. If this ever reds because the last such comment
+  // was reworded, restate the control over whatever prose replaced it — do not delete it.
+  const raw = collectSources(path.join(repoRoot, 'src'), { extensions: ['.svelte'] });
+  const prose = Object.keys(raw).filter((file) => /^\s*\/\/.*<IconButton\b/m.test(raw[file]));
+  assert.ok(
+    prose.length > 0,
+    'no component names `<IconButton>` inside a `//` comment any more, so this control is ' +
+      'measuring nothing and the reader is unguarded'
+  );
+
+  // `<IconButton>` with nothing between the name and the `>` is the shape prose produces and the
+  // shape no call site has: a bare one would render an icon button with no glyph and no
+  // accessible name. `</IconButton>` does not match — the `/` sits where the `I` would.
+  const readAsMarkup = prose.filter((file) => /<IconButton>/.test(contract.components[file]));
+  assert.deepEqual(
+    readAsMarkup,
+    [],
+    'the corpus reader is returning comment prose as an opening tag, so every clause stated ' +
+      'over `callSiteTags` is now accusing files of what their documentation says:\n  ' +
+      readAsMarkup.join('\n  ')
   );
 });

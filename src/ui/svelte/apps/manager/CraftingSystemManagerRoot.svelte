@@ -5,6 +5,7 @@
   import CharacterModifierBoundsRow from './environment/CharacterModifierBoundsRow.svelte';
   import GatheringRuleLimitStepper from './environment/GatheringRuleLimitStepper.svelte';
   import Chip from '../../components/Chip.svelte';
+  import Kicker from '../../components/Kicker.svelte';
   import EmptyState from './EmptyState.svelte';
   import ExplainerCard from './ExplainerCard.svelte';
   import {
@@ -4612,6 +4613,27 @@
     return item ? text(item.labelKey, item.labelFallback) : '';
   });
 
+  // THE GATHERING FAMILY'S PER-TAB PAGE COPY, RESOLVED HERE RATHER THAN IN THE VIEW (issue 1515).
+  // Each of the four Gathering tabs used to title itself inside `EnvironmentsBrowserView`'s own
+  // section header, which stacked a second page title and hint under this shell's. The shell owns
+  // the page header for every route, so the branch that chose that copy moves here — and reads the
+  // rail's OWN record, the same way `gatheringTabLabel` above reads its label, so the four tabs
+  // cannot drift into two tables. The `environments` tab declares no title/hint pair in that
+  // record and falls through to the library's own name and sentence in the resolvers below.
+  const activeGatheringNavItem = $derived(
+    gatheringNavItems.find((entry) => entry.id === displayedGatheringTab) || null
+  );
+  const gatheringTabPageTitle = $derived(
+    activeGatheringNavItem?.titleKey
+      ? text(activeGatheringNavItem.titleKey, activeGatheringNavItem.titleFallback)
+      : ''
+  );
+  const gatheringTabPageHint = $derived(
+    activeGatheringNavItem?.hintKey
+      ? text(activeGatheringNavItem.hintKey, activeGatheringNavItem.hintFallback)
+      : ''
+  );
+
   const gatheringTaskDefinitions = $derived(
     Array.isArray(selectedGatheringSystemConfig.tasks) ? selectedGatheringSystemConfig.tasks : []
   );
@@ -5302,6 +5324,38 @@
     return buildComponentEditorState(selectedSystem, item).showEssences === true;
   }
 
+  // THE PAGE HEADER'S EYEBROW, ONE PER ROUTE (issue 1515).
+  //
+  // Six manager routes used to draw their own `manager-section-header` — kicker, title and hint —
+  // directly under this shell's header, so each of the six rendered TWO page headings. The section
+  // headers are deleted and the shell states the whole heading; the eyebrow is the part of it that
+  // had nowhere else to go, because it names the CONTEXT the `<h1>` beneath it is read in rather
+  // than restating the route. Usually that context is the scope the route acts inside — the
+  // selected system on `access`, `crafting-settings` and `environments`, and `WORLD / every
+  // system` on `world`. On `systems` there is no narrower scope than the manager itself, so it
+  // names the ACTIVITY instead ("Browse"), which is the same job done with the only word left.
+  //
+  // A ROUTE THAT RETURNS THE EMPTY STRING RENDERS NO EYEBROW, and `system-edit` is deliberately
+  // one of them: its `<h1>` now carries the selected system's name and its breadcrumb already
+  // names both the system and the route, so an eyebrow there would be a third statement of a fact
+  // the screen makes twice.
+  //
+  // Written as whole literal keys, never an interpolated base — see `worldScopedSubtitle` below.
+  function viewKicker() {
+    if (currentView === 'systems') return text('FABRICATE.Admin.Manager.Browse', 'Browse');
+    if (currentView === 'world')
+      return text('FABRICATE.Admin.Manager.World.PartiesKicker', 'WORLD / every system');
+    if (
+      currentView === 'access' ||
+      currentView === 'crafting-settings' ||
+      currentView === 'environments'
+    )
+      return (
+        selectedSystem?.name || text('FABRICATE.Admin.Manager.SelectSystem', 'Select a system')
+      );
+    return '';
+  }
+
   function viewTitle() {
     if (currentView === 'recipes') return text('FABRICATE.Admin.Manager.Recipe.Title', 'Recipes');
     if (currentView === 'recipe-edit')
@@ -5329,10 +5383,17 @@
       return text('FABRICATE.Admin.Manager.Nav.EssenceRules', 'Essence Rules');
     if (currentView === 'essence-edit')
       return text('FABRICATE.Admin.Manager.Essence.EditTitle', 'Edit essence');
-    if (currentView === 'environments' && displayedGatheringTab === 'tasks')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksTitle',
-        'Gathering Tasks'
+    // The Gathering family titles itself after the TAB on screen (issue 1515), the same way the
+    // Downtime route below does: the four tabs are four screens and one page header must change
+    // with them. Only Tasks did this here before; the other three named themselves in the browse
+    // view's own section header, which is what made every Gathering screen carry two titles. The
+    // `environments` tab declares no per-tab pair in the rail record, so it keeps the library's
+    // own name — the wording its section header used, and the one that reads as a member of the
+    // same family as the other three rather than as the route token.
+    if (currentView === 'environments')
+      return (
+        gatheringTabPageTitle ||
+        text('FABRICATE.Admin.Manager.Environment.Library', 'Gathering environments')
       );
     if (currentView === 'world')
       return text('FABRICATE.Admin.Manager.World.PartiesTitle', 'World Parties');
@@ -5377,16 +5438,22 @@
     // nineteen this repo tracks deliberately in `tests/lang-known-orphans.js`. The scan reads
     // COMMENTS too, so this note must not spell that prefix out either.
     if (isChecksRoute) return text(CHECKS_ROUTE_TITLE_KEYS[checksActiveTab], 'Checks');
-    if (currentView === 'environments')
-      return text('FABRICATE.Admin.Manager.Environment.Title', 'Environments');
     if (currentView === 'environment-edit')
       return text('FABRICATE.Admin.Manager.Environment.EditTitle', 'Edit environment');
     if (currentView === 'gathering-task-edit')
       return text('FABRICATE.Admin.Manager.Environment.Tasks.EditTitle', 'Edit gathering task');
     if (currentView === 'gathering-event-edit')
       return text('FABRICATE.Admin.Manager.Environment.Events.EditTitle', 'Edit gathering event');
+    // THE RECORD, NOT THE ROUTE (issue 1515). Every other editor route in the Manager puts the
+    // name of the thing being edited in the page title — recipe, component, essence, tool — and
+    // this one alone repeated its route name, which the breadcrumb tail and the rail item already
+    // say. The tail and the nav item keep saying it: the trail names where you are, the title
+    // names what you are looking at. The fallback is the route's own name for the state where no
+    // system is selected, so the heading is never empty.
     if (currentView === 'system-edit')
-      return text('FABRICATE.Admin.Manager.SystemEdit.PageTitle', 'System Overview');
+      return (
+        selectedSystem?.name || text('FABRICATE.Admin.Manager.SystemEdit.Nav', 'System Overview')
+      );
     return text('FABRICATE.Admin.Manager.Title', 'Crafting systems');
   }
 
@@ -5425,15 +5492,29 @@
         'Manage recipes for the selected crafting system.'
       );
     if (currentView === 'recipe-edit') return recipeEditSubtitle();
+    // The lede states the OUTCOME rather than the mechanism (issue 1515). The route's deleted
+    // section header carried this sentence and the shell carried a restatement of the rail item;
+    // one page header keeps one of them, and it is the one a GM can act on.
     if (currentView === 'crafting-settings')
       return text(
-        'FABRICATE.Admin.Manager.Crafting.CraftingTabs.SettingsHint',
-        'System-level crafting rules: resolution mode and recipe visibility.'
+        'FABRICATE.Admin.Manager.Crafting.Settings.Subtitle',
+        'Control how players get access to the recipes in this system.'
       );
+    // The SUPERSET of the two sentences the route used to carry (issue 1515). The shell's own was
+    // the first half of the section header's; the second half — what a grant actually does to what
+    // a player can see — is GM-facing rules content with no other home on the screen.
     if (currentView === 'access')
       return text(
-        'FABRICATE.Admin.Manager.Access.Subtitle',
-        'Grant individual recipes to specific characters or players.'
+        'FABRICATE.Admin.Manager.Access.Hint',
+        'Grant individual recipes to specific characters or players. Only granted recipes are visible to them.'
+      );
+    // The system library's lede is the one sentence on that screen telling a GM what to DO with
+    // it (issue 1515); the generic `Manager.Subtitle` below describes what a crafting system IS and
+    // stays the fall-through for the routes with nothing more specific to say.
+    if (currentView === 'systems')
+      return text(
+        'FABRICATE.Admin.Manager.SystemLibraryHint',
+        'Select a row to view counts and enabled features.'
       );
     if (currentView === 'books-scrolls')
       return text(
@@ -5495,11 +5576,6 @@
       return text(
         'FABRICATE.Admin.Manager.Essence.EditNoSourceSubtitle',
         'Update identity and icon for this essence.'
-      );
-    if (currentView === 'environments' && displayedGatheringTab === 'tasks')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.GatheringTabs.TasksHint',
-        'Browse gathering tasks before attaching them to environments.'
       );
     if (currentView === 'world') {
       if (travelParties.length === 0)
@@ -5614,10 +5690,14 @@
         'FABRICATE.Admin.Manager.Checks.Subtitle',
         'Configure how crafting, salvage, and gathering attempts are checked for the selected crafting system.'
       );
+    // Per TAB, from the rail's own record — see `gatheringTabPageTitle` (issue 1515).
     if (currentView === 'environments')
-      return text(
-        'FABRICATE.Admin.Manager.Environment.Subtitle',
-        'Manage gathering environments for the selected crafting system.'
+      return (
+        gatheringTabPageHint ||
+        text(
+          'FABRICATE.Admin.Manager.Environment.LibraryHint',
+          'Browse scene-linked gathering environments and open the existing editor for task authoring.'
+        )
       );
     if (currentView === 'environment-edit')
       return text(
@@ -9590,7 +9670,7 @@
    * One of the three environment inspector counts, as the store computed it.
    *
    * All three now read a stored number with a zero fallback — the pattern
-   * `EnvironmentsBrowserView.svelte:340-345` already uses for the same fact. The
+   * `EnvironmentsBrowserView.svelte:394-398` already uses for the same fact. The
    * `environmentComposedIds` fallback these three used to share is deleted, not moved:
    *
    * - It was **unreachable in practice.** `adminStore.js`'s `_buildEnvironmentState` writes a
@@ -10592,6 +10672,17 @@
             >
           {/if}
         </nav>
+        <!--
+          The eyebrow sits between the trail and the title, which is the order the six deleted
+          section headers drew it in and the order `Kicker`'s own specimen draws. `Kicker` takes no
+          `class`, so the one-off bottom margin the eyebrow needs is the WRAPPER's, exactly as that
+          component's contract requires of a caller that needs layout.
+        -->
+        {#if viewKicker()}
+          <div class="manager-page-kicker">
+            <Kicker dataAttr="data-page-kicker">{viewKicker()}</Kicker>
+          </div>
+        {/if}
         {#if currentView === 'recipe-edit' && recipeDraft}
           <!-- The recipe editor's identity header: the recipe's real image (never a
              glyph-only avatar — a recipe HAS an img), its name, and the
@@ -12001,7 +12092,14 @@
           >
             <i class={view.icon} aria-hidden="true"></i>
             <span class="manager-nav-label">{text(view.labelKey, view.fallback)}</span>
-            <span class="manager-nav-count">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>
+            <!-- NOT a rail marker. The Rail Marker Family is four marks and a record COUNT
+                 is one of them: a bare mono numeral standing for records behind the row. "Soon"
+                 is a word on a row that has no records and no route, so drawing it through the
+                 count vehicle made that vehicle's own definition false wherever a reader
+                 checked it. It gets `.manager-nav-planned` (issue 1515): the same quiet trailing
+                 text at the same rung, in the BODY face rather than the mono one, because a
+                 word has no numerals to align and this sheet ships no real mono 600. -->
+            <span class="manager-nav-planned">{text('FABRICATE.Admin.Manager.Soon', 'Soon')}</span>
           </button>
         {/each}
         <section
@@ -12041,8 +12139,10 @@
             into anything.
 
             EVERY LEAF CARRIES AN EXPLICIT `aria-label`, which is not belt-and-braces here. The
-            collapsed rail hides BOTH `.manager-nav-label` and `.manager-nav-count`
-            (`styles/fabricate.css`), leaving only an `aria-hidden` glyph — so without one the
+            collapsed rail hides `.manager-nav-label` and every trailing marker that reports on
+            the row's own contents — `.manager-nav-count`, `.manager-nav-planned` and
+            `.manager-nav-premium` (`styles/fabricate.css`) — so a collapsed leaf is left with
+            only an `aria-hidden` glyph, and without an explicit label the
             button's accessible name is EMPTY at 56px, which is a state this PR ships a frame
             of. Parties, Travel, Rules & Resources and Downtime all do the same.
           -->
@@ -12350,12 +12450,17 @@
             that Core's own tab strip offers, each carrying a premium padlock. The structure
             follows the shipped Travel group exactly — parent, disclosure toggle, submenu —
             so the collapsed 56px rail hides the labels, the toggle and the whole submenu
-            without a rule of its own, and the premium badge rides `.manager-nav-count` for
-            the same reason.
+            without a rule of its own.
+
+            THE PREMIUM CHIP HAS ITS OWN CLASS (issue 1515). It used to ride
+            `.manager-nav-count` — a tier gate drawn through the record-count vehicle, which is
+            the one substitution the Rail Marker Family forbids, and it rode it only to inherit
+            the collapsed-rail hide. The hide now names `.manager-nav-premium` directly, so the
+            chip keeps the behaviour without borrowing the vehicle.
 
             THE WHOLE GROUP IS EXPERIMENTAL-GATED (issue 1257), parent row, disclosure toggle
             and submenu alike, and everything premium that rides them goes with it: the
-            `.manager-nav-count` PREMIUM badge is a child of the parent button, the padlocks
+            `.manager-nav-premium` badge is a child of the parent button, the padlocks
             are children of the sub-items, and the PREMIUM PREVIEW callout is a child of the
             submenu. Nothing outside this group names Downtime — the title-bar badge answers
             "is a companion module registered at all" across BOTH registries and is not this
@@ -12404,7 +12509,7 @@
               -->
                 {#if !downtimeNavRollupVisible}
                   <span
-                    class={`manager-nav-count manager-nav-premium ${downtimeCoreFallback ? '' : 'is-installed'}`}
+                    class={`manager-nav-premium ${downtimeCoreFallback ? '' : 'is-installed'}`}
                     data-world-nav-premium
                     data-world-nav-premium-state={downtimeCoreFallback ? 'preview' : 'installed'}
                     >{text('FABRICATE.Admin.Manager.World.Downtime.Premium', 'PREMIUM')}</span
@@ -12495,6 +12600,14 @@
                         >{downtimeTabText(item, 'label')}</span
                       >
                       <!--
+                      IT IS THE ISSUE-SUMMARY VEHICLE, not the record count (issue 1515). The
+                      discriminator the family states is that this mark carries a count AND
+                      names its unit in an `aria-label`, which is what the rollup on the parent
+                      row above does; the rollup is literally the sum of these badges, so the
+                      sum and its addends have to be the same mark. A record count is a bare
+                      numeral standing for Fabricate records, and a companion's badge is not
+                      that.
+
                       A badge is a DESCRIPTION, never a name: it is a sibling of the label
                       span above, and it is never nested inside it, because that span names
                       the whole companion panel region (issue 1213) and a nested badge would
@@ -12505,7 +12618,7 @@
                         {@const badge = downtimeSubitemBadge(item)}
                         {#if badge}
                           <span
-                            class="manager-nav-count"
+                            class="manager-nav-issue-badge"
                             data-world-downtime-badge={item.id}
                             id={downtimeNavBadgeId(item.id)}
                             role="img"
@@ -12795,7 +12908,6 @@
         environmentDraftDirty={$viewState.environmentDraftDirty}
         {environmentValidationCount}
         {selectedEnvironmentId}
-        selectedSystemName={selectedSystem?.name || ''}
         {selectedSystemId}
         gatheringConfig={$viewState.gatheringConfig}
         sceneOptions={selectedSystem?.sceneOptions || []}
@@ -12803,7 +12915,6 @@
         {shouldUseEnvironmentDraftForDisplay}
         activeGatheringTab={isWorldRoute ? 'travel' : displayedGatheringTab}
         activeTravelTab={isWorldRoute ? 'parties' : activeTravelTab}
-        worldParties={isWorldRoute}
         selectedTaskId={selectedGatheringTask?.id || selectedGatheringTaskId}
         selectedEventId={selectedGatheringEvent?.id || selectedGatheringEventId}
         managedItemOptions={selectedSystem?.managedItemOptions || []}
@@ -13291,7 +13402,6 @@
         recipeCategories={$viewState.recipeCategories || []}
         recipeSearchTerm={$viewState.recipeSearchTerm || ''}
         selectedRecipeId={selectedRecipeIdForAccess}
-        selectedSystemName={selectedSystem?.name || ''}
         onSearchChange={(term) => store.setRecipeSearch?.(term)}
         onSelectRecipe={(id) => (selectedRecipeIdForAccess = id)}
       />

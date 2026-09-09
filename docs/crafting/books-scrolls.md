@@ -246,6 +246,7 @@ See [The Crafting Menu]({% link crafting/index.md %}) for the rest of the group.
 The surface lists every recipe item in the selected system.
 Each item shows its image and name, and the recipes it teaches under **Linked recipes**.
 An item with no linked recipes yet says so, and the whole surface shows an empty state when the system has no recipe items at all.
+A search field above the list narrows it to items whose name matches what you type.
 
 {% include screenshot.html case="manager-books-scrolls-normal" caption="Every recipe item in a system, with the recipes each one teaches." %}
 

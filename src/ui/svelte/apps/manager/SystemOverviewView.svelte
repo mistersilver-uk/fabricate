@@ -191,35 +191,43 @@
   data-system-overview
   aria-label={text('FABRICATE.Admin.Manager.SystemOverview.Title', 'System overview')}
 >
-  <section class="manager-section-header">
-    <div class="manager-heading">
-      <p class="manager-kicker">
-        {text('FABRICATE.Admin.Manager.SystemOverview.Kicker', 'System overview')}
-      </p>
-      <h2 class="manager-title">
-        {text('FABRICATE.Admin.Manager.SystemOverview.Heading', 'Validation overview')}
-      </h2>
-      <p class="manager-subtitle">
-        {text(
-          'FABRICATE.Admin.Manager.SystemOverview.Subtitle',
-          'Review every validation issue across this crafting system and jump straight to the editor that owns each one.'
-        )}
-      </p>
-    </div>
-    <div class="manager-chip-row" data-system-overview-counts>
-      <Chip tone="danger" data-overview-count="critical"
-        >{counts.critical}
-        {text('FABRICATE.Admin.Manager.SystemOverview.CountCritical', 'critical')}</Chip
-      >
-      <Chip tone="warning" data-overview-count="warning"
-        >{counts.warning}
-        {text('FABRICATE.Admin.Manager.SystemOverview.CountWarning', 'warnings')}</Chip
-      >
-      <Chip tone="neutral" data-overview-count="info"
-        >{counts.info} {text('FABRICATE.Admin.Manager.SystemOverview.CountInfo', 'notes')}</Chip
-      >
-    </div>
-  </section>
+  <!--
+    THE COUNTS ROW STAYS ON THE VALIDATION SURFACE (issue 1515). The route's page header moved
+    to the manager shell, which now names the SYSTEM in its `<h1>`; the kicker, heading and
+    description this section used to carry are retired with it. The counts are not header
+    chrome — `openspec/specs/design-system/spec.md` requires the validation surface itself to
+    carry them — so the row is lifted out of the deleted `<section>` and kept as a direct child
+    of `.manager-main`, with `data-system-overview-counts` unchanged.
+
+    AND IT SPEAKS THE SPEC'S CLOSED VOCABULARY, AS THE SUBSET IT CAN SUPPLY. Cited by
+    REQUIREMENT rather than by line, because a line cite into `openspec/specs/design-system/spec.md`
+    rots on the next edit above it: the requirement "One blocking notice, and non-blocking notices
+    stack" gives the validation surface "passing, warning and blocking counts", and the requirement
+    "Validation is one screen everywhere" fixes their ORDER and closes the vocabulary — "pass, then
+    warning, then blocking", of which "a site reports the subset it can answer rather than choosing
+    an order or inventing a fourth". This row used to read `critical / warnings / notes`, which
+    agreed with the spec on one word of three. Reconciled per the maintainer ruling on issue 1515:
+
+      - `passing` is OMITTED, not invented. The report is `evaluateSystemValidation`'s, which
+        counts ISSUES and never checks run, so there is no denominator here and no pass figure
+        to derive; a "0 passing" or a "2 of 40" would both be a number this surface made up.
+      - `warning` and `blocking` render, in the spec's relative order. `blocking` reads
+        `counts.critical`, because `critical` is the REPORT's severity name for the same fact
+        and only the surface's own copy is governed by the vocabulary.
+      - `info` gains no chip, because a fourth word is not in a closed vocabulary to add. It
+        loses nothing: the groups below draw a row per issue with that issue's own severity
+        chip, whatever its severity.
+  -->
+  <div class="manager-chip-row manager-system-overview-counts" data-system-overview-counts>
+    <Chip tone="warning" data-overview-count="warning"
+      >{counts.warning}
+      {text('FABRICATE.Admin.Manager.SystemOverview.CountWarning', 'warnings')}</Chip
+    >
+    <Chip tone="danger" data-overview-count="blocking"
+      >{counts.critical}
+      {text('FABRICATE.Admin.Manager.SystemOverview.CountBlocking', 'blocking')}</Chip
+    >
+  </div>
 
   {#if report?.blocksSystem === true}
     <div

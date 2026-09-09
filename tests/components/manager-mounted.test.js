@@ -1189,6 +1189,55 @@ function worldNavItem(id) {
   return target.querySelector(`#manager-world-nav-${id}`);
 }
 
+/**
+ * Run one browse row's overflow command (issue 1515).
+ *
+ * The four browse rows carry Edit as an `<IconButton>` and their remaining verbs inside a shared
+ * `<ActionMenu>`, so a verb is reached by OPENING the row's menu and then choosing its item. The
+ * trigger is addressed inside the row — which is what proves the right record's menu opened — and
+ * the panel is addressed at the mount root, because `<ActionMenu>` portals it out of the row
+ * entirely. Exactly one menu is open at a time, which the assertion below holds rather than
+ * assumes.
+ *
+ * One helper rather than a copy per row: the six call sites differ only in the row selector and
+ * the item's label, and six near-identical open-then-click blocks are what the duplication gate
+ * fails on.
+ */
+async function openRowMenu(rowSelector) {
+  const trigger = target.querySelector(`${rowSelector} .manager-icon-button[aria-haspopup="menu"]`);
+  assert.ok(Boolean(trigger), `${rowSelector} renders no overflow menu trigger`);
+  trigger.click();
+  await tick();
+  flushSync();
+
+  const panels = target.querySelectorAll('[role="menu"]');
+  assert.equal(panels.length, 1, 'exactly one row menu is open at a time');
+  return panels[0];
+}
+
+/** The commands one row's overflow menu offers, read and then closed again. */
+async function rowMenuCommands(rowSelector) {
+  const panel = await openRowMenu(rowSelector);
+  const labels = Array.from(panel.querySelectorAll('[role="menuitem"]')).map((item) =>
+    item.textContent.trim()
+  );
+  target.querySelector(`${rowSelector} .manager-icon-button[aria-haspopup="menu"]`).click();
+  await tick();
+  flushSync();
+  return labels;
+}
+
+async function runRowMenuCommand(rowSelector, itemLabel) {
+  const panel = await openRowMenu(rowSelector);
+  const item = Array.from(panel.querySelectorAll('[role="menuitem"]')).find(
+    (candidate) => candidate.textContent.trim() === itemLabel
+  );
+  assert.ok(Boolean(item), `${rowSelector}'s menu offers no "${itemLabel}" command`);
+  item.click();
+  await tick();
+  flushSync();
+}
+
 // The mounted harness stubs `game.i18n.localize` as `(key) => key`, which makes the root's
 // `text(key, fallback)` return the FALLBACK for everything. That is fine for behaviour, and
 // useless for copy: a component reading the WRONG key and a lang value that has drifted from
@@ -3767,12 +3816,43 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.querySelector('.manager-main'));
     assert.ok(target.querySelector('.manager-inspector'));
     assert.equal(target.querySelectorAll('.manager-system-row').length, 2);
-    assert.equal(target.querySelectorAll('.manager-table-head [role="columnheader"]').length, 4);
+    // The strip is `aria-hidden` and carries no `columnheader` since issue 1515: the library is a
+    // `role="list"` of `role="listitem"` rows, and a column header outside a table names nothing.
+    // It is still four VISUAL labels over the four-column grid the rows share.
+    const systemsHead = target.querySelector('.manager-table-head');
+    assert.equal(systemsHead.getAttribute('aria-hidden'), 'true');
+    assert.deepEqual(
+      Array.from(systemsHead.querySelectorAll('span')).map((label) => label.textContent.trim()),
+      ['System', 'Resolution', 'Status', 'Actions']
+    );
+    assert.equal(target.querySelectorAll('[role="columnheader"]').length, 0);
+    assert.equal(target.querySelectorAll('.manager-systems-table[role="list"]').length, 1);
+    assert.equal(target.querySelectorAll('.manager-system-row[role="listitem"]').length, 2);
     assert.equal(target.querySelectorAll('.manager-count-cluster').length, 0);
     assert.ok(target.querySelector('.manager-breadcrumbs'));
-    assert.equal(target.querySelector('.manager-header .manager-heading > .manager-kicker'), null);
+    // ONE PAGE HEADER, EYEBROW INCLUDED (issue 1515). The library used to draw its own
+    // `manager-section-header` — `Browse` / `System library` / a second hint — directly under the
+    // shell's. The eyebrow survives as the shell's `<Kicker>`; the second title does not, and the
+    // lede is the library's own actionable sentence rather than the generic one that described
+    // what a crafting system IS.
+    assert.ok(
+      !target.querySelector('.manager-header .manager-heading > .manager-kicker'),
+      'the shell eyebrow is the shared Kicker primitive, not the manager class it replaces'
+    );
+    assert.equal(
+      target.querySelector('.manager-header [data-page-kicker]').textContent.trim(),
+      'Browse'
+    );
+    assert.equal(
+      target.querySelector('.manager-header .manager-subtitle').textContent.trim(),
+      'Select a row to view counts and enabled features.'
+    );
     assert.equal(target.textContent.includes('Systems View'), false);
-    assert.equal(target.querySelector('.manager-section-header .manager-action-group'), null);
+    assert.equal(target.textContent.includes('System library'), false);
+    assert.ok(
+      !target.querySelector('.manager-main .manager-section-header'),
+      'the library renders no second page header, so it carries no header action group either'
+    );
     assert.equal(target.textContent.includes('Quick actions'), false);
     assert.deepEqual(
       Array.from(target.querySelectorAll('.manager-nav-label')).map((label) =>
@@ -7363,13 +7443,16 @@ describe('CraftingSystemManager mounted behavior', () => {
     flushSync();
 
     assert.deepEqual(calls.slice(-1), [['toggleSystemEnabled', 'smithing', true]]);
+    // Selection reads as `aria-current` on the `listitem` (issue 1515). `aria-selected` is not
+    // valid outside a listbox, and the unselected row carries the attribute at all rather than
+    // announcing itself as "not selected".
     assert.equal(
-      target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-selected'),
+      target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-current'),
       'true'
     );
     assert.equal(
-      target.querySelector('[data-system-id="smithing"]').getAttribute('aria-selected'),
-      'false'
+      target.querySelector('[data-system-id="smithing"]').hasAttribute('aria-current'),
+      false
     );
     assert.equal(
       target.querySelector('[aria-label="Disable Smithing"]').getAttribute('aria-pressed'),
@@ -7461,7 +7544,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     for (const label of ['Graph']) {
       const plannedNav = navButton(label);
       assert.equal(plannedNav.disabled, true);
-      assert.equal(plannedNav.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');
+      assert.equal(plannedNav.querySelector('.manager-nav-planned')?.textContent.trim(), 'Soon');
+      // The planned-view word is NOT the record-count vehicle (issue 1515): a bare mono
+      // numeral standing for records is what that class means, and this row has neither.
+      assert.ok(
+        !plannedNav.querySelector('.manager-nav-count'),
+        'a placeholder row draws no record count'
+      );
     }
 
     craftingParent().click();
@@ -7529,7 +7618,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'selected system scope should remain visible'
     );
     assert.equal(
-      target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-selected'),
+      target.querySelector('[data-system-id="alchemy"]').getAttribute('aria-current'),
       'true'
     );
     // The Crafting group is still open, and that is the fix rather than a leak (issue 1185):
@@ -7567,7 +7656,9 @@ describe('CraftingSystemManager mounted behavior', () => {
         'Downtime',
       ]
     );
-    assert.ok(target.textContent.includes('System library'));
+    // The system library's own page copy is the shell's, since issue 1515 deleted the second
+    // header this used to read `System library` from.
+    assert.ok(target.textContent.includes('Select a row to view counts and enabled features.'));
   });
 
   it('routes to the recipes browser with selected recipe inspector and actions', async () => {
@@ -7773,9 +7864,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(flash, 'the refusal the store pushes back through the sink renders in-window');
     assert.equal(flash.getAttribute('role'), 'alert');
     assert.match(flash.textContent, /This recipe has no result groups\./);
-    target.querySelector('[data-recipe-flash-dismiss]').click();
+    // The dismiss control is the shared `<Notice>`'s own as of issue 1515 — the primitive takes
+    // no per-caller hook for it — while the root keeps the caller's `data-recipe-flash`.
+    target.querySelector('[data-notice-dismiss]').click();
     flushSync();
-    assert.equal(target.querySelector('[data-recipe-flash]'), null, 'the flash is dismissible');
+    assert.ok(!target.querySelector('[data-recipe-flash]'), 'the flash is dismissible');
 
     // The recipes header no longer renders crafting-system import/export.
     assert.ok(
@@ -8537,7 +8630,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const searchStep = VIEW_LAB_CASES.find(
       (entry) => entry.id === 'manager-world-parties-search-filtered'
     ).steps.at(-1);
-    assert.equal(searchStep.selector, '.manager-travel-parties-query');
+    assert.equal(searchStep.selector, '[data-manager-party-search]');
     setInputValue(target.querySelector(searchStep.selector), searchStep.fill);
     await tick();
     flushSync();
@@ -13112,7 +13205,11 @@ describe('CraftingSystemManager mounted behavior', () => {
     const graph = navButton('Graph');
     assert.ok(graph, 'Graph placeholder advertised when experimental on');
     assert.equal(graph.disabled, true, 'Graph is a disabled placeholder');
-    assert.equal(graph.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');
+    assert.equal(graph.querySelector('.manager-nav-planned')?.textContent.trim(), 'Soon');
+    assert.ok(
+      !graph.querySelector('.manager-nav-count'),
+      'and the placeholder word is not drawn through the record-count vehicle (issue 1515)'
+    );
   });
 
   it('exposes the Crafting group with Gathering-parity a11y and nested Settings + Recipes', async () => {
@@ -13897,23 +13994,31 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(target.textContent.includes('Gather Moon Herbs'));
     assert.ok(target.textContent.includes('Prospect Crystal Veins'));
     const tasksHead = target.querySelector('.manager-gathering-task-table-head');
-    const taskHeaders = Array.from(tasksHead.querySelectorAll('[role="columnheader"]')).map(
-      (node) => node.textContent.trim()
+    assert.equal(tasksHead.getAttribute('aria-hidden'), 'true');
+    const taskHeaders = Array.from(tasksHead.querySelectorAll('span')).map((node) =>
+      node.textContent.trim()
     );
-    assert.equal(taskHeaders.length, 4, 'task table should have four headers');
+    assert.equal(taskHeaders.length, 4, 'task list should have four column labels');
     assert.deepEqual(taskHeaders, ['Gathering task', 'Tags', 'Status', 'Actions']);
+    assert.equal(
+      target.querySelectorAll('.manager-gathering-tasks-table[role="list"]').length,
+      1,
+      'the gathering task browser is a list, not a table (issue 1515)'
+    );
+    assert.equal(target.querySelectorAll('.manager-gathering-task-row[role="listitem"]').length, 3);
     const firstTaskRow = target.querySelector('.manager-gathering-task-row');
     const tagsCell = firstTaskRow.querySelector(
       '.manager-gathering-task-tags-cell[data-gathering-task-tags]'
     );
     assert.ok(tagsCell, 'tags chip cell renders as its own grid cell');
-    const tagPills = Array.from(tagsCell.querySelectorAll('.manager-availability-pill'));
-    const tagKinds = new Set();
-    for (const pill of tagPills) {
-      for (const kind of ['biome', 'timeOfDay', 'weather']) {
-        if (pill.classList.contains(`is-${kind}`)) tagKinds.add(kind);
-      }
-    }
+    // BY THE FACET HOOK, NOT BY A VARIANT CLASS (issue 1515). The three facet chips render
+    // through the shared `Chip` now, whose face is a `tone` or a `tint` rather than an
+    // `is-<facet>` class of the retired availability family, so the row's own data hook is what
+    // says which dimension each chip states.
+    const tagPills = Array.from(tagsCell.querySelectorAll('.manager-chip[data-gathering-task-tag]'));
+    const tagKinds = new Set(
+      tagPills.map((pill) => pill.getAttribute('data-gathering-task-tag'))
+    );
     assert.equal(
       tagKinds.size,
       3,
@@ -14029,16 +14134,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
     target.querySelector('[data-gathering-task-id="task-herbs"] .manager-status-toggle').click();
-    target
-      .querySelector(
-        '[data-gathering-task-id="task-herbs"] [aria-label="Duplicate Gather Moon Herbs"]'
-      )
-      .click();
-    target
-      .querySelector(
-        '[data-gathering-task-id="task-herbs"] [aria-label="Delete Gather Moon Herbs"]'
-      )
-      .click();
+    await runRowMenuCommand('[data-gathering-task-id="task-herbs"]', 'Duplicate gathering task');
+    await runRowMenuCommand('[data-gathering-task-id="task-herbs"]', 'Delete gathering task');
     assert.ok(
       calls.some(
         (call) =>
@@ -14538,7 +14635,7 @@ describe('CraftingSystemManager mounted behavior', () => {
         `[data-gathering-task-availability-pill="${kind}"][data-condition-id="${conditionId}"]`
       );
     const availabilityTrigger = (field) =>
-      field.querySelector('.manager-availability-menu-button');
+      field.querySelector('.manager-condition-menu-button');
     const openAvailabilityMenu = async (field) => {
       availabilityTrigger(field).click();
       await tick();
@@ -14546,7 +14643,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     };
     const removeAvailabilityPill = async (field, kind, conditionId) => {
       availabilityPill(field, kind, conditionId)
-        .querySelector('.manager-availability-remove')
+        .querySelector('[data-chip-remove]')
         .click();
       await tick();
       flushSync();
@@ -14747,8 +14844,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(gatheringSubitem('Settings').getAttribute('aria-current'), 'page');
     assert.equal(target.querySelector('.manager-toolbar'), null);
     assert.equal(target.querySelector('.manager-environments-table'), null);
-    assert.ok(
-      target.textContent.includes('Set system-level drop resolution and event rules for gathering.')
+    // The Gathering tab's page hint is the SHELL's since issue 1515 deleted the browse view's own
+    // section header, so it reads the rail record's fallback — which is the one that agrees with
+    // `lang/en.json`. The view's own tab table still carries a longer copy for the empty-tab
+    // panel; the two tables have disagreed on this string since before this change.
+    assert.equal(
+      target.querySelector('.manager-header .manager-subtitle').textContent.trim(),
+      'Set system-level rules for gathering.'
     );
     assert.equal(target.querySelectorAll('[data-gathering-condition-panel]').length, 2);
     // Region is no longer a vocabulary dimension: only the biome vocabulary panel remains.
@@ -15113,10 +15215,17 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.equal(target.querySelectorAll('.manager-environment-row').length, 2);
 
     const environmentTable = target.querySelector('.manager-environments-table');
+    assert.equal(
+      environmentTable.getAttribute('role'),
+      'list',
+      'the environments browser is a list, not a table (issue 1515)'
+    );
+    assert.equal(target.querySelectorAll('.manager-environment-row[role="listitem"]').length, 2);
+    assert.equal(environmentTable.querySelectorAll('[role="columnheader"]').length, 0);
     assert.deepEqual(
-      Array.from(environmentTable.querySelectorAll('[role="columnheader"]')).map((header) =>
-        header.textContent.trim()
-      ),
+      Array.from(
+        environmentTable.querySelectorAll('.manager-environment-table-head[aria-hidden="true"] span')
+      ).map((header) => header.textContent.trim()),
       ['Environment', 'Selection mode', 'Tasks', 'Status', 'Actions']
     );
     assert.equal(environmentTable.textContent.includes('Linked scene'), false);
@@ -15132,8 +15241,37 @@ describe('CraftingSystemManager mounted behavior', () => {
     assert.ok(forestRow.querySelector('.manager-status-toggle'));
     assert.ok(forestRow.querySelector('.manager-environment-action-grid'));
     assert.ok(forestRow.querySelector('[aria-label="Edit Moonlit Forest"]'));
-    assert.ok(forestRow.querySelector('[aria-label="Duplicate Moonlit Forest"]'));
-    assert.ok(forestRow.querySelector('[aria-label="Delete Moonlit Forest"]'));
+    // Edit stays the row's own `<IconButton>`; Duplicate and Delete are commands in the shared
+    // overflow menu since issue 1515, so they are read from the portaled panel rather than as two
+    // more buttons in the row. They name the COMMAND, not the row: `ActionMenu`'s `label` is the
+    // `menuitem`'s accessible name as well as its visible text, and the shipped callers that
+    // predate this conversion spell it generically. The row is named by the trigger the menu was
+    // opened from — which this helper addresses by, so the binding is still asserted here, and
+    // the clause below pins that the trigger really does carry the record's name.
+    assert.deepEqual(await rowMenuCommands('[data-environment-id="env-forest"]'), [
+      'Duplicate environment',
+      'Delete environment',
+    ]);
+    // AND THE TRIGGER NAMES THE RECORD (issue 1515, review round 1). The items are generic, so
+    // the ONLY thing telling a screen-reader user which row they are on is the trigger's own
+    // accessible name — and every row announced the identical "Environment actions", which the
+    // route header's action group also announces. Read as a SET of two, because a per-row check
+    // against one expected string passes just as well when every row says the same thing.
+    assert.deepEqual(
+      [...target.querySelectorAll('.manager-environment-row')].map((row) =>
+        row.querySelector('[aria-haspopup="menu"]').getAttribute('aria-label')
+      ),
+      ['Environment actions for Moonlit Forest', 'Environment actions for Quiet Cavern'],
+      'each row menu trigger is named for the record it acts on'
+    );
+    // The hover tooltip stays generic: it appears beside the row the pointer is already on, so a
+    // name there restates what the GM can see.
+    assert.deepEqual(
+      [...target.querySelectorAll('.manager-environment-row')].map((row) =>
+        row.querySelector('[aria-haspopup="menu"]').getAttribute('title')
+      ),
+      ['Environment actions', 'Environment actions']
+    );
     assert.equal(
       forestRow.querySelector('.manager-environment-reorder-stack'),
       null,
@@ -15183,12 +15321,8 @@ describe('CraftingSystemManager mounted behavior', () => {
     );
     assert.ok(calls.some((call) => call[0] === 'selectEnvironment' && call[1] === 'env-cavern'));
 
-    target
-      .querySelector('[data-environment-id="env-cavern"] [aria-label="Duplicate Quiet Cavern"]')
-      .click();
-    target
-      .querySelector('[data-environment-id="env-cavern"] [aria-label="Delete Quiet Cavern"]')
-      .click();
+    await runRowMenuCommand('[data-environment-id="env-cavern"]', 'Duplicate environment');
+    await runRowMenuCommand('[data-environment-id="env-cavern"]', 'Delete environment');
     assert.ok(
       calls.some((call) => call[0] === 'duplicateEnvironmentDraft' && call[1] === 'env-cavern')
     );
@@ -15664,8 +15798,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       'the premium mark is a WORD, not an icon a sighted reader loses'
     );
     assert.ok(
-      parent.querySelector('[data-world-nav-premium]').classList.contains('manager-nav-count'),
-      'the badge rides the count class so the collapsed 56px rail hides it with the rest'
+      parent.querySelector('[data-world-nav-premium]').classList.contains('manager-nav-premium'),
+      'the premium chip is a vehicle of its own (issue 1515), named by the collapsed-rail hide'
+    );
+    assert.ok(
+      !parent.querySelector('[data-world-nav-premium]').classList.contains('manager-nav-count'),
+      'and no longer borrows the record-count vehicle to inherit that hide'
     );
 
     parent.click();
@@ -17811,7 +17949,19 @@ describe('CraftingSystemManager mounted behavior', () => {
     await settleRouteExit();
 
     const badge = downtimeBadge('ledger');
-    assert.equal(badge.getAttribute('role'), 'img', 'a bare numeral needs a name of its own');
+    assert.equal(badge.getAttribute('role'), 'img', 'a marker needs a name of its own');
+    // THE SAME VEHICLE AS ITS OWN SUM (issue 1515). The parent's rollup is `navTabBadgeTotal`
+    // over exactly these badges and has always drawn as the issue pill; drawing the addends as
+    // record counts made one fact two marks. The discriminator the Rail Marker Family states is
+    // that this mark carries a count AND names its unit, which the `aria-label` above is.
+    assert.ok(
+      badge.classList.contains('manager-nav-issue-badge'),
+      'a companion tab badge draws through the rail summary vehicle'
+    );
+    assert.ok(
+      !badge.classList.contains('manager-nav-count'),
+      'and not through the record-count vehicle, which is a bare numeral standing for records'
+    );
     assert.equal(
       badge.getAttribute('aria-label'),
       VERBATIM_KEY,
@@ -18683,23 +18833,31 @@ describe('CraftingSystemManager mounted behavior', () => {
 
     assert.equal(target.querySelector('.fabricate-manager').dataset.managerView, 'world');
     assert.ok(target.querySelector('[data-travel-panel="parties"]'));
+    // ONE PAGE HEADER (issue 1515). This route used to render the kicker, the title AND a
+    // description sentence a second time inside `.manager-main`, under a page header already
+    // saying two of the three. The eyebrow moves to the shell as a `<Kicker>`, the title was
+    // always the shell's, and the description sentence RETIRES: the maintainer ruled the lede
+    // keeps the computed census, which is the one line on the screen the rows do not already say.
+    // `docs/world/parties.md` carries the retired sentence.
+    assert.ok(
+      !target.querySelector('.manager-main .manager-section-header'),
+      'World Parties renders no second page header'
+    );
+    assert.equal(
+      target.querySelector('.manager-header [data-page-kicker]').textContent.trim(),
+      'WORLD / every system'
+    );
     assert.equal(
       target.querySelector('.manager-header .manager-title').textContent.trim(),
       'World Parties'
     );
-    const worldHeading = target.querySelector('.manager-main .manager-section-header');
     assert.equal(
-      worldHeading.querySelector('.manager-kicker').textContent.trim(),
-      'WORLD / every system'
+      target.textContent.includes('shared across every crafting system'),
+      false,
+      'the retired description sentence is gone rather than moved'
     );
-    assert.equal(worldHeading.querySelector('.manager-title').textContent.trim(), 'World Parties');
-    assert.match(
-      worldHeading.querySelector('.manager-subtitle').textContent,
-      /shared across every crafting system/
-    );
-    // The PAGE header carries the computed census. It is a different element from the
-    // section heading above, and the regex there matches both strings, so this one is
-    // pinned exactly or the count could drift unnoticed.
+    // The page header carries the computed census, pinned exactly or the count could drift
+    // unnoticed.
     assert.equal(
       target.querySelector('.manager-header .manager-subtitle').textContent.trim(),
       '2 parties · 1 enabled · 1 of 2 characters assigned'
@@ -19825,6 +19983,58 @@ describe('CraftingSystemManager mounted behavior', () => {
       ),
       ['in', 'all', 'over']
     );
+    // THE BROWSE ARCHETYPE'S FILTER BAR (issue 1515). The search and the membership filter are
+    // the screen's two filters and render in one `ManagerToolbar` INSIDE the search card, which
+    // is why the band above still reports as `search`: the card is unchanged and the bar nests
+    // in it. Identity rather than presence, because two `.manager-toolbar` elements on one
+    // screen - a bar per control - is the failure this reads for, and `querySelector` would
+    // find the first either way.
+    const toolsBar = target.querySelector('[data-manager-tools-search] .manager-toolbar');
+    assert.ok(Boolean(toolsBar), 'the Tools search band renders the shared filter bar');
+    assert.equal(
+      target.querySelectorAll('[data-manager-tools-search] .manager-toolbar').length,
+      1,
+      'one bar, not one per control'
+    );
+    assert.ok(
+      toolsBar.getAttribute('aria-label')?.length > 0,
+      'a `<section>` with no accessible name is not a landmark at all'
+    );
+    assert.ok(
+      Boolean(toolsBar.querySelector('input[type="search"]')),
+      'the search field is a control OF the bar'
+    );
+    assert.ok(
+      Boolean(toolsBar.querySelector('[data-tool-membership-filter]')),
+      'and so is the membership filter'
+    );
+    // THE SEGMENTS ARE A SETTING AND STAY OUT OF IT. They author `breakageSource` on the system
+    // record rather than narrowing this list, so the bar must not have swept them in.
+    assert.ok(
+      !toolsBar.querySelector('[data-tool-authority-segment]'),
+      'the breakage-source segments are a setting, not a filter'
+    );
+
+    // THE ROW SWITCH IS THE SHARED PRIMITIVE (issue 1515, D2), and its own class SURVIVES the
+    // conversion rather than being replaced by it - `StatusToggle` composes `class` onto its
+    // own, which is what keeps the Foundry smoke's selector and the View Lab's steps pointing
+    // at the same control.
+    const enabledSwitch = target.querySelector('.manager-tools-enabled-toggle');
+    assert.ok(Boolean(enabledSwitch), 'the row still writes its enable switch');
+    assert.equal(enabledSwitch.tagName, 'BUTTON');
+    for (const token of ['fabricate-toggle', 'manager-status-toggle', 'is-on']) {
+      assert.ok(
+        enabledSwitch.classList.contains(token),
+        `the enable switch is the shared control and carries \`${token}\``
+      );
+    }
+    assert.equal(enabledSwitch.getAttribute('aria-pressed'), 'true');
+    const switchTrack = enabledSwitch.querySelector('.manager-status-toggle-track');
+    assert.ok(Boolean(switchTrack), 'the primitive renders the track');
+    assert.ok(
+      Boolean(switchTrack.querySelector('.manager-status-toggle-knob')),
+      'and the knob INSIDE it - a track with no knob is a switch that cannot show its state'
+    );
     // The drop behaviour itself moved WITH the control, to
     // `tests/components/world-tool-catalogue-mounted.test.js`, which drives the zone on the
     // screen that now owns it - including the compendium `{pack, id}` payload that carries no
@@ -20469,21 +20679,51 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
+    // THE COPY AND THE TALLY ARE TWO ELEMENTS SINCE THE CONVERSION (issue 1515). The counts used
+    // to be baked into the label string (`All world tools (3)`); `<SegmentedControl>` draws them
+    // in its own `count` slot, so the words and the numerals are read separately rather than
+    // through one `textContent` that would now report `All world tools3`.
     assert.deepEqual(
-      [...target.querySelectorAll('[data-tool-membership-option]')].map((option) =>
-        option.textContent.trim()
+      [...target.querySelectorAll('[data-tool-membership-option] .manager-segment-label')].map(
+        (label) => label.textContent.trim()
       ),
-      ['In this system (0)', 'All world tools (3)', 'Overriding'],
-      'the segment states a cohort of three against a membership of none'
+      ['In this system', 'All world tools', 'Overriding'],
+      'the three cohort segments name themselves without their tallies'
+    );
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-tool-membership-option]')].map(
+        (option) => option.querySelector('.manager-segment-count')?.textContent.trim() ?? null
+      ),
+      ['0', '3', null],
+      'the segment states a cohort of three against a membership of none, and `Overriding` ' +
+        'renders no tally at all rather than a zero it cannot derive'
     );
 
     target.querySelector('[data-tool-membership-option="all"] input').click();
     await tick();
     flushSync();
 
-    assert.equal(
-      target.querySelector('[data-tool-membership-filter]').dataset.toolMembershipFilter,
-      'all'
+    // SELECTION IS READ FROM THE PRIMITIVE'S OWN STATE, not from the track's data attribute and not
+    // from the radio's `checked` (issue 1515). Three readings were available and two of them are
+    // wrong here:
+    //
+    //   - `data-tool-membership-filter` is `dataAttr`, which the primitive stamps `true` on the
+    //     track rather than the current value, so the retired `="all"` reading now passes for
+    //     every cohort;
+    //   - `input.checked` is written by the synthetic click ITSELF and by the browser's own radio
+    //     group exclusivity, so it reports the click rather than the component. Measured: pinning
+    //     `value` to a constant `'in'` — which is the whole defect this clause exists to catch —
+    //     leaves both `checked` readings unchanged and the suite green.
+    //
+    // `is-active` is the segment class the primitive derives FROM `value`, so it is the one
+    // reading the component has to re-render to satisfy. Read as the whole selected SET, because
+    // a per-segment check cannot see a track that lit two.
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-tool-membership-option]')]
+        .filter((option) => option.classList.contains('is-active'))
+        .map((option) => option.dataset.toolMembershipOption),
+      ['all'],
+      'exactly one segment is lit, and it is the widened cohort'
     );
     assert.deepEqual(libraryRowStates(), WIDENED_GHOST_ROWS);
     assert.ok(!target.querySelector('[data-tool-library-empty]'));
@@ -21374,7 +21614,13 @@ describe('CraftingSystemManager mounted behavior', () => {
     for (const label of ['Graph']) {
       const plannedNav = navButton(label);
       assert.equal(plannedNav.disabled, true);
-      assert.equal(plannedNav.querySelector('.manager-nav-count')?.textContent.trim(), 'Soon');
+      assert.equal(plannedNav.querySelector('.manager-nav-planned')?.textContent.trim(), 'Soon');
+      // The planned-view word is NOT the record-count vehicle (issue 1515): a bare mono
+      // numeral standing for records is what that class means, and this row has neither.
+      assert.ok(
+        !plannedNav.querySelector('.manager-nav-count'),
+        'a placeholder row draws no record count'
+      );
     }
 
     craftingParent().click();
@@ -22774,15 +23020,27 @@ describe('CraftingSystemManager mounted behavior', () => {
     await tick();
     flushSync();
 
+    // THE ROW ITSELF IS INERT (issue 1515). It was a `role="row"` `<div>` with a click handler and
+    // `tabindex="0"`, so clicking any cell selected the system and Enter on the row did too. It is
+    // a `listitem` now: the selecting control is the identity `<button>` inside it, and a click on
+    // a plain cell selects nothing. Both halves are exercised, because a check that only presses
+    // the new control cannot see the old whole-row handler surviving beside it.
     target.querySelector('[data-system-id="smithing"] .manager-labeled-cell').click();
     await tick();
     flushSync();
-    target
-      .querySelector('[data-system-id="smithing"]')
-      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    assert.equal(
+      callsWithoutRouteScopedClear(calls).some((call) => call[0] === 'selectSystem'),
+      false,
+      'a click on a non-identity cell should no longer select the row'
+    );
+
+    target.querySelector('[data-system-id="smithing"] .manager-system-identity').click();
     await tick();
     flushSync();
-    target.querySelector('[aria-label="Export Smithing"]').click();
+    target.querySelector('[data-system-id="smithing"] .manager-system-identity').click();
+    await tick();
+    flushSync();
+    await runRowMenuCommand('[data-system-id="smithing"]', 'Export system');
     target.querySelector('[aria-label="Edit Smithing"]').click();
     await Promise.resolve();
     await Promise.resolve();
@@ -23209,6 +23467,19 @@ describe('CraftingSystemManager mounted behavior', () => {
       validationTab.querySelector('.manager-environment-tab-badge.is-warning')?.textContent.trim(),
       '1'
     );
+    // AND IN THE ORDER THE SURFACE BENEATH THE TAB READS THEM (issue 1515). The counts row on the
+    // validation surface was reconciled to the design system's closed, ordered vocabulary - pass,
+    // then warning, then blocking - so a tab strip badging blocking-then-warning above it would
+    // state one screen's two figures in two orders. Read as a SEQUENCE of tones rather than by
+    // querying each tone in turn, which is what the two clauses above do and is exactly why the
+    // wrong order passed them.
+    assert.deepEqual(
+      [...validationTab.querySelectorAll('.manager-environment-tab-badge')].map((badge) =>
+        badge.classList.contains('is-warning') ? 'warning' : 'blocking'
+      ),
+      ['warning', 'blocking'],
+      'the tab badges run warning then blocking, as the counts row below them does'
+    );
   });
 
   it('renders the kind-grouped validation list on the Validation tab and deep-links an issue', async () => {
@@ -23234,10 +23505,51 @@ describe('CraftingSystemManager mounted behavior', () => {
       target.querySelector('[data-system-overview-blocker]'),
       'the validation list keeps its blocker note'
     );
-    // The summary badges + Review copy stay on the validation tab.
+    // THE COUNTS STAY ON THE VALIDATION SURFACE, AND STAY IN ORDER (issue 1515). The route's page
+    // header moved to the manager shell and the section this row sat inside was deleted with it;
+    // the row itself is not header chrome — `openspec/specs/design-system/spec.md` requires the
+    // validation surface to carry the counts — so it is lifted to a direct child of the surface.
+    // Pinned by POSITION as well as presence, because "lifted out of the deleted section" is a
+    // claim a presence check alone cannot tell apart from "left inside something else".
+    const overviewCounts = target.querySelector('[data-system-overview-counts]');
+    assert.ok(overviewCounts, 'the warning/blocking summary badges render');
     assert.ok(
-      target.querySelector('[data-system-overview-counts]'),
-      'the critical/warning/notes summary badges render'
+      overviewCounts.parentElement?.hasAttribute('data-system-overview'),
+      'the counts row is a direct child of the validation surface, not of a page header'
+    );
+    // THE VOCABULARY IS CLOSED AND THIS SURFACE RENDERS THE SUBSET IT CAN SUPPLY — the maintainer
+    // ruling of 2026-09-08 on issue 1515, applying `openspec/specs/design-system/spec.md`'s
+    // requirement "One blocking notice, and non-blocking notices stack" ("the validation surface
+    // ... carries passing, warning and blocking counts") and its ordering twin under "Validation
+    // is one screen everywhere" ("the pass, warning and blocking counts in that order"). Cited by
+    // REQUIREMENT rather than by line: both line cites had already rotted by the time the review
+    // read them, which is what a line number into a growing spec file does.
+    //
+    // The report this surface draws is `evaluateSystemValidation`'s, which counts ISSUES and never
+    // checks run, so no passing figure is derivable and none is invented: the row is `warning` then
+    // `blocking`, which is the spec's order with the underivable member omitted. `info` is a FOURTH
+    // word the closed vocabulary does not contain, so it gets no chip — and losing a chip loses no
+    // information, because the LIST below is severity-agnostic: it draws a row per issue carrying
+    // that issue's own severity chip, whatever the severity is, which is the second assertion here.
+    // (`info` additionally has no producer in `src/systems/systemValidation.js` today, so the chip
+    // this removes read "0 notes" on every report the surface can be handed.) No denominator is
+    // added either; a chip reading "2 of 40" would be the same invention wearing a different shape.
+    //
+    // Pinned as an ORDERED SET rather than by wording, so a re-spelling of the labels cannot
+    // silently reorder or re-admit a member.
+    assert.deepEqual(
+      [...overviewCounts.querySelectorAll('[data-overview-count]')].map((chip) =>
+        chip.getAttribute('data-overview-count')
+      ),
+      ['warning', 'blocking'],
+      'the counts render the spec vocabulary it can supply, in the spec order'
+    );
+    assert.deepEqual(
+      [...target.querySelectorAll('[data-overview-issue]')].map((row) =>
+        row.querySelector('[data-overview-severity]')?.getAttribute('data-overview-severity')
+      ),
+      ['critical', 'warning'],
+      'every issue stays listed under its group with its own severity chip, counted or not'
     );
 
     const recipeLink = target.querySelector(
@@ -23840,12 +24152,12 @@ describe('CraftingSystemManager mounted behavior', () => {
       'no edit/delete icon buttons in read-only summary'
     );
     assert.equal(
-      card.querySelectorAll('.manager-availability-pill-amount').length,
+      card.querySelectorAll('.manager-currency-subunit-amount').length,
       0,
       'no editable amount inputs in read-only mode'
     );
     assert.equal(
-      card.querySelectorAll('.manager-availability-remove').length,
+      card.querySelectorAll('[data-chip-remove]').length,
       0,
       'no remove-cross controls in read-only mode'
     );
@@ -24197,7 +24509,7 @@ describe('CraftingSystemManager mounted behavior', () => {
     const lanternPill = Array.from(afterAddPills).find(
       (node) => node.getAttribute('data-gathering-task-required-tool-pill') === 'tool-pickaxe'
     );
-    lanternPill.querySelector('.manager-availability-remove').click();
+    lanternPill.querySelector('[data-chip-remove]').click();
     await tick();
     flushSync();
     const afterRemovePills = target.querySelectorAll('[data-gathering-task-required-tool-pill]');
@@ -24336,7 +24648,7 @@ describe('CraftingSystemManager mounted behavior', () => {
       'search input should hide when library is empty'
     );
 
-    stalePill.querySelector('.manager-availability-remove').click();
+    stalePill.querySelector('[data-chip-remove]').click();
     await tick();
     flushSync();
 

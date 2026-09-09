@@ -20,6 +20,7 @@ import {
   minimumViewportFor,
 } from '../scripts/lib/foundryChromeSpec.js';
 import {
+  ACCESS_ROSTER_SEARCH_MISS_TERM,
   ACTOR_KNOWLEDGE_RENDER_FILES,
   BROAD_SIGNAL_CASE_OVERRIDES,
   FALLBACK_CASE_ID,
@@ -37,6 +38,7 @@ import {
   normalizePath,
   parseLabActorTableRegions,
   parseMountRegions,
+  partitionConsoleErrors,
   publishableCases,
   WORLD_PARTIES_SEARCH_TERM,
   WORLD_TOOL_SEARCH_MISS_TERM,
@@ -959,6 +961,164 @@ test('the capture runner threads and asserts declared layouts before taking a sc
   assert.ok(screenshot > assertion, 'the layout assertion must run before frame.screenshot()');
 });
 
+// -- THE PER-CASE CONSOLE-ERROR ALLOWANCE (issue 1515) ------------------------------------------
+//
+// The capture driver fails a render on ANY console error, and that is why a lab frame is worth
+// looking at: a frame rendered over a thrown handler is indistinguishable from one rendered over a
+// working handler. Widening that gate is therefore the most dangerous edit in this harness, and
+// these three properties are what keep the widening narrow.
+//
+// The driver script itself cannot be imported - it dispatches on `process.argv` at module scope
+// and would launch a browser - so the decision is a pure function in the registry module and the
+// WIRING is asserted separately below, in the same shape as the layout-threading check above.
+test('an undeclared console error is still fatal, and a declared one is not', () => {
+  const allowance = [/Failed to toggle recipe enabled state/];
+
+  // (1) THE DEFAULT IS UNCHANGED. A case declaring nothing tolerates nothing.
+  assert.deepEqual(partitionConsoleErrors(['boom'], []), {
+    unmatched: ['boom'],
+    unusedAllowances: [],
+  });
+
+  // (2) A DECLARED ERROR PASSES, and only that one.
+  assert.deepEqual(
+    partitionConsoleErrors(['Fabricate | Failed to toggle recipe enabled state: refused'], allowance),
+    { unmatched: [], unusedAllowances: [] }
+  );
+
+  // (3) AND AN UNMATCHED ERROR BESIDE A MATCHED ONE IS STILL FATAL, which is the property that
+  // makes the allowance narrow rather than a mute button. A case that declares one refusal must
+  // not thereby tolerate a second, unrelated failure in the same render.
+  assert.deepEqual(
+    partitionConsoleErrors(
+      ['Fabricate | Failed to toggle recipe enabled state: refused', 'TypeError: x is undefined'],
+      allowance
+    ),
+    { unmatched: ['TypeError: x is undefined'], unusedAllowances: [] }
+  );
+});
+
+test('a declared console error that never arrives fails the case too', () => {
+  // The allowance is an ASSERTION, not a permission. A pattern that matches nothing means the
+  // case stopped reaching the refusal it is named for, and the frame it is about to publish is
+  // the resting screen - the "unreachable configuration looks identical to working configuration"
+  // failure this repository keeps meeting.
+  assert.deepEqual(partitionConsoleErrors([], [/never happens/]), {
+    unmatched: [],
+    unusedAllowances: ['/never happens/'],
+  });
+
+  // Reported per pattern, so a case declaring two learns WHICH one went stale.
+  assert.deepEqual(partitionConsoleErrors(['seen'], [/seen/, /unseen/]), {
+    unmatched: [],
+    unusedAllowances: ['/unseen/'],
+  });
+});
+
+test('a global-flagged allowance does not skip its second match', () => {
+  // `RegExp#test` advances `lastIndex` on a `g`-flagged pattern, so the second call against a
+  // fresh string starts from the first match's offset and can miss. The symptom would be an
+  // "unused allowance" failure on a case that DID produce the error twice, which reads as a
+  // fixture regression and is not one. `partitionConsoleErrors` strips the flag before it
+  // matches, so the pattern is stateless by the time it is used.
+  const sticky = /refused/g;
+  assert.deepEqual(partitionConsoleErrors(['refused once', 'refused twice'], [sticky]), {
+    unmatched: [],
+    unusedAllowances: [],
+  });
+});
+
+test('the capture runner threads the per-case console allowance into the render', () => {
+  // The same shape as the layout-threading check above, and for the same reason: the field is
+  // declarative data on a case, and a case field that the driver never reads is configuration
+  // that cannot fail. Asserted against the driver's SOURCE because the module cannot be imported.
+  const driver = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
+  assert.match(driver, /allowedConsoleErrors: viewCase\.allowedConsoleErrors \?\? \[\]/);
+  assert.match(driver, /partitionConsoleErrors\(\s*consoleErrors,\s*allowedConsoleErrors\s*\)/);
+
+  // BOTH halves of the rule reach a throw, and BOTH throws precede the return that hands the
+  // buffer back to the publisher.
+  //
+  // THE GUARD AND ITS THROW ARE PINNED AS ONE STATEMENT, not as two substrings that both occur
+  // somewhere. `driver.includes('unusedAllowances.length > 0')` is satisfied by
+  // `if (false && unusedAllowances.length > 0)` - measured, by mutating the driver to exactly
+  // that and watching an earlier draft of this test stay green over a gate that could no longer
+  // fire. A grep that cannot fail is the defect this whole file exists to catch, so the condition
+  // is matched verbatim and the `throw` is required to be the next thing inside the block.
+  assert.match(
+    driver,
+    /\n\s*if \(unmatched\.length > 0\) \{\n\s*throw new Error\(/,
+    'an unmatched console error must still throw, from an unguarded `if`'
+  );
+  assert.match(
+    driver,
+    /\n\s*if \(unusedAllowances\.length > 0\) \{\n\s*throw new Error\(/,
+    'an unused allowance must throw, from an unguarded `if`'
+  );
+  const partition = driver.indexOf('partitionConsoleErrors(');
+  const unusedThrow = driver.indexOf('unusedAllowances.length > 0', partition);
+  const handOff = driver.indexOf('return { buffer, box }', partition);
+  assert.ok(partition >= 0, 'the runner must consult the shared partition helper');
+  assert.ok(handOff > unusedThrow, 'both gates must run before the frame is returned');
+
+  // AND THE ALLOWANCE IS RARE BY CONSTRUCTION. The registry-wide count is asserted so that
+  // adopting this field becomes a visible edit rather than a habit: the gate is the reason the
+  // lab is trusted, and a second case wanting an allowance should have to argue for it here.
+  const declaring = VIEW_LAB_CASES.filter(
+    (viewCase) => (viewCase.allowedConsoleErrors ?? []).length > 0
+  ).map((viewCase) => viewCase.id);
+  assert.deepEqual(
+    declaring,
+    ['manager-recipes-blocked-enable-flash'],
+    'a case gained or lost a console-error allowance; the console gate is what makes a lab frame ' +
+      'evidence, so widening it is an accepted edit rather than an incidental one'
+  );
+});
+
+// -- AN ALERT FRAME HAS TO CONTAIN ITS ALERT (issue 1515, driver capture) ----------------------
+//
+// `manager-world-parties-pane-alert` PASSED its first real capture and did not depict the state
+// it is named for. The click that produces the alert auto-scrolls its own target into view, and
+// the alert renders above the card list, so the shutter opened on a pane with the refusal message
+// off the top edge. Every assertion the case carried was green: `expectSelector` resolves against
+// the DOM, and `expectVisible` asks about `display` and box size rather than about scroll offset.
+// A frame count is not the check.
+//
+// `expectContained` is the assertion that CAN see it, because it compares bounding boxes against
+// the element that clips them. So the two cases whose subject is a transient alert declare it,
+// and this pins the declaration: deleting an `expectContained` entry is otherwise silent, and
+// what it silently restores is a case that photographs the wrong part of the right screen.
+test('the two alert frames assert their alert is inside the box that clips it', () => {
+  const pinned = [
+    // The pane's own scroller - the element `GatheringPartiesTab.svelte` binds as `scroller` and
+    // gives `overflow` to. An alert scrolled above it has a box above the container's and fails.
+    [
+      'manager-world-parties-pane-alert',
+      '.manager-travel-parties-content',
+      '[data-manager-party-summary-error]',
+    ],
+    // The recipes flash is `position: absolute` against this route's `.manager-main`, so it does
+    // not ride the row list's scroll - but that is an argument about a stylesheet, and this makes
+    // it a measurement taken at capture time instead.
+    ['manager-recipes-blocked-enable-flash', '.manager-main', '[data-recipe-flash]'],
+  ];
+
+  for (const [caseId, container, target] of pinned) {
+    const declared = getCaseById(caseId).expectContained ?? [];
+    assert.ok(
+      declared.some((entry) => entry.container === container && entry.target === target),
+      `${caseId} no longer asserts ${target} is contained by ${container}, so it can publish a ` +
+        'frame that resolves every selector and shows none of the state it is named for'
+    );
+  }
+
+  // AND THE RUNNER STILL ENFORCES IT. A declaration the driver stopped reading is configuration
+  // that cannot fail, which is the same defect one level down.
+  const driver = readFileSync(resolve(ROOT, 'scripts/view-lab-screenshots.mjs'), 'utf8');
+  assert.match(driver, /expectContained: viewCase\.expectContained \?\? \[\]/);
+  assert.match(driver, /for \(const expectation of expectContained\)/);
+});
+
 test('every combination-rule value the registry targets is a real MODIFIER_POLICIES member', () => {
   // Ten selectors in this registry pin a rule option by its VALUE, and NOTHING else could
   // see them go stale. The token check above strips attribute values before extracting
@@ -1400,8 +1560,11 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
   );
 
   const filtered = getCaseById('manager-world-parties-search-filtered');
+  // The hook on the INPUT, not the row's own class: the field is `ManagerSearchField` as of
+  // issue 1515, whose `class` prop lands on the `<label>` — a `fill` step targeting the label
+  // would throw — so the case types into the `inputAttrs` hook the caller passes through.
   assert.deepEqual(filtered.steps.at(-1), {
-    selector: '.manager-travel-parties-query',
+    selector: '[data-manager-party-search]',
     fill: WORLD_PARTIES_SEARCH_TERM,
   });
   assert.deepEqual(filtered.smokeLabels, []);
@@ -1444,6 +1607,53 @@ test('the World Parties fixture is legal, and its search and pager cases claim w
     lastPage.expectSelector.includes(
       `:not(:has([data-manager-travel-party-id="${parties[0].id}"]))`
     )
+  );
+
+  // THE REFUSED ENABLE (issue 1515), derived from the same parsed seed, the same `holder` map the
+  // uniqueness walk above built, and the same page size the last-page case is held to.
+  //
+  // `manager-world-parties-pane-alert` is the registry's only frame of
+  // `GatheringPartiesTab.svelte`'s `role="alert"` summary line, and that line renders only when a
+  // travel write is refused with no field to attach the reason to. `setPartyEnabled` is that
+  // operation - `withSave` passes it no `fieldContext`, so `_travelErrorState` writes a summary
+  // and no field error - and the refusal itself is the composite-uniqueness invariant the walk
+  // above models.
+  //
+  // The failure this pins is silent in both directions. A fixture edit that ENABLES the pressed
+  // party makes the press a disable, which is never refused; one that removes the collision makes
+  // the enable SUCCEED. Either way the case still runs, still reaches the pane, and publishes a
+  // frame with no alert in it under the only case named for one.
+  const alertCase = getCaseById('manager-world-parties-pane-alert');
+  const alertPartyId = /data-manager-party-enable="([^"]+)"/.exec(
+    alertCase.steps.map((step) => step.selector ?? '').join(' ')
+  )?.[1];
+  assert.ok(alertPartyId, 'the pane-alert case must press a named party enable pill');
+  const alertParty = parties.find((party) => party.id === alertPartyId);
+  assert.ok(
+    alertParty,
+    `the pane-alert case presses "${alertPartyId}", which the seeded party list does not hold`
+  );
+  assert.equal(
+    alertParty.enabled,
+    false,
+    `${alertPartyId} is enabled, so the case's press DISABLES it - which is never refused, and ` +
+      'the frame would be the resting parties pane under a case named for the alert'
+  );
+  const alertAssociations = [
+    ...new Set([...alertParty.members, alertParty.travelActorUuid].filter(Boolean)),
+  ];
+  assert.ok(
+    alertAssociations.some((uuid) => holder.has(uuid)),
+    `${alertPartyId} associates no actor that an enabled party already holds, so enabling it ` +
+      'would SUCCEED and no pane alert would render'
+  );
+
+  // And the card has to be on the RESTING page: the case takes no pager step, so a card the
+  // first page does not hold has no enable pill in the DOM for its step to press.
+  assert.ok(
+    parties.slice(0, declaredPageSize).some((party) => party.id === alertPartyId),
+    `${alertPartyId} is not on the parties pane's first page, so its enable pill is not rendered ` +
+      'and the capture aborts on that step'
   );
 
   // The empty state reaches its world through the seeded setting, not a post-construction call.
@@ -2133,10 +2343,24 @@ test('changed files map to the windows they affect', () => {
   assert.deepEqual(ids(['lang/en.json']), []);
 
   // A shared primitive or a global stylesheet can change every screen. Selecting all of them would
-  // bury the reviewer, so those signals map to one player screen and one manager screen.
+  // bury the reviewer, so those signals map to one player screen and one manager screen — PLUS
+  // the sheet's own `BROAD_SIGNAL_CASE_OVERRIDES` entry (issue 1515), which is why this list is
+  // five and not two.
+  //
+  // The representative pair is still here, and its presence is the assertion that the override
+  // is ADDITIVE rather than a replacement: the table's contract is that a broad signal keeps
+  // selecting the pair, and "claimed wins, no fallback" would show up here as the pair
+  // disappearing rather than as a comment going stale.
+  //
+  // The three added ids are the surfaces the pair structurally cannot contain — the availability
+  // pill family in the gathering task editor, and the World > Downtime rail group expanded and
+  // collapsed. The entry beside them in `viewLabCases.js` says why each.
   assert.deepEqual(ids(['styles/fabricate.css']).sort(), [
     'fabricate-app-shell',
     'manager-components-normal',
+    'manager-gathering-task-editor-normal',
+    'manager-world-downtime-collapsed',
+    'manager-world-downtime-tracking',
   ]);
 
   // An unmatched render file still yields evidence rather than none.
@@ -3164,6 +3388,91 @@ test('a region-attributed input widens by union too, and so does a straddling hu
   for (const id of LAB_SURFACE_CASE_IDS) {
     assert.ok(straddling.includes(id), `the straddling hunk dropped coverage frame "${id}"`);
   }
+});
+
+test('the two Access roster frames are pinned to the crowded roster the shim seeds', () => {
+  // A MIRROR GUARD ACROSS FOUR FILES THAT KNOW NOTHING ABOUT EACH OTHER (issue 1515): the two
+  // case literals here, `mount.js`'s query layer, `installFoundryShim.js`'s roster table and
+  // `GrantAccessInspector.svelte`'s own page size. A rename in any one of them leaves a query
+  // parameter nobody reads or a page size nothing fills, and neither failure says anything at
+  // the point it happens — it surfaces as a frame showing a one-row roster under a case named
+  // for a pager, which is exactly the class of defect issue 1632 records as undetectable.
+  //
+  // The ARITHMETIC is derived here rather than restated in the cases, for the reason the World >
+  // Parties page-size block a few hundred lines up gives: two magic numbers in two files drift,
+  // and the drift is invisible in a screenshot.
+  const shimSource = readFileSync(
+    resolve(ROOT, 'tests/view-lab/foundry/installFoundryShim.js'),
+    'utf8'
+  );
+  const mountSource = readFileSync(resolve(ROOT, 'tests/view-lab/mount.js'), 'utf8');
+  const inspectorSource = readFileSync(
+    resolve(ROOT, 'src/ui/svelte/apps/manager/GrantAccessInspector.svelte'),
+    'utf8'
+  );
+
+  // The seeded roster, read off the table rather than off a count the table does not state.
+  const table = /const LAB_EXTRA_PLAYER_USERS = Object\.freeze\(\[([\s\S]*?)\]\);/.exec(shimSource);
+  assert.ok(table, 'the shim no longer declares the opt-in extra player roster this pin reads');
+  const seededNames = [...table[1].matchAll(/name: '([^']+)'/gu)].map((found) => found[1]);
+  assert.ok(seededNames.length > 0, 'the roster table parsed to no users, so nothing below binds');
+  // Plus the resting world's own single non-GM user, which the seeder keeps at the head.
+  const rosterSize = seededNames.length + 1;
+
+  const pageSize = Number(/const ROSTER_PAGE_SIZE = (\d+);/.exec(inspectorSource)?.[1]);
+  assert.ok(Number.isInteger(pageSize) && pageSize > 0, 'the inspector states no roster page size');
+
+  // The two claims the paged frame rests on, in the order they fail: a FULL first page, and a
+  // SECOND page to put a bar under it. A roster that fell to the page size satisfies the first
+  // and not the second, and would publish a full page with no pager.
+  assert.ok(
+    rosterSize >= pageSize,
+    `the seeded roster is ${rosterSize} and the page size ${pageSize}, so page one is not full ` +
+      'and the selector the paged frame declares cannot resolve'
+  );
+  assert.ok(
+    rosterSize > pageSize,
+    `the seeded roster is ${rosterSize} at a page size of ${pageSize}, which is ONE page — so ` +
+      'the pager the frame is named for does not render at all'
+  );
+
+  const paged = getCaseById('manager-access-recipe-roster-paged');
+  const noMatch = getCaseById('manager-access-recipe-roster-no-match');
+  for (const viewCase of [paged, noMatch]) {
+    assert.equal(viewCase.query?.manyPlayers, '1', `${viewCase.id} must ask for the crowded roster`);
+    assert.equal(viewCase.query?.system, 'lab-alchemy', `${viewCase.id} needs a restricted system`);
+    assert.deepEqual(viewCase.smokeLabels, [], `${viewCase.id} has no smoke counterpart`);
+    assert.equal(viewCase.reaches, 'beyond', `${viewCase.id} is beyond the smoke walk`);
+  }
+
+  // The flag, end to end. Both halves, because reading the param without acting on it and acting
+  // on a param nothing parses fail in opposite directions and both render the resting roster.
+  assert.match(mountSource, /manyPlayers: params\.get\('manyPlayers'\) === '1'/);
+  assert.match(mountSource, /if \(params\.manyPlayers\) world\.shim\.seedPlayerRoster\(\);/);
+  assert.match(shimSource, /seedPlayerRoster\(\) \{/);
+
+  // The paged frame's selector names the page size it was derived from, so a page size that
+  // changed without this case changing with it fails here rather than in a capture.
+  assert.ok(
+    paged.expectSelector.includes(`[data-access-player-row]:nth-child(${pageSize})`),
+    `the paged case must name the roster's own page size (${pageSize}) as the row it proves`
+  );
+
+  // And the miss term misses. `matches()` in the inspector is a case-insensitive substring test
+  // over the user's name, so this is the same predicate the screen runs.
+  const needle = ACCESS_ROSTER_SEARCH_MISS_TERM.trim().toLowerCase();
+  assert.ok(needle.length > 0, 'an empty term matches everything and the no-match frame is a lie');
+  const hits = ['Lab Player', ...seededNames].filter((name) =>
+    name.toLowerCase().includes(needle)
+  );
+  assert.deepEqual(
+    hits,
+    [],
+    `${ACCESS_ROSTER_SEARCH_MISS_TERM} matches ${hits.join(', ')}, so the no-match frame would ` +
+      'publish a roster row under a case named for the line that stands in for one'
+  );
+  assert.equal(noMatch.steps.at(-1).fill, ACCESS_ROSTER_SEARCH_MISS_TERM);
+  assert.equal(noMatch.steps.at(-1).selector, '[data-access-roster-search="players"]');
 });
 
 test('the registry counts quoted in prose match the registry', () => {
@@ -5504,6 +5813,148 @@ test('every world tool id the capture cases click exists in the lab world, proje
 // So the id set a case may click is the UNION of the two halves, and asserting against either
 // alone would be wrong in opposite directions: the seed alone rejects every migrated row, and the
 // systems alone reject the two world-only records the entry cases are built on.
+// -- A FIXTURE ID IN A SELECTOR IS UNCHECKED BY THE SELECTOR GUARD (issue 1632) ----------------
+//
+// `collectSelectorHookFailures` STRIPS ATTRIBUTE VALUES before it tokenizes, and deliberately so:
+// a value is a fixture id, and fixture ids live in `tests/view-lab/world/`, not in `src/`. The
+// consequence is that the guard proves `data-recipe-id` still exists on some element and says
+// nothing whatever about `sm-r-runeplate-draft`. A renamed or deleted recipe therefore leaves the
+// whole suite green and fails twenty minutes into a capture run - where an aborted step takes the
+// ENTIRE run down, so no case in the registry publishes a frame.
+//
+// The world COMPONENT ids and the world TOOL ids already have their counterpart guards. This is
+// the recipe one, added with issue 1515's cases because two of them are the first to name a
+// recipe id for a state only that recipe can reach.
+//
+// FOUR ATTRIBUTES, because a recipe id reaches the DOM under four different hooks and a guard
+// that knew only the one this change happened to use would be green over the other three: the
+// browse row's identity (`data-recipe-id`), its edit pencil (`data-recipe-edit`), its
+// bulk-selection checkbox (`data-recipe-select`) and the Access route's row (`data-access-row`).
+// The SECTION / MODE / ADD attributes are deliberately NOT in the set - `data-recipe-section`,
+// `data-recipe-mode` and `data-recipe-add` carry vocabulary rather than identity, and demanding a
+// recipe of that name would fail on a correct registry.
+test('every recipe id the capture cases name exists in the lab world', async () => {
+  const { buildLabContent } = await import('./view-lab/world/labContent.js');
+  const content = buildLabContent();
+  const recipeIds = new Set((content.recipes ?? []).map((recipe) => String(recipe?.id ?? '')));
+  assert.ok(recipeIds.size > 0, 'the lab world holds recipes; the fixture read is broken');
+
+  const IDENTITY_HOOK = /\[data-(?:recipe-id|recipe-edit|recipe-select|access-row)="([^"]+)"\]/g;
+  const named = [];
+  for (const viewCase of VIEW_LAB_CASES) {
+    // BOTH halves of a case, not only its steps. An `expectSelector` naming a dead id fails the
+    // capture exactly as a step does - it is the assertion the driver runs before it photographs
+    // - and `manager-recipes-bulk-edit-blocked` already names one there.
+    const selectors = [
+      ...(viewCase.steps ?? [])
+        .filter((step) => typeof step === 'object')
+        .map((step) => String(step.selector ?? '')),
+      String(viewCase.expectSelector ?? ''),
+    ];
+    for (const selector of selectors) {
+      for (const [, id] of selector.matchAll(IDENTITY_HOOK)) {
+        named.push({ caseId: viewCase.id, id });
+      }
+    }
+  }
+
+  // NON-VACUITY, and a floor rather than `> 0`: a regex that stopped matching all but one hook
+  // would report a surviving id and read as a healthy guard. The registry names two dozen.
+  const distinct = new Set(named.map((entry) => entry.id)).size;
+  assert.ok(distinct >= 20, `the scan found only ${distinct} distinct recipe ids; it is broken`);
+
+  for (const { caseId, id } of named) {
+    assert.ok(
+      recipeIds.has(id),
+      `${caseId} names the recipe "${id}", which the lab world does not hold - the capture aborts ` +
+        'on this step and the whole run publishes nothing'
+    );
+  }
+});
+
+// -- THE THREE STATES ISSUE 1515 REGISTERED, DERIVED FROM THE FIXTURE --------------------------
+//
+// Each of these three cases photographs a state that exists only because the fixture is in a
+// particular condition, and in every case the failure mode is a frame that looks fine. A repaired
+// recipe publishes the recipe browser with no flash; a system whose report empties publishes the
+// validation tab's own empty panel; an Access system that stopped being `restricted` does not
+// render the rail entry the case clicks at all.
+//
+// So the premise is DERIVED from production code over the fixture rather than restated. Nothing
+// here asserts a count or a message - both are free to move - only that the state each frame is
+// named for is still reachable.
+test('the states issue 1515 registered are still reachable from the lab fixture', async () => {
+  const { buildLabContent } = await import('./view-lab/world/labContent.js');
+  const { evaluateSystemValidation } = await import('../src/systems/systemValidation.js');
+  const content = buildLabContent();
+
+  const systemOf = (id) => (content.systems ?? []).find((system) => system.id === id);
+  const reportFor = (systemId) => {
+    const system = systemOf(systemId);
+    assert.ok(system, `the lab world no longer holds the crafting system "${systemId}"`);
+    return evaluateSystemValidation(system, {
+      recipes: (content.recipes ?? []).filter((recipe) => recipe.craftingSystemId === systemId),
+      components: system.components ?? [],
+      // The environments the store also feeds in can only ADD issues, so omitting them makes
+      // every claim below a LOWER bound - which is the safe direction for a reachability check.
+      environments: [],
+    });
+  };
+
+  // `manager-recipes-blocked-enable-flash` presses a switch whose write the activation gate
+  // refuses. Two facts have to hold together: the recipe is OFF, so the click is an ENABLE and
+  // not a never-gated disable, and the readiness predicate the browse row's pill reads reports a
+  // critical issue against it, which is the same incompleteness activation refuses on.
+  const flashCase = getCaseById('manager-recipes-blocked-enable-flash');
+  const blockedId = /data-recipe-id="([^"]+)"/.exec(
+    flashCase.steps.map((step) => step.selector ?? '').join(' ')
+  )?.[1];
+  assert.ok(blockedId, 'the flash case must click a named recipe row; the read is broken');
+  const blocked = (content.recipes ?? []).find((recipe) => recipe.id === blockedId);
+  assert.ok(blocked, `the flash case clicks "${blockedId}", which the lab world does not hold`);
+  assert.equal(
+    blocked.enabled,
+    false,
+    `${blockedId} is enabled, so the case's click DISABLES it - which is never gated, and the ` +
+      'frame would be the plain recipe browser under a case named for the refusal alert'
+  );
+  assert.ok(
+    reportFor(blocked.craftingSystemId).issues.some(
+      (issue) => issue.entityId === blockedId && issue.severity === 'critical'
+    ),
+    `${blockedId} raises no critical readiness issue, so activation would ACCEPT it and no flash ` +
+      'would render'
+  );
+
+  // `manager-system-edit-validation` photographs the kind-grouped issue list, and its
+  // `expectSelector` requires a populated `recipe` group inside the counts row. An empty report
+  // draws `data-system-overview-empty` instead, which is a different surface.
+  const validationCase = getCaseById('manager-system-edit-validation');
+  assert.ok(
+    reportFor(validationCase.query.system).issues.some((issue) => issue.kind === 'recipe'),
+    `${validationCase.query.system} reports no recipe-kind issue, so the validation tab draws its ` +
+      'empty panel and the case cannot reach the group its expectSelector names'
+  );
+
+  // `manager-access-recipe-selected` reaches the Access route, which the crafting rail offers
+  // only for a `restricted` system, and then selects one of that system's recipes by id.
+  const accessCase = getCaseById('manager-access-recipe-selected');
+  assert.equal(
+    systemOf(accessCase.query.system)?.visibilityMode,
+    'restricted',
+    `${accessCase.query.system} is no longer restricted, so the Access rail entry the case clicks ` +
+      'is not rendered at all'
+  );
+  const accessRecipeId = /data-access-row="([^"]+)"/.exec(
+    accessCase.steps.map((step) => step.selector ?? '').join(' ')
+  )?.[1];
+  assert.equal(
+    (content.recipes ?? []).find((recipe) => recipe.id === accessRecipeId)?.craftingSystemId,
+    accessCase.query.system,
+    `the Access case selects "${accessRecipeId}", which is not a recipe of the system it opens`
+  );
+});
+
 test('every world component id the capture cases click exists in the lab world', async () => {
   const { buildLabContent } = await import('./view-lab/world/labContent.js');
   const content = buildLabContent();

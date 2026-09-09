@@ -175,6 +175,77 @@
      `density` prop is, for the identical reason: a layout context may still size a
      chip's POSITION (a caller sets `flex-shrink` etc. from outside), but never its own
      geometry.
+   - removable / removeLabel / onRemove: the chip is a MEMBERSHIP TOKEN in an editable set —
+     one value a GM authored here and can take back — rather than a state they can only read
+     (issue 1515). `removable` adds a trailing `<button class="manager-chip-remove">` and the
+     `is-removable` class; `removeLabel` is that button’s `aria-label` and must name the
+     member it takes out ("Remove Perception"), because the chip’s own label arrives as a
+     snippet and no component can read a name out of one; `onRemove` is called once focus has
+     moved.
+
+     `removeLabel` DEFAULTS TO `undefined` RATHER THAN TO `''` OR TO A WORD OF ITS OWN, and
+     `aria-label` is written `{removeLabel || undefined}` (issue 1515, after the required-names
+     gate). Three facts decide it. An `aria-label=""` is not "no label": it REPLACES the name
+     the element would take from its own content with nothing, so it is strictly worse than
+     writing no attribute at all — `tests/design-system-required-names.test.js` ratchets exactly
+     that shape and `IconButton` and `SelectionCheckbox` ship the guarded spelling this now
+     matches. A hard-coded English default is a name no world can change, because `game.i18n`
+     never sees it, and that gate ratchets that too. And a LOCALIZED generic — "Remove",
+     repeated down a row of eight chips — is eight identically named buttons, which is why
+     `ModifierPillSelect` composes `${Remove} ${optionLabel(option)}` rather than naming its
+     control from the key alone. So the caller always has a better name than this primitive
+     could invent, which is the case that same gate says to answer by defaulting to `undefined`
+     and REQUIRING it. The refusal below is what makes that requirement real, and it is why the
+     `|| undefined` branch is unreachable in a rendered chip rather than a silent fallback: a
+     removable chip either has a name or does not render. The read-only state chip is this same component saying something the GM cannot
+     delete, and it never takes this prop: a fact chip that grew an `x` would offer an edit
+     the screen cannot honour.
+
+     THE CONTROL IS A BUTTON OUTSIDE A FORM, so it carries `data-keyboard-focus="true"` —
+     Foundry’s `KeyboardManager#hasFocus` recognises a BUTTON only by its `form` (it returns
+     `!!focused.form`) and this application renders almost none, so without the declaration
+     the window reads as unfocused while the control holds focus: Space pauses the game and
+     the arrows pan the canvas behind it. `ModifierPillSelect` carries the same declaration on
+     the same control for the same reason (issue 1508).
+
+     THREE REFUSALS, AND EACH IS A THROW RATHER THAN A DROPPED PROP. `tag="button"` or
+     `tag="a"` would nest a button inside a control; a missing `removeLabel` leaves a control
+     whose only content is an `aria-hidden` glyph, announced as nothing at all; a missing
+     `onRemove` is an affordance for an edit the screen cannot make. An unrecognised `tone` or
+     `density` is DROPPED a few lines below and that is right for those: the caller sees the
+     default chip and the typo reads as a miss. Here the visible result of a drop would be a
+     chip that looks removable and is not, which is worse than a screen that does not render.
+     `iconOnly` above states its own name requirement and leaves it to a source contract, and
+     the difference is that it shipped with ninety-odd callers to be retroactive to; this prop
+     has none, so the invariant is enforced where it is stated.
+
+     FOCUS DIES WITH THE REMOVED BUTTON, so the destination is taken BEFORE `onRemove` runs:
+     the next chip’s remove control, else the previous chip’s, else the nearest enclosing
+     `[data-chip-remove-fallback]` — a hook the CALLER puts on its own add trigger. The ROW is
+     not a rung this component can add, because it cannot put a `tabindex` on markup it does
+     not own. Deleting the focused element drops focus to `<body>`, which is the unfocused
+     state above plus a keyboard user stranded at the top of the document.
+
+     THE ADD TRIGGER IS OFTEN CONDITIONAL, SO THE CALLER OWES A SECOND HOOK (issue 1515). Four
+     shipped sets hung the hook on a control that renders only while there is something left to
+     add — a `<select>` of unselected realms, a library search, an Add sub-unit button — so
+     removing the LAST chip with no source left was exactly the state in which the ladder ran
+     out. The rung that cannot disappear is the CHIP ROW itself, carrying `tabindex="-1"` and
+     the same hook, and it has to be rendered in the empty state too: a row that appears only
+     alongside chips is resolved, focused and then replaced in the same removal. Both hooks
+     coexist — the search runs outwards from the chip and takes the first match in document
+     order at the nearest ancestor holding one, so a trigger beside the row still wins while it
+     exists.
+
+     THE LIVE REGION IS THE CALLER’S, and a bare chip cannot own one. Neither adding nor
+     removing a member moves focus into the row, so an editable set owes ONE
+     `aria-live="polite"` summary beside it; a region wrapped around the row announces each
+     added chip’s whole subtree — its remove control’s label included — and nothing at all on
+     a removal. `ModifierPillSelect` carries exactly that summary and records the same reason.
+   - disabled: the chip and its remove control go inert together. A DECLARED prop as of issue
+     1515 rather than a rest-spread attribute, because the control has to read it; it is still
+     written onto the rendered element, before the rest spread beside `role`, so a call site
+     that passed it through the spread before is unaffected.
    - iconOnly: the chip is its GLYPH — a square with equal insets and no label, which is the
      face a dense browser row draws when the status has already been said in words beside it
      (issue 1506). It is a boolean rather than a density because it is not a scale: it composes
@@ -200,7 +271,7 @@
      primitive cannot make a caller pass one.
 
   Every other attribute — `title`, `aria-label`, `role`, `data-*` hooks, `onclick`,
-  `type`, `disabled` — is forwarded through the rest spread, so a call site is not
+  `type` — is forwarded through the rest spread, so a call site is not
   limited to a fixed prop list.
 -->
 <script>
@@ -217,6 +288,10 @@
     truncate = false,
     density = 'default',
     iconOnly = false,
+    removable = false,
+    removeLabel = undefined,
+    onRemove = null,
+    disabled = false,
     element = $bindable(null),
     children,
     ...rest
@@ -326,6 +401,95 @@
 
   const iconOnlyRole = $derived(iconOnly && !INTERACTIVE_TAGS.has(tag) ? 'img' : undefined);
 
+  // Read by the class list below and by the template, so the refusals fire while the chip is
+  // being rendered rather than on the first click of a control that should never have existed.
+  const removeControl = $derived(resolveRemoveControl(removable, tag, removeLabel, onRemove));
+
+  /**
+   * Whether to render the remove control, refusing the three shapes that cannot be rendered.
+   *
+   * See the `removable` note in the docblock for why each of these throws where an unrecognised
+   * `tone` is dropped: a dropped tone renders the default chip and reads as a typo, and a
+   * dropped `removable` renders a chip that LOOKS removable and is not.
+   *
+   * @param {boolean} on the `removable` prop
+   * @param {string} host the `tag` prop
+   * @param {string} label the `removeLabel` prop
+   * @param {unknown} handler the `onRemove` prop
+   * @returns {boolean}
+   */
+  function resolveRemoveControl(on, host, label, handler) {
+    if (!on) return false;
+    if (INTERACTIVE_TAGS.has(host)) {
+      throw new Error(
+        `Chip: removable refuses tag="${host}", because the remove control is a button and a button inside an operable host nests a control in a control.`
+      );
+    }
+    if (!label) {
+      throw new Error(
+        'Chip: removable requires removeLabel, because the control\u2019s glyph is aria-hidden and a control with no label is announced as nothing at all.'
+      );
+    }
+    if (typeof handler !== 'function') {
+      throw new Error(
+        'Chip: removable requires onRemove, because a remove control with no handler is an affordance for an edit the screen cannot make.'
+      );
+    }
+    return true;
+  }
+
+  // Focus dies with the removed control and drops to `<body>`, where Foundry treats the window
+  // as unfocused and the next keystroke reaches the canvas bindings. Move it BEFORE emitting:
+  // every candidate below exists right now, and choosing one after the handler has run is
+  // choosing from a DOM the removal has already changed. Next chip first, then the previous one
+  // — removing the LAST member has no "next", and jumping straight to the trigger while members
+  // remain reads as being thrown out of the row.
+  function remove() {
+    focusAfterRemoval();
+    onRemove?.();
+  }
+
+  function focusAfterRemoval() {
+    const target =
+      removeControlIn(element?.nextElementSibling) ||
+      removeControlIn(element?.previousElementSibling) ||
+      fallbackTarget();
+    target?.focus?.();
+  }
+
+  /**
+   * A sibling chip’s own remove control, or null when the sibling is not one.
+   *
+   * A row may hold things that are not chips — a caller’s trailing add button sits in one — so
+   * this asks each side for the hook rather than assuming a sibling is a chip.
+   *
+   * @param {Element|null|undefined} sibling
+   * @returns {Element|null}
+   */
+  function removeControlIn(sibling) {
+    return sibling?.querySelector?.('[data-chip-remove]') || null;
+  }
+
+  /**
+   * The caller’s named fallback: the nearest ancestor that CONTAINS a
+   * `[data-chip-remove-fallback]`, searched outwards from the chip.
+   *
+   * Outwards rather than from the document, so a screen with two editable sets hands focus to
+   * the trigger of the set being edited rather than to whichever one the document happens to
+   * hold first. A hook rather than a prop, for the reason `ModifierPillSelect` finds its own
+   * menu button by hook: the trigger is usually a component, and `bind:this` on a component tag
+   * yields the INSTANCE rather than its node.
+   *
+   * @returns {Element|null}
+   */
+  function fallbackTarget() {
+    for (let node = element?.parentElement; node; node = node.parentElement) {
+      const found = node.querySelector('[data-chip-remove-fallback]');
+      if (found) return found;
+    }
+    return null;
+  }
+
   const classes = $derived(
     [
       'manager-chip',
@@ -345,6 +509,7 @@
       density === 'tag-run' ? 'is-tag-run' : '',
       density === 'inspector' ? 'is-inspector' : '',
       iconOnly ? 'is-icon-only' : '',
+      removeControl ? 'is-removable' : '',
       extraClass,
     ]
       .filter(Boolean)
@@ -362,13 +527,23 @@
   style={swatchStyle}
   data-chip-tint={safeTint || undefined}
   role={iconOnlyRole}
+  disabled={disabled || undefined}
   {...rest}
   >{#if safeSwatch}<span
       class="manager-chip-swatch"
       data-chip-swatch={safeSwatch}
       aria-hidden="true"
-    ></span>{/if}{#if icon}<i class={icon} aria-hidden="true"
-    ></i>{/if}{@render children?.()}</svelte:element
+    ></span>{/if}{#if icon}<i class={icon} aria-hidden="true"></i>{/if}{#if removeControl}<span
+      class="manager-chip-label">{@render children?.()}</span
+    ><button
+      type="button"
+      class="manager-chip-remove"
+      data-chip-remove
+      data-keyboard-focus="true"
+      {disabled}
+      aria-label={removeLabel || undefined}
+      onclick={remove}><i class="fas fa-xmark" aria-hidden="true"></i></button
+    >{:else}{@render children?.()}{/if}</svelte:element
 >
 
 <style>
@@ -903,6 +1078,82 @@
     border: 1px solid color-mix(in srgb, var(--fab-chip-color) 60%, var(--fab-border));
     border-radius: 50%;
     background: var(--fab-chip-color);
+  }
+
+  /* THE REMOVE CONTROL (issue 1515), and everything about it is written AFTER the six density
+     rules deliberately. Each density restates the chip’s `padding` shorthand at (0,2,0), which
+     is this block’s own specificity, so a trailing inset written before them would be reset by
+     whichever density the caller also asked for.
+
+     THE HIT BOX IS ONE SIDE, NOT SIX. `iconOnly` above publishes a square per density because it
+     IS the chip; this is a CONTROL inside one, and the density axis scales the badge a GM reads
+     rather than the thing they press. 20px is the default density’s own `min-height` and the
+     side `iconOnly` already publishes there, so a removable chip at the compact scale measures
+     28px — the shipped `.manager-availability-pill` height to the pixel, which is what lets the
+     hand-written sites converge here without moving. No `min-height` is stated on the chip for
+     it: the control’s own box is what makes the chip 28px, so `is-action`’s 34px floor still
+     governs there and nothing has to restate a height per density.
+
+     `is-list` IS THE ONE PLACE THIS SHOWS, and it is the same anomaly `iconOnly` records: that
+     density declares `min-height: 0` and draws a ~15px stadium, so a removable list chip is the
+     control’s 28px rather than the row’s 15. That is the honest consequence of putting a
+     control in the densest badge the reference draws, and the alternative is a hit box derived
+     from a height that density declines to have. */
+  .manager-chip.is-removable {
+    padding-right: var(--fab-space-2xs);
+  }
+
+  /* `truncate` clips the LABEL and never the control. A truncated chip is a nowrap flex row with
+     `overflow: hidden`, and a flex item’s automatic minimum size is its CONTENT width — so
+     without this the label refuses to shrink and pushes the control out of the chip’s visible
+     box, leaving an affordance that is still in the DOM, still in the tab order, and no longer
+     on screen. The wrapper exists only on a removable chip, so every other chip renders the
+     snippet exactly where it always did. */
+  .manager-chip.is-truncated .manager-chip-label {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* `flex: 0 0 auto` is the other half of that: the label gives way, the control does not.
+     `height` and `min-height` are both stated for the reason the icon-only squares state both —
+     a column flex parent would otherwise collapse it — and `appearance`, `height` and the font
+     are the three properties Foundry’s host button geometry imposes, exactly as the
+     `button.manager-chip` reset above names them. The glyph takes the chip’s own font size by
+     inheritance, so it follows whichever density the caller asked for. */
+  .manager-chip-remove {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    min-height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    color: var(--fab-text-muted);
+    background: transparent;
+    font-family: inherit;
+    font-size: inherit;
+    cursor: pointer;
+  }
+
+  /* The control says what it does before it does it, on the family that means "this deletes
+     something". Foreground and fill only: no `outline` and no `box-shadow`, because the module
+     focus pair is declared once at the module root and a primitive that restated either half
+     here would take the keyboard affordance off the one control this prop adds. */
+  .manager-chip-remove:hover:not(:disabled),
+  .manager-chip-remove:focus-visible {
+    color: var(--fab-danger-text);
+    background: var(--fab-danger-soft);
+  }
+
+  /* Inert with the chip. `button.manager-chip:disabled` above states the same two declarations
+     for a chip that IS a button; this states them for the control inside one, which is a
+     different element and the only one `disabled` can reach on a `span` host. */
+  .manager-chip-remove:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
 
   /* An item TAG (issue 772). Purple, through the same `--fab-chip-color` + `color-mix`

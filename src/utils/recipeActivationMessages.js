@@ -218,6 +218,42 @@ export function localizeRecipeActivationError(error, localizeFn) {
 }
 
 /**
+ * The SAME refusal, as the two parts a `<Notice>` draws (issue 1515).
+ *
+ * The single string above is the right shape for a Foundry toast, which has one line and no
+ * hierarchy. The recipe library's in-window refusal is a `<Notice>`, whose specimen states a
+ * `title` naming what happened over a quieter `detail` saying why — so handing it the whole
+ * sentence put the reasons in the title's ink and left the detail line empty.
+ *
+ * SPLIT AT THE PRODUCER, NOT AT THE CONSUMER. The alternative is for the view to cut the built
+ * string at its first colon, which is a parse of localized copy: a translation free to move or
+ * drop that punctuation would silently retitle the notice, and nothing would fail. Here both
+ * halves are built from their own material — the name from the error, the reasons from the
+ * issues — so no separator is ever inferred.
+ *
+ * @param {unknown} error
+ * @param {(key: string, data?: object) => string} [localizeFn]
+ * @returns {{ title: string, detail: string }|null} `null` for a non-activation error.
+ */
+export function localizeRecipeActivationParts(error, localizeFn) {
+  const issues = Array.isArray(error?.activationIssues) ? error.activationIssues : null;
+  if (!issues) return null;
+
+  const detail = issues
+    .map((issue) => localizeActivationIssue(issue, localizeFn))
+    .filter(Boolean)
+    .join(' ');
+  const params = { name: error?.recipeName || '' };
+  const key = `${LANG_PREFIX}.CannotEnableTitle`;
+  const localized = localizeFn?.(key, params);
+  const title =
+    localized && localized !== key
+      ? localized
+      : interpolate('Cannot enable recipe "{name}"', params);
+  return { title, detail };
+}
+
+/**
  * Build the localized, id-free toast string for a
  * {@link module:systems/RecipePersistenceError.RecipePersistenceError} — a recipe
  * SAVE (create/update) that failed structural/reference validation (issue 595).
