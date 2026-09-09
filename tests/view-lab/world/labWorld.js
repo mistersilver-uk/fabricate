@@ -20,12 +20,13 @@
  *   4. initialize as GM (initialization migrates and writes),
  *   5. flip the viewer for player frames.
  */
+import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
+import { createLocalizer, toI18nStub } from '../labI18n.js';
+
 import { buildLabActors, buildDocumentIndex } from './labActors.js';
 import { buildLabContent, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
 import { seedLabInteractables } from './labInteractables.js';
 import { buildLabBlindRunSecret, buildLabRunStates, installLabRunStates } from './labRunStates.js';
-import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
-import { createLocalizer, toI18nStub } from '../labI18n.js';
 
 const FABRICATE_NAMESPACE = 'fabricate';
 
@@ -355,6 +356,7 @@ function stripAuthoredWorldComponents(content) {
  *   whatever the active scene carries, so "nothing on this scene" is a property of the world
  *   rather than of which behaviour a case opens. See `labInteractables.js` for why the two config
  *   states are seeded behaviours instead.
+ * @param {string|null} [options.journalCaseState] Focused persisted Journal state for View Lab.
  * @returns {Promise<object>} The world, with `fabricate`, `shim`, and `content` attached.
  */
 export async function buildLabWorld({
@@ -368,6 +370,7 @@ export async function buildLabWorld({
   noAuthoredWorldComponents = false,
   noInteractables = false,
   gatheringTaskMode = null,
+  journalCaseState = null,
 } = {}) {
   const content = buildLabContent();
   seedGatheringTaskMode(content, gatheringTaskMode);
@@ -461,6 +464,14 @@ export async function buildLabWorld({
   await runtime.runOwnedItemComponentIdentityRestamp();
   world.fabricate = fabricate;
 
+  // Versioned Journal frames need to show the controls that an available authority enables. The
+  // lab has no real JournalEntry document service, so it cannot prove arbitration; this narrow
+  // presentation collaborator answers only the availability question consumed by the projection.
+  // Command correctness remains owned by mounted command tests and the two-realm Foundry gate.
+  if (journalCaseState && journalCaseState !== 'authority-unavailable') {
+    fabricate.getJournalRunAuthorityAvailability = () => ({ available: true, reason: null });
+  }
+
   if (!fabricate.craftingSystemManager?.initialized) {
     throw new Error(
       'view lab: CraftingSystemManager did not initialize; the fixture world is unusable'
@@ -515,6 +526,8 @@ export async function buildLabWorld({
         userId: 'user-lab-player',
         recipes: runRecipes,
         environments: content.environments,
+        tasks: content.gatheringConfig.tasks,
+        journalCaseState,
       })
     );
     // The in-flight blind run's secret half (issue 901). It is NOT a flag: the drawn task, its
