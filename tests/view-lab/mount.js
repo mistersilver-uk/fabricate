@@ -447,10 +447,12 @@ function installJournalCaseServiceSeam(services, state) {
     return;
   }
   if (state === 'error-retry') {
-    let attempts = 0;
+    let recovered = false;
+    services.recoverJournalCaseFixture = () => {
+      recovered = true;
+    };
     services.listJournalForActor = (...args) => {
-      attempts += 1;
-      if (attempts === 1) return Promise.reject(new Error('View Lab Journal load failure'));
+      if (!recovered) return Promise.reject(new Error('View Lab Journal load failure'));
       return list?.(...args) ?? null;
     };
     return;

@@ -1491,42 +1491,81 @@ function journalLifecycleCases() {
     'cancel-confirmation': [{ selector: '[data-run-action="cancel-arm"]' }],
     'past-stage': [{ selector: '[data-stage-nav-index="0"]' }],
     'future-stage': [{ selector: '[data-stage-nav-index="2"]' }],
+    'finished-cancelled': [{ selector: '[data-stage-nav-index="0"]' }],
     'active-page-two': [{ selector: '[data-journal-list="active"] [data-pagination-next]' }],
     'finished-page-two': [{ selector: '[data-journal-list="finished"] [data-pagination-next]' }],
     'gathering-straight-finished': [{ selector: '[data-run-action="primary"]' }],
     'gathering-d100-finished': [{ selector: '[data-run-action="primary"]' }],
     'gathering-check-finished': [{ selector: '[data-run-action="primary"]' }],
-    'filter-paused': [{ selector: '[data-journal-status-filter] input[value="paused"]' }],
+    'filter-paused': [{ selector: '[data-journal-status-filter] label:has(input[value="paused"])' }],
     'empty-search': [{ selector: '[data-journal-search] input', fill: 'No matching Journal run' }],
     dismissal: [{ selector: '[data-journal-dismiss]' }],
     'stale-action': [{ selector: '[data-run-action="primary"]' }],
     'command-timeout': [{ selector: '[data-run-action="primary"]' }],
     'roll-cancelled': [{ selector: '[data-run-action="primary"]' }],
+    alchemy: [{ selector: '[data-journal-kind-filter]' }, { selector: '[data-popover-option="alchemy"]' }],
+    salvage: [{ selector: '[data-journal-kind-filter]' }, { selector: '[data-popover-option="salvage"]' }],
   };
+  const detail = '[data-journal-detail]';
+  const primary = '[data-run-action="primary"]';
+  const enabledPrimary = `${primary}:not(:disabled):not([aria-busy="true"])`;
+  const has = (...selectors) => selectors.map((selector) => `:has(${selector})`).join('');
+  const lacks = (...selectors) => selectors.map((selector) => `:not(:has(${selector}))`).join('');
+  const terminal = (status, ...evidence) =>
+    detail + has(`[data-journal-verdict="${status}"]`, ...evidence) + lacks('[data-run-action-bar]');
+  const commandError = (runId) =>
+    '.journal-view-container' +
+    has(`[data-run-id="${runId}"]`, '[data-journal-command-error] [data-notice-action]', `${detail} ${enabledPrimary}`) +
+    lacks('[data-run-action-bar][aria-busy="true"]', '[data-journal-verdict]');
+  const paged = (kind, row, otherRow) =>
+    '.journal-view-container' + has(
+      row, otherRow, `[data-journal-list="${kind}"] [data-pagination-prev]:not(:disabled)`,
+      `[data-journal-list="${kind}"] [data-pagination-next]:disabled`, detail
+    );
+  const roomy = detail + has('[data-stage-card="1"][data-stage-state="current"]', '[data-stage-nav-index="2"]');
   const expected = {
-    loading: '[data-journal-state="loading"]',
-    'error-retry': '[data-journal-state="error"]',
-    'no-actor-empty': '[data-journal-state="empty"]',
-    'cancel-confirmation': '[data-run-cancel-decision]',
-    'waiting-open-choice': '[data-choice-options]',
-    'past-stage': '[data-stage-nav-return]',
-    'future-stage': '[data-stage-nav-return]',
-    'gathering-d100': '[data-yield-scale]',
-    'gathering-check': '[data-outcome-ladder]',
-    'essence-shared': '[data-essence-pool]',
-    'recovery-required': '[data-journal-recovery]',
-    'ready-single': '[data-run-status="ready"]',
-    paused: '[data-journal-paused]',
-    'finished-success': '[data-journal-verdict="succeeded"]',
-    'finished-failure': '[data-journal-verdict="failed"]',
-    'finished-cancelled': '[data-journal-verdict="cancelled"]',
-    'gathering-straight-finished': '[data-journal-verdict="succeeded"]',
-    'gathering-d100-finished': '[data-yield-cut]',
-    'gathering-check-finished': '[data-journal-verdict="succeeded"]',
-    'active-page-two': '[data-run-id="lab-v1-active-5"]',
-    'finished-page-two': '[data-history-run-id="lab-v1-finished-5"]',
-    'automatic-completion': '[data-journal-verdict="succeeded"]',
-    dismissal: '[data-journal-empty="detail"]',
+    'ready-single': '.journal-view-container' + has('[data-run-status="ready"]', `${detail} ${enabledPrimary}`) + lacks('[data-stage-nav]'),
+    'waiting-auto-eligible': detail + has('[data-run-completion-switch] input[value="worldTime"]:checked', '[data-journal-time-remaining]', `${primary}:disabled`),
+    'waiting-open-choice': detail + has('[data-choice-options] [data-choice-id]:not(:disabled)', '[data-slot-row] button[aria-pressed="true"]', `${primary}:disabled`),
+    'material-shortage': detail + has('[data-essence-threshold="fire"] [aria-valuemax="60"][aria-valuenow="0"]', `${primary}:disabled`),
+    'ingredient-route': detail + has('[data-slot-id="jw-set-gold-g1"]', '[data-journal-stage-details][data-editable="true"]') + lacks('[data-slot-id="jw-set-silver-g1"]'),
+    'check-route': detail + has('[data-outcome-ladder] [data-outcome-tier]', enabledPrimary),
+    'essence-shared': detail + has('[data-essence-threshold="earth"]', '[data-essence-threshold="fire"]', '[data-essence-source] button:not(:disabled)'),
+    paused: detail + has('[data-journal-paused]', '[data-run-action="resume"]:not(:disabled)', '[data-stage-state="paused"]') + lacks('[data-journal-time-remaining]'),
+    'cancel-confirmation': detail + has('[data-run-cancel-decision] [data-run-action="cancel-confirm"]', '[data-run-action="cancel-keep"]') + lacks(primary, '[data-run-action="pause"]', '[data-run-completion]'),
+    'past-stage': detail + has('[data-stage-card="0"][data-stage-state="past"]', '[data-stage-nav-return]', '[data-journal-stage-evidence] .journal-fact-value:not(:empty)') + lacks('[data-journal-stage-details][data-editable="true"]'),
+    'future-stage': detail + has('[data-stage-card="2"][data-stage-state="future"]', '[data-stage-nav-return]', '[data-journal-summary-card="check"] .journal-fact-value:not(:empty)') + lacks('[data-journal-stage-details][data-editable="true"]'),
+    'gathering-straight': detail + has('[data-yield-entry="lab-gathering-emberbloom"]', enabledPrimary) + lacks('[data-yield-cut]', '[data-outcome-ladder]'),
+    'gathering-d100': detail + has('[data-yield-scale] [data-yield-entry]', enabledPrimary) + lacks('[data-yield-cut]', '[data-outcome-ladder]'),
+    'gathering-check': detail + has('[data-outcome-tier="lab-abundant"]', '.fab-outcome-tier .fa-circle-xmark', enabledPrimary) + lacks('[data-yield-cut]'),
+    'gathering-straight-finished': terminal('succeeded', '[data-yield-entry="hb-emberbloom"]') + lacks('[data-yield-cut]'),
+    'gathering-d100-finished': terminal('succeeded', '[data-yield-cut]', '[data-yield-entry="hb-moonleaf"]', '[data-yield-entry="hb-sunroot"]') + lacks('[data-yield-cut] ~ [data-yield-cut]'),
+    'gathering-check-finished': terminal('succeeded', '[data-outcome-tier="lab-abundant"]', '[data-yield-entry="hb-emberbloom"]'),
+    'finished-success': terminal('succeeded', '[data-yield-entry="sm-horseshoe"]', '[data-journal-stage-evidence] .journal-fact-value:not(:empty)'),
+    'finished-failure': terminal('failed', '[data-journal-stage-evidence] .journal-fact-row.is-danger') + lacks('[data-yield-entry]'),
+    'finished-cancelled': terminal('cancelled', '[data-stage-card="0"][data-stage-state="past"]', '[data-stage-nav-index="1"]', '[data-journal-stage-evidence] .journal-fact-value:not(:empty)'),
+    'active-page-two': paged('active', '[data-run-id="lab-v1-active-5"]', '[data-history-run-id="lab-v1-finished-1"]'),
+    'finished-page-two': paged('finished', '[data-history-run-id="lab-v1-finished-5"]', '[data-run-id="lab-v1-active-1"]'),
+    'filter-paused': '.journal-view-container' + has('[data-journal-status-filter] input[value="paused"]:checked', '[data-run-id="lab-v1-filter-paused"][data-run-status="paused"]') + lacks('[data-run-id="lab-v1-filter-ready"]'),
+    'empty-search': '.journal-view-container' + has('[data-journal-empty="active"]', '[data-journal-empty="history"]', detail) + lacks('[data-run-id]', '[data-history-run-id]'),
+    'automatic-completion': terminal('succeeded', '[data-yield-entry="sm-horseshoe"]'),
+    'automatic-blocker': '.journal-view-container' + has('[data-run-id="lab-v1-automatic-blocker"][data-run-status="ready"]', '[data-essence-threshold="fire"] [aria-valuemax="60"][aria-valuenow="0"]') + lacks('[data-journal-verdict]'),
+    dismissal: '.journal-view-container' + has('[data-journal-empty="detail"]', '[data-journal-empty="history"]') + lacks('[data-history-run-id="lab-v1-dismissal"]'),
+    'redacted-owner': '.journal-view-container' + has('[data-run-id="lab-gathering-blind-waiting"]', `${detail} [data-run-action="cancel-arm"]:not(:disabled)`) + lacks('[data-journal-stages]', '[data-yield-entry]', '[data-run-secret-preview]'),
+    alchemy: detail + has('[data-run-action="primary"]:not(:disabled)', '[data-slot-id="s1-g1"]', '.journal-detail-identity img[src$="bottle-bulb-corked-glowing-red.webp"]') + lacks('[data-journal-verdict]'),
+    salvage: terminal('succeeded', '[data-yield-entry="Item.hb-empty-vial"]', '[data-yield-entry="Item.hb-mortar-dust"]'),
+    legacy: '.journal-view-container' + has('[data-run-id="lab-run-inprogress-single"][data-run-status="inProgress"]', `${detail} ${enabledPrimary}`) + lacks('[data-run-completion]', '[data-run-action="pause"]'),
+    loading: '[data-journal-state="loading"][aria-busy="true"] .fa-spinner',
+    'error-retry': '[data-journal-state="error"] [data-notice-tone="danger"] [data-notice-action]',
+    'no-actor-empty': '[data-journal-state="empty"]:not([aria-busy="true"])' + lacks('[data-run-action-bar]'),
+    'stale-action': commandError('lab-v1-stale-action'),
+    'command-timeout': commandError('lab-v1-command-timeout'),
+    'authority-unavailable': detail + has(`${primary}:disabled[title]:not([title=""])`, '[data-run-action="cancel-arm"]:disabled') + lacks('[data-journal-verdict]'),
+    'roll-cancelled': '.journal-view-container' + has('[data-run-id="lab-v1-roll-cancelled"][data-run-status="ready"]', `${detail} ${enabledPrimary}`) + lacks('[data-journal-command-error]', '[data-journal-verdict]', '[data-run-action-bar][aria-busy="true"]'),
+    'unsupported-version': detail + has('[data-notice-tone="warning"]', `${primary}:disabled`, '[data-run-action="cancel-arm"]:disabled') + lacks('[data-run-completion]'),
+    'recovery-required': detail + has('[data-journal-recovery][role="alert"] .fab-notice-detail:not(:empty)', `${primary}:disabled`, '[data-run-action="cancel-arm"]:disabled'),
+    wide: roomy,
+    narrow: roomy,
   };
   return states.map((state) =>
     playerCase({
@@ -1540,9 +1579,19 @@ function journalLifecycleCases() {
         ...(state.startsWith('gathering-straight') && { gatheringTaskMode: 'straight' }),
         ...(state.startsWith('gathering-check') && { gatheringTaskMode: 'routed' }),
       },
-      position: { width: state === 'narrow' ? 900 : 1240, height: 880 },
+      position: { width: state === 'narrow' ? 1024 : 1240, height: 880 },
       steps: steps[state] ?? [],
-      expectSelector: expected[state] ?? '[data-journal-state="populated"]',
+      expectTab: 'journal',
+      expectSelector: expected[state],
+      ...(state === 'filter-paused' && { expectCenterHit: steps[state][0].selector }),
+      ...(['narrow', 'wide'].includes(state) && {
+        expectLayout: {
+          containerSelector: '.journal-view-container',
+          gridSelector: '.journal-view-grid',
+          expectedTracks: state === 'narrow' ? 1 : 2,
+          ...(state === 'narrow' && { maxContentBoxInlineSize: 960 }),
+        },
+      }),
       kinds: ['player', 'journal', ...(state === 'narrow' ? ['responsive'] : [])],
       sourceMatches: [
         /^src\/ui\/svelte\/apps\/journal\//,

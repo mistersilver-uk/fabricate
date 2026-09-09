@@ -382,8 +382,10 @@ export async function buildLabWorld({
   gatheringTaskMode = null,
   journalCaseState = null,
 } = {}) {
-  const content = buildLabContent();
-  if (journalCaseState === 'ready-single') seedJournalNoCheckFixture(content);
+  const content = buildLabContent({ journalCaseState });
+  if (['ready-single', 'waiting-auto-eligible', 'automatic-completion'].includes(journalCaseState)) {
+    seedJournalNoCheckFixture(content);
+  }
   seedGatheringTaskMode(content, gatheringTaskMode);
   if (noTools) stripTools(content);
   if (noAuthoredWorldComponents) stripAuthoredWorldComponents(content);
@@ -546,6 +548,7 @@ export async function buildLabWorld({
         state: journalCaseState,
         recipes: runRecipes,
         nowWorldTime: () => Number(fabricate.getWorldTime?.() ?? LAB_WORLD_TIME),
+        onPersist: () => invalidateJournalFixtureCaches(fabricate),
       });
       fabricate.executeJournalCaseFixtureCommand = controller.execute;
       fabricate.journalCaseFixtureEvents = controller.events;
@@ -572,14 +575,18 @@ export async function buildLabWorld({
     // The run managers memoise each actor's container the first time they read it, and
     // `initialize()` reads it — so a container written afterwards is invisible until the cache is
     // dropped. The symptom is a journal with runs on the actor and none on screen.
-    for (const manager of [
-      fabricate.craftingRunManager,
-      fabricate.salvageRunManager,
-      fabricate.gatheringRunManager,
-    ]) {
-      manager?.invalidateCache?.();
-    }
+    invalidateJournalFixtureCaches(fabricate);
   }
 
   return world;
+}
+
+function invalidateJournalFixtureCaches(fabricate) {
+  for (const manager of [
+    fabricate.craftingRunManager,
+    fabricate.salvageRunManager,
+    fabricate.gatheringRunManager,
+  ]) {
+    manager?.invalidateCache?.();
+  }
 }

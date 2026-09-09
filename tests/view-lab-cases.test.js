@@ -868,6 +868,8 @@ const LAYOUT_CASE_IDS = [
   ...RESPONSIVE_LAYOUT_CASE_IDS,
   ...FULL_WIDTH_LAYOUT_CASE_IDS,
   ...FRAME_STACK_LAYOUT_CASE_IDS,
+  'fabricate-journal-lifecycle-narrow',
+  'fabricate-journal-lifecycle-wide',
 ];
 const LAYOUT_ASSERTION_PATH = 'scripts/lib/viewLabLayoutAssertion.js';
 
@@ -875,6 +877,13 @@ test('exactly the declared 1024px cases carry complete layout expectations', () 
   const declared = VIEW_LAB_CASES.filter((viewCase) => viewCase.expectLayout);
   assert.deepEqual(declared.map((viewCase) => viewCase.id).sort(), [...LAYOUT_CASE_IDS].sort());
   for (const viewCase of declared) {
+    if (viewCase.query?.journalCaseState === 'wide' || viewCase.query?.journalCaseState === 'narrow') {
+      const narrow = viewCase.query.journalCaseState === 'narrow';
+      assert.deepEqual(viewCase.position, { width: narrow ? 1024 : 1240, height: 880 });
+      assert.equal(viewCase.expectLayout.expectedTracks, narrow ? 1 : 2);
+      assert.equal(viewCase.expectLayout.maxContentBoxInlineSize, narrow ? 960 : undefined);
+      continue;
+    }
     // THE WINDOW IS PER GROUP, because the breakpoint each group asserts is a different one and a
     // shared literal would be asserting one screen's threshold about another's. The shell's stack
     // is reached at 1024; the shared editor frame's own container query is at 1000 and the lab's
@@ -914,6 +923,33 @@ test('exactly the declared 1024px cases carry complete layout expectations', () 
     assert.equal(viewCase.expectLayout.expectedTracks, 2);
     assert.equal(viewCase.expectLayout.absentSelector, '.manager-inspector');
   }
+});
+
+test('all 42 Journal lifecycle captures assert defining product state rather than a populated shell', () => {
+  const cases = VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-lifecycle-'));
+  assert.equal(cases.length, 42);
+  for (const entry of cases) {
+    assert.equal(entry.expectTab, 'journal', entry.id);
+    assert.ok(entry.expectSelector, `${entry.id} has an explicit assertion`);
+    assert.notEqual(entry.expectSelector, '[data-journal-state="populated"]', entry.id);
+    assert.ok(!entry.expectSelector.includes('data-journal-case-state'), `${entry.id} checks product output`);
+  }
+  const byState = new Map(cases.map((entry) => [entry.id.replace('fabricate-journal-lifecycle-', ''), entry]));
+  for (const state of ['stale-action', 'command-timeout']) {
+    assert.match(byState.get(state).expectSelector, /data-journal-command-error/);
+    assert.match(byState.get(state).expectSelector, /data-notice-action/);
+    assert.match(byState.get(state).expectSelector, /aria-busy/);
+  }
+  for (const state of ['gathering-straight-finished', 'gathering-d100-finished', 'gathering-check-finished', 'finished-success', 'automatic-completion', 'salvage']) {
+    assert.match(byState.get(state).expectSelector, /data-journal-verdict="succeeded"/);
+    assert.match(byState.get(state).expectSelector, /data-yield-entry=/, `${state} requires actual award rows`);
+  }
+  assert.equal(byState.get('filter-paused').steps[0].selector,
+    '[data-journal-status-filter] label:has(input[value="paused"])');
+  assert.equal(byState.get('filter-paused').expectCenterHit, byState.get('filter-paused').steps[0].selector);
+  assert.match(byState.get('filter-paused').expectSelector, /:checked/);
+  assert.match(byState.get('empty-search').expectSelector, /data-journal-empty="active"/);
+  assert.match(byState.get('empty-search').expectSelector, /data-journal-empty="history"/);
 });
 
 test('layout expectation selectors name UI that still exists', () => {

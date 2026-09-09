@@ -3674,7 +3674,7 @@ const HERBALISM_GATHERING_CHECK = Object.freeze({
   defaultModifierIds: ['hb-mod-nature', 'hb-mod-tools'],
 });
 
-export function buildLabContent() {
+export function buildLabContent({ journalCaseState = null } = {}) {
   const systems = [
     {
       id: LAB_SYSTEM_IDS.SMITHING,
@@ -4032,7 +4032,11 @@ export function buildLabContent() {
     recipes: [
       ...SMITHING_RECIPES,
       ...HERBALISM_RECIPES,
-      ...ALCHEMY_RECIPES,
+      ...ALCHEMY_RECIPES.map((entry) =>
+        journalCaseState === 'alchemy' && entry.id === 'al-r-fire'
+          ? { ...entry, access: { playerIds: ['user-lab-player'], characterIds: [] } }
+          : entry
+      ),
       ...JEWELRY_RECIPES,
       ...RUNEWORK_RECIPES,
       ...TIDEWRACK_RECIPES,

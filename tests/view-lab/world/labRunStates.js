@@ -514,9 +514,7 @@ function journalCaseFactories(context) {
   const checkRoute = () => requireRecipe(context.recipes, 'rw-r-blade');
   const essence = () => requireRecipe(context.recipes, 'sm-r-deepbind');
   const multi = () => requireRecipe(context.recipes, 'sm-r-pattern-blade');
-  const alchemy = () =>
-    context.recipes.find((recipe) => recipe?.craftingSystemId === LAB_SYSTEM_IDS.ALCHEMY) ??
-    requireRecipe(context.recipes, 'al-r-firebomb');
+  const alchemy = () => requireRecipe(context.recipes, 'al-r-fire');
   const active = (run) => emptyRunContainers({ craftingActive: [run] });
   const finished = (run) => emptyRunContainers({ craftingHistory: [run] });
   const ready = (id, recipe = single()) =>
@@ -864,21 +862,12 @@ function filterContainers(context, recipe) {
 
 function versionedSalvageCase(context) {
   return {
+    ...buildResolvedProgressiveSalvageRun(context),
     id: 'lab-v1-salvage',
-    actorUuid: context.actorUuid,
-    userId: context.userId,
-    craftingSystemId: LAB_SYSTEM_IDS.HERBALISM,
-    componentId: 'hb-cracked-alembic',
     lifecycleVersion: 1,
     runRevision: 1,
     completionMode: 'manual',
     pausedDurationSeconds: 0,
-    status: 'succeeded',
-    startedAt: NOW - 2 * HOUR,
-    updatedAt: NOW - HOUR,
-    finishedAt: NOW - HOUR,
-    consumedComponents: [{ itemUuid: 'Item.hb-cracked-alembic', quantity: 1 }],
-    createdResults: [],
   };
 }
 
@@ -943,6 +932,7 @@ function emptyRunContainers({
  * @param {string|null} options.state Selected Journal fixture state.
  * @param {object[]} [options.recipes] Authored recipes used to resolve completion results.
  * @param {() => number} [options.nowWorldTime] Current world-time reader.
+ * @param {() => void} [options.onPersist] Refresh readers after the actor flags have been replaced.
  * @returns {{events: object[], execute: (command: object) => Promise<object|undefined>}}
  */
 export function createLabJournalCaseController({
@@ -951,9 +941,13 @@ export function createLabJournalCaseController({
   state,
   recipes = [],
   nowWorldTime = () => NOW,
+  onPersist = () => {},
 }) {
   const events = [];
-  const persist = () => installLabRunStates(actor, containers);
+  const persist = () => {
+    installLabRunStates(actor, containers);
+    onPersist();
+  };
 
   async function execute(command) {
     const event = { ...cloneFixtureValue(command ?? {}), state };
@@ -1082,10 +1076,13 @@ function completeFixtureRun({ container, run, recipes, now }) {
 function completeGatheringFixture(run, now) {
   const task = run.economyEvidence?.runtimeSnapshot?.task ?? {};
   const mode = task.resolutionMode ?? 'd100';
-  const firstDrop = task.dropRows?.find((row) => row?.enabled !== false);
+  const roll = mode === 'd100' ? 25 : 17;
+  const drops = (task.dropRows ?? []).filter((row) => row?.enabled !== false);
+  const clearedDrops = drops.filter((row) => Number(row.dropRate) >= roll);
   const firstGroup = task.resultGroups?.[0];
-  const awarded = mode === 'd100' ? (firstDrop ? [firstDrop] : []) : (firstGroup?.results ?? []);
+  const awarded = mode === 'd100' ? clearedDrops : (firstGroup?.results ?? []);
   run.createdResults = awarded.map((result) => ({
+    actorUuid: run.actorUuid,
     componentId: result.componentId,
     quantity: result.quantity ?? 1,
     name: result.name,
@@ -1097,14 +1094,14 @@ function completeGatheringFixture(run, now) {
       : {
           success: true,
           outcome: mode === 'routed' ? firstGroup?.name ?? null : null,
-          roll: 63,
-          value: 63,
-          data: { total: 63 },
-          itemRows: (task.dropRows ?? []).map((row) => ({
+          roll,
+          value: roll,
+          data: { total: roll },
+          itemRows: drops.map((row) => ({
             id: row.id,
             finalDropRate: row.dropRate,
-            roll: 63,
-            awarded: row === firstDrop,
+            roll,
+            awarded: clearedDrops.includes(row),
           })),
         };
   run.completedAtWorldTime = now;
