@@ -15,7 +15,6 @@ import {
   chooseSelectOption,
   openSelectPanel,
   selectOptionValues,
-  selectTriggerText,
 } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -488,10 +487,24 @@ describe('RecipeBrowser mounted behavior', () => {
       'a leading bare :global() rule reaches every trigger in the document, including the ' +
         'pager one row below that refuses a width floor'
     );
+    // THE DECLARATIONS ARE READ FROM THE BLOCK, NOT FROM THE FILE. A file-wide `includes` for
+    // `background: var(--fab-surface);` cannot fail here: this component declares that fill at
+    // three other elements, so the clause was green whether or not the trigger rule carried it.
+    const blockStart = source.indexOf('.crafting-browser-filter-category :global(');
+    assert.ok(blockStart !== -1, 'the category filter no longer opens a scoped :global() block');
+    const block = source.slice(blockStart, source.indexOf('}', blockStart) + 1);
     assert.ok(
-      source.includes('width: 100%;') && source.includes('background: var(--fab-surface);'),
-      'the two properties this call site keeps — the width core used to supply and the column ' +
-        'fill the pager beside it restates — are both declared'
+      block.includes('.crafting-browser-filter-system :global(.fabricate-select-trigger)'),
+      'the two filters no longer share one trigger block, so this clause is reading the ' +
+        `category filter's alone. It reads: ${block}`
     );
+    for (const declaration of ['width: 100%;', 'background: var(--fab-surface);']) {
+      assert.ok(
+        block.includes(declaration),
+        `the filters' own trigger block no longer declares \`${declaration}\` — the two ` +
+          'properties this call site keeps are the width core used to supply and the column ' +
+          `fill the pager beside it restates. The block reads: ${block}`
+      );
+    }
   });
 });

@@ -897,10 +897,21 @@ test('a converted select did not pay its ratchet with a marker', () => {
   }
 });
 
+/**
+ * The one phrase both published documents state the ratchet's pin in.
+ *
+ * Each numeral is captured BOUND TO ITS NOUN rather than searched for loose in the sentence.
+ * The loose form — "does the pin sentence contain the number 78 anywhere" — is satisfied by a
+ * sentence that has the element total and the file count the wrong way round, and by one whose
+ * file count happens to equal an unrelated figure beside it; both are exactly the drift this
+ * clause exists to catch.
+ */
+const PIN_PHRASE = /(\d+) elements across (\d+)\s*(?:<code>)?`?\.svelte`?(?:<\/code>)? files/u;
+
 /** The `### Requirement:` section that owns the select pin, so a fragment cannot match elsewhere. */
 function selectRequirement() {
   const spec = readFileSync(new URL('../../openspec/specs/design-system/spec.md', import.meta.url), 'utf8');
-  const heading = '### Requirement: Every select renders the app\u2019s own option list';
+  const heading = '### Requirement: Every select renders the app’s own option list';
   const start = spec.indexOf(heading);
   assert.ok(
     start !== -1,
@@ -912,7 +923,34 @@ function selectRequirement() {
   return spec.slice(start, end === -1 ? spec.length : end);
 }
 
-test('the spec’s pin sentence states the two numerals this ratchet measures', () => {
+/**
+ * Assert one document's pin phrase names today's two constants, each in its own position.
+ *
+ * @param {string} where The document, for the failure message.
+ * @param {string} sentence The single sentence carrying the pin.
+ */
+function assertPinPhrase(where, sentence) {
+  const match = sentence.match(PIN_PHRASE);
+  assert.ok(
+    match,
+    `${where}'s pin no longer reads "<N> elements across <M> .svelte files", so this clause has ` +
+      `stopped reading the phrase it was written to pin rather than found it correct. It reads: ${sentence}`
+  );
+  const [, elements, files] = match;
+  assert.equal(
+    Number(elements),
+    KNOWN_NATIVE_SELECT_TOTAL,
+    `${where} publishes ${elements} native select ELEMENTS against a ratchet pinned at ` +
+      `${KNOWN_NATIVE_SELECT_TOTAL}`
+  );
+  assert.equal(
+    Number(files),
+    KNOWN_NATIVE_SELECT_ELEMENTS.length,
+    `${where} publishes ${files} FILES against a baseline of ${KNOWN_NATIVE_SELECT_ELEMENTS.length}`
+  );
+}
+
+test('both published pin sentences state the two numerals this ratchet measures', () => {
   // THE SENTENCE, NOT THE SECTION. The requirement's next line carries HISTORICAL figures — the
   // pin's earlier values — so a stale pin could match one of those and read as green. The slice
   // is therefore the one sentence that begins "The figure is the RATCHET'S PIN", which is the
@@ -922,6 +960,11 @@ test('the spec’s pin sentence states the two numerals this ratchet measures', 
   // exactly this reason. It is worth a clause of its own here because this sentence has ALREADY
   // rotted once: it read "96 elements across 36 `.svelte` files" against a pin of 84 across 33,
   // and nothing in `npm test` could see it.
+  //
+  // AND THE SPECIMEN CARRIES THE SAME CLAIM, which is why it is read here too. `library.html` is
+  // the published shape of this capability and its select entry states the pin in the identical
+  // phrase; guarding only the prose leaves a second copy that rots on its own schedule, and the
+  // specimen is the one a reader is shown.
   const requirement = selectRequirement();
   const pin = requirement.match(/^The figure is the RATCHET'S PIN[^\n]*$/mu)?.[0];
   assert.ok(
@@ -930,16 +973,20 @@ test('the spec’s pin sentence states the two numerals this ratchet measures', 
       'so this clause has stopped reading the sentence it was written to pin rather than found ' +
       'it correct'
   );
-  for (const [what, numeral] of [
-    ['element total', KNOWN_NATIVE_SELECT_TOTAL],
-    ['file count', KNOWN_NATIVE_SELECT_ELEMENTS.length],
-  ]) {
-    assert.ok(
-      new RegExp(String.raw`\b${numeral}\b`, 'u').test(pin),
-      `the spec's pin sentence no longer names ${numeral} as the ${what} this ratchet measures. ` +
-        `It reads: ${pin}`
-    );
-  }
+  assertPinPhrase('the design-system spec', pin);
+
+  const library = readFileSync(
+    new URL('../../openspec/specs/design-system/library.html', import.meta.url),
+    'utf8'
+  );
+  const specimenPin = library.match(/Every remaining native select is recorded DEBT[^<]*<b>[^<]*<code>[^<]*<\/code>[^<]*<\/b>/u)?.[0];
+  assert.ok(
+    specimenPin,
+    'the select specimen in `library.html` no longer carries an "Every remaining native select ' +
+      'is recorded DEBT against the ratchet" sentence ending in the bolded pin, so this clause ' +
+      'is reading nothing'
+  );
+  assertPinPhrase('the `library.html` select specimen', specimenPin);
 });
 
 test('no new native <select> is rendered by a Svelte template', () => {

@@ -56,16 +56,9 @@
  */
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
-import { createReadStream } from 'node:fs';
-import { join, resolve } from 'node:path';
-
-import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { chromium } from 'playwright';
-import { createServer } from 'vite';
 
 import { OVERLAY_HOST_ROOT_CLASSES } from '../../src/ui/svelte/util/overlayHost.js';
-
-const repoRoot = resolve(import.meta.dirname, '../..');
+import { createViteFixtureServer } from '../helpers/vite-fixture-server.js';
 
 /** The fixture's window frame origin. The defect displaces the panel by exactly this. */
 const FRAME_LEFT = 220;
@@ -106,60 +99,17 @@ function foundryIconStub() {
   };
 }
 
-/**
- * Serve `styles/fabricate.css` RAW, outside Vite's CSS pipeline.
- *
- * The sheet is 20k+ lines with `url()` references and layered `@import`s; running it through
- * PostCSS would rewrite or inline them for no benefit here. The page wants the bytes.
- */
-function rawStylesheetMount() {
-  const prefix = '/@overlay-host-styles/';
-  return {
-    name: 'overlay-host-styles',
-    configureServer(server) {
-      server.middlewares.use((request, response, next) => {
-        const url = request.url ?? '';
-        if (!url.startsWith(prefix)) return next();
-        const name = url.slice(prefix.length).split('?')[0];
-        if (name !== 'fabricate.css') {
-          response.statusCode = 404;
-          response.end('not found');
-          return;
-        }
-        response.setHeader('Content-Type', 'text/css; charset=utf-8');
-        createReadStream(join(repoRoot, 'styles', 'fabricate.css')).pipe(response);
-      });
-    },
-  };
-}
-
-let server;
-let browser;
-let origin = '';
+const fixtureServer = createViteFixtureServer({
+  styleMountPrefix: '/@overlay-host-styles/',
+  extraPlugins: [foundryIconStub()],
+});
 
 before(async () => {
-  server = await createServer({
-    // `configFile: false` on purpose: the production `vite.config.js` installs the Foundry dev
-    // proxy on `serve`, which this fixture neither needs nor should depend on.
-    configFile: false,
-    root: repoRoot,
-    // NO FILE WATCHER, for the reason `tests/view-lab/vite.config.js` records at length: the root
-    // is the whole repository, chokidar costs an inotify handle per file, and a developer with
-    // harvested Foundry chrome or sibling lane worktrees exhausts the user-session limit and dies
-    // with an `ENOSPC` naming a file the run never touches. Nothing is edited mid-run.
-    server: { host: '127.0.0.1', port: 0, hmr: false, watch: null },
-    logLevel: 'silent',
-    plugins: [rawStylesheetMount(), foundryIconStub(), svelte()],
-  });
-  await server.listen();
-  const address = server.httpServer.address();
-  origin = `http://127.0.0.1:${address.port}`;
-  browser = await chromium.launch();
+  await fixtureServer.start();
 });
 
 after(async () => {
-  await browser?.close();
-  await server?.close();
+  await fixtureServer.stop();
 });
 
 /**
@@ -219,14 +169,14 @@ const SELECTORS = Object.freeze({
  * @returns {Promise<object>} Measured rects, the resolved host, and console errors.
  */
 async function openOverlayIn({ host, component = 'popover' }) {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const page = await fixtureServer.newPage({ viewport: { width: 1280, height: 800 } });
   const consoleErrors = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
   });
   try {
     const query = `host=${host}&component=${component}&frameLeft=${FRAME_LEFT}&frameTop=${FRAME_TOP}`;
-    await page.goto(`${origin}/tests/fixtures/overlay-host/index.html?${query}`, {
+    await page.goto(fixtureServer.url(`/tests/fixtures/overlay-host/index.html?${query}`), {
       waitUntil: 'load',
     });
     await page.waitForFunction(() => globalThis.__overlayHostFixtureReady === true);

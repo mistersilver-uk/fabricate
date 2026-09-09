@@ -34,6 +34,24 @@
         box-sizing: border-box;
       }
 
+      /*
+        THE OTHER HALF OF THAT SAME `@layer reset` BLOCK, and it is load bearing here rather than
+        tidy (issue 1511). A `<button>` does not inherit type from its ancestors: the user agent
+        gives it its own font, so without this the trigger and every option row render in
+        Chromium's default button face and the `font-family: Arial, sans-serif` declared below
+        never reaches the text this fixture measures. On this repository's runners that default
+        happens to BE Arial, which is why the suite's face assertion passed while reading the user
+        agent's answer rather than the fixture's — a silent agreement, not a measurement. Core
+        declares the two together (`input, button, textarea, select { font: inherit }`), so the
+        fixture mirrors both.
+      */
+      input,
+      button,
+      textarea,
+      select {
+        font: inherit;
+      }
+
       html,
       body {
         width: 100%;
