@@ -1,7 +1,7 @@
 // Source-pin contract for the player Journal screen (Slice B), mirroring
 // gathering-environments-source.test.js. These string assertions fail at test
 // time when load-bearing wiring drifts: the shell branch + nav badge + shell
-// refresh, the cloned container-query grid, the status vocabulary, and the global
+// refresh, the two-zone container-query grid, the status vocabulary, and the global
 // CSS treatments. Keep names stable or update these in lockstep.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,6 +17,7 @@ function read(relPath) {
 
 const rootSource = read('../../src/ui/svelte/apps/FabricateAppRoot.svelte');
 const viewSource = read('../../src/ui/svelte/apps/journal/JournalView.svelte');
+const detailSource = read('../../src/ui/svelte/apps/journal/RunDetail.svelte');
 const statusSource = read('../../src/ui/svelte/apps/journal/journalRunStatus.js');
 const actionsSource = read('../../src/ui/svelte/apps/journal/ActionsPanel.svelte');
 const builderSource = read('../../src/systems/RunJournalBuilder.js');
@@ -49,18 +50,21 @@ describe('FabricateAppRoot Journal wiring', () => {
     assert.ok(rootSource.includes('services?.journal?.load?.(true)'), 'shell quietly re-loads on those events');
     assert.ok(rootSource.includes('!store.loadedOnce'), 'shell guards its one-time initial load via loadedOnce');
   });
+
+  it('places the read-only shared world clock in the Journal top bar', () => {
+    assert.ok(rootSource.includes("import WorldClockChip from '../components/WorldClockChip.svelte'"));
+    assert.ok(rootSource.includes("activeTab === 'journal' && journalWorldClock"));
+    assert.ok(rootSource.includes('<WorldClockChip'));
+    assert.ok(rootSource.includes('worldTimeLabel('), 'uses the existing calendar formatter');
+  });
 });
 
 describe('JournalView layout + effects', () => {
-  it('clones the GatheringView container-query 3-column grid', () => {
-    // Pin the reflow contract (container seam + narrow-width single-column
-    // breakpoint), not the exact fr/minmax track literal — the column ratios are
-    // tunable design details that should not break this wiring guard.
+  it('uses the prototype two-zone layout and stacks Active, Finished, then Detail', () => {
     const narrowBreakpoint = '@container fabricate-journal (max-width: 960px)';
 
-    assert.ok(viewSource.includes('grid-template-columns:'), 'declares an explicit column track');
-    assert.ok(viewSource.includes('container-type: inline-size;'), 'establishes a size container');
-    assert.ok(viewSource.includes('container-name: fabricate-journal;'), 'names the journal container');
+    assert.ok(viewSource.includes('grid-template-columns: minmax(310px, 0.72fr) minmax(0, 1.8fr)'), 'declares browse and detail tracks');
+    assert.ok(viewSource.includes('container: fabricate-journal / inline-size;'), 'establishes the named size container');
     assert.ok(
       viewSource.includes(narrowBreakpoint),
       'uses the shared reachable 960px narrow breakpoint'
@@ -69,20 +73,29 @@ describe('JournalView layout + effects', () => {
       viewSource.slice(viewSource.indexOf(narrowBreakpoint)).includes('grid-template-columns: 1fr;'),
       'reflows to a single column at the narrow breakpoint'
     );
-    assert.match(
-      viewSource.slice(viewSource.indexOf(narrowBreakpoint)),
-      /\.journal-view-grid\s+\.journal-view-column-left\s*\{\s*overflow:\s*visible;/,
-      'the stacked grid does not clip the first list header beneath the player bar'
-    );
-    assert.match(
-      viewSource.slice(viewSource.indexOf(narrowBreakpoint)),
-      /\.journal-view-grid\s+\.journal-view-column\s*\{\s*min-height:\s*220px;/,
-      'the stacked grid retains the 220px minimum despite desktop flex defaults'
-    );
+    assert.ok(viewSource.includes('.journal-browse-lists {\n      display: contents;'), 'list sections become consecutive stacked regions');
+    assert.ok(viewSource.includes('.journal-detail-pane {\n      min-height: 220px;'), 'Detail remains reachable below both lists');
+  });
+
+  it('composes the required shared search, kind, status, and independent pager controls', () => {
+    assert.ok(viewSource.includes('<Field as="div" class="journal-search-field">'));
+    assert.ok(viewSource.includes('<ManagerSearchField'));
+    assert.ok(viewSource.includes('size="38"'));
+    assert.ok(viewSource.includes('journal?.activePageItems'));
+    assert.ok(viewSource.includes('onPageChange={(value) => journal?.setActivePage?.(value)}'));
+    assert.ok(viewSource.includes('onPageChange={(value) => journal?.setHistoryPage?.(value)}'));
   });
 
   it('reads the shared store', () => {
     assert.ok(viewSource.includes('services?.journal'), 'reads the shared journal store');
+  });
+
+  it('reads only the authoritative gathering-yield projection', () => {
+    assert.ok(detailSource.includes('run?.gatheringYield'));
+    assert.equal(detailSource.includes('run?.yieldScale'), false);
+    assert.equal(detailSource.includes('run?.dropRows'), false);
+    assert.equal(detailSource.includes('run?.outcomeTiers'), false);
+    assert.equal(detailSource.includes('run?.routedTiers'), false);
   });
 
   it('hosts the re-fetch effects (actor change, scene, world-time tick)', () => {
@@ -106,7 +119,8 @@ describe('Journal status vocabulary + actions', () => {
   it('derives Trigger readiness from the time gate, never from run.status', () => {
     assert.ok(actionsSource.includes('availableAt <= now'), 'readiness is availableAt <= now');
     assert.equal(actionsSource.includes('run.status'), false, 'never reads run.status for readiness');
-    assert.ok(actionsSource.includes('fabricate-app-primary-button'), 'uses the global primary button class');
+    assert.ok(actionsSource.includes("import RunActionBar from '../../components/RunActionBar.svelte'"));
+    assert.ok(actionsSource.includes('<RunActionBar'));
   });
 });
 

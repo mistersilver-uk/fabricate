@@ -15,7 +15,7 @@
   import { localize } from '../../util/foundryBridge.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import Chip from '../../components/Chip.svelte';
-  import FillBar from '../../components/FillBar.svelte';
+  import RunProgress from '../../components/RunProgress.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import { runStatusPresentation } from './journalRunStatus.js';
   import { formatDurationHMS } from '../../util/formatDuration.js';
@@ -56,7 +56,7 @@
   const progressPercent = $derived(progress === null ? 0 : Math.round(progress * 100));
 
   function activate() {
-    if (id) onSelect?.(id);
+    if (id) onSelect?.(run);
   }
   function onKey(event) {
     if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
@@ -80,7 +80,7 @@
   onkeydown={onKey}
 >
   <div class="journal-run-card-main">
-    <Medallion art={img} alt="" size={64} />
+    <Medallion art={img} alt="" size={40} />
     <div class="journal-run-card-copy">
       <span class="journal-run-card-name" {title}>{title}</span>
       {#if subtitle !== ''}
@@ -136,7 +136,11 @@
         aria-valuenow={progressPercent}
         data-run-progress={progressPercent}
       >
-        <FillBar value={progressPercent} tone="accent" size="sm" />
+        <RunProgress
+          stages={Array.isArray(run?.steps) && run.steps.length > 0 ? run.steps : [{}]}
+          current={Math.max(0, Number(run?.stepIndex) || 0)}
+          progress={progressPercent}
+        />
       </div>
     {/if}
   {/if}
@@ -147,9 +151,9 @@
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--fab-space-2);
     width: 100%;
-    padding: 10px;
+    padding: var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 8px;
     background: var(--fab-surface-soft);
@@ -172,7 +176,7 @@
   .journal-run-card-main {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--fab-space-2);
     min-width: 0;
   }
 

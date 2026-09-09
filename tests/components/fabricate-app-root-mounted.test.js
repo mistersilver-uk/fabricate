@@ -231,6 +231,18 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
     'src/ui/svelte/apps/journal/WhatToExpect.svelte',
     'src/ui/svelte/apps/ActorSelectTopBar.svelte',
+    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/RunActionBar.svelte',
+    'src/ui/svelte/components/SlotTile.svelte',
+    'src/ui/svelte/components/ChoiceOptionList.svelte',
+    'src/ui/svelte/components/SlotRow.svelte',
+    'src/ui/svelte/components/EssencePool.svelte',
+    'src/ui/svelte/components/RunProgress.svelte',
+    'src/ui/svelte/components/StageNav.svelte',
+    'src/ui/svelte/components/StageCard.svelte',
+    'src/ui/svelte/components/YieldScale.svelte',
+    'src/ui/svelte/components/OutcomeLadder.svelte',
+    'src/ui/svelte/components/WorldClockChip.svelte',
     'src/ui/svelte/components/FillBar.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/IconButton.svelte',
@@ -314,7 +326,14 @@ function fakeServices({ selectedActorId = '' } = {}) {
       selectScopedActor: () => {},
       selectActor: () => {},
     },
-    journal: { navCount: 0, loadedOnce: true, load: () => {} },
+    journal: {
+      navCount: 0,
+      loadedOnce: true,
+      load: () => {},
+      worldTime: 28800,
+      listing: { selectedActorId: selectedActorId || null },
+    },
+    getWorldTimeComponents: () => ({ day: 13, hour: 8, minute: 0, secondsPerDay: 86400 }),
   };
 }
 
@@ -422,6 +441,22 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 describe('FabricateAppRoot (mounted, against a real player registry)', () => {
+  it('shows the read-only shared world clock only while the Journal tab is active', async () => {
+    const registry = createPlayerExtensionsRegistry({ emitHook: () => {} });
+    const host = makeHost(registry, 'journal');
+    host.selectActor('actor-1');
+    const root = await harness.mount(host.props());
+    const clock = root.querySelector('[data-world-clock]');
+    assert.ok(clock, 'the Journal top bar contains the world clock');
+    assert.match(clock.textContent, /"day":14,"time":"08:00"/, 'it uses the existing calendar formatter');
+    assert.equal(clock.querySelector('button, input'), null, 'the clock is read-only');
+
+    railButton(root, 'crafting').click();
+    await tick();
+    await harness.setProps(host.props());
+    assert.equal(root.querySelector('[data-world-clock]'), null, 'other tabs do not duplicate it');
+  });
+
   it('appends provider tabs after the Core tabs and addresses them by route key', async () => {
     const registry = createPlayerExtensionsRegistry({ emitHook: () => {} });
     registry.publicApi.registerPlayerNavProvider(makeProvider().provider);

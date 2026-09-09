@@ -891,11 +891,13 @@
       "Journal": {
         "Loading": "Loading runs…",
         "Error": "Couldn't load your runs.",
+        "Retry": "Try again",
         "Step": {
           "Label": "Step {index} of {count}",
           "LabelNamed": "Step {index} of {count} • {name}"
         },
         "Status": {
+          "paused": "Paused",
           "waiting": "Waiting",
           "ready": "Ready",
           "inProgress": "In progress",
@@ -908,7 +910,10 @@
           "RoutedByIngredients": "Routed by Ingredients",
           "RoutedByCheck": "Routed by Check",
           "Progressive": "Progressive",
-          "Alchemy": "Alchemy"
+          "Alchemy": "Alchemy",
+          "straight": "Direct",
+          "d100": "d100",
+          "routed": "Check"
         },
         "Structure": {
           "MultiStep": "Multi-Step Recipe",
@@ -949,7 +954,7 @@
           "Detail": "Select a run to see its details."
         },
         "ActiveRuns": {
-          "Title": "Active Runs",
+          "Title": "Active",
           "Count": "({count})",
           "Sort": {
             "Label": "Sort",
@@ -958,7 +963,8 @@
           }
         },
         "History": {
-          "Title": "History",
+          "Title": "Finished",
+          "Dismiss": "Hide {name} from this Journal",
           "Sort": {
             "Label": "Sort",
             "Newest": "Newest",
@@ -967,6 +973,29 @@
         },
         "Sort": {
           "Fallback": "Sort"
+        },
+        "Browse": {
+          "Label": "Journal runs"
+        },
+        "Filters": {
+          "SearchKicker": "Find a run",
+          "SearchPlaceholder": "Search runs…",
+          "SearchLabel": "Search runs",
+          "Kind": {
+            "Label": "Kind",
+            "All": "All kinds",
+            "Crafting": "Crafting",
+            "Gathering": "Gathering",
+            "Salvage": "Salvage",
+            "Alchemy": "Alchemy"
+          },
+          "Status": {
+            "Label": "Active run status",
+            "All": "All",
+            "Ready": "Ready",
+            "Waiting": "Waiting",
+            "Paused": "Paused"
+          }
         },
         "Countdown": {
           "ReadyToContinue": "Ready to continue",
@@ -1006,6 +1035,65 @@
         "Progress": {
           "Label": "Crafting progress"
         },
+        "WorldClock": {
+          "Label": "World time"
+        },
+        "Notice": {
+          "PausedTitle": "Run paused",
+          "PausedDetail": "Its countdown is frozen until you resume it.",
+          "RecoveryTitle": "This run needs GM attention",
+          "RecoveryDetail": "Fabricate recorded {count} completed effects and stopped before it could confirm the rest.",
+          "UnsupportedTitle": "This run is read-only"
+        },
+        "Verdict": {
+          "succeeded": "Run completed",
+          "failed": "Run failed",
+          "cancelled": "Run cancelled"
+        },
+        "Stage": {
+          "Number": "Stage {index}",
+          "Requirement": "Requirement {n}",
+          "Requirements": "Authored requirements",
+          "RequirementsHint": "Choose how to meet this stage before it runs.",
+          "Locked": "This stage is read-only.",
+          "Choose": "Choose an ingredient",
+          "Choices": "{count} choices",
+          "NoChoices": "No choices are available.",
+          "Essence": "Shared essence allocation",
+          "CarrierReading": "{held} held · {spare} unallocated",
+          "Overshoot": "{essence}: {amount} more than required",
+          "Allocate": "Allocation for {name}",
+          "Decrease": "Use one fewer {name}",
+          "Increase": "Use one more {name}",
+          "Open": "View stage {index}: {name}",
+          "Previous": "Previous stage",
+          "Next": "Next stage",
+          "Position": "Viewing stage {index} of {count}",
+          "Return": "Return to current stage {index}",
+          "State": {
+            "past": "Completed",
+            "current": "Current",
+            "future": "Upcoming",
+            "paused": "Paused"
+          }
+        },
+        "Yields": {
+          "Title": "Yields",
+          "PreviewTitle": "Possible yields",
+          "AwardedTitle": "Received",
+          "Item": "Result",
+          "None": "No items",
+          "Chance": "{chance}% chance",
+          "Awarded": "Awarded at {chance}%",
+          "Missed": "Not awarded at {chance}%",
+          "Received": "Received",
+          "AwardedChip": "Awarded"
+        },
+        "Record": {
+          "Title": "Run record",
+          "Task": "Task",
+          "Finished": "Finished"
+        },
         "Tips": {
           "Title": "Tips",
           "WorldTime": "Countdowns use world time, not real time — they only move when your GM advances the game clock.",
@@ -1039,7 +1127,21 @@
           "CancelKeep": "Keep crafting",
           "Cancelled": "Craft cancelled.",
           "CancelledRefunded": "Craft cancelled; ingredients and currency returned.",
-          "CancelledPartial": "Craft cancelled; some ingredients or currency could not be returned."
+          "CancelledPartial": "Craft cancelled; some ingredients or currency could not be returned.",
+          "Collect": "Collect",
+          "Brew": "Brew",
+          "Working": "Working…",
+          "Pause": "Pause",
+          "Resume": "Resume",
+          "AuthorityUnavailable": "A GM must be online to change this run.",
+          "RecoveryRequired": "This run needs GM recovery before it can change.",
+          "UnsupportedLifecycle": "This run was created by an unsupported Fabricate version and remains available as a record.",
+          "SelectionRequired": "Complete the current stage requirements first.",
+          "Completion": {
+            "Label": "When ready",
+            "Manual": "Ask me",
+            "WorldTime": "Complete"
+          }
         }
       },
       "Gathering": {

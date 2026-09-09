@@ -1,53 +1,49 @@
-// Mounted coverage for JournalView: loading / error / no-actor states, the
-// populated 3-column layout, per-column empty states, the world-time footer, and
-// run selection wiring through the shared store. JournalView consumes a
-// services.journal store; the test passes a plain mock store implementing the
-// getter/action surface (the production store is a runes factory, exercised
-// separately in tests/stores/journal-store.test.js). Uses the shared harness with
-// the FULL JournalView subtree registered so the suite cannot hang as
-// `# cancelled`.
-import { describe, it, before, after, afterEach } from 'node:test';
+import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
+  PLAYER_APP_COMPILED_MODULES,
   SEARCHABLE_POPOVER_RAW_MODULES,
   SELECT_COMPILED_MODULES,
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness,
-  PLAYER_APP_COMPILED_MODULES,
 } from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
-import { assertViewErrorTreatment } from '../helpers/playerViewStateAssertions.js';
-import {
-  chooseSelectOption,
-  selectOptionValues,
-  selectTriggerText,
-} from '../helpers/select-control.js';
+import { chooseSelectOption } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
-
+const component = (name) => `src/ui/svelte/components/${name}.svelte`;
 const harness = createMountedComponentHarness({
   repoRoot,
   tmpPrefix: 'fabricate-journal-view-',
   rawModules: [
-    // Issue 1504: the raw closure the shared `<Select>` reaches through `SearchablePopover`.
     ...SEARCHABLE_POPOVER_RAW_MODULES,
-    'src/ui/svelte/util/foundryBridge.js',
+    ...STATUS_TONE_RAW_MODULES,
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/formatDuration.js',
     'src/ui/svelte/util/worldTimeLabel.js',
     'src/systems/foundryCalendar.js',
     'src/ui/svelte/apps/journal/journalRunStatus.js',
-    // Issue 1506: the run's status is a `<Chip>` now, and the chip tone it wears comes from
-    // the ONE map the retired status vocabularies were routed through.
-    ...STATUS_TONE_RAW_MODULES
   ],
   compiledModules: [
-    'src/ui/svelte/components/Pagination.svelte',
-    // Issue 1504: the shared `<Select>`'s whole compiled closure, spread rather than copied.
     ...SELECT_COMPILED_MODULES,
-    'src/ui/svelte/components/IconButton.svelte',
+    ...PLAYER_APP_COMPILED_MODULES,
+    component('ManagerSearchField'),
+    component('Pagination'),
+    component('IconButton'),
+    component('ManagerButton'),
+    component('RunActionBar'),
+    component('SlotTile'),
+    component('ChoiceOptionList'),
+    component('SlotRow'),
+    component('Stepper'),
+    component('EssencePool'),
+    component('RunProgress'),
+    component('StageNav'),
+    component('StageCard'),
+    component('YieldScale'),
+    component('OutcomeLadder'),
     'src/ui/svelte/apps/journal/JournalCard.svelte',
     'src/ui/svelte/apps/journal/JournalListShell.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
@@ -55,91 +51,81 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/ActiveRunsList.svelte',
     'src/ui/svelte/apps/journal/HistoryRow.svelte',
     'src/ui/svelte/apps/journal/HistoryList.svelte',
-    'src/ui/svelte/apps/journal/StepTimeline.svelte',
     'src/ui/svelte/apps/journal/StepDetails.svelte',
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
     'src/ui/svelte/apps/journal/ActionsPanel.svelte',
-    'src/ui/svelte/apps/journal/RecentResults.svelte',
-    'src/ui/svelte/apps/journal/AboutThisRun.svelte',
-    'src/ui/svelte/apps/journal/WhatToExpect.svelte',
-    'src/ui/svelte/apps/journal/JournalTips.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
-    // The ONE not-yet-ready chrome the five player views draw (issue 1514), the strip its error
-    // branch composes, and the tile, track, label and no-state panel this tree adopted in the
-    // same issue's third phase — as ONE spread. The claim that stood here, "this tree reaches
-    // neither `Kicker` nor `Notice`", is retired by the commit that falsified half of it:
-    // `JournalCard`'s title IS a `Kicker` now. An omission CANCELS this suite rather than
-    // failing it.
-    ...PLAYER_APP_COMPILED_MODULES,
-    'src/ui/svelte/apps/journal/JournalView.svelte'
-  ],
-  // THE PRODUCTION HOST IS THE PLAYER WINDOW (issue 1504, decision YY). This tree renders a
-  // `Pagination`, whose page-size control is a shared `<Select>` now, and a picker resolves its
-  // portal host by walking up to the nearest Fabricate application root. `rootClass` IS that
-  // host: on the `fabricate-manager` default the panel would portal to a root no production
-  // mount of this component can reach, and every `target.querySelector` for a row would miss.
-  rootClass: 'fabricate-app',
-  componentPath: 'src/ui/svelte/apps/journal/JournalView.svelte'
-});
-
-/**
- * The list shell ON ITS OWN, because one of its states is unreachable through `JournalView`.
- *
- * `sortLabel` defaults to `''` and both production callers pass a localized string, so the
- * fallback branch — the one that names the trigger with `ariaLabel` instead of pointing
- * `ariaLabelledBy` at an empty caption — has no route through the view. A second harness over the
- * same shared bundles is cheaper than a second FILE, and cheaper than a prop the component does
- * not otherwise need.
- */
-const shellHarness = createMountedComponentHarness({
-  repoRoot,
-  tmpPrefix: 'fabricate-journal-list-shell-',
-  rawModules: [...SEARCHABLE_POPOVER_RAW_MODULES],
-  compiledModules: [
-    ...SELECT_COMPILED_MODULES,
-    'src/ui/svelte/apps/journal/JournalListShell.svelte'
+    'src/ui/svelte/apps/journal/JournalView.svelte',
   ],
   rootClass: 'fabricate-app',
-  componentPath: 'src/ui/svelte/apps/journal/JournalListShell.svelte'
+  componentPath: 'src/ui/svelte/apps/journal/JournalView.svelte',
 });
 
 function makeJournal(overrides = {}) {
-  const calls = { select: [], cancel: [] };
+  const calls = Object.fromEntries(
+    ['load', 'select', 'search', 'kind', 'status', 'activeSort', 'historySort', 'activePage',
+      'activeSize', 'historyPage', 'historySize', 'execute', 'pause', 'resume',
+      'completion', 'selection', 'cancel', 'dismiss', 'viewStage'].map((key) => [key, []])
+  );
   const store = {
     loading: false,
     error: false,
-    listing: { selectedActorId: 'Actor.1' },
+    listing: { selectedActorId: 'Actor.actor-1' },
     worldTime: 0,
+    activePageItems: [],
     activeRuns: [],
+    activeCount: 0,
+    activeCounts: { all: 0, ready: 0, waiting: 0, paused: 0 },
+    activePage: 0,
+    activePageSize: 4,
+    pageSizes: [4, 6, 12, 25],
     historyPageItems: [],
-    recentTerminalRuns: [],
-    selectedRun: null,
-    selectedRunId: '',
     historyCount: 0,
     historyPage: 0,
-    historyPageSize: 6,
-    historyPageSizes: [6, 12, 25],
+    historyPageSize: 4,
+    historyPageSizes: [4, 6, 12, 25],
+    selectedRun: null,
+    selectedRunKey: '',
+    selectedRunId: '',
+    viewedStageIndex: 0,
+    search: '',
+    kindFilter: 'all',
+    activeStatusFilter: 'all',
     activeSort: 'soonestReady',
     historySort: 'newest',
-    navCount: 0,
     loadedOnce: true,
-    busyRunId: '',
-    load() {},
-    select(id) { calls.select.push(id); },
-    setActiveSort() {},
-    setHistorySort() {},
-    setHistoryPage() {},
-    setHistoryPageSize() {},
-    advance() {},
-    cancel(run) { calls.cancel.push(run?.id ?? run); },
+    busyRunKey: '',
+    load: (...args) => calls.load.push(args),
     tickWorldTime() {},
-    ...overrides
+    select: (value) => calls.select.push(value),
+    setSearch: (value) => calls.search.push(value),
+    setKindFilter: (value) => calls.kind.push(value),
+    setActiveStatusFilter: (value) => calls.status.push(value),
+    setActiveSort: (value) => calls.activeSort.push(value),
+    setHistorySort: (value) => calls.historySort.push(value),
+    setActivePage: (value) => calls.activePage.push(value),
+    setActivePageSize: (value) => calls.activeSize.push(value),
+    setHistoryPage: (value) => calls.historyPage.push(value),
+    setHistoryPageSize: (value) => calls.historySize.push(value),
+    execute: (run) => calls.execute.push(run),
+    pause: (run) => calls.pause.push(run),
+    resume: (run) => calls.resume.push(run),
+    setCompletionMode: (run, value) => calls.completion.push([run, value]),
+    setSelection: (run, value) => calls.selection.push([run, value]),
+    cancel: (run) => calls.cancel.push(run),
+    dismiss: (run) => calls.dismiss.push(run),
+    viewStage: (value) => calls.viewStage.push(value),
+    ...overrides,
   };
   return { store, calls };
 }
 
 function makeServices(journal) {
-  return { journal, actorBar: { selectedActorId: 'Actor.1' }, getWorldTimeComponents: () => null };
+  return {
+    journal,
+    actorBar: { selectedActorId: 'Actor.actor-1' },
+    getWorldTimeComponents: () => ({ day: 13, hour: 8, minute: 0, secondsPerDay: 86400 }),
+  };
 }
 
 describe('JournalView mounted behavior', () => {
@@ -147,502 +133,316 @@ describe('JournalView mounted behavior', () => {
   afterEach(() => harness.remount());
   after(() => harness.teardown());
 
-  it('renders the loading state', async () => {
-    const { store } = makeJournal({ loading: true });
-    const target = await harness.mount({ services: makeServices(store) });
-    assert.ok(target.querySelector('[data-journal-state="loading"]'), 'loading state shown');
+  it('keeps loading, error, and no-actor branches explicit', async () => {
+    for (const [overrides, state] of [
+      [{ loading: true }, 'loading'],
+      [{ error: true }, 'error'],
+      [{ listing: { selectedActorId: null } }, 'empty'],
+    ]) {
+      const { store } = makeJournal(overrides);
+      const target = await harness.mount({ services: makeServices(store) });
+      assert.ok(target.querySelector(`[data-journal-state="${state}"]`));
+      harness.remount();
+    }
   });
 
-  it('announces the loading root as busy, and does not once the view is ready', async () => {
-    // Asserted on the RENDERED DOM (issue 1514): a composition that declares `aria-busy` and
-    // stops rendering it passes every source-text reader, and the negative half is what makes
-    // the attribute mean the loading state rather than the component.
-    const { store: loadingStore } = makeJournal({ loading: true });
-    const loading = await harness.mount({ services: makeServices(loadingStore) });
-    const loadingRoot = loading.querySelector('[data-journal-state="loading"]');
-    assert.equal(loadingRoot.getAttribute('aria-busy'), 'true', 'the loading root is busy');
-    assert.ok(
-      loadingRoot.textContent.includes('FABRICATE.App.Journal.Loading'),
-      'and a VISIBLE label states what is loading'
-    );
+  it('offers a working retry action after a load error', async () => {
+    const { store, calls } = makeJournal({ error: true });
+    const target = await harness.mount({ services: makeServices(store) });
+    const beforeRetry = calls.load.length;
+    target.querySelector('[data-notice-action]').click();
+    assert.equal(calls.load.length, beforeRetry + 1);
+  });
+
+  it('renders Browse and Detail as two zones with independently paged Active and Finished lists', async () => {
+    const active = makeCraftingRun();
+    const finished = makeSucceededRun();
+    const { store } = makeJournal({
+      activePageItems: [active], activeRuns: [active], activeCount: 1,
+      activeCounts: { all: 1, ready: 0, waiting: 1, paused: 0 },
+      historyPageItems: [finished], historyCount: 1,
+      selectedRun: active, selectedRunKey: active.key, selectedRunId: active.id,
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+
+    assert.equal(target.querySelectorAll('.journal-browse, .journal-detail-pane').length, 2);
+    assert.ok(target.querySelector('[data-run-id="run-craft-1"]'));
+    assert.ok(target.querySelector('[data-history-run-id="run-done-1"]'));
+    const activeList = target.querySelector('[data-journal-list="active"]');
+    const finishedList = target.querySelector('[data-journal-list="finished"]');
+    assert.ok(activeList.querySelector('[data-journal-list-scroll]'));
+    assert.ok(finishedList.querySelector('[data-journal-list-scroll]'));
+    assert.ok(!activeList.querySelector('[data-journal-list-scroll]').contains(activeList.querySelector('[data-pagination]')));
+    assert.ok(!finishedList.querySelector('[data-journal-list-scroll]').contains(finishedList.querySelector('[data-pagination]')));
+    assert.equal(target.querySelectorAll('.journal-list-footer .manager-pagination').length, 2);
+    assert.ok(target.querySelector('[data-journal-detail]'));
+    assert.ok(target.querySelector('[data-journal-time-remaining]'));
+    assert.ok(!target.querySelector('.journal-view-column-right'));
+    assert.ok(!target.querySelector('[data-journal-card="recent"]'));
+  });
+
+  it('operates search, kind, status, and both independent sort controls', async () => {
+    const run = makeGatheringRun();
+    const { store, calls } = makeJournal({
+      activePageItems: [run], activeRuns: [run], activeCount: 1,
+      activeCounts: { all: 4, ready: 1, waiting: 2, paused: 1 },
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+
+    const search = target.querySelector('[data-journal-search] input');
+    search.value = 'herb';
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+    chooseSelectOption(target, '[data-journal-kind-filter]', 'gathering');
+    target.querySelector('[data-journal-status-filter] input[value="ready"]').click();
+    chooseSelectOption(target, '[data-journal-sort="active"]', 'newest');
+    chooseSelectOption(target, '[data-journal-sort="history"]', 'oldest');
+
+    assert.deepEqual(calls.search, ['herb']);
+    assert.deepEqual(calls.kind, ['gathering']);
+    assert.deepEqual(calls.status, ['ready']);
+    assert.deepEqual(calls.activeSort, ['newest']);
+    assert.deepEqual(calls.historySort, ['oldest']);
+    assert.equal(target.querySelector('[data-segment-badge="4"]').textContent, '4');
+  });
+
+  it('selects by the full run model so equal ids in different run types stay distinct', async () => {
+    const crafting = makeCraftingRun({ id: 'same' });
+    const gathering = makeGatheringRun({ id: 'same' });
+    const { store, calls } = makeJournal({
+      activePageItems: [crafting, gathering], activeRuns: [crafting, gathering], activeCount: 2,
+      selectedRunKey: gathering.key,
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+    const rows = target.querySelectorAll('[data-run-id="same"]');
+    assert.equal(rows.length, 2);
+    assert.equal(rows[1].getAttribute('data-selected'), 'true');
+    rows[0].click();
+    assert.equal(calls.select[0], crafting);
+  });
+
+  it('dismisses a Finished row without selecting it', async () => {
+    const run = makeSucceededRun();
+    const { store, calls } = makeJournal({ historyPageItems: [run], historyCount: 1 });
+    const target = await harness.mount({ services: makeServices(store) });
+    target.querySelector('[data-journal-dismiss]').click();
+    assert.deepEqual(calls.dismiss, [run]);
+    assert.deepEqual(calls.select, []);
+  });
+
+  it('uses the shared action bar for primary, pause, completion preference, and armed cancellation', async () => {
+    const run = makeCraftingRun({
+      lifecycleContract: 'current', lifecycleVersion: 1, derivedStatus: 'ready', timeGate: null,
+      actions: { execute: true, pause: true, resume: false, setCompletionMode: true, setSelection: false, cancel: true, dismiss: false, disabledReason: null },
+    });
+    const { store, calls } = makeJournal({
+      activePageItems: [run], activeRuns: [run], activeCount: 1,
+      selectedRun: run, selectedRunKey: run.key, selectedRunId: run.id,
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+    target.querySelector('[data-run-action="primary"]').click();
+    target.querySelector('[data-run-action="pause"]').click();
+    target.querySelector('[data-run-completion-switch] input[value="worldTime"]').click();
+    target.querySelector('[data-run-action="cancel-arm"]').click();
+    flushSync();
+    assert.ok(target.querySelector('[data-run-cancel-decision]'));
+    assert.ok(!target.querySelector('[data-run-action="primary"]'));
+    target.querySelector('[data-run-action="cancel-confirm"]').click();
+    assert.deepEqual(calls.execute, [run]);
+    assert.deepEqual(calls.pause, [run]);
+    assert.deepEqual(calls.completion, [[run, 'worldTime']]);
+    assert.deepEqual(calls.cancel, [run]);
+  });
+
+  it('keeps stage browsing separate from the current stage and uses no navigation for one stage', async () => {
+    const run = makeCraftingRun({ lifecycleContract: 'current', lifecycleVersion: 1 });
+    const { store, calls } = makeJournal({
+      activePageItems: [run], activeRuns: [run], activeCount: 1,
+      selectedRun: run, selectedRunKey: run.key, selectedRunId: run.id, viewedStageIndex: 0,
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+    target.querySelector('[data-stage-nav-index="1"]').click();
+    assert.deepEqual(calls.viewStage, [1]);
+    assert.equal(target.querySelector('[data-stage-card]').getAttribute('data-stage-state'), 'current');
 
     harness.remount();
-    const { store: readyStore } = makeJournal({});
-    const ready = await harness.mount({ services: makeServices(readyStore) });
-    assert.ok(ready.querySelector('[data-journal-state="populated"]'), 'the ready view is populated');
-    assert.ok(!ready.querySelector('[aria-busy]'), 'nothing in the ready view claims to be busy');
-  });
+    const single = makeCraftingRun({ steps: [run.steps[0]], stepCount: 1, multiStep: false });
+    const { store: singleStore } = makeJournal({ selectedRun: single, selectedRunKey: single.key });
+    const singleTarget = await harness.mount({ services: makeServices(singleStore) });
+    assert.equal(singleTarget.querySelector('[data-stage-nav]'), null);
 
-  it('renders the error state', async () => {
-    const { store } = makeJournal({ error: true });
-    const target = await harness.mount({ services: makeServices(store) });
-    assert.ok(target.querySelector('[data-journal-state="error"]'), 'error state shown');
-    assertViewErrorTreatment(target.querySelector('[data-journal-state="error"]'), {
-      view: 'journal view',
-      message: 'FABRICATE.App.Journal.Error'
-    });
-  });
-
-  it('renders the no-actor empty state', async () => {
-    const { store } = makeJournal({ listing: { selectedActorId: null } });
-    const target = await harness.mount({ services: makeServices(store) });
-    assert.ok(target.querySelector('[data-journal-state="empty"]'), 'no-actor empty state shown');
-  });
-
-  it('renders the populated 3-column layout with the footer', async () => {
-    const run = makeCraftingRun();
-    const { store } = makeJournal({
-      activeRuns: [run],
-      selectedRun: run,
-      selectedRunId: run.id,
-      historyPageItems: [makeSucceededRun()],
-      historyCount: 1,
-      recentTerminalRuns: [makeSucceededRun()],
-      navCount: 1
-    });
-    const target = await harness.mount({ services: makeServices(store) });
-    assert.ok(target.querySelector('[data-journal-state="populated"]'), 'populated grid shown');
-    assert.ok(target.querySelector('.journal-view-column-left'), 'left column present');
-    assert.ok(target.querySelector('.journal-view-column-center'), 'center column present');
-    assert.ok(target.querySelector('.journal-view-column-right'), 'right column present');
-    assert.ok(target.querySelector('[data-run-id="run-craft-1"]'), 'the active run card renders');
-    assert.ok(target.querySelector('[data-journal-detail]'), 'the run detail renders in the centre');
-    assert.ok(target.querySelector('[data-journal-card="recent"]'), 'recent results render on the right');
-    assert.ok(target.querySelector('[data-journal-card="about"]'), 'about-this-run renders when a run is selected');
-    // Right-column order (mockup): about → recent (about now precedes recent).
-    const about = target.querySelector('[data-journal-card="about"]');
-    const recent = target.querySelector('[data-journal-card="recent"]');
-    assert.ok(
-      about.compareDocumentPosition(recent) & Node.DOCUMENT_POSITION_FOLLOWING,
-      'about-this-run is ordered before recent results in the right column'
-    );
-    // A multi-step crafting run uses the standard crafting explainer, not the single-step variant.
-    const expect = target.querySelector('.journal-view-column-right [data-journal-card="expect"]');
-    assert.match(expect.textContent, /WhatToExpect\.Crafting\b/, 'multi-step run uses the standard crafting copy');
-    assert.doesNotMatch(expect.textContent, /CraftingSingleStep/, 'not the single-step variant');
-  });
-
-  it('suppresses the step timeline and uses finish copy for a single-step run', async () => {
-    const base = makeCraftingRun();
-    const run = makeCraftingRun({
-      id: 'run-single-1',
-      multiStep: false,
-      isFinalStep: true,
-      stepLabel: '',
-      structureLabel: 'Single-Step Recipe',
-      steps: [base.steps[0]]
-    });
-    const { store } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
-    const target = await harness.mount({ services: makeServices(store) });
-
-    const center = target.querySelector('.journal-view-column-center');
-    assert.ok(!center.querySelector('[data-journal-timeline]'), 'no step timeline for a single-step run');
-    // Only the structure chip renders — the blanked step-label chip is gone from the DOM.
-    assert.equal(center.querySelectorAll('.journal-detail-tag').length, 1, 'only the structure chip remains');
-
-    const trigger = target.querySelector('[data-journal-trigger]');
-    assert.ok(trigger, 'the primary action button renders');
-    assert.match(trigger.textContent, /FinishCrafting/, 'button uses the finish-crafting label');
-    // Gated (worldTime 0 < availableAt): the time-gate card shows the finish hint.
-    const gate = target.querySelector('[data-journal-time-remaining]');
-    assert.ok(gate, 'the time-gate card renders while gated');
-    assert.match(gate.textContent, /WhenPassedFinal/, 'gate hint uses the finish variant');
-    // The right-column explainer switches to the single-step crafting copy.
-    const expect = target.querySelector('.journal-view-column-right [data-journal-card="expect"]');
-    assert.match(expect.textContent, /CraftingSingleStep/, 'what-to-expect uses the single-step copy');
-  });
-
-  it('uses finish copy on the last step of a multi-step run while keeping the timeline', async () => {
-    // multiStep stays true (timeline shown) but the run is on its final step
-    // (isFinalStep true) — proving the finish copy keys off isFinalStep, not !multiStep.
-    const run = makeCraftingRun({ id: 'run-last-step', stepIndex: 1, isFinalStep: true });
-    const { store } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
-    const target = await harness.mount({ services: makeServices(store) });
-
-    const center = target.querySelector('.journal-view-column-center');
-    assert.ok(center.querySelector('[data-journal-timeline]'), 'the multi-step timeline is still shown');
-    assert.match(
-      target.querySelector('[data-journal-trigger]').textContent,
-      /FinishCrafting/,
-      'the last step uses the finish-crafting label'
-    );
-    assert.match(
-      target.querySelector('[data-journal-time-remaining]').textContent,
-      /WhenPassedFinal/,
-      'the last step gate uses the finish variant'
-    );
-  });
-
-  it('keeps the gathering explainer for a gathering run (not the single-step crafting copy)', async () => {
-    const run = makeGatheringRun();
-    const { store } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
-    const target = await harness.mount({ services: makeServices(store) });
-    const expect = target.querySelector('.journal-view-column-right [data-journal-card="expect"]');
-    assert.match(expect.textContent, /WhatToExpect\.Gathering/, 'gathering run keeps the gathering copy');
-    assert.doesNotMatch(expect.textContent, /CraftingSingleStep/, 'gathering never mis-routes to the single-step copy');
-  });
-
-  it('shows per-column empty states when there are no active or history runs', async () => {
-    const { store } = makeJournal({ activeRuns: [], historyPageItems: [], historyCount: 0 });
-    const target = await harness.mount({ services: makeServices(store) });
-    assert.ok(target.querySelector('[data-journal-empty="active"]'), 'no-active-runs empty state shown');
-    assert.ok(target.querySelector('[data-journal-empty="history"]'), 'no-history empty state shown');
-    assert.ok(target.querySelector('[data-journal-empty="detail"]'), 'no-run-selected empty state shown');
-  });
-
-  it('shows an owner-only cancel affordance that confirms then routes to store.cancel', async () => {
-    // A discovered, owned, in-progress crafting run offers the player cancel (issue 848).
-    const run = makeCraftingRun({ canCancel: true, refundOnCancel: true });
-    const { store, calls } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
-    const target = await harness.mount({ services: makeServices(store) });
-
-    const startBtn = target.querySelector('[data-journal-cancel-start]');
-    assert.ok(startBtn, 'the cancel-craft button renders for an owned in-progress run');
-    // No cancel is issued until the player confirms.
-    startBtn.click();
-    flushSync();
-    assert.equal(calls.cancel.length, 0, 'the first click only reveals the confirm step');
-    const prompt = target.querySelector('[data-journal-cancel-prompt]');
-    assert.ok(prompt, 'the confirm prompt appears');
-    assert.match(prompt.textContent, /CancelConfirmRefund/, 'refund-on run explains inputs return');
-
-    target.querySelector('[data-journal-cancel-confirm]').click();
-    flushSync();
-    assert.deepEqual(calls.cancel, [run.id], 'confirming routes to store.cancel with the run');
-  });
-
-  it('lets the player back out of a cancel with "keep crafting" (no cancel issued)', async () => {
-    const run = makeCraftingRun({ canCancel: true, refundOnCancel: false });
-    const { store, calls } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
-    const target = await harness.mount({ services: makeServices(store) });
-
-    target.querySelector('[data-journal-cancel-start]').click();
-    flushSync();
-    // A forfeit system warns that inputs will NOT return.
-    assert.match(
-      target.querySelector('[data-journal-cancel-prompt]').textContent,
-      /CancelConfirmForfeit/,
-      'refund-off run warns inputs are forfeit'
-    );
-    target.querySelector('[data-journal-cancel-keep]').click();
-    flushSync();
-    assert.equal(calls.cancel.length, 0, 'backing out issues no cancel');
-    assert.ok(!target.querySelector('[data-journal-cancel-prompt]'), 'the confirm step is dismissed');
-  });
-
-  it('hides the cancel affordance for a run the player does not own', async () => {
-    const run = makeCraftingRun({ canCancel: false });
-    const { store } = makeJournal({ activeRuns: [run], selectedRun: run, selectedRunId: run.id });
-    const target = await harness.mount({ services: makeServices(store) });
-    assert.ok(!target.querySelector('[data-journal-cancel]'), 'no cancel affordance for a not-owned run');
-    // The advance button still renders — only the cancel affordance is gated.
-    assert.ok(target.querySelector('[data-journal-trigger]'), 'the advance button is unaffected');
-  });
-
-  it('routes a run-card click to the store select action', async () => {
-    const run = makeCraftingRun();
-    const { store, calls } = makeJournal({ activeRuns: [run] });
-    const target = await harness.mount({ services: makeServices(store) });
-    target.querySelector('[data-run-id="run-craft-1"]').click();
-    assert.deepEqual(calls.select, ['run-craft-1'], 'clicking the card calls store.select with the run id');
-  });
-});
-
-/**
- * The Journal tab's adoption of the shared tile, bar, label, no-state panel and standing
- * statement (issue 1514, phase 3).
- *
- * Every assertion here is on the RENDERED DOM rather than on the source text, because the
- * failure this phase is exposed to is a component that keeps its import and stops emitting
- * what the import is for. A source grep for `<Medallion` cannot see a tile that renders at
- * the wrong size, an ARIA attribute that moved off the wrapper it was supposed to stay on,
- * or a hook whose dynamic value stopped being forwarded.
- */
-describe('JournalView primitive adoption (issue 1514)', () => {
-  before(() => harness.setup());
-  afterEach(() => harness.remount());
-  after(() => harness.teardown());
-
-  /** Mount the populated three-column layout with a selected, gated, succeeded-history run. */
-  async function mountPopulated(overrides = {}) {
-    const run = makeCraftingRun();
-    const { store } = makeJournal({
-      activeRuns: [run],
-      selectedRun: run,
-      selectedRunId: run.id,
-      historyPageItems: [makeSucceededRun()],
-      historyCount: 1,
-      recentTerminalRuns: [makeSucceededRun()],
-      navCount: 1,
-      ...overrides
-    });
-    return harness.mount({ services: makeServices(store) });
-  }
-
-  /** The medallion's rendered edge length, read off the `style` attribute it composes. */
-  function medallionSize(tile) {
-    return /width:\s*(\d+)px/.exec(tile?.getAttribute('style') ?? '')?.[1] ?? '';
-  }
-
-  it('draws every record thumb as the shared tile, at the size its row already rendered', async () => {
-    const target = await mountPopulated();
-    const sizes = {
-      'the active run card': medallionSize(
-        target.querySelector('.journal-run-card-main .fab-medallion')
-      ),
-      'the history row': medallionSize(
-        target.querySelector('.journal-history-row .fab-medallion')
-      ),
-      'the recent-results row': medallionSize(
-        target.querySelector('.journal-recent-item .fab-medallion')
-      ),
-      'the run detail header': medallionSize(
-        target.querySelector('.journal-detail-header .fab-medallion')
-      )
+    harness.remount();
+    const futureStep = {
+      ...run.steps[1],
+      detail: { ...run.steps[1].detail, failureText: 'The metal cracked.' },
+      lastCheckResult: { formula: '1d20 + 2', total: 16, value: 14, dc: 10, success: false },
+      requirementSnapshot: {
+        id: 'future-set',
+        ingredientGroups: [{
+          id: 'fuel', name: 'Fuel', quantity: 2,
+          options: [{ componentId: 'coal', name: 'Coal', quantity: 2 }],
+        }],
+      },
+      selectionPlan: { selectedIngredientSetId: 'future-set' },
     };
-    assert.deepEqual(
-      sizes,
-      {
-        'the active run card': '64',
-        'the history row': '40',
-        'the recent-results row': '28',
-        'the run detail header': '64'
+    const futureRun = makeCraftingRun({ steps: [run.steps[0], futureStep] });
+    const { store: futureStore } = makeJournal({
+      selectedRun: futureRun, selectedRunKey: futureRun.key, viewedStageIndex: 1,
+    });
+    const futureTarget = await harness.mount({ services: makeServices(futureStore) });
+    const futureCard = futureTarget.querySelector('[data-stage-card]');
+    assert.equal(futureCard.getAttribute('data-stage-state'), 'future');
+    assert.ok(futureCard.classList.contains('is-inactive'));
+    assert.match(futureCard.textContent, /Coal/);
+    assert.match(futureCard.textContent, /RollResultWithDc/);
+    assert.match(futureCard.textContent, /The metal cracked/);
+    assert.equal(futureCard.querySelector('button, input'), null);
+  });
+
+  it('persists an exact held-item choice and a stage-scoped essence allocation', async () => {
+    const base = makeCraftingRun();
+    const option = (index, id, name, candidate) => ({
+      index, id, kind: 'component', name, img: '', icon: 'fas fa-cube', colorToken: 'sage',
+      need: 1, available: true, candidates: [candidate],
+    });
+    const iron = option(0, 'iron', 'Iron', {
+      itemId: 'Item.iron', name: 'Iron ingot', img: '', held: 3, available: true,
+    });
+    const copper = option(1, 'copper', 'Copper', {
+      itemId: 'Item.copper', name: 'Copper ingot', img: '', held: 2, available: true,
+    });
+    const firstStep = {
+      ...base.steps[0],
+      selectionPlan: { selectedIngredientSetId: 'set-1', ingredientOptionOverrides: {} },
+      requirementSnapshot: { id: 'set-1', ingredientGroups: [] },
+      selectionAvailability: {
+        requirements: [{
+          groupId: 'metal', name: 'Metal', selectedOptionIndex: 0,
+          selectedItemId: 'Item.iron', option: iron,
+        }],
+        choices: [{ groupId: 'metal', selectedOptionIndex: 0, options: [iron, copper] }],
+        essencePool: {
+          requirements: [{
+            groupId: 'spark', essenceId: 'fire', name: 'Fire', icon: 'fas fa-fire',
+            colorToken: 'ember', need: 4, delivered: 0, owned: 4, satisfied: false,
+          }],
+          carriers: [{
+            itemKey: 'Item.crystal', componentId: 'crystal', name: 'Ember crystal', img: '',
+            perUnit: { fire: 2 }, ownedUnits: 2, allocatedUnits: 0,
+          }],
+          allocation: {}, suggested: {}, totals: {},
+        },
       },
-      'a CONVERSION preserves the rendered size; these are the four the raw `<img>` rules drew'
+    };
+    const run = makeCraftingRun({
+      lifecycleContract: 'current', lifecycleVersion: 1,
+      steps: [firstStep, base.steps[1]], currentStep: firstStep,
+      actions: { ...base.actions, setSelection: true },
+    });
+    const { store, calls } = makeJournal({ selectedRun: run, selectedRunKey: run.key });
+    const target = await harness.mount({ services: makeServices(store) });
+    target.querySelector('[data-slot-id="metal"] button').click();
+    flushSync();
+    const copperChoice = [...target.querySelectorAll('[data-choice-id]')]
+      .find((node) => node.textContent.includes('Copper ingot'));
+    copperChoice.click();
+    const essenceIncrement = target.querySelector(
+      '[data-essence-source="Item.crystal"] [data-stepper-increment]'
     );
+    essenceIncrement.click();
+    flushSync();
+    essenceIncrement.click();
+
+    assert.equal(calls.selection[0][1].ingredientOptionOverrides.metal.optionIndex, 1);
+    assert.equal(calls.selection[0][1].ingredientOptionOverrides.metal.heldItemId, 'Item.copper');
+    assert.equal(
+      calls.selection[2][1].ingredientEssenceAllocation.allocation['Item.crystal'],
+      2
+    );
+    assert.equal(calls.selection[2][1].ingredientEssenceAllocation.stepId, 's1');
+    assert.equal(calls.selection[2][1].ingredientEssenceAllocation.ingredientSetId, 'set-1');
   });
 
-  it('draws the succeeded run detail result thumb as the tile at 24, inside its image branch', async () => {
-    const succeeded = makeSucceededRun();
+  it('renders terminal awards through YieldScale and moves facts and guidance into Detail', async () => {
+    const run = makeSucceededRun();
     const { store } = makeJournal({
-      historyPageItems: [succeeded],
-      historyCount: 1,
-      selectedRun: succeeded,
-      selectedRunId: succeeded.id
+      historyPageItems: [run], historyCount: 1,
+      selectedRun: run, selectedRunKey: run.key, selectedRunId: run.id,
     });
     const target = await harness.mount({ services: makeServices(store) });
-    const results = target.querySelector('[data-journal-results]');
-    assert.ok(Boolean(results), 'the succeeded run lists its created results');
-    assert.equal(
-      medallionSize(results.querySelector('.fab-medallion')),
-      '24',
-      'the result tile keeps the 24px box its own rule drew'
-    );
+    assert.match(target.querySelector('[data-yield-scale]').textContent, /Healing Potion/);
+    assert.ok(target.querySelector('[data-journal-record]'));
+    assert.match(target.querySelector('[data-journal-record]').textContent, /DayWithClock/u);
+    assert.ok(target.querySelector('[data-journal-guidance]'));
+    assert.ok(target.querySelector('[data-journal-verdict="succeeded"]'));
   });
 
-  it('keeps the progressbar role and its values on the CALLER, with the shared bar inside', async () => {
-    const target = await mountPopulated();
-    const wrapper = target.querySelector('.journal-run-card-progress');
-    assert.ok(Boolean(wrapper), 'the gated run card draws a progress track');
-    assert.equal(wrapper.getAttribute('role'), 'progressbar', 'the ROLE stays on the caller');
-    assert.deepEqual(
-      {
-        min: wrapper.getAttribute('aria-valuemin'),
-        max: wrapper.getAttribute('aria-valuemax'),
-        now: wrapper.getAttribute('aria-valuenow')
+  it('renders the authoritative gathering preview separately from actual awards', async () => {
+    const run = makeGatheringRun({
+      gatheringYield: {
+        mode: 'd100',
+        entries: [
+          { id: 'herb', name: 'Moon herb', qty: 2, chance: 70 },
+          { id: 'seed', name: 'Moon seed', qty: 1, chance: 20 },
+        ],
+        roll: 41,
+        tiers: [],
       },
-      { min: '0', max: '100', now: '0' },
-      'all three aria-value* attributes stay on the caller — FillBar declares none of its own'
-    );
-    const bar = wrapper.querySelector('.fab-fill-bar');
-    assert.ok(Boolean(bar), 'the track itself is the shared bar');
-    assert.ok(bar.classList.contains('is-sm'), 'at the 6px rung the hand-rolled track drew');
-    assert.equal(
-      bar.getAttribute('data-fill-bar-tone'),
-      'accent',
-      'the accent fill the hand-rolled `.journal-run-card-progress-fill` painted'
-    );
-  });
-
-  it('draws every titled card heading as the shared kicker, still on an h3', async () => {
-    const target = await mountPopulated();
-    const headings = [...target.querySelectorAll('[data-journal-card] > .fab-kicker')];
-    assert.ok(headings.length >= 3, 'the right column draws several titled cards');
-    assert.deepEqual(
-      [...new Set(headings.map((heading) => heading.tagName.toLowerCase()))],
-      ['h3'],
-      'the kicker renders `h3`, so the card titles keep their place in the document outline'
-    );
-    assert.ok(
-      !target.querySelector('.journal-card-title'),
-      'the hand-rolled title class is gone rather than left beside the primitive'
-    );
-  });
-
-  it('draws each list column empty as the shared panel, forwarding its DYNAMIC hook value', async () => {
-    const { store } = makeJournal({ activeRuns: [], historyPageItems: [], historyCount: 0 });
-    const target = await harness.mount({ services: makeServices(store) });
-    for (const kind of ['active', 'history']) {
-      const panel = target.querySelector(`[data-journal-empty="${kind}"]`);
-      assert.ok(Boolean(panel), `the ${kind} column states its emptiness`);
-      assert.ok(
-        panel.classList.contains('manager-empty'),
-        `the ${kind} empty is the shared panel, not a hand-rolled block`
-      );
-      assert.ok(
-        panel.classList.contains('is-compact'),
-        `the ${kind} empty takes the compact density its half-column affords`
-      );
-    }
-    const detail = target.querySelector('[data-journal-empty="detail"]');
-    assert.ok(
-      detail.classList.contains('manager-empty'),
-      'the centre column empty is the shared panel too, at its EXACT hook value'
-    );
-    // AND IT PASSES `title`, LIKE THE OTHER FOUR HERO EMPTIES (issue 1514). This is a
-    // screen-level empty standing in for the whole centre column, which is what the base
-    // variant is for; `hint` alone renders a 46px tile over an 11px subtle line in a
-    // full-height fill with no statement above it. The objection to `title` belongs to the
-    // pane one-liners, which take `note` and render no heading at all.
-    assert.ok(
-      Boolean(detail.querySelector('h3')),
-      'the centre-column hero empty states its sentence as the panel TITLE, not as the hint ' +
-        'line beneath a title that is not there'
-    );
-    assert.ok(
-      !detail.querySelector('p'),
-      'and it renders no second line, because the sentence is the statement rather than a ' +
-        'gloss on one'
-    );
-  });
-
-  it('draws the world-time gate as the shared standing statement at the warning tone', async () => {
-    const target = await mountPopulated();
-    const box = target.querySelector('[data-journal-time-remaining]');
-    assert.ok(Boolean(box), 'a gated run states when it becomes available');
-    assert.ok(box.classList.contains('manager-callout'), 'it is the shared callout');
-    assert.equal(box.getAttribute('data-callout-tone'), 'warning', 'at the amber tone it drew');
-    assert.match(
-      box.textContent,
-      /TimeRemaining\.WhenPassed/,
-      'the "ready once time passes" line is the callout body'
-    );
-  });
-  it('sorts each list through the app’s own option list, one caption per instance', async () => {
-    // TWO INSTANCES OF ONE COMPONENT ON ONE SCREEN, which is why `JournalListShell` mints its
-    // caption id from `$props.id()` rather than declaring one. A fixed id would give both
-    // triggers the same `aria-labelledby` target and the History control would be announced as
-    // "Sort" for Active Runs.
-    const active = [];
-    const history = [];
-    const { store } = makeJournal({
-      activeRuns: [makeCraftingRun()],
-      historyPageItems: [makeSucceededRun()],
-      historyCount: 1,
-      setActiveSort: (next) => active.push(next),
-      setHistorySort: (next) => history.push(next),
+      createdResults: [{ componentId: 'herb', name: 'Moon herb', quantity: 2 }],
     });
+    const { store } = makeJournal({ selectedRun: run, selectedRunKey: run.key });
     const target = await harness.mount({ services: makeServices(store) });
+    assert.equal(target.querySelectorAll('[data-yield-scale]').length, 2);
+    assert.ok(target.querySelector('[data-yield-cut]'));
+    assert.match(target.querySelector('[data-journal-record]').textContent, /d100/u);
 
-    const triggers = [...target.querySelectorAll('[data-journal-sort]')];
-    assert.equal(triggers.length, 2, 'both list regions draw their own sort control');
-    assert.deepEqual(
-      triggers.map((trigger) => trigger.getAttribute('data-journal-sort')),
-      ['active', 'history'],
-      'the dynamic hook value rides `triggerData` onto each trigger, so the two stay ' +
-        'distinguishable to a capture step and to a smoke assertion'
-    );
-    const named = triggers.map((trigger) => trigger.getAttribute('aria-labelledby'));
-    assert.ok(named.every(Boolean), 'each trigger is named by a caption');
-    assert.notEqual(named[0], named[1], 'and the two captions are different elements');
-    for (const [index, id] of named.entries()) {
-      // `getElementById` rather than a `#id` selector: `$props.id()` mints an id that can begin
-      // with a digit, which is a valid id and an invalid selector, and happy-dom exposes no
-      // `CSS.escape`.
-      const caption = target.ownerDocument.getElementById(id);
-      assert.ok(Boolean(caption), `the caption ${id} that names trigger ${index} is rendered`);
-      assert.ok(
-        caption.textContent.trim().length > 0,
-        'and it has text: an `aria-labelledby` to an EMPTY span is no accessible name at all, ' +
-          'and the primitive does not warn about one'
-      );
-    }
-    assert.ok(
-      triggers.every((trigger) => !trigger.getAttribute('aria-label')),
-      'no trigger carries both naming routes, which the primitive refuses'
-    );
+    harness.remount();
+    const routed = makeGatheringRun({
+      gatheringYield: {
+        mode: 'routed', entries: [], roll: null,
+        tiers: [
+          { id: 'rich', name: 'Rich seam', band: '20+', fail: false,
+            yields: [{ id: 'ore', name: 'Moon ore', quantity: '×3' }] },
+          { id: 'barren', name: 'Barren', band: '<10', fail: true, yields: [] },
+        ],
+      },
+    });
+    const { store: routedStore } = makeJournal({
+      selectedRun: routed, selectedRunKey: routed.key,
+    });
+    const routedTarget = await harness.mount({ services: makeServices(routedStore) });
+    assert.equal(routedTarget.querySelectorAll('[data-outcome-tier]').length, 2);
+    assert.match(routedTarget.querySelector('[data-journal-record]').textContent, /Mode\.routed/u);
+    assert.doesNotMatch(routedTarget.querySelector('[data-journal-record]').textContent, /null/u);
 
-    assert.deepEqual(
-      selectOptionValues(target, '[data-journal-sort="active"]'),
-      ['soonestReady', 'newest'],
-      'the Active Runs keys'
-    );
-    assert.equal(
-      selectTriggerText(target, '[data-journal-sort="active"]'),
-      'FABRICATE.App.Journal.ActiveRuns.Sort.SoonestReady',
-      'the trigger states the live key rather than a placeholder'
-    );
-    chooseSelectOption(target, '[data-journal-sort="active"]', 'newest');
-    assert.deepEqual(active, ['newest'], 'the Active Runs list forwards its own key');
-    assert.deepEqual(history, [], 'and does not drive its sibling');
-
-    chooseSelectOption(target, '[data-journal-sort="history"]', 'oldest');
-    assert.deepEqual(history, ['oldest'], 'the History list forwards its own key');
+    harness.remount();
+    const straight = makeGatheringRun({
+      gatheringYield: {
+        mode: 'straight',
+        entries: [{ id: 'ore', name: 'Moon ore', qty: 3, chance: 100 }],
+        roll: null,
+        tiers: [],
+      },
+    });
+    const { store: straightStore } = makeJournal({
+      selectedRun: straight, selectedRunKey: straight.key,
+    });
+    const straightTarget = await harness.mount({ services: makeServices(straightStore) });
+    assert.ok(straightTarget.querySelector('[data-yield-entry="ore"]'));
+    assert.equal(straightTarget.querySelector('[data-yield-cut]'), null);
+    assert.match(straightTarget.querySelector('[data-journal-record]').textContent, /Mode\.straight/u);
   });
 
-  it('demotes each sort wrapper to a span, so the caption cannot re-open the list it closed', async () => {
-    const { store } = makeJournal({ activeRuns: [makeCraftingRun()] });
+  it('shows recovery evidence without disclosing selection internals on a redacted owner run', async () => {
+    const run = makeCraftingRun({
+      redacted: true, names: { title: 'Hidden recipe', subtitle: '' }, steps: [], currentStep: null,
+      lifecycleContract: 'current', lifecycleVersion: 1,
+      recoveryEvidence: { required: true, appliedEffectCount: 2, effects: [] },
+      actions: { execute: false, pause: false, resume: false, setCompletionMode: false, setSelection: false, cancel: false, dismiss: false, disabledReason: 'recoveryRequired' },
+    });
+    const { store } = makeJournal({ selectedRun: run, selectedRunKey: run.key });
     const target = await harness.mount({ services: makeServices(store) });
-
-    const wrappers = [...target.querySelectorAll('.journal-sort')];
-    assert.equal(wrappers.length, 2, 'both wrappers survive with their class');
-    assert.ok(
-      wrappers.every((wrapper) => wrapper.tagName === 'SPAN'),
-      'and both are spans: a `<label>` forwards a caption click into the trigger, so with the ' +
-        'panel open its own mousedown would dismiss the list and the forwarded click re-open it'
-    );
-    assert.ok(!target.querySelector('label.journal-sort'), 'no label wrapper is left');
-  });
-});
-describe('JournalListShell naming without a caption (issue 1511)', () => {
-  before(() => shellHarness.setup());
-  afterEach(() => shellHarness.remount());
-  after(() => shellHarness.teardown());
-
-  const SORT_OPTIONS = [
-    { value: 'newest', label: 'Newest' },
-    { value: 'oldest', label: 'Oldest' }
-  ];
-
-  it('names the trigger by its caption when one is drawn', async () => {
-    const target = await shellHarness.mount({
-      kind: 'history',
-      title: 'History',
-      sortLabel: 'Sort',
-      sortValue: 'newest',
-      sortOptions: SORT_OPTIONS
-    });
-    const trigger = target.querySelector('[data-journal-sort="history"]');
-    const caption = target.querySelector('.journal-sort-label');
-    assert.equal(caption.textContent.trim(), 'Sort', 'the caption is drawn');
-    assert.equal(trigger.getAttribute('aria-labelledby'), caption.id, 'and it names the trigger');
-    assert.ok(!trigger.getAttribute('aria-label'), 'exactly one naming route, never both');
-  });
-
-  it('falls back to a localized string when the caption would be empty', async () => {
-    // THE STATE THE DEFAULT PRODUCES, and the reason it needs a clause of its own: an
-    // `aria-labelledby` pointed at an EMPTY span computes no accessible name AND raises no
-    // warning — the primitive warns only when all three naming props are absent, and a non-empty
-    // id string satisfies that check while naming nothing. So the fallback is a decision at the
-    // call site rather than something the primitive can catch.
-    const target = await shellHarness.mount({
-      kind: 'active',
-      title: 'Active Runs',
-      sortLabel: '',
-      sortValue: 'newest',
-      sortOptions: SORT_OPTIONS
-    });
-    const trigger = target.querySelector('[data-journal-sort="active"]');
-    assert.ok(Boolean(trigger), 'the control still renders');
-    assert.equal(
-      trigger.getAttribute('aria-label'),
-      'FABRICATE.App.Journal.Sort.Fallback',
-      'the trigger is named by the localized fallback key, read through `localize` so ' +
-        '`lang-keys-no-orphans` can see the reference'
-    );
-    assert.ok(
-      !trigger.getAttribute('aria-labelledby'),
-      'and NOT by the empty caption beside it, which would be a name of zero characters'
-    );
+    assert.ok(target.querySelector('[data-journal-recovery]'));
+    assert.match(target.textContent, /Hidden recipe/);
+    assert.doesNotMatch(target.textContent, /selectedIngredientSetId/);
   });
 });

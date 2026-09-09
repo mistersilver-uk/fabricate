@@ -1,310 +1,428 @@
 <!-- Svelte 5 runes mode -->
-<!--
-  RunDetail is the Journal's centre column: the full view of the selected run.
-  With no run selected it shows the "Select a run" per-column empty state. With a
-  run selected it renders a header (thumb, name, status chip, structure + step
-  labels, flavor) then branches on runType:
-   - crafting / salvage: a StepTimeline + the current step's StepDetails;
-   - gathering: a simple auto-resolve summary (full gathering detail is Phase 2).
-  An ActionsPanel is shown for non-terminal runs (run-type-aware: a Trigger button
-  for crafting, an auto-resolve note for gathering/salvage). The run's
-  createdResults are listed only when it succeeded.
--->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { formatDurationHMS } from '../../util/formatDuration.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
+  import { worldTimeLabel } from '../../util/worldTimeLabel.js';
+  import Callout from '../manager/Callout.svelte';
   import Chip from '../../components/Chip.svelte';
   import Medallion from '../../components/Medallion.svelte';
-  import EmptyState from '../manager/EmptyState.svelte';
+  import Notice from '../../components/Notice.svelte';
+  import OutcomeLadder from '../../components/OutcomeLadder.svelte';
+  import RunProgress from '../../components/RunProgress.svelte';
+  import StageCard from '../../components/StageCard.svelte';
+  import StageNav from '../../components/StageNav.svelte';
+  import YieldScale from '../../components/YieldScale.svelte';
   import { runStatusPresentation } from './journalRunStatus.js';
-  import StepTimeline from './StepTimeline.svelte';
-  import StepDetails from './StepDetails.svelte';
   import ActionsPanel from './ActionsPanel.svelte';
+  import JournalFactRow from './JournalFactRow.svelte';
+  import StepDetails from './StepDetails.svelte';
+  import TimeRemainingBox from './TimeRemainingBox.svelte';
 
-  const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
-  const TERMINAL = new Set(['succeeded', 'failed', 'cancelled']);
+  let { run = null, journal = null, now = 0, services = null } = $props();
 
-  let { run = null, now = 0, services = null } = $props();
-
-  const runType = $derived(String(run?.runType ?? ''));
-  const status = $derived(String(run?.derivedStatus ?? ''));
-  const runStatus = $derived(runStatusPresentation(status));
-  const isTerminal = $derived(TERMINAL.has(status));
-  const isSucceeded = $derived(status === 'succeeded');
-  const hasSteps = $derived(runType === 'crafting' || runType === 'salvage');
-  const steps = $derived(Array.isArray(run?.steps) ? run.steps : []);
-  const TERMINAL_STEP = new Set(['succeeded', 'failed']);
-  // The step whose detail to show: the active step when present, else the last
-  // EXECUTED step for a terminal run. All recipe steps are pre-created, so a run
-  // that failed on an early step still carries trailing `pending` steps; picking the
-  // raw last array element would show an unreached step with no roll / consumed
-  // items. Walk back to the last step that actually ran (a terminal status or a
-  // recorded check), falling back to the last element only if none did.
-  function lastExecutedStep(list) {
-    for (let i = list.length - 1; i >= 0; i -= 1) {
-      const candidate = list[i];
-      if (TERMINAL_STEP.has(candidate?.status) || candidate?.lastCheckResult) return candidate;
-    }
-    return list.length > 0 ? list[list.length - 1] : null;
-  }
-  const detailStep = $derived(run?.currentStep ?? lastExecutedStep(steps));
-  const createdResults = $derived(Array.isArray(run?.createdResults) ? run.createdResults : []);
-  // The results heading names the activity: gathered vs salvaged vs crafted.
-  const resultsTitle = $derived(
-    localize(
-      runType === 'gathering'
-        ? 'FABRICATE.App.Journal.Results.TitleGathering'
-        : runType === 'salvage'
-          ? 'FABRICATE.App.Journal.Results.TitleSalvage'
-          : 'FABRICATE.App.Journal.Results.Title'
-    )
+  const status = $derived(String(run?.derivedStatus ?? run?.status ?? 'inProgress'));
+  const statusView = $derived(runStatusPresentation(status));
+  const terminal = $derived(['succeeded', 'failed', 'cancelled'].includes(status));
+  const stages = $derived(Array.isArray(run?.steps) ? run.steps : []);
+  const currentIndex = $derived(Math.max(0, Number(run?.stepIndex) || 0));
+  const viewedIndex = $derived(Math.max(0, Number(journal?.viewedStageIndex) || 0));
+  const viewedStage = $derived(stages[viewedIndex] ?? run?.currentStep ?? null);
+  const gate = $derived(run?.timeGate ?? run?.currentStep?.timeGate ?? null);
+  const elapsed = $derived(
+    Number.isFinite(Number(gate?.requiredSeconds)) && Number(gate.requiredSeconds) > 0
+      ? Math.max(
+          0,
+          Math.min(
+            100,
+            ((now - Number(gate.initiatedAt ?? now)) / Number(gate.requiredSeconds)) * 100
+          )
+        )
+      : status === 'ready'
+        ? 100
+        : 0
   );
+  const progressBlocker = $derived(
+    run?.pauseState ? localize('FABRICATE.App.Journal.Notice.PausedTitle') : ''
+  );
+
+  const gatheringYield = $derived(run?.gatheringYield ?? null);
+  const yieldEntries = $derived(
+    Array.isArray(gatheringYield?.entries) ? gatheringYield.entries : []
+  );
+  const outcomeTiers = $derived(Array.isArray(gatheringYield?.tiers) ? gatheringYield.tiers : []);
+  const resolutionModeLabel = $derived(
+    gatheringYield?.mode
+      ? localize(`FABRICATE.App.Journal.Mode.${gatheringYield.mode}`)
+      : (run?.resolutionModeLabel ?? '')
+  );
+  const startedLabel = $derived(calendarLabel(run?.startedAt));
+  const finishedLabel = $derived(calendarLabel(run?.finishedAt));
+  const results = $derived(Array.isArray(run?.createdResults) ? run.createdResults : []);
+  const resultEntries = $derived(
+    results.map((result, index) => ({
+      id: result.itemUuid ?? result.componentId ?? `result-${index}`,
+      name: result.name ?? result.componentId ?? localize('FABRICATE.App.Journal.Yields.Item'),
+      art: result.img ?? '',
+      chance: 100,
+      qty: Number(result.quantity) || 1,
+    }))
+  );
+
+  const showActions = $derived(
+    !terminal && (run?.manualAdvance === true || Object.values(run?.actions ?? {}).some(Boolean))
+  );
+  const guidance = $derived(
+    run?.activityKind === 'gathering'
+      ? localize('FABRICATE.App.Journal.WhatToExpect.Gathering')
+      : run?.runType === 'salvage'
+        ? localize('FABRICATE.App.Journal.WhatToExpect.Salvage')
+        : localize(
+            run?.multiStep
+              ? 'FABRICATE.App.Journal.WhatToExpect.Crafting'
+              : 'FABRICATE.App.Journal.WhatToExpect.CraftingSingleStep'
+          )
+  );
+
+  function stageState(index) {
+    if (terminal || index < currentIndex) return 'past';
+    if (index > currentIndex) return 'future';
+    return run?.pauseState ? 'paused' : 'current';
+  }
+  function hasTimestamp(value) {
+    return value !== null && value !== undefined && Number.isFinite(Number(value));
+  }
+  function calendarLabel(value) {
+    if (!hasTimestamp(value)) return '';
+    const components = services?.getWorldTimeComponents?.(Number(value)) ?? null;
+    return worldTimeLabel(components, { localize });
+  }
+  function numberOrNaN(raw) {
+    return raw == null ? Number.NaN : Number(raw);
+  }
+  function formatRoll(check) {
+    const formula = String(check?.formula ?? '');
+    const total = numberOrNaN(check?.total);
+    const value = numberOrNaN(check?.value);
+    const dc = numberOrNaN(check?.dc);
+    if (formula !== '' && Number.isFinite(total)) {
+      return Number.isFinite(dc)
+        ? localize('FABRICATE.App.Journal.StepDetails.RollResultWithDc', { formula, total, dc })
+        : localize('FABRICATE.App.Journal.StepDetails.RollResult', { formula, total });
+    }
+    if (Number.isFinite(value)) {
+      return Number.isFinite(dc)
+        ? localize('FABRICATE.App.Journal.StepDetails.RollResultValueWithDc', { value, dc })
+        : localize('FABRICATE.App.Journal.StepDetails.RollResultValue', { value });
+    }
+    return '';
+  }
+  function stageFacts(stage) {
+    const facts = [];
+    const snapshot = stage?.requirementSnapshot;
+    for (const [index, group] of (snapshot?.ingredientGroups ?? []).entries()) {
+      const picked = Number(
+        stage?.selectionPlan?.ingredientOptionOverrides?.[group?.id]?.optionIndex
+      );
+      const option =
+        group?.options?.[Number.isSafeInteger(picked) ? picked : 0] ?? group?.options?.[0];
+      const name =
+        option?.name ??
+        option?.match?.value ??
+        option?.componentId ??
+        localize('FABRICATE.App.Journal.Yields.Item');
+      const quantity = Math.max(1, Number(option?.quantity ?? group?.quantity) || 1);
+      facts.push({
+        id: `requirement-${group?.id ?? index}`,
+        icon: 'fas fa-box',
+        label: group?.name ?? localize('FABRICATE.App.Journal.Stage.Requirement', { n: index + 1 }),
+        value: `${name} ${localize('FABRICATE.App.Journal.Quantity', { n: quantity })}`,
+      });
+    }
+    if (Number(stage?.detail?.requiredSeconds) > 0)
+      facts.push({
+        id: 'time',
+        icon: 'fas fa-clock',
+        label: localize('FABRICATE.App.Journal.StepDetails.RequiresTime'),
+        value: formatDurationHMS(stage.detail.requiredSeconds),
+      });
+    if (stage?.lastCheckResult)
+      facts.push({
+        id: 'roll',
+        icon: 'fas fa-dice-d20',
+        label: localize('FABRICATE.App.Journal.StepDetails.RollLabel'),
+        value: formatRoll(stage.lastCheckResult),
+      });
+    if (stage?.detail?.failureText)
+      facts.push({
+        id: 'failure',
+        icon: 'fas fa-triangle-exclamation',
+        label: localize('FABRICATE.App.Journal.StepDetails.Failure'),
+        value: stage.detail.failureText,
+      });
+    if (stage?.consumedIngredients?.length)
+      facts.push({
+        id: 'spent',
+        icon: 'fas fa-box-open',
+        label: localize('FABRICATE.App.Journal.StepDetails.ConsumedTitle'),
+        value: stage.consumedIngredients
+          .map((item) => `${item.name ?? item.componentId} ×${item.quantity}`)
+          .join(', '),
+      });
+    return facts;
+  }
 </script>
 
-{#if run == null}
-  <!--
-    THE FILL IS THE CALLER'S, THE PANEL IS THE PRIMITIVE'S (issue 1514). This branch stands
-    in for the whole centre column, so it is a `height: 100%` centred fill; `EmptyState` is
-    padding-driven and declares no height, and its own fill escape is `contextClass`, whose
-    rules "live in the global sheet" (`EmptyState.svelte:53-55`) — which would put
-    `styles/fabricate.css` on this change's path. So `.journal-detail-empty` survives as a
-    caller-owned WRAPPER declaring the fill and the centring alone.
-
-    The hook is an EXACT-VALUE one (`data-journal-empty="detail"`), and `EmptyState` renders
-    `dataValue || true`, so the value is passed explicitly rather than left bare.
-
-    `title`, NOT `hint`, and the other four hero empties in this change already pass it: a
-    screen-level empty is what the base variant is for, and `hint` alone renders a 46px tile
-    over an 11px subtle line in a full-height fill with no statement above it. The objection to
-    `title` belongs to the 28 PANE one-liners — up to 28 headings into the outline — and here at
-    most one `<h3>` renders per screen, only in a not-yet-ready state.
-  -->
-  <div class="journal-detail-empty">
-    <EmptyState
-      icon="fas fa-hand-pointer"
-      title={localize('FABRICATE.App.Journal.Empty.Detail')}
-      dataAttr="data-journal-empty"
-      dataValue="detail"
-    />
-  </div>
-{:else}
-  <article class="journal-detail" data-journal-detail data-run-id={run.id} data-run-type={runType}>
-    <header class="journal-detail-header">
-      <Medallion art={run.img || DEFAULT_RUN_IMAGE} alt="" size={64} />
-      <div class="journal-detail-identity">
-        <h2 class="journal-detail-title" title={run.names?.title ?? ''}>
-          {run.names?.title ?? ''}
-        </h2>
+<article class="journal-detail" data-journal-detail data-run-key={run?.key ?? run?.id}>
+  <header class="journal-detail-header">
+    <div class="journal-detail-identity">
+      <Medallion art={run?.img ?? ''} icon="fas fa-hammer" alt="" size={52} />
+      <div>
+        <h2>{run?.names?.title ?? ''}</h2>
         <div class="journal-detail-meta">
+          {#if run?.names?.subtitle}<span>{run.names.subtitle}</span>{/if}
           <Chip
-            class="journal-run-status"
             density="list"
-            tone={statusChipTone(runStatus.tone)}
-            icon={`fas ${runStatus.icon}`}
-            data-run-status={status}>{localize(runStatus.labelKey)}</Chip
+            tone={statusChipTone(statusView.tone)}
+            icon={`fas ${statusView.icon}`}>{localize(statusView.labelKey)}</Chip
           >
-          {#if run.structureLabel}
-            <span class="journal-detail-tag">{run.structureLabel}</span>
-          {/if}
-          {#if run.stepLabel}
-            <span class="journal-detail-tag">{run.stepLabel}</span>
-          {/if}
+          {#if run?.blindSecretPreview}<Chip density="list" tone="warning" icon="fas fa-eye-slash"
+              >{localize('FABRICATE.App.Journal.BlindSecret.Badge')}</Chip
+            >{/if}
         </div>
-        {#if run.flavor}
-          <p class="journal-detail-flavor">{run.flavor}</p>
-        {/if}
       </div>
-    </header>
-
-    <div class="journal-detail-body">
-      {#if hasSteps}
-        {#if run.multiStep}
-          <StepTimeline {steps} currentIndex={run.stepIndex} />
-        {/if}
-        <StepDetails step={detailStep} multiStep={run?.multiStep === true} />
-      {:else}
-        <p class="journal-detail-gathering-summary" data-journal-gathering-summary>
-          {localize('FABRICATE.App.Journal.WhatToExpect.Gathering')}
-        </p>
-      {/if}
-
-      {#if !isTerminal}
-        <ActionsPanel {run} {now} {services} />
-      {/if}
-
-      {#if isSucceeded && createdResults.length > 0}
-        <section class="journal-detail-results" data-journal-results>
-          <!--
-            DEFERRED, on ink (issue 1514; recorded on this primitive's row in `scripts/lib/designSystemPrimitives.json`). This heading paints
-            `var(--fab-success-text)` inside a success-soft well, which is the one thing on the
-            panel that says the run SUCCEEDED. `Kicker`'s tone set is `default` (subtle) and
-            `accent` (`Kicker.svelte:105`), so the conversion would turn the green grey. The
-            plan's kicker table asserts every candidate paints `--fab-text-muted`; measured in
-            the View Lab this one resolves to the success-text token instead.
-          -->
-          <h3 class="journal-detail-results-title">{resultsTitle}</h3>
-          <ul class="journal-detail-results-list">
-            {#each createdResults as result, index (result.itemUuid ?? result.componentId ?? index)}
-              <li class="journal-detail-result" data-journal-result>
-                {#if result.img}
-                  <Medallion art={result.img} alt="" size={24} />
-                {/if}
-                <span class="journal-detail-result-name"
-                  >{result.name ?? result.componentId ?? ''}</span
-                >
-                {#if Number(result.quantity) > 1}
-                  <span class="journal-detail-result-qty"
-                    >{localize('FABRICATE.App.Journal.Quantity', { n: result.quantity })}</span
-                  >
-                {/if}
-              </li>
-            {/each}
-          </ul>
-        </section>
-      {/if}
     </div>
-  </article>
-{/if}
+    {#if showActions}<ActionsPanel {run} {journal} {now} />{/if}
+  </header>
+
+  {#if run?.recoveryEvidence?.required}
+    <Notice
+      tone="danger"
+      blocking
+      title={localize('FABRICATE.App.Journal.Notice.RecoveryTitle')}
+      detail={localize('FABRICATE.App.Journal.Notice.RecoveryDetail', {
+        count: run.recoveryEvidence.appliedEffectCount ?? 0,
+      })}
+      dataAttr="data-journal-recovery"
+      dataValue="true"
+    />
+  {:else if run?.pauseState}
+    <Notice
+      tone="warning"
+      title={localize('FABRICATE.App.Journal.Notice.PausedTitle')}
+      detail={localize('FABRICATE.App.Journal.Notice.PausedDetail')}
+      dataAttr="data-journal-paused"
+      dataValue="true"
+    />
+  {:else if run?.actions?.disabledReason === 'unsupportedLifecycle'}
+    <Notice
+      tone="warning"
+      title={localize('FABRICATE.App.Journal.Notice.UnsupportedTitle')}
+      detail={localize('FABRICATE.App.Journal.Actions.UnsupportedLifecycle')}
+    />
+  {/if}
+
+  {#if terminal}
+    <Notice
+      tone={status === 'succeeded' ? 'success' : status === 'failed' ? 'danger' : 'info'}
+      title={localize(`FABRICATE.App.Journal.Verdict.${status}`)}
+      detail={status === 'failed' ? (run?.failureReason ?? '') : ''}
+      dataAttr="data-journal-verdict"
+      dataValue={status}
+    />
+  {/if}
+
+  {#if stages.length > 0}
+    <section class="journal-detail-stages" data-journal-stages>
+      <RunProgress
+        {stages}
+        current={currentIndex}
+        progress={elapsed}
+        blocker={progressBlocker}
+        label={localize('FABRICATE.App.Journal.Progress.Label')}
+      />
+      <StageNav
+        {stages}
+        current={currentIndex}
+        view={viewedIndex}
+        onView={(index) => journal?.viewStage?.(index)}
+        stageLabel={(stage, index) =>
+          localize('FABRICATE.App.Journal.Stage.Open', {
+            index: index + 1,
+            name: stage?.stepName ?? '',
+          })}
+        previousLabel={localize('FABRICATE.App.Journal.Stage.Previous')}
+        nextLabel={localize('FABRICATE.App.Journal.Stage.Next')}
+        positionLabel={(index, count) =>
+          localize('FABRICATE.App.Journal.Stage.Position', { index: index + 1, count })}
+        returnLabel={(index) =>
+          localize('FABRICATE.App.Journal.Stage.Return', { index: index + 1 })}
+      />
+      {#if viewedStage}
+        <StageCard
+          stage={{
+            name:
+              viewedStage.stepName ||
+              localize('FABRICATE.App.Journal.Stage.Number', { index: viewedIndex + 1 }),
+            summary: viewedStage.detail?.summary ?? '',
+          }}
+          index={viewedIndex}
+          current={!terminal && viewedIndex === currentIndex}
+          state={stageState(viewedIndex)}
+          tag={{
+            label: localize(`FABRICATE.App.Journal.Stage.State.${stageState(viewedIndex)}`),
+            tone: stageState(viewedIndex) === 'past' ? 'positive' : 'neutral',
+          }}
+          facts={stageFacts(viewedStage)}
+        >
+          {#snippet body()}
+            <StepDetails
+              step={viewedStage}
+              {run}
+              {journal}
+              editable={!terminal &&
+                viewedIndex === currentIndex &&
+                run?.actions?.setSelection === true}
+            />
+          {/snippet}
+        </StageCard>
+      {/if}
+    </section>
+  {/if}
+
+  {#if gate && !terminal}<TimeRemainingBox
+      availableAt={gate.availableAt}
+      hintKey={run?.isFinalStep ? 'FABRICATE.App.Journal.TimeRemaining.WhenPassedFinal' : undefined}
+      {services}
+    />{/if}
+
+  {#if gatheringYield?.mode === 'routed' && outcomeTiers.length > 0}
+    <OutcomeLadder
+      tiers={outcomeTiers}
+      emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
+      label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
+    />
+  {:else if gatheringYield && yieldEntries.length > 0}
+    <YieldScale
+      entries={yieldEntries}
+      roll={gatheringYield.roll}
+      label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
+      labels={{
+        threshold: (entry) =>
+          localize('FABRICATE.App.Journal.Yields.Chance', { chance: entry.chance }),
+        cleared: (entry) =>
+          localize('FABRICATE.App.Journal.Yields.Awarded', { chance: entry.chance }),
+        missed: (entry) =>
+          localize('FABRICATE.App.Journal.Yields.Missed', { chance: entry.chance }),
+        quantity: (entry) => localize('FABRICATE.App.Journal.Quantity', { n: entry.qty }),
+        chance: (entry) => `${entry.chance}%`,
+        cut: (roll) => String(roll),
+      }}
+    />
+  {/if}
+
+  {#if resultEntries.length > 0}
+    <YieldScale
+      entries={resultEntries}
+      label={localize('FABRICATE.App.Journal.Yields.AwardedTitle')}
+      labels={{
+        threshold: () => localize('FABRICATE.App.Journal.Yields.Received'),
+        quantity: (entry) => localize('FABRICATE.App.Journal.Quantity', { n: entry.qty }),
+        chance: () => localize('FABRICATE.App.Journal.Yields.AwardedChip'),
+      }}
+    />
+  {/if}
+
+  <section class="journal-detail-record" data-journal-record>
+    <h3>{localize('FABRICATE.App.Journal.Record.Title')}</h3>
+    <JournalFactRow
+      icon="fa-fingerprint"
+      label={localize('FABRICATE.App.Journal.About.RunId')}
+      value={run?.id ?? ''}
+    />
+    {#if run?.recipeId}<JournalFactRow
+        icon="fa-scroll"
+        label={localize('FABRICATE.App.Journal.About.Recipe')}
+        value={run.recipeId}
+      />{/if}
+    {#if run?.taskId}<JournalFactRow
+        icon="fa-leaf"
+        label={localize('FABRICATE.App.Journal.Record.Task')}
+        value={run.taskId}
+      />{/if}
+    {#if resolutionModeLabel}<JournalFactRow
+        icon="fa-diagram-project"
+        label={localize('FABRICATE.App.Journal.About.Mode')}
+        value={resolutionModeLabel}
+      />{/if}
+    {#if startedLabel}<JournalFactRow
+        icon="fa-clock"
+        label={localize('FABRICATE.App.Journal.About.Started')}
+        value={startedLabel}
+      />{/if}
+    {#if finishedLabel}<JournalFactRow
+        icon="fa-flag-checkered"
+        label={localize('FABRICATE.App.Journal.Record.Finished')}
+        value={finishedLabel}
+      />{/if}
+  </section>
+
+  <Callout
+    tone="info"
+    title={localize('FABRICATE.App.Journal.WhatToExpect.Title')}
+    text={`${guidance} ${localize('FABRICATE.App.Journal.Tips.WorldTime')}`}
+    dataAttr="data-journal-guidance"
+  />
+</article>
 
 <style>
-  /* THE WRAPPER ONLY: the fill and the centring the column needs. See the markup comment. */
-  .journal-detail-empty {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    height: 100%;
-    box-sizing: border-box;
-  }
-
   .journal-detail {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-3);
-    height: 100%;
-    min-height: 0;
-    padding: var(--fab-space-3);
-    box-sizing: border-box;
-    overflow-y: auto;
-    color: var(--fab-text);
+    display: grid;
+    gap: var(--fab-space-4);
+    min-width: 0;
+    padding: var(--fab-space-4);
   }
-
   .journal-detail-header {
-    flex: 0 0 auto;
     display: flex;
     align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
     gap: var(--fab-space-3);
   }
-
   .journal-detail-identity {
-    flex: 1 1 auto;
-    min-width: 0;
     display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
+    align-items: center;
+    min-width: 0;
+    gap: var(--fab-space-3);
   }
-
-  .journal-detail-title {
-    margin: 0;
+  .journal-detail-identity h2 {
+    margin: 0 0 var(--fab-space-1);
+    color: var(--fab-text);
     font-size: 18px;
-    font-weight: 700;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
-
   .journal-detail-meta {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
-  }
-
-  /* THE ROW'S STATUS CHIP holds its width (issue 1506). The retired journal status pill declared
-     `flex: 0 0 auto` on itself; the shared chip declares no flex at all, because POSITION is the
-     caller's and geometry is the primitive's — the rule its own `density` note states. So the one
-     property that was doing work here is restated here, where the row that squeezes it lives. */
-  .journal-detail-meta :global(.journal-run-status) {
-    flex: 0 0 auto;
-  }
-
-  .journal-detail-tag {
-    padding: 1px 8px;
-    border-radius: 999px;
+    flex-wrap: wrap;
+    gap: var(--fab-space-2);
+    color: var(--fab-text-subtle);
     font-size: 11px;
-    background: var(--fab-surface-raised);
-    border: 1px solid var(--fab-border);
-    color: var(--fab-text-muted);
   }
-
-  .journal-detail-flavor {
-    margin: 0;
-    font-size: 13px;
-    line-height: 1.5;
-    color: var(--fab-text-muted);
-  }
-
-  .journal-detail-body {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
+  .journal-detail-stages {
+    display: grid;
     gap: var(--fab-space-3);
   }
-
-  .journal-detail-gathering-summary {
-    margin: 0;
-    font-size: 13px;
-    line-height: 1.5;
-    color: var(--fab-text-muted);
-  }
-
-  .journal-detail-results {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-3);
-    border: 1px solid var(--fab-success-border);
-    border-radius: 8px;
-    background: var(--fab-success-soft);
-  }
-
-  .journal-detail-results-title {
-    margin: 0;
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--fab-success-text);
-  }
-
-  .journal-detail-results-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
+  .journal-detail-record {
+    display: grid;
     gap: var(--fab-space-1);
+    padding-top: var(--fab-space-3);
+    border-top: 1px solid var(--fab-border);
   }
-
-  .journal-detail-result {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    font-size: 13px;
-  }
-
-  .journal-detail-result-name {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .journal-detail-result-qty {
-    flex: 0 0 auto;
-    font-weight: 600;
-    color: var(--fab-text-muted);
+  .journal-detail-record h3 {
+    margin: 0 0 var(--fab-space-2);
+    color: var(--fab-text-subtle);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 </style>
