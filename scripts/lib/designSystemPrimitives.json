@@ -415,6 +415,94 @@
       "evidence": "broad",
       "scope": "shared",
       "why": "`library.html:716` — a tiled strip of spans whose dividers are dragged, \"outcome tiers against a DC\", which is exactly this. Exactly 2 callers, `checks/CraftingCheckEditor.svelte` and `checks/SimpleCraftingCheckEditor.svelte`, and it carries a two-entry `BROAD_SIGNAL_CASE_OVERRIDES` entry because those are its two modes and each renders chrome the other does not."
+    },
+    {
+      "path": "src/ui/svelte/components/RunActionBar.svelte",
+      "library": "<RunActionBar>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 task 6 builds the reversible candidate from the `library.html:731` action-bar contract: fixed cancel, pause/resume, completion and primary order at 34/r9, with the armed cancellation decision replacing its siblings. It composes `ManagerButton`, `IconButton` and `SegmentedControl` and owns no product strings. Status remains target until the coordinated Journal adoption and reachable View Lab states land; manifest status measures the current candidate against that evidence boundary rather than claiming adoption."
+    },
+    {
+      "path": "src/ui/svelte/components/WorldClockChip.svelte",
+      "library": "<WorldClockChip>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 task 6 builds the reversible read-only clock candidate from `library.html:1088`, composing `Chip` at the specified 28/r7 info geometry with a mono tabular value and no event surface. Status remains target until Journal placement and its reachable frame land."
+    },
+    {
+      "path": "src/ui/svelte/components/SlotRow.svelte",
+      "library": "<SlotRow>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 task 6 builds the reversible stage requirement-row candidate from `library.html:1815`. It coordinates exactly one open `SlotTile`, places `ChoiceOptionList` in flow beneath the row, and derives candidate availability from held minus stage claims. Status remains target until crafting adoption and the open-slot View Lab state land."
+    },
+    {
+      "path": "src/ui/svelte/components/SlotTile.svelte",
+      "library": "<SlotTile>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 task 6 builds the reversible 56/r11 slot candidate from `library.html:1815`, composing `Medallion` and keeping slashed held/needed pips distinct from unslashed candidate counts. Locked tiles become role=img and expose no control. Status remains target until consumer adoption and representative frames land."
+    },
+    {
+      "path": "src/ui/svelte/components/ChoiceOptionList.svelte",
+      "library": "<ChoiceOptionList>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 task 6 builds the reversible in-flow chooser candidate from `library.html:1815`: 44/r11 rows compose `Medallion`, state held/needed stock, keep unavailable candidates visible and disabled, and report selection through one callback. Status remains target until the crafting consumer and open-choice frame land."
+    },
+    {
+      "path": "src/ui/svelte/components/EssencePool.svelte",
+      "library": "<EssencePool>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 task 6 builds the reversible one-allocation-per-stage candidate from `library.html:1970`, composing `Medallion`, `FillBar` and `Stepper`. It renders every threshold from one physical carrier allocation, lists each carrier once, and states overshoot below that list. Status remains target until crafting adoption and short/met/shared-carrier frames land."
+    },
+    {
+      "path": "src/ui/svelte/components/RunProgress.svelte",
+      "library": "<RunProgress>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 task 6 builds the reversible tiled-progress candidate from `library.html:2066`, composing one 6px `FillBar` per stage and reserving its adjacent text for a blocker. Status remains target until Journal adoption and active-run frames land."
+    },
+    {
+      "path": "src/ui/svelte/components/StageNav.svelte",
+      "library": "<StageNav>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 task 6 builds the reversible stage-navigation candidate from `library.html:2066`: current and viewed indices remain separate, at most five 26/r7 numerals render, and one return-to-current action appears when they diverge. It composes `IconButton` and `ManagerButton`. Status remains target until Journal adoption and past/future frames land."
+    },
+    {
+      "path": "src/ui/svelte/components/StageCard.svelte",
+      "library": "<StageCard>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 task 6 builds the reversible stage-card candidate from `library.html:2066`: the current stage alone renders the caller's body snippet, while past and future cards use a transparent dashed inert frame. It composes `Chip` for the optional state tag. Status remains target until Journal adoption and worked/past/future frames land."
+    },
+    {
+      "path": "src/ui/svelte/components/YieldScale.svelte",
+      "library": "<YieldScale>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 task 6 builds the reversible d100 scale candidate from `library.html:2119`, composing `Medallion` and `Chip`. It sorts commonest first, renders the full scale before and after resolution, and inserts one cut including over-all and under-all edge notes. Status remains target until gathering adoption and before/after frames land."
+    },
+    {
+      "path": "src/ui/svelte/components/OutcomeLadder.svelte",
+      "library": "<OutcomeLadder>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 task 6 builds the reversible routed-outcome candidate from `library.html:2119`, composing `Chip` and rendering the whole ordered, read-only ladder including its failure tier and empty-yield sentence. Status remains target until gathering adoption and the routed-check frame land."
     }
   ],
   "notAPrimitive": [
