@@ -430,7 +430,7 @@
       "status": "target",
       "evidence": "targeted",
       "scope": "manager-only",
-      "why": "Issue 1648 reuses this result-group authoring composition in crafting and gathering. Independent importers: `src/ui/svelte/apps/manager/GatheringTaskEditView.svelte`, `src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte`. It edits domain result groups and routing assignments rather than implementing a named generic library entry. Manager-only scope reflects its authoring context and dependencies; this is a recorded shared composition with its existing geometry, not a new library contract."
+      "why": "Issue 1648 reuses this result-group authoring composition in crafting and gathering. Independent importers: `src/ui/svelte/apps/manager/GatheringTaskEditView.svelte`, `src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte`. It edits domain result groups and routing assignments rather than implementing a named generic library entry. The manager-only scope reflects its authoring context and dependencies; this is a recorded shared composition with its existing geometry, not a new library contract."
     },
     {
       "path": "src/ui/svelte/apps/manager/recipe/RecipeResultsSection.svelte",
@@ -438,7 +438,7 @@
       "status": "target",
       "evidence": "targeted",
       "scope": "manager-only",
-      "why": "Issue 1648 reuses this result-group authoring composition in crafting and gathering. Independent importers: `src/ui/svelte/apps/manager/GatheringTaskEditView.svelte`, `src/ui/svelte/apps/manager/recipe/RecipeResultsTab.svelte`. It edits domain result groups and routing assignments rather than implementing a named generic library entry. Manager-only scope reflects its authoring context and dependencies; this is a recorded shared composition with its existing geometry, not a new library contract."
+      "why": "Issue 1648 reuses this result-group authoring composition in crafting and gathering. Independent importers: `src/ui/svelte/apps/manager/GatheringTaskEditView.svelte`, `src/ui/svelte/apps/manager/recipe/RecipeResultsTab.svelte`. It edits domain result groups and routing assignments rather than implementing a named generic library entry. The manager-only scope reflects its authoring context and dependencies; this is a recorded shared composition with its existing geometry, not a new library contract."
     }
   ],
   "notAPrimitive": [

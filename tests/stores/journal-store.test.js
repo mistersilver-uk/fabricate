@@ -314,6 +314,7 @@ describe('journalStore', () => {
       lifecycleContract: 'current',
       lifecycleVersion: 1,
       runRevision: 0,
+      stepIndex: 2,
     });
 
     await store.execute(selected, { interactive: true });
@@ -335,6 +336,10 @@ describe('journalStore', () => {
       payload: { interactive: true },
     });
     assert.equal(setup.calls.list, 6, 'each settled command refreshes authoritative state');
+    assert.deepEqual(setup.calls.command[4].payload, {
+      stepIndex: 2,
+      selectionPlan: { selectedIngredientSetId: 'set-1' },
+    }, 'selection targets the executable stage with the authority command contract');
     assert.equal(store.busyRunId, '');
   });
 

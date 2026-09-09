@@ -224,7 +224,10 @@ export function createJournalStore({ services } = {}) {
   }
 
   async function setSelection(run, selection) {
-    return runCommand(run, 'setSelection', selection ?? {});
+    return runCommand(run, 'setSelection', {
+      stepIndex: run?.stepIndex,
+      selectionPlan: selection ?? {},
+    });
   }
 
   async function runCommand(run, action, payload) {

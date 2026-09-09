@@ -183,6 +183,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   // those six claims the moment the file landed. The move commit deleted them and re-expressed
   // them here, which preserves the routing rather than inventing one — and is why this entry does
   // not appear in `PRIMITIVES_WITH_NO_FRAME` even for a commit: it never spent one there.
+  'src/ui/svelte/components/ChoiceOptionList.svelte',
   'src/ui/svelte/components/EditorTabs.svelte',
   'src/ui/svelte/components/EditorValidationSurface.svelte',
   // The player window's shared top bar was here until issue 1500, and its ABSENCE is the point.
@@ -196,6 +197,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   // was the one of the two panels that move made with no frame anywhere in the registry. Its
   // override names the one published frame that opens it, and it leaves `PRIMITIVES_WITH_NO_FRAME`
   // in the same change — which is the direction that list is meant to move.
+  'src/ui/svelte/components/EssencePool.svelte',
   'src/ui/svelte/components/EssenceSourceSelector.svelte',
   'src/ui/svelte/components/Field.svelte',
   'src/ui/svelte/components/IconButton.svelte',
@@ -225,11 +227,14 @@ const EXPECTED_OVERRIDE_KEYS = [
   // of its two callers is reachable — the alchemy brew banner is drawn by no case in the registry
   // and is held by its own mounted suite instead, which that entry records.
   'src/ui/svelte/components/Notice.svelte',
+  'src/ui/svelte/components/OutcomeLadder.svelte',
   'src/ui/svelte/components/RadioCardGroup.svelte',
   // THE searchable picker. This list is compared against `Object.keys(...).sort()`, so the entry
   // sits here rather than four lines up because issue 1500 moved the file from
   // `apps/manager/SearchablePopover.svelte` into `components/` — which changes nothing about the
   // override itself and everything about where it sorts.
+  'src/ui/svelte/components/RunActionBar.svelte',
+  'src/ui/svelte/components/RunProgress.svelte',
   'src/ui/svelte/components/SearchablePopover.svelte',
   // Issue 1504: the app's own select. Its option list exists only while the panel is open, and
   // both representative frames draw every select they contain CLOSED — so its override names the
@@ -244,6 +249,10 @@ const EXPECTED_OVERRIDE_KEYS = [
   // this list is compared against `Object.keys(...).sort()` and `'B'` < `'u'`. ONE frame, for the
   // same reason as `Notice`: the manager caller's grid is drawn by no case, since nothing in the
   // registry selects a Books & Scrolls row.
+  'src/ui/svelte/components/SlotRow.svelte',
+  'src/ui/svelte/components/SlotTile.svelte',
+  'src/ui/svelte/components/StageCard.svelte',
+  'src/ui/svelte/components/StageNav.svelte',
   'src/ui/svelte/components/StatBox.svelte',
   'src/ui/svelte/components/StatusToggle.svelte',
   'src/ui/svelte/components/Stepper.svelte',
@@ -260,6 +269,8 @@ const EXPECTED_OVERRIDE_KEYS = [
   // a table that had only ever held `components/` paths is one a later reader could narrow to
   // them by accident, and this pin is what makes that a failing edit rather than a silent
   // routing change for every UI PR that touches the sheet.
+  'src/ui/svelte/components/WorldClockChip.svelte',
+  'src/ui/svelte/components/YieldScale.svelte',
   'styles/fabricate.css',
 ];
 
