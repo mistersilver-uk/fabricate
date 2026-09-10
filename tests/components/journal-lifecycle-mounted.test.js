@@ -317,8 +317,10 @@ function makeBuilder(
     resolveItemEssences:
       resolveItemEssences ??
       (content
-        ? ({ item }) =>
-            content.components.find((entry) => entry.originItemUuid === item.uuid)?.essences ?? {}
+        ? ({ item, recipe }) =>
+            getSystem(recipe.craftingSystemId).components.find(
+              (entry) => entry.originItemUuid === item.uuid
+            )?.essences ?? {}
         : null),
     getComponentSourceActors: () => [actor],
     resolveComponentForItem: (held) => componentById.get(held?.componentId) ?? null,
@@ -398,7 +400,6 @@ async function mountState(state, { prepare = null, initialLoad = true, builderOp
   prepare?.(runtime);
   const store = createJournalStore({ services: runtime.services });
   if (initialLoad) await store.load();
-  if (initialLoad && builderOptions?.content) store.select(LAB_JOURNAL_CASE_STATE_RUN_IDS[state]);
   flushSync();
   const target = await harness.mount({
     services: {
@@ -965,28 +966,9 @@ describe('Journal versioned lifecycle (mounted)', () => {
         },
       });
       await settleAction();
-      // A selected-run fixture seam chooses the initial off-page detail. Exercise
-      // the actual row as well: search, select, then clear restores both full panes.
-      const selected = mounted.store.selectedRun;
-      if (
-        selected &&
-        !delayed &&
-        state !== 'no-actor-empty' &&
-        !['active-page-two', 'finished-page-two'].includes(state)
-      ) {
-        const search = mounted.target.querySelector('[data-journal-search] input');
-        search.value = selected.names.title;
-        search.dispatchEvent(new window.Event('input', { bubbles: true }));
-        await settleAction();
-        const row = mounted.target.querySelector(
-          `[data-run-id="${selected.id}"], [data-history-run-id="${selected.id}"]`
-        );
-        assert.ok(row, `${suffix} selected account is reachable through search`);
-        row.click();
-        search.value = '';
-        search.dispatchEvent(new window.Event('input', { bubbles: true }));
-        await settleAction();
-      }
+      // The committed producer walk owns selection as well as the defining action.
+      // No store.select shortcut may make a missing capture step pass here.
+      const selectedId = LAB_JOURNAL_CASE_STATE_RUN_IDS[state];
       for (const action of capture.steps) {
         const control =
           mounted.target.querySelector(action.selector) ?? document.querySelector(action.selector);
@@ -1003,6 +985,20 @@ describe('Journal versioned lifecycle (mounted)', () => {
         }
       }
       assertCaseWitness(mounted.target, capture);
+      if (state === 'waiting-auto-eligible' || state === 'automatic-blocker') {
+        assert.equal(
+          mounted.target.querySelectorAll('[data-essence-source]').length,
+          2,
+          'Poultice has the two reference carrier controls'
+        );
+      }
+      if (state === 'essence-shared' || state === 'essence-overshoot') {
+        assert.equal(
+          mounted.target.querySelectorAll('[data-essence-source]').length,
+          3,
+          'Sigil has the three reference shared carriers'
+        );
+      }
       if (suffix === 'history-checked-choice') proveTerminalWitness(mounted.target, capture);
       if (state === 'history-redacted')
         assert.doesNotMatch(
@@ -1015,7 +1011,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
           /Unknown material.*Not recorded/i
         );
       if (state === 'automatic-blocker') {
-        const run = mounted.containers.craftingRuns.active[selected.id];
+        const run = mounted.containers.craftingRuns.active[selectedId];
         assert.equal(run.completionMode, 'worldTime');
         assert.deepEqual(run.steps[run.currentStepIndex].consumedIngredients, []);
         assert.deepEqual(run.steps[run.currentStepIndex].createdResults, []);
@@ -1039,7 +1035,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
           assert.ok(entries.every((entry) => !entry.cleared && entry.qty === 0));
       }
       if (state === 'history-just-resolved') {
-        mounted.target.querySelector(`[data-history-run-id="${selected.id}"]`).click();
+        mounted.target.querySelector(`[data-history-run-id="${selectedId}"]`).click();
         await settleAction();
         assert.ok(!mounted.target.querySelector('[data-journal-verdict]'));
         assert.ok(mounted.target.querySelector('[data-history-summary="none"]'));

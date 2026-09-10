@@ -371,6 +371,18 @@ function authoredStep(id, spec) {
   };
 }
 
+function recipeComponents(key, components) {
+  const claritySources = {
+    tonic: ['jp-dewglass', 'jp-moonpetal', 'jp-springwater'],
+    poultice: ['jp-springwater', 'jp-bitterroot'],
+  }[key];
+  return components.map((entry) => {
+    const copy = structuredClone(entry);
+    if (claritySources && !claritySources.includes(copy.id)) delete copy.essences.clarity;
+    return copy;
+  });
+}
+
 /** Extend only a fresh Journal case's authoring world using the existing fixture factories. */
 export function seedJournalPrototype(content, state, { component, recipe }) {
   if (!Object.hasOwn(JOURNAL_PROTOTYPE_BINDINGS, state)) return content;
@@ -409,7 +421,7 @@ export function seedJournalPrototype(content, state, { component, recipe }) {
       id: systemId(key),
       name: WORKSHOPS[key] ?? 'Mythwright',
       resolutionMode: spec.mode,
-      components: structuredClone(components),
+      components: recipeComponents(key, components),
       tools: [],
       essenceDefinitions: definitions,
       visibilityMode: spec.mode === 'alchemy' ? 'restricted' : 'global',

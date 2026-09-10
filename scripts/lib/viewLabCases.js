@@ -1522,6 +1522,55 @@ function journalLifecycleCases() {
     { selector: '[data-run-id="lab-v1-active-4"]' },
     { selector: '[data-journal-search] input', fill: '' },
   ];
+  const selectionNames = Object.fromEntries(
+    [
+      [
+        'Forge Iron Rivets',
+        [
+          'waiting-open-choice',
+          'current-choice-closed',
+          'paused',
+          'cancel-confirmation',
+          'past-stage',
+          'future-stage',
+          'empty-search',
+          'wide',
+          'narrow',
+          'kind-menu-open',
+          'finished-cancelled',
+        ],
+      ],
+      ['Wax a Hemp Cord', ['ready-single', 'history-just-resolved', 'history-cancelled-before']],
+      ['Bind a Shield Boss', ['ingredient-route', 'material-shortage']],
+      ['Whet a Keen Edge', ['check-route']],
+      ['Inscribe a Prismatic Sigil', ['essence-shared', 'essence-overshoot']],
+      ['Steep a Bitter Poultice', ['waiting-auto-eligible', 'automatic-blocker']],
+      [
+        'Assemble a Warded Buckler',
+        ['past-routed-stage', 'future-routed-stage', 'history-cancelled-multi'],
+      ],
+      ['Gather Meadow Herbs', ['gathering-straight']],
+      ['Quarry Rough Stone', ['gathering-d100', 'history-d100-all-hit', 'history-d100-all-miss']],
+      ['Track a Balehound', ['gathering-check', 'history-gathering-check-failure']],
+    ].flatMap(([name, suffixes]) => suffixes.map((suffix) => [suffix, name]))
+  );
+  const selectedIds = {
+    'past-stage': 'lab-v1-stage-browser',
+    'future-stage': 'lab-v1-stage-browser',
+    'empty-search': 'lab-v1-ready-single',
+    narrow: 'lab-v1-wide',
+  };
+  const selectCaseRun = (state) => {
+    const fixtureState = state.replace(/-finished$/, '');
+    const name = selectionNames[fixtureState];
+    if (!name) return [];
+    const id = selectedIds[fixtureState] ?? `lab-v1-${fixtureState}`;
+    return [
+      { selector: '[data-journal-search] input', fill: name },
+      { selector: `[data-run-id="${id}"]` },
+      { selector: '[data-journal-search] input', fill: '' },
+    ];
+  };
   const steps = {
     paused: [
       { selector: '[data-run-action="pause"]' },
@@ -1996,12 +2045,14 @@ function journalLifecycleCases() {
         ...(state.startsWith('gathering-check') && { gatheringTaskMode: 'routed' }),
       },
       position: { width: state === 'narrow' ? 1024 : 1240, height: 880 },
-      steps:
-        steps[state] ??
-        (state.startsWith('history-') ||
-        ['finished-success', 'finished-failure', 'automatic-completion'].includes(state)
-          ? [{ selector: `[data-history-run-id="lab-v1-${state}"]` }]
-          : []),
+      steps: [
+        ...selectCaseRun(state),
+        ...(steps[state] ??
+          (state.startsWith('history-') ||
+          ['finished-success', 'finished-failure', 'automatic-completion'].includes(state)
+            ? [{ selector: `[data-history-run-id="lab-v1-${state}"]` }]
+            : [])),
+      ],
       expectTab: 'journal',
       expectSelector: expected[state],
       ...(pointerTargets[state] && { expectCenterHit: pointerTargets[state] }),
