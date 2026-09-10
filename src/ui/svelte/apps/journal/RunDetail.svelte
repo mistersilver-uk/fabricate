@@ -26,9 +26,16 @@
   const statusView = $derived(runStatusPresentation(status));
   const terminal = $derived(['succeeded', 'failed', 'cancelled'].includes(status));
   const stages = $derived(Array.isArray(run?.steps) ? run.steps : []);
-  const currentIndex = $derived(
-    terminal ? Math.max(0, stages.length - 1) : Math.max(0, Number(run?.stepIndex) || 0)
-  );
+  const currentIndex = $derived.by(() => {
+    if (!terminal) return Math.max(0, Number(run?.stepIndex) || 0);
+    if (run?.lifecycleContract == null || run.lifecycleContract === 'legacy') {
+      const executed = stages.findLastIndex((stage) =>
+        ['succeeded', 'failed', 'done'].includes(stage.status)
+      );
+      if (executed >= 0) return executed;
+    }
+    return Math.max(0, stages.length - 1);
+  });
   const viewedIndex = $derived(
     journal?.viewedStageIndex == null
       ? currentIndex
@@ -123,6 +130,15 @@
   const commandError = $derived(
     journal?.commandError?.runKey === runIdentity ? journal.commandError : null
   );
+  function effectPhaseText(phase) {
+    const key = {
+      applied: 'FABRICATE.App.Journal.Notice.EffectPhase.applied',
+      applying: 'FABRICATE.App.Journal.Notice.EffectPhase.applying',
+      planned: 'FABRICATE.App.Journal.Notice.EffectPhase.planned',
+      unknown: 'FABRICATE.App.Journal.Notice.EffectPhase.unknown',
+    }[phase];
+    return localize(key);
+  }
 
   const showActions = $derived(
     !terminal && (run?.manualAdvance === true || Object.values(run?.actions ?? {}).some(Boolean))
@@ -131,7 +147,7 @@
     Boolean(currentStage?.detail?.checkLabel || currentStage?.lastCheckResult)
   );
   const guidanceKey = $derived.by(() => {
-    if (run?.activityKind === 'gathering')
+    if (run?.activityKind === 'gathering' || run?.runType === 'gathering')
       return run?.lifecycleContract === 'current'
         ? 'FABRICATE.App.Journal.WhatToExpect.GatheringManual'
         : 'FABRICATE.App.Journal.WhatToExpect.Gathering';
@@ -147,6 +163,9 @@
   const guidance = $derived(localize(guidanceKey));
 
   function stageState(index) {
+    const stageStatus = stages[index]?.status;
+    if (stageStatus === 'failed') return 'failed';
+    if (terminal && !['succeeded', 'done'].includes(stageStatus)) return 'unexecuted';
     if (terminal || index < currentIndex) return 'past';
     if (index > currentIndex) return 'future';
     return run?.pauseState ? 'paused' : 'current';
@@ -179,9 +198,19 @@
     }
     return '';
   }
-  function stageFacts(stage) {
+  function stageRequirementFacts(stage) {
     const facts = [];
     const snapshot = stage?.requirementSnapshot;
+    if (!snapshot?.ingredientGroups?.length) {
+      for (const [index, requirement] of (stage?.requirements ?? []).entries()) {
+        facts.push({
+          id: `requirement-${index}`,
+          icon: 'fas fa-box',
+          label: localize('FABRICATE.App.Journal.Stage.Requirements'),
+          value: `${requirement.name ?? requirement.componentId} ${localize('FABRICATE.App.Journal.Quantity', { n: requirement.quantity })}`,
+        });
+      }
+    }
     for (const [index, group] of (snapshot?.ingredientGroups ?? []).entries()) {
       const picked = Number(
         stage?.selectionPlan?.ingredientOptionOverrides?.[group?.id]?.optionIndex
@@ -201,6 +230,11 @@
         value: `${name} ${localize('FABRICATE.App.Journal.Quantity', { n: quantity })}`,
       });
     }
+    return facts;
+  }
+
+  function stageFacts(stage) {
+    const facts = stageRequirementFacts(stage);
     if (Number(stage?.detail?.requiredSeconds) > 0)
       facts.push({
         id: 'time',
@@ -208,7 +242,19 @@
         label: localize('FABRICATE.App.Journal.StepDetails.RequiresTime'),
         value: formatDurationHMS(stage.detail.requiredSeconds),
       });
-    if (stage?.lastCheckResult)
+    if (stage?.detail?.primaryToolName)
+      facts.push({
+        id: 'tool',
+        label: localize('FABRICATE.App.Journal.StepDetails.PrimaryTool'),
+        value: stage.detail.primaryToolName,
+      });
+    if (stage?.detail?.checkLabel)
+      facts.push({
+        id: 'check',
+        label: localize('FABRICATE.App.Journal.StepDetails.Check'),
+        value: stage.detail.checkLabel,
+      });
+    if (formatRoll(stage?.lastCheckResult))
       facts.push({
         id: 'roll',
         icon: 'fas fa-dice-d20',
@@ -332,6 +378,26 @@
       dataAttr="data-journal-recovery"
       dataValue="true"
     />
+    <section data-journal-recovery-evidence>
+      {#each run.recoveryEvidence.effects ?? [] as effect (effect.index)}
+        <div data-journal-effect={effect.index} data-effect-phase={effect.phase}>
+          <JournalFactRow
+            label={localize('FABRICATE.App.Journal.Notice.Effect', { index: effect.index + 1 })}
+            value={effectPhaseText(effect.phase)}
+            danger={effect.phase === 'applying'}
+          />
+          {#each effect.receipt?.items ?? [] as item, index (index)}
+            <JournalFactRow
+              label={item.name || localize('FABRICATE.App.Journal.Yields.Item')}
+              value={localize('FABRICATE.App.Journal.Quantity', { n: item.quantity })}
+            />
+          {/each}
+          {#each effect.receipt?.currencies ?? [] as spend, index (index)}
+            <JournalFactRow label={spend.unit} value={String(spend.amount ?? '')} />
+          {/each}
+        </div>
+      {/each}
+    </section>
   {:else if run?.pauseState}
     <Notice
       tone="warning"
@@ -376,7 +442,7 @@
     <section class="journal-detail-stages" data-journal-stages>
       <RunProgress
         {stages}
-        current={currentIndex}
+        current={terminal ? -1 : currentIndex}
         progress={elapsed}
         blocker={progressBlocker}
         label={localize('FABRICATE.App.Journal.Progress.Label')}
@@ -406,6 +472,7 @@
       {#if viewedStage}
         <StageCard
           stage={{
+            status: viewedStage.status,
             name:
               viewedStage.stepName ||
               localize('FABRICATE.App.Journal.Stage.Number', { index: viewedIndex + 1 }),

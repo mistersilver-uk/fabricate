@@ -1957,6 +1957,7 @@ a{color:var(--fab-accent)}
       </ul></div>
       <div><h5>Svelte API</h5><ul>
         <li><b>requirements</b> the stage’s requirement list, in authored order</li>
+        <li><b>available</b> on a requirement preserves an explicit solver refusal in the tile state; candidate <b>needed</b> overrides the slot-level amount for mixed-quantity choices.</li>
         <li><b>held</b> (id) → count · <b>claimed</b> (id) → count — spare is derived, never passed</li>
         <li><b>openSlot</b> <span class="req">bindable</span> · <b>onOpen</b> (slotId)</li>
         <li><b>onChoose</b> (slotId, componentId) <span class="req">required</span></li>
@@ -2053,7 +2054,7 @@ a{color:var(--fab-accent)}
         <li><b>overshoot</b> stated in words beneath the list; never clamped, never silent</li>
       </ul></div>
       <div><h5>Svelte API</h5><ul>
-        <li><b>thresholds</b> {essence, amount, sources[]}[] — the stage’s essence requirements</li>
+        <li><b>thresholds</b> {essence, amount, sources[]}[] — the stage’s essence requirements; repeated essence amounts are summed into one pool before comparing contributions or disabling increments.</li>
         <li><b>allocation</b> {componentId: count} <span class="req">bindable</span> — <b>one per stage</b>, not one per threshold</li>
         <li><b>onStep</b> (componentId, delta) <span class="req">required</span></li>
         <li><b>yield</b> (componentId, essence) → number — the per-unit contribution</li>
@@ -2112,6 +2113,7 @@ a{color:var(--fab-accent)}
         <li><b>window</b> number = 5 · <b>onView</b> (index)</li>
         <li><b>stageLabel</b> (stage, index) <span class="req">required</span> — each numeral is a bare number</li>
         <li><b>body</b> (stage) snippet — rendered for the worked stage only</li>
+        <li><b>stage.status</b> when supplied owns the completion marker independently of browse position; failed or unexecuted stages never acquire a success checkmark from <code>state="past"</code>.</li>
         <li><b>showHeading</b> boolean = true — a single-stage surface may suppress the redundant numeral/name header while retaining the stage body</li>
         <li><b>blocker</b> string — the one line beside the Progress kicker</li>
       </ul></div>

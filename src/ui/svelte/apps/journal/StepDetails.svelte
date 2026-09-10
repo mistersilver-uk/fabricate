@@ -4,6 +4,7 @@
   import { formatDurationHMS } from '../../util/formatDuration.js';
   import EssencePool from '../../components/EssencePool.svelte';
   import SlotRow from '../../components/SlotRow.svelte';
+  import Select from '../../components/Select.svelte';
   import JournalFactRow from './JournalFactRow.svelte';
 
   let { step = null, run = null, journal = null, editable = false } = $props();
@@ -20,6 +21,16 @@
   );
   const availability = $derived(step?.selectionAvailability ?? null);
   const plan = $derived(step?.selectionPlan ?? {});
+  const routes = $derived(availability?.routes ?? []);
+  function chooseRoute(id) {
+    if (!editable || busy || !routes.some((route) => route.id === id)) return;
+    openSlot = '';
+    journal?.setSelection?.(run, {
+      selectedIngredientSetId: id,
+      ingredientOptionOverrides: {},
+      ingredientEssenceAllocation: { stepId: step?.stepId, ingredientSetId: id, allocation: {} },
+    });
+  }
   const requirementsHint = $derived.by(() => {
     if (busy) return localize('FABRICATE.App.Journal.Actions.Working');
     if (!editable) return localize('FABRICATE.App.Journal.Stage.Locked');
@@ -93,6 +104,8 @@
             icon: option?.icon ?? 'fas fa-circle',
             tint: tintOf(option?.colorToken),
             disabled: option?.available !== true,
+            needed: Number(option?.need) || 1,
+            claimed: 0,
             held: option?.available === true ? Number(option?.need) || 1 : 0,
             optionIndex: Number(option?.index) || 0,
             heldItemId: null,
@@ -105,7 +118,9 @@
         art: item?.img ?? option?.img ?? '',
         icon: option?.icon ?? 'fas fa-circle',
         tint: tintOf(option?.colorToken),
-        disabled: item?.available !== true,
+        disabled: option?.available !== true || item?.available !== true,
+        needed: Number(option?.need) || 1,
+        claimed: Math.max(0, Number(item?.claimed) || 0),
         held: Math.max(0, Number(item?.held) || 0),
         optionIndex: Number(option?.index) || 0,
         heldItemId: item?.itemId ?? null,
@@ -130,7 +145,7 @@
     if (
       options.length > 1 ||
       candidates.length > 1 ||
-      (!selected && requirement?.selectedItemId != null)
+      (!selected && (requirement?.selectedItemId != null || !requirement?.option))
     )
       return 'choice';
     return 'fixed';
@@ -143,6 +158,9 @@
       const candidates = candidateRows(groupId, options).map((candidate) => ({
         ...candidate,
         unavailable: candidate.disabled,
+        reason: candidate.disabled
+          ? localize('FABRICATE.App.Journal.Stage.CandidateUnavailable')
+          : '',
         disabled: busy || candidate.disabled,
       }));
       const selected = selectedCandidate(requirement, candidates);
@@ -155,6 +173,7 @@
         label: String(requirement?.name ?? ''),
         kind: slotKind(requirement, options, candidates, selected),
         needed,
+        available: requirement?.option?.available === true,
         componentId: selected?.id ?? '',
         selected,
         candidates,
@@ -174,7 +193,13 @@
     );
     if (!slot) return 0;
     const candidate = slot.candidates.find((entry) => entry.id === componentId);
-    return candidate?.unavailable ? 0 : (candidate?.held ?? 0);
+    return candidate?.held ?? 0;
+  }
+  function claimed(componentId) {
+    return (
+      slots.flatMap((slot) => slot.candidates).find((candidate) => candidate.id === componentId)
+        ?.claimed ?? 0
+    );
   }
   function choose(groupId, candidateId) {
     if (!editable || busy) return;
@@ -284,11 +309,23 @@
   data-editable={(editable && !busy) || undefined}
   aria-busy={busy || undefined}
 >
+  {#if routes.length > 1 || availability?.staleRoute}
+    <Select
+      label={localize('FABRICATE.App.Journal.Stage.Route')}
+      options={routes.map((route) => ({ value: route.id, label: route.name || route.id }))}
+      value={availability?.selectedIngredientSetId ?? ''}
+      placeholder={localize('FABRICATE.App.Journal.Stage.ChooseRoute')}
+      disabled={!editable || busy}
+      onChange={chooseRoute}
+      triggerData={{ 'data-journal-route': 'true' }}
+    />
+    {#if availability?.staleRoute}<p>{localize('FABRICATE.App.Journal.Stage.StaleSelection')}</p>{/if}
+  {/if}
   {#if slots.length > 0}
     <SlotRow
       requirements={slots}
       {held}
-      claimed={() => 0}
+      {claimed}
       bind:openSlot
       onChoose={choose}
       locked={!editable}
@@ -297,7 +334,13 @@
       slotLabel={(slot) => slot.label}
       choiceLabel={localize('FABRICATE.App.Journal.Stage.Choose')}
       candidateSummary={(count) => localize('FABRICATE.App.Journal.Stage.Choices', { count })}
-      candidateReading={({ held: count, needed }) => `${count}/${needed}`}
+      candidateReading={({ option, held: count, needed, spare }) =>
+        [
+          localize('FABRICATE.App.Journal.Stage.CandidateReading', { held: count, needed, spare }),
+          option.reason,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
       emptyChoiceText={localize('FABRICATE.App.Journal.Stage.NoChoices')}
     />
   {:else if historicalRequirements.length > 0}
@@ -315,7 +358,7 @@
   {:else if Array.isArray(step?.requirements) && step.requirements.length > 0}
     <section class="journal-stage-legacy" data-journal-stage-requirements>
       <h4>{localize('FABRICATE.App.Journal.Stage.Requirements')}</h4>
-      {#each step.requirements as requirement, index (requirement.itemUuid ?? requirement.componentId ?? index)}
+      {#each step.requirements as requirement, index (index)}
         <JournalFactRow
           label={requirement.name ?? requirement.componentId}
           value={localize('FABRICATE.App.Journal.Quantity', { n: requirement.quantity })}
@@ -379,7 +422,7 @@
         value={step.detail.failureText}
         danger
       />{/if}
-    {#each consumed as item, index (item.itemUuid ?? item.componentId ?? index)}
+    {#each consumed as item, index (index)}
       <JournalFactRow
         label={localize('FABRICATE.App.Journal.StepDetails.ConsumedTitle')}
         value={`${item.name ?? item.componentId} ${localize('FABRICATE.App.Journal.Quantity', { n: item.quantity })}`}

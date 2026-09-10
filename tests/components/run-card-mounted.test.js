@@ -42,6 +42,7 @@ const harness = createMountedComponentHarness({
     // `PLAYER_APP_COMPILED_MODULES` in the harness for why it is one roster and not a
     // list per suite.
     ...PLAYER_APP_COMPILED_MODULES,
+    'src/ui/svelte/components/RunProgress.svelte',
     'src/ui/svelte/apps/journal/RunCard.svelte'
   ],
   componentPath: 'src/ui/svelte/apps/journal/RunCard.svelte'
@@ -125,10 +126,21 @@ describe('RunCard mounted behavior', () => {
     assert.ok(card.classList.contains('is-selected'), 'selected card carries the highlight class');
   });
 
-  it('invokes onSelect with the run id on click', async () => {
+  it('freezes paused countdown and progress after the old gate deadline', async () => {
+    for (const now of [500, 5000]) {
+      const run = makeCraftingRun({ derivedStatus: 'paused', pauseState: { pausedAt: 500, remainingSeconds: 500 } });
+      const target = await harness.mount({ run, now });
+      assert.match(target.querySelector('[data-run-countdown]').textContent, /8m 20s/);
+      assert.doesNotMatch(target.querySelector('[data-run-countdown]').textContent, /ReadyTo/);
+      assert.equal(target.querySelector('[data-run-progress]').getAttribute('data-run-progress'), '50');
+      harness.remount();
+    }
+  });
+
+  it('invokes onSelect with the composite-identity run on click', async () => {
     let selectedId = null;
     const target = await harness.mount({ run: makeCraftingRun(), now: 0, onSelect: (id) => { selectedId = id; } });
     target.querySelector('.journal-run-card').click();
-    assert.equal(selectedId, 'run-craft-1', 'clicking the card selects it');
+    assert.equal(selectedId.id, 'run-craft-1', 'clicking the card selects the native run object');
   });
 });

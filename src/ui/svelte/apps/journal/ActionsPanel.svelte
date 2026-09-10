@@ -15,10 +15,17 @@
   const gateReady = $derived(!Number.isFinite(availableAt) || availableAt <= now);
   const actions = $derived(run?.actions ?? {});
   const currentContract = $derived(run?.lifecycleContract === 'current');
+  const legacyContract = $derived(
+    run?.lifecycleContract == null || run.lifecycleContract === 'legacy'
+  );
   const legacyExecutable = $derived(run?.manualAdvance === true && gateReady);
-  const canExecute = $derived(actions.execute === true || (!currentContract && legacyExecutable));
+  const canExecute = $derived(
+    currentContract
+      ? actions.execute === true
+      : legacyContract && legacyExecutable && actions.execute !== false
+  );
   const canCancel = $derived(
-    actions.cancel === true || (!currentContract && run?.canCancel === true)
+    currentContract ? actions.cancel === true : legacyContract && run?.canCancel === true
   );
   const reason = $derived(reasonFor(actions.disabledReason, gateReady));
 

@@ -15,6 +15,7 @@ import { readStackQuantity } from './itemStackQuantity.js';
 import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
 import { resolvedEssencesFor } from './scopedEntityReads.js';
+import { resolveActiveCraftingCheckFormula } from './checkModifierResolver.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 // Generic player-facing label for a blind gathering run, shared with the
@@ -54,6 +55,7 @@ const SAFE_EXECUTION_EFFECT_KINDS = new Set([
   'postCraftChat',
   'recordAlchemyDeadEnd',
   'consumeAlchemyItems',
+  'createGatheredResults',
 ]);
 
 /**
@@ -466,7 +468,13 @@ export class RunJournalBuilder {
     const activeStep =
       !terminal && Number.isFinite(currentStepIndex) ? runSteps[currentStepIndex] : null;
     // Eligibility must be derived before identity redaction removes the public steps.
-    const hasPlayerCheck = Boolean(activeStep && this._checkLabel({ system, recipe }));
+    const activeCheck = resolveActiveCraftingCheckFormula({
+      ...system,
+      resolutionMode: this._resolveMode(recipe, system),
+    });
+    const hasPlayerCheck = Boolean(
+      activeStep && (activeCheck.requiresCheck || activeCheck.checkUsable)
+    );
 
     const systemId = stringOrNull(run.craftingSystemId);
     const availabilitySnapshot =
@@ -623,6 +631,7 @@ export class RunJournalBuilder {
         actor,
         actorUuid,
         terminal: true,
+        entitled: isGM,
         derivedStatus: status,
         authority,
       }),
@@ -813,8 +822,6 @@ export class RunJournalBuilder {
       runStep?.selectionPlan?.selectedIngredientSetId ?? runStep?.selectedIngredientSetId
     );
     if (!selectedId) return null;
-    const snapshot = plainObjectOrNull(runStep?.selectedRequirementSnapshot);
-    if (stringOrNull(snapshot?.id) === selectedId) return snapshot;
     return (
       normalizeList(recipeStep?.ingredientSets).find(
         (ingredientSet) => stringOrNull(ingredientSet?.id) === selectedId
@@ -913,9 +920,21 @@ export class RunJournalBuilder {
     const plan = runStep?.selectionPlan;
     const setId = stringOrNull(plan?.selectedIngredientSetId ?? runStep?.selectedIngredientSetId);
     const sets = normalizeList(recipeStep?.ingredientSets);
-    const ingredientSet = sets.find((set) => stringOrNull(set?.id) === setId) ?? sets[0] ?? null;
+    const ingredientSet = sets.find((set) => stringOrNull(set?.id) === setId) ?? null;
+    const routes = sets.map((set) => ({ id: stringOrNull(set?.id), name: stringOrEmpty(set?.name) }));
+    if (!ingredientSet) {
+      return {
+        success: false,
+        selectedIngredientSetId: setId,
+        routes,
+        staleRoute: true,
+        missingGroups: [],
+        choices: [],
+        requirements: [],
+        essencePool: null,
+      };
+    }
     if (
-      !ingredientSet ||
       typeof ingredientSet.resolveIngredientSelection !== 'function' ||
       !snapshot
     ) {
@@ -933,23 +952,24 @@ export class RunJournalBuilder {
       essenceAllocation,
     });
     const system = this._getSystem(stringOrNull(recipe?.craftingSystemId));
-    const choices = normalizeList(ingredientSet.ingredientGroups)
-      .filter((group) => normalizeList(group?.options).length > 1)
-      .map((group) =>
-        this._choiceAvailability({
-          group,
-          ingredientSet,
-          recipe,
-          actor,
-          items,
-          optionOverrides,
-          essenceAllocation,
-          system,
-          selection,
-        })
-      );
+    const choices = normalizeList(ingredientSet.ingredientGroups).map((group) =>
+      this._choiceAvailability({
+        group,
+        ingredientSet,
+        recipe,
+        actor,
+        items,
+        optionOverrides,
+        essenceAllocation,
+        system,
+        selection,
+      })
+    );
     const choicesByGroup = new Map(choices.map((choice) => [choice.groupId, choice]));
     return {
+      selectedIngredientSetId: setId,
+      routes,
+      staleRoute: false,
       success: selection?.success === true,
       missingGroups: normalizeList(selection?.missingGroups).map(safeMissingGroup),
       choices,
@@ -1039,18 +1059,37 @@ export class RunJournalBuilder {
         },
         essenceAllocation,
       });
-      const optionMissing = normalizeList(candidate?.missingGroups).some(
-        (missing) => missingGroupId(missing) === groupId
-      );
-      return this._ingredientOptionPresentation({
+      const presentation = this._ingredientOptionPresentation({
         group,
         option,
         index,
-        available: !optionMissing,
+        available: candidate?.success === true,
         recipe,
         items,
         system,
       });
+      presentation.candidates = presentation.candidates.map((item) => {
+        const resolved = this._resolveIngredientSelection({
+          ingredientSet,
+          recipe,
+          actor,
+          items,
+          essenceAllocation,
+          optionOverrides: {
+            ...optionOverrides,
+            [groupId]: { optionIndex: index, heldItemId: item.itemId },
+          },
+        });
+        const claimed = normalizeList(resolved?.plan)
+          .filter(
+            (entry) =>
+              entry.ingredient !== option &&
+              (stringOrNull(entry.item?.uuid) || stringOrNull(idOf(entry.item))) === item.itemId
+          )
+          .reduce((sum, entry) => sum + Math.max(0, Number(entry.quantity) || 0), 0);
+        return { ...item, claimed, available: resolved?.success === true };
+      });
+      return presentation;
     });
     return { groupId, selectedOptionIndex, options };
   }
@@ -1078,7 +1117,9 @@ export class RunJournalBuilder {
       name: stringOrEmpty(group?.name),
       selectedOptionIndex,
       selectedItemId: stringOrNull(optionOverrides?.[groupId]?.heldItemId),
-      option: option ? { ...presentation, available: !selectedMissing } : null,
+      option: option
+        ? { ...presentation, available: presentation.available && !selectedMissing }
+        : null,
     };
   }
 
@@ -1229,21 +1270,16 @@ export class RunJournalBuilder {
   _checkLabel({ system, recipe }) {
     if (!system) return null;
     const mode = this._resolveMode(recipe, system);
-    const config = this._checkConfigForMode(system, mode);
-    const formula = stringOrNull(config?.rollFormula);
+    const { config, rollFormula } = resolveActiveCraftingCheckFormula({
+      ...system,
+      resolutionMode: mode,
+    });
+    const formula = stringOrNull(rollFormula);
     if (!formula) return null;
     const dc = this._resolveCheckDc({ config, recipe, mode });
     return dc === null
       ? formula
       : this.localize('FABRICATE.App.Journal.StepDetails.CheckWithDc', { formula, dc });
-  }
-
-  _checkConfigForMode(system, mode) {
-    const check = system?.craftingCheck;
-    if (mode === 'progressive') return check?.progressive;
-    if (mode === 'routedByCheck') return check?.routed;
-    // simple / alchemy / routedByIngredients all read the shared simple slot.
-    return check?.simple;
   }
 
   _resolveCheckDc({ config, recipe, mode }) {
@@ -1435,6 +1471,7 @@ export class RunJournalBuilder {
         derivedStatus,
         timeGate,
         hasPlayerCheck,
+        entitled: !gatheringContext?.blind || viewer?.isGM === true,
         authority,
       }),
       runType,
@@ -1763,7 +1800,11 @@ export class RunJournalBuilder {
     authority = null,
   }) {
     const lifecycleContract = getRunLifecycleContract(run);
-    const recoveryEvidence = this._recoveryEvidence(run?.executionJournal);
+    const recoveryEvidence = this._recoveryEvidence(
+      run?.executionJournal,
+      entitled,
+      stringOrNull(run?.craftingSystemId)
+    );
     const blockedReason = terminal
       ? null
       : this._mutationBlockedReason({
@@ -1831,22 +1872,49 @@ export class RunJournalBuilder {
     return null;
   }
 
-  _recoveryEvidence(journal) {
+  _recoveryEvidence(journal, entitled, systemId) {
     if (!journal || typeof journal !== 'object') return null;
     const rawStatus = stringOrNull(journal.status);
     if (!EXECUTION_JOURNAL_STATUSES.has(rawStatus)) return null;
     const status = rawStatus;
-    const effects = normalizeList(journal.effects).map((effect) => ({
-      kind: SAFE_EXECUTION_EFFECT_KINDS.has(effect?.kind) ? effect.kind : 'other',
+    const effects = normalizeList(journal.effects).map((effect, index) => ({
+      index,
+      kind: entitled && SAFE_EXECUTION_EFFECT_KINDS.has(effect?.kind) ? effect.kind : 'other',
       phase: EXECUTION_EFFECT_PHASES.has(effect?.phase) ? effect.phase : 'unknown',
       hasReceipt: Object.hasOwn(effect || {}, 'receipt'),
+      receipt:
+        entitled && effect?.phase === 'applied' ? this._safeEffectReceipt(effect, systemId) : null,
     }));
     return {
       status,
       appliedEffectCount: effects.filter((effect) => effect.phase === 'applied').length,
       effectCount: effects.length,
       effects,
+      uncertainEffectIndex: effects.find((effect) => effect.phase === 'applying')?.index ?? null,
       ...(status === 'recoveryRequired' && { required: true }),
+    };
+  }
+
+  _safeEffectReceipt(effect, systemId) {
+    const receipt = effect?.receipt;
+    if (!receipt || typeof receipt !== 'object') return null;
+    let entries = [];
+    if (['consumeIngredients', 'consumeAlchemyExtras', 'consumeItems'].includes(effect.kind)) {
+      entries = normalizeList(receipt.items);
+    } else if (['awardResults', 'awardItems'].includes(effect.kind)) {
+      entries = normalizeList(receipt.results);
+    } else if (effect.kind === 'createGatheredResults') {
+      entries = normalizeList(receipt);
+    }
+    return {
+      items: entries.map((entry) => this._mapResult(entry, systemId)),
+      currencies:
+        effect.kind === 'spendCurrency'
+          ? normalizeList(receipt.settledSpends).map((spend) => ({
+              unit: stringOrEmpty(spend?.unit),
+              amount: numberOrNull(spend?.amount),
+            }))
+          : [],
     };
   }
 }

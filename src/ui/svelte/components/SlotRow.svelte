@@ -34,6 +34,7 @@
 
   function tileState(requirement) {
     if (requirement.kind === 'choice' && !componentFor(requirement)) return 'open';
+    if (requirement.available === false) return 'short';
     if (requirement.kind === 'essence') {
       return Number(requirement.poolsMet) >= Number(requirement.poolsRequired) ? 'met' : 'short';
     }

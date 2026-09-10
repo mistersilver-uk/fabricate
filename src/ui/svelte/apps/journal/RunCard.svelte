@@ -42,15 +42,19 @@
   const availableAt = $derived(Number(run?.timeGate?.availableAt));
   const initiatedAt = $derived(Number(run?.timeGate?.initiatedAt));
   const requiredSeconds = $derived(Number(run?.timeGate?.requiredSeconds));
-  const hasGate = $derived(Number.isFinite(availableAt));
-  const isReady = $derived(hasGate && availableAt <= now);
-  const remaining = $derived(hasGate ? formatDurationHMS(availableAt - now) : '');
+  const hasGate = $derived(run?.timeGate?.availableAt != null && Number.isFinite(availableAt));
+  const paused = $derived(Boolean(run?.pauseState));
+  const remainingSeconds = $derived(
+    paused ? Math.max(0, Number(run.pauseState.remainingSeconds) || 0) : availableAt - now
+  );
+  const isReady = $derived(!paused && hasGate && availableAt <= now);
+  const remaining = $derived(hasGate ? formatDurationHMS(remainingSeconds) : '');
 
   // Progress fraction across the current step's time gate, clamped 0..1. Only
   // meaningful when the gate carries a positive required-seconds budget.
   const progress = $derived.by(() => {
     if (!hasGate || !Number.isFinite(initiatedAt) || !(requiredSeconds > 0)) return null;
-    const elapsed = now - initiatedAt;
+    const elapsed = paused ? requiredSeconds - remainingSeconds : now - initiatedAt;
     return Math.max(0, Math.min(1, elapsed / requiredSeconds));
   });
   const progressPercent = $derived(progress === null ? 0 : Math.round(progress * 100));

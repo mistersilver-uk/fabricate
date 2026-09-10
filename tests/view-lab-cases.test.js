@@ -943,7 +943,19 @@ test('all 42 Journal lifecycle captures assert defining product state rather tha
   for (const state of ['gathering-straight-finished', 'gathering-d100-finished', 'gathering-check-finished', 'finished-success', 'automatic-completion', 'salvage']) {
     assert.match(byState.get(state).expectSelector, /data-journal-verdict="succeeded"/);
     assert.match(byState.get(state).expectSelector, /data-yield-entry=/, `${state} requires actual award rows`);
+    const awardIds = [...byState.get(state).expectSelector.matchAll(/data-yield-entry='([^']+)'/g)];
+    assert.ok(awardIds.length > 0, `${state} uses the emitted duplicate-safe award identity`);
+    for (const [, value] of awardIds) {
+      const [identity, ordinal] = JSON.parse(value);
+      assert.equal(typeof identity, 'string');
+      assert.equal(Number.isSafeInteger(ordinal), true);
+    }
   }
+  for (const state of ['past-stage', 'finished-success', 'finished-failure', 'finished-cancelled']) {
+    assert.match(byState.get(state).expectSelector, /data-stage-fact=/, `${state} asserts inactive StageCard evidence`);
+    assert.doesNotMatch(byState.get(state).expectSelector, /data-journal-stage-evidence/);
+  }
+  assert.match(byState.get('legacy').expectSelector, /data-run-action="pause"\]:disabled/);
   assert.equal(byState.get('filter-paused').steps[0].selector,
     '[data-journal-status-filter] label:has(input[value="paused"])');
   assert.equal(byState.get('filter-paused').expectCenterHit, byState.get('filter-paused').steps[0].selector);

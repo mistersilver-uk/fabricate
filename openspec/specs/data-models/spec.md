@@ -3343,13 +3343,15 @@ Define the unified, UI-safe projection the player-facing Journal screen reads (s
 It is a **derived, computed view**, not a persisted entity: there is no new actor flag or `CraftingSystem` field, mirroring the System Validation Report's derived-view contract.
 `RunJournalBuilder` recomputes it on demand from the selected actor's three native run sources — `craftingRuns` (see _CraftingRun_ / _CraftingRunStepState_), `salvageRuns`, and `gatheringRuns` — projecting each native run into a single superset `RunModel`.
 Crafting runs populate the step fields; gathering and salvage carry no steps.
-Like the gathering listing it never returns raw Foundry documents: every model is built from cloned primitives, so the Journal monitors and (crafting only) advances _existing_ runs without creating them.
+Like the gathering listing it never returns raw Foundry documents: every model is built from cloned primitives, so the Journal monitors existing runs without creating them.
+The action projection supports versioned crafting and gathering commands while preserving legacy crafting advance, legacy gathering automatic completion and salvage behavior.
 
 ### JournalListing
 
 ```js
 JournalListing = {
   selectedActorId: string | null,
+  selectedActorUuid: string | null,
   actor: object | null,                 // UI-safe actor option (image, name, id)
   worldTime: number,                    // current world time used for readiness derivation
   activeRuns: RunModel[],               // projected non-terminal runs
@@ -3363,9 +3365,20 @@ JournalListing = {
 ```js
 RunModel = {
   id: string,
+  key: string,                          // JSON-encoded actor UUID / native run type / run ID
+  actorUuid: string | null,
   runType: "crafting" | "salvage" | "gathering",
+  activityKind: "crafting" | "alchemy" | "salvage" | "gathering",
+  lifecycleContract: "legacy" | "current" | "unsupported",
+  lifecycleVersion: number | string | boolean | null,
+  runRevision: number,
+  completionMode: "manual" | "worldTime",
+  pauseState: { pausedAt: number, remainingSeconds: number } | null,
+  pausedDurationSeconds: number,
+  actions: { execute, pause, resume, setCompletionMode, setSelection, cancel, dismiss, disabledReason },
+  recoveryEvidence: { status, required?, appliedEffectCount, effectCount, effects, uncertainEffectIndex } | null,
   status: string,                        // the native persisted status, passed through verbatim
-  derivedStatus: "waiting" | "ready" | "inProgress" | "succeeded" | "failed" | "cancelled",
+  derivedStatus: "paused" | "waiting" | "ready" | "inProgress" | "succeeded" | "failed" | "cancelled",
   craftingSystemId: string | null,
   craftingSystemName: string,
   names: { title: string, subtitle: string },
@@ -3390,17 +3403,20 @@ RunModel = {
   failureReason: string | null,
   createdResults: Array<{ componentId, itemUuid, quantity, name, img }>,
   createdResultCount: number,
+  craftingYield: object | null,          // current-stage authored preview, never an actual award
+  gatheringYield: object | null,         // permitted mode-specific preview and recorded roll evidence
   manualAdvance: boolean,                // true for every crafting run (the Trigger Next Step gate); redaction does not suppress it
-  canCancel: boolean,                    // crafting only: true when the run is live (non-terminal) and the viewer OWNS the actor — a player may self-cancel only their own in-progress craft, redacted or not
-  refundOnCancel: boolean,               // mirrors the system's features.refundOnPlayerCancel (default true), so the cancel affordance can tell the player whether inputs will be returned
+  canCancel: boolean,                    // crafting compatibility alias of actions.cancel, including lifecycle refusals
+  refundOnCancel: boolean,               // legacy refund policy; versioned cancel retains completed spending
 }
 ```
 
-A **player self-cancel** removes an in-progress crafting run (archived to history as `cancelled`), produces nothing, and discards any rolled check outcome so the recipe becomes craftable again.
+A **legacy player self-cancel** removes an in-progress crafting run (archived to history as `cancelled`), produces nothing, and discards any rolled check outcome so the recipe becomes craftable again.
 It is owner-scoped with no GM relay (the engine writes items directly), so the cancel edge blocks a non-owner exactly as the advance edge does.
 When the system's `features.refundOnPlayerCancel` policy is on (default), the reversal restores each consumed ingredient onto its recorded source actor and refunds the spent currency (the shared "un-consume" primitive, reused by the GM cancel/reverse); when off, the inputs are forfeit.
 The reversal is best-effort and reports the actual outcome — a partial or failed restore does not falsely report the inputs as returned, and the run is still archived so it can never be re-cancelled (which would double-restore).
 The currency refund is attempted for EVERY recorded group even when one fails, and its result distinguishes a full refund, a partial refund, and a total failure, because "one terminal base unit returned, another failed" and "nothing returned" require different operator responses.
+Versioned cancellation instead preserves completed-stage spending, awards and check evidence, forfeits elapsed time, and leaves unconsumed materials alone through the authoritative command boundary.
 
 ### StepModel
 
@@ -3431,6 +3447,11 @@ StepModel = {
   // actually consumed, each a UI-safe result row. `[]` when absent or for a redacted run.
   requirements: Array<{ componentId, itemUuid, quantity, name, img }>,
   consumedIngredients: Array<{ componentId, itemUuid, quantity, name, img }>,
+  selectionPlan: object | null,
+  selectedRequirementSnapshot: object | null,
+  requirementSnapshot: object | object[], // full selected-set snapshot, else legacy requirements
+  selectionAvailability: object | null,  // current-stage live solver projection only
+  craftingYield: object | null,
 }
 ```
 
@@ -3438,10 +3459,35 @@ StepModel = {
 
 1. **`derivedStatus` is computed, never the persisted status.**
    A terminal `status` (`succeeded`, `failed`, `cancelled`) passes through to `derivedStatus` unchanged.
-   For a non-terminal run, readiness is derived from the active readiness gate's `availableAt`: `ready` when `availableAt <= worldTime`, otherwise `waiting`.
+   For a non-terminal run, a persisted pause takes precedence and projects `paused`; remaining time and progress use its frozen remainder even after the former gate deadline.
+   Otherwise readiness is derived from the active readiness gate's `availableAt`: `ready` when `availableAt <= worldTime`, otherwise `waiting`.
    A non-terminal run with no armed gate is `inProgress`.
-   The persisted `status` (e.g. a `waitingTime` that `processWorldTime` flips to `inProgress` asynchronously off the same world-time hook) is NEVER consulted for the active-run derivation — only the gate's `availableAt` against `worldTime` — so the readiness read is race-free.
+   Apart from terminal and pause precedence, the persisted `status` (e.g. a `waitingTime` that `processWorldTime` flips asynchronously) does not override the active gate's readiness.
    The `processWorldTime` write side (the salvage/crafting timed resume and its `_persist`/`setFlag` broadcast write) is **primary-GM-gated** (`game.users.activeGM?.id === game.user?.id`) so it fires exactly once even though `updateWorldTime` is a synced hook on every client — mirroring the gathering matured-run publication gate; a resume deferred while no GM is connected is caught up by the primary GM's startup `processWorldTime` pass.
+
+2. **Selection intent and live feasibility stay distinct from history.**
+   Current-stage availability MUST name the selected ingredient set and available routes, preserve stale set/option/item references as blocked, and never silently substitute a surviving route or option.
+   Explicit route changes replace scoped option overrides and essence allocation.
+   Each candidate MUST carry its own required amount and canonical solver feasibility against the whole stage's shared physical stock, including other fixed, choice and essence claims.
+   A stale selection MUST remain explicitly repairable even when only one option survives.
+   Alchemy check labels and completion-mode eligibility MUST use the canonical active-check resolver: none has no check, simple reads the simple slot, and tiered reads the routed slot.
+
+3. **Versioned actions are explicit capabilities.**
+   Unsupported versions MUST remain readable without inheriting legacy mutation fallbacks.
+   Authority, owner, pause, execution/recovery and check eligibility MUST govern the exposed capabilities; raw manual-advance flags cannot override a refusal.
+   User-specific terminal dismissals filter the composite key before counts without deleting native history.
+
+4. **Stage browsing is not execution.**
+   Browsing MUST NOT mutate the persisted step index or selections.
+   Inactive stages retain selected-set requirements or legacy array requirements alongside actual consumption, rolls and failures.
+   An unexecuted stage in a cancelled or failed run MUST NOT be presented as completed merely because it is before the browse anchor.
+   Legacy terminal detail defaults to the last executed stage; versioned terminal browsing may anchor on the final stage without changing that stage's recorded status.
+
+5. **Recovery evidence is allowlisted, not a raw execution journal.**
+   The projection MUST retain ordered effect phases, known receipt presence, safe actual item/currency receipt rows for entitled viewers, and the index of the applying effect as an uncertain boundary.
+   Planned effects MUST be distinguished from confirmed and uncertain effects; unconfirmed receipt payloads MUST NOT be displayed as awards.
+   Raw intent, plans, document snapshots, arbitrary receipt properties, chat, formula and protected identity data MUST NOT pass through this projection.
+   Redacted crafting and opaque blind gathering retain generic recovery progress without receipt identities; recovery does not grant additional disclosure or replay permission.
 
 ### Startup Maintenance Passes
 

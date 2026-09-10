@@ -20,13 +20,21 @@
     const heldCount = Math.max(0, Number(held(option.id)) || 0);
     const claimedCount = Math.max(0, Number(claimed(option.id)) || 0);
     const spare = Math.max(0, heldCount - claimedCount);
-    return candidateReading({ option, held: heldCount, claimed: claimedCount, spare, needed });
+    return candidateReading({
+      option,
+      held: heldCount,
+      claimed: claimedCount,
+      spare,
+      needed: option.needed ?? needed,
+    });
   }
 
   function unavailable(option) {
     const heldCount = Math.max(0, Number(held(option.id)) || 0);
     const claimedCount = Math.max(0, Number(claimed(option.id)) || 0);
-    return option.disabled === true || Math.max(0, heldCount - claimedCount) < needed;
+    return (
+      option.disabled === true || Math.max(0, heldCount - claimedCount) < (option.needed ?? needed)
+    );
   }
 </script>
 

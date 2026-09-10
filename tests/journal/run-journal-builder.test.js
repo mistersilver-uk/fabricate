@@ -1811,11 +1811,12 @@ test('projects current lifecycle state, alchemy activity kind, pause precedence,
     appliedEffectCount: 2,
     effectCount: 3,
     effects: [
-      { kind: 'consumeIngredients', phase: 'applied', hasReceipt: true },
-      { kind: 'other', phase: 'applied', hasReceipt: true },
-      { kind: 'awardResults', phase: 'applying', hasReceipt: false },
+      { index: 0, kind: 'consumeIngredients', phase: 'applied', hasReceipt: true, receipt: { items: [], currencies: [] } },
+      { index: 1, kind: 'other', phase: 'applied', hasReceipt: true, receipt: { items: [], currencies: [] } },
+      { index: 2, kind: 'awardResults', phase: 'applying', hasReceipt: false, receipt: null },
     ],
     required: true,
+    uncertainEffectIndex: 2,
   });
   assert.equal(projected.actions.execute, false);
   assert.equal(projected.actions.cancel, false);
@@ -2209,12 +2210,12 @@ test('current-step availability delegates material choices and shared essence al
       system.components.find((component) => component.id === componentId) ?? null,
   }).buildListing({ actor, viewer: PLAYER }).activeRuns[0].currentStep;
 
-  assert.equal(calls.length, 3, 'one selected resolve plus one canonical resolve per choice option');
+  assert.equal(calls.length, 5, 'selected plan, three authored options and one pinned held-item candidate use the canonical resolver');
   assert.equal(calls[0].items[0], held);
   assert.deepEqual(calls[0].options.essenceAllocation, { 'Item.ember': 2 });
   assert.equal(calls[0].options.resolveItemEssences(held).fire, 1);
   assert.equal(calls[0].options.affordCurrency({ unit: 'gp', amount: 1 }), true);
-  assert.deepEqual(step.selectionAvailability, {
+  const expectedAvailability = {
     success: false,
     missingGroups: [
       {
@@ -2330,7 +2331,19 @@ test('current-step availability delegates material choices and shared essence al
       suggested: { 'Item.ember': 2 },
       totals: { fire: 2 },
     },
-  });
+  };
+  expectedAvailability.selectedIngredientSetId = 'set-1';
+  expectedAvailability.routes = [{ id: 'set-1', name: '' }];
+  expectedAvailability.staleRoute = false;
+  // A candidate that leaves a different required group short is infeasible too.
+  expectedAvailability.choices[0].options[0].available = false;
+  expectedAvailability.choices[0].options[0].candidates[0].available = false;
+  expectedAvailability.choices[0].options[0].candidates[0].claimed = 1;
+  expectedAvailability.requirements[0].option = structuredClone(expectedAvailability.choices[0].options[0]);
+  expectedAvailability.requirements[1].option.available = false;
+  expectedAvailability.choices.push({ groupId: 'essence', selectedOptionIndex: 0,
+    options: [structuredClone(expectedAvailability.requirements[1].option)] });
+  assert.deepEqual(step.selectionAvailability, expectedAvailability);
   assert.equal(JSON.stringify(step.selectionAvailability).includes('system'), false, 'held document internals are not spread');
 });
 
@@ -2340,4 +2353,52 @@ test('paused runs use an explicit neutral pause status presentation', () => {
     icon: 'fa-pause',
     labelKey: 'FABRICATE.App.Journal.Status.paused',
   });
+});
+
+test('alchemy check eligibility follows none/simple/tiered canonical active slots', () => {
+  for (const [checkMode, expectedFormula, automatic] of [
+    ['none', null, true], ['simple', '1d20', false], ['tiered', '2d10', false],
+  ]) {
+    const projected = makeBuilder({
+      mode: 'alchemy', active: [activeCraftingRun({ lifecycleVersion: 1 })],
+      system: { ...SYSTEM, resolutionMode: 'alchemy', alchemy: { checkMode },
+        craftingCheck: { simple: { rollFormula: '1d20', dc: 12 }, routed: { rollFormula: '2d10', dc: 18 } } },
+    }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER }).activeRuns[0];
+    assert.equal(projected.actions.setCompletionMode, automatic, checkMode);
+    if (expectedFormula) assert.ok(projected.currentStep.detail.checkLabel.includes(expectedFormula));
+    else assert.equal(projected.currentStep.detail.checkLabel, null);
+  }
+});
+
+test('recovery projects actual safe receipts and an uncertain boundary without leaking secret internals', () => {
+  const executionJournal = { status: 'recoveryRequired', effects: [
+    { kind: 'consumeIngredients', phase: 'applied', receipt: {
+      items: [{ itemUuid: 'Item.iron', name: 'Iron', quantity: 2 }],
+      consumedItems: [{ secret: 'PRIVATE_SNAPSHOT' }],
+    } },
+    { kind: 'awardResults', phase: 'applying', receipt: { results: [{ name: 'UNCONFIRMED', quantity: 5 }] } },
+    { kind: 'postCraftChat', phase: 'planned', planned: { content: 'PRIVATE_CHAT' } },
+  ] };
+  const options = { active: [activeCraftingRun({ lifecycleVersion: 1, executionJournal })] };
+  const visible = makeBuilder(options).buildListing({ actor: ACTOR, viewer: GM }).activeRuns[0];
+  assert.equal(visible.recoveryEvidence.uncertainEffectIndex, 1);
+  assert.equal(visible.recoveryEvidence.effects[0].receipt.items[0].quantity, 2);
+  assert.equal(visible.recoveryEvidence.effects[1].receipt, null);
+  assert.doesNotMatch(JSON.stringify(visible), /PRIVATE_|UNCONFIRMED/);
+  const hidden = makeBuilder({ ...options, recipeVisibility: { evaluateRecipeAccess: () => ({ visible: false }) } })
+    .buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+  assert.ok(hidden.recoveryEvidence.effects.every((effect) => effect.receipt === null && effect.kind === 'other'));
+  assert.doesNotMatch(JSON.stringify(hidden.recoveryEvidence), /Iron|Item.iron|PRIVATE_|UNCONFIRMED/);
+  const gatheringRun = {
+    id: 'gather-recovery', lifecycleVersion: 1, status: 'succeeded', taskId: 'visible-task',
+    executionJournal: { status: 'recoveryRequired', effects: [{ kind: 'createGatheredResults',
+      phase: 'applied', receipt: [{ name: 'Gathered herb', quantity: 3, secret: 'PRIVATE_SNAPSHOT' }] }] },
+  };
+  const gathering = makeBuilder({ gatheringHistory: [gatheringRun] })
+    .buildListing({ actor: ACTOR, viewer: PLAYER }).history[0];
+  assert.equal(gathering.recoveryEvidence.effects[0].receipt.items[0].name, 'Gathered herb');
+  assert.doesNotMatch(JSON.stringify(gathering.recoveryEvidence), /PRIVATE_/);
+  const blind = makeBuilder({ gatheringHistory: [{ ...gatheringRun, taskId: 'blind' }] })
+    .buildListing({ actor: ACTOR, viewer: PLAYER }).history[0];
+  assert.equal(blind.recoveryEvidence.effects[0].receipt, null);
 });

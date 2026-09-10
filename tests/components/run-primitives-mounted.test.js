@@ -208,6 +208,25 @@ describe('run primitives mounted behavior', () => {
     ]);
   });
 
+  it('adds repeated essence needs before evaluating a shared physical allocation', async () => {
+    const target = await essenceHarness.mount({
+      thresholds: [2, 2].map((amount) => ({ essence: 'fire', amount, sources: [{ id: 'ember', label: 'Ember' }] })),
+      allocation: { ember: 1 },
+      yield: () => 2,
+      spare: () => 1,
+      held: () => 2,
+      incrementLabel: () => 'More ember',
+    });
+    assert.equal(target.querySelectorAll('[data-essence-total="fire"]').length, 1);
+    assert.match(target.querySelector('[data-essence-total="fire"]').textContent, /2 \/ 4/);
+    assert.equal(target.querySelector('[aria-label="More ember"]').disabled, false);
+    target.querySelector('[aria-label="More ember"]').click();
+    await flushRender();
+    assert.match(target.querySelector('[data-essence-total="fire"]').textContent, /4 \/ 4/);
+    assert.equal(target.querySelector('[aria-label="More ember"]').disabled, true);
+    essenceHarness.remount();
+  });
+
   it('states the world clock as a read-only 28px info chip', async () => {
     const target = await worldClockHarness.mount({ label: 'World clock', value: 'Day 14 · 08:00' });
     const chip = target.querySelector('[data-world-clock]');

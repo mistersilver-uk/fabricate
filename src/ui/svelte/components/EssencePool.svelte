@@ -27,9 +27,22 @@
     return /^[a-z0-9-]+$/u.test(key) ? key : '';
   }
 
+  // Repeated requirements consume the same essence budget, rather than each
+  // independently claiming the full contribution of the shared carrier.
+  const pools = $derived.by(() => {
+    const byEssence = new Map();
+    for (const threshold of thresholds) {
+      const pool = byEssence.get(threshold.essence) ?? { ...threshold, amount: 0, sources: [] };
+      pool.amount += Math.max(0, Number(threshold.amount) || 0);
+      pool.sources.push(...(threshold.sources ?? []));
+      byEssence.set(threshold.essence, pool);
+    }
+    return [...byEssence.values()];
+  });
+
   const sources = $derived.by(() => {
     const unique = [];
-    for (const threshold of thresholds) {
+    for (const threshold of pools) {
       for (const source of threshold.sources ?? []) {
         const entry = typeof source === 'string' ? { id: source, label: source } : source;
         if (entry?.id && !unique.some((candidate) => candidate.id === entry.id)) unique.push(entry);
@@ -56,10 +69,10 @@
     return totalFor(threshold) >= Math.max(0, Number(threshold.amount) || 0);
   }
 
-  const everyPoolMet = $derived(thresholds.length > 0 && thresholds.every(met));
+  const everyPoolMet = $derived(pools.length > 0 && pools.every(met));
 
   function contributionsFor(source) {
-    return thresholds
+    return pools
       .map((threshold) => ({
         essence: threshold.essence,
         label: essenceLabel(threshold.essence),
@@ -75,7 +88,7 @@
   }
 
   const overshoots = $derived(
-    thresholds
+    pools
       .map((threshold) => ({
         essence: threshold.essence,
         amount: totalFor(threshold) - Math.max(0, Number(threshold.amount) || 0),
@@ -93,7 +106,7 @@
   {/if}
 
   <div class="fab-essence-thresholds">
-    {#each thresholds as threshold (threshold.essence)}
+    {#each pools as threshold (threshold.essence)}
       {@const got = totalFor(threshold)}
       {@const need = Math.max(0, Number(threshold.amount) || 0)}
       {@const isMet = got >= need}

@@ -954,8 +954,6 @@
           "SingleStep": "Single-Step Recipe"
         },
         "StepDetails": {
-          "Title": "Step requirements",
-          "TitleSingleStep": "Craft requirements",
           "RequiresTime": "Requires time",
           "PrimaryTool": "Primary tool",
           "Check": "Check",
@@ -967,7 +965,6 @@
           "RollResultWithDc": "{formula} = {total} vs DC {dc}",
           "RollResultValue": "Rolled {value}",
           "RollResultValueWithDc": "Rolled {value} vs DC {dc}",
-          "RequirementsTitle": "Required ingredients",
           "ConsumedTitle": "Consumed"
         },
         "Redacted": {
@@ -1012,7 +1009,6 @@
           "Label": "Journal runs"
         },
         "Filters": {
-          "SearchKicker": "Find a run",
           "SearchPlaceholder": "Search runs…",
           "SearchLabel": "Search runs",
           "Kind": {
@@ -1077,11 +1073,6 @@
           "Empty": "No completed runs yet.",
           "ViewFullHistory": "View full history"
         },
-        "Results": {
-          "Title": "Crafted items",
-          "TitleGathering": "Gathered items",
-          "TitleSalvage": "Salvaged items"
-        },
         "Progress": {
           "Label": "Crafting progress"
         },
@@ -1092,6 +1083,13 @@
           "PausedTitle": "Run paused",
           "PausedDetail": "Its countdown is frozen until you resume it.",
           "RecoveryTitle": "This run needs GM attention",
+          "Effect": "Effect {index}",
+          "EffectPhase": {
+            "applied": "Confirmed — receipt recorded",
+            "applying": "Uncertain — do not repeat",
+            "planned": "Not started",
+            "unknown": "Unknown"
+          },
           "RecoveryDetail": "Fabricate recorded {count} completed effects and stopped before it could confirm the rest.",
           "UnsupportedTitle": "This run is read-only"
         },
@@ -1102,6 +1100,10 @@
         },
         "Stage": {
           "Number": "Stage {index}",
+          "Route": "Ingredient route",
+          "ChooseRoute": "Choose an ingredient route",
+          "CandidateReading": "{held} held · needs {needed} · {spare} spare",
+          "CandidateUnavailable": "This choice cannot satisfy all stage requirements",
           "Requirement": "Requirement {n}",
           "Requirements": "This run consumes",
           "RequirementsHint": "Choose how to meet this stage before it runs.",
@@ -1123,6 +1125,8 @@
           "ReturnFinal": "Return to final stage {index}",
           "StaleSelection": "A selected material is no longer available. Choose a replacement explicitly.",
           "State": {
+            "failed": "Failed",
+            "unexecuted": "Not completed",
             "past": "Completed",
             "current": "Current",
             "future": "Upcoming",
@@ -1130,7 +1134,6 @@
           }
         },
         "Yields": {
-          "Title": "Yields",
           "PreviewTitle": "Possible yields",
           "AwardedTitle": "Received",
           "Item": "Result",
@@ -1779,14 +1782,10 @@
         "LoadFailedStaleEntry": "Fabricate could not open the crafting system manager because this browser is still running an earlier version of the module. Reload your browser to complete the update. If this message comes back, reload again bypassing the cache — Ctrl+Shift+R, or Cmd+Shift+R on macOS.",
         "Done": "Done",
         "Economy": {
-          "GatheringResolutionMode": "Gathering resolution mode",
           "Resolution": {
             "D100": "d100 roll",
-            "D100Desc": "Each attempt rolls a d100 against the task’s drop tables to determine what is gathered.",
             "Progressive": "Progressive",
-            "ProgressiveDesc": "A numeric check awards every drop whose difficulty threshold is met.",
-            "Routed": "Routed by check",
-            "RoutedDesc": "The gathering check outcome selects which drop group is returned."
+            "Routed": "Routed by check"
           },
           "ModeTitle": "Limitation mode",
           "ModeHint": "How this system limits how often tasks can be attempted.",
@@ -7224,7 +7223,6 @@
         "ResolutionModeChangeContent": "{count} recipe(s) will be migrated to {mode}.",
         "ResolutionModeChangeContentDelete": "{count} recipe(s) will be migrated to {mode}; {deleteCount} cannot be migrated and will be deleted: {names}.",
         "ResolutionModeChangeConfirm": "Change mode",
-        "ResolutionComingSoon": "Coming soon",
         "SalvageResolutionMode": "Salvage resolution mode",
         "SalvageResolutionModeHint": "Salvage has one ingredient, so ingredient-set routing does not apply. Components incompatible with the new salvage mode will have salvage disabled.",
         "SalvageResolutionSimple": "Simple",

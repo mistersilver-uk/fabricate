@@ -6,7 +6,9 @@ import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
 import { IngredientSet } from '../../src/models/IngredientSet.js';
+import { Recipe } from '../../src/models/Recipe.js';
 import english from '../../lang/en.json' with { type: 'json' };
+import { getCaseById } from '../../scripts/lib/viewLabCases.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
 import {
   PLAYER_APP_COMPILED_MODULES,
@@ -238,6 +240,7 @@ const ENVIRONMENTS = [{ id: 'environment-1', craftingSystemId: SYSTEM.id }];
 
 function makeBuilder(containers, dismissed, nowWorldTime, {
   recipes = RECIPES, system = SYSTEM, visible = true, authority = { available: true, reason: null },
+  resolveItemEssences = null,
 } = {}) {
   const recipeById = new Map(recipes.map((entry) => [entry.id, entry]));
   const componentById = new Map(system.components.map((entry) => [entry.id, entry]));
@@ -265,6 +268,7 @@ function makeBuilder(containers, dismissed, nowWorldTime, {
     getComponent: (_systemId, id) => componentById.get(id) ?? null,
     getViewer: () => ({ id: 'user-1', isGM: false }),
     nowWorldTime,
+    resolveItemEssences,
     getComponentSourceActors: () => [ACTOR],
     resolveComponentForItem: (held) => componentById.get(held?.componentId) ?? null,
     getDismissedRunKeys: () => dismissed,
@@ -273,10 +277,11 @@ function makeBuilder(containers, dismissed, nowWorldTime, {
 }
 
 function persistedRuntime(state, builderOptions) {
+  const recipes = builderOptions?.recipes ?? RECIPES;
   const containers = buildLabRunStates({
     actor: ACTOR,
     userId: 'user-1',
-    recipes: RECIPES,
+    recipes,
     environments: ENVIRONMENTS,
     tasks: TASKS,
     journalCaseState: state,
@@ -289,7 +294,7 @@ function persistedRuntime(state, builderOptions) {
     actor: ACTOR,
     containers,
     state,
-    recipes: RECIPES,
+    recipes,
     nowWorldTime: () => worldTime,
   });
   const services = {
@@ -341,6 +346,22 @@ async function mountState(state, { prepare = null, initialLoad = true, builderOp
 async function settleAction() {
   await new Promise((resolve) => setImmediate(resolve));
   flushSync();
+}
+
+function selectionFixture(sets, plan, { mode = 'simple' } = {}) {
+  const authored = recipe('sm-r-horseshoe', 'Selection trial', sets);
+  authored.getExecutionSteps()[0].resultGroups = sets.map((set, index) => ({
+    id: set.resultGroupId, name: set.name,
+    results: [{ id: `yield-${index}`, componentId: index === 0 ? 'iron' : 'copper', quantity: index + 1 }],
+  }));
+  return {
+    builderOptions: { recipes: [authored], system: { ...SYSTEM, resolutionMode: mode } },
+    prepare({ containers }) {
+      const run = containers.craftingRuns.active['lab-v1-ready-single'];
+      run.currentStepIndex = 0;
+      run.steps = [{ stepId: authored.getExecutionSteps()[0].id, status: 'inProgress', selectionPlan: plan }];
+    },
+  };
 }
 
 function assertScrollContract(target) {
@@ -423,6 +444,164 @@ describe('Journal versioned lifecycle (mounted)', () => {
   });
   afterEach(() => harness.remount());
   after(() => harness.teardown());
+
+  it('changes the ingredient route through the real store and resets scoped intent and yields', async () => {
+    const first = ingredientSet('route-a', [{ id: 'a', options: [componentOption('iron', 'iron')] }]);
+    const second = ingredientSet('route-b', [{ id: 'b', options: [componentOption('copper', 'copper')] }]);
+    first.resultGroupId = 'a-results';
+    second.resultGroupId = 'b-results';
+    const mounted = await mountState('ready-single', selectionFixture([first, second], {
+      selectedIngredientSetId: first.id,
+      ingredientOptionOverrides: { a: { optionIndex: 0, heldItemId: 'Item.iron-a' } },
+      ingredientEssenceAllocation: { stepId: 'old', ingredientSetId: first.id, allocation: { old: 2 } },
+    }, { mode: 'routedByIngredients' }));
+    assert.ok(mounted.target.querySelector('[data-slot-id="a"]'));
+    assert.match(mounted.target.querySelector('[data-journal-crafting-yield]').textContent, /Iron/);
+    await chooseSelectOption(mounted.target, '[data-journal-route]', second.id);
+    await settleAction();
+    assert.ok(mounted.target.querySelector('[data-slot-id="b"]'));
+    assert.ok(!mounted.target.querySelector('[data-slot-id="a"]'));
+    assert.match(mounted.target.querySelector('[data-journal-crafting-yield]').textContent, /Copper/);
+    const saved = mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan;
+    assert.deepEqual(saved.ingredientOptionOverrides, {});
+    assert.deepEqual(saved.ingredientEssenceAllocation.allocation, {});
+    assert.equal(saved.ingredientEssenceAllocation.ingredientSetId, second.id);
+  });
+
+  it('requires explicit repair when a removed ingredient route leaves only one route', async () => {
+    const remaining = ingredientSet('remaining', [{ id: 'metal', options: [componentOption('iron', 'iron')] }]);
+    const mounted = await mountState('ready-single', selectionFixture([remaining], { selectedIngredientSetId: 'removed' }, { mode: 'routedByIngredients' }));
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, false);
+    assert.equal(mounted.store.selectedRun.craftingYield, null);
+    assert.ok(!mounted.target.querySelector('[data-slot-id="metal"]'));
+    await chooseSelectOption(mounted.target, '[data-journal-route]', 'remaining');
+    await settleAction();
+    assert.ok(mounted.target.querySelector('[data-slot-id="metal"]'));
+  });
+
+  it('offers explicit option repair even when removal leaves a single candidate', async () => {
+    const remaining = ingredientSet('remaining', [{ id: 'metal', options: [componentOption('iron', 'iron')] }]);
+    const mounted = await mountState('ready-single', selectionFixture([remaining], {
+      selectedIngredientSetId: remaining.id, ingredientOptionOverrides: { metal: { optionIndex: 1 } },
+    }));
+    assert.match(mounted.target.textContent, /no longer available/i);
+    mounted.target.querySelector('[data-slot-id="metal"] button').click();
+    await settleAction();
+    const candidate = mounted.target.querySelector('[data-choice-id]');
+    assert.equal(candidate.disabled, false);
+    candidate.click();
+    await settleAction();
+    assert.equal(mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan.ingredientOptionOverrides.metal.optionIndex, 0);
+  });
+
+  it('states each option quantity and disables candidates that conflict with shared fixed stock', async () => {
+    const set = ingredientSet('mixed', [
+      { id: 'choice', options: [componentOption('large', 'iron', 3), componentOption('small', 'copper', 1)] },
+      { id: 'fixed', options: [componentOption('reserved', 'iron', 1)] },
+    ]);
+    const mounted = await mountState('ready-single', selectionFixture([set], {
+      selectedIngredientSetId: set.id, ingredientOptionOverrides: { choice: { optionIndex: 0 } },
+    }));
+    mounted.target.querySelector('[data-slot-id="choice"] button').click();
+    await settleAction();
+    const options = [...mounted.target.querySelectorAll('[data-choice-id]')];
+    const large = options.find((option) => option.textContent.includes('iron stock'));
+    const small = options.find((option) => option.textContent.includes('copper stock'));
+    assert.match(large.textContent, /3 held · needs 3/);
+    assert.equal(large.disabled, true, 'the candidate would leave the fixed iron group short');
+    assert.match(small.textContent, /2 held · needs 1/);
+    assert.equal(small.disabled, false, 'the smaller alternate uses its own required amount');
+    small.click();
+    await settleAction();
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, true);
+  });
+
+  it('keeps unsupported lifecycle controls disabled despite legacy-looking manual fields', async () => {
+    const mounted = await mountState('unsupported-version');
+    const primary = mounted.target.querySelector('[data-run-action="primary"]');
+    assert.equal(primary.disabled, true);
+    primary.click();
+    assert.equal(mounted.commands.length, 0);
+  });
+
+  it('tests a held candidate against the same stock reserved for the essence allocation', async () => {
+    const set = ingredientSet('shared', [
+      { id: 'choice', options: [componentOption('iron', 'iron', 3), componentOption('copper', 'copper', 1)] },
+      { id: 'fire', options: [{ match: { type: 'essence', essenceId: 'fire', amount: 2 } }] },
+    ]);
+    const fixture = selectionFixture([set], {
+      selectedIngredientSetId: set.id,
+      ingredientOptionOverrides: { choice: { optionIndex: 1 } },
+      ingredientEssenceAllocation: {
+        stepId: 'sm-r-horseshoe-step-1', ingredientSetId: set.id, allocation: { 'Item.iron-a': 1 },
+      },
+    });
+    fixture.builderOptions.resolveItemEssences = ({ item }) => item.componentId === 'iron' ? { fire: 2 } : {};
+    const mounted = await mountState('ready-single', fixture);
+    mounted.target.querySelector('[data-slot-id="choice"] button').click();
+    await settleAction();
+    const options = [...mounted.target.querySelectorAll('[data-choice-id]')];
+    assert.equal(options.find((entry) => entry.textContent.includes('iron stock')).disabled, true);
+    assert.equal(options.find((entry) => entry.textContent.includes('copper stock')).disabled, false);
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, true);
+  });
+
+  it('states confirmed receipt rows, uncertainty and unstarted effects with strict redaction', async () => {
+    for (const visible of [true, false]) {
+      const mounted = await mountState('recovery-required', {
+        builderOptions: { visible },
+        prepare({ containers }) {
+          containers.craftingRuns.active['lab-v1-recovery-required'].executionJournal = {
+            status: 'recoveryRequired', effects: [
+              { kind: 'consumeIngredients', phase: 'applied', receipt: {
+                items: [{ name: 'Recorded iron', quantity: 2 }], private: 'PRIVATE_CANARY',
+              } },
+              { kind: 'awardResults', phase: 'applying', receipt: { results: [{ name: 'UNCERTAIN_CANARY', quantity: 1 }] } },
+              { kind: 'postCraftChat', phase: 'planned' },
+            ],
+          };
+        },
+      });
+      const evidence = mounted.target.querySelector('[data-journal-recovery-evidence]');
+      assert.ok(evidence);
+      assert.match(evidence.textContent, /Confirmed.*Uncertain.*Not started/s);
+      assert.equal(evidence.textContent.includes('Recorded iron'), visible);
+      assert.doesNotMatch(evidence.textContent, /PRIVATE_CANARY|UNCERTAIN_CANARY/);
+      harness.remount();
+    }
+  });
+
+  it('does not mark the unexecuted tail of a cancelled run completed', async () => {
+    const mounted = await mountState('finished-cancelled');
+    assert.ok(mounted.target.querySelector('[data-stage-state="unexecuted"]'));
+    assert.ok(!mounted.target.querySelector('[data-stage-card] .is-complete'));
+    const tracks = [...mounted.target.querySelectorAll('[data-stage-progress-state]')];
+    assert.equal(tracks.filter((track) => track.dataset.stageProgressState === 'success').length, 1);
+  });
+
+  it('matches terminal and past-stage capture assertions against the emitted application DOM', async () => {
+    const previousFoundry = globalThis.foundry;
+    let fixtureId = 0;
+    let recipes;
+    try {
+      globalThis.foundry = { utils: { randomID: () => `receipt-fixture-${++fixtureId}` } };
+      recipes = buildLabContent().recipes.map((entry) => new Recipe(entry));
+    } finally {
+      globalThis.foundry = previousFoundry;
+    }
+    for (const state of ['past-stage', 'finished-success', 'finished-failure', 'finished-cancelled', 'automatic-completion', 'salvage']) {
+      const capture = getCaseById(`fabricate-journal-lifecycle-${state}`);
+      const mounted = await mountState(capture.query.journalCaseState, { builderOptions: { recipes } });
+      for (const action of capture.steps ?? []) {
+        const control = mounted.target.querySelector(action.selector);
+        assert.ok(control, `${state} emits ${action.selector}`);
+        control.click();
+        await settleAction();
+      }
+      assert.ok(mounted.target.querySelector(capture.expectSelector), `${state} satisfies its real capture assertion: ${JSON.stringify({ steps: mounted.store.selectedRun.steps.map((step) => [step.status, step.consumedIngredients]), viewed: mounted.store.viewedStageIndex })}`);
+      harness.remount();
+    }
+  });
 
   it('pins every committed View Lab state to a persisted run identity', () => {
     assert.equal(LAB_JOURNAL_CASE_STATE_RUN_IDS['ready-single'], 'lab-v1-ready-single');

@@ -1559,6 +1559,10 @@ An armed cancellation decision MUST replace the other actions in that bar until 
 Past and future `StageCard` presentations MUST be inert; browsing them MUST NOT change persisted selections or the executable stage.
 `SlotRow`, `SlotTile` and `ChoiceOptionList` MUST expose the selected materials and held-versus-needed amounts without hiding unavailable choices.
 `EssencePool` MUST derive every threshold from one shared physical carrier allocation and place overshoot evidence below its source list.
+Repeated thresholds for the same essence MUST sum their required amounts before comparing the shared contribution and render one keyed pool, so Fire 2 plus Fire 2 requires four Fire rather than counting the same two Fire twice.
+`ChoiceOptionList` MUST use each option's own `needed` amount when provided, falling back to the slot-level amount only for uniform-quantity callers.
+`SlotRow` MUST retain a caller's explicit infeasibility verdict even when held stock alone reaches the required quantity.
+`StageCard` MUST derive its completion marker from an explicit stage status when supplied; past browse position alone cannot mark an unexecuted or failed stage successful.
 `YieldScale` MUST show one shared d100 cut against the item chances rather than implying separate item rolls.
 `OutcomeLadder` MUST display the complete routed outcome ladder as evidence, without making its outcomes selectable.
 

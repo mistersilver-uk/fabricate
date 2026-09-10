@@ -42,6 +42,9 @@ const harness = createMountedComponentHarness({
     // `PLAYER_APP_COMPILED_MODULES` in the harness for why it is one roster and not a
     // list per suite.
     ...PLAYER_APP_COMPILED_MODULES,
+    ...['RunActionBar', 'ManagerButton', 'IconButton', 'InspectorCard', 'SlotTile',
+      'SlotRow', 'ChoiceOptionList', 'EssencePool', 'Stepper', 'RunProgress', 'StageNav',
+      'StageCard', 'YieldScale', 'OutcomeLadder'].map((name) => `src/ui/svelte/components/${name}.svelte`),
     'src/ui/svelte/apps/journal/JournalCard.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/journal/StepTimeline.svelte',
@@ -54,35 +57,37 @@ const harness = createMountedComponentHarness({
 });
 
 function services() {
-  return { journal: { busyRunId: '', advance() {} }, getWorldTimeComponents: () => null };
+  return { journal: { busyRunId: '', execute() {} }, getWorldTimeComponents: () => null };
 }
+
+const mount = (props) => harness.mount({ ...props, journal: props.services?.journal });
 
 describe('RunDetail mounted behavior', () => {
   before(() => harness.setup());
   afterEach(() => harness.remount());
   after(() => harness.teardown());
 
-  it('shows the "select a run" empty state with no run', async () => {
-    const target = await harness.mount({ run: null, now: 0, services: services() });
-    assert.ok(target.querySelector('[data-journal-empty="detail"]'), 'detail empty state shown');
-    assert.equal(target.querySelector('[data-journal-detail]'), null, 'no detail article rendered');
+  it('renders no action or stage for an absent run (the Journal owns the empty state)', async () => {
+    const target = await mount({ run: null, now: 0, services: services() });
+    assert.ok(!target.querySelector('[data-journal-actions]'));
+    assert.ok(!target.querySelector('[data-stage-card]'));
   });
 
   it('renders the crafting step timeline, step details, and a Trigger button', async () => {
     const target = await harness.mount({ run: makeCraftingRun(), now: 0, services: services() });
     const detail = target.querySelector('[data-journal-detail]');
-    assert.equal(detail.getAttribute('data-run-type'), 'crafting');
-    assert.ok(target.querySelector('[data-journal-timeline]'), 'step timeline rendered');
-    assert.ok(target.querySelector('[data-journal-card="step-details"]'), 'step details rendered');
+    assert.equal(detail.getAttribute('data-run-key'), makeCraftingRun().key);
+    assert.ok(target.querySelector('[data-stage-nav]'), 'stage navigation rendered');
+    assert.ok(target.querySelector('[data-stage-card]'), 'step details rendered');
     assert.ok(
-      target.querySelector('[data-journal-card="step-details"]').textContent.includes('Mortar & Pestle'),
+      target.querySelector('[data-stage-card]').textContent.includes('Mortar & Pestle'),
       'primary tool fact rendered'
     );
-    assert.ok(target.querySelector('[data-journal-trigger]'), 'Trigger button rendered for a crafting run');
+    assert.ok(target.querySelector('[data-run-action="primary"]'), 'primary action rendered for a crafting run');
     // The active node (index 0) is time-gated, so it takes the distinct "waiting"
     // (warning) tone rather than the accent "current" tone; index 1 is pending.
-    assert.equal(target.querySelector('[data-step-index="0"]').getAttribute('data-step-state'), 'waiting');
-    assert.equal(target.querySelector('[data-step-index="1"]').getAttribute('data-step-state'), 'pending');
+    assert.equal(target.querySelector('[data-stage-card="0"]').getAttribute('data-stage-state'), 'current');
+    assert.ok(target.querySelector('[data-stage-nav-index="1"]'));
   });
 
   // BOTH TITLE LOCATORS MOVED WITH THE MARKUP (issue 1514). `JournalCard` drew its heading as
@@ -90,13 +95,13 @@ describe('RunDetail mounted behavior', () => {
   // gone and `.fab-kicker` is the locator. A test that kept the old selector would not have
   // failed loudly — `querySelector` returns null and the assertion dies on `textContent`, which
   // is what these two did before this line was written.
-  it('titles the requirements card "Step requirements" for a multi-step run', async () => {
+  it('names the viewed stage for a multi-step run', async () => {
     const target = await harness.mount({ run: makeCraftingRun(), now: 0, services: services() });
-    const title = target.querySelector('[data-journal-card="step-details"] .fab-kicker');
-    assert.equal(title.textContent, 'FABRICATE.App.Journal.StepDetails.Title', 'multi-step keeps the step title');
+    const title = target.querySelector('[data-stage-card] .fab-stage-card-name');
+    assert.equal(title.textContent, 'Brew', 'multi-step keeps its authored stage name');
   });
 
-  it('titles the requirements card "Craft requirements" for a single-step run', async () => {
+  it('suppresses redundant stage heading and navigation for a single-step run', async () => {
     const step = {
       stepId: 's1',
       stepName: 'Brew',
@@ -115,25 +120,24 @@ describe('RunDetail mounted behavior', () => {
       structureLabel: 'Single-Step Recipe'
     });
     const target = await harness.mount({ run, now: 0, services: services() });
-    assert.equal(target.querySelector('[data-journal-timeline]'), null, 'single-step run omits the step timeline');
-    const title = target.querySelector('[data-journal-card="step-details"] .fab-kicker');
-    assert.equal(title.textContent, 'FABRICATE.App.Journal.StepDetails.TitleSingleStep', 'single-step uses the craft title');
+    assert.ok(!target.querySelector('[data-stage-nav]'), 'single-step run omits navigation');
+    assert.ok(!target.querySelector('.fab-stage-card-heading'), 'single-step run omits redundant heading');
   });
 
   it('disables Trigger while the gate is unmatured and enables it once ready', async () => {
     const waiting = await harness.mount({ run: makeCraftingRun(), now: 0, services: services() });
-    assert.equal(waiting.querySelector('[data-journal-trigger]').disabled, true, 'waiting → disabled');
+    assert.equal(waiting.querySelector('[data-run-action="primary"]').disabled, true, 'waiting → disabled');
     assert.ok(waiting.querySelector('[data-journal-time-remaining]'), 'waiting → shows the time-remaining callout');
 
     harness.remount();
     const ready = await harness.mount({ run: makeCraftingRun(), now: 2000, services: services() });
-    assert.equal(ready.querySelector('[data-journal-trigger]').disabled, false, 'matured gate → enabled');
+    assert.equal(ready.querySelector('[data-run-action="primary"]').disabled, false, 'matured gate → enabled');
   });
 
   it('treats an un-armed step (no time gate) as immediately triggerable', async () => {
     const run = makeCraftingRun({ timeGate: null, derivedStatus: 'inProgress' });
     const target = await harness.mount({ run, now: 0, services: services() });
-    assert.equal(target.querySelector('[data-journal-trigger]').disabled, false, 'no gate → triggerable now');
+    assert.equal(target.querySelector('[data-run-action="primary"]').disabled, false, 'no gate → triggerable now');
   });
 
   it('disables Trigger while the run is busy even after the gate has matured', async () => {
@@ -141,8 +145,8 @@ describe('RunDetail mounted behavior', () => {
     // Matured gate (now past availableAt) would normally enable the button, but a
     // busy advance for this run id keeps it disabled to block re-entrancy.
     const svc = { journal: { busyRunId: run.id, advance() {} }, getWorldTimeComponents: () => null };
-    const target = await harness.mount({ run, now: 2000, services: svc });
-    assert.equal(target.querySelector('[data-journal-trigger]').disabled, true, 'busy → disabled');
+    const target = await mount({ run, now: 2000, services: svc });
+    assert.equal(target.querySelector('[data-run-action="primary"]').disabled, true, 'busy → disabled');
   });
 
   it('marks a failed step node with the failed state', async () => {
@@ -163,8 +167,8 @@ describe('RunDetail mounted behavior', () => {
       ]
     });
     const target = await harness.mount({ run, now: 0, services: services() });
-    assert.equal(target.querySelector('[data-step-index="0"]').getAttribute('data-step-state'), 'failed');
-    assert.equal(target.querySelector('[data-journal-actions]'), null, 'terminal run shows no actions panel');
+    assert.equal(target.querySelector('[data-stage-card="0"]').getAttribute('data-stage-state'), 'failed');
+    assert.ok(!target.querySelector('[data-journal-actions]'), 'terminal run shows no actions panel');
   });
 
   it('falls back to the last step detail for a terminal run with no currentStep', async () => {
@@ -192,7 +196,7 @@ describe('RunDetail mounted behavior', () => {
       ]
     });
     const target = await harness.mount({ run, now: 5000, services: services() });
-    const details = target.querySelector('[data-journal-card="step-details"]');
+    const details = target.querySelector('[data-stage-card]');
     assert.ok(details, 'step details render for a terminal run without a currentStep');
     // detailStep falls back to the LAST step (Flask), not the first.
     assert.ok(details.textContent.includes('Flask'), 'shows the final step tool via the fallback');
@@ -232,7 +236,7 @@ describe('RunDetail mounted behavior', () => {
       ]
     });
     const target = await harness.mount({ run, now: 5000, services: services() });
-    const details = target.querySelector('[data-journal-card="step-details"]');
+    const details = target.querySelector('[data-stage-card]');
     assert.ok(details.textContent.includes('Mortar & Pestle'), 'shows the executed (failed) step');
     assert.ok(details.textContent.includes('Botched the brew'), 'shows the failed step failure text');
     assert.ok(!details.textContent.includes('Flask'), 'does not show the unreached pending step');
@@ -259,7 +263,7 @@ describe('RunDetail mounted behavior', () => {
       ]
     });
     const target = await harness.mount({ run, now: 5000, services: services() });
-    const details = target.querySelector('[data-journal-card="step-details"]');
+    const details = target.querySelector('[data-stage-card]');
     assert.ok(details, 'step details render for a legacy no-formula roll');
     assert.ok(details.textContent.includes('RollResultValue'), 'bare-value roll fallback rendered');
     assert.ok(details.textContent.includes('9'), 'shows the bare rolled value');
@@ -287,7 +291,7 @@ describe('RunDetail mounted behavior', () => {
       ]
     });
     const target = await harness.mount({ run, now: 5000, services: services() });
-    const details = target.querySelector('[data-journal-card="step-details"]');
+    const details = target.querySelector('[data-stage-card]');
     assert.ok(details.textContent.includes('RollResult'), 'a roll row is still rendered');
     assert.ok(!details.textContent.includes('WithDc'), 'the WithDc variant is not used for a null DC');
     assert.ok(!details.textContent.includes('"dc"'), 'no DC is interpolated into the roll');
@@ -313,7 +317,7 @@ describe('RunDetail mounted behavior', () => {
       ]
     });
     const target = await harness.mount({ run, now: 5000, services: services() });
-    const details = target.querySelector('[data-journal-card="step-details"]');
+    const details = target.querySelector('[data-stage-card]');
     assert.ok(details.textContent.includes('RollResultValue'), 'the bare-value roll row is rendered');
     assert.ok(!details.textContent.includes('WithDc'), 'the WithDc variant is not used for a null DC');
   });
@@ -342,7 +346,7 @@ describe('RunDetail mounted behavior', () => {
       ]
     });
     const target = await harness.mount({ run, now: 5000, services: services() });
-    const rows = target.querySelectorAll('[data-journal-requirement]');
+    const rows = target.querySelectorAll('[data-stage-fact^="requirement-"]');
     assert.equal(rows.length, 2, 'both same-component requirement rows render');
   });
 
@@ -373,7 +377,7 @@ describe('RunDetail mounted behavior', () => {
       ]
     });
     const target = await harness.mount({ run, now: 5000, services: services() });
-    const details = target.querySelector('[data-journal-card="step-details"]');
+    const details = target.querySelector('[data-stage-card]');
     assert.ok(details, 'step details render for the failed step');
     assert.ok(details.textContent.includes('Botched the brew'), 'shows the failure text');
     assert.ok(!details.textContent.includes('RollResultValue'), 'no bare-value roll row rendered');
@@ -398,44 +402,44 @@ describe('RunDetail mounted behavior', () => {
       ]
     });
     const target = await harness.mount({ run, now: 5000, services: services() });
-    const requirements = target.querySelector('[data-journal-requirements]');
-    const consumed = target.querySelector('[data-journal-consumed]');
+    const requirements = target.querySelector('[data-stage-fact^="requirement-"]');
+    const consumed = target.querySelector('[data-stage-fact="spent"]');
     assert.ok(requirements, 'requirements section rendered');
     assert.ok(requirements.textContent.includes('Dried Herb'), 'requirement name rendered');
     assert.ok(consumed, 'consumed section rendered');
-    assert.ok(consumed.querySelector('[data-journal-consumed-item]'), 'a consumed item row rendered');
+    assert.ok(consumed.querySelector('.fab-stage-card-fact-value'), 'actual consumption rendered');
     assert.ok(consumed.textContent.includes('Dried Herb'), 'consumed name rendered');
   });
 
-  it('calls store.advance when the enabled Trigger button is clicked', async () => {
+  it('calls store.execute when the enabled primary action is clicked', async () => {
     const advanced = [];
-    const svc = { journal: { busyRunId: '', advance: (run) => advanced.push(run?.id) }, getWorldTimeComponents: () => null };
-    const target = await harness.mount({ run: makeCraftingRun(), now: 2000, services: svc });
-    target.querySelector('[data-journal-trigger]').click();
+    const svc = { journal: { busyRunId: '', execute: (run) => advanced.push(run?.id) }, getWorldTimeComponents: () => null };
+    const target = await mount({ run: makeCraftingRun(), now: 2000, services: svc });
+    target.querySelector('[data-run-action="primary"]').click();
     assert.deepEqual(advanced, ['run-craft-1'], 'advance invoked with the run');
   });
 
   it('shows an auto-resolve note and no Trigger button for a gathering run', async () => {
     const target = await harness.mount({ run: makeGatheringRun(), now: 0, services: services() });
-    assert.equal(target.querySelector('[data-journal-trigger]'), null, 'no Trigger button for gathering');
-    assert.ok(target.querySelector('[data-journal-auto-resolve]'), 'auto-resolve note shown');
-    assert.equal(target.querySelector('[data-journal-timeline]'), null, 'no step timeline for gathering');
+    assert.ok(!target.querySelector('[data-run-action="primary"]'), 'no manual action for legacy gathering');
+    assert.match(target.textContent, /WhatToExpect.Gathering/, 'auto-resolve guidance shown');
+    assert.ok(!target.querySelector('[data-stage-nav]'), 'no stage nav for gathering');
     assert.ok(
-      target.querySelector('[data-journal-gathering-summary]'),
+      target.querySelector('[data-journal-summary-card="time"]'),
       'gathering summary shown in the body'
     );
   });
 
   it('lists created results only when the run succeeded, and hides actions', async () => {
     const target = await harness.mount({ run: makeSucceededRun(), now: 5000, services: services() });
-    const results = target.querySelector('[data-journal-results]');
+    const results = target.querySelector('[data-yield-scale]');
     assert.ok(results, 'results section shown for a succeeded run');
     assert.ok(results.textContent.includes('Healing Potion'), 'result name rendered');
     // The harness's localize stub echoes the key + data, so assert the Quantity
     // key + the count rather than the rendered "×N" glyph.
-    const resultText = results.querySelector('[data-journal-result]').textContent;
-    assert.ok(resultText.includes('Quantity'), 'quantity badge uses the localized Quantity key');
+    const resultText = results.querySelector('[data-yield-entry]').textContent;
+    assert.ok(resultText.includes('Quantity'), 'quantity badge uses the localized quantity key');
     assert.ok(resultText.includes('3'), 'quantity badge shows the produced count');
-    assert.equal(target.querySelector('[data-journal-actions]'), null, 'terminal run shows no actions panel');
+    assert.ok(!target.querySelector('[data-journal-actions]'), 'terminal run shows no actions panel');
   });
 });

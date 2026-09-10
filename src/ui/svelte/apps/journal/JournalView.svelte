@@ -126,7 +126,7 @@
                 onInput={(value) => journal?.setSearch?.(value)}
                 placeholder={localize('FABRICATE.App.Journal.Filters.SearchPlaceholder')}
                 ariaLabel={localize('FABRICATE.App.Journal.Filters.SearchLabel')}
-                data-journal-search
+                data-journal-search="true"
               />
             </div>
             <div class="journal-kind-field">

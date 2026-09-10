@@ -13,7 +13,10 @@
     showHeading = true,
   } = $props();
 
-  const completed = $derived(state === 'past' || state === 'done' || stage?.status === 'done');
+  const completed = $derived(
+    ['succeeded', 'done'].includes(stage?.status) ||
+      (stage?.status == null && (state === 'past' || state === 'done'))
+  );
   const paused = $derived(state === 'paused');
 </script>
 
@@ -45,7 +48,7 @@
   {:else if !current && facts.length > 0}
     <div class="fab-stage-card-facts">
       {#each facts as fact (fact.id || fact.label)}
-        <div class="fab-stage-card-fact">
+        <div class="fab-stage-card-fact" data-stage-fact={fact.id}>
           {#if fact.icon}<i class={fact.icon} aria-hidden="true"></i>{/if}
           <span>{fact.label}</span>
           <span class="fab-stage-card-fact-value">{fact.value}</span>
