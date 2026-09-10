@@ -593,6 +593,7 @@ export class RunJournalBuilder {
       derivedStatus,
       timeGate: activeStep?.timeGate,
       hasPlayerCheck,
+      knownMaterialShortfall: currentStep?.selectionAvailability?.knownMaterialShortfall === true,
       entitled: !redacted,
       authority,
     });
@@ -1044,6 +1045,7 @@ export class RunJournalBuilder {
     if (!ingredientSet) {
       return {
         success: false,
+        knownMaterialShortfall: false,
         selectedIngredientSetId: setId,
         routes,
         staleRoute: true,
@@ -1087,6 +1089,9 @@ export class RunJournalBuilder {
       routes,
       staleRoute: false,
       success: selection?.success === true,
+      knownMaterialShortfall:
+        selection?.success === false &&
+        normalizeList(selection.missingGroups).some(isPhysicalMaterialShortfall),
       missingGroups: normalizeList(selection?.missingGroups).map(safeMissingGroup),
       choices,
       requirements: normalizeList(ingredientSet.ingredientGroups).map((group) =>
@@ -2014,6 +2019,7 @@ export class RunJournalBuilder {
     derivedStatus,
     timeGate = null,
     hasPlayerCheck = false,
+    knownMaterialShortfall = false,
     entitled = true,
     authority = null,
   }) {
@@ -2040,7 +2046,9 @@ export class RunJournalBuilder {
       recoveryEvidence?.required === true || recoveryEvidence?.status === 'planned';
     const mutableCurrent = current && live && owner && authoritative && !executionBlocked;
     const executableType = runType === 'crafting' || runType === 'gathering';
-    const readyToExecute = derivedStatus !== 'waiting' && derivedStatus !== 'paused';
+    const materialBlocked = current && live && runType === 'crafting' && knownMaterialShortfall;
+    const readyToExecute =
+      derivedStatus !== 'waiting' && derivedStatus !== 'paused' && !materialBlocked;
     const legacyExecute = lifecycleContract === 'legacy' && live && runType === 'crafting' && owner;
     const legacyCancel = lifecycleContract === 'legacy' && live && runType === 'crafting' && owner;
     return {
@@ -2074,7 +2082,7 @@ export class RunJournalBuilder {
         setSelection: mutableCurrent && runType === 'crafting' && entitled,
         cancel: legacyCancel || (mutableCurrent && executableType),
         dismiss: terminal,
-        disabledReason: blockedReason,
+        disabledReason: blockedReason ?? (materialBlocked ? 'selectionRequired' : null),
       },
     };
   }
@@ -2253,6 +2261,17 @@ function ingredientOptionName({ group, option, kind, match, definition, componen
     return tags.join(match?.tagMatch === 'all' ? ' & ' : ' | ') || stringOrEmpty(group?.name);
   }
   return stringOrEmpty(option?.name) || stringOrEmpty(group?.name);
+}
+
+// Essence have is delivered allocation, not held stock. Classify only physical
+// misses before safeMissingGroup removes the raw ingredient kind.
+function isPhysicalMaterialShortfall(group) {
+  return (
+    ['component', 'tag', 'item'].includes(ingredientKind(group?.ingredient)) &&
+    Number.isFinite(group?.have) &&
+    Number.isFinite(group?.need) &&
+    group.have < group.need
+  );
 }
 
 function safeMissingGroup(group) {

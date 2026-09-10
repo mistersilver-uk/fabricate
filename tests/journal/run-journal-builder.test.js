@@ -2052,6 +2052,117 @@ test('redacted checked countdown keeps owner actions but cannot offer automatic 
   assert.equal(JSON.stringify(model).includes('1d20'), false);
 });
 
+function materialShortfallFixture(sets, dependencies = {}) {
+  const actor = { ...ACTOR, isOwner: true, items: [{
+    id: 'ember', uuid: 'Actor.actor-1.Item.ember', name: 'Emberdust', system: { quantity: 1 },
+  }] };
+  const plan = { selectedIngredientSetId: sets[0].id };
+  const raw = activeSingleStepRun({ lifecycleVersion: 1, steps: [{ stepId: 's0', selectionPlan: plan }] });
+  const recipe = { ...SINGLE_STEP_RECIPE, getExecutionSteps: () => [{ id: 's0', ingredientSets: sets }] };
+  const builder = makeBuilder({ active: [raw], recipe, ingredientMatchesItem: () => true, ...dependencies });
+  return { actor, raw, plan, project: () => builder.buildListing({ actor, viewer: PLAYER }).activeRuns[0] };
+}
+
+for (const [kind, reference] of [
+  ['component', { match: { type: 'component', componentId: 'ember' } }],
+  ['tag', { match: { type: 'tags', tags: ['fire'] } }],
+  ['item', { itemUuid: 'Item.ember' }],
+]) {
+  test(`known ${kind} shortage refuses execution and permits supply or alternate-route repair without spending`, () => {
+    const sets = [2, 1].map((quantity) => new IngredientSet({
+      id: `route-${quantity}`, ingredientGroups: [{ id: 'material', options: [{ quantity, ...reference }] }],
+    }));
+    const { actor, raw, plan, project } = materialShortfallFixture(sets);
+    const before = structuredClone({ actor, raw });
+    const short = project();
+    assert.equal(short.derivedStatus, 'inProgress', 'no countdown supplies an unrelated execution blocker');
+    assert.equal(short.currentStep.selectionAvailability.success, false);
+    assert.deepEqual(short.currentStep.selectionAvailability.missingGroups.map(({ have, need }) => ({ have, need })), [{ have: 1, need: 2 }]);
+    assert.equal(short.actions.execute, false);
+    assert.equal(short.actions.disabledReason, 'selectionRequired');
+    assert.equal(short.actions.setSelection, true);
+    assert.equal(short.actions.cancel, true);
+    assert.deepEqual({ actor, raw }, before, 'projection changes neither stock nor persisted intent');
+
+    plan.selectedIngredientSetId = sets[1].id;
+    const alternate = project();
+    assert.equal(alternate.currentStep.selectionAvailability.success, true);
+    assert.equal(alternate.actions.execute, true);
+    assert.equal(alternate.actions.disabledReason, null);
+    assert.equal(actor.items[0].system.quantity, 1);
+
+    plan.selectedIngredientSetId = sets[0].id;
+    assert.equal(project().actions.execute, false, 'returning to the scarce route re-applies the refusal');
+    actor.items[0].system.quantity = 2;
+    const supplied = project();
+    assert.equal(supplied.currentStep.selectionAvailability.success, true);
+    assert.equal(supplied.actions.execute, true);
+    assert.equal(supplied.actions.disabledReason, null);
+    assert.equal(actor.items[0].system.quantity, 2, 'supply is observed, never consumed by projection');
+  });
+}
+
+test('incomplete essence allocation is not physical scarcity even with finite missing have/need', () => {
+  const set = new IngredientSet({ id: 'essence', ingredientGroups: [{
+    id: 'fire', options: [{ match: { type: 'essence', essenceId: 'fire', amount: 2 } }],
+  }] });
+  const { actor, plan, project } = materialShortfallFixture([set], { resolveItemEssences: () => ({ fire: 1 }) });
+  actor.items[0].system.quantity = 3;
+  plan.ingredientEssenceAllocation = { stepId: 's0', ingredientSetId: set.id, allocation: { [actor.items[0].uuid]: 1 } };
+  const model = project();
+  assert.equal(model.currentStep.selectionAvailability.success, false);
+  assert.deepEqual(model.currentStep.selectionAvailability.missingGroups.map(({ have, need }) => ({ have, need })), [{ have: 1, need: 2 }]);
+  assert.equal(model.actions.execute, true, 'manual attempt retains authoritative no-spend validation');
+  assert.equal(model.actions.disabledReason, null);
+  assert.equal(model.actions.setSelection, true);
+  assert.equal(actor.items[0].system.quantity, 3);
+});
+
+test('absent or uncertain resolver evidence never proves a physical shortfall', () => {
+  const missing = { ingredient: { match: { type: 'component', componentId: 'ember' } }, have: 1, need: 2 };
+  const results = [
+    null, undefined, {}, { success: false },
+    { success: true, missingGroups: [missing] },
+    { missingGroups: [missing] },
+    ...[
+      { ingredient: undefined }, { ingredient: { match: { type: 'currency' } } },
+      { have: undefined }, { have: null }, { have: NaN }, { have: -Infinity }, { have: '1' },
+      { need: undefined }, { need: null }, { need: Infinity }, { need: '2' },
+      { have: 2 }, { have: 3 },
+    ].map((overrides) => ({ success: false, missingGroups: [{ ...missing, ...overrides }] })),
+  ];
+  for (const result of results) {
+    const set = { id: 'uncertain', ingredientGroups: [], resolveIngredientSelection: () => result };
+    const model = materialShortfallFixture([set]).project();
+    assert.equal(model.actions.execute, true);
+    assert.equal(model.actions.disabledReason, null);
+  }
+  const absentResolver = materialShortfallFixture([{ id: 'absent' }]).project();
+  assert.equal(absentResolver.currentStep.selectionAvailability, null);
+  assert.equal(absentResolver.actions.execute, true);
+  const stale = materialShortfallFixture([{ id: 'removed' }]);
+  stale.plan.selectedIngredientSetId = 'gone';
+  assert.equal(stale.project().currentStep.selectionAvailability.staleRoute, true);
+  assert.equal(stale.project().actions.execute, true, 'a stale route is not proven stock scarcity');
+});
+
+test('shortfall preserves authority/recovery precedence and legacy execution', () => {
+  const set = new IngredientSet({ id: 'short', ingredientGroups: [{
+    id: 'material', options: [{ quantity: 2, match: { type: 'component', componentId: 'ember' } }],
+  }] });
+  const authority = { available: false, reason: 'authorityUnavailable' };
+  const { raw, project } = materialShortfallFixture([set], { getJournalActionAvailability: () => authority });
+  assert.equal(project().actions.disabledReason, 'authorityUnavailable');
+  raw.executionJournal = { status: 'recoveryRequired', effects: [] };
+  assert.equal(project().actions.disabledReason, 'recoveryRequired');
+  raw.executionJournal.status = 'planned';
+  assert.equal(project().actions.disabledReason, 'executionInProgress');
+  delete raw.executionJournal;
+  delete raw.lifecycleVersion;
+  assert.equal(project().actions.execute, true);
+  assert.equal(project().actions.disabledReason, null);
+});
+
 function projectMaterialSelection(override) {
   const ingredientSet = new IngredientSet({ id: 'materials', ingredientGroups: [{
     id: 'metal', name: 'Metal', options: [
@@ -2384,6 +2495,7 @@ test('current-step availability delegates material choices and shared essence al
   assert.equal(calls[0].options.affordCurrency({ unit: 'gp', amount: 1 }), true);
   const expectedAvailability = {
     success: false,
+    knownMaterialShortfall: false,
     missingGroups: [
       {
         id: 'fixed',
