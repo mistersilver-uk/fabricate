@@ -13947,7 +13947,7 @@ export const VIEW_LAB_CASES = Object.freeze([
     label: 'Player app — Journal craft detail',
     smokeLabels: ['fabricate-journal-craft-detail'],
     // The counterpart's condition is a HISTORY crafting run selected, so the run-detail
-    // requirements section (`[data-journal-stage-details]`) is on screen — a different article
+    // recorded stage facts (`[data-stage-fact]`) are on screen — a different article
     // from the one `fabricate-journal` shows, which is the default ACTIVE run. With empty steps
     // this case published that same default frame under a second name.
     //
@@ -13957,13 +13957,15 @@ export const VIEW_LAB_CASES = Object.freeze([
     reaches: 'exact',
     query: { tab: 'journal' },
     steps: [
-      { selector: '.journal-history-row[data-history-run-id="lab-run-succeeded-multi"]' },
+      { selector: '[data-history-run-id="lab-run-succeeded-multi"]' },
       {
         selector:
-          '[data-journal-detail][data-run-key*="lab-run-succeeded-multi"] [data-journal-stage-details]',
+          '[data-journal-detail][data-run-key*="lab-run-succeeded-multi"] [data-stage-card]',
         scroll: true,
       },
     ],
+    expectSelector:
+      '[data-journal-detail][data-run-key*="lab-run-succeeded-multi"]:has([data-stage-nav]):has([data-stage-fact])',
     kinds: ['player', 'journal'],
     sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/svelte\/stores\/journalStore/],
   }),
