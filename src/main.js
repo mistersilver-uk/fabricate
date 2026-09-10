@@ -461,7 +461,7 @@ function createCraftingJournalOperations(fabricate, getService) {
         requestId,
       });
     },
-    executeAlchemyFizzle: async ({ actor, payload, executionGrant, requestId }) => {
+    executeAlchemyFizzle: async ({ actor, payload, executionGrant, requestId, sender }) => {
       const sourceActors = await resolveJournalSourceActors(null, payload, actor);
       if (!sourceActors) return { success: false, reason: 'source-actor-not-found' };
       const system = fabricate.craftingSystemManager?.getSystem?.(payload.craftingSystemId) ?? null;
@@ -481,6 +481,7 @@ function createCraftingJournalOperations(fabricate, getService) {
       const execute = fabricate.craftingEngine?.executeVersionedAlchemyFizzle;
       if (typeof execute !== 'function') return { success: false, reason: 'unsupported-operation' };
       return execute.call(fabricate.craftingEngine, {
+        viewer: sender,
         actor,
         sourceActors,
         craftingSystemId: payload.craftingSystemId,

@@ -4,7 +4,10 @@ import { readFileSync } from 'node:fs';
 import { compileFunction } from 'node:vm';
 import { IngredientSet } from '../src/models/IngredientSet.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
+import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
+import { resolvedComponentsFor } from '../src/systems/scopedEntityReads.js';
 
 import {
   JOURNAL_RUN_SOCKET_KIND,
@@ -85,7 +88,75 @@ describe('journal run command protocol', () => {
     const start = source.indexOf('async function resolveJournalSourceActors(');
     const end = source.indexOf('function createJournalCommandsForFabricate(', start);
     assert.ok(start >= 0 && end > start, 'the production operation factory must be present');
-    return compileFunction(`${source.slice(start, end)}\nreturn createCraftingJournalOperations;`)();
+    return compileFunction(`${source.slice(start, end)}\nreturn createCraftingJournalOperations;`,
+      ['resolveAlchemySubmissions', 'resolvedComponentsFor'])(resolveAlchemySubmissions, resolvedComponentsFor);
+  }
+
+  for (const kind of ['crafting', 'matched-alchemy', 'fizzle']) {
+    for (const sender of [{ id: 'player', isGM: false }, { id: 'gm', isGM: true }]) {
+      it(`persists the initiating ${sender.id} through the ${kind} callback on the GM`, async () => {
+        const oldGlobals = { game: globalThis.game, foundry: globalThis.foundry };
+        try {
+          globalThis.foundry = { utils: { randomID: () => 'identity-run' } };
+          const flags = {};
+          const actor = {
+            id: 'a', uuid: 'Actor.a', items: [],
+            getFlag: (scope, key) => flags[scope]?.[key],
+            async setFlag(scope, key, value) {
+              flags[scope] ??= {};
+              flags[scope][key] = structuredClone(value);
+              return value;
+            },
+          };
+          const item = { id: 'herb', uuid: 'Actor.a.Item.herb', name: 'Herb',
+            parent: actor, system: { quantity: 1 } };
+          actor.items = [item];
+          const recipe = { id: 'recipe', craftingSystemId: 'system', name: 'Brew',
+            getExecutionSteps: () => [{ id: 'step', timeRequirement: { minutes: 2 },
+              ingredientSets: [new IngredientSet({ id: 'set' })] }] };
+          const system = { id: 'system', resolutionMode: 'alchemy',
+            components: [{ id: 'herb', name: 'Herb' }],
+            alchemy: { consumeOnFail: false, showAttemptHistoryToPlayers: false } };
+          const runManager = new CraftingRunManager();
+          const engine = new CraftingEngine({ getRecipe: () => recipe }, runManager);
+          engine._matchAlchemySignature = () => ({ matched: false });
+          engine.installVersionedRunAuthority({ consumeExecutionGrant: async (grant) => {
+            assert.equal(grant, 'private-grant');
+            return { operationId: 'identity-operation', activityKind: 'alchemy',
+              matched: kind === 'matched-alchemy', recipeId: recipe.id };
+          } });
+          globalThis.game = { user: { id: 'gm', isGM: true }, time: { worldTime: 1000 },
+            fabricate: {
+              getCraftingSystemManager: () => ({ getSystem: () => system }),
+              getRecipeVisibilityService: () => ({ guardCraftStart: ({ viewer }) => {
+                assert.equal(viewer.id, sender.id);
+                assert.equal(kind, 'crafting', 'matched alchemy retains its grant-bound bypass');
+                return { craftable: true };
+              } }),
+            } };
+          const operations = loadCraftingOperations()({ craftingEngine: engine,
+            craftingSystemManager: { getSystem: () => system } }, () => null);
+          const operation = kind === 'fizzle' ? 'executeAlchemyFizzle' : 'start';
+          const result = await operations[operation]({ actor, sender,
+            executionGrant: 'private-grant', requestId: 'identity-request',
+            payload: { recipeId: recipe.id, craftingSystemId: system.id,
+              userId: 'forged-user', viewer: { id: 'forged-viewer' },
+              submittedItems: [{ itemUuid: item.uuid, componentId: 'herb' }] } });
+          assert.ok(result.runId, JSON.stringify(result));
+          const reloaded = new CraftingRunManager().getRun(actor, result.runId);
+          assert.equal(reloaded.userId, sender.id);
+          assert.equal(reloaded.lifecycleVersion, 1);
+          if (kind === 'fizzle') {
+            assert.equal(reloaded.executionJournal.status, 'committed');
+            assert.equal(result.disposition, 'no-match');
+          } else {
+            assert.equal(reloaded.status, 'waitingTime');
+          }
+        } finally {
+          Object.assign(globalThis, oldGlobals);
+        }
+      });
+    }
   }
 
   it('redacts initial crafting prompts for the attested sender rather than the executing GM', async () => {

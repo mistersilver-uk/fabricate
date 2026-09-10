@@ -682,6 +682,7 @@ export class CraftingEngine {
   }
 
   async executeVersionedAlchemyFizzle({
+    viewer,
     actor,
     sourceActors,
     craftingSystemId,
@@ -704,7 +705,7 @@ export class CraftingEngine {
       executionGrant,
       details: {
         craftingSystemId,
-        userId: game.user?.id ?? null,
+        userId: viewer?.id ?? null,
         componentSourceActorUuids: sourceActors.map((source) => source.uuid),
       },
       validateTrusted: () => {
@@ -809,7 +810,7 @@ export class CraftingEngine {
       return versionedFailure(`Invalid recipe: ${(validation.errors || []).join(', ')}`);
     }
 
-    const run = await runManager.createRun(actor, recipe, sourceActors, game.user?.id || null, {
+    const run = await runManager.createRun(actor, recipe, sourceActors, viewer?.id ?? null, {
       lifecycleVersion: 1,
       completionMode,
     });
