@@ -147,7 +147,7 @@
     onCancel={() => journal?.cancel?.(run)}
     bind:armed={cancelArmed}
   />
-  {#if actions.disabledReason && !canExecute}
+  {#if actions.disabledReason && !canExecute && run?.lifecycleContract !== 'unsupported'}
     <Notice
       tone="warning"
       title={reason}

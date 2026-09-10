@@ -1007,7 +1007,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
         const cards = mounted.target.querySelectorAll('[data-journal-route] [data-radio-card-option]');
         assert.equal(cards.length, 2);
         assert.ok([...cards].every((card) => card.querySelector('[data-list-row]')));
-        assert.match(cards[1].textContent, /Short 1 requirements/);
+        assert.match(cards[1].textContent, /Missing requirements: 1/);
       }
       if (state === 'authority-unavailable') {
         assert.match(mounted.target.querySelector('[data-journal-action-blocker]').textContent, /GM must be online/i);

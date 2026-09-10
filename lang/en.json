@@ -1182,7 +1182,7 @@
           "Number": "Stage {index}",
           "Route": "Ingredient route",
           "ChosenRoute": "Chosen",
-          "RouteShortfall": "Short {count} requirements",
+          "RouteShortfall": "Missing requirements: {count}",
           "CandidateReading": "{held} held · needs {needed} · {spare} spare",
           "CandidateUnavailable": "This choice cannot satisfy all stage requirements",
           "Requirement": "Requirement {n}",
