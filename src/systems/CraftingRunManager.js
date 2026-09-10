@@ -905,12 +905,14 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   /**
-   * Prune legacy phantom active runs: a crafting run whose recipe is single-step
+   * Prune legacy phantom active runs: an unversioned run whose recipe is single-step
    * AND whose only step has no time requirement can never legitimately persist as
    * active (it only ever rejects, fails, or succeeds atomically), so any such run
    * left in the active container is a phantom stranded by an old pre-validation
    * early-return. Multi-step recipes (persist between "Trigger Next Step") and
    * single-step time-gated recipes (persist a waiting run) are excluded.
+   * Current-version runs can legitimately await manual completion without a time
+   * requirement, including after authored timing is removed, and are never pruned here.
    *
    * Unknown recipes are left alone here — {@link cleanupInvalidRuns} owns those.
    *
@@ -928,7 +930,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
       let dirty = false;
 
       for (const [runId, run] of Object.entries(container.active || {})) {
-        if (getRunLifecycleContract(run) === 'unsupported') continue;
+        if (getRunLifecycleContract(run) !== 'legacy') continue;
         const recipe = run?.recipeId ? resolveRecipe(run.recipeId) : null;
         if (!recipe) continue;
         const steps =

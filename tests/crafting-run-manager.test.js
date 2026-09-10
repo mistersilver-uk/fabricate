@@ -1138,6 +1138,70 @@ test('CraftingRunManager: pruneInstantaneousActiveRuns removes single-step no-ti
   );
 });
 
+test('startup phantom pruning preserves zero-duration v1 manual runs and receipts while removing a legacy phantom', async () => {
+  setupGlobals();
+  const actor = new FakeActor('Rejoining crafter');
+  actor.id = 'rejoining-crafter';
+  game.actors = [actor];
+  const manager = new CraftingRunManager();
+  const recipe = singleStepRecipe('instant-rejoin');
+  const retained = [];
+  for (const withReceipt of [false, true]) {
+    const run = await manager.createRun(actor, recipe, [actor], 'user-1', { lifecycleVersion: 1 });
+    await manager.setStepSelectionPlan(actor, run.id, 0, {
+      selectedIngredientSetId: 'chosen',
+      ingredientOptionOverrides: { metal: { optionIndex: 1, heldItemId: 'Item.silver' } },
+      selectedRequirementSnapshot: { id: 'chosen', ingredients: [{ componentId: 'silver', quantity: 2 }] },
+    }, { expectedRevision: 0 });
+    if (withReceipt) {
+      await manager.updateExecutionJournal(actor, run.id, {
+        type: 'plan',
+        plan: {
+          operationId: 'retained-operation', requestId: 'retained-request', baseRunRevision: 1,
+          intent: { stepIndex: 0 },
+          effects: [{ effectId: 'consume', kind: 'consumeIngredients', planned: { quantity: 2 } }],
+        },
+      });
+      await manager.updateExecutionJournal(actor, run.id, { type: 'effectApplying', effectId: 'consume' });
+      await manager.updateExecutionJournal(actor, run.id, {
+        type: 'effectApplied', effectId: 'consume', receipt: { itemUuid: 'Item.silver', quantity: 2 },
+      });
+    }
+    retained.push(structuredClone(manager.getActiveRun(actor, run.id)));
+  }
+  const legacy = await manager.createRun(actor, recipe, [actor], 'user-1');
+  const startupManager = new CraftingRunManager();
+  assert.equal(await startupManager.pruneInstantaneousActiveRuns(() => recipe), 1);
+  const reloaded = new CraftingRunManager();
+  assert.equal(reloaded.getActiveRun(actor, legacy.id), null);
+  assert.deepEqual(reloaded.getActiveRuns(actor), retained, 'selection, revision, manual preference and receipts survive the cleanup write');
+  assert.deepEqual(reloaded.getRunHistory(actor), []);
+});
+
+test('startup phantom pruning preserves pending and paused v1 runs after authored timing is removed', async () => {
+  setupGlobals();
+  const actor = new FakeActor('Changed timing');
+  actor.id = 'changed-timing';
+  game.actors = [actor];
+  const manager = new CraftingRunManager();
+  const step = { id: 'timed-step', timeRequirement: { minutes: 2 } };
+  const recipe = { id: 'timed-recipe', craftingSystemId: 'system-1', getExecutionSteps: () => [step] };
+  for (const paused of [false, true]) {
+    const run = await manager.createRun(actor, recipe, [actor], 'user-1', { lifecycleVersion: 1 });
+    await manager.markStepWaitingForTime(actor, run, 0, step.timeRequirement);
+    if (paused) await manager.pauseRun(actor, run.id, { expectedRevision: 1 });
+  }
+  const before = structuredClone(actor._flags);
+  step.timeRequirement = null;
+  game.time.worldTime += 5000;
+  actor.setFlag = async () => assert.fail('current-only startup pruning must not write');
+  const startupManager = new CraftingRunManager();
+  const expectedRuns = manager.getActiveRuns(actor);
+  assert.equal(await startupManager.pruneInstantaneousActiveRuns(() => recipe), 0);
+  assert.deepEqual(startupManager.getActiveRuns(actor), expectedRuns);
+  assert.deepEqual(actor._flags, before, 'persisted gates, pause state and revisions remain exact');
+});
+
 test('createRun snapshots each step\'s component ingredient requirements (issue 738)', async () => {
   setupGlobals();
   const manager = new CraftingRunManager();
