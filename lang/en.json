@@ -1164,7 +1164,6 @@
         },
         "Record": {
           "Title": "Run record",
-          "Task": "Task",
           "RecipeId": "Recipe ID",
           "TaskId": "Task ID",
           "Finished": "Finished"
