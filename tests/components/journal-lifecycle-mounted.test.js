@@ -5,10 +5,16 @@ import { after, afterEach, before, describe, it } from 'node:test';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
+import { RecipeVisibilityService } from '../../src/systems/RecipeVisibilityService.js';
 import { IngredientSet } from '../../src/models/IngredientSet.js';
 import { Recipe } from '../../src/models/Recipe.js';
 import english from '../../lang/en.json' with { type: 'json' };
-import { getCaseById } from '../../scripts/lib/viewLabCases.js';
+import { getCaseById, VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
+import { buildLabActors } from '../view-lab/world/labActors.js';
+import {
+  stockJournalPrototype,
+  JOURNAL_PROTOTYPE_BINDINGS,
+} from '../view-lab/world/labJournalPrototype.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
 import {
   PLAYER_APP_COMPILED_MODULES,
@@ -74,7 +80,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
     'src/ui/svelte/apps/journal/ActionsPanel.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
-    'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte', 'src/ui/svelte/apps/journal/ThisRun.svelte',
+    'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte',
+    'src/ui/svelte/apps/journal/ThisRun.svelte',
     'src/ui/svelte/apps/journal/JournalView.svelte',
   ],
   rootClass: 'fabricate-app',
@@ -197,8 +204,22 @@ const ESSENCE_SET = {
       missingGroups: earth >= 6 && fire >= 3 ? [] : ESSENCE_GROUPS,
       essencePool: {
         requirements: [
-          { groupId: 'earth-group', essenceId: 'earth', need: 6, delivered: earth, owned: 18, satisfied: earth >= 6 },
-          { groupId: 'fire-group', essenceId: 'fire', need: 3, delivered: fire, owned: 9, satisfied: fire >= 3 },
+          {
+            groupId: 'earth-group',
+            essenceId: 'earth',
+            need: 6,
+            delivered: earth,
+            owned: 18,
+            satisfied: earth >= 6,
+          },
+          {
+            groupId: 'fire-group',
+            essenceId: 'fire',
+            need: 3,
+            delivered: fire,
+            owned: 9,
+            satisfied: fire >= 3,
+          },
         ],
         carriers: [
           {
@@ -231,22 +252,38 @@ const TASKS = ['straight', 'd100', 'routed'].map((mode) => ({
   name: `${mode} task`,
   craftingSystemId: SYSTEM.id,
   resolutionMode: mode,
-  dropRows: [
-    { id: `${mode}-drop`, componentId: 'iron', quantity: 1, dropRate: 65, enabled: true },
-  ],
+  dropRows: [{ id: `${mode}-drop`, componentId: 'iron', quantity: 1, dropRate: 65, enabled: true }],
   resultGroups: [
     { id: `${mode}-group`, name: 'Standard', results: [{ componentId: 'iron', quantity: 1 }] },
   ],
 }));
 const ENVIRONMENTS = [{ id: 'environment-1', craftingSystemId: SYSTEM.id }];
 
-function makeBuilder(containers, dismissed, nowWorldTime, {
-  recipes = RECIPES, system = SYSTEM, visible = true, authority = { available: true, reason: null },
-  resolveItemEssences = null,
-} = {}) {
+function makeBuilder(
+  containers,
+  dismissed,
+  nowWorldTime,
+  {
+    recipes = RECIPES,
+    system = SYSTEM,
+    visible = true,
+    authority = { available: true, reason: null },
+    resolveItemEssences = null,
+    content = null,
+    actor = ACTOR,
+    viewer = { id: 'user-1', isGM: false },
+  } = {}
+) {
   const recipeById = new Map(recipes.map((entry) => [entry.id, entry]));
   const componentById = new Map(system.components.map((entry) => [entry.id, entry]));
+  const getSystem = (id) => content?.systems.find((entry) => entry.id === id) ?? system;
+  const getComponent = (systemId, id) =>
+    getSystem(systemId)?.components.find((entry) => entry.id === id) ??
+    componentById.get(id) ??
+    null;
   return new RunJournalBuilder({
+    localize: (key, data) =>
+      data ? globalThis.game.i18n.format(key, data) : globalThis.game.i18n.localize(key),
     craftingRunManager: {
       getActiveRuns: () => Object.values(containers.craftingRuns.active),
       getRunHistory: () => containers.craftingRuns.history,
@@ -262,16 +299,28 @@ function makeBuilder(containers, dismissed, nowWorldTime, {
     recipeManager: {
       getRecipe: (id) => recipeById.get(id) ?? null,
       ingredientMatchesItem: (_recipe, option, held) =>
-        option?.match?.componentId === held?.componentId,
+        option?.match?.componentId === held?.componentId ||
+        getComponent(_recipe.craftingSystemId, option?.match?.componentId)?.originItemUuid ===
+          held.uuid,
     },
-    resolutionModeService: new ResolutionModeService({ getSystem: () => system }),
-    recipeVisibility: { evaluateRecipeAccess: () => ({ visible }) },
-    getSystem: () => system,
-    getComponent: (_systemId, id) => componentById.get(id) ?? null,
-    getViewer: () => ({ id: 'user-1', isGM: false }),
+    resolutionModeService: new ResolutionModeService({ getSystem }),
+    recipeVisibility: content
+      ? new RecipeVisibilityService(null, { getSystem })
+      : { evaluateRecipeAccess: () => ({ visible }) },
+    getSystem,
+    getComponent,
+    getGatheringTask: (_environmentId, taskId) =>
+      content?.gatheringConfig.tasks.find((entry) => entry.id === taskId) ??
+      TASKS.find((entry) => entry.id === taskId),
+    getViewer: () => viewer,
     nowWorldTime,
-    resolveItemEssences,
-    getComponentSourceActors: () => [ACTOR],
+    resolveItemEssences:
+      resolveItemEssences ??
+      (content
+        ? ({ item }) =>
+            content.components.find((entry) => entry.originItemUuid === item.uuid)?.essences ?? {}
+        : null),
+    getComponentSourceActors: () => [actor],
     resolveComponentForItem: (held) => componentById.get(held?.componentId) ?? null,
     getDismissedRunKeys: () => dismissed,
     getJournalActionAvailability: () => authority,
@@ -280,12 +329,14 @@ function makeBuilder(containers, dismissed, nowWorldTime, {
 
 function persistedRuntime(state, builderOptions) {
   const recipes = builderOptions?.recipes ?? RECIPES;
+  const actor = builderOptions?.actor ?? ACTOR;
+  const viewer = builderOptions?.viewer ?? { id: 'user-1', isGM: false };
   const containers = buildLabRunStates({
-    actor: ACTOR,
-    userId: 'user-1',
+    actor,
+    userId: viewer.id,
     recipes,
-    environments: ENVIRONMENTS,
-    tasks: TASKS,
+    environments: builderOptions?.content?.environments ?? ENVIRONMENTS,
+    tasks: builderOptions?.content?.gatheringConfig.tasks ?? TASKS,
     journalCaseState: state,
   });
   const dismissed = new Set();
@@ -293,7 +344,7 @@ function persistedRuntime(state, builderOptions) {
   let worldTime = 1_209_600;
   const builder = makeBuilder(containers, dismissed, () => worldTime, builderOptions);
   const controller = createLabJournalCaseController({
-    actor: ACTOR,
+    actor,
     containers,
     state,
     recipes,
@@ -302,14 +353,15 @@ function persistedRuntime(state, builderOptions) {
   const services = {
     getWorldTime: () => worldTime,
     getWorldTimeComponents: () => ({ day: 15, hour: 0, minute: 0, secondsPerDay: 86_400 }),
-    getSelectedActorId: () => ACTOR.id,
-    listJournalForActor: async () => builder.buildListing({
-      actor: ACTOR,
-      viewer: { id: 'user-1', isGM: false },
-    }),
+    getSelectedActorId: () => actor.id,
+    listJournalForActor: async () =>
+      builder.buildListing({
+        actor,
+        viewer,
+      }),
     executeJournalRunCommand: controller.execute,
     dismissJournalRun: async ({ runId, runType }) => {
-      dismissed.add(JSON.stringify([ACTOR_UUID, runType, runId]));
+      dismissed.add(JSON.stringify([actor.uuid, runType, runId]));
       return { success: true };
     },
     notify: (message) => {
@@ -318,6 +370,7 @@ function persistedRuntime(state, builderOptions) {
     craftErrorMessage: () => 'Craft failed.',
   };
   return {
+    actor,
     containers,
     commands: controller.events,
     notifications,
@@ -329,16 +382,28 @@ function persistedRuntime(state, builderOptions) {
 
 let createJournalStore;
 
+function labRecipes(content) {
+  const previous = globalThis.foundry;
+  let index = 0;
+  try {
+    globalThis.foundry = { utils: { randomID: () => `journal-result-${++index}` } };
+    return content.recipes.map((entry) => new Recipe(entry));
+  } finally {
+    globalThis.foundry = previous;
+  }
+}
+
 async function mountState(state, { prepare = null, initialLoad = true, builderOptions } = {}) {
   const runtime = persistedRuntime(state, builderOptions);
   prepare?.(runtime);
   const store = createJournalStore({ services: runtime.services });
   if (initialLoad) await store.load();
+  if (initialLoad && builderOptions?.content) store.select(LAB_JOURNAL_CASE_STATE_RUN_IDS[state]);
   flushSync();
   const target = await harness.mount({
     services: {
       journal: store,
-      actorBar: { selectedActorId: ACTOR.id },
+      actorBar: { selectedActorId: state === 'no-actor-empty' ? null : runtime.actor.id },
       getWorldTimeComponents: runtime.services.getWorldTimeComponents,
     },
   });
@@ -353,15 +418,20 @@ async function settleAction() {
 function selectionFixture(sets, plan, { mode = 'simple' } = {}) {
   const authored = recipe('sm-r-horseshoe', 'Selection trial', sets);
   authored.getExecutionSteps()[0].resultGroups = sets.map((set, index) => ({
-    id: set.resultGroupId, name: set.name,
-    results: [{ id: `yield-${index}`, componentId: index === 0 ? 'iron' : 'copper', quantity: index + 1 }],
+    id: set.resultGroupId,
+    name: set.name,
+    results: [
+      { id: `yield-${index}`, componentId: index === 0 ? 'iron' : 'copper', quantity: index + 1 },
+    ],
   }));
   return {
     builderOptions: { recipes: [authored], system: { ...SYSTEM, resolutionMode: mode } },
     prepare({ containers }) {
       const run = containers.craftingRuns.active['lab-v1-ready-single'];
       run.currentStepIndex = 0;
-      run.steps = [{ stepId: authored.getExecutionSteps()[0].id, status: 'inProgress', selectionPlan: plan }];
+      run.steps = [
+        { stepId: authored.getExecutionSteps()[0].id, status: 'inProgress', selectionPlan: plan },
+      ];
     },
   };
 }
@@ -386,7 +456,75 @@ function assertActionAlignment(target) {
 function assertLockedStage(target) {
   const card = target.querySelector('[data-stage-card][data-stage-state="future"]');
   assert.ok(card, 'future stage is visible');
-  assert.ok(!card.querySelector('button, input, select'), 'future stage exposes no editing control');
+  assert.ok(
+    !card.querySelector('button, input, select'),
+    'future stage exposes no editing control'
+  );
+}
+
+function assertCaseWitness(target, capture) {
+  assert.ok(
+    target.querySelector(capture.expectSelector) ?? document.querySelector(capture.expectSelector),
+    `${capture.id}: ${capture.expectSelector}`
+  );
+  const history = target.querySelector('[data-journal-history-detail]');
+  if (!history) return;
+  assert.ok(
+    history.querySelectorAll('[data-history-summary]').length <= 1,
+    'one final summary at most'
+  );
+  const summary = history.querySelector('[data-history-summary]');
+  const material = history.querySelector('[data-history-items]');
+  if (summary && material) {
+    const siblings = [...history.children];
+    assert.ok(
+      siblings.indexOf(summary) < siblings.indexOf(material),
+      'Final check/Resolution precedes materials and awards'
+    );
+  }
+  assert.ok(
+    history.querySelectorAll('[data-yield-cut]').length <= 1,
+    'one historical d100 cut at most'
+  );
+  assert.doesNotMatch(history.textContent, /null\s*[·×]|undefined\s*[·×]|PLANNED_ONLY_SENTINEL/);
+}
+
+function proveTerminalWitness(target, capture) {
+  const detail = target.querySelector('[data-journal-detail]');
+  for (const attr of [
+    'data-run-action-bar',
+    'data-stage-nav',
+    'data-run-progress',
+    'data-journal-summary',
+    'data-journal-time-remaining',
+    'data-journal-record',
+  ]) {
+    const intrusion = document.createElement('div');
+    intrusion.setAttribute(attr, '');
+    detail.appendChild(intrusion);
+    assert.equal(detail.querySelectorAll(`[${attr}]`).length, 1, `injected ${attr}`);
+    assert.throws(() => assertCaseWitness(target, capture), `${attr} must red the witness`);
+    intrusion.remove();
+    assertCaseWitness(target, capture);
+  }
+  const summary = detail.querySelector('[data-history-summary]');
+  const duplicate = summary.cloneNode(true);
+  summary.after(duplicate);
+  assert.equal(detail.querySelectorAll('[data-history-summary]').length, 2);
+  assert.throws(
+    () => assertCaseWitness(target, capture),
+    'duplicate Final check must red the witness'
+  );
+  duplicate.remove();
+  const parent = summary.parentNode;
+  parent.appendChild(summary);
+  assert.ok(parent.lastElementChild === summary);
+  assert.throws(
+    () => assertCaseWitness(target, capture),
+    'Final check below materials must red the witness'
+  );
+  parent.prepend(summary);
+  assertCaseWitness(target, capture);
 }
 
 function craftingPreviewFixture(mode, checkMode = 'none') {
@@ -409,14 +547,22 @@ function craftingPreviewFixture(mode, checkMode = 'none') {
   system.components[1].difficulty = 5;
   const authored = recipe('sm-r-horseshoe', 'Yield trial', [FIXED_SET], 3);
   const groups = [
-    { id: 'fine-results', name: 'Fine', checkOutcomeIds: ['fine'], results: [
-      { id: 'iron-result', componentId: 'iron', quantity: 2 },
-      { id: 'copper-result', componentId: 'copper', quantity: 3 },
-    ] },
+    {
+      id: 'fine-results',
+      name: 'Fine',
+      checkOutcomeIds: ['fine'],
+      results: [
+        { id: 'iron-result', componentId: 'iron', quantity: 2 },
+        { id: 'copper-result', componentId: 'copper', quantity: 3 },
+      ],
+    },
   ];
-  if (mode === 'routedByIngredients') groups.push({
-    id: 'other-route', name: 'Other route', results: [{ id: 'other', componentId: 'horseshoe', quantity: 9 }],
-  });
+  if (mode === 'routedByIngredients')
+    groups.push({
+      id: 'other-route',
+      name: 'Other route',
+      results: [{ id: 'other', componentId: 'horseshoe', quantity: 9 }],
+    });
   for (const [index, step] of authored.steps.entries()) {
     step.resultGroups = structuredClone(groups);
     if (index === 2) step.resultGroups[0].results[0].quantity = 7;
@@ -427,7 +573,8 @@ function craftingPreviewFixture(mode, checkMode = 'none') {
       const run = containers.craftingRuns.active['lab-v1-ready-single'];
       run.currentStepIndex = 1;
       run.steps = authored.steps.map((step, index) => ({
-        stepId: step.id, stepName: step.name,
+        stepId: step.id,
+        stepName: step.name,
         status: index === 0 ? 'succeeded' : 'inProgress',
         selectionPlan: { selectedIngredientSetId: 'fixed-set' },
         selectedRequirementSnapshot: { id: 'fixed-set', resultGroupId: 'fine-results' },
@@ -442,7 +589,9 @@ describe('Journal versioned lifecycle (mounted)', () => {
     globalThis.game.i18n.localize = (key) =>
       key.split('.').reduce((value, part) => value?.[part], english) ?? key;
     globalThis.game.i18n.format = (key, data) =>
-      globalThis.game.i18n.localize(key).replace(/\{(\w+)\}/g, (match, name) => data[name] ?? match);
+      globalThis.game.i18n
+        .localize(key)
+        .replace(/\{(\w+)\}/g, (match, name) => data[name] ?? match);
     ({ createJournalStore } = await harness.loadRuneModule(
       'src/ui/svelte/stores/journalStore.svelte.js'
     ));
@@ -457,7 +606,10 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.match(target.querySelector('[data-journal-this-run]').textContent, /Started/);
     await harness.remount();
     const gathering = await mountState('gathering-straight');
-    assert.match(gathering.target.querySelector('.journal-detail-identity').textContent, /straight task/);
+    assert.match(
+      gathering.target.querySelector('.journal-detail-identity').textContent,
+      /straight task/
+    );
     assert.ok(!gathering.target.querySelector('[data-journal-record]'));
   });
 
@@ -473,7 +625,10 @@ describe('Journal versioned lifecycle (mounted)', () => {
       const { target } = await mountState(state);
       const guidance = target.querySelector('[data-journal-guidance]').textContent;
       assert.match(guidance, expected, state);
-      assert.ok(!target.querySelector('[data-journal-guidance] .manager-callout-title'), 'guidance is untitled');
+      assert.ok(
+        !target.querySelector('[data-journal-guidance] .manager-callout-title'),
+        'guidance is untitled'
+      );
       if (state.startsWith('finished-') || state === 'recovery-required') {
         assert.doesNotMatch(guidance, /finish crafting|trigger|use the available action/i, state);
       }
@@ -500,14 +655,26 @@ describe('Journal versioned lifecycle (mounted)', () => {
     await settleAction();
     assert.equal(calls, 0, 'opening the Journal never provisions authority');
     const capture = getCaseById('fabricate-journal-lifecycle-authority-setup');
-    assert.ok(target.querySelector(capture.expectSelector), 'the defining capture selector matches actual rendered product state');
-    assert.match(target.querySelector('[data-journal-authority-setup]').textContent, /Close all other GM tabs/);
-    assert.match(target.querySelector('[data-journal-authority-setup]').textContent, /single GM session/);
+    assert.ok(
+      target.querySelector(capture.expectSelector),
+      'the defining capture selector matches actual rendered product state'
+    );
+    assert.match(
+      target.querySelector('[data-journal-authority-setup]').textContent,
+      /Close all other GM tabs/
+    );
+    assert.match(
+      target.querySelector('[data-journal-authority-setup]').textContent,
+      /single GM session/
+    );
     target.querySelector('[data-journal-authority-setup-action]').click();
     await settleAction();
     assert.equal(calls, 1);
     assert.equal(store.authoritySetupBusy, false);
-    assert.match(target.querySelector('[data-journal-authority-setup-error]').textContent, /could not be completed/i);
+    assert.match(
+      target.querySelector('[data-journal-authority-setup-error]').textContent,
+      /could not be completed/i
+    );
     target.querySelector('[data-journal-authority-setup-action]').click();
     await settleAction();
     assert.equal(calls, 2);
@@ -518,13 +685,18 @@ describe('Journal versioned lifecycle (mounted)', () => {
   });
 
   it('refuses setup for ineligible viewers and duplicate ledgers', async () => {
-    for (const [isActiveGM, reason] of [[false, 'ledger-missing'], [true, 'ledger-ambiguous']]) {
+    for (const [isActiveGM, reason] of [
+      [false, 'ledger-missing'],
+      [true, 'ledger-ambiguous'],
+    ]) {
       let calls = 0;
       const { target, store } = await mountState('authority-unavailable', {
         builderOptions: { authority: { available: false, reason } },
         prepare({ services }) {
           services.isActiveGM = () => isActiveGM;
-          services.setupJournalRunAuthority = async () => { calls += 1; };
+          services.setupJournalRunAuthority = async () => {
+            calls += 1;
+          };
         },
       });
       await settleAction();
@@ -535,15 +707,30 @@ describe('Journal versioned lifecycle (mounted)', () => {
     }
   });
   it('changes the ingredient route through the real store and resets scoped intent and yields', async () => {
-    const first = ingredientSet('route-a', [{ id: 'a', options: [componentOption('iron', 'iron')] }]);
-    const second = ingredientSet('route-b', [{ id: 'b', options: [componentOption('copper', 'copper')] }]);
+    const first = ingredientSet('route-a', [
+      { id: 'a', options: [componentOption('iron', 'iron')] },
+    ]);
+    const second = ingredientSet('route-b', [
+      { id: 'b', options: [componentOption('copper', 'copper')] },
+    ]);
     first.resultGroupId = 'a-results';
     second.resultGroupId = 'b-results';
-    const mounted = await mountState('ready-single', selectionFixture([first, second], {
-      selectedIngredientSetId: first.id,
-      ingredientOptionOverrides: { a: { optionIndex: 0, heldItemId: 'Item.iron-a' } },
-      ingredientEssenceAllocation: { stepId: 'old', ingredientSetId: first.id, allocation: { old: 2 } },
-    }, { mode: 'routedByIngredients' }));
+    const mounted = await mountState(
+      'ready-single',
+      selectionFixture(
+        [first, second],
+        {
+          selectedIngredientSetId: first.id,
+          ingredientOptionOverrides: { a: { optionIndex: 0, heldItemId: 'Item.iron-a' } },
+          ingredientEssenceAllocation: {
+            stepId: 'old',
+            ingredientSetId: first.id,
+            allocation: { old: 2 },
+          },
+        },
+        { mode: 'routedByIngredients' }
+      )
+    );
     assert.ok(mounted.target.querySelector('[data-slot-id="a"]'));
     assert.match(mounted.target.querySelector('[data-stage-io="produced"]').textContent, /Iron/);
     await chooseSelectOption(mounted.target, '[data-journal-route]', second.id);
@@ -551,15 +738,25 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.ok(mounted.target.querySelector('[data-slot-id="b"]'));
     assert.ok(!mounted.target.querySelector('[data-slot-id="a"]'));
     assert.match(mounted.target.querySelector('[data-stage-io="produced"]').textContent, /Copper/);
-    const saved = mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan;
+    const saved =
+      mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan;
     assert.deepEqual(saved.ingredientOptionOverrides, {});
     assert.deepEqual(saved.ingredientEssenceAllocation.allocation, {});
     assert.equal(saved.ingredientEssenceAllocation.ingredientSetId, second.id);
   });
 
   it('requires explicit repair when a removed ingredient route leaves only one route', async () => {
-    const remaining = ingredientSet('remaining', [{ id: 'metal', options: [componentOption('iron', 'iron')] }]);
-    const mounted = await mountState('ready-single', selectionFixture([remaining], { selectedIngredientSetId: 'removed' }, { mode: 'routedByIngredients' }));
+    const remaining = ingredientSet('remaining', [
+      { id: 'metal', options: [componentOption('iron', 'iron')] },
+    ]);
+    const mounted = await mountState(
+      'ready-single',
+      selectionFixture(
+        [remaining],
+        { selectedIngredientSetId: 'removed' },
+        { mode: 'routedByIngredients' }
+      )
+    );
     assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, false);
     assert.equal(mounted.store.selectedRun.craftingYield, null);
     assert.ok(!mounted.target.querySelector('[data-slot-id="metal"]'));
@@ -573,11 +770,16 @@ describe('Journal versioned lifecycle (mounted)', () => {
       { id: 'metal', options: [componentOption('iron', 'iron')] },
       { id: 'other', options: [componentOption('copper', 'copper')] },
     ]);
-    const mounted = await mountState('ready-single', selectionFixture([remaining], {
-      selectedIngredientSetId: remaining.id, ingredientOptionOverrides: {
-        metal: { optionIndex: 1 }, other: { optionIndex: 1 },
-      },
-    }));
+    const mounted = await mountState(
+      'ready-single',
+      selectionFixture([remaining], {
+        selectedIngredientSetId: remaining.id,
+        ingredientOptionOverrides: {
+          metal: { optionIndex: 1 },
+          other: { optionIndex: 1 },
+        },
+      })
+    );
     assert.match(mounted.target.textContent, /no longer available/i);
     for (const groupId of ['metal', 'other']) {
       assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, false);
@@ -587,7 +789,9 @@ describe('Journal versioned lifecycle (mounted)', () => {
       assert.equal(candidate.disabled, false);
       candidate.click();
       await settleAction();
-      const overrides = mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan.ingredientOptionOverrides;
+      const overrides =
+        mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan
+          .ingredientOptionOverrides;
       assert.equal(overrides[groupId].optionIndex, 0);
       if (groupId === 'metal') {
         assert.deepEqual(overrides.other, { optionIndex: 1 });
@@ -600,12 +804,19 @@ describe('Journal versioned lifecycle (mounted)', () => {
 
   it('states each option quantity and disables candidates that conflict with shared fixed stock', async () => {
     const set = ingredientSet('mixed', [
-      { id: 'choice', options: [componentOption('large', 'iron', 3), componentOption('small', 'copper', 1)] },
+      {
+        id: 'choice',
+        options: [componentOption('large', 'iron', 3), componentOption('small', 'copper', 1)],
+      },
       { id: 'fixed', options: [componentOption('reserved', 'iron', 1)] },
     ]);
-    const mounted = await mountState('ready-single', selectionFixture([set], {
-      selectedIngredientSetId: set.id, ingredientOptionOverrides: { choice: { optionIndex: 0 } },
-    }));
+    const mounted = await mountState(
+      'ready-single',
+      selectionFixture([set], {
+        selectedIngredientSetId: set.id,
+        ingredientOptionOverrides: { choice: { optionIndex: 0 } },
+      })
+    );
     mounted.target.querySelector('[data-slot-id="choice"] button').click();
     await settleAction();
     const options = [...mounted.target.querySelectorAll('[data-choice-id]')];
@@ -630,23 +841,32 @@ describe('Journal versioned lifecycle (mounted)', () => {
 
   it('tests a held candidate against the same stock reserved for the essence allocation', async () => {
     const set = ingredientSet('shared', [
-      { id: 'choice', options: [componentOption('iron', 'iron', 3), componentOption('copper', 'copper', 1)] },
+      {
+        id: 'choice',
+        options: [componentOption('iron', 'iron', 3), componentOption('copper', 'copper', 1)],
+      },
       { id: 'fire', options: [{ match: { type: 'essence', essenceId: 'fire', amount: 2 } }] },
     ]);
     const fixture = selectionFixture([set], {
       selectedIngredientSetId: set.id,
       ingredientOptionOverrides: { choice: { optionIndex: 1 } },
       ingredientEssenceAllocation: {
-        stepId: 'sm-r-horseshoe-step-1', ingredientSetId: set.id, allocation: { 'Item.iron-a': 1 },
+        stepId: 'sm-r-horseshoe-step-1',
+        ingredientSetId: set.id,
+        allocation: { 'Item.iron-a': 1 },
       },
     });
-    fixture.builderOptions.resolveItemEssences = ({ item }) => item.componentId === 'iron' ? { fire: 2 } : {};
+    fixture.builderOptions.resolveItemEssences = ({ item }) =>
+      item.componentId === 'iron' ? { fire: 2 } : {};
     const mounted = await mountState('ready-single', fixture);
     mounted.target.querySelector('[data-slot-id="choice"] button').click();
     await settleAction();
     const options = [...mounted.target.querySelectorAll('[data-choice-id]')];
     assert.equal(options.find((entry) => entry.textContent.includes('iron stock')).disabled, true);
-    assert.equal(options.find((entry) => entry.textContent.includes('copper stock')).disabled, false);
+    assert.equal(
+      options.find((entry) => entry.textContent.includes('copper stock')).disabled,
+      false
+    );
     assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, true);
   });
 
@@ -656,11 +876,21 @@ describe('Journal versioned lifecycle (mounted)', () => {
         builderOptions: { visible },
         prepare({ containers }) {
           containers.craftingRuns.active['lab-v1-recovery-required'].executionJournal = {
-            status: 'recoveryRequired', effects: [
-              { kind: 'consumeIngredients', phase: 'applied', receipt: {
-                items: [{ name: 'Recorded iron', quantity: 2 }], private: 'PRIVATE_CANARY',
-              } },
-              { kind: 'awardResults', phase: 'applying', receipt: { results: [{ name: 'UNCERTAIN_CANARY', quantity: 1 }] } },
+            status: 'recoveryRequired',
+            effects: [
+              {
+                kind: 'consumeIngredients',
+                phase: 'applied',
+                receipt: {
+                  items: [{ name: 'Recorded iron', quantity: 2 }],
+                  private: 'PRIVATE_CANARY',
+                },
+              },
+              {
+                kind: 'awardResults',
+                phase: 'applying',
+                receipt: { results: [{ name: 'UNCERTAIN_CANARY', quantity: 1 }] },
+              },
               { kind: 'postCraftChat', phase: 'planned' },
             ],
           };
@@ -677,37 +907,145 @@ describe('Journal versioned lifecycle (mounted)', () => {
 
   it('does not mark the unexecuted tail of a cancelled run completed', async () => {
     const mounted = await mountState('finished-cancelled');
-    assert.ok(!mounted.target.querySelector('[data-stage-state="unexecuted"]'), 'unattempted stages do not enter the account');
+    assert.ok(
+      !mounted.target.querySelector('[data-stage-state="unexecuted"]'),
+      'unattempted stages do not enter the account'
+    );
     assert.ok(!mounted.target.querySelector('[data-stage-card] .is-complete'));
     const tracks = [...mounted.target.querySelectorAll('[data-stage-progress-state]')];
     assert.equal(tracks.length, 0, 'terminal history has no active progress');
   });
 
-  it('matches terminal and past-stage capture assertions against the emitted application DOM', async () => {
-    const previousFoundry = globalThis.foundry;
-    let fixtureId = 0;
-    let recipes;
-    try {
-      globalThis.foundry = { utils: { randomID: () => `receipt-fixture-${++fixtureId}` } };
-      recipes = buildLabContent().recipes.map((entry) => new Recipe(entry));
-    } finally {
-      globalThis.foundry = previousFoundry;
-    }
-    for (const state of ['past-stage', 'finished-success', 'finished-failure', 'finished-cancelled', 'automatic-completion', 'salvage']) {
-      const capture = getCaseById(`fabricate-journal-lifecycle-${state}`);
-      const mounted = await mountState(capture.query.journalCaseState, { builderOptions: { recipes } });
-      for (const action of capture.steps ?? []) {
-        if (state !== 'past-stage' && action.selector.includes('data-stage-nav')) continue;
-        const control = mounted.target.querySelector(action.selector);
-        assert.ok(control, `${state} emits ${action.selector}`);
-        control.click();
+  for (const capture of VIEW_LAB_CASES.filter((entry) =>
+    entry.id.startsWith('fabricate-journal-lifecycle-')
+  )) {
+    const suffix = capture.id.replace('fabricate-journal-lifecycle-', '');
+    it(`TP5 ${suffix}: operates its case walk against populated authoring/receipt data`, async () => {
+      const state = capture.query.journalCaseState;
+      const content = buildLabContent({ journalCaseState: state });
+      const actor = buildLabActors(content)[0];
+      await stockJournalPrototype(actor, content);
+      const recipes = labRecipes(content);
+      const delayed = ['loading', 'error-retry'].includes(state);
+      const authority = ['authority-unavailable', 'authority-setup'].includes(state)
+        ? {
+            available: false,
+            reason: state === 'authority-setup' ? 'ledger-missing' : 'active-gm-missing',
+          }
+        : { available: true, reason: null };
+      const mounted = await mountState(state, {
+        initialLoad: !delayed,
+        builderOptions: {
+          content,
+          actor,
+          recipes,
+          authority,
+          visible: state !== 'history-redacted',
+          viewer: { id: 'user-lab-player', isGM: capture.query.viewer === 'gm' },
+        },
+        prepare({ services }) {
+          if (state === 'loading') services.listJournalForActor = () => new Promise(() => {});
+          if (state === 'error-retry')
+            services.listJournalForActor = async () => {
+              throw new Error('fixture load failure');
+            };
+          if (state === 'no-actor-empty') {
+            services.getSelectedActorId = () => null;
+            services.listJournalForActor = async () => ({
+              selectedActorId: null,
+              selectedActorUuid: null,
+              activeRuns: [],
+              history: [],
+            });
+          }
+          if (state === 'authority-setup') {
+            services.isActiveGM = () => true;
+            services.setupJournalRunAuthority = async () => ({ success: true });
+          }
+        },
+      });
+      await settleAction();
+      // A selected-run fixture seam chooses the initial off-page detail. Exercise
+      // the actual row as well: search, select, then clear restores both full panes.
+      const selected = mounted.store.selectedRun;
+      if (
+        selected &&
+        !delayed &&
+        state !== 'no-actor-empty' &&
+        !['active-page-two', 'finished-page-two'].includes(state)
+      ) {
+        const search = mounted.target.querySelector('[data-journal-search] input');
+        search.value = selected.names.title;
+        search.dispatchEvent(new window.Event('input', { bubbles: true }));
+        await settleAction();
+        const row = mounted.target.querySelector(
+          `[data-run-id="${selected.id}"], [data-history-run-id="${selected.id}"]`
+        );
+        assert.ok(row, `${suffix} selected account is reachable through search`);
+        row.click();
+        search.value = '';
+        search.dispatchEvent(new window.Event('input', { bubbles: true }));
         await settleAction();
       }
-      const witness = state === 'past-stage' ? '[data-stage-state="past"] [data-stage-io="consumed"]' : '[data-journal-history-detail]';
-      assert.ok(mounted.target.querySelector(witness), `${state} emits the corrected evidence target; TP5 updates its capture selector`);
-      harness.remount();
-    }
-  });
+      for (const action of capture.steps) {
+        const control =
+          mounted.target.querySelector(action.selector) ?? document.querySelector(action.selector);
+        assert.ok(control, `${suffix} emits ${action.selector}`);
+        assert.ok(!control.disabled, `${suffix} can operate ${action.selector}`);
+        if (Object.hasOwn(action, 'fill')) {
+          control.value = action.fill;
+          control.dispatchEvent(new window.Event('input', { bubbles: true }));
+        } else control.click();
+        await settleAction();
+        if (state === 'command-timeout') {
+          await new Promise((resolve) => setTimeout(resolve, 35));
+          flushSync();
+        }
+      }
+      assertCaseWitness(mounted.target, capture);
+      if (suffix === 'history-checked-choice') proveTerminalWitness(mounted.target, capture);
+      if (state === 'history-redacted')
+        assert.doesNotMatch(
+          mounted.target.querySelector('[data-journal-detail]').textContent,
+          /Copper Ingot|jp-deleted-recipe/
+        );
+      if (state === 'history-missing-material')
+        assert.match(
+          mounted.target.querySelector('[data-history-items="consumed"]').textContent,
+          /Unknown material.*Not recorded/i
+        );
+      if (state === 'automatic-blocker') {
+        const run = mounted.containers.craftingRuns.active[selected.id];
+        assert.equal(run.completionMode, 'worldTime');
+        assert.deepEqual(run.steps[run.currentStepIndex].consumedIngredients, []);
+        assert.deepEqual(run.steps[run.currentStepIndex].createdResults, []);
+      }
+      if (
+        suffix.includes('d100') &&
+        (suffix.includes('finished') || suffix.startsWith('history-'))
+      ) {
+        assert.equal(
+          mounted.target.querySelectorAll('[data-yield-cut]').length,
+          1,
+          'one recorded roll owns exactly one cut'
+        );
+        const entries = mounted.store.selectedRun.gatheringYield.entries;
+        assert.ok(
+          entries.every((entry) => typeof entry.cleared === 'boolean' && entry.qty != null)
+        );
+        if (suffix.endsWith('all-hit'))
+          assert.ok(entries.every((entry) => entry.cleared && entry.qty > 0));
+        if (suffix.endsWith('all-miss'))
+          assert.ok(entries.every((entry) => !entry.cleared && entry.qty === 0));
+      }
+      if (state === 'history-just-resolved') {
+        mounted.target.querySelector(`[data-history-run-id="${selected.id}"]`).click();
+        await settleAction();
+        assert.ok(!mounted.target.querySelector('[data-journal-verdict]'));
+        assert.ok(mounted.target.querySelector('[data-history-summary="none"]'));
+      }
+    });
+  }
 
   it('pins every committed View Lab state to a persisted run identity', () => {
     assert.equal(LAB_JOURNAL_CASE_STATE_RUN_IDS['ready-single'], 'lab-v1-ready-single');
@@ -716,19 +1054,25 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(typeof buildLabRunStates, 'function');
     for (const [state, runId] of Object.entries(LAB_JOURNAL_CASE_STATE_RUN_IDS)) {
       if (!runId || ['legacy', 'redacted-owner'].includes(state)) continue;
+      const fixtureContent = Object.hasOwn(JOURNAL_PROTOTYPE_BINDINGS, state)
+        ? buildLabContent({ journalCaseState: state })
+        : null;
       const containers = buildLabRunStates({
         actor: ACTOR,
         userId: 'user-1',
-        recipes: RECIPES,
-        environments: ENVIRONMENTS,
-        tasks: TASKS,
+        recipes: fixtureContent ? labRecipes(fixtureContent) : RECIPES,
+        environments: fixtureContent?.environments ?? ENVIRONMENTS,
+        tasks: fixtureContent?.gatheringConfig.tasks ?? TASKS,
         journalCaseState: state,
       });
       const runs = Object.values(containers).flatMap((container) => [
         ...Object.values(container.active),
         ...container.history,
       ]);
-      assert.ok(runs.some((run) => run.id === runId), `${state} resolves ${runId}`);
+      assert.ok(
+        runs.some((run) => run.id === runId),
+        `${state} resolves ${runId}`
+      );
     }
 
     const automatic = buildLabRunStates({
@@ -771,14 +1115,21 @@ describe('Journal versioned lifecycle (mounted)', () => {
 
   it('renders stage-owned current and future previews while past stages keep actual awards', async () => {
     for (const [mode, checkMode, presentation] of [
-      ['simple', 'none', 'entries'], ['simple', 'simple', 'entries'],
-      ['routedByIngredients', 'none', 'entries'], ['routedByCheck', 'none', 'tiers'],
-      ['progressive', 'none', 'progressive'], ['alchemy', 'none', 'entries'],
+      ['simple', 'none', 'entries'],
+      ['simple', 'simple', 'entries'],
+      ['routedByIngredients', 'none', 'entries'],
+      ['routedByCheck', 'none', 'tiers'],
+      ['progressive', 'none', 'progressive'],
+      ['alchemy', 'none', 'entries'],
       ['alchemy', 'tiered', 'tiers'],
     ]) {
       const mounted = await mountState('ready-single', craftingPreviewFixture(mode, checkMode));
       assert.equal(mounted.store.selectedRun.craftingYield.presentation, presentation);
-      const preview = mounted.target.querySelector(presentation === 'entries' ? '[data-stage-state="current"] [data-stage-io="produced"]' : '[data-journal-crafting-yield]');
+      const preview = mounted.target.querySelector(
+        presentation === 'entries'
+          ? '[data-stage-state="current"] [data-stage-io="produced"]'
+          : '[data-journal-crafting-yield]'
+      );
       assert.ok(preview, `${mode}/${checkMode} has a visible preview`);
       assert.match(preview.textContent, /Iron/);
       assert.doesNotMatch(preview.textContent, /Received|Awarded|100%|Horseshoe/);
@@ -799,21 +1150,39 @@ describe('Journal versioned lifecycle (mounted)', () => {
         mounted.target.querySelector(`[data-stage-nav-index="${index}"]`).click();
         flushSync();
         if (index === 0) {
-          assert.ok(!mounted.target.querySelector('[data-journal-crafting-yield]'), 'past uses only actual awards');
+          assert.ok(
+            !mounted.target.querySelector('[data-journal-crafting-yield]'),
+            'past uses only actual awards'
+          );
         } else {
           const future = mounted.target.querySelector('[data-stage-state="future"]');
           assert.ok(!future.querySelector('button, input, select'));
-          const futurePreview = future.querySelector(presentation === 'entries' && mode !== 'routedByIngredients' ? '[data-stage-io="produced"]' : '[data-journal-crafting-yield]');
+          const futurePreview = future.querySelector(
+            presentation === 'entries' && mode !== 'routedByIngredients'
+              ? '[data-stage-io="produced"]'
+              : '[data-journal-crafting-yield]'
+          );
           assert.ok(futurePreview, `${mode} future stage has its own preview`);
           assert.match(futurePreview.textContent, /Iron/);
-          if (presentation !== 'progressive') assert.match(futurePreview.textContent, /7/, 'future authored output differs from current output');
-          assert.ok(!mounted.target.querySelector('[data-journal-summary], [data-journal-time-remaining]'));
+          if (presentation !== 'progressive')
+            assert.match(
+              futurePreview.textContent,
+              /7/,
+              'future authored output differs from current output'
+            );
+          assert.ok(
+            !mounted.target.querySelector('[data-journal-summary], [data-journal-time-remaining]')
+          );
           assert.equal(mounted.store.selectedRun.steps[2].yieldPreview.stageIndex, 2);
         }
       }
       mounted.target.querySelector('[data-stage-nav-return]').click();
       flushSync();
-      assert.ok(mounted.target.querySelector('[data-stage-state="current"] [data-stage-io="produced"], [data-stage-state="current"] [data-journal-crafting-yield]'));
+      assert.ok(
+        mounted.target.querySelector(
+          '[data-stage-state="current"] [data-stage-io="produced"], [data-stage-state="current"] [data-journal-crafting-yield]'
+        )
+      );
       harness.remount();
     }
   });
@@ -849,26 +1218,41 @@ describe('Journal versioned lifecycle (mounted)', () => {
     harness.remount();
 
     const hidden = await mountState('ready-single', {
-      ...fixture, builderOptions: { ...fixture.builderOptions, visible: false },
+      ...fixture,
+      builderOptions: { ...fixture.builderOptions, visible: false },
     });
     assert.equal(hidden.store.selectedRun.redacted, true);
-    assert.ok(!hidden.target.querySelector('[data-journal-crafting-yield], [data-yield-scale], [data-outcome-ladder]'));
+    assert.ok(
+      !hidden.target.querySelector(
+        '[data-journal-crafting-yield], [data-yield-scale], [data-outcome-ladder]'
+      )
+    );
     assert.doesNotMatch(hidden.target.textContent, /Yield trial|Iron|Copper/);
   });
 
   it('uses actual authority refusal reasons even while a time gate is pending', async () => {
     for (const [reason, key] of [
-      ['ledger-missing', 'LedgerMissing'], ['ledger-ambiguous', 'LedgerAmbiguous'],
-      ['active-gm-missing', 'AuthorityUnavailable'], ['active-gm-required', 'ActiveGmRequired'],
-      ['recovery-required', 'RecoveryRequired'], ['claim-held', 'ClaimHeld'],
-      ['claim-release-failed', 'ClaimReleaseFailed'], ['secure-random-unavailable', 'SecureRandomUnavailable'],
+      ['ledger-missing', 'LedgerMissing'],
+      ['ledger-ambiguous', 'LedgerAmbiguous'],
+      ['active-gm-missing', 'AuthorityUnavailable'],
+      ['active-gm-required', 'ActiveGmRequired'],
+      ['recovery-required', 'RecoveryRequired'],
+      ['claim-held', 'ClaimHeld'],
+      ['claim-release-failed', 'ClaimReleaseFailed'],
+      ['secure-random-unavailable', 'SecureRandomUnavailable'],
     ]) {
       const mounted = await mountState('waiting-auto-eligible', {
         builderOptions: { authority: { available: false, reason } },
       });
       assert.equal(mounted.store.selectedRun.actions.disabledReason, reason);
-      assert.equal(mounted.target.querySelector('[data-run-action="primary"]').title, english.FABRICATE.App.Journal.Actions[key]);
-      assert.doesNotMatch(mounted.target.querySelector('[data-journal-actions]').textContent, /must own/);
+      assert.equal(
+        mounted.target.querySelector('[data-run-action="primary"]').title,
+        english.FABRICATE.App.Journal.Actions[key]
+      );
+      assert.doesNotMatch(
+        mounted.target.querySelector('[data-journal-actions]').textContent,
+        /must own/
+      );
       harness.remount();
     }
   });
@@ -877,18 +1261,24 @@ describe('Journal versioned lifecycle (mounted)', () => {
     const mounted = await mountState('ready-single', {
       prepare({ containers }) {
         containers.craftingRuns.active['lab-v1-ready-single'].executionJournal = {
-          status: 'planned', effects: [],
+          status: 'planned',
+          effects: [],
         };
       },
     });
     assert.equal(mounted.store.selectedRun.actions.disabledReason, 'executionInProgress');
-    assert.equal(mounted.target.querySelector('[data-run-action="primary"]').title, english.FABRICATE.App.Journal.Actions.ExecutionInProgress);
+    assert.equal(
+      mounted.target.querySelector('[data-run-action="primary"]').title,
+      english.FABRICATE.App.Journal.Actions.ExecutionInProgress
+    );
   });
 
   it('persists completion preference and completion through a rebuild of raw records', async () => {
     const { target, store, containers, advanceWorldTime } =
       await mountState('waiting-auto-eligible');
-    const manual = target.querySelector(':scope [data-run-completion-switch] input[value="manual"]');
+    const manual = target.querySelector(
+      ':scope [data-run-completion-switch] input[value="manual"]'
+    );
     assert.ok(manual, 'completion preference is actionable');
     manual.click();
     await new Promise((resolve) => setImmediate(resolve));
@@ -932,19 +1322,29 @@ describe('Journal versioned lifecycle (mounted)', () => {
   it('marks the effective initial selection and the fallback after its actual removal', async () => {
     const mounted = await mountState('filter-paused');
     const selectedId = mounted.store.selectedRun.id;
-    assert.equal(mounted.target.querySelector(`[data-run-id="${selectedId}"]`).getAttribute('aria-pressed'), 'true');
+    assert.equal(
+      mounted.target.querySelector(`[data-run-id="${selectedId}"]`).getAttribute('aria-pressed'),
+      'true'
+    );
     mounted.store.select(mounted.store.selectedRun);
     delete mounted.containers.craftingRuns.active[selectedId];
     await mounted.store.load(true);
     flushSync();
     assert.notEqual(mounted.store.selectedRun.id, selectedId);
-    assert.equal(mounted.target.querySelector(`[data-run-id="${mounted.store.selectedRun.id}"]`).getAttribute('aria-pressed'), 'true');
+    assert.equal(
+      mounted.target
+        .querySelector(`[data-run-id="${mounted.store.selectedRun.id}"]`)
+        .getAttribute('aria-pressed'),
+      'true'
+    );
   });
 
   it('keeps a missing selected held item unfilled until an explicit replacement is chosen', async () => {
     const mounted = await mountState('waiting-open-choice', {
       prepare({ containers }) {
-        containers.craftingRuns.active['lab-v1-waiting-open-choice'].steps[0].selectionPlan.ingredientOptionOverrides = {
+        containers.craftingRuns.active[
+          'lab-v1-waiting-open-choice'
+        ].steps[0].selectionPlan.ingredientOptionOverrides = {
           metal: { optionIndex: 0, heldItemId: 'Item.removed-stock' },
         };
       },
@@ -955,16 +1355,23 @@ describe('Journal versioned lifecycle (mounted)', () => {
     slot.querySelector('button').click();
     flushSync();
     assert.ok(!mounted.target.querySelector('[data-choice-id][aria-pressed="true"]'));
-    const iron = [...mounted.target.querySelectorAll('[data-choice-id]')].find((entry) => entry.textContent.includes('iron stock'));
+    const iron = [...mounted.target.querySelectorAll('[data-choice-id]')].find((entry) =>
+      entry.textContent.includes('iron stock')
+    );
     iron.click();
     await settleAction();
     assert.match(mounted.target.querySelector('[data-slot-id="metal"]').textContent, /iron stock/);
-    assert.equal(mounted.commands.at(-1).payload.selectionPlan.ingredientOptionOverrides.metal.heldItemId, 'Item.iron-a');
+    assert.equal(
+      mounted.commands.at(-1).payload.selectionPlan.ingredientOptionOverrides.metal.heldItemId,
+      'Item.iron-a'
+    );
   });
 
   it('disables choices and essence while a selection command is pending and discards refused optimism', async () => {
     for (const [state, accepted] of [
-      ['waiting-open-choice', true], ['essence-shared', true], ['essence-shared', false],
+      ['waiting-open-choice', true],
+      ['essence-shared', true],
+      ['essence-shared', false],
     ]) {
       let finish;
       let submitted;
@@ -975,7 +1382,9 @@ describe('Journal versioned lifecycle (mounted)', () => {
           services.executeJournalRunCommand = (command) => {
             submitted = command;
             submissions += 1;
-            return new Promise((resolve) => { finish = resolve; }).then(() =>
+            return new Promise((resolve) => {
+              finish = resolve;
+            }).then(() =>
               accepted ? execute(command) : { success: false, message: 'selection refused' }
             );
           };
@@ -991,9 +1400,14 @@ describe('Journal versioned lifecycle (mounted)', () => {
       control.click();
       flushSync();
       assert.ok(mounted.store.busyRunKey);
-      const controls = mounted.target.querySelectorAll('[data-journal-stage-details] button, [data-journal-stage-details] input');
+      const controls = mounted.target.querySelectorAll(
+        '[data-journal-stage-details] button, [data-journal-stage-details] input'
+      );
       assert.ok(controls.length > 0);
-      assert.ok([...controls].every((control) => control.disabled), 'all visible material controls are disabled');
+      assert.ok(
+        [...controls].every((control) => control.disabled),
+        'all visible material controls are disabled'
+      );
       for (const control of controls) control.click();
       assert.equal(submitted.action, 'setSelection');
       assert.equal(submissions, 1, 'rapid input submits exactly one plan');
@@ -1008,8 +1422,14 @@ describe('Journal versioned lifecycle (mounted)', () => {
         );
       }
       if (state === 'essence-shared') {
-        assert.match(mounted.target.querySelector('[data-essence-total="earth"]').textContent, accepted ? /6 \/ 6/ : /0 \/ 6/);
-        assert.equal(mounted.target.querySelector('[data-essence-source] input').value, accepted ? '1' : '0');
+        assert.match(
+          mounted.target.querySelector('[data-essence-total="earth"]').textContent,
+          accepted ? /6 \/ 6/ : /0 \/ 6/
+        );
+        assert.equal(
+          mounted.target.querySelector('[data-essence-source] input').value,
+          accepted ? '1' : '0'
+        );
       }
       harness.remount();
     }
@@ -1114,7 +1534,10 @@ describe('Journal versioned lifecycle (mounted)', () => {
     flushSync();
     assert.equal(filtered.target.querySelectorAll('[data-run-id]').length, 0);
     assert.equal(filtered.store.selectedRun.key, retainedKey);
-    assert.equal(filtered.target.querySelector('[data-journal-detail]').dataset.runKey, retainedKey);
+    assert.equal(
+      filtered.target.querySelector('[data-journal-detail]').dataset.runKey,
+      retainedKey
+    );
 
     harness.remount();
     const salvage = await mountState('salvage');
@@ -1135,7 +1558,10 @@ describe('Journal versioned lifecycle (mounted)', () => {
       run.steps[0].selectionPlan.ingredientEssenceAllocation.allocation['Item.iron-a'],
       1
     );
-    assert.match(essence.target.querySelector('[data-essence-total="earth"]').textContent, /6 \/ 6/);
+    assert.match(
+      essence.target.querySelector('[data-essence-total="earth"]').textContent,
+      /6 \/ 6/
+    );
     assert.match(essence.target.querySelector('[data-essence-total="fire"]').textContent, /3 \/ 3/);
   });
 
@@ -1157,15 +1583,27 @@ describe('Journal versioned lifecycle (mounted)', () => {
       await settleAction();
       assert.ok(!mounted.containers.gatheringRuns.active[runId]);
       assert.ok(mounted.target.querySelector(`[data-history-run-id="${runId}"]`));
-      assert.deepEqual(mounted.store.selectedRun.createdResults, [], 'the fixture command writes no applied award receipt');
+      assert.equal(
+        mounted.store.selectedRun.createdResults.length,
+        1,
+        'the fixture command records its applied award receipt'
+      );
       if (mode === 'straight') assert.equal(mounted.store.selectedRun.gatheringYield.roll, null);
       if (mode === 'd100') {
-        assert.equal(mounted.store.selectedRun.gatheringYield.roll, 25);
-        assert.equal(mounted.target.querySelectorAll('[data-yield-cut]').length, 0, 'legacy fixture has no evaluated rows; live authored rows cannot invent a historical cut');
+        assert.equal(mounted.store.selectedRun.gatheringYield.roll, 75);
+        assert.equal(
+          mounted.target.querySelectorAll('[data-yield-cut]').length,
+          1,
+          'recorded high-roll evidence owns one historical cut'
+        );
       }
       if (mode === 'routed') {
-        assert.equal(mounted.store.selectedRun.gatheringYield.tiers.length, 0, 'history never projects live outcome bands');
-        assert.ok(!mounted.target.querySelector('[data-history-items="produced"]'));
+        assert.equal(
+          mounted.store.selectedRun.gatheringYield.tiers.length,
+          0,
+          'history never projects live outcome bands'
+        );
+        assert.ok(mounted.target.querySelector('[data-history-items="transient-produced"]'));
       }
       harness.remount();
     }

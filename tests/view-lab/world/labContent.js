@@ -24,6 +24,8 @@
  * a placeholder would also collapse the intrinsic dimensions of anything sized by its image.
  */
 
+import { seedJournalPrototype } from './labJournalPrototype.js';
+
 /** Foundry serves `public/` at the web root; the lab mounts the harvested cache here. */
 export const ICON_BASE = '/@foundry-chrome/icons';
 
@@ -4027,7 +4029,7 @@ export function buildLabContent({ journalCaseState = null } = {}) {
     },
   };
 
-  return {
+  const content = {
     systems,
     recipes: [
       ...SMITHING_RECIPES,
@@ -4402,6 +4404,7 @@ export function buildLabContent({ journalCaseState = null } = {}) {
     // unresolved — the same "looks unpopulated" failure the component index exists to prevent.
     recipeItems: [...HERBALISM_RECIPE_ITEMS],
   };
+  return seedJournalPrototype(content, journalCaseState, { component, recipe });
 }
 
 /**

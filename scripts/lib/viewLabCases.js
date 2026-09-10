@@ -31,7 +31,7 @@ const MANAGER = 'fabricate-crafting-system-manager';
 // Only the recomposed Journal's reachable render surfaces claim its frames.
 // Retained legacy components outside the window's import closure cannot supply evidence.
 const JOURNAL_SOURCES =
-  /^src\/ui\/svelte\/apps\/journal\/(?:(?:ActionsPanel|ActiveRunsList|HistoryList|HistoryRow|JournalFactRow|JournalListShell|JournalView|RunCard|RunDetail|StepDetails|TimeRemainingBox)\.svelte|journalRunStatus\.js)$/;
+  /^src\/ui\/svelte\/apps\/journal\/(?:(?:ActionsPanel|ActiveRunsList|HistoricalRunDetail|HistoryList|HistoryRow|JournalFactRow|JournalListShell|JournalView|RunCard|RunDetail|StepDetails|ThisRun|TimeRemainingBox)\.svelte|(?:journalRunStatus|historyPresentation)\.js)$/;
 
 /**
  * The three GM canvas windows (issue 1520).
@@ -1491,18 +1491,68 @@ function journalLifecycleCases() {
     'recovery-required',
     'wide',
     'narrow',
+    'history-checked-choice',
+    'history-resolution-ingredients',
+    'history-resolution-simple',
+    'history-checked-ingredients',
+    'history-legacy-no-check-failure',
+    'history-multi-essence',
+    'history-multi-shared-essence',
+    'history-multi-success',
+    'history-multi-failure',
+    'history-cancelled-before',
+    'history-cancelled-multi',
+    'history-d100-all-hit',
+    'history-d100-all-miss',
+    'history-gathering-check-failure',
+    'history-just-resolved',
+    'history-redacted',
+    'history-missing-material',
+    'history-gm-deleted-recipe',
+    'history-failure-awards',
+    'current-choice-closed',
+    'essence-overshoot',
+    'past-routed-stage',
+    'future-routed-stage',
+    'kind-menu-open',
+    'history-settling',
   ];
   const steps = {
+    paused: [
+      { selector: '[data-run-action="pause"]' },
+      { selector: '[data-slot-row] button.fab-slot-tile' },
+    ],
     'waiting-open-choice': [{ selector: '[data-slot-row] button.fab-slot-tile' }],
+    'check-route': [
+      { selector: '[data-slot-row] button.fab-slot-tile' },
+      { selector: '[data-choice-id]:not(:disabled)' },
+    ],
+    'material-shortage': [
+      { selector: '[data-journal-route]' },
+      { selector: '[data-popover-option="boss-stage-1-verdant"]' },
+      { selector: '[data-journal-route]' },
+      { selector: '[data-popover-option="boss-stage-1-sunward"]' },
+    ],
+    'automatic-blocker': [{ selector: '[data-run-action="primary"]' }],
     'cancel-confirmation': [{ selector: '[data-run-action="cancel-arm"]' }],
     'past-stage': [{ selector: '[data-stage-nav-index="0"]' }],
     'future-stage': [{ selector: '[data-stage-nav-index="2"]' }],
-    'finished-cancelled': [{ selector: '[data-stage-nav-index="0"]' }],
+    'finished-cancelled': [
+      { selector: '[data-run-action="cancel-arm"]' },
+      { selector: '[data-run-action="cancel-confirm"]' },
+      { selector: '[data-history-run-id="lab-v1-finished-cancelled"]' },
+    ],
     'active-page-two': [{ selector: '[data-journal-list="active"] [data-pagination-next]' }],
     'finished-page-two': [{ selector: '[data-journal-list="finished"] [data-pagination-next]' }],
-    'gathering-straight-finished': [{ selector: '[data-run-action="primary"]' }],
-    'gathering-d100-finished': [{ selector: '[data-run-action="primary"]' }],
-    'gathering-check-finished': [{ selector: '[data-run-action="primary"]' }],
+    ...Object.fromEntries(
+      ['straight', 'd100', 'check'].map((mode) => [
+        `gathering-${mode}-finished`,
+        [
+          { selector: '[data-run-action="primary"]' },
+          { selector: `[data-history-run-id="lab-v1-gathering-${mode}"]` },
+        ],
+      ])
+    ),
     'filter-paused': [
       { selector: '[data-journal-status-filter] label:has(input[value="paused"])' },
     ],
@@ -1519,21 +1569,64 @@ function journalLifecycleCases() {
       { selector: '[data-journal-kind-filter]' },
       { selector: '[data-popover-option="salvage"]' },
     ],
+    'past-routed-stage': [{ selector: '[data-stage-nav-index="0"]' }],
+    'future-routed-stage': [{ selector: '[data-stage-nav-index="3"]' }],
+    'kind-menu-open': [{ selector: '[data-journal-kind-filter]' }],
+    'essence-overshoot': [
+      { selector: '[data-essence-source="Item.jp-duskglass"] [data-stepper-increment]' },
+      { selector: '[data-essence-source="Item.jp-duskglass"] [data-stepper-increment]' },
+      { selector: '[data-essence-source="Item.jp-sunmote"] [data-stepper-increment]' },
+    ],
+    ...Object.fromEntries(
+      ['history-cancelled-before', 'history-cancelled-multi'].map((state) => [
+        state,
+        [
+          { selector: '[data-run-action="cancel-arm"]' },
+          { selector: '[data-run-action="cancel-confirm"]' },
+          { selector: `[data-history-run-id="lab-v1-${state}"]` },
+        ],
+      ])
+    ),
+    ...Object.fromEntries(
+      ['history-d100-all-hit', 'history-d100-all-miss', 'history-gathering-check-failure'].map(
+        (state) => [
+          state,
+          [
+            { selector: '[data-run-action="primary"]' },
+            { selector: `[data-history-run-id="lab-v1-${state}"]` },
+          ],
+        ]
+      )
+    ),
+    'history-just-resolved': [{ selector: '[data-run-action="primary"]' }],
   };
   const detail = '[data-journal-detail]';
   const primary = '[data-run-action="primary"]';
   const enabledPrimary = `${primary}:not(:disabled):not([aria-busy="true"])`;
-  const award = (id, index = 0) => `[data-yield-entry='${JSON.stringify([id, index])}']`;
   const has = (...selectors) => selectors.map((selector) => `:has(${selector})`).join('');
   const lacks = (...selectors) => selectors.map((selector) => `:not(:has(${selector}))`).join('');
   const terminal = (status, ...evidence) =>
     detail +
-    has(`[data-journal-verdict="${status}"]`, ...evidence) +
-    lacks('[data-run-action-bar]');
+    has(
+      '[data-journal-history-detail]',
+      '[data-journal-this-run] + [data-journal-guidance]',
+      ...(status === 'failed' ? ['[data-journal-verdict="failed"]'] : []),
+      ...evidence
+    ) +
+    lacks(
+      '[data-run-action-bar]',
+      '[data-stage-nav]',
+      '[data-run-progress]',
+      '[data-journal-summary]',
+      '[data-journal-time-remaining]',
+      '[data-journal-record]',
+      '.manager-callout-title',
+      ...(status === 'failed' ? [] : ['[data-journal-verdict]'])
+    );
   const commandError = (runId) =>
     '.journal-view-container' +
     has(
-      `[data-run-id="${runId}"]`,
+      `${detail}[data-run-key*="${runId}"]`,
       '[data-journal-command-error] [data-notice-action]',
       `${detail} ${enabledPrimary}`
     ) +
@@ -1544,7 +1637,7 @@ function journalLifecycleCases() {
       row,
       otherRow,
       `[data-journal-list="${kind}"] [data-pagination-prev]:not(:disabled)`,
-      `[data-journal-list="${kind}"] [data-pagination-next]:disabled`,
+      `[data-journal-list="${kind}"] [data-pagination-next]:not(:disabled)`,
       detail
     );
   const roomy =
@@ -1558,7 +1651,7 @@ function journalLifecycleCases() {
       detail +
       has(
         '[data-run-completion-switch] input[value="worldTime"]:checked',
-        '[data-journal-time-remaining]',
+        '[data-journal-summary-card="time"]',
         `${primary}:disabled`
       ),
     'waiting-open-choice':
@@ -1569,25 +1662,21 @@ function journalLifecycleCases() {
         `${primary}:disabled`
       ),
     'material-shortage':
-      detail +
-      has(
-        '[data-essence-threshold="fire"] [aria-valuemax="60"][aria-valuenow="0"]',
-        `${primary}:disabled`
-      ),
+      detail + has('[data-slot-id="boss-stage-1-sunward-g3"]', `${primary}:disabled`),
     'ingredient-route':
       detail +
       has(
         '[data-journal-route]:not(:disabled)',
-        '[data-slot-id="jw-set-gold-g1"]',
+        '[data-slot-id="boss-stage-1-verdant-g1"]',
         '[data-journal-stage-details][data-editable="true"]'
       ) +
-      lacks('[data-slot-id="jw-set-silver-g1"]'),
+      lacks('[data-slot-id="boss-stage-1-sunward-g1"]'),
     'check-route': detail + has('[data-outcome-ladder] [data-outcome-tier]', enabledPrimary),
     'essence-shared':
       detail +
       has(
-        '[data-essence-threshold="earth"]',
-        '[data-essence-threshold="fire"]',
+        '[data-essence-threshold="radiant"]',
+        '[data-essence-threshold="shadow"]',
         '[data-essence-source] button:not(:disabled)'
       ),
     paused:
@@ -1610,20 +1699,30 @@ function journalLifecycleCases() {
       has(
         '[data-stage-card="0"][data-stage-state="past"]',
         '[data-stage-nav-return]',
-        '[data-stage-fact="spent"] .fab-stage-card-fact-value:not(:empty)'
+        '[data-stage-io="consumed"]',
+        '[data-stage-io="produced"]'
       ) +
-      lacks('[data-journal-stage-details][data-editable="true"]'),
+      lacks(
+        '[data-journal-stage-details][data-editable="true"]',
+        '[data-journal-summary]',
+        '[data-journal-time-remaining]'
+      ),
     'future-stage':
       detail +
       has(
         '[data-stage-card="2"][data-stage-state="future"]',
         '[data-stage-nav-return]',
-        '[data-journal-summary-card="check"] .journal-fact-value:not(:empty)'
+        '[data-stage-io="consumed"]',
+        '[data-stage-state="future"] [data-journal-crafting-yield]'
       ) +
-      lacks('[data-journal-stage-details][data-editable="true"]'),
+      lacks(
+        '[data-journal-stage-details][data-editable="true"]',
+        '[data-journal-summary]',
+        '[data-journal-time-remaining]'
+      ),
     'gathering-straight':
       detail +
-      has('[data-yield-entry="lab-gathering-emberbloom"]', enabledPrimary) +
+      has('[data-yield-entry="jp-meadow_herb-drop"]', enabledPrimary) +
       lacks('[data-yield-cut]', '[data-outcome-ladder]'),
     'gathering-d100':
       detail +
@@ -1631,39 +1730,33 @@ function journalLifecycleCases() {
       lacks('[data-yield-cut]', '[data-outcome-ladder]'),
     'gathering-check':
       detail +
-      has(
-        '[data-outcome-tier="lab-abundant"]',
-        '.fab-outcome-tier .fa-circle-xmark',
-        enabledPrimary
-      ) +
+      has('[data-outcome-tier="rich"]', '.fab-outcome-tier .fa-circle-xmark', enabledPrimary) +
       lacks('[data-yield-cut]'),
     'gathering-straight-finished':
-      terminal('succeeded', award('hb-emberbloom')) + lacks('[data-yield-cut]'),
+      terminal('succeeded', '[data-history-summary="none"] ~ [data-history-items="produced"]') +
+      lacks('[data-yield-cut]'),
     'gathering-d100-finished':
-      terminal('succeeded', '[data-yield-cut]', award('hb-moonleaf'), award('hb-sunroot', 1)) +
-      lacks('[data-yield-cut] ~ [data-yield-cut]'),
-    'gathering-check-finished': terminal(
-      'succeeded',
-      '[data-outcome-tier="lab-abundant"]',
-      award('hb-emberbloom')
-    ),
+      terminal('succeeded', '[data-yield-cut]', '[data-yield-entry="jp-rough_stone-drop"]') +
+      lacks('[data-history-items="produced"]', '[data-history-summary]'),
+    'gathering-check-finished':
+      terminal(
+        'succeeded',
+        '[data-history-summary="check"] ~ [data-history-items="produced"] ~ [data-history-outcome-log]'
+      ) + lacks('[data-outcome-ladder]'),
     'finished-success': terminal(
       'succeeded',
-      award('sm-horseshoe'),
-      '[data-stage-fact="spent"] .fab-stage-card-fact-value:not(:empty)'
+      '[data-history-summary="check"] ~ [data-history-items="produced"]'
     ),
     'finished-failure':
-      terminal('failed', '[data-stage-fact="failure"] .fab-stage-card-fact-value:not(:empty)') +
-      lacks('[data-yield-entry]'),
+      terminal('failed', '[data-history-verdict-check]') +
+      lacks('[data-history-summary]', '[data-history-items="produced"]'),
     'finished-cancelled': terminal(
       'cancelled',
-      '[data-stage-card="0"][data-stage-state="past"]',
-      '[data-stage-nav-index="1"]',
-      '[data-stage-fact="spent"] .fab-stage-card-fact-value:not(:empty)'
+      '[data-history-items="consumed"] ~ [data-history-items="produced"]'
     ),
     'active-page-two': paged(
       'active',
-      '[data-run-id="lab-v1-active-5"]',
+      '[data-run-id="lab-v1-active-7"]',
       '[data-history-run-id="lab-v1-finished-1"]'
     ),
     'finished-page-two': paged(
@@ -1677,22 +1770,21 @@ function journalLifecycleCases() {
         '[data-journal-status-filter] input[value="paused"]:checked',
         '[data-run-id="lab-v1-filter-paused"][data-run-status="paused"]'
       ) +
-      lacks('[data-run-id="lab-v1-filter-ready"]'),
+      lacks('[data-run-status="ready"]'),
     'empty-search':
       '.journal-view-container' +
       has('[data-journal-empty="active"]', '[data-journal-empty="history"]', detail) +
       lacks('[data-run-id]', '[data-history-run-id]'),
-    'automatic-completion': terminal('succeeded', award('sm-horseshoe')),
+    'automatic-completion': terminal(
+      'succeeded',
+      '[data-history-stages] [data-stage-io="produced"]'
+    ),
     'automatic-blocker':
-      '.journal-view-container' +
-      has(
-        '[data-run-id="lab-v1-automatic-blocker"][data-run-status="ready"]',
-        '[data-essence-threshold="fire"] [aria-valuemax="60"][aria-valuenow="0"]'
-      ) +
-      lacks('[data-journal-verdict]'),
+      commandError('lab-v1-automatic-blocker') +
+      has('[data-essence-threshold="clarity"] [aria-valuenow="0"]'),
     dismissal:
       '.journal-view-container' +
-      has('[data-journal-empty="detail"]', '[data-journal-empty="history"]') +
+      has('[data-history-run-id]', detail) +
       lacks('[data-history-run-id="lab-v1-dismissal"]'),
     'redacted-owner':
       '.journal-view-container' +
@@ -1709,7 +1801,7 @@ function journalLifecycleCases() {
         '.journal-detail-identity img[src$="bottle-bulb-corked-glowing-red.webp"]'
       ) +
       lacks('[data-journal-verdict]'),
-    salvage: terminal('succeeded', award('Item.hb-empty-vial'), award('Item.hb-mortar-dust', 1)),
+    salvage: terminal('succeeded', '[data-history-items="produced"]'),
     legacy:
       '.journal-view-container' +
       has(
@@ -1765,6 +1857,117 @@ function journalLifecycleCases() {
       ),
     wide: roomy,
     narrow: roomy,
+    'current-choice-closed':
+      detail +
+      has('[data-stage-state="current"] [data-slot-row] button.fab-slot-tile') +
+      lacks('[data-choice-options]'),
+    'essence-overshoot':
+      detail + has('[data-essence-overshoot]', '[data-essence-source="Item.jp-duskglass"]'),
+    'past-routed-stage':
+      detail +
+      has(
+        '[data-stage-card="0"][data-stage-state="past"] [data-stage-io="consumed"]',
+        '[data-stage-fact="route"]'
+      ) +
+      lacks('[data-journal-summary]', '[data-journal-time-remaining]'),
+    'future-routed-stage':
+      detail +
+      has(
+        '[data-stage-card="3"][data-stage-state="future"] [data-journal-crafting-yield]',
+        '[data-stage-nav-return]'
+      ) +
+      lacks('[data-journal-summary]', '[data-journal-time-remaining]'),
+    'kind-menu-open': '[role="listbox"] [data-popover-option="gathering"]',
+    'history-checked-choice': terminal(
+      'succeeded',
+      '[data-history-summary="check"] ~ [data-history-items="consumed"] ~ [data-history-items="produced"]'
+    ),
+    'history-resolution-ingredients': terminal(
+      'succeeded',
+      '[data-history-summary="ingredients"] ~ [data-history-items="produced"]'
+    ),
+    'history-resolution-simple': terminal(
+      'succeeded',
+      '[data-history-summary="none"] ~ [data-history-items="produced"]'
+    ),
+    'history-checked-ingredients': terminal(
+      'succeeded',
+      '[data-history-summary="check"] ~ [data-history-items="consumed"] ~ [data-history-items="produced"]'
+    ),
+    'history-legacy-no-check-failure':
+      terminal(
+        'failed',
+        '[data-journal-verdict] ~ [data-history-summary="ingredients"] ~ [data-history-items="consumed"]'
+      ) + lacks('[data-history-items="produced"]'),
+    ...Object.fromEntries(
+      ['history-multi-essence', 'history-multi-shared-essence'].map((state) => [
+        state,
+        terminal(
+          'succeeded',
+          '[data-history-stages] [data-stage-card="0"]',
+          '[data-history-stages] [data-stage-card="1"]',
+          '[data-essence-history-carrier]'
+        ) + lacks('[data-history-summary]', '[data-history-items="produced"]'),
+      ])
+    ),
+    'history-multi-success':
+      terminal(
+        'succeeded',
+        '[data-history-stages] [data-stage-card="2"] [data-stage-io="produced"]'
+      ) + lacks('[data-history-summary]', '[data-history-items="produced"]'),
+    'history-multi-failure':
+      terminal('failed', '[data-history-stages] [data-stage-card="2"][data-stage-state="failed"]') +
+      lacks('[data-history-summary]', '[data-history-items="produced"]'),
+    'history-cancelled-before':
+      terminal('cancelled') +
+      lacks('[data-history-stages]', '[data-history-summary]', '[data-history-items]'),
+    'history-cancelled-multi':
+      terminal('cancelled', '[data-history-stages] [data-stage-card="1"]') +
+      lacks('[data-stage-card="2"]', '[data-history-summary]'),
+    ...Object.fromEntries(
+      ['history-d100-all-hit', 'history-d100-all-miss'].map((state) => [
+        state,
+        terminal(
+          'succeeded',
+          '[data-yield-scale] [data-yield-cut]',
+          '[data-yield-entry="jp-dewglass-drop"]'
+        ) + lacks('[data-history-items="produced"]', '[data-history-summary]'),
+      ])
+    ),
+    'history-gathering-check-failure':
+      terminal('failed', '[data-history-outcome-log]') +
+      lacks('[data-history-verdict-check]', '[data-outcome-ladder]', '[data-history-summary]'),
+    'history-just-resolved':
+      detail +
+      has('[data-journal-verdict="succeeded"] [data-history-items="transient-produced"]') +
+      lacks('[data-history-summary]', '[data-run-action-bar]'),
+    'history-redacted':
+      terminal('succeeded') +
+      lacks('[data-history-items]', '[data-history-summary]', '[data-history-stages]'),
+    'history-missing-material': terminal('succeeded', '[data-history-items="consumed"]'),
+    'history-gm-deleted-recipe': terminal(
+      'succeeded',
+      '[data-history-summary="check"]',
+      '[data-history-items="produced"]'
+    ),
+    'history-failure-awards': terminal('failed', '[data-history-items="produced"]'),
+    'history-settling':
+      detail +
+      has('[data-journal-settling]') +
+      lacks('[data-journal-verdict]', '[data-run-action-bar]', '[data-history-items="produced"]'),
+  };
+  const pointerTargets = {
+    'waiting-open-choice': '[data-choice-id]:not(:disabled)',
+    'cancel-confirmation': '[data-run-action="cancel-confirm"]',
+    paused: '[data-run-action="resume"]',
+    'ingredient-route': '[data-journal-route]',
+    'check-route': '[data-run-action="primary"]',
+    'essence-overshoot': '[data-essence-source="Item.jp-sunmote"] [data-stepper-increment]',
+    'past-stage': '[data-stage-nav-return]',
+    'future-stage': '[data-stage-nav-return]',
+    'past-routed-stage': '[data-stage-nav-return]',
+    'future-routed-stage': '[data-stage-nav-return]',
+    'history-just-resolved': '[data-history-run-id="lab-v1-history-just-resolved"]',
   };
   return states.map((state) =>
     playerCase({
@@ -1775,15 +1978,25 @@ function journalLifecycleCases() {
       query: {
         tab: 'journal',
         journalCaseState: state.replace(/-finished$/, ''),
-        ...(state === 'authority-setup' && { viewer: 'gm' }),
+        ...(['authority-setup', 'history-gm-deleted-recipe'].includes(state) && { viewer: 'gm' }),
         ...(state.startsWith('gathering-straight') && { gatheringTaskMode: 'straight' }),
         ...(state.startsWith('gathering-check') && { gatheringTaskMode: 'routed' }),
       },
       position: { width: state === 'narrow' ? 1024 : 1240, height: 880 },
-      steps: steps[state] ?? [],
+      steps:
+        steps[state] ??
+        (state.startsWith('history-') ||
+        ['finished-success', 'finished-failure', 'automatic-completion'].includes(state)
+          ? [{ selector: `[data-history-run-id="lab-v1-${state}"]` }]
+          : []),
       expectTab: 'journal',
       expectSelector: expected[state],
+      ...(pointerTargets[state] && { expectCenterHit: pointerTargets[state] }),
       ...(state === 'filter-paused' && { expectCenterHit: steps[state][0].selector }),
+      ...(state === 'kind-menu-open' && { expectCenterHit: '[data-popover-option="gathering"]' }),
+      ...(state === 'current-choice-closed' && {
+        expectCenterHit: '[data-slot-row] button.fab-slot-tile',
+      }),
       ...(state === 'authority-setup' && {
         expectCenterHit: '[data-journal-authority-setup-action]',
       }),
@@ -13980,7 +14193,7 @@ export const VIEW_LAB_CASES = Object.freeze([
       },
     ],
     expectSelector:
-      '[data-journal-detail][data-run-key*="lab-run-succeeded-multi"]:has([data-stage-nav]):has([data-stage-fact])',
+      '[data-journal-detail][data-run-key*="lab-run-succeeded-multi"]:has([data-history-stages]):not(:has([data-stage-nav]))',
     kinds: ['player', 'journal'],
     sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/svelte\/stores\/journalStore/],
   }),

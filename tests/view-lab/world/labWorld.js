@@ -32,6 +32,7 @@ import {
   seedJournalNoCheckFixture,
 } from './labContent.js';
 import { seedLabInteractables } from './labInteractables.js';
+import { stockJournalPrototype } from './labJournalPrototype.js';
 import { installUpdateSemantics, makeGetFlag } from './labFlags.js';
 import {
   buildLabBlindRunSecret,
@@ -50,24 +51,29 @@ function seedGatheringTaskMode(content, mode) {
   const slice = content.gatheringConfig.systems[LAB_SYSTEM_IDS.HERBALISM];
   const task = structuredClone(slice.tasks.find((entry) => entry.id === 'hb-task-slowbloom'));
   task.resolutionMode = mode === 'straight' ? 'straight' : 'routed';
-  task.resultGroups = [{
-    id: 'lab-gathering-yield',
-    name: mode === 'routed-unmatched' ? 'Old abundance name' : 'Abundant',
-    results: [{ id: 'lab-gathering-emberbloom', componentId: 'hb-emberbloom', quantity: 2 }],
-  }];
+  task.resultGroups = [
+    {
+      id: 'lab-gathering-yield',
+      name: mode === 'routed-unmatched' ? 'Old abundance name' : 'Abundant',
+      results: [{ id: 'lab-gathering-emberbloom', componentId: 'hb-emberbloom', quantity: 2 }],
+    },
+  ];
   if (mode !== 'straight') {
-    system.gatheringCraftingCheck = { ...system.gatheringCraftingCheck, routed: {
-      rollFormula: '1d20',
-      dc: 15,
-      type: 'relative',
-      thresholdMode: 'meet',
-      relativeOutcomes: [
-        { id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 },
-        { id: 'lab-failed', name: 'Failed', success: false, dc: -15 },
-      ],
-    } };
+    system.gatheringCraftingCheck = {
+      ...system.gatheringCraftingCheck,
+      routed: {
+        rollFormula: '1d20',
+        dc: 15,
+        type: 'relative',
+        thresholdMode: 'meet',
+        relativeOutcomes: [
+          { id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 },
+          { id: 'lab-failed', name: 'Failed', success: false, dc: -15 },
+        ],
+      },
+    };
   }
-  const replaceTask = (entry) => entry.id === task.id ? task : entry;
+  const replaceTask = (entry) => (entry.id === task.id ? task : entry);
   slice.tasks = slice.tasks.map(replaceTask);
   content.gatheringConfig.tasks = content.gatheringConfig.tasks.map(replaceTask);
 }
@@ -388,7 +394,9 @@ export async function buildLabWorld({
   journalCaseState = null,
 } = {}) {
   const content = buildLabContent({ journalCaseState });
-  if (['ready-single', 'waiting-auto-eligible', 'automatic-completion'].includes(journalCaseState)) {
+  if (
+    ['ready-single', 'waiting-auto-eligible', 'automatic-completion'].includes(journalCaseState)
+  ) {
     seedJournalNoCheckFixture(content);
   }
   seedGatheringTaskMode(content, gatheringTaskMode);
@@ -459,7 +467,7 @@ export async function buildLabWorld({
     const journal = globalThis.game.journal;
     const get = journal.get;
     journal.contents.push(ledger);
-    journal.get = (id) => id === ledger.id ? ledger : get(id);
+    journal.get = (id) => (id === ledger.id ? ledger : get(id));
   }
 
   // Dynamic, and only now: `src/main.js` registers hooks at module scope.
@@ -534,6 +542,7 @@ export async function buildLabWorld({
     world.settings.get(settingsKey(FABRICATE_NAMESPACE, 'lastCraftingActor')) ??
     world.settings.get(settingsKey(FABRICATE_NAMESPACE, 'lastGatheringActor'));
   const journalActor = globalThis.game.actors.get(rememberedId) ?? actors[0];
+  await stockJournalPrototype(journalActor, content);
   // If the viewer can see none of them, fall back to the full set: a journal of redacted rows still
   // shows how each STATUS renders, where an empty journal shows nothing at all.
   const runRecipes = journalRecipes.length > 0 ? journalRecipes : allRecipes;
@@ -621,7 +630,8 @@ function createLabRunAuthorityLedger() {
     return created;
   };
   ledger.deleteEmbeddedDocuments = async (type, ids) => {
-    if (type !== 'JournalEntryPage') throw new Error('view lab: unexpected authority claim deletion');
+    if (type !== 'JournalEntryPage')
+      throw new Error('view lab: unexpected authority claim deletion');
     return ids.flatMap((id) => {
       const page = ledger.pages.get(id);
       return ledger.pages.delete(id) ? [page] : [];
@@ -670,21 +680,23 @@ function installLabJournalTransport(game, service) {
       }
       if (payload?.kind !== JOURNAL_RUN_SOCKET_KIND.REQUEST) return;
       const sender = game.user;
-      delivery = delivery.then(async () => {
-        const viewer = game.user;
-        reply = null;
-        game.user = game.users.activeGM;
-        try {
-          await service.handleSocketMessage(payload, sender.id);
-        } finally {
-          game.user = viewer;
-        }
-        if (reply && (!Array.isArray(reply.recipients) || reply.recipients.includes(viewer.id))) {
-          service.acceptReply(reply.payload, reply.senderId);
-        }
-      }).catch((error) => {
-        console.error('view lab: Journal command delivery failed', error);
-      });
+      delivery = delivery
+        .then(async () => {
+          const viewer = game.user;
+          reply = null;
+          game.user = game.users.activeGM;
+          try {
+            await service.handleSocketMessage(payload, sender.id);
+          } finally {
+            game.user = viewer;
+          }
+          if (reply && (!Array.isArray(reply.recipients) || reply.recipients.includes(viewer.id))) {
+            service.acceptReply(reply.payload, reply.senderId);
+          }
+        })
+        .catch((error) => {
+          console.error('view lab: Journal command delivery failed', error);
+        });
     },
   };
 }

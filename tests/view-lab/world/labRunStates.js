@@ -33,6 +33,13 @@ import {
 import { blindWaitingTaskId } from '../../../src/systems/gatheringEngineInternals.js';
 
 import { CRACKED_ALEMBIC_STAGE_IDS, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
+import {
+  JOURNAL_PROTOTYPE_RECIPES,
+  JOURNAL_PROTOTYPE_BINDINGS,
+  journalPrototypeRecipeId,
+  journalPrototypeMaterial,
+  journalPrototypeEssenceSpend,
+} from './labJournalPrototype.js';
 import { RUN_CONTAINER_PATHS, makeGetFlag, makeSetFlag, seedFabricateFlag } from './labFlags.js';
 
 /** World time the lab pins to; a run's timestamps are relative to it. */
@@ -84,6 +91,35 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'recovery-required': 'lab-v1-recovery-required',
   wide: 'lab-v1-wide',
   narrow: 'lab-v1-wide',
+  ...Object.fromEntries(
+    [
+      'history-checked-choice',
+      'history-resolution-ingredients',
+      'history-resolution-simple',
+      'history-checked-ingredients',
+      'history-legacy-no-check-failure',
+      'history-multi-essence',
+      'history-multi-shared-essence',
+      'history-multi-success',
+      'history-multi-failure',
+      'history-cancelled-before',
+      'history-cancelled-multi',
+      'history-d100-all-hit',
+      'history-d100-all-miss',
+      'history-gathering-check-failure',
+      'history-just-resolved',
+      'history-redacted',
+      'history-missing-material',
+      'history-gm-deleted-recipe',
+      'history-failure-awards',
+      'current-choice-closed',
+      'essence-overshoot',
+      'past-routed-stage',
+      'future-routed-stage',
+      'kind-menu-open',
+      'history-settling',
+    ].map((state) => [state, `lab-v1-${state}`])
+  ),
 });
 
 /**
@@ -292,6 +328,16 @@ export function buildLabRunStates({
   const multiStep = recipes.find((recipe) => (recipe.steps?.length ?? 0) > 1) ?? recipes[0];
   const single = recipes.find((recipe) => (recipe.steps?.length ?? 0) <= 1) ?? recipes[0];
   const pick = (index) => recipes[index % recipes.length] ?? recipes[0];
+
+  if (
+    recipes.some((recipe) => recipe.id === journalPrototypeRecipeId('cord')) &&
+    Object.hasOwn(JOURNAL_PROTOTYPE_BINDINGS, journalCaseState)
+  ) {
+    return prototypeContainers(
+      { actor, actorUuid, userId, recipes, environments, tasks },
+      journalCaseState
+    );
+  }
 
   if (journalCaseState && !['legacy', 'redacted-owner'].includes(journalCaseState)) {
     return buildJournalCaseContainers({
@@ -548,10 +594,12 @@ function journalCaseFactories(context) {
     'waiting-open-choice': () =>
       active(waiting('lab-v1-waiting-open-choice', choice(), { completionMode: 'manual' })),
     'material-shortage': () =>
-      active(waiting('lab-v1-material-shortage', shortage(), {
-        completionMode: 'manual',
-        steps: [shortageStep(shortage(), futureGate())],
-      })),
+      active(
+        waiting('lab-v1-material-shortage', shortage(), {
+          completionMode: 'manual',
+          steps: [shortageStep(shortage(), futureGate())],
+        })
+      ),
     'ingredient-route': () =>
       active(
         versionedCraftingRun(context, ingredientRoute(), {
@@ -600,7 +648,8 @@ function journalCaseFactories(context) {
           steps: [shortageStep(shortage(), maturedGate())],
         })
       ),
-    dismissal: () => finished(terminalCraftingCase(context, single(), 'succeeded', 'lab-v1-dismissal')),
+    dismissal: () =>
+      finished(terminalCraftingCase(context, single(), 'succeeded', 'lab-v1-dismissal')),
     alchemy: () => active(ready('lab-v1-alchemy', alchemy())),
     salvage: () => emptyRunContainers({ salvageHistory: [versionedSalvageCase(context)] }),
     'stale-action': readyAlias('lab-v1-stale-action'),
@@ -616,6 +665,412 @@ function journalCaseFactories(context) {
     loading: readyAlias('lab-v1-ready-single'),
     'error-retry': readyAlias('lab-v1-ready-single'),
   };
+}
+
+/** The prototype's eight crafting and three gathering accounts, plus its twelve closed accounts. */
+function prototypeContainers(context, state) {
+  const keys = ['cord', 'boss', 'edge', 'rivets', 'tonic', 'sigil', 'poultice', 'buckler'];
+  const active = keys.map((key, index) =>
+    prototypeCraft(context, key, `lab-v1-active-${index + 1}`)
+  );
+  const gatheringActive = ['stone', 'herbs', 'balehound'].map((key) =>
+    prototypeGather(context, key)
+  );
+  const history = [
+    'copper',
+    'draught',
+    'breastplate',
+    'boss',
+    'cord',
+    'sigil',
+    'tonic',
+    'boss',
+    'edge',
+    'rivets',
+  ].map((key, index) => prototypeHistory(context, key, `lab-v1-finished-${index + 1}`, index));
+  const gatheringHistory = ['herbs', 'stone'].map((key) => {
+    const run = prototypeGather(context, key);
+    run.id = `jp-history-${key}`;
+    const closedAt = NOW - (key === 'herbs' ? 5.5 : 11) * HOUR;
+    run.startedAtWorldTime = closedAt - run.timeGate.requiredSeconds;
+    run.timeGate = { ...run.timeGate, initiatedAt: run.startedAtWorldTime, availableAt: closedAt };
+    completeGatheringFixture(run, closedAt);
+    run.status = 'succeeded';
+    return run;
+  });
+  const containers = emptyRunContainers({
+    craftingActive: active,
+    craftingHistory: history,
+    gatheringActive,
+    gatheringHistory,
+  });
+  if (['active-page-two', 'finished-page-two'].includes(state)) return containers;
+  const id = LAB_JOURNAL_CASE_STATE_RUN_IDS[state];
+  const binding = JOURNAL_PROTOTYPE_BINDINGS[state];
+  const historyIndex = { h1: 0, h2: 1, h3: 2, h4: 3, h5: 4, h7: 5, h8: 6, h9: 7, h10: 8, h12: 9 }[
+    binding
+  ];
+  if (historyIndex != null) {
+    containers.craftingRuns.history[historyIndex].id = id;
+    // Keep the selected historical row on page one; all twelve accounts remain.
+    const [selected] = containers.craftingRuns.history.splice(historyIndex, 1);
+    selected.finishedAt = NOW;
+    containers.craftingRuns.history.unshift(selected);
+    return containers;
+  }
+  const special = prototypeSpecial(context, state, id, containers);
+  if (special) return containers;
+  const key = state === 'automatic-blocker' ? 'poultice' : binding.split('/')[0];
+  const craftKey = Object.hasOwn(JOURNAL_PROTOTYPE_RECIPES, key) ? key : 'rivets';
+  const selected = prototypeCraft(context, craftKey, id);
+  if (['gathering-straight', 'gathering-d100', 'gathering-check'].includes(state)) {
+    const run = prototypeGather(context, key);
+    run.id = id;
+    maturePrototypeGather(run);
+    replacePrototypeFocus(containers.gatheringRuns, run, false);
+    return containers;
+  }
+  if (state === 'filter-paused')
+    selected.pauseState = { pausedAt: NOW - HOUR, remainingSeconds: 3 * HOUR };
+  if (state === 'waiting-auto-eligible') {
+    selected.completionMode = 'worldTime';
+    const current = selected.steps[selected.currentStepIndex];
+    current.selectionPlan.ingredientEssenceAllocation = {
+      stepId: current.stepId,
+      ingredientSetId: current.selectedIngredientSetId,
+      allocation: { 'Item.jp-bitterroot': 2 },
+    };
+  }
+  if (state === 'material-shortage') {
+    const recipe = requireRecipe(context.recipes, selected.recipeId);
+    selected.steps[0] = versionedRecipeStep(recipe, 0, 'waitingTime', {
+      timeGate: selected.steps[0].timeGate,
+      presentationSnapshot: selected.steps[0].presentationSnapshot,
+      selectedSetIndex: 1,
+    });
+  }
+  if (state === 'automatic-blocker') {
+    selected.completionMode = 'worldTime';
+    const current = selected.steps[selected.currentStepIndex];
+    current.timeGate = maturedGate().timeGate;
+    current.selectionPlan.ingredientEssenceAllocation = {
+      stepId: current.stepId,
+      ingredientSetId: current.selectedIngredientSetId,
+      allocation: {},
+    };
+  }
+  replacePrototypeFocus(containers.craftingRuns, selected, false);
+  return containers;
+}
+
+function replacePrototypeFocus(container, run, terminal) {
+  if (terminal) {
+    container.history[0] = run;
+    run.finishedAt = NOW;
+    if (run.taskId) run.completedAtWorldTime = NOW;
+  } else {
+    const replaced = Object.values(container.active).find((entry) =>
+      run.taskId ? entry.taskId === run.taskId : entry.recipeId === run.recipeId
+    );
+    delete container.active[replaced?.id ?? Object.keys(container.active)[0]];
+    container.active = { [run.id]: run, ...container.active };
+  }
+}
+
+function prototypeCheck(spec, success = true, total = null) {
+  const value = total ?? (success ? spec.dc + 4 : spec.dc - 8);
+  return {
+    success,
+    value,
+    outcome: success ? 'Cleared' : 'Short',
+    data: { resolvedFormula: `1d20 + ${spec.mod}`, total: value, dc: spec.dc },
+  };
+}
+
+function prototypeStageStatus(index, current) {
+  if (index < current) return 'succeeded';
+  return index === current ? 'waitingTime' : 'pending';
+}
+
+function prototypeCraft(context, key, id) {
+  const spec = JOURNAL_PROTOTYPE_RECIPES[key];
+  const recipe = requireRecipe(context.recipes, journalPrototypeRecipeId(key));
+  const steps = recipeSteps(recipe).map((authored, index) => {
+    const status = prototypeStageStatus(index, spec.current);
+    const entry = versionedRecipeStep(recipe, index, status);
+    if (index <= spec.current)
+      entry.presentationSnapshot = {
+        name: spec.steps[index].name,
+        description: spec.steps.length === 1 ? (spec.description ?? '') : '',
+      };
+    if (index < spec.current) recordPrototypeStage(context, key, entry, index, true);
+    if (index === spec.current)
+      entry.timeGate = {
+        requiredSeconds: spec.steps[index].hours * HOUR,
+        initiatedAt: NOW - (spec.steps[index].hours - spec.left) * HOUR,
+        availableAt: NOW + spec.left * HOUR,
+      };
+    if (index === spec.current && key === 'sigil')
+      entry.selectionPlan.ingredientEssenceAllocation = {
+        stepId: entry.stepId,
+        ingredientSetId: entry.selectedIngredientSetId,
+        allocation: {},
+      };
+    if (index > spec.current) {
+      delete entry.selectionPlan;
+      delete entry.selectedRequirementSnapshot;
+      delete entry.selectedIngredientSetId;
+    }
+    return entry;
+  });
+  return versionedCraftingRun(context, recipe, {
+    id,
+    status: 'waitingTime',
+    currentStepIndex: spec.current,
+    steps,
+    ...(key === 'tonic' && {
+      pauseState: { pausedAt: NOW - 5 * HOUR, remainingSeconds: 5 * HOUR },
+    }),
+    ...(key === 'poultice' && { pausedDurationSeconds: 3 * HOUR }),
+  });
+}
+
+function recordPrototypeStage(context, key, entry, index, success) {
+  const spec = JOURNAL_PROTOTYPE_RECIPES[key];
+  const stageSpec = spec.steps[index];
+  if (!entry.selectionPlan)
+    Object.assign(
+      entry,
+      versionedRecipeStep(
+        requireRecipe(context.recipes, journalPrototypeRecipeId(key)),
+        index,
+        'inProgress'
+      )
+    );
+  const requirements = stageSpec.routes?.[0].requirements ?? stageSpec.requirements;
+  const consumed = requirements
+    .filter((req) => !req.essence)
+    .map((req) =>
+      journalPrototypeMaterial(context.actorUuid, req.id ?? req.options.at(-1), req.quantity ?? 1)
+    );
+  entry.status = success ? 'succeeded' : 'failed';
+  entry.completedAt = NOW - (spec.steps.length - index) * HOUR;
+  entry.presentationSnapshot = { name: stageSpec.name, description: spec.description ?? '' };
+  const checked = Boolean(spec.dc) && (spec.steps.length === 1 || index > 0);
+  let kind = stageSpec.routes ? 'ingredients' : 'none';
+  if (checked) kind = 'check';
+  entry.resolutionSnapshot = {
+    kind,
+    mode: spec.mode,
+  };
+  if (checked)
+    entry.lastCheckResult = prototypeCheck(
+      { ...spec, dc: key === 'rivets' && index === 2 ? 13 : spec.dc },
+      success
+    );
+  entry.selectionPlan.ingredientOptionOverrides = Object.fromEntries(
+    requirements.flatMap((req, groupIndex) =>
+      req.options
+        ? [
+            [
+              entry.selectedRequirementSnapshot.ingredientGroups[groupIndex].id,
+              {
+                optionIndex: req.options.length - 1,
+                heldItemId: `Item.jp-${req.options.at(-1)}`,
+              },
+            ],
+          ]
+        : []
+    )
+  );
+  const output = stageSpec.routes?.[0].output ?? stageSpec.output;
+  entry.consumedIngredients = consumed;
+  entry.createdResults =
+    success && output ? [journalPrototypeMaterial(context.actorUuid, ...output)] : [];
+  entry.currencySpends = [];
+  if (!success) entry.failureReason = 'checkFailed';
+  if (index === 1 && ['sigil', 'tonic'].includes(key)) {
+    entry.essenceSpend = journalPrototypeEssenceSpend(
+      context.actorUuid,
+      key === 'sigil' ? { sunmote: 1, duskglass: 2 } : { dewglass: 1, moonpetal: 1 }
+    );
+    entry.consumedIngredients.push(
+      ...entry.essenceSpend.carriers.map(({ contributions: _contributions, ...item }) => item)
+    );
+  }
+}
+
+function prototypeHistory(context, key, id, index = -1) {
+  const run = prototypeCraft(context, key, id);
+  const failed = [2, 7, 9].includes(index);
+  run.status = failed ? 'failed' : 'succeeded';
+  run.finishedAt = NOW - (index + 1) * HOUR;
+  run.currentStepIndex = run.steps.length - 1;
+  delete run.pauseState;
+  run.steps.forEach((entry, stepIndex) =>
+    recordPrototypeStage(
+      context,
+      key,
+      entry,
+      stepIndex,
+      !failed || stepIndex < run.steps.length - 1
+    )
+  );
+  if (key === 'boss' && [3, 7].includes(index)) {
+    const entry = run.steps[0];
+    entry.resolutionSnapshot = { kind: 'ingredients', mode: 'routedByIngredients' };
+    delete entry.lastCheckResult;
+    if (failed) {
+      delete run.lifecycleVersion;
+      entry.failureReason =
+        'The Sunward set was two Emberdust short when this legacy run resolved.';
+      const recipe = requireRecipe(context.recipes, run.recipeId);
+      entry.selectedRequirementSnapshot = recipeSteps(recipe)[0].ingredientSets[1].toJSON();
+      entry.consumedIngredients = ['shield_blank', 'rune_chalk', 'emberdust'].map((material) =>
+        journalPrototypeMaterial(context.actorUuid, material, material === 'emberdust' ? 2 : 1)
+      );
+    }
+  }
+  if ([0, 1, 2, 3, 4].includes(index)) run.steps[0].consumedIngredients = [];
+  const totals = {
+    0: [12],
+    1: [14],
+    2: [6],
+    5: [null, 17],
+    6: [null, 15],
+    8: [18],
+    9: [null, 16, 7],
+  };
+  for (const [stepIndex, total] of (totals[index] ?? []).entries()) {
+    const check = run.steps[stepIndex].lastCheckResult;
+    if (check && total != null) {
+      check.value = total;
+      check.data.total = total;
+    }
+  }
+  if (key === 'cord') run.steps[0].createdResults[0].quantity = 2;
+  if (key === 'tonic') run.steps[1].createdResults[0].quantity = 1;
+  if (key === 'edge') run.steps[0].createdResults[0].quantity = 2;
+  if (key === 'sigil') run.pausedDurationSeconds = 4 * HOUR;
+  const duration = JOURNAL_PROTOTYPE_RECIPES[key].steps.reduce(
+    (sum, entry) => sum + entry.hours * HOUR,
+    0
+  );
+  run.startedAt = run.finishedAt - duration - run.pausedDurationSeconds;
+  run.updatedAt = run.finishedAt;
+  let cursor = run.startedAt + run.pausedDurationSeconds;
+  run.steps.forEach((entry, stepIndex) => {
+    const requiredSeconds = JOURNAL_PROTOTYPE_RECIPES[key].steps[stepIndex].hours * HOUR;
+    entry.startedAt = cursor;
+    cursor += requiredSeconds;
+    entry.updatedAt = cursor;
+    entry.completedAt = cursor;
+    entry.timeGate = { requiredSeconds, initiatedAt: entry.startedAt, availableAt: cursor };
+  });
+  return run;
+}
+
+function prototypeGather(context, key) {
+  const task = context.tasks.find((entry) => entry.id === `jp-${key}`);
+  if (!task) throw new Error(`Journal prototype task missing: ${key}`);
+  const left = { stone: 0, herbs: 2, balehound: 1 }[key] * HOUR;
+  const availableAt = NOW + left;
+  const initiatedAt = availableAt - task.durationSeconds;
+  return {
+    ...gatheringCaseRun({ ...context, tasks: [task] }, task.resolutionMode),
+    id: `jp-active-${key}`,
+    environmentId: 'jp-environment',
+    startedAtWorldTime: initiatedAt,
+    timeGate: { requiredSeconds: task.durationSeconds, initiatedAt, availableAt },
+  };
+}
+
+function maturePrototypeGather(run) {
+  const requiredSeconds = run.timeGate.requiredSeconds;
+  run.startedAtWorldTime = NOW - requiredSeconds;
+  run.timeGate = { requiredSeconds, initiatedAt: run.startedAtWorldTime, availableAt: NOW };
+}
+
+function prototypeSpecial(context, state, id, containers) {
+  if (state === 'history-settling') {
+    const run = prototypeGather(context, 'herbs');
+    run.id = id;
+    completeGatheringFixture(run, NOW);
+    run.status = 'succeeded';
+    // Gathering persists terminal intent before applying results. The planned
+    // top-level awards must remain invisible until this receipt is applied.
+    run.executionJournal.status = 'planned';
+    const effect = run.executionJournal.effects[0];
+    effect.phase = 'planned';
+    effect.planned = cloneFixtureValue(run.createdResults);
+    delete effect.receipt;
+    replacePrototypeFocus(containers.gatheringRuns, run, true);
+    return true;
+  }
+  const cancelled = {
+    'finished-cancelled': ['rivets', 1],
+    'history-cancelled-before': ['cord', 0],
+    'history-cancelled-multi': ['buckler', 2],
+  }[state];
+  if (cancelled) {
+    const [key, attempted] = cancelled;
+    const run = prototypeCraft(context, key, id);
+    run.currentStepIndex = attempted;
+    run.steps.forEach((entry, index) => {
+      if (index < attempted) recordPrototypeStage(context, key, entry, index, true);
+    });
+    // Cancellation cases start active and close through the real arm/confirm controls.
+    replacePrototypeFocus(containers.craftingRuns, run, false);
+    return true;
+  }
+  if (
+    ['history-d100-all-hit', 'history-d100-all-miss', 'history-gathering-check-failure'].includes(
+      state
+    )
+  ) {
+    const key = state === 'history-gathering-check-failure' ? 'balehound' : 'stone';
+    const run = prototypeGather(context, key);
+    run.id = id;
+    maturePrototypeGather(run);
+    replacePrototypeFocus(containers.gatheringRuns, run, false);
+    return true;
+  }
+  if (state === 'history-just-resolved') {
+    replacePrototypeFocus(containers.craftingRuns, prototypeCraft(context, 'cord', id), false);
+    return true;
+  }
+  const historyKey = {
+    'history-checked-ingredients': 'boss',
+    'history-multi-success': 'rivets',
+    'history-redacted': 'copper',
+    'history-missing-material': 'edge',
+    'history-gm-deleted-recipe': 'edge',
+    'history-failure-awards': 'edge',
+    'automatic-completion': 'poultice',
+    dismissal: 'copper',
+  }[state];
+  if (!historyKey) return false;
+  const run = prototypeHistory(context, historyKey, id);
+  if (state === 'history-redacted' || state === 'history-gm-deleted-recipe')
+    run.recipeId = 'jp-deleted-recipe';
+  if (state === 'history-missing-material')
+    run.steps[0].consumedIngredients = [
+      {
+        actorUuid: context.actorUuid,
+        itemUuid: 'Actor.deleted.Item.missing',
+        name: null,
+        img: null,
+        quantity: null,
+      },
+    ];
+  if (state === 'history-failure-awards') {
+    run.status = 'failed';
+    run.steps[0].status = 'failed';
+    run.steps[0].lastCheckResult = prototypeCheck(JOURNAL_PROTOTYPE_RECIPES.edge, false);
+  }
+  if (state === 'automatic-completion') run.completionMode = 'worldTime';
+  replacePrototypeFocus(containers.craftingRuns, run, true);
+  return true;
 }
 
 function requireRecipe(recipes, id) {
@@ -687,11 +1142,15 @@ function shortageStep(recipe, gate) {
 }
 
 function maturedGate() {
-  return { timeGate: { requiredSeconds: HOUR, initiatedAt: NOW - 2 * HOUR, availableAt: NOW - HOUR } };
+  return {
+    timeGate: { requiredSeconds: HOUR, initiatedAt: NOW - 2 * HOUR, availableAt: NOW - HOUR },
+  };
 }
 
 function futureGate() {
-  return { timeGate: { requiredSeconds: 4 * HOUR, initiatedAt: NOW - HOUR, availableAt: NOW + 3 * HOUR } };
+  return {
+    timeGate: { requiredSeconds: 4 * HOUR, initiatedAt: NOW - HOUR, availableAt: NOW + 3 * HOUR },
+  };
 }
 
 function stageBrowserRun(context, recipe) {
@@ -705,19 +1164,11 @@ function stageBrowserRun(context, recipe) {
           value: 17,
           data: { resolvedFormula: '1d20 + 3', total: 17, dc: 14 },
         },
-        consumedIngredients: [
-          { componentId: 'sm-steel-ingot', quantity: 2, name: 'Steel Ingot' },
-        ],
+        consumedIngredients: [{ componentId: 'sm-steel-ingot', quantity: 2, name: 'Steel Ingot' }],
       });
     }
     if (index === 1) return versionedRecipeStep(recipe, index, 'waitingTime', futureGate());
-    return versionedRecipeStep(recipe, index, 'pending', {
-      lastCheckResult: {
-        success: false,
-        value: 8,
-        data: { resolvedFormula: '1d20 + 1', total: 8, dc: 15 },
-      },
-    });
+    return versionedRecipeStep(recipe, index, 'pending');
   });
   return versionedCraftingRun(context, recipe, {
     id: 'lab-v1-stage-browser',
@@ -839,7 +1290,8 @@ function requireGatheringTask(tasks, mode) {
     const resolutionMode = entry?.resolutionMode ?? 'd100';
     return resolutionMode === mode;
   });
-  if (!task) throw new Error(`labRunStates: journal fixture requires a real ${mode} gathering task`);
+  if (!task)
+    throw new Error(`labRunStates: journal fixture requires a real ${mode} gathering task`);
   return task;
 }
 
@@ -853,12 +1305,7 @@ function pagingContainers(context, recipe) {
     startedAt: NOW - index * 60,
   }));
   const historyRuns = Array.from({ length: 6 }, (_unused, index) => ({
-    ...terminalCraftingCase(
-      context,
-      recipe,
-      'succeeded',
-      `lab-v1-finished-${index + 1}`
-    ),
+    ...terminalCraftingCase(context, recipe, 'succeeded', `lab-v1-finished-${index + 1}`),
     finishedAt: NOW - index * 60,
   }));
   return emptyRunContainers({ craftingActive: activeRuns, craftingHistory: historyRuns });
@@ -919,8 +1366,12 @@ function wideContainers(context, recipe) {
     status: 'waitingTime',
     currentStepIndex: 1,
     steps: recipeSteps(recipe).map((_entry, index) =>
-      versionedRecipeStep(recipe, index, index === 1 ? 'waitingTime' : index < 1 ? 'succeeded' : 'pending',
-        index === 1 ? futureGate() : {})
+      versionedRecipeStep(
+        recipe,
+        index,
+        index === 1 ? 'waitingTime' : index < 1 ? 'succeeded' : 'pending',
+        index === 1 ? futureGate() : {}
+      )
     ),
   });
   containers.craftingRuns.active = {
@@ -993,11 +1444,21 @@ export function createLabJournalCaseController({
     if (state === 'roll-cancelled') {
       return { success: false, cancelled: true, reason: 'roll-cancelled' };
     }
-    if (state === 'automatic-blocker' && command.action === 'execute') {
+    if (
+      ['automatic-blocker', 'material-shortage'].includes(state) &&
+      command.action === 'execute'
+    ) {
       return fixtureFailure('selection-required');
     }
 
-    applyFixtureCommand({ command, container, run, recipes, now: Number(nowWorldTime()) || NOW });
+    applyFixtureCommand({
+      command,
+      container,
+      run,
+      recipes,
+      state,
+      now: Number(nowWorldTime()) || NOW,
+    });
     persist();
     return { success: true };
   }
@@ -1020,7 +1481,7 @@ function locateActiveRun(containers, command) {
   return run ? { container, run } : null;
 }
 
-function applyFixtureCommand({ command, container, run, recipes, now }) {
+function applyFixtureCommand({ command, container, run, recipes, state, now }) {
   switch (command.action) {
     case 'setCompletionMode': {
       run.completionMode = command.payload?.completionMode === 'worldTime' ? 'worldTime' : 'manual';
@@ -1030,13 +1491,17 @@ function applyFixtureCommand({ command, container, run, recipes, now }) {
     case 'setSelection': {
       const stepIndex = Math.max(0, Number(command.payload?.stepIndex) || 0);
       if (run.steps?.[stepIndex]) {
-        run.steps[stepIndex].selectionPlan = cloneFixtureValue(command.payload?.selectionPlan ?? {});
+        run.steps[stepIndex].selectionPlan = cloneFixtureValue(
+          command.payload?.selectionPlan ?? {}
+        );
       }
       bumpRun(run);
       return;
     }
     case 'pause': {
-      const availableAt = Number(run.timeGate?.availableAt ?? run.steps?.[run.currentStepIndex]?.timeGate?.availableAt);
+      const availableAt = Number(
+        run.timeGate?.availableAt ?? run.steps?.[run.currentStepIndex]?.timeGate?.availableAt
+      );
       run.pauseState = {
         pausedAt: now,
         remainingSeconds: Number.isFinite(availableAt) ? Math.max(0, availableAt - now) : 0,
@@ -1066,7 +1531,7 @@ function applyFixtureCommand({ command, container, run, recipes, now }) {
       return;
     }
     case 'execute': {
-      completeFixtureRun({ container, run, recipes, now });
+      completeFixtureRun({ container, run, recipes, state, now });
     }
   }
 }
@@ -1075,8 +1540,8 @@ function bumpRun(run) {
   run.runRevision = Math.max(0, Number(run.runRevision) || 0) + 1;
 }
 
-function completeFixtureRun({ container, run, recipes, now }) {
-  if (run.taskId) completeGatheringFixture(run, now);
+function completeFixtureRun({ container, run, recipes, state, now }) {
+  if (run.taskId) completeGatheringFixture(run, now, state);
   else {
     const recipe = recipes.find((entry) => entry?.id === run.recipeId);
     const stepIndex = Math.max(0, Number(run.currentStepIndex) || 0);
@@ -1085,6 +1550,12 @@ function completeFixtureRun({ container, run, recipes, now }) {
       current.status = 'succeeded';
       current.completedAt = now;
       current.createdResults = authoredResults(recipe, stepIndex);
+      const prototypeKey = Object.keys(JOURNAL_PROTOTYPE_RECIPES).find(
+        (key) => journalPrototypeRecipeId(key) === run.recipeId
+      );
+      if (prototypeKey)
+        recordPrototypeStage({ actorUuid: run.actorUuid }, prototypeKey, current, stepIndex, true);
+      else current.resolutionSnapshot = { kind: 'none', mode: 'simple' };
       if (recipe?.craftingSystemId === LAB_SYSTEM_IDS.RUNEWORK) {
         current.lastCheckResult = {
           success: true,
@@ -1095,16 +1566,29 @@ function completeFixtureRun({ container, run, recipes, now }) {
       }
     }
   }
-  finishFixtureRun({ container, run, status: 'succeeded', now });
+  finishFixtureRun({
+    container,
+    run,
+    status: state === 'history-gathering-check-failure' ? 'failed' : 'succeeded',
+    now,
+  });
 }
 
-function completeGatheringFixture(run, now) {
+function completeGatheringFixture(run, now, state = '') {
   const task = run.economyEvidence?.runtimeSnapshot?.task ?? {};
   const mode = task.resolutionMode ?? 'd100';
-  const roll = mode === 'd100' ? 25 : 17;
+  const rolls = {
+    'history-d100-all-hit': 100,
+    'history-d100-all-miss': 1,
+    'history-gathering-check-failure': 3,
+  };
+  const roll = rolls[state] ?? (mode === 'd100' ? 75 : 17);
   const drops = (task.dropRows ?? []).filter((row) => row?.enabled !== false);
-  const clearedDrops = drops.filter((row) => Number(row.dropRate) >= roll);
-  const firstGroup = task.resultGroups?.[0];
+  const clearedDrops = drops.filter((row) => roll >= 101 - Number(row.dropRate));
+  const firstGroup =
+    task.resultGroups?.find(
+      (group) => group.name === (state === 'history-gathering-check-failure' ? 'Barren' : 'Rich')
+    ) ?? task.resultGroups?.[0];
   const awarded = mode === 'd100' ? clearedDrops : (firstGroup?.results ?? []);
   run.createdResults = awarded.map((result) => ({
     actorUuid: run.actorUuid,
@@ -1117,18 +1601,40 @@ function completeGatheringFixture(run, now) {
     mode === 'straight'
       ? null
       : {
-          success: true,
-          outcome: mode === 'routed' ? firstGroup?.name ?? null : null,
+          success: state !== 'history-gathering-check-failure',
+          provider: mode === 'd100' ? 'd100' : 'formula',
+          ...(mode === 'routed' && { outcome: firstGroup?.name ?? null }),
           roll,
           value: roll,
-          data: { total: roll },
+          data: {
+            total: roll,
+            resolvedFormula: mode === 'd100' ? '1d100' : '1d20 + 2',
+            ...(mode === 'routed' && { dc: task.dc ?? 15 }),
+          },
           itemRows: drops.map((row) => ({
             id: row.id,
+            componentId: row.componentId,
             finalDropRate: row.dropRate,
-            roll,
-            awarded: clearedDrops.includes(row),
+            effectiveRoll: roll,
+            threshold: 101 - Number(row.dropRate),
+            dropped: clearedDrops.includes(row),
+            quantity: row.quantity,
           })),
         };
+  run.executionJournal = {
+    operationId: `${run.id}-collect`,
+    requestId: `${run.id}-request`,
+    baseRunRevision: run.runRevision ?? 0,
+    status: 'committed',
+    effects: [
+      {
+        effectId: 'results',
+        kind: 'createGatheredResults',
+        phase: 'applied',
+        receipt: cloneFixtureValue(run.createdResults),
+      },
+    ],
+  };
   run.completedAtWorldTime = now;
   run.updatedAtWorldTime = now;
 }
