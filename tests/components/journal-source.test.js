@@ -64,7 +64,7 @@ describe('JournalView layout + effects', () => {
   it('uses the prototype two-zone layout and stacks Active, Finished, then Detail', () => {
     const narrowBreakpoint = '@container fabricate-journal (max-width: 960px)';
 
-    assert.ok(viewSource.includes('grid-template-columns: minmax(310px, 0.72fr) minmax(0, 1.8fr)'), 'declares browse and detail tracks');
+    assert.ok(viewSource.includes('grid-template-columns: 336px minmax(0, 1fr)'), 'declares the prototype browse width and flexible detail track');
     assert.ok(viewSource.includes('container: fabricate-journal / inline-size;'), 'establishes the named size container');
     assert.ok(
       viewSource.includes(narrowBreakpoint),

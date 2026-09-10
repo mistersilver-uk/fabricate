@@ -1110,6 +1110,7 @@ a{color:var(--fab-accent)}
 
   <div class="spec" data-status="target" data-status-Callout="shipped" data-status-Notice="shipped" data-status-InfoStrip="target" data-status-Empty="target">
     <div class="spec-head"><h4>&lt;Callout&gt; &lt;Notice&gt; &lt;InfoStrip&gt; &lt;Empty&gt;</h4><span class="st st-shipped">Callout &middot; shipped</span><span class="st st-shipped">Notice &middot; shipped</span><span class="st st-target">InfoStrip &middot; target</span><span class="st st-target">Empty &middot; target</span></div>
+    <div class="delta"><b>Notice evidence API (issue 1648).</b> Optional <code>evidence()</code> snippet beneath the detail, with an 8px top margin and gap, 11px mono secondary ink. It carries bounded recorded check/receipt evidence belonging to this notice, never arbitrary page content. The default is absent. JournalFactRow's opt-in <code>inline</code> form composes compact This run facts using the existing <code>.k-fact</code> atom: muted label, adjacent 13px/500 mono value. Historical closed guidance uses the untitled neutral Callout.</div>
     <div class="stage col">
       <div class="unit"><span class="cap">callout &mdash; explains a rule that is always true, and stays put</span>
         <div class="k-callout"><svg class="i"><use href="#i-info"/></svg><div>Time only &mdash; nothing is awarded when this activity resolves. Reach for the info tint only when the note is about live state.</div></div></div>
@@ -2060,10 +2061,11 @@ a{color:var(--fab-accent)}
         <li><b>yield</b> (componentId, essence) → number — the per-unit contribution</li>
         <li><b>spare</b> (componentId) → number — from the stage’s claims map</li>
         <li><b>locked</b> boolean · <b>essenceLabel</b> (essence) <span class="req">required</span></li>
+        <li><b>history</b> optional recorded {totals, labels, requirements, carriers} account. Renders recorded channel totals and one actor-qualified physical carrier row with all of its contributions; no allocation controls, held stock, editable progress or steppers. Absence retains the active allocation form.</li>
       </ul></div>
     </div>
     <div class="delta"><b>Why the allocation is keyed to the stage and not to the requirement.</b> Model a spend per threshold and the same Duskglass can be allocated to Radiant and to Shadow independently, which lets a player satisfy both from one reagent they only own once. One allocation shared across every threshold on the stage is the only shape in which the arithmetic is honest, and it is why the source list is rendered once rather than repeated under each bar. Under a routed recipe the allocation is keyed by stage <em>and route</em>, because changing route changes what the stage is asking for.</div>
-    <div class="delta ok"><b>This refines the chooser family rather than replacing it.</b> The essence panel already in the set states the total, the contributions and the overshoot; what it lacked was the control that decides them and the shared-pool rule. Both are added here as the same primitive, so a surface that only needs to <em>report</em> a past spend renders the bars and rows with <code>locked</code> and no steppers.</div>
+    <div class="delta ok"><b>This refines the chooser family rather than replacing it.</b> Active allocation retains its shared pool. A historical account uses <code>history</code>, not disabled active controls: a channelled total and a source list once, with no invented live stock. Issue 1648 adds the second independent consumer, HistoricalRunDetail, beside StepDetails; rendered approval remains pending.</div>
     <div class="delta warn"><b>Candidate implementation.</b> Issue 1648 task 6 now supplies the component and its mounted shared-carrier arithmetic, but this entry remains <b>target</b> until the coordinated crafting consumer and short/met frames are registered and reviewed.</div>
   </div>
 <div class="spec" data-status="target" data-status-RunProgress="target" data-status-StageNav="target" data-status-StageCard="target">
@@ -2105,7 +2107,7 @@ a{color:var(--fab-accent)}
         <li><b>stage card</b> radius 9 — <code>bg-2</code> with a hairline when worked, transparent and dashed when not</li>
         <li><b>numeral</b> 24 round, mono 11; a tick when done, a pause glyph when held</li>
         <li><b>tag</b> a 999 pill, success for <em>Your move</em>, warning for <em>Paused</em>, absent otherwise</li>
-        <li><b>body indent</b> 48px, so text lines up under the stage name rather than the numeral</li>
+        <li><b>summary/facts indent</b> 48px, so text lines up under the stage name rather than the numeral; the current control body has 12px padding on every side below its separator</li>
       </ul></div>
       <div><h5>Svelte API</h5><ul>
         <li><b>stages</b> the run’s stage list · <b>current</b> index — the stage being worked</li>
@@ -2115,6 +2117,11 @@ a{color:var(--fab-accent)}
         <li><b>body</b> (stage) snippet — rendered for the worked stage only</li>
         <li><b>stage.status</b> when supplied owns the completion marker independently of browse position; failed or unexecuted stages never acquire a success checkmark from <code>state="past"</code>.</li>
         <li><b>showHeading</b> boolean = true — a single-stage surface may suppress the redundant numeral/name header while retaining the stage body</li>
+        <li><b>showNumber</b> boolean = true — a single stage retains its captured purpose heading while omitting the redundant numbered marker.</li>
+        <li><b>io</b> {kind, label, items, emptyText, tone}[] — paired inert input/output chip groups, before facts and the current-only body. Current shows Produces only; past shows Consumed/Produced; future shows Will consume/Will produce. The groups use the 48px name indent and a 12px gap.</li>
+        <li><b>presentation</b> active | history, default active — history has the filled radius-9 recap, never current controls or a browse-state dashed shell. A failed recap takes the danger edge. Every attempted stage renders together; unattempted stages have no recap.</li>
+        <li><b>note</b> optional inert looking-back/ahead sentence beneath the facts, in 10.5px subtle ink.</li>
+        <li><b>output()</b> optional preview snippet at the same summary indent, above the live control separator, for routed or progressive output compositions that need more than entry chips.</li>
         <li><b>blocker</b> string — the one line beside the Progress kicker</li>
       </ul></div>
     </div>

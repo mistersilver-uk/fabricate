@@ -2,6 +2,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import RunActionBar from '../../components/RunActionBar.svelte';
+  import { formatDurationHMS } from '../../util/formatDuration.js';
 
   let { run = null, journal = null, now = 0 } = $props();
   let cancelArmed = $state(false);
@@ -28,6 +29,13 @@
     currentContract ? actions.cancel === true : legacyContract && run?.canCancel === true
   );
   const reason = $derived(reasonFor(actions.disabledReason, gateReady));
+  const hasCheck = $derived(
+    Boolean(
+      run?.currentStep?.detail?.checkLabel ||
+      run?.currentStep?.resolutionSnapshot?.kind === 'check' ||
+      run?.gatheringYield?.mode === 'routed'
+    )
+  );
 
   function reasonFor(code, ready) {
     const key = {
@@ -52,13 +60,27 @@
   }
 
   function primaryLabel() {
+    if (currentContract && !gateReady)
+      return localize('FABRICATE.App.Journal.Actions.Wait', {
+        time: formatDurationHMS(availableAt - now),
+      });
+    if (run?.gatheringYield?.mode === 'd100')
+      return localize('FABRICATE.App.Journal.Actions.RollD100');
+    if (hasCheck) return localize('FABRICATE.App.Journal.Actions.RollCheck');
     if (run?.activityKind === 'gathering') return localize('FABRICATE.App.Journal.Actions.Collect');
     if (run?.activityKind === 'alchemy') return localize('FABRICATE.App.Journal.Actions.Brew');
     return localize(
       run?.isFinalStep
-        ? 'FABRICATE.App.Journal.Actions.FinishCrafting'
-        : 'FABRICATE.App.Journal.Actions.TriggerNextStep'
+        ? 'FABRICATE.App.Journal.Actions.Complete'
+        : 'FABRICATE.App.Journal.Actions.CompleteStage'
     );
+  }
+
+  function primaryIcon() {
+    if (!gateReady) return 'fas fa-hourglass-half';
+    if (run?.gatheringYield?.mode === 'd100') return 'fas fa-dice';
+    if (hasCheck) return 'fas fa-dice-d20';
+    return 'fas fa-check-double';
   }
 
   const completion = $derived(
@@ -92,7 +114,7 @@
       busy,
       label: primaryLabel(),
       busyLabel: localize('FABRICATE.App.Journal.Actions.Working'),
-      icon: 'fas fa-play',
+      icon: primaryIcon(),
       reason,
     }}
     pause={{

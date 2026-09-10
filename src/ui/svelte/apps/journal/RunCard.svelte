@@ -1,13 +1,13 @@
 <!-- Svelte 5 runes mode -->
 <!--
   RunCard renders one active run in the left column. It mirrors the gathering
-  EnvironmentCard idiom (64px thumb, ellipsised name) but adds a status pill, a
+  record-card idiom (30px icon, ellipsised name) with a status pill, a
   world-time countdown, and a progress bar.
 
   Countdown + progress are world-time driven (no wall-clock interval): `now` is
   the store's reactive world time, recomputed on the `updateWorldTime` tick, so
   `formatDurationHMS(availableAt - now)` and the progress fraction update when
-  game time advances. Selection is an accent border + success-soft background
+  game time advances. Selection is an accent border on the record's normal surface
   (NOT a box-shadow, which the .fabricate-app focus rule would clear on click) and
   aria-pressed. The card is a role=button with Enter/Space keyboard activation.
 -->
@@ -84,7 +84,7 @@
   onkeydown={onKey}
 >
   <div class="journal-run-card-main">
-    <Medallion art={img} alt="" size={38} />
+    <Medallion art={img} alt="" size={30} />
     <div class="journal-run-card-copy">
       <div class="journal-run-card-heading">
         <span class="journal-run-card-name" {title}>{title}</span>
@@ -112,45 +112,43 @@
           {#if stepLabel !== ''}<span class="journal-run-card-step">{stepLabel}</span>{/if}
         </div>
       {/if}
-      {#if hasGate}
-        <div class="journal-run-card-timing">
-          {#if progress !== null}
-            <div
-              class="journal-run-card-progress"
-              role="progressbar"
-              aria-label={localize('FABRICATE.App.Journal.Progress.Label')}
-              aria-valuemin="0"
-              aria-valuemax="100"
-              aria-valuenow={progressPercent}
-              data-run-progress={progressPercent}
-            >
-              <RunProgress
-                stages={Array.isArray(run?.steps) && run.steps.length > 0 ? run.steps : [{}]}
-                current={Math.max(0, Number(run?.stepIndex) || 0)}
-                progress={progressPercent}
-              />
-            </div>
-          {/if}
-          <div class="journal-run-card-countdown" data-run-countdown>
-            <i class="fas fa-clock" aria-hidden="true"></i>
-            {#if isReady}
-              <span
-                >{localize(
-                  isFinalStep
-                    ? 'FABRICATE.App.Journal.Countdown.ReadyToFinish'
-                    : 'FABRICATE.App.Journal.Countdown.ReadyToContinue'
-                )}</span
-              >
-            {:else}
-              <span
-                >{localize('FABRICATE.App.Journal.Countdown.Remaining', { time: remaining })}</span
-              >
-            {/if}
-          </div>
-        </div>
-      {/if}
     </div>
   </div>
+  {#if hasGate}
+    <div class="journal-run-card-timing">
+      {#if progress !== null}
+        <div
+          class="journal-run-card-progress"
+          role="progressbar"
+          aria-label={localize('FABRICATE.App.Journal.Progress.Label')}
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow={progressPercent}
+          data-run-progress={progressPercent}
+        >
+          <RunProgress
+            stages={Array.isArray(run?.steps) && run.steps.length > 0 ? run.steps : [{}]}
+            current={Math.max(0, Number(run?.stepIndex) || 0)}
+            progress={progressPercent}
+          />
+        </div>
+      {/if}
+      <div class="journal-run-card-countdown" data-run-countdown>
+        <i class="fas fa-clock" aria-hidden="true"></i>
+        {#if isReady}
+          <span
+            >{localize(
+              isFinalStep
+                ? 'FABRICATE.App.Journal.Countdown.ReadyToFinish'
+                : 'FABRICATE.App.Journal.Countdown.ReadyToContinue'
+            )}</span
+          >
+        {:else}
+          <span>{localize('FABRICATE.App.Journal.Countdown.Remaining', { time: remaining })}</span>
+        {/if}
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -158,10 +156,10 @@
     box-sizing: border-box;
     display: block;
     width: 100%;
-    padding: var(--fab-space-2);
+    padding: var(--fab-space-3);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
+    border-radius: 9px;
+    background: var(--fab-bg-2);
     color: var(--fab-text);
     text-align: left;
     cursor: pointer;
@@ -171,11 +169,10 @@
     background: var(--fab-surface-raised);
   }
 
-  /* Selection is an accent border outline + success-soft fill (not a box-shadow,
+  /* Selection is an accent border outline (not a box-shadow,
      which the global .fabricate-app focus rule clears on mouse-click focus). */
   .journal-run-card.is-selected {
-    border-color: var(--fab-accent);
-    background: var(--fab-success-soft);
+    border-color: var(--fab-accent-border);
   }
 
   .journal-run-card-main {
@@ -203,6 +200,8 @@
   }
 
   .journal-run-card-name {
+    flex: 1 1 auto;
+    font-size: 12px;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -216,7 +215,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 12px;
+    font-size: 10.5px;
     color: var(--fab-text-muted);
   }
 
@@ -234,7 +233,7 @@
   }
 
   .journal-run-card-step {
-    font-size: 11px;
+    font-size: 10.5px;
   }
 
   /* GM secret preview marker. Deliberately styled as a warning-toned chip rather
@@ -256,8 +255,9 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
-    font-weight: 600;
+    font-family: var(--fab-font-mono);
+    font-size: 10px;
+    font-weight: 500;
     color: var(--fab-text);
     white-space: nowrap;
   }
@@ -276,5 +276,8 @@
   .journal-run-card-progress {
     min-width: 56px;
     flex: 1 1 auto;
+  }
+  .journal-run-card-timing {
+    margin-top: var(--fab-space-2);
   }
 </style>

@@ -52,7 +52,7 @@
   }
 </script>
 
-<div class="journal-history-row" class:is-selected={selected}>
+<div class="journal-history-row" class:is-selected={selected} class:is-failed={status === 'failed'}>
   <div
     class="journal-history-select"
     role="button"
@@ -63,7 +63,7 @@
     onclick={activate}
     onkeydown={onKey}
   >
-    <Medallion art={img} alt="" size={30} />
+    <Medallion art={img} alt="" size={26} />
     <div class="journal-history-copy">
       <span class="journal-history-name" {title}>{title}</span>
       <div class="journal-history-meta">
@@ -86,7 +86,7 @@
     {/if}
   </div>
   <IconButton
-    class="journal-history-dismiss"
+    class="journal-history-dismiss is-ghost"
     ariaLabel={localize('FABRICATE.App.Journal.History.Dismiss', { name: title })}
     title={localize('FABRICATE.App.Journal.History.Dismiss', { name: title })}
     data-journal-dismiss={id}
@@ -103,8 +103,8 @@
     width: 100%;
     padding: var(--fab-space-2);
     border: 1px solid var(--fab-border);
-    border-radius: 8px;
-    background: var(--fab-surface-soft);
+    border-radius: 9px;
+    background: var(--fab-bg-2);
     color: var(--fab-text);
     text-align: left;
     cursor: pointer;
@@ -122,9 +122,12 @@
     background: var(--fab-surface-raised);
   }
 
+  .journal-history-row.is-failed {
+    background: var(--fab-danger-soft);
+    border-color: var(--fab-danger-border);
+  }
   .journal-history-row.is-selected {
-    border-color: var(--fab-accent);
-    background: var(--fab-success-soft);
+    border-color: var(--fab-accent-border);
   }
 
   .journal-history-copy {
@@ -132,10 +135,11 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 1px;
   }
 
   .journal-history-name {
+    font-size: 11px;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -159,7 +163,7 @@
   }
 
   .journal-history-time {
-    font-size: 11px;
+    font-size: 9.5px;
     color: var(--fab-text-muted);
   }
 

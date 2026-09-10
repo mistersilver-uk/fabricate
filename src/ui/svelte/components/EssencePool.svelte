@@ -21,6 +21,7 @@
     incrementLabel = () => '',
     label = '',
     hint = '',
+    history = null,
   } = $props();
 
   function safeTint(tint) {
@@ -106,81 +107,111 @@
     </header>
   {/if}
 
-  <div class="fab-essence-thresholds">
-    {#each pools as threshold (threshold.essence)}
-      {@const got = totalFor(threshold)}
-      {@const need = Math.max(0, Number(threshold.amount) || 0)}
-      {@const isMet = got >= need}
-      {@const tint = safeTint(threshold.tint)}
-      <div class="fab-essence-threshold" data-essence-threshold={threshold.essence}>
+  {#if history}
+    <div class="fab-essence-thresholds" data-essence-history>
+      {#each Object.entries(history.totals ?? {}) as [essence, amount] (essence)}
         <div class="fab-essence-threshold-heading">
-          <Medallion icon={threshold.icon || 'fas fa-droplet'} {tint} size={26} glyph={12} />
-          <span class="fab-essence-name">{essenceLabel(threshold.essence)}</span>
-          <span
-            class:is-met={isMet}
-            class="fab-essence-total"
-            data-essence-total={threshold.essence}>{got} / {need}</span
+          <Medallion icon="fas fa-droplet" size={26} />
+          <span class="fab-essence-name">{history.labels?.[essence] || essenceLabel(essence)}</span>
+          <span class="fab-essence-total"
+            >{amount}{#if history.requirements?.some((entry) => entry.essenceId === essence)}
+              / {history.requirements
+                .filter((entry) => entry.essenceId === essence)
+                .reduce((sum, entry) => sum + Number(entry.amount), 0)}{/if}</span
           >
         </div>
-        <div
-          class="fab-essence-progress"
-          role="progressbar"
-          aria-label={essenceLabel(threshold.essence)}
-          aria-valuemin="0"
-          aria-valuemax={need}
-          aria-valuenow={Math.min(got, need)}
-        >
-          <FillBar
-            value={need > 0 ? (got / need) * 100 : 100}
-            size="sm"
-            tone={isMet ? 'success' : 'neutral'}
-            color={!isMet && tint ? `var(--fab-tag-${tint})` : ''}
-          />
-        </div>
-      </div>
-    {/each}
-  </div>
-
-  <div class="fab-essence-sources" data-essence-sources>
-    {#each sources as source (source.id)}
-      {@const value = allocated(source.id)}
-      {@const available = Math.max(0, Number(spare(source.id)) || 0)}
-      {@const maximum = everyPoolMet ? value : value + available}
-      <div class="fab-essence-source" data-essence-source={source.id}>
-        <Medallion
-          art={source.art || ''}
-          icon={source.icon || 'fas fa-flask'}
-          tint={source.tint || ''}
-          alt=""
-          size={26}
-        />
-        <div class="fab-essence-source-copy">
-          <span class="fab-essence-source-name">{source.label}</span>
-          <span class="fab-essence-source-reading"
-            >{sourceReading(source, contributionsFor(source), held(source.id), available)}</span
-          >
-        </div>
-        <Stepper
-          {value}
-          min={0}
-          max={maximum}
-          density="comfortable"
-          disabled={locked}
-          ariaLabel={allocationLabel(source)}
-          decrementLabel={decrementLabel(source)}
-          incrementLabel={incrementLabel(source)}
-          onChange={(next) => step(source, next)}
-        />
-      </div>
-    {/each}
-  </div>
-
-  {#if overshoots.length > 0}
-    <div class="fab-essence-overshoots" data-essence-overshoot>
-      {#each overshoots as overshoot (overshoot.essence)}
-        <span>{overshootLabel(essenceLabel(overshoot.essence), overshoot.amount)}</span>
       {/each}
     </div>
+    <div class="fab-essence-sources">
+      {#each history.carriers ?? [] as source (source.id)}
+        <div class="fab-essence-source" data-essence-history-carrier={source.id}>
+          <Medallion art={source.img || ''} icon="fas fa-flask" size={26} />
+          <div class="fab-essence-source-copy">
+            <span class="fab-essence-source-name">{source.label}</span>
+            <span class="fab-essence-source-reading"
+              >{sourceReading(source, source.contributions ?? [])}</span
+            >
+          </div>
+        </div>
+      {/each}
+    </div>
+  {:else}
+    <div class="fab-essence-thresholds">
+      {#each pools as threshold (threshold.essence)}
+        {@const got = totalFor(threshold)}
+        {@const need = Math.max(0, Number(threshold.amount) || 0)}
+        {@const isMet = got >= need}
+        {@const tint = safeTint(threshold.tint)}
+        <div class="fab-essence-threshold" data-essence-threshold={threshold.essence}>
+          <div class="fab-essence-threshold-heading">
+            <Medallion icon={threshold.icon || 'fas fa-droplet'} {tint} size={26} glyph={12} />
+            <span class="fab-essence-name">{essenceLabel(threshold.essence)}</span>
+            <span
+              class:is-met={isMet}
+              class="fab-essence-total"
+              data-essence-total={threshold.essence}>{got} / {need}</span
+            >
+          </div>
+          <div
+            class="fab-essence-progress"
+            role="progressbar"
+            aria-label={essenceLabel(threshold.essence)}
+            aria-valuemin="0"
+            aria-valuemax={need}
+            aria-valuenow={Math.min(got, need)}
+          >
+            <FillBar
+              value={need > 0 ? (got / need) * 100 : 100}
+              size="sm"
+              tone={isMet ? 'success' : 'neutral'}
+              color={!isMet && tint ? `var(--fab-tag-${tint})` : ''}
+            />
+          </div>
+        </div>
+      {/each}
+    </div>
+
+    <div class="fab-essence-sources" data-essence-sources>
+      {#each sources as source (source.id)}
+        {@const value = allocated(source.id)}
+        {@const available = Math.max(0, Number(spare(source.id)) || 0)}
+        {@const maximum = everyPoolMet ? value : value + available}
+        <div class="fab-essence-source" data-essence-source={source.id}>
+          <Medallion
+            art={source.art || ''}
+            icon={source.icon || 'fas fa-flask'}
+            tint={source.tint || ''}
+            alt=""
+            size={26}
+          />
+          <div class="fab-essence-source-copy">
+            <span class="fab-essence-source-name">{source.label}</span>
+            <span class="fab-essence-source-reading"
+              >{sourceReading(source, contributionsFor(source), held(source.id), available)}</span
+            >
+          </div>
+          <Stepper
+            {value}
+            min={0}
+            max={maximum}
+            density="comfortable"
+            disabled={locked}
+            ariaLabel={allocationLabel(source)}
+            decrementLabel={decrementLabel(source)}
+            incrementLabel={incrementLabel(source)}
+            onChange={(next) => step(source, next)}
+          />
+        </div>
+      {/each}
+    </div>
+
+    {#if overshoots.length > 0}
+      <div class="fab-essence-overshoots" data-essence-overshoot>
+        {#each overshoots as overshoot (overshoot.essence)}
+          <span>{overshootLabel(essenceLabel(overshoot.essence), overshoot.amount)}</span>
+        {/each}
+      </div>
+    {/if}
   {/if}
 </section>
 

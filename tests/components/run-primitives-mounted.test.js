@@ -40,7 +40,7 @@ const essenceHarness = createHarness('EssencePool', [
 ]);
 const progressHarness = createHarness('RunProgress', [component('FillBar')]);
 const stageNavHarness = createHarness('StageNav', [component('IconButton'), component('ManagerButton')]);
-const stageCardHarness = createHarness('StageCard', [component('Chip')]);
+const stageCardHarness = createHarness('StageCard', [component('Chip'), component('Kicker')]);
 const yieldHarness = createHarness('YieldScale', [component('Chip'), component('Medallion')]);
 const outcomeHarness = createHarness('OutcomeLadder', [component('Chip')]);
 const harnesses = [

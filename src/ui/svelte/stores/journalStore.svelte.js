@@ -37,6 +37,8 @@ export function createJournalStore({ services } = {}) {
   let busyRunId = $state('');
   let busyRunKey = $state('');
   let commandError = $state(null);
+  let commandResult = $state(null);
+  let selectionGeneration = 0;
   let authoritySetupBusy = $state(false);
   let authoritySetupError = $state(null);
   let commandRetry = null;
@@ -124,6 +126,11 @@ export function createJournalStore({ services } = {}) {
       });
       if (!isCurrentLoad()) return;
       listing = next ?? null;
+      if (
+        commandResult &&
+        ![...(listing?.history ?? [])].some((run) => runKey(run, listing) === commandResult.runKey)
+      )
+        commandResult = null;
       error = !next;
       reconcileCommandError();
       reconcileSelection();
@@ -159,6 +166,8 @@ export function createJournalStore({ services } = {}) {
   }
 
   function select(runOrId, runType = null) {
+    selectionGeneration += 1;
+    commandResult = null;
     const run = resolveRun(runOrId, runType, listing);
     selectedRunId = run?.id ?? (typeof runOrId === 'string' ? runOrId : '');
     selectedRunKey = run ? runKey(run, listing) : '';
@@ -234,14 +243,18 @@ export function createJournalStore({ services } = {}) {
   }
 
   function canSetupAuthority(run) {
-    return services?.isActiveGM?.() === true &&
+    return (
+      services?.isActiveGM?.() === true &&
       typeof services?.setupJournalRunAuthority === 'function' &&
-      run?.lifecycleContract === 'current' && run?.actions?.disabledReason === 'ledger-missing';
+      run?.lifecycleContract === 'current' &&
+      run?.actions?.disabledReason === 'ledger-missing'
+    );
   }
 
   async function setupAuthority(run) {
-    const current = [...allActiveRuns, ...allHistoryRuns]
-      .find((candidate) => runKey(candidate, listing) === runKey(run, listing));
+    const current = [...allActiveRuns, ...allHistoryRuns].find(
+      (candidate) => runKey(candidate, listing) === runKey(run, listing)
+    );
     if (authoritySetupBusy || busyRunKey || !canSetupAuthority(current)) return;
     const key = runKey(current, listing);
     authoritySetupBusy = true;
@@ -289,6 +302,9 @@ export function createJournalStore({ services } = {}) {
     )
       return;
     clearCommandError();
+    commandResult = null;
+    const selectionAtStart = selectionGeneration;
+    const actorAtStart = services?.getSelectedActorId?.() ?? null;
     busyRunId = run.id;
     busyRunKey = runKey(run, listing);
     const request = {
@@ -311,6 +327,16 @@ export function createJournalStore({ services } = {}) {
       if (result?.success === false) setCommandError(request, message);
       if (message) services?.notify?.(message);
       await load(true);
+      if (
+        action === 'execute' &&
+        result?.success === true &&
+        selectionAtStart === selectionGeneration &&
+        actorAtStart === (services?.getSelectedActorId?.() ?? null)
+      ) {
+        const completed = allHistoryRuns.find((entry) => runKey(entry, listing) === request.runKey);
+        if (completed && !completed.recoveryEvidence?.required && !completed.redacted)
+          commandResult = { runKey: request.runKey };
+      }
     } catch (err) {
       console.error(`Fabricate | Error running Journal ${action} command:`, err);
       const message = safeCommandMessage(services?.craftErrorMessage?.());
@@ -479,6 +505,9 @@ export function createJournalStore({ services } = {}) {
     },
     get commandError() {
       return commandError;
+    },
+    get commandResult() {
+      return commandResult;
     },
     get authoritySetupBusy() {
       return authoritySetupBusy;

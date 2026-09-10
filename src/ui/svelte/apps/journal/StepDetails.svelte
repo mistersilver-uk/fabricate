@@ -1,7 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import { formatDurationHMS } from '../../util/formatDuration.js';
   import EssencePool from '../../components/EssencePool.svelte';
   import SlotRow from '../../components/SlotRow.svelte';
   import Select from '../../components/Select.svelte';
@@ -36,7 +35,9 @@
     if (!editable) return localize('FABRICATE.App.Journal.Stage.Locked');
     if (slots.some((slot) => slot.stale))
       return localize('FABRICATE.App.Journal.Stage.StaleSelection');
-    return localize('FABRICATE.App.Journal.Stage.RequirementsHint');
+    return slots.some((slot) => slot.kind === 'choice')
+      ? localize('FABRICATE.App.Journal.Stage.RequirementsHint')
+      : '';
   });
 
   function tintOf(value) {
@@ -272,35 +273,6 @@
     }
   }
   const carrier = (id) => pool?.carriers?.find((entry) => entry.itemKey === id);
-  const consumed = $derived(
-    Array.isArray(step?.consumedIngredients) ? step.consumedIngredients : []
-  );
-  const lastCheck = $derived(step?.lastCheckResult ?? null);
-  const rollResult = $derived(
-    formatRoll(
-      String(lastCheck?.formula ?? ''),
-      numberOrNaN(lastCheck?.total),
-      numberOrNaN(lastCheck?.value),
-      numberOrNaN(lastCheck?.dc)
-    )
-  );
-
-  function numberOrNaN(raw) {
-    return raw == null ? Number.NaN : Number(raw);
-  }
-  function formatRoll(formula, total, value, dc) {
-    if (formula !== '' && Number.isFinite(total)) {
-      return Number.isFinite(dc)
-        ? localize('FABRICATE.App.Journal.StepDetails.RollResultWithDc', { formula, total, dc })
-        : localize('FABRICATE.App.Journal.StepDetails.RollResult', { formula, total });
-    }
-    if (Number.isFinite(value)) {
-      return Number.isFinite(dc)
-        ? localize('FABRICATE.App.Journal.StepDetails.RollResultValueWithDc', { value, dc })
-        : localize('FABRICATE.App.Journal.StepDetails.RollResultValue', { value });
-    }
-    return '';
-  }
 </script>
 
 <div
@@ -384,7 +356,9 @@
       locked={!editable || busy}
       essenceLabel={(essence) =>
         thresholds.find((threshold) => threshold.essence === essence)?.name ?? essence}
-      sourceReading={(_source, _contributions, heldCount, spareCount) =>
+      sourceReading={(_source, contributions, heldCount, spareCount) =>
+        contributions.map((entry) => `+${entry.amount} ${entry.label}`).join(' · ') +
+        ' · ' +
         localize('FABRICATE.App.Journal.Stage.CarrierReading', {
           held: heldCount,
           spare: spareCount,
@@ -402,34 +376,15 @@
   {/if}
 
   <div class="journal-stage-facts" data-journal-stage-evidence>
-    {#if Number(step?.detail?.requiredSeconds) > 0}<JournalFactRow
-        label={localize('FABRICATE.App.Journal.StepDetails.RequiresTime')}
-        value={formatDurationHMS(step.detail.requiredSeconds)}
-      />{/if}
     {#if step?.detail?.primaryToolName}<JournalFactRow
         label={localize('FABRICATE.App.Journal.StepDetails.PrimaryTool')}
         value={step.detail.primaryToolName}
-      />{/if}
-    {#if step?.detail?.checkLabel}<JournalFactRow
-        label={localize('FABRICATE.App.Journal.StepDetails.Check')}
-        value={step.detail.checkLabel}
-      />{/if}
-    {#if rollResult}<JournalFactRow
-        label={localize('FABRICATE.App.Journal.StepDetails.RollLabel')}
-        value={rollResult}
-        danger={lastCheck?.success === false}
       />{/if}
     {#if step?.detail?.failureText}<JournalFactRow
         label={localize('FABRICATE.App.Journal.StepDetails.Failure')}
         value={step.detail.failureText}
         danger
       />{/if}
-    {#each consumed as item, index (index)}
-      <JournalFactRow
-        label={localize('FABRICATE.App.Journal.StepDetails.ConsumedTitle')}
-        value={`${item.name ?? item.componentId} ${localize('FABRICATE.App.Journal.Quantity', { n: item.quantity })}`}
-      />
-    {/each}
   </div>
 </div>
 

@@ -516,7 +516,7 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 279;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 277;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -1041,4 +1041,6 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // file sits outside `src/ui/svelte/components/` and inside `src/ui/svelte/`, which is what
 // `unregisteredSharedComponents()` filters on. The same file under `components/` would be inside
 // the primitive directory and would demand a manifest row instead.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 46;
+// Issue 1648: ThisRun is an app-specific composition of InspectorCard, Kicker and
+// JournalFactRow, shared by the active and historical detail compositions.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 47;

@@ -20,6 +20,9 @@
   import JournalFactRow from './JournalFactRow.svelte';
   import StepDetails from './StepDetails.svelte';
   import TimeRemainingBox from './TimeRemainingBox.svelte';
+  import HistoricalRunDetail from './HistoricalRunDetail.svelte';
+  import ThisRun from './ThisRun.svelte';
+  import { presentStage, materialText } from './historyPresentation.js';
 
   let { run = null, journal = null, now = 0, services = null } = $props();
 
@@ -43,6 +46,7 @@
       : Math.max(0, Number(journal.viewedStageIndex) || 0)
   );
   const viewedStage = $derived(stages[viewedIndex] ?? run?.currentStep ?? null);
+  const viewedEvidence = $derived(presentStage(viewedStage, localize));
   const currentStage = $derived(run?.currentStep ?? stages[currentIndex] ?? null);
   const currentGate = $derived(run?.timeGate ?? currentStage?.timeGate ?? null);
   const viewedIsCurrent = $derived(stages.length === 0 || viewedIndex === currentIndex);
@@ -79,18 +83,7 @@
       ? localize(`FABRICATE.App.Journal.Mode.${gatheringYield.mode}`)
       : (run?.resolutionModeLabel ?? '')
   );
-  const startedLabel = $derived(calendarLabel(run?.startedAt));
   const finishedLabel = $derived(calendarLabel(run?.finishedAt));
-  const results = $derived(Array.isArray(run?.createdResults) ? run.createdResults : []);
-  const resultEntries = $derived(
-    results.map((result, index) => ({
-      id: JSON.stringify([result.itemUuid ?? result.componentId, index]),
-      name: result.name ?? result.componentId ?? localize('FABRICATE.App.Journal.Yields.Item'),
-      art: result.img ?? '',
-      chance: 100,
-      qty: Number(result.quantity) || 0,
-    }))
-  );
   const requiredSeconds = $derived(
     Number(summaryGate?.requiredSeconds ?? viewedStage?.detail?.requiredSeconds) || 0
   );
@@ -131,6 +124,7 @@
   const commandError = $derived(
     journal?.commandError?.runKey === runIdentity ? journal.commandError : null
   );
+  const transient = $derived(journal?.commandResult?.runKey === runIdentity);
   const canSetupAuthority = $derived(journal?.canSetupAuthority?.(run) === true);
   const authoritySetupError = $derived(
     journal?.authoritySetupError?.runKey === runIdentity ? journal.authoritySetupError : null
@@ -169,6 +163,10 @@
     if (run?.actions?.disabledReason === 'unsupportedLifecycle')
       return 'FABRICATE.App.Journal.Actions.UnsupportedLifecycle';
     if (terminal) return 'FABRICATE.App.Journal.WhatToExpect.Terminal';
+    if (!viewedIsCurrent)
+      return viewedIndex < currentIndex
+        ? 'FABRICATE.App.Journal.WhatToExpect.Past'
+        : 'FABRICATE.App.Journal.WhatToExpect.Future';
     if (run?.pauseState) return 'FABRICATE.App.Journal.WhatToExpect.Paused';
     if (run?.activityKind === 'gathering' || run?.runType === 'gathering')
       return run?.lifecycleContract === 'current'
@@ -183,7 +181,9 @@
       ? 'FABRICATE.App.Journal.WhatToExpect.Crafting'
       : 'FABRICATE.App.Journal.WhatToExpect.CraftingSingleStep';
   });
-  const guidance = $derived(localize(guidanceKey));
+  const guidance = $derived(
+    viewedIsCurrent ? localize(guidanceKey) : localize(guidanceKey, { index: currentIndex + 1 })
+  );
 
   function stageState(index) {
     const stageStatus = stages[index]?.status;
@@ -230,11 +230,20 @@
           id: `requirement-${index}`,
           icon: 'fas fa-box',
           label: localize('FABRICATE.App.Journal.Stage.Requirements'),
-          value: `${requirement.name ?? requirement.componentId} ${localize('FABRICATE.App.Journal.Quantity', { n: requirement.quantity })}`,
+          value: materialText(requirement, localize),
         });
       }
     }
     for (const [index, group] of (snapshot?.ingredientGroups ?? []).entries()) {
+      if (viewedIndex > currentIndex && group.options?.length > 1) {
+        facts.push({
+          id: `choice-${index}`,
+          value: localize('FABRICATE.App.Journal.History.FutureChoice', {
+            count: group.options.length,
+          }),
+        });
+        continue;
+      }
       const picked = Number(
         stage?.selectionPlan?.ingredientOptionOverrides?.[group?.id]?.optionIndex
       );
@@ -257,7 +266,7 @@
   }
 
   function stageFacts(stage) {
-    const facts = stageRequirementFacts(stage);
+    const facts = [];
     if (Number(stage?.detail?.requiredSeconds) > 0)
       facts.push({
         id: 'time',
@@ -271,36 +280,65 @@
         label: localize('FABRICATE.App.Journal.StepDetails.PrimaryTool'),
         value: stage.detail.primaryToolName,
       });
-    if (stage?.detail?.checkLabel)
+    if (viewedIndex > currentIndex && stage?.detail?.checkLabel)
       facts.push({
         id: 'check',
         label: localize('FABRICATE.App.Journal.StepDetails.Check'),
         value: stage.detail.checkLabel,
       });
-    if (formatRoll(stage?.lastCheckResult))
+    if (viewedIndex < currentIndex)
       facts.push({
         id: 'roll',
         icon: 'fas fa-dice-d20',
         label: localize('FABRICATE.App.Journal.StepDetails.RollLabel'),
-        value: formatRoll(stage.lastCheckResult),
+        value: presentStage(stage, localize).resolution,
       });
-    if (stage?.detail?.failureText)
+    if (viewedIndex < currentIndex && stage?.detail?.failureText)
       facts.push({
         id: 'failure',
         icon: 'fas fa-triangle-exclamation',
         label: localize('FABRICATE.App.Journal.StepDetails.Failure'),
         value: stage.detail.failureText,
       });
-    if (stage?.consumedIngredients?.length)
+    if (stage?.selectedRequirementSnapshot?.name)
       facts.push({
-        id: 'spent',
-        icon: 'fas fa-box-open',
-        label: localize('FABRICATE.App.Journal.StepDetails.ConsumedTitle'),
-        value: stage.consumedIngredients
-          .map((item) => `${item.name ?? item.componentId} ×${item.quantity}`)
-          .join(', '),
+        id: 'route',
+        label: localize('FABRICATE.App.Journal.Stage.Route'),
+        value: stage.selectedRequirementSnapshot.name,
       });
     return facts;
+  }
+
+  function stageIo() {
+    if (viewedIsCurrent && craftingYield && craftingYield.presentation !== 'entries') return [];
+    const text = (key) => localize(`FABRICATE.App.Journal.History.${key}`);
+    const past = viewedIndex < currentIndex;
+    const produced = viewedIsCurrent
+      ? (craftingYield?.entries ?? []).map((item) => ({
+          ...item,
+          label: materialText({ ...item, quantity: item.qty }, localize),
+        }))
+      : viewedEvidence.produced;
+    const io = [
+      {
+        kind: 'produced',
+        label: text(past ? 'Produced' : viewedIsCurrent ? 'Produces' : 'WillProduce'),
+        items: produced,
+        emptyText: text(
+          past && viewedStage?.createdResultsRecorded ? 'NothingBanked' : 'NotRecorded'
+        ),
+      },
+    ];
+    if (!viewedIsCurrent)
+      io.unshift({
+        kind: 'consumed',
+        label: text(past ? 'Consumed' : 'WillConsume'),
+        items: past
+          ? viewedEvidence.consumed
+          : stageRequirementFacts(viewedStage).map((fact) => ({ ...fact, label: fact.value })),
+        emptyText: text('NotRecorded'),
+      });
+    return io;
   }
 
   function personalizedChance(drop) {
@@ -376,6 +414,8 @@
         <h2>{run?.names?.title ?? ''}</h2>
         <div class="journal-detail-meta">
           {#if run?.names?.subtitle}<span>{run.names.subtitle}</span>{/if}
+          {#if resolutionModeLabel}<span>{resolutionModeLabel}</span>{/if}
+          {#if terminal && finishedLabel}<span>{finishedLabel}</span>{/if}
           <Chip
             density="list"
             tone={statusChipTone(statusView.tone)}
@@ -482,271 +522,246 @@
   {/if}
 
   {#if terminal}
-    <Notice
-      tone={status === 'succeeded' ? 'success' : status === 'failed' ? 'danger' : 'info'}
-      title={localize(`FABRICATE.App.Journal.Verdict.${status}`)}
-      detail={status === 'failed' ? (run?.failureReason ?? '') : ''}
-      dataAttr="data-journal-verdict"
-      dataValue={status}
-    />
-  {/if}
-
-  {#if stages.length > 0}
-    <section class="journal-detail-stages" data-journal-stages>
+    <HistoricalRunDetail {run} {services} {transient} />
+  {:else}
+    {#if stages.length > 0}
+      <section class="journal-detail-stages" data-journal-stages>
+        <RunProgress
+          {stages}
+          current={terminal ? -1 : currentIndex}
+          progress={elapsed}
+          blocker={progressBlocker}
+          label={localize('FABRICATE.App.Journal.Progress.Label')}
+        />
+        <StageNav
+          {stages}
+          current={currentIndex}
+          view={viewedIndex}
+          onView={(index) => journal?.viewStage?.(run, index)}
+          stageLabel={(stage, index) =>
+            localize('FABRICATE.App.Journal.Stage.Open', {
+              index: index + 1,
+              name: stage?.stepName ?? '',
+            })}
+          previousLabel={localize('FABRICATE.App.Journal.Stage.Previous')}
+          nextLabel={localize('FABRICATE.App.Journal.Stage.Next')}
+          positionLabel={(index, count) =>
+            localize('FABRICATE.App.Journal.Stage.Position', { index: index + 1, count })}
+          returnLabel={(index) =>
+            localize(
+              terminal
+                ? 'FABRICATE.App.Journal.Stage.ReturnFinal'
+                : 'FABRICATE.App.Journal.Stage.Return',
+              { index: index + 1 }
+            )}
+        />
+        {#if viewedStage}
+          <StageCard
+            stage={{
+              status: viewedStage.status,
+              name:
+                (stages.length === 1 ? viewedStage.presentationSnapshot?.description : '') ||
+                viewedStage.presentationSnapshot?.name ||
+                viewedStage.stepName ||
+                localize('FABRICATE.App.Journal.Stage.Number', { index: viewedIndex + 1 }),
+              summary:
+                stages.length > 1 && viewedIsCurrent
+                  ? viewedStage.presentationSnapshot?.description || ''
+                  : viewedStage.detail?.summary || '',
+            }}
+            index={viewedIndex}
+            current={!terminal && viewedIndex === currentIndex}
+            state={stageState(viewedIndex)}
+            tag={viewedIsCurrent && (status === 'ready' || run?.pauseState)
+              ? {
+                  label: localize(
+                    run?.pauseState
+                      ? 'FABRICATE.App.Journal.Stage.State.paused'
+                      : 'FABRICATE.App.Journal.History.YourMove'
+                  ),
+                  tone: run?.pauseState ? 'warning' : 'positive',
+                }
+              : null}
+            facts={stageFacts(viewedStage)}
+            showHeading={true}
+            showNumber={stages.length > 1}
+            io={stageIo()}
+            output={viewedIsCurrent && craftingYield && craftingYield.presentation !== 'entries'
+              ? craftingPreview
+              : null}
+            note={!viewedIsCurrent
+              ? localize(
+                  viewedIndex < currentIndex
+                    ? 'FABRICATE.App.Journal.History.PastNote'
+                    : 'FABRICATE.App.Journal.History.FutureNote'
+                )
+              : ''}
+          >
+            {#snippet body()}
+              <StepDetails
+                step={viewedStage}
+                {run}
+                {journal}
+                editable={!terminal &&
+                  viewedIndex === currentIndex &&
+                  run?.actions?.setSelection === true}
+              />
+            {/snippet}
+          </StageCard>
+        {/if}
+      </section>
+    {:else if currentGate && !run?.redacted}
       <RunProgress
-        {stages}
-        current={terminal ? -1 : currentIndex}
+        stages={[{}]}
+        current={0}
         progress={elapsed}
-        blocker={progressBlocker}
         label={localize('FABRICATE.App.Journal.Progress.Label')}
       />
-      <StageNav
-        {stages}
-        current={currentIndex}
-        view={viewedIndex}
-        onView={(index) => journal?.viewStage?.(run, index)}
-        stageLabel={(stage, index) =>
-          localize('FABRICATE.App.Journal.Stage.Open', {
-            index: index + 1,
-            name: stage?.stepName ?? '',
-          })}
-        previousLabel={localize('FABRICATE.App.Journal.Stage.Previous')}
-        nextLabel={localize('FABRICATE.App.Journal.Stage.Next')}
-        positionLabel={(index, count) =>
-          localize('FABRICATE.App.Journal.Stage.Position', { index: index + 1, count })}
-        returnLabel={(index) =>
-          localize(
-            terminal
-              ? 'FABRICATE.App.Journal.Stage.ReturnFinal'
-              : 'FABRICATE.App.Journal.Stage.Return',
-            { index: index + 1 }
-          )}
+    {/if}
+
+    {#if currentGate && viewedIsCurrent && run?.lifecycleContract !== 'current' && !run?.pauseState}<TimeRemainingBox
+        availableAt={currentGate.availableAt}
+        hintKey={run?.isFinalStep
+          ? 'FABRICATE.App.Journal.TimeRemaining.WhenPassedFinal'
+          : undefined}
+        {services}
+        {now}
+      />{/if}
+
+    {#if gatheringYield?.mode === 'routed' && outcomeTiers.length > 0}
+      <OutcomeLadder
+        tiers={outcomeTiers}
+        emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
+        label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
       />
-      {#if viewedStage}
-        <StageCard
-          stage={{
-            status: viewedStage.status,
-            name:
-              viewedStage.stepName ||
-              localize('FABRICATE.App.Journal.Stage.Number', { index: viewedIndex + 1 }),
-            summary: viewedStage.detail?.summary ?? '',
-          }}
-          index={viewedIndex}
-          current={!terminal && viewedIndex === currentIndex}
-          state={stageState(viewedIndex)}
-          tag={{
-            label: localize(`FABRICATE.App.Journal.Stage.State.${stageState(viewedIndex)}`),
-            tone: stageState(viewedIndex) === 'past' ? 'positive' : 'neutral',
-          }}
-          facts={stageFacts(viewedStage)}
-          showHeading={stages.length > 1}
-        >
-          {#snippet body()}
-            <StepDetails
-              step={viewedStage}
-              {run}
-              {journal}
-              editable={!terminal &&
-                viewedIndex === currentIndex &&
-                run?.actions?.setSelection === true}
-            />
-          {/snippet}
-        </StageCard>
+    {:else if gatheringYield && displayedYieldEntries.length > 0}
+      {#if yieldPreviewLoading}
+        <Notice
+          tone="info"
+          title={localize('FABRICATE.App.Journal.Yields.LoadingPreview')}
+          dataAttr="data-journal-yield-loading"
+          dataValue="true"
+        />
+      {:else if yieldPreviewError}
+        <Notice
+          tone="warning"
+          title={localize('FABRICATE.App.Journal.Yields.PreviewError')}
+          dataAttr="data-journal-yield-error"
+          dataValue="true"
+        />
       {/if}
-    </section>
-  {/if}
-
-  {#if currentGate && !terminal && !run?.pauseState}<TimeRemainingBox
-      availableAt={currentGate.availableAt}
-      hintKey={run?.isFinalStep ? 'FABRICATE.App.Journal.TimeRemaining.WhenPassedFinal' : undefined}
-      {services}
-      {now}
-    />{/if}
-
-  {#if gatheringYield?.mode === 'routed' && outcomeTiers.length > 0}
-    <OutcomeLadder
-      tiers={outcomeTiers}
-      emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
-      label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
-    />
-  {:else if gatheringYield && displayedYieldEntries.length > 0}
-    {#if yieldPreviewLoading}
-      <Notice
-        tone="info"
-        title={localize('FABRICATE.App.Journal.Yields.LoadingPreview')}
-        dataAttr="data-journal-yield-loading"
-        dataValue="true"
-      />
-    {:else if yieldPreviewError}
-      <Notice
-        tone="warning"
-        title={localize('FABRICATE.App.Journal.Yields.PreviewError')}
-        dataAttr="data-journal-yield-error"
-        dataValue="true"
+      <YieldScale
+        entries={displayedYieldEntries}
+        roll={gatheringYield.roll}
+        label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
+        labels={{
+          threshold: (entry) =>
+            localize('FABRICATE.App.Journal.Yields.Chance', { chance: entry.chance }),
+          cleared: (entry) =>
+            localize('FABRICATE.App.Journal.Yields.Awarded', { chance: entry.chance }),
+          missed: (entry) =>
+            localize('FABRICATE.App.Journal.Yields.Missed', { chance: entry.chance }),
+          quantity: (entry) => localize('FABRICATE.App.Journal.Quantity', { n: entry.qty }),
+          chance: (entry) => `${entry.chance}%`,
+          cut: (roll) => String(roll),
+        }}
       />
     {/if}
-    <YieldScale
-      entries={displayedYieldEntries}
-      roll={gatheringYield.roll}
-      label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
-      labels={{
-        threshold: (entry) =>
-          localize('FABRICATE.App.Journal.Yields.Chance', { chance: entry.chance }),
-        cleared: (entry) =>
-          localize('FABRICATE.App.Journal.Yields.Awarded', { chance: entry.chance }),
-        missed: (entry) =>
-          localize('FABRICATE.App.Journal.Yields.Missed', { chance: entry.chance }),
-        quantity: (entry) => localize('FABRICATE.App.Journal.Quantity', { n: entry.qty }),
-        chance: (entry) => `${entry.chance}%`,
-        cut: (roll) => String(roll),
-      }}
-    />
-  {/if}
 
-  {#if craftingYield}
-    <div data-journal-crafting-yield={craftingYield.presentation}>
-      {#if craftingYield.presentation === 'tiers'}
-        <OutcomeLadder
-          tiers={craftingYield.tiers ?? []}
-          emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
-          label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
-          hint={localize('FABRICATE.App.Journal.Yields.CraftingPreviewHint')}
-        />
-      {:else if craftingYield.presentation === 'progressive'}
-        <InspectorCard>
-          <h3>{localize('FABRICATE.App.Journal.Yields.ProgressiveTitle')}</h3>
-          <p>{localize('FABRICATE.App.Journal.Yields.ProgressiveHint')}</p>
-          <JournalFactRow
-            label={localize('FABRICATE.App.Journal.Yields.AwardMode')}
-            value={localize(
-              `FABRICATE.App.Journal.Yields.AwardModes.${craftingYield.progressive?.awardMode ?? 'equal'}`
-            )}
-          />
-          {#each craftingYield.progressive?.stages ?? [] as entry, index (index)}
-            <JournalFactRow
-              label={`${index + 1}. ${entry.name}`}
-              value={entry.cost == null
-                ? localize('FABRICATE.App.Journal.Yields.UnknownCost')
-                : localize('FABRICATE.App.Journal.Yields.BudgetCost', {
-                    quantity: entry.quantity,
-                    cost: entry.cost,
-                  })}
+    {#snippet craftingPreview()}
+      {#if craftingYield}
+        <div data-journal-crafting-yield={craftingYield.presentation}>
+          {#if craftingYield.presentation === 'tiers'}
+            <OutcomeLadder
+              tiers={craftingYield.tiers ?? []}
+              emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
+              label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
+              hint={localize('FABRICATE.App.Journal.Yields.CraftingPreviewHint')}
             />
-          {/each}
-        </InspectorCard>
-      {:else if craftingYield.presentation === 'entries'}
-        <YieldScale
-          entries={craftingYield.entries ?? []}
-          label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
-          hint={localize('FABRICATE.App.Journal.Yields.CraftingPreviewHint')}
-          labels={{
-            threshold: () => localize('FABRICATE.App.Journal.Yields.OnSuccess'),
-            quantity: (entry) => localize('FABRICATE.App.Journal.Quantity', { n: entry.qty }),
-            chance: () => localize('FABRICATE.App.Journal.Yields.PreviewChip'),
-          }}
-        />
+          {:else if craftingYield.presentation === 'progressive'}
+            <InspectorCard>
+              <h3>{localize('FABRICATE.App.Journal.Yields.ProgressiveTitle')}</h3>
+              <p>{localize('FABRICATE.App.Journal.Yields.ProgressiveHint')}</p>
+              <JournalFactRow
+                label={localize('FABRICATE.App.Journal.Yields.AwardMode')}
+                value={localize(
+                  `FABRICATE.App.Journal.Yields.AwardModes.${craftingYield.progressive?.awardMode ?? 'equal'}`
+                )}
+              />
+              {#each craftingYield.progressive?.stages ?? [] as entry, index (index)}
+                <JournalFactRow
+                  label={`${index + 1}. ${entry.name}`}
+                  value={entry.cost == null
+                    ? localize('FABRICATE.App.Journal.Yields.UnknownCost')
+                    : localize('FABRICATE.App.Journal.Yields.BudgetCost', {
+                        quantity: entry.quantity,
+                        cost: entry.cost,
+                      })}
+                />
+              {/each}
+            </InspectorCard>
+          {/if}
+        </div>
       {/if}
-    </div>
+    {/snippet}
+
+    {#if viewedIsCurrent}<div class="journal-detail-summary" data-journal-summary>
+        <InspectorCard class="journal-summary-card" data-journal-summary-card="time">
+          <div class="journal-summary-heading">
+            <Medallion size={26} icon="fas fa-clock" />
+            <h3>{localize('FABRICATE.App.Journal.Summary.Time')}</h3>
+          </div>
+          <JournalFactRow
+            icon="fa-clock"
+            label={localize('FABRICATE.App.Journal.Summary.Needs')}
+            value={requiredSeconds > 0
+              ? formatDurationHMS(requiredSeconds)
+              : localize('FABRICATE.App.Journal.Summary.None')}
+          />
+          <JournalFactRow
+            icon="fa-hourglass-half"
+            label={localize('FABRICATE.App.Journal.Summary.Left')}
+            value={remainingTime}
+          />
+          {#if readyAtLabel}<JournalFactRow
+              icon="fa-calendar"
+              label={localize('FABRICATE.App.Journal.Summary.ReadyAt')}
+              value={readyAtLabel}
+            />{/if}
+        </InspectorCard>
+        <InspectorCard class="journal-summary-card" data-journal-summary-card="check">
+          <div class="journal-summary-heading">
+            <Medallion
+              size={26}
+              icon={checkLabel ? 'fas fa-dice-d20' : 'fas fa-wand-magic-sparkles'}
+            />
+            <h3>
+              {localize(
+                checkLabel
+                  ? 'FABRICATE.App.Journal.Summary.Check'
+                  : 'FABRICATE.App.Journal.Summary.NoCheck'
+              )}
+            </h3>
+          </div>
+          <JournalFactRow
+            icon={checkLabel ? 'fa-dice-d20' : 'fa-circle-check'}
+            label={localize(
+              checkLabel
+                ? 'FABRICATE.App.Journal.Summary.DecidedBy'
+                : 'FABRICATE.App.Journal.Summary.NothingToRoll'
+            )}
+            value={checkLabel || localize('FABRICATE.App.Journal.Summary.SimplyCompletes')}
+          />
+          {#if checkOutcome}<JournalFactRow
+              icon="fa-check"
+              label={localize('FABRICATE.App.Journal.Summary.Outcome')}
+              value={checkOutcome}
+            />{/if}
+        </InspectorCard>
+      </div>{/if}
+    <ThisRun {run} {services} />
+    <Callout tone="neutral" text={guidance} dataAttr="data-journal-guidance" />
   {/if}
-
-  {#if resultEntries.length > 0}
-    <YieldScale
-      entries={resultEntries}
-      label={localize('FABRICATE.App.Journal.Yields.AwardedTitle')}
-      labels={{
-        threshold: () => localize('FABRICATE.App.Journal.Yields.Received'),
-        quantity: (entry) => localize('FABRICATE.App.Journal.Quantity', { n: entry.qty }),
-        chance: () => localize('FABRICATE.App.Journal.Yields.AwardedChip'),
-      }}
-    />
-  {/if}
-
-  <div class="journal-detail-summary" data-journal-summary>
-    <InspectorCard class="journal-summary-card" data-journal-summary-card="time">
-      <h3>{localize('FABRICATE.App.Journal.Summary.Time')}</h3>
-      <JournalFactRow
-        icon="fa-clock"
-        label={localize('FABRICATE.App.Journal.Summary.Needs')}
-        value={requiredSeconds > 0
-          ? formatDurationHMS(requiredSeconds)
-          : localize('FABRICATE.App.Journal.Summary.None')}
-      />
-      <JournalFactRow
-        icon="fa-hourglass-half"
-        label={localize('FABRICATE.App.Journal.Summary.Left')}
-        value={remainingTime}
-      />
-      {#if readyAtLabel}<JournalFactRow
-          icon="fa-calendar"
-          label={localize('FABRICATE.App.Journal.Summary.ReadyAt')}
-          value={readyAtLabel}
-        />{/if}
-    </InspectorCard>
-    <InspectorCard class="journal-summary-card" data-journal-summary-card="check">
-      <h3>
-        {localize(
-          checkLabel
-            ? 'FABRICATE.App.Journal.Summary.Check'
-            : 'FABRICATE.App.Journal.Summary.NoCheck'
-        )}
-      </h3>
-      <JournalFactRow
-        icon={checkLabel ? 'fa-dice-d20' : 'fa-circle-check'}
-        label={localize(
-          checkLabel
-            ? 'FABRICATE.App.Journal.Summary.DecidedBy'
-            : 'FABRICATE.App.Journal.Summary.NothingToRoll'
-        )}
-        value={checkLabel || localize('FABRICATE.App.Journal.Summary.SimplyCompletes')}
-      />
-      {#if checkOutcome}<JournalFactRow
-          icon="fa-check"
-          label={localize('FABRICATE.App.Journal.Summary.Outcome')}
-          value={checkOutcome}
-        />{/if}
-    </InspectorCard>
-  </div>
-
-  <section class="journal-detail-record" data-journal-record>
-    <h3>{localize('FABRICATE.App.Journal.Record.Title')}</h3>
-    <JournalFactRow
-      icon="fa-fingerprint"
-      label={localize('FABRICATE.App.Journal.About.RunId')}
-      value={run?.id ?? ''}
-    />
-    {#if run?.recipeId}<JournalFactRow
-        icon="fa-scroll"
-        label={localize('FABRICATE.App.Journal.Record.RecipeId')}
-        value={run.recipeId}
-      />{/if}
-    {#if run?.taskId}<JournalFactRow
-        icon="fa-leaf"
-        label={localize('FABRICATE.App.Journal.Record.TaskId')}
-        value={run.taskId}
-      />{/if}
-    {#if resolutionModeLabel}<JournalFactRow
-        icon="fa-diagram-project"
-        label={localize('FABRICATE.App.Journal.About.Mode')}
-        value={resolutionModeLabel}
-      />{/if}
-    {#if startedLabel}<JournalFactRow
-        icon="fa-clock"
-        label={localize('FABRICATE.App.Journal.About.Started')}
-        value={startedLabel}
-      />{/if}
-    {#if finishedLabel}<JournalFactRow
-        icon="fa-flag-checkered"
-        label={localize('FABRICATE.App.Journal.Record.Finished')}
-        value={finishedLabel}
-      />{/if}
-  </section>
-
-  <Callout
-    tone="info"
-    title={localize('FABRICATE.App.Journal.WhatToExpect.Title')}
-    text={`${guidance} ${localize('FABRICATE.App.Journal.Tips.WorldTime')} ${localize('FABRICATE.App.Journal.Tips.History')}`}
-    dataAttr="data-journal-guidance"
-  />
 </article>
 
 <style>
@@ -754,7 +769,7 @@
     display: grid;
     gap: var(--fab-space-4);
     min-width: 0;
-    padding: var(--fab-space-6);
+    padding: var(--fab-space-4) var(--fab-space-6);
   }
   .journal-detail-header {
     display: flex;
@@ -798,19 +813,6 @@
   }
   .journal-detail-summary h3 {
     margin: 0 0 var(--fab-space-1);
-    color: var(--fab-text-subtle);
-    font-size: 9px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .journal-detail-record {
-    display: grid;
-    gap: var(--fab-space-1);
-    padding-top: var(--fab-space-3);
-    border-top: 1px solid var(--fab-border);
-  }
-  .journal-detail-record h3 {
-    margin: 0 0 var(--fab-space-2);
     color: var(--fab-text-subtle);
     font-size: 9px;
     letter-spacing: 0.08em;

@@ -133,10 +133,7 @@
 </section>
 
 <style>
-  /* Each list region takes an equal half of the left column (flex: 1 1 0) so the
-     Active Runs and History sections are always the same height regardless of
-     content, and the empty state stays vertically centered in its half rather
-     than collapsing the section to the top third. */
+  /* Active takes the remaining space; Finished is content-sized by its browse host. */
   .journal-list-section {
     flex: 1 1 0;
     display: flex;
@@ -150,6 +147,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+    gap: var(--fab-space-2);
     overflow-y: auto;
   }
 

@@ -144,6 +144,39 @@ describe('journalStore', () => {
     rmSync(tempRoot, { recursive: true, force: true });
   });
 
+  it('correlates a trusted completed command notice and clears it on reselect', async () => {
+    const active = run({ lifecycleContract: 'current' });
+    const setup = makeServices({ listing: baseListing({ activeRuns: [active], history: [] }) });
+    const store = await loadedStore(setup);
+    setup.services.executeJournalRunCommand = async () => {
+      setup.state.listing = baseListing({ activeRuns: [], history: [{ ...active, status: 'succeeded', runRevision: 1 }] });
+      return { success: true, message: 'Untrusted presentation is not copied' };
+    };
+    await store.execute(active);
+    flushSync();
+    assert.deepEqual(store.commandResult, { runKey: active.key });
+    store.select(store.selectedRun);
+    assert.equal(store.commandResult, null);
+  });
+
+  for (const change of ['reselect', 'actor', 'timeout']) {
+    it(`does not publish transient evidence after ${change}`, async () => {
+      const active = run({ lifecycleContract: 'current' });
+      const setup = makeServices({ listing: baseListing({ activeRuns: [active], history: [] }) });
+      let complete;
+      setup.services.executeJournalRunCommand = () => new Promise((resolve) => { complete = resolve; });
+      const store = await loadedStore(setup);
+      const pending = store.execute(active);
+      if (change === 'reselect') store.select(active);
+      if (change === 'actor') setup.services.getSelectedActorId = () => 'actor-2';
+      setup.state.listing = baseListing({ activeRuns: [], history: [{ ...active, status: 'succeeded' }] });
+      complete(change === 'timeout' ? { success: false, reason: 'timeout' } : { success: true });
+      await pending;
+      assert.equal(store.commandResult, null);
+      assert.equal(store.busyRunKey, '');
+    });
+  }
+
   it('holds a single in-flight setup and treats cancellation and malformed replies truthfully', async () => {
     const pending = run({ lifecycleContract: 'current', actions: { disabledReason: 'ledger-missing' } });
     let complete;

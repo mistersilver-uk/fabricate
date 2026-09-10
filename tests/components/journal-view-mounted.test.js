@@ -26,6 +26,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/worldTimeLabel.js',
     'src/systems/foundryCalendar.js',
     'src/ui/svelte/apps/journal/journalRunStatus.js',
+    'src/ui/svelte/apps/journal/historyPresentation.js',
   ],
   compiledModules: [
     ...SELECT_COMPILED_MODULES,
@@ -57,6 +58,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
     'src/ui/svelte/apps/journal/ActionsPanel.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
+    'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte', 'src/ui/svelte/apps/journal/ThisRun.svelte',
     'src/ui/svelte/apps/journal/JournalView.svelte',
   ],
   rootClass: 'fabricate-app',
@@ -298,7 +300,7 @@ describe('JournalView mounted behavior', () => {
     const { store: singleStore } = makeJournal({ selectedRun: single, selectedRunKey: single.key });
     const singleTarget = await harness.mount({ services: makeServices(singleStore) });
     assert.ok(!singleTarget.querySelector('[data-stage-nav]'));
-    assert.ok(!singleTarget.querySelector('.fab-stage-card-heading'));
+    assert.ok(!singleTarget.querySelector('.fab-stage-card-number'));
     assert.ok(singleTarget.querySelector('.fab-stage-card-body'), 'the single stage body remains rendered');
 
     harness.remount();
@@ -324,9 +326,8 @@ describe('JournalView mounted behavior', () => {
     assert.equal(futureCard.getAttribute('data-stage-state'), 'future');
     assert.ok(futureCard.classList.contains('is-inactive'));
     assert.match(futureCard.textContent, /Coal/);
-    assert.match(futureCard.textContent, /RollResultWithDc/);
-    assert.match(futureCard.textContent, /The metal cracked/);
-    assert.equal(futureCard.querySelector('button, input'), null);
+    assert.doesNotMatch(futureCard.textContent, /RollResultWithDc|The metal cracked/);
+    assert.ok(!futureCard.querySelector('button, input'));
   });
 
   it('persists an exact held-item choice and a stage-scoped essence allocation', async () => {
@@ -400,11 +401,11 @@ describe('JournalView mounted behavior', () => {
       selectedRun: run, selectedRunKey: run.key, selectedRunId: run.id,
     });
     const target = await harness.mount({ services: makeServices(store) });
-    assert.match(target.querySelector('[data-yield-scale]').textContent, /Healing Potion/);
-    assert.ok(target.querySelector('[data-journal-record]'));
-    assert.match(target.querySelector('[data-journal-record]').textContent, /DayWithClock/u);
+    assert.match(target.querySelector('[data-history-items="produced"]').textContent, /Healing Potion/);
+    assert.ok(!target.querySelector('[data-journal-record]'));
+    assert.match(target.querySelector('[data-journal-this-run]').textContent, /DayWithClock/u);
     assert.ok(target.querySelector('[data-journal-guidance]'));
-    assert.ok(target.querySelector('[data-journal-verdict="succeeded"]'));
+    assert.ok(!target.querySelector('[data-journal-verdict="succeeded"]'), 'ordinary reselected history has no transient success banner');
   });
 
   it('anchors a terminal detail with no browse index at its final stage', async () => {
@@ -414,15 +415,11 @@ describe('JournalView mounted behavior', () => {
     const run = makeSucceededRun({ steps, stepIndex: null, currentStep: null });
     const { store, calls } = makeJournal({ selectedRun: run, viewedStageIndex: null });
     const target = await harness.mount({ services: makeServices(store) });
-    assert.equal(target.querySelector('[data-stage-nav-index="2"]').getAttribute('aria-pressed'), 'true');
+    assert.ok(!target.querySelector('[data-stage-nav]'));
     assert.ok(!target.querySelector('[data-stage-nav-return]'));
     assert.equal(target.querySelector('[data-stage-card]').dataset.stageState, 'past');
-    target.querySelector('[data-stage-nav-index="0"]').click();
-    flushSync();
-    const returnFinal = target.querySelector('[data-stage-nav-return]');
-    assert.match(returnFinal.textContent, /ReturnFinal/);
-    returnFinal.click();
-    assert.deepEqual(calls.viewStage.map((call) => call[1]), [0, 2]);
+    assert.equal(target.querySelectorAll('[data-stage-card]').length, 3);
+    assert.deepEqual(calls.viewStage, []);
   });
 
   it('renders the authoritative gathering preview separately from actual awards', async () => {
@@ -440,9 +437,9 @@ describe('JournalView mounted behavior', () => {
     });
     const { store } = makeJournal({ selectedRun: run, selectedRunKey: run.key });
     const target = await harness.mount({ services: makeServices(store) });
-    assert.equal(target.querySelectorAll('[data-yield-scale]').length, 2);
+    assert.equal(target.querySelectorAll('[data-yield-scale]').length, 1, 'active scale has no duplicate received aggregate');
     assert.ok(target.querySelector('[data-yield-cut]'));
-    assert.match(target.querySelector('[data-journal-record]').textContent, /d100/u);
+    assert.match(target.querySelector('.journal-detail-meta').textContent, /d100/u);
 
     harness.remount();
     const routed = makeGatheringRun({
@@ -460,8 +457,8 @@ describe('JournalView mounted behavior', () => {
     });
     const routedTarget = await harness.mount({ services: makeServices(routedStore) });
     assert.equal(routedTarget.querySelectorAll('[data-outcome-tier]').length, 2);
-    assert.match(routedTarget.querySelector('[data-journal-record]').textContent, /Mode\.routed/u);
-    assert.doesNotMatch(routedTarget.querySelector('[data-journal-record]').textContent, /null/u);
+    assert.match(routedTarget.querySelector('.journal-detail-meta').textContent, /Mode\.routed/u);
+    assert.doesNotMatch(routedTarget.querySelector('.journal-detail-meta').textContent, /null/u);
 
     harness.remount();
     const straight = makeGatheringRun({
@@ -478,7 +475,7 @@ describe('JournalView mounted behavior', () => {
     const straightTarget = await harness.mount({ services: makeServices(straightStore) });
     assert.ok(straightTarget.querySelector('[data-yield-entry="ore"]'));
     assert.equal(straightTarget.querySelector('[data-yield-cut]'), null);
-    assert.match(straightTarget.querySelector('[data-journal-record]').textContent, /Mode\.straight/u);
+    assert.match(straightTarget.querySelector('.journal-detail-meta').textContent, /Mode\.straight/u);
   });
 
   it('personalizes active d100 chances without replacing terminal evidence', async () => {
@@ -637,8 +634,9 @@ describe('JournalView mounted behavior', () => {
     harness.remount();
     store.viewedStageIndex = 1;
     const futureTarget = await harness.mount({ services: makeServices(store) });
-    assert.match(futureTarget.querySelector('[data-journal-summary-card="time"]').textContent, /2h 0m 0s/u);
-    const check = futureTarget.querySelector('[data-journal-summary-card="check"]').textContent;
+    assert.ok(!futureTarget.querySelector('[data-journal-summary]'));
+    assert.match(futureTarget.querySelector('[data-stage-card]').textContent, /2h 0m 0s/u);
+    const check = futureTarget.querySelector('[data-stage-card]').textContent;
     assert.match(check, /FUTURE CHECK/u);
     assert.doesNotMatch(check, /CURRENT CHECK/u);
   });

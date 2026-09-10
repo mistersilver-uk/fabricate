@@ -163,9 +163,9 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
   const objectResolving = resolved.filter(([, value]) => value !== undefined && typeof value !== 'string');
   assert.equal(
     objectResolving.length,
-    46,
-    'expected 46 legitimate namespace bases to resolve to an object — ' +
-      '#1648 adds Journal Actions, Mode, Verdict, Stage.State and Yields.AwardModes, whose ' +
+    47,
+    'expected 47 legitimate namespace bases to resolve to an object — ' +
+      '#1648 uses Journal Actions, Mode, Verdict, History, StepDetails and Yields.AwardModes (the parity correction replaces Stage.State), whose ' +
       'leaf suffixes are selected from run state. ' +
       'update this count only if the number of such bases genuinely changes. It fell from 44 ' +
       'when issue 1282 deleted `GatheringTravelTabs.svelte`, whose template literal was the ' +

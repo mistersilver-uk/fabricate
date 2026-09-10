@@ -126,6 +126,7 @@
     tone = 'danger',
     title = '',
     detail = '',
+    evidence = null,
     icon = '',
     action = null,
     dismissable = false,
@@ -181,6 +182,7 @@
     <div class="fab-notice-body">
       <div class="fab-notice-title">{title}</div>
       {#if detail}<div class="fab-notice-detail">{detail}</div>{/if}
+      {#if evidence}<div class="fab-notice-evidence">{@render evidence()}</div>{/if}
     </div>
     {#if action}
       <button
@@ -207,6 +209,14 @@
 {/if}
 
 <style>
+  .fab-notice-evidence {
+    display: grid;
+    gap: var(--fab-space-2);
+    margin-top: var(--fab-space-2);
+    font-family: var(--fab-font-mono);
+    font-size: 11px;
+    color: var(--fab-text-secondary);
+  }
   /* Theme-root tokens ONLY. NO scoped `<style>` may reference `--fab-manager-*`, or any other
      custom property `styles/fabricate.css` declares inside `.fabricate-manager`, from ANY
      directory — a component is placed in a directory, not in a DOM subtree, so its scoped CSS

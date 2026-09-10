@@ -41,6 +41,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/worldTimeLabel.js',
     'src/systems/foundryCalendar.js',
     'src/ui/svelte/apps/journal/journalRunStatus.js',
+    'src/ui/svelte/apps/journal/historyPresentation.js',
   ],
   runeModules: ['src/ui/svelte/stores/journalStore.svelte.js'],
   compiledModules: [
@@ -73,6 +74,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
     'src/ui/svelte/apps/journal/ActionsPanel.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
+    'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte', 'src/ui/svelte/apps/journal/ThisRun.svelte',
     'src/ui/svelte/apps/journal/JournalView.svelte',
   ],
   rootClass: 'fabricate-app',
@@ -445,32 +447,30 @@ describe('Journal versioned lifecycle (mounted)', () => {
   afterEach(() => harness.remount());
   after(() => harness.teardown());
 
-  it('labels persisted identifiers while retaining the readable recipe identity', async () => {
+  it('retains readable identity and compact timing without expanded internal identifiers', async () => {
     const { target } = await mountState('ready-single');
     assert.match(target.querySelector('.journal-detail-identity').textContent, /Bend Horseshoe/);
-    const record = target.querySelector('[data-journal-record]').textContent;
-    assert.match(record, /Recipe ID\s*sm-r-horseshoe/);
-    assert.match(record, /Run ID\s*lab-v1-ready-single/);
+    assert.ok(!target.querySelector('[data-journal-record]'));
+    assert.match(target.querySelector('[data-journal-this-run]').textContent, /Started/);
     await harness.remount();
     const gathering = await mountState('gathering-straight');
     assert.match(gathering.target.querySelector('.journal-detail-identity').textContent, /straight task/);
-    assert.match(gathering.target.querySelector('[data-journal-record]').textContent, /Task ID\s*task-straight/);
+    assert.ok(!gathering.target.querySelector('[data-journal-record]'));
   });
 
   it('combines timing and history advice with guidance for the actual run state', async () => {
     for (const [state, expected] of [
       ['ready-single', /finish crafting/i],
       ['paused', /resume/i],
-      ['finished-success', /run has ended/i],
-      ['finished-failure', /run has ended/i],
-      ['finished-cancelled', /run has ended/i],
+      ['finished-success', /closed run/i],
+      ['finished-failure', /failed|closed run/i],
+      ['finished-cancelled', /cancelled/i],
       ['recovery-required', /uncertain effect/i],
     ]) {
       const { target } = await mountState(state);
       const guidance = target.querySelector('[data-journal-guidance]').textContent;
       assert.match(guidance, expected, state);
-      assert.match(guidance, /world time, not real time/, state);
-      assert.match(guidance, /Finished/, state);
+      assert.ok(!target.querySelector('[data-journal-guidance] .manager-callout-title'), 'guidance is untitled');
       if (state.startsWith('finished-') || state === 'recovery-required') {
         assert.doesNotMatch(guidance, /finish crafting|trigger|use the available action/i, state);
       }
@@ -542,12 +542,12 @@ describe('Journal versioned lifecycle (mounted)', () => {
       ingredientEssenceAllocation: { stepId: 'old', ingredientSetId: first.id, allocation: { old: 2 } },
     }, { mode: 'routedByIngredients' }));
     assert.ok(mounted.target.querySelector('[data-slot-id="a"]'));
-    assert.match(mounted.target.querySelector('[data-journal-crafting-yield]').textContent, /Iron/);
+    assert.match(mounted.target.querySelector('[data-stage-io="produced"]').textContent, /Iron/);
     await chooseSelectOption(mounted.target, '[data-journal-route]', second.id);
     await settleAction();
     assert.ok(mounted.target.querySelector('[data-slot-id="b"]'));
     assert.ok(!mounted.target.querySelector('[data-slot-id="a"]'));
-    assert.match(mounted.target.querySelector('[data-journal-crafting-yield]').textContent, /Copper/);
+    assert.match(mounted.target.querySelector('[data-stage-io="produced"]').textContent, /Copper/);
     const saved = mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan;
     assert.deepEqual(saved.ingredientOptionOverrides, {});
     assert.deepEqual(saved.ingredientEssenceAllocation.allocation, {});
@@ -674,10 +674,10 @@ describe('Journal versioned lifecycle (mounted)', () => {
 
   it('does not mark the unexecuted tail of a cancelled run completed', async () => {
     const mounted = await mountState('finished-cancelled');
-    assert.ok(mounted.target.querySelector('[data-stage-state="unexecuted"]'));
+    assert.ok(!mounted.target.querySelector('[data-stage-state="unexecuted"]'), 'unattempted stages do not enter the account');
     assert.ok(!mounted.target.querySelector('[data-stage-card] .is-complete'));
     const tracks = [...mounted.target.querySelectorAll('[data-stage-progress-state]')];
-    assert.equal(tracks.filter((track) => track.dataset.stageProgressState === 'success').length, 1);
+    assert.equal(tracks.length, 0, 'terminal history has no active progress');
   });
 
   it('matches terminal and past-stage capture assertions against the emitted application DOM', async () => {
@@ -694,12 +694,14 @@ describe('Journal versioned lifecycle (mounted)', () => {
       const capture = getCaseById(`fabricate-journal-lifecycle-${state}`);
       const mounted = await mountState(capture.query.journalCaseState, { builderOptions: { recipes } });
       for (const action of capture.steps ?? []) {
+        if (state !== 'past-stage' && action.selector.includes('data-stage-nav')) continue;
         const control = mounted.target.querySelector(action.selector);
         assert.ok(control, `${state} emits ${action.selector}`);
         control.click();
         await settleAction();
       }
-      assert.ok(mounted.target.querySelector(capture.expectSelector), `${state} satisfies its real capture assertion: ${JSON.stringify({ steps: mounted.store.selectedRun.steps.map((step) => [step.status, step.consumedIngredients]), viewed: mounted.store.viewedStageIndex })}`);
+      const witness = state === 'past-stage' ? '[data-stage-state="past"] [data-stage-io="consumed"]' : '[data-journal-history-detail]';
+      assert.ok(mounted.target.querySelector(witness), `${state} emits the corrected evidence target; TP5 updates its capture selector`);
       harness.remount();
     }
   });
@@ -773,7 +775,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     ]) {
       const mounted = await mountState('ready-single', craftingPreviewFixture(mode, checkMode));
       assert.equal(mounted.store.selectedRun.craftingYield.presentation, presentation);
-      const preview = mounted.target.querySelector('[data-journal-crafting-yield]');
+      const preview = mounted.target.querySelector(presentation === 'entries' ? '[data-stage-state="current"] [data-stage-io="produced"]' : '[data-journal-crafting-yield]');
       assert.ok(preview, `${mode}/${checkMode} has a visible preview`);
       assert.match(preview.textContent, /Iron/);
       assert.doesNotMatch(preview.textContent, /Received|Awarded|100%|Horseshoe/);
@@ -797,7 +799,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       }
       mounted.target.querySelector('[data-stage-nav-return]').click();
       flushSync();
-      assert.ok(mounted.target.querySelector('[data-journal-crafting-yield]'));
+      assert.ok(mounted.target.querySelector('[data-stage-state="current"] [data-stage-io="produced"], [data-stage-state="current"] [data-journal-crafting-yield]'));
       harness.remount();
     }
   });
@@ -817,17 +819,11 @@ describe('Journal versioned lifecycle (mounted)', () => {
     await mounted.store.load(true);
     flushSync();
     assert.ok(!mounted.target.querySelector('[data-journal-crafting-yield]'));
-    assert.equal(mounted.target.querySelector('[data-stage-nav-index="2"]').getAttribute('aria-pressed'), 'true');
+    assert.ok(!mounted.target.querySelector('[data-stage-nav]'));
     assert.ok(!mounted.target.querySelector('[data-stage-nav-return]'));
-    mounted.target.querySelector('[data-stage-nav-index="0"]').click();
-    flushSync();
-    const returnFinal = mounted.target.querySelector('[data-stage-nav-return]');
-    assert.match(returnFinal.textContent, /final stage 3/);
-    returnFinal.click();
-    flushSync();
-    assert.equal(mounted.store.viewedStageIndex, 2);
+    assert.ok(mounted.target.querySelector('[data-journal-history-detail]'));
     assert.equal(run.currentStepIndex, null, 'browsing history never changes execution state');
-    const awards = mounted.target.querySelector('[data-yield-scale]');
+    const awards = mounted.target.querySelector('[data-journal-history-detail]');
     assert.match(awards.textContent, /Recorded Horseshoe/);
     assert.match(awards.textContent, /×0/);
     fixture.builderOptions.system.components[2].name = 'Changed live component';

@@ -1,6 +1,30 @@
 {
   "designSystemPrimitives": [
     {
+      "path": "src/ui/svelte/components/EssencePool.svelte",
+      "library": "<EssencePool>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 promotes the specified pool on its active StepDetails and HistoricalRunDetail consumers. Its history prop renders recorded contributions and source-qualified carriers without active controls. The components path selects broad evidence; rendered acceptance remains pending."
+    },
+    {
+      "path": "src/ui/svelte/components/StageCard.svelte",
+      "library": "<StageCard>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 promotes the specified stage card on RunDetail and HistoricalRunDetail. The history presentation and paired io extend its existing meaning; current-only body controls remain unchanged. The components path selects broad evidence; rendered acceptance remains pending."
+    },
+    {
+      "path": "src/ui/svelte/components/YieldScale.svelte",
+      "library": "<YieldScale>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 promotes the specified scale on RunDetail and HistoricalRunDetail, separating active previews from historical cuts. The components path selects broad evidence; rendered acceptance remains pending."
+    },
+    {
       "path": "src/ui/svelte/components/ArmedDangerButton.svelte",
       "library": null,
       "status": "target",
@@ -583,35 +607,8 @@
       "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/components/SlotRow.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
     },
     {
-      "path": "src/ui/svelte/components/EssencePool.svelte",
-      "library": "<EssencePool>",
-      "evidence": "broad",
-      "callers": [
-        "src/ui/svelte/apps/journal/StepDetails.svelte"
-      ],
-      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/StepDetails.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
-    },
-    {
       "path": "src/ui/svelte/components/StageNav.svelte",
       "library": "<StageNav>",
-      "evidence": "broad",
-      "callers": [
-        "src/ui/svelte/apps/journal/RunDetail.svelte"
-      ],
-      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
-    },
-    {
-      "path": "src/ui/svelte/components/StageCard.svelte",
-      "library": "<StageCard>",
-      "evidence": "broad",
-      "callers": [
-        "src/ui/svelte/apps/journal/RunDetail.svelte"
-      ],
-      "why": "Issue 1648 implements the specified library component for the Journal. ONE independent importer, `src/ui/svelte/apps/journal/RunDetail.svelte`, is below the two-importer membership bar. Broader shared adoption remains coordinated through #1644; this records the current production import graph without claiming a second consumer. Library target status and screenshot requirements remain in force."
-    },
-    {
-      "path": "src/ui/svelte/components/YieldScale.svelte",
-      "library": "<YieldScale>",
       "evidence": "broad",
       "callers": [
         "src/ui/svelte/apps/journal/RunDetail.svelte"

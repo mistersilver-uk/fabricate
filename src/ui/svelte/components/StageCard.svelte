@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import Chip from './Chip.svelte';
+  import Kicker from './Kicker.svelte';
 
   let {
     stage = {},
@@ -10,7 +11,12 @@
     tag = null,
     facts = [],
     body = null,
+    output = null,
     showHeading = true,
+    showNumber = true,
+    presentation = 'active',
+    io = [],
+    note = '',
   } = $props();
 
   const completed = $derived(
@@ -23,17 +29,28 @@
 <article
   class="fab-stage-card"
   class:is-current={current}
-  class:is-inactive={!current}
+  class:is-inactive={!current && presentation !== 'history'}
+  class:is-history={presentation === 'history'}
+  class:is-failed={state === 'failed'}
   class:is-headingless={!showHeading}
   data-stage-card={index}
   data-stage-state={state}
 >
   {#if showHeading}<header class="fab-stage-card-heading">
-      <span class="fab-stage-card-number" class:is-complete={completed} class:is-paused={paused}>
-        {#if completed}<i class="fas fa-check" aria-hidden="true"></i>
-        {:else if paused}<i class="fas fa-pause" aria-hidden="true"></i>
-        {:else}{index + 1}{/if}
-      </span>
+      {#if showNumber}<span
+          class="fab-stage-card-number"
+          class:is-complete={completed}
+          class:is-paused={paused}
+        >
+          {#if presentation === 'history' && state === 'failed'}<i
+              class="fas fa-xmark"
+              aria-hidden="true"
+            ></i>
+          {:else if presentation === 'history'}{index + 1}
+          {:else if completed}<i class="fas fa-check" aria-hidden="true"></i>
+          {:else if paused}<i class="fas fa-pause" aria-hidden="true"></i>
+          {:else}{index + 1}{/if}
+        </span>{/if}
       <span class="fab-stage-card-identity">
         <span class="fab-stage-card-name">{stage.name}</span>
         {#if stage.summary}<span class="fab-stage-card-summary">{stage.summary}</span>{/if}
@@ -43,6 +60,23 @@
       {/if}
     </header>{/if}
 
+  {#if output}<div class="fab-stage-card-output">{@render output()}</div>{/if}
+  {#if io.length > 0}
+    <div class="fab-stage-card-io">
+      {#each io as group (group.label)}
+        <div class="fab-stage-card-io-group" data-stage-io={group.kind}>
+          <Kicker>{group.label}</Kicker>
+          <div class="fab-stage-card-items">
+            {#each group.items ?? [] as item, index (item.id ?? index)}
+              <Chip tone={group.tone ?? 'neutral'} icon={item.icon ?? 'fas fa-box'}
+                >{item.label}</Chip
+              >
+            {:else}<span class="fab-stage-card-summary">{group.emptyText}</span>{/each}
+          </div>
+        </div>
+      {/each}
+    </div>
+  {/if}
   {#if current && body}
     <div class="fab-stage-card-body">{@render body(stage)}</div>
   {:else if !current && facts.length > 0}
@@ -56,6 +90,7 @@
       {/each}
     </div>
   {/if}
+  {#if note}<p class="fab-stage-card-note">{note}</p>{/if}
 </article>
 
 <style>
@@ -69,6 +104,34 @@
   .fab-stage-card.is-inactive {
     border: 1px dashed var(--fab-border);
     background: transparent;
+  }
+  .fab-stage-card.is-failed {
+    border-color: var(--fab-danger-border);
+  }
+  .fab-stage-card-io {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: var(--fab-space-3);
+    padding: 0 var(--fab-space-3) var(--fab-space-3) calc(var(--fab-space-6) * 2);
+  }
+  .fab-stage-card-io-group {
+    display: grid;
+    align-content: start;
+    gap: var(--fab-space-1);
+  }
+  .fab-stage-card-output {
+    padding: 0 var(--fab-space-3) var(--fab-space-3) calc(var(--fab-space-6) * 2);
+  }
+  .fab-stage-card-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fab-space-1);
+  }
+  .fab-stage-card-note {
+    margin: 0;
+    padding: 0 var(--fab-space-3) var(--fab-space-3) calc(var(--fab-space-6) * 2);
+    color: var(--fab-text-subtle);
+    font-size: 10.5px;
   }
 
   .fab-stage-card-heading {
@@ -99,6 +162,10 @@
   }
 
   .fab-stage-card-number.is-complete {
+    background: var(--fab-success);
+    color: var(--fab-on-accent);
+  }
+  .fab-stage-card.is-inactive .fab-stage-card-number.is-complete {
     background: var(--fab-success);
     color: var(--fab-on-accent);
   }
@@ -140,6 +207,7 @@
   }
 
   .fab-stage-card-body {
+    padding-left: var(--fab-space-3);
     padding-top: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
   }

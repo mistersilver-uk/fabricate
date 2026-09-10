@@ -1276,6 +1276,21 @@
   background: var(--fab-success);
 }
 
+/* Journal fact cards share header geometry across active and recorded accounts. */
+.fabricate-app .journal-summary-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--fab-space-2);
+  margin-bottom: var(--fab-space-2);
+}
+
+.fabricate-app .journal-history-row .journal-history-dismiss {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+}
+
 /* ==========================================
    Image path picker (environment editor)
    ========================================== */
