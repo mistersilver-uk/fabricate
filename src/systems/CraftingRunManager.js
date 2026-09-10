@@ -969,11 +969,11 @@ function buildSelectionPlan(selection) {
  * Allowlist optional historical stage evidence before it enters an actor flag or
  * an execution receipt. Callers own initiating-viewer disclosure; absent evidence
  * stays absent, and captured empty arrays remain an explicit zero.
- * @param {object} source
+ * @param {object} input
  * @returns {object}
  */
-export function craftingStepHistoryEvidence(source = {}) {
-  source ??= {};
+export function craftingStepHistoryEvidence(input = {}) {
+  const source = input ?? {};
   const evidence = {};
   const resolution = source.resolutionSnapshot;
   if (
