@@ -33,7 +33,11 @@ import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
+import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
 import { installFoundryShim } from './view-lab/foundry/installFoundryShim.js';
+import { installUpdateSemantics, makeGetFlag } from './view-lab/world/labFlags.js';
+import { createFoundryJournalRunAuthority } from '../src/systems/journalRunAuthority.js';
+import { createJournalRunCommandService, JOURNAL_RUN_SOCKET_KIND } from '../src/systems/journalRunCommands.js';
 
 const content = buildLabContent();
 const actors = buildLabActors(content);
@@ -345,8 +349,140 @@ function journalFixture(state) {
     actor, userId: 'user-lab-player', recipes, environments: seeded.environments,
     tasks: seeded.gatheringConfig.tasks, journalCaseState: state,
   });
-  return { actor, recipes, containers };
+  return { actor, recipes, containers, seeded };
 }
+
+function journalProjection(state, viewer = { id: 'user-lab-player', isGM: false }) {
+  const fixture = journalFixture(state);
+  const { actor, recipes, containers, seeded } = fixture;
+  installLabRunStates(actor, containers);
+  const getSystem = (id) => seeded.systems.find((entry) => entry.id === id);
+  const builder = new RunJournalBuilder({
+    craftingRunManager: new CraftingRunManager(),
+    salvageRunManager: new SalvageRunManager(),
+    gatheringRunSource: new GatheringRunManager(),
+    recipeManager: { getRecipe: (id) => recipes.find((recipe) => recipe.id === id) },
+    recipeVisibility: new RecipeVisibilityService(null, { getSystem }),
+    getSystem,
+    getGatheringTask: (_environmentId, taskId) => seeded.gatheringConfig.tasks.find((task) => task.id === taskId),
+    nowWorldTime: () => 1_209_600,
+  });
+  return builder.buildListing({ actor, viewer });
+}
+
+test('shortage fixtures persist an explicitly empty stage-scoped allocation, not an automatic suggestion', () => {
+  for (const state of ['material-shortage', 'automatic-blocker']) {
+    const { containers } = journalFixture(state);
+    const run = Object.values(containers.craftingRuns.active)[0];
+    const stage = run.steps[0];
+    assert.deepEqual(stage.selectionPlan.ingredientEssenceAllocation, {
+      stepId: stage.stepId,
+      ingredientSetId: stage.selectedIngredientSetId,
+      allocation: {},
+    });
+    assert.equal(run.recipeId, 'sm-r-chainmail', 'canonical inventory shortage, not prototype Sunward-route parity');
+    assert.equal(run.completionMode, state === 'automatic-blocker' ? 'worldTime' : 'manual');
+    assert.deepEqual(stage.consumedIngredients, []);
+  }
+});
+
+test('routed gathering fixture authors both success and failure outcomes for the whole ladder', () => {
+  const { seeded } = journalFixture('gathering-check');
+  const system = seeded.systems.find((entry) => entry.id === LAB_SYSTEM_IDS.HERBALISM);
+  const outcomes = system.gatheringCraftingCheck.routed.relativeOutcomes;
+  assert.deepEqual(outcomes.map(({ name, success }) => [name, success]), [
+    ['Abundant', true], ['Failed', false],
+  ]);
+  assert.ok(outcomes[1].dc < outcomes[0].dc, 'failure occupies the lower rolled band');
+  const tiers = journalProjection('gathering-check').activeRuns[0].gatheringYield.tiers;
+  assert.deepEqual(tiers.map(({ id, fail }) => [id, fail]), [
+    ['lab-abundant', false], ['lab-failed', true],
+  ], 'the real projection delivers both authored tiers to OutcomeLadder');
+});
+
+test('redacted owner is versioned only in its lifecycle case; existing blind fixtures stay legacy', () => {
+  const id = LAB_JOURNAL_CASE_STATE_RUN_IDS['redacted-owner'];
+  const legacy = journalFixture(null).containers.gatheringRuns.active[id];
+  const current = journalFixture('redacted-owner').containers.gatheringRuns.active[id];
+  assert.equal(Object.hasOwn(legacy, 'lifecycleVersion'), false);
+  assert.deepEqual(current, {
+    ...legacy, lifecycleVersion: 1, runRevision: 0, completionMode: 'manual', pausedDurationSeconds: 0,
+  });
+  assert.ok(current.taskId.startsWith('blind:'));
+  assert.equal(Object.hasOwn(current, 'economyEvidence'), false);
+  const projected = journalProjection('redacted-owner').activeRuns[0];
+  assert.equal(projected.actions.cancel, true);
+  assert.equal(projected.gatheringYield, null);
+});
+
+test('legacy capture targets remain in the real Journal projection and on their initial pages', () => {
+  const listing = journalProjection(null);
+  const history = listing.history.toSorted((left, right) => right.finishedAt - left.finishedAt);
+  assert.ok(history.slice(0, 4).some((run) => run.id === 'lab-run-succeeded-multi'));
+  const detail = history.find((run) => run.id === 'lab-run-succeeded-multi');
+  assert.ok(detail.steps.length > 1, 'legacy detail has a real multi-step recipe');
+  assert.ok(listing.activeRuns.some((run) => run.id === 'lab-gathering-blind-waiting'));
+  assert.ok(listing.activeRuns.length <= 4, 'legacy blind row needs no active-page navigation');
+});
+
+test('lab authority transport runs real prepare/resolve commands and restores the player before prompting/posting', async () => {
+  const ledger = fixtureFunction('./view-lab/world/labWorld.js', 'createLabRunAuthorityLedger', {
+    installUpdateSemantics, makeGetFlag,
+  })();
+  const player = { id: 'player', isGM: false };
+  const gm = { id: 'gm', isGM: true };
+  const game = { user: gm, users: { activeGM: gm }, journal: [ledger] };
+  const actor = { uuid: 'Actor.lab', testUserPermission: (user) => user === player };
+  const run = { id: 'run', lifecycleVersion: 1, runRevision: 0 };
+  const authority = createFoundryJournalRunAuthority({
+    game, reconstructExecutions: async () => ({ success: true }),
+  });
+  let prompts = 0;
+  let executions = 0;
+  const service = createJournalRunCommandService({
+    authority,
+    currentUser: () => game.user,
+    activeGM: () => gm,
+    getUser: (id) => [player, gm].find((user) => user.id === id),
+    resolveUuid: async () => actor,
+    emit: (...args) => game.socket.emit('module.fabricate', ...args),
+    randomId: () => crypto.randomUUID(),
+    promptCheck: async () => {
+      assert.equal(game.user, player, 'prompt runs in the initiating player context');
+      assert.equal(ledger.pages.size, 0, 'prepare releases its claim before the player prompt');
+      prompts++;
+      return { confirmed: true };
+    },
+    postRollHandoff: async () => assert.equal(game.user, player),
+    operations: { crafting: {
+      getRun: async () => run,
+      describeCheck: async () => ({ required: true, publicPrompt: { label: 'Craft' } }),
+      evaluateCheck: async () => ({ engineEvaluated: true, success: true, rollHandoff: { total: 17 } }),
+      execute: async ({ executionGrant, sender }) => {
+        assert.equal(game.user, gm);
+        assert.equal(sender, player, 'ownership remains sender-scoped');
+        assert.ok(authority.consumeExecutionGrant(executionGrant, { operation: 'execute' }));
+        executions++;
+        return { success: true };
+      },
+    } },
+  });
+  fixtureFunction('./view-lab/world/labWorld.js', 'installLabJournalTransport', {
+    JOURNAL_RUN_SOCKET_KIND,
+  })(game, service);
+  assert.equal((await service.bootstrapJournalRunAuthority()).success, true);
+  game.user = player;
+  const result = await service.executeJournalRunCommand({
+    actorUuid: actor.uuid, runType: 'crafting', runId: run.id, expectedRevision: 0, action: 'execute',
+  });
+  assert.equal(result.success, true);
+  assert.equal(prompts, 1);
+  assert.equal(executions, 1);
+  assert.equal(game.user, player);
+  assert.equal(ledger.pages.size, 0);
+  assert.ok(Object.values(ledger.getFlag('fabricate', 'journalRunAuthorityState').requests)
+    .every((request) => request.status === 'settled'));
+});
 
 test('alchemy Journal uses an authored recipe revealed to its player, not a missing/redacted fallback', () => {
   const seeded = buildLabContent({ journalCaseState: 'alchemy' });

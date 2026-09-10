@@ -495,7 +495,15 @@ function buildJournalCaseContainers({
   }
   if (state === 'legacy') return defaults;
   if (state === 'redacted-owner') {
-    return emptyRunContainers({ gatheringActive: Object.values(defaults.gatheringRuns.active) });
+    return emptyRunContainers({
+      gatheringActive: Object.values(defaults.gatheringRuns.active).map((run) => ({
+        ...run,
+        lifecycleVersion: 1,
+        runRevision: 0,
+        completionMode: 'manual',
+        pausedDurationSeconds: 0,
+      })),
+    });
   }
   if (state === 'no-actor-empty') return emptyRunContainers();
 
@@ -539,7 +547,10 @@ function journalCaseFactories(context) {
     'waiting-open-choice': () =>
       active(waiting('lab-v1-waiting-open-choice', choice(), { completionMode: 'manual' })),
     'material-shortage': () =>
-      active(waiting('lab-v1-material-shortage', shortage(), { completionMode: 'manual' })),
+      active(waiting('lab-v1-material-shortage', shortage(), {
+        completionMode: 'manual',
+        steps: [shortageStep(shortage(), futureGate())],
+      })),
     'ingredient-route': () =>
       active(
         versionedCraftingRun(context, ingredientRoute(), {
@@ -585,7 +596,7 @@ function journalCaseFactories(context) {
           id: 'lab-v1-automatic-blocker',
           status: 'waitingTime',
           completionMode: 'worldTime',
-          steps: [versionedRecipeStep(shortage(), 0, 'waitingTime', maturedGate())],
+          steps: [shortageStep(shortage(), maturedGate())],
         })
       ),
     dismissal: () => finished(terminalCraftingCase(context, single(), 'succeeded', 'lab-v1-dismissal')),
@@ -659,6 +670,18 @@ function versionedCraftingRun(context, recipe, overrides = {}) {
     ...(overrides.pauseState && { pauseState: overrides.pauseState }),
     ...(overrides.executionJournal && { executionJournal: overrides.executionJournal }),
   };
+}
+
+function shortageStep(recipe, gate) {
+  const current = versionedRecipeStep(recipe, 0, 'waitingTime', gate);
+  // No allocation means "suggest one"; an explicit empty allocation means the player has
+  // allocated nothing. This is canonical Chainmail shortage evidence, not Sunward-route parity.
+  current.selectionPlan.ingredientEssenceAllocation = {
+    stepId: current.stepId,
+    ingredientSetId: current.selectedIngredientSetId,
+    allocation: {},
+  };
+  return current;
 }
 
 function maturedGate() {

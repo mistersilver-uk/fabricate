@@ -22,6 +22,7 @@
  */
 import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
+import { JOURNAL_RUN_SOCKET_KIND } from '../../../src/systems/journalRunCommands.js';
 
 import { buildLabActors, buildDocumentIndex } from './labActors.js';
 import {
@@ -31,6 +32,7 @@ import {
   seedJournalNoCheckFixture,
 } from './labContent.js';
 import { seedLabInteractables } from './labInteractables.js';
+import { installUpdateSemantics, makeGetFlag } from './labFlags.js';
 import {
   buildLabBlindRunSecret,
   buildLabRunStates,
@@ -59,7 +61,10 @@ function seedGatheringTaskMode(content, mode) {
       dc: 15,
       type: 'relative',
       thresholdMode: 'meet',
-      relativeOutcomes: [{ id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 }],
+      relativeOutcomes: [
+        { id: 'lab-abundant', name: 'Abundant', success: true, dc: 0 },
+        { id: 'lab-failed', name: 'Failed', success: false, dc: -15 },
+      ],
     } };
   }
   const replaceTask = (entry) => entry.id === task.id ? task : entry;
@@ -448,12 +453,20 @@ export async function buildLabWorld({
 
   const shim = installFoundryShim(world);
   world.shim = shim;
+  if (journalCaseState !== 'authority-unavailable') {
+    const ledger = createLabRunAuthorityLedger();
+    const journal = globalThis.game.journal;
+    const get = journal.get;
+    journal.contents.push(ledger);
+    journal.get = (id) => id === ledger.id ? ledger : get(id);
+  }
 
   // Dynamic, and only now: `src/main.js` registers hooks at module scope.
   const runtime = await import('../../../src/main.js');
   const fabricate = runtime.default;
   await fabricate.initialize();
   globalThis.game.fabricate = fabricate;
+  installLabJournalTransport(globalThis.game, fabricate.journalRunCommands);
 
   // The rest of `Hooks.once('ready')`, called directly.
   //
@@ -476,14 +489,6 @@ export async function buildLabWorld({
   await runtime.runToolFlagAutoStamp();
   await runtime.runOwnedItemComponentIdentityRestamp();
   world.fabricate = fabricate;
-
-  // Versioned Journal frames need to show the controls that an available authority enables. The
-  // lab has no real JournalEntry document service, so it cannot prove arbitration; this narrow
-  // presentation collaborator answers only the availability question consumed by the projection.
-  // Command correctness remains owned by mounted command tests and the two-realm Foundry gate.
-  if (journalCaseState && journalCaseState !== 'authority-unavailable') {
-    fabricate.getJournalRunAuthorityAvailability = () => ({ available: true, reason: null });
-  }
 
   if (!fabricate.craftingSystemManager?.initialized) {
     throw new Error(
@@ -589,4 +594,69 @@ function invalidateJournalFixtureCaches(fabricate) {
   ]) {
     manager?.invalidateCache?.();
   }
+}
+
+// The in-memory document edge lets the REAL authority and craft pipeline run in local and CI
+// captures. It is deliberately not evidence of server arbitration or cross-client persistence.
+function createLabRunAuthorityLedger() {
+  const ledger = installUpdateSemantics({
+    id: 'lab-run-authority',
+    flags: { fabricate: { journalRunAuthorityLedger: true } },
+    pages: new Map(),
+  });
+  ledger.getFlag = makeGetFlag(ledger);
+  ledger.createEmbeddedDocuments = async (type, sources, options) => {
+    if (type !== 'JournalEntryPage' || options?.keepId !== true) {
+      throw new Error('view lab: unexpected authority claim creation');
+    }
+    const created = [];
+    for (const source of sources) {
+      if (ledger.pages.has(source._id)) continue;
+      const page = { ...structuredClone(source), id: source._id };
+      page.getFlag = makeGetFlag(page);
+      ledger.pages.set(page.id, page);
+      created.push(page);
+    }
+    return created;
+  };
+  ledger.deleteEmbeddedDocuments = async (type, ids) => {
+    if (type !== 'JournalEntryPage') throw new Error('view lab: unexpected authority claim deletion');
+    return ids.flatMap((id) => {
+      const page = ledger.pages.get(id);
+      return ledger.pages.delete(id) ? [page] : [];
+    });
+  };
+  return ledger;
+}
+
+// There is one browser realm in the lab. Serialize server delivery under the elected GM,
+// restoring the initiating viewer BEFORE accepting the reply so the real local prompt and
+// Roll.toMessage handoff retain player authorship. Never manufacture a prompt or a roll result.
+function installLabJournalTransport(game, service) {
+  let delivery = Promise.resolve();
+  let reply = null;
+  game.socket = {
+    emit(channel, payload) {
+      if (channel !== 'module.fabricate') return;
+      if (payload?.kind === JOURNAL_RUN_SOCKET_KIND.REPLY) {
+        reply = { payload, senderId: game.user.id };
+        return;
+      }
+      if (payload?.kind !== JOURNAL_RUN_SOCKET_KIND.REQUEST) return;
+      const sender = game.user;
+      delivery = delivery.then(async () => {
+        const viewer = game.user;
+        reply = null;
+        game.user = game.users.activeGM;
+        try {
+          await service.handleSocketMessage(payload, sender.id);
+        } finally {
+          game.user = viewer;
+        }
+        if (reply) service.acceptReply(reply.payload, reply.senderId);
+      }).catch((error) => {
+        console.error('view lab: Journal command delivery failed', error);
+      });
+    },
+  };
 }
