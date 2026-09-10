@@ -22,6 +22,7 @@ import test from 'node:test';
 import { VIEW_LAB_CASES } from '../scripts/lib/viewLabCases.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
 import { buildLabActors, buildDocumentIndex } from './view-lab/world/labActors.js';
+import { stockJournalPrototype } from './view-lab/world/labJournalPrototype.js';
 import {
   LAB_JOURNAL_CASE_STATE_RUN_IDS,
   buildLabRunStates,
@@ -732,8 +733,9 @@ test('lab authority transport runs real prepare/resolve commands and restores th
   assert.deepEqual(socket.listeners('module.fabricate'), []);
 });
 
-test('alchemy Journal uses an authored recipe revealed to its player, not a missing/redacted fallback', () => {
+test('alchemy Journal uses a supplied authored recipe revealed to its player, not a missing/redacted fallback', async () => {
   const seeded = buildLabContent({ journalCaseState: 'alchemy' });
+  const actor = buildLabActors(seeded)[0];
   const recipes = seeded.recipes.map((entry) => new Recipe(entry));
   const visibility = new RecipeVisibilityService(null, {
     getSystem: (id) => seeded.systems.find((entry) => entry.id === id),
@@ -743,11 +745,11 @@ test('alchemy Journal uses an authored recipe revealed to its player, not a miss
       visibility.evaluateRecipeAccess({
         recipe,
         viewer: { id: 'user-lab-player', isGM: false },
-        craftingActor: actors[0],
+        craftingActor: actor,
       }).visible
   );
   const containers = buildLabRunStates({
-    actor: actors[0],
+    actor,
     userId: 'user-lab-player',
     recipes: visible,
     environments: seeded.environments,
@@ -755,6 +757,26 @@ test('alchemy Journal uses an authored recipe revealed to its player, not a miss
   });
   const run = containers.craftingRuns.active['lab-v1-alchemy'];
   assert.equal(run.recipeId, 'al-r-fire');
+  const ingredientSet = recipes.find((recipe) => recipe.id === run.recipeId).ingredientSets[0];
+  const matches = (option, held) =>
+    seeded.components.find((entry) => entry.id === option.match.componentId)?.originItemUuid ===
+    held.uuid;
+  const resolveSelection = () => ingredientSet.resolveIngredientSelection(actor.items, matches);
+  assert.equal(resolveSelection().success, false, 'the default smith has no alchemy reagents');
+  await stockJournalPrototype(actor, seeded);
+  assert.equal(resolveSelection().success, false, 'stocking is opt-in for this retained mode');
+  await stockJournalPrototype(actor, seeded, 'alchemy');
+  assert.equal(resolveSelection().success, true, 'the actual Journal actor can supply every group');
+  assert.deepEqual(
+    actor.items
+      .filter((held) => ingredientSet.ingredients.some((option) => matches(option, held)))
+      .map((held) => [held.uuid, held.system.quantity]),
+    [
+      ['Item.al-sulphur', 2],
+      ['Item.al-quicksilver', 1],
+      ['Item.al-flask', 1],
+    ]
+  );
   assert.deepEqual(
     recipes
       .filter((recipe) => recipe.craftingSystemId === LAB_SYSTEM_IDS.ALCHEMY)

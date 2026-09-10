@@ -590,13 +590,27 @@ function seedGathering(content, components, template) {
 }
 
 /** Seed through the existing actor's embedded-document seam before Journal readers cache it. */
-export async function stockJournalPrototype(actor, content) {
-  if (!content.recipes.some((entry) => entry.id === journalPrototypeRecipeId('cord'))) return;
+export async function stockJournalPrototype(actor, content, state = null) {
+  const stock = content.recipes.some((entry) => entry.id === journalPrototypeRecipeId('cord'))
+    ? Object.entries(STOCK).map(([id, quantity]) => [componentId(id), quantity])
+    : [];
+  if (state === 'alchemy') {
+    // This retained-mode case opens on the Journal actor, not the stocked herbalist.
+    // Supply its fixed authored reagents before the availability snapshot is built.
+    const recipe = content.recipes.find((entry) => entry.id === 'al-r-fire');
+    stock.push(
+      ...recipe.ingredientSets[0].ingredientGroups.map(({ options: [option] }) => [
+        option.componentId,
+        option.quantity,
+      ])
+    );
+  }
+  if (!stock.length) return;
   const byId = new Map(content.components.map((entry) => [entry.id, entry]));
   await actor.createEmbeddedDocuments(
     'Item',
-    Object.entries(STOCK).map(([id, quantity]) => {
-      const entry = byId.get(componentId(id));
+    stock.map(([id, quantity]) => {
+      const entry = byId.get(id);
       return {
         name: entry.name,
         img: entry.img,

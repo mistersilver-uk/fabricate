@@ -542,7 +542,7 @@ export async function buildLabWorld({
     world.settings.get(settingsKey(FABRICATE_NAMESPACE, 'lastCraftingActor')) ??
     world.settings.get(settingsKey(FABRICATE_NAMESPACE, 'lastGatheringActor'));
   const journalActor = globalThis.game.actors.get(rememberedId) ?? actors[0];
-  await stockJournalPrototype(journalActor, content);
+  await stockJournalPrototype(journalActor, content, journalCaseState);
   // If the viewer can see none of them, fall back to the full set: a journal of redacted rows still
   // shows how each STATUS renders, where an empty journal shows nothing at all.
   const runRecipes = journalRecipes.length > 0 ? journalRecipes : allRecipes;

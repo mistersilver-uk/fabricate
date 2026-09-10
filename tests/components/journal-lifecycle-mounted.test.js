@@ -926,7 +926,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       const state = capture.query.journalCaseState;
       const content = buildLabContent({ journalCaseState: state });
       const actor = buildLabActors(content)[0];
-      await stockJournalPrototype(actor, content);
+      await stockJournalPrototype(actor, content, state);
       const recipes = labRecipes(content);
       const delayed = ['loading', 'error-retry'].includes(state);
       const authority = ['authority-unavailable', 'authority-setup'].includes(state)
@@ -984,6 +984,11 @@ describe('Journal versioned lifecycle (mounted)', () => {
           await new Promise((resolve) => setTimeout(resolve, 35));
           flushSync();
         }
+      }
+      if (state === 'alchemy') {
+        const availability = mounted.store.selectedRun.steps[0].selectionAvailability;
+        assert.equal(availability.success, true, 'alchemy has every required reagent');
+        assert.equal(availability.knownMaterialShortfall, false);
       }
       assertCaseWitness(mounted.target, capture);
       if (state === 'waiting-auto-eligible' || state === 'automatic-blocker') {
@@ -1632,9 +1637,37 @@ describe('Journal versioned lifecycle (mounted)', () => {
       ['automatic-blocker', 'selection-required'],
     ]) {
       harness.remount();
-      const refused = await mountState(state);
+      // Use the same authored state as the capture walk: automatic-blocker has
+      // available essence carriers but no allocation, not a physical shortage.
+      const content = buildLabContent({ journalCaseState: state });
+      const actor = buildLabActors(content)[0];
+      await stockJournalPrototype(actor, content, state);
+      const refused = await mountState(state, {
+        builderOptions: {
+          content,
+          actor,
+          recipes: labRecipes(content),
+          viewer: { id: 'user-lab-player', isGM: false },
+        },
+      });
       const runId = LAB_JOURNAL_CASE_STATE_RUN_IDS[state];
-      refused.target.querySelector('[data-run-action="primary"]').click();
+      const rawRun = refused.containers.craftingRuns.active[runId];
+      const search = refused.target.querySelector('[data-journal-search] input');
+      search.value = content.recipes.find((entry) => entry.id === rawRun.recipeId).name;
+      search.dispatchEvent(new window.Event('input', { bubbles: true }));
+      await settleAction();
+      refused.target.querySelector(`[data-run-id="${runId}"]`).click();
+      await settleAction();
+      assert.equal(refused.store.selectedRun.id, runId);
+      if (state === 'automatic-blocker') {
+        const availability = refused.store.selectedRun.currentStep.selectionAvailability;
+        assert.equal(availability.success, false, 'essence allocation is still required');
+        assert.equal(availability.knownMaterialShortfall, false);
+        assert.ok(availability.essencePool.carriers.length > 0);
+      }
+      const primary = refused.target.querySelector('[data-run-action="primary"]');
+      assert.ok(primary && !primary.disabled, `${state} reaches its command refusal`);
+      primary.click();
       flushSync();
       if (state === 'command-timeout') {
         assert.equal(
@@ -1648,6 +1681,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       assert.equal(refused.store.busyRunKey, '');
       assert.match(refused.notifications.at(-1), new RegExp(reason));
       assert.equal(refused.commands.at(-1).action, 'execute');
+      assert.equal(refused.commands.at(-1).runId, runId);
     }
 
     harness.remount();
