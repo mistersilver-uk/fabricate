@@ -4888,6 +4888,9 @@ Status counts use the selected kind cohort before search, active-status filterin
 - Each list defaults to four rows per page and retains existing page-size and sorting choices.
 Both pagers MUST use the shared compact single-row presentation with independently named region and navigation landmarks, accessible page-size choice and at least 24px interactive targets.
 At the populated wide layout, all four default Active and all four default Finished entries MUST fit visibly in their panes without undersizing shared primitives.
+Finished rows MUST be 44px border-box with a 24px-square dismiss control.
+Both pane allocations and footer bounds MUST remain stable across full, short-last, empty and restored pages at 1240×880 and the supported 1024×880 stacked layout.
+EmptyState MUST fill each allocated list body.
 Filtering and removal clamp its page independently.
 Selection is keyed by actor UUID, run type and run ID and remains selected when its row leaves the visible page or filter; fallback occurs only after actual removal or dismissal.
 - Selected detail MUST use the active-current, active-browsed, ordinary-history or recovery composition below rather than a universal section order.
@@ -4936,6 +4939,10 @@ Checked successful single-stage history MUST show Final check once, recorded mat
 Confirmed no-check history uses Resolution instead; missing check evidence is Not recorded, never proof of No check.
 A failed checked single-stage verdict owns its actual roll without a duplicate summary; failed no-check history may retain Resolution after its verdict.
 Salvage results use Recovered and gathering results use Brought back instead of Crafted.
+Materials used, Crafted and Tools used MUST use the same dense ListRow anatomy in four equal grid columns at both supported widths, with long names ellipsized and their complete text accessible.
+Tools used MUST appear once for the attempted stages, including matching transient history, and MUST group only recorded actor-qualified physical Item identity.
+Each occurrence MUST retain its stage association, recorded quantity and affirmative broken, virtual, spared and immune evidence; repeated use MUST NOT be summed or described as consumed tools, and absent breakage evidence MUST NOT be called intact.
+Virtual and ambiguous identities MUST remain separate occurrence cards, and omitted tool evidence MUST NOT assert that no tools were used.
 
 Multiple attempted stages MUST appear together under How each stage went with per-stage checks and paired actual consumed/produced evidence, without duplicate run-level Crafted or Final check.
 An attempt requires completed/failed status or actual check/effect evidence; a preinitialized next stage or started timestamp alone does not establish execution.
@@ -5000,6 +5007,10 @@ Legacy actions retain the projection's `manualAdvance` contract:
 - **Legacy gathering / salvage (`manualAdvance: false`)** show an explanatory "resolves automatically when world time advances" line plus the time-remaining box, and offer no trigger button, because those matured runs auto-resolve on world time.
 
 ### World-Time Disclosure
+
+The player Journal header MUST paint one shared surface behind the actor area and world clock, without a second translucent fill under the actor area.
+The clock MUST retain the WorldClockChip info treatment and canonical geometry.
+Every gathering identity without an entitled task image MUST use `icons/containers/bags/pouch-leather-brown-green.webp`; disclosed task imagery and explicit GM secret previews MUST retain their entitled image when present.
 
 The Journal shows a read-only WorldClockChip using the existing calendar formatter and fallback.
 The shared clock identifies the time domain; all detail countdowns and compact This run timestamps MUST use that same world-time domain.

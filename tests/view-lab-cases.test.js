@@ -934,6 +934,22 @@ test('exactly the declared 1024px cases carry complete layout expectations', () 
   }
 });
 
+test('compact Journal captures add full, short, empty, restored and tool witnesses at both widths', () => {
+  const cases = VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-'));
+  assert.equal(cases.length, 10);
+  for (const width of [1240, 1024]) {
+    for (const state of ['full', 'partial', 'empty', 'restored', 'tools']) {
+      const capture = getCaseById(`fabricate-journal-history-batch-${state}-${width}`);
+      assert.equal(capture.position.width, width);
+      assert.equal(capture.expectTab, 'journal');
+      assert.match(capture.expectSelector, /data-history-items="tools"/);
+      if (state === 'partial') assert.equal(capture.steps.filter((step) => step.selector.includes('data-pagination-next')).length, 4);
+      if (state === 'restored') assert.equal(capture.steps.at(-1).fill, '');
+      if (state === 'empty') assert.match(capture.expectSelector, /is-fill/);
+    }
+  }
+});
+
 test('all Journal lifecycle captures assert defining product state rather than a populated shell', () => {
   const cases = VIEW_LAB_CASES.filter((entry) =>
     entry.id.startsWith('fabricate-journal-lifecycle-')

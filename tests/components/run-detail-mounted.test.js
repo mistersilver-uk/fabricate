@@ -93,6 +93,28 @@ describe('RunDetail mounted behavior', () => {
   afterEach(() => harness.remount());
   after(() => harness.teardown());
 
+  it('keeps one compact Tools used section through transient, ordinary and protected history', async () => {
+    const { model } = await createPersistedCraftingHistory({ stageCount: 2 });
+    const tool = { actorUuid: 'Actor.source', itemUuid: 'Actor.source.Item.hammer', name: 'Captured hammer', img: 'hammer.webp', quantity: 1 };
+    model.steps[0].usedTools = [tool, { ...tool, itemUuid: 'Actor.source.Item.other', name: tool.name, img: 'other.webp' }];
+    model.steps[1].usedTools = [{ ...tool, quantity: 2, broken: true }, { toolId: 'virtual', name: 'Station', virtual: true, quantity: null }];
+    for (const commandResult of [null, { runKey: model.key }]) {
+      harness.remount();
+      const target = await harness.mount({ run: model, journal: { commandResult } });
+      assert.equal(target.querySelectorAll('[data-history-items="tools"]').length, 1);
+      const cards = [...target.querySelectorAll('[data-history-items="tools"] [data-list-row]')];
+      assert.equal(cards.length, 3);
+      assert.equal(cards[0].querySelector('img').getAttribute('src'), 'hammer.webp');
+      assert.match(cards[0].textContent, /ToolBroken/);
+      assert.ok(cards.every((card) => card.classList.contains('is-truncated')));
+      assert.ok(!target.querySelector('[data-stage-fact^="tool-"]'));
+    }
+    harness.remount();
+    const hidden = await harness.mount({ run: { ...model, redacted: true } });
+    assert.ok(!hidden.querySelector('[data-history-items="tools"]'));
+    assert.doesNotMatch(hidden.innerHTML, /hammer.webp|Captured hammer|other.webp/);
+  });
+
   const forbiddenHistory = '[data-run-progress], [data-stage-nav], [data-journal-actions], [data-journal-summary], [data-journal-record], [data-journal-stage-details], [data-journal-time-remaining]';
   it('renders all authored future requirement kinds without selecting or persisting them', async () => {
     const fixture = await createPersistedCraftingHistory({ previewOnly: true });

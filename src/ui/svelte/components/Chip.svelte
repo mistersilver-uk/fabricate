@@ -127,7 +127,7 @@
      modifier row's own scale for an in-line annotation chip (the bounds chip, the
      "Rolls dice" chip), taken from the prototype (issue 1096) — 'list', a browser ROW's
      own in-line pill, which the reference draws smaller and quieter than either
-     (`proto:4872`: a ~15px stadium at 9px/600 in the secondary ink on the soft surface) —
+     (the library's 18.4px bordered stadium at 9px/600 with 1.6 line-height) —
      'action', the page
      header's action cluster, where a chip stands in the same row as the Back / Delete /
      Save buttons and has to be one of them — 'tag-run', the scale of a chip that is a
@@ -256,9 +256,8 @@
      at `action`, 25px at `tag-run` and 20px at `inspector`. Five of the six are read from the
      density they belong to — its `min-height`, or the height its own note computes. `list` has
      none to read, because it is the one density that states `min-height: 0`, so its side is the
-     15px stadium `proto:4872` publishes and the density's own note above quotes. That makes an
-     icon-only list chip about two pixels TALLER than the labelled list chips beside it, which is
-     deliberate: the alternative is a side derived from a height that density declines to have.
+     independently specified 15px icon square. Labelled list chips follow the library's
+     explicit 1.6 line-height (18.4px bordered, 16.4px bare); icon-only geometry stays 15px.
 
      THE ACCESSIBLE NAME IS REQUIRED, AND THE ROLE IS CONDITIONAL. The glyph is `aria-hidden`, so
      an icon-only chip with no `aria-label` is announced as nothing at all; a `title` is a tooltip
@@ -287,6 +286,8 @@
     class: extraClass = '',
     truncate = false,
     density = 'default',
+    // WorldClockChip opts into its owning geometry; ordinary density callers keep their face.
+    presentation = '',
     iconOnly = false,
     removable = false,
     removeLabel = undefined,
@@ -508,6 +509,7 @@
       // either reaching the other's rules.
       density === 'tag-run' ? 'is-tag-run' : '',
       density === 'inspector' ? 'is-inspector' : '',
+      presentation === 'clock' ? 'is-clock' : '',
       iconOnly ? 'is-icon-only' : '',
       removeControl ? 'is-removable' : '',
       extraClass,
@@ -861,11 +863,9 @@
      and state pills, and the same construction on every list the reference draws.
      `proto:4872` states it exactly: `padding: 1px 8px; border-radius: 999px; background:
      var(--surface-soft); border: 1px solid var(--border); font: 600 9px var(--sans); color:
-     var(--text2)`, a stadium about 15px tall.
-
-     THE DEFAULT SCALE IS FIVE PIXELS TALLER AND A WEIGHT HEAVIER than that, which is a lot on
-     a chip that sits under a 13.5px row name and is meant to read as an annotation of it. The
-     row was carrying two chips at nearly the height of the name above them.
+     var(--text2)`. The canonical library's explicit 1.6 line-height yields 18.4px with
+     the border, or 16.4px bare. Issue 1648 repairs the implementation's inherited
+     line-height of 1 to match that specimen rather than its contradictory height prose.
 
      A VARIANT ON THE PRIMITIVE, not a caller override, for the reason `density` documents
      above — and here that reason is enforced rather than advisory: `manager-layout.test.js`
@@ -892,6 +892,7 @@
     border-radius: 999px;
     font-size: 9px;
     font-weight: 600;
+    line-height: 1.6;
     /* SINGLE-LINE, and it is the one density that had to say so (issue 1506). `is-row` and
        `is-action` both state it; the base rule states none, because wrapping is the chip's
        default for the reason `is-truncated` gives above. So a list chip inherited the wrap —
@@ -902,6 +903,16 @@
        would otherwise break a have/need pair across two lines. SHRINK PROTECTION STAYS WITH THE
        CALLER, per the `density` note above: this states how the text lays out, never how much
        room the row gives the chip. */
+    white-space: nowrap;
+  }
+
+  /* Opt-in WorldClockChip composition; icon, label and value are direct flex children. */
+  .manager-chip.is-clock {
+    height: 28px;
+    min-height: 28px;
+    padding: 0 var(--fab-space-2);
+    border-radius: 7px;
+    gap: var(--fab-space-2);
     white-space: nowrap;
   }
 
@@ -973,7 +984,7 @@
      10px face at roughly 12px, so 3 + 12 + 3 plus the hairline is about 20px, which is exactly
      the base rule's floor — so what a parity lane actually measured as open is TWO properties,
      not a size: the base scale's `font-weight: 700` against the reference's 600, and its
-     `--fab-space-chip` horizontal inset against a wider one. `is-list` (15px) and `is-tag-run`
+     `--fab-space-chip` horizontal inset against a wider one. `is-list` (18.4px) and `is-tag-run`
      (25px) are both a different pill; this is the default pill, spoken more quietly.
 
      THE OTHER TWO DECLARATIONS ARE NOT RESTATEMENTS of the base rule, which is why they are
@@ -1015,10 +1026,8 @@
      `is-action`'s, 25px is the height `is-tag-run`'s note computes (6 + 6 + 11 + 2) and 20px is
      the height `is-inspector`'s note computes (3 + 12 + 3 plus the hairline). `is-list` is the
      exception and the reason these are published: it states `min-height: 0`, so it has no height
-     to read, and its side is the 15px stadium `proto:4872` states and its own note quotes. A
-     labelled list chip renders about 13px, so an icon-only one is deliberately about two pixels
-     taller — the published figure, rather than one derived from a height that density declines
-     to have.
+     to read, and its icon-only side is independently specified at 15px, separately from the
+     labelled list chip's 18.4px bordered or 16.4px bare height.
 
      EQUAL INSETS, WHICH IS `padding: 0`. Every density's padding is horizontal-only or
      horizontal-heavy, so carrying one into a fixed square would push the glyph off centre; the
@@ -1095,8 +1104,8 @@
      governs there and nothing has to restate a height per density.
 
      `is-list` IS THE ONE PLACE THIS SHOWS, and it is the same anomaly `iconOnly` records: that
-     density declares `min-height: 0` and draws a ~15px stadium, so a removable list chip is the
-     control’s 28px rather than the row’s 15. That is the honest consequence of putting a
+     density declares `min-height: 0` and draws an 18.4px bordered stadium, so a removable list chip is the
+     control’s 28px rather than the row’s 18.4. That is the honest consequence of putting a
      control in the densest badge the reference draws, and the alternative is a hit box derived
      from a height that density declines to have. */
   .manager-chip.is-removable {

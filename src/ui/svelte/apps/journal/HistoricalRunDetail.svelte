@@ -36,7 +36,6 @@
         value: stage.resolution,
       },
       ...(stage.route ? [{ id: 'route', label: text('ChosenRoute'), value: stage.route }] : []),
-      ...stage.tools.map((tool) => ({ id: tool.id, label: text('Tool'), value: tool.label })),
       ...(stage.currencySpends ?? []).map((spend, index) => ({
         id: `currency-${index}`,
         label: text('CurrencySpent'),
@@ -71,6 +70,8 @@
             name={item.name}
             art={item.img ?? ''}
             quantity={item.quantityText}
+            detail={item.evidence ?? ''}
+            truncateName
           />{/each}
       </div>
     </section>
@@ -154,10 +155,6 @@
         'consumed'
       )}
       {#if single?.route}<JournalFactRow label={text('ChosenRoute')} value={single.route} />{/if}
-      {#each single?.tools ?? [] as tool (tool.id)}<JournalFactRow
-          label={text('Tool')}
-          value={tool.label}
-        />{/each}
       {#each single?.currencySpends ?? [] as spend, index (index)}<JournalFactRow
           label={text('CurrencySpent')}
           value={`${spend.amount} ${spend.unit}`}
@@ -204,6 +201,7 @@
         <JournalFactRow label={text('Outcome')} value={account.gatheringOutcome} />
       </InspectorCard>
     {/if}
+    {@render items(text('ToolsUsed'), account.tools, 'tools')}
   {/if}
   <ThisRun {run} {services} />
   <Callout tone="neutral" text={account.closed} dataAttr="data-journal-guidance" />
@@ -221,6 +219,7 @@
   }
   .journal-history-results {
     display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--fab-space-1);
   }
 </style>

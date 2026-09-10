@@ -173,6 +173,60 @@ function attributedScaleAwards(run, results) {
   );
 }
 
+// Identity comes only from a recorded Actor Item address, never from current metadata.
+// A contradictory actor qualifier, virtual tool or ambiguous address stays an occurrence.
+function physicalToolKey(tool) {
+  if (tool.virtual === true || !named(tool.itemUuid)) return null;
+  const match = /^(Actor\.[^.]+|Scene\.[^.]+\.Token\.[^.]+\.Actor\.[^.]+)\.Item\.[^.]+$/.exec(
+    tool.itemUuid
+  );
+  if (!match || (named(tool.actorUuid) && tool.actorUuid !== match[1])) return null;
+  return tool.itemUuid;
+}
+
+function toolOccurrenceText(tool, stageIndex, localize) {
+  const state = [
+    ['broken', 'ToolBroken'],
+    ['virtual', 'ToolVirtual'],
+    ['spared', 'ToolSpared'],
+    ['skippedImmune', 'ToolImmune'],
+  ]
+    .filter(([flag]) => tool[flag] === true)
+    .map(([, key]) => localize(`${prefix}${key}`));
+  return [
+    localize(`${prefix}ToolOccurrence`, { stage: stageIndex + 1, quantity: tool.quantityText }),
+    ...state,
+  ].join(' · ');
+}
+
+function historyTools(stages, localize) {
+  const cards = [];
+  const byPhysicalItem = new Map();
+  for (const [index, stage] of stages.entries()) {
+    const stageIndex = Number.isInteger(stage.index) ? stage.index : index;
+    for (const tool of stage.tools) {
+      const key = physicalToolKey(tool);
+      let card = key ? byPhysicalItem.get(key) : null;
+      if (!card) {
+        card = {
+          id: `tool-${cards.length}`,
+          name: tool.name,
+          img: tool.img,
+          quantityText: null,
+          occurrences: [],
+          evidence: '',
+        };
+        cards.push(card);
+        if (key) byPhysicalItem.set(key, card);
+      }
+      card.occurrences.push({ ...tool, stepId: stage.stepId, stageIndex });
+      const evidence = toolOccurrenceText(tool, stageIndex, localize);
+      card.evidence = card.evidence ? `${card.evidence}; ${evidence}` : evidence;
+    }
+  }
+  return cards;
+}
+
 /** Choose the terminal composition from typed receipts, never from translated mode labels. */
 export function presentHistory(run, localize) {
   const stages = run?.redacted
@@ -189,6 +243,7 @@ export function presentHistory(run, localize) {
   const stage = stages[0];
   return {
     stages,
+    tools: historyTools(stages, localize),
     results,
     multi,
     gathering,

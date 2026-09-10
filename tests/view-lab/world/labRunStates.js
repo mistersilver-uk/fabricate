@@ -118,6 +118,8 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
       'future-routed-stage',
       'kind-menu-open',
       'history-settling',
+      'history-compact-grid',
+      'history-compact-tools',
     ].map((state) => [state, `lab-v1-${state}`])
   ),
 });
@@ -704,6 +706,10 @@ function prototypeContainers(context, state) {
     gatheringActive,
     gatheringHistory,
   });
+  if (['history-compact-grid', 'history-compact-tools'].includes(state)) {
+    seedCompactHistory(context, containers, state);
+    return containers;
+  }
   if (['active-page-two', 'finished-page-two'].includes(state)) return containers;
   const id = LAB_JOURNAL_CASE_STATE_RUN_IDS[state];
   const binding = JOURNAL_PROTOTYPE_BINDINGS[state];
@@ -761,6 +767,43 @@ function prototypeContainers(context, state) {
   }
   replacePrototypeFocus(containers.craftingRuns, selected, false);
   return containers;
+}
+
+// Additive maintainer witnesses: original prototype cohorts and acting walks are untouched.
+function seedCompactHistory(context, containers, state) {
+  const multi = state === 'history-compact-tools';
+  const run = prototypeHistory(context, multi ? 'tonic' : 'cord', `lab-v1-${state}`);
+  const materials = ['iron_billet', 'charcoal', 'quench_oil', 'brine', 'beeswax'].map(
+    (id, index) => ({
+      ...journalPrototypeMaterial(context.actorUuid, id, index + 1),
+      name: `${id.replaceAll('_', ' ')} — a very long recorded name from the northern mountain expedition`,
+    })
+  );
+  const tools = [
+    ['Hammer', 'smithing/hammer-sledge-steel-grey'],
+    ['Tongs', 'smithing/tongs-steel-grey'],
+    ['Mortar', 'cooking/mortar-stone-yellow'],
+    ['Chisel', 'hand/chisel-steel-brown'],
+    ['Hammer', 'hand/hammer-cobbler-steel'],
+  ].map(([name, image], index) => ({
+    actorUuid: context.actorUuid,
+    itemUuid: `${context.actorUuid}.Item.batch-tool-${index}`,
+    toolId: `batch-tool-${index}`,
+    name,
+    img: `/@foundry-chrome/icons/tools/${image}.webp`,
+    quantity: 1,
+  }));
+  run.steps[0].consumedIngredients = materials;
+  run.steps[0].createdResults = materials.map((item) => ({ ...item, quantity: 2 }));
+  run.steps[0].usedTools = tools;
+  if (multi)
+    run.steps[1].usedTools = [
+      { ...tools[0], quantity: 2, broken: true },
+      { ...tools[1], itemUuid: null, virtual: true, quantity: null },
+    ];
+  replacePrototypeFocus(containers.craftingRuns, run, true);
+  // Eleven gives BOTH independent pagers a genuine three-row last page.
+  containers.craftingRuns.history.pop();
 }
 
 function replacePrototypeFocus(container, run, terminal) {

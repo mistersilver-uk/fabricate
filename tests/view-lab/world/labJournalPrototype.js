@@ -312,6 +312,8 @@ export const JOURNAL_PROTOTYPE_BINDINGS = Object.freeze({
   'history-gm-deleted-recipe': 'canonical/deleted-recipe',
   'history-failure-awards': 'canonical/actual-failure-awards',
   'history-settling': 'canonical/settlement',
+  'history-compact-grid': 'canonical/maintainer-four-column',
+  'history-compact-tools': 'canonical/recorded-physical-tools',
   'active-page-two': 'runs/page-2',
   'finished-page-two': 'history/page-2',
   'filter-paused': 'tonic',

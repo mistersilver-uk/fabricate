@@ -6,6 +6,30 @@ import { createPersistedCraftingHistory } from '../helpers/journal-fixtures.js';
 const text = (key, data) => `${key.split('.').at(-1)}${data ? JSON.stringify(data) : ''}`;
 
 describe('recorded Journal presentation', () => {
+  it('groups only recorded physical tool identity and retains every stage occurrence', () => {
+    const physical = { actorUuid: 'Actor.a', itemUuid: 'Actor.a.Item.hammer', name: 'Hammer', quantity: 1 };
+    const account = presentHistory({ steps: [
+      { stepId: 'first', index: 0, attempted: true, usedTools: [physical, { ...physical, itemUuid: 'Actor.a.Item.other' }] },
+      { stepId: 'last', index: 2, attempted: true, usedTools: [
+        { ...physical, quantity: 2, broken: true },
+        { ...physical, actorUuid: 'Actor.b' },
+        { ...physical, virtual: true },
+        { name: 'Hammer', quantity: null }, { name: 'Hammer', quantity: null, spared: true, skippedImmune: true },
+      ] },
+      { attempted: false, usedTools: [physical] },
+    ] }, text);
+    assert.equal(account.tools.length, 6);
+    assert.deepEqual(account.tools[0].occurrences.map(({ stepId, stageIndex, quantity }) => ({ stepId, stageIndex, quantity })), [
+      { stepId: 'first', stageIndex: 0, quantity: 1 }, { stepId: 'last', stageIndex: 2, quantity: 2 },
+    ]);
+    assert.equal(account.tools[0].quantityText, null, 'repeated usage is not summed consumption');
+    assert.match(account.tools[0].evidence, /ToolBroken/);
+    assert.match(account.tools[4].evidence, /NotRecorded/);
+    assert.match(account.tools[5].evidence, /ToolSpared/);
+    assert.match(account.tools[5].evidence, /ToolImmune/);
+    assert.doesNotMatch(JSON.stringify(account.tools), /intact/i);
+    assert.deepEqual(presentHistory({ redacted: true, steps: [{ attempted: true, usedTools: [physical] }] }, text).tools, []);
+  });
   for (const failLast of [false, true]) {
     for (const awardQuantity of [null, 2]) {
       it(`writer/reload distinguishes empty, zero and positive awards (${awardQuantity}, failed=${failLast})`, async () => {

@@ -5,22 +5,13 @@
   let { label = '', value = '', icon = 'fas fa-clock' } = $props();
 </script>
 
-<Chip class="fab-world-clock-chip" tone="info" data-world-clock>
+<Chip class="fab-world-clock-chip" tone="info" presentation="clock" data-world-clock>
   <i class={icon} aria-hidden="true"></i>
   <span class="fab-world-clock-label">{label}</span>
   <span class="fab-world-clock-value">{value}</span>
 </Chip>
 
 <style>
-  :global(.fab-world-clock-chip) {
-    box-sizing: border-box;
-    height: 28px;
-    min-height: 28px;
-    padding: 0 var(--fab-space-2);
-    border-radius: 7px;
-    gap: var(--fab-space-2);
-  }
-
   .fab-world-clock-label {
     color: var(--fab-info-text);
     font-size: 9px;

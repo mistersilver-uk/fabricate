@@ -193,6 +193,7 @@ describe('JournalView mounted behavior', () => {
     rows[3].dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     assert.equal(calls.select[0].id, 'outcome-3');
     target.querySelector('[data-journal-dismiss="outcome-3"]').click();
+    assert.ok(target.querySelector('[data-journal-dismiss="outcome-3"]').classList.contains('is-size-24'), 'dismiss uses the owning 24px variant');
     assert.equal(calls.dismiss[0].id, 'outcome-3');
     assert.equal(calls.select.length, 1, 'dismissal does not select the entry');
   });

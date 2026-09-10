@@ -1451,6 +1451,50 @@ function responsiveLayout(containerSelector, gridSelector) {
   return { containerSelector, gridSelector, maxContentBoxInlineSize: 960 };
 }
 
+/** Additive TP10 witnesses, with identical local and CI navigation over persisted fixtures. */
+function journalHistoryBatchCases() {
+  const search = '[data-journal-search] input';
+  const page = (list, direction) => `[data-journal-list="${list}"] [data-pagination-${direction}]`;
+  const lastPages = ['active', 'finished'].flatMap((list) =>
+    [1, 2].map(() => ({ selector: page(list, 'next') }))
+  );
+  const states = ['full', 'partial', 'empty', 'restored', 'tools'];
+  return [1240, 1024].flatMap((width) =>
+    states.map((state) => {
+      const fixture = state === 'tools' ? 'history-compact-tools' : 'history-compact-grid';
+      const steps = [{ selector: `[data-history-run-id="lab-v1-${fixture}"]` }];
+      if (['partial', 'restored'].includes(state)) steps.push(...lastPages);
+      if (['empty', 'restored'].includes(state))
+        steps.push({ selector: search, fill: 'no batch matches' });
+      if (state === 'restored') steps.push({ selector: search, fill: '' });
+      const empty = state === 'empty';
+      const count = state === 'partial' ? 3 : 4;
+      const populated = ['journal-run-list', 'journal-history-list']
+        .map((list) => `:has(.${list} > [role="listitem"]:nth-child(${count}):last-child)`)
+        .join('');
+      return playerCase({
+        id: `fabricate-journal-history-batch-${state}-${width}`,
+        label: `Player Journal — compact history ${state} at ${width}px`,
+        smokeLabels: [],
+        reaches: 'beyond',
+        query: { tab: 'journal', journalCaseState: fixture },
+        position: { width, height: 880 },
+        steps,
+        expectTab: 'journal',
+        expectSelector:
+          '.journal-view-grid' +
+          (empty
+            ? ':has([data-journal-empty="active"].is-fill):has([data-journal-empty="history"].is-fill)'
+            : populated) +
+          ':has([data-history-items="tools"] [data-list-row]:nth-child(5))',
+        ...(!empty && { expectCenterHit: '[data-journal-list="finished"] [data-journal-dismiss]' }),
+        kinds: ['player', 'journal', ...(width === 1024 ? ['responsive'] : [])],
+        sourceMatches: [JOURNAL_SOURCES, /^src\/ui\/svelte\/apps\/FabricateAppRoot\.svelte$/],
+      });
+    })
+  );
+}
+
 /** Journal lifecycle fixtures use persisted records; steps operate the real controls. */
 function journalLifecycleCases() {
   const states = [
@@ -14267,6 +14311,7 @@ export const VIEW_LAB_CASES = Object.freeze([
   }),
   ...journalBlindRunCases(),
   ...journalLifecycleCases(),
+  ...journalHistoryBatchCases(),
   // ───────────────────────────────────────────────────────────────────────────────────────────────
   // Coverage matrix — states the live smoke does NOT photograph.
   //

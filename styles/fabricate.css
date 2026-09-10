@@ -1284,13 +1284,6 @@
   margin-bottom: var(--fab-space-2);
 }
 
-.fabricate-app .journal-history-row .journal-history-dismiss {
-  width: 26px;
-  height: 26px;
-  min-width: 26px;
-  min-height: 26px;
-}
-
 /* ==========================================
    Image path picker (environment editor)
    ========================================== */
@@ -6009,6 +6002,17 @@
   font-family: var(--fab-font-mono);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
+}
+
+.fabricate-list-row.is-truncated .fabricate-list-row-name,
+.fabricate-list-row.is-truncated .fabricate-list-row-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fabricate-list-row.is-truncated .fabricate-list-row-detail {
+  flex: 0 1 50%;
 }
 
 .fabricate-list-row .fabricate-list-row-detail {
@@ -14441,6 +14445,17 @@
   height: 34px;
   padding: 0;
   flex: 0 0 34px;
+}
+
+/* Opt-in compact dismiss: the owner sets the flex basis as well as the box. */
+.fabricate-icon-button.manager-icon-button.is-size-24 {
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  flex: 0 0 24px;
 }
 
 /* The strip half, for the reason spelled out on `.fabricate-button:focus` above: core's orange

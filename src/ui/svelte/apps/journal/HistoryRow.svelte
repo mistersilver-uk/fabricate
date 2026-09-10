@@ -79,6 +79,7 @@
     >
   </div>
   <IconButton
+    size={24}
     class="journal-history-dismiss is-ghost"
     ariaLabel={localize('FABRICATE.App.Journal.History.Dismiss', { name: title })}
     title={localize('FABRICATE.App.Journal.History.Dismiss', { name: title })}
@@ -94,6 +95,8 @@
     align-items: center;
     gap: var(--fab-space-2);
     width: 100%;
+    height: 44px;
+    min-height: 44px;
     padding: var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
@@ -129,6 +132,7 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
+    line-height: 1.2;
   }
 
   .journal-history-name {

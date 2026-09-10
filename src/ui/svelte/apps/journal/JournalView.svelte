@@ -261,15 +261,14 @@
     width: 100%;
   }
   .journal-browse-lists {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    /* Four 44px rows, row gaps, header, pager and separator remain allocated on every page. */
+    grid-template-rows: minmax(0, 1fr) 280px;
     min-height: 0;
     flex: 1 1 auto;
     gap: var(--fab-space-2);
   }
   .journal-browse-lists > :global([data-journal-list='finished']) {
-    flex: 0 1 auto;
-    max-height: 50%;
     padding-top: var(--fab-space-2);
     border-top: 1px solid var(--fab-border);
   }
@@ -299,8 +298,9 @@
       display: contents;
     }
     .journal-browse-lists > :global(.journal-list-section) {
-      min-height: 220px;
-      max-height: 360px;
+      box-sizing: border-box;
+      height: 360px;
+      min-height: 360px;
       padding: var(--fab-space-3);
       border-bottom: 1px solid var(--fab-border);
     }

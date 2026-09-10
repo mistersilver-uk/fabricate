@@ -99,6 +99,8 @@
      reader would otherwise derive. Two shipped sites pass `label || undefined`
      deliberately, so the empty case is reachable and is not merely a typo.
    - disabled: forwarded to the `<button>`.
+   - size: 'default' preserves existing geometry; numeric 24 opts into the compact
+     24px-square border-box with matching minimums, zero padding and 24px flex-basis.
    - onclick: forwarded verbatim, so a call site keeps its `event.stopPropagation()`.
    - children: the glyph snippet — an `<i class="fas fa-…" aria-hidden="true">` at
      every shipped site. A snippet rather than an `icon` string because the sites
@@ -150,6 +152,7 @@
   let {
     ariaLabel = '',
     disabled = false,
+    size = 'default',
     onclick = () => {},
     children = undefined,
     // An EXTRA class, appended to the primitive's own — never a replacement for it. It has
@@ -175,7 +178,9 @@
   // class in a `//` comment here: `withoutComments` does not strip `//`, and
   // `icon-button-source-contract.test.js` pins this file's occurrences at exactly 2.
   const classes = $derived(
-    ['fabricate-icon-button', 'manager-icon-button', extraClass].filter(Boolean).join(' ')
+    ['fabricate-icon-button', 'manager-icon-button', size === 24 ? 'is-size-24' : '', extraClass]
+      .filter(Boolean)
+      .join(' ')
   );
 
   // Emitted only when non-empty. `aria-label=""` is not a neutral no-op: it names the control

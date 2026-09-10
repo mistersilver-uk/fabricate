@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
+import { createRawSnippet } from 'svelte';
 
 import { createMountedComponentHarness, SELECT_COMPILED_MODULES, SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
 
@@ -28,6 +29,8 @@ const runActionHarness = createHarness(
   ['src/ui/svelte/util/foundryBridge.js']
 );
 const worldClockHarness = createHarness('WorldClockChip', [component('Chip')]);
+const listRowHarness = createHarness('ListRow', [component('Medallion')]);
+const chipHarness = createHarness('Chip');
 const slotRowHarness = createHarness('SlotRow', [
   component('SlotTile'),
   component('ChoiceOptionList'),
@@ -48,6 +51,8 @@ const pagerHarness = createHarness('Pagination', [...SELECT_COMPILED_MODULES, co
 const harnesses = [
   runActionHarness,
   worldClockHarness,
+  listRowHarness,
+  chipHarness,
   slotRowHarness,
   essenceHarness,
   progressHarness,
@@ -252,10 +257,42 @@ describe('run primitives mounted behavior', () => {
     const chip = target.querySelector('[data-world-clock]');
     assert.equal(chip.textContent.replaceAll(/\s+/gu, ' ').trim(), 'World clock Day 14 · 08:00');
     assert.ok(!chip.querySelector('button'), 'the player clock has no control');
-    expectGeometry('WorldClockChip', ':global(.fab-world-clock-chip)', [
+    assert.ok(chip.classList.contains('is-clock'));
+    assert.deepEqual([...chip.children].map((node) => node.tagName), ['I', 'SPAN', 'SPAN']);
+    expectGeometry('Chip', '.manager-chip.is-clock', [
       /height:\s*28px/u,
+      /min-height:\s*28px/u,
       /border-radius:\s*7px/u,
+      /padding:\s*0 var\(--fab-space-2\)/u,
+      /gap:\s*var\(--fab-space-2\)/u,
     ]);
+  });
+
+  it('uses canonical list line-height across bordered, bare and icon-only chip siblings', async () => {
+    for (const props of [{ tone: 'positive' }, { tone: 'danger' }, { emphasis: 'bare' }, { iconOnly: true, 'aria-label': 'Blocked' }]) {
+      chipHarness.remount();
+      const children = props.iconOnly ? undefined : createRawSnippet(() => ({ render: () => '<span>Recorded status</span>' }));
+      const target = await chipHarness.mount({ density: 'list', icon: 'fas fa-check', children, ...props });
+      assert.ok(target.querySelector('.manager-chip.is-list'));
+      if (!props.iconOnly) assert.match(target.textContent, /Recorded status/);
+    }
+    expectGeometry('Chip', '.manager-chip.is-list', [/line-height:\s*1\.6/u, /font-size:\s*9px/u, /font-weight:\s*600/u]);
+    expectGeometry('Chip', '.manager-chip.is-icon-only.is-list', [/width:\s*15px/u, /height:\s*15px/u]);
+    chipHarness.remount();
+  });
+
+  it('opts dense cards into truncation while retaining full names and occurrence evidence', async () => {
+    const name = 'A long hammer name with a distinct physical source'.repeat(3);
+    const detail = 'Stage 1: ×1; Stage 3: ×2 · Broken';
+    const target = await listRowHarness.mount({ name, detail, quantity: null });
+    assert.ok(!target.querySelector('.is-truncated'));
+    await listRowHarness.setProps({ name, detail, quantity: null, truncateName: true });
+    assert.ok(target.querySelector('.fabricate-list-row.is-truncated'));
+    assert.equal(target.querySelector('.fabricate-list-row-name').title, name);
+    assert.equal(target.querySelector('.fabricate-list-row-detail').title, detail);
+    assert.equal(target.querySelector('.fabricate-list-row-detail').textContent, detail);
+    assert.ok(!target.querySelector('.fabricate-list-row-quantity'));
+    listRowHarness.remount();
   });
 
   it('opens one choice below the slot row, chooses spare stock, and locks to images', async () => {

@@ -107,9 +107,8 @@
       <!--
         `compact`, because this panel shares a half-height column with a sibling list: the
         base variant's 44px hero inset would make an empty half taller than the rows it
-        stands in for. The wrapper survives carrying the ONE property the deleted rule had
-        that is the column's layout rather than the panel's box — `flex: 0 0 auto`, without
-        which `.journal-list-body`'s column flex could shrink the panel and clip it.
+        stands in for. The wrapper fills the allocated body and opts the panel into `fill`,
+        so the dashed empty box reaches the same footer regardless of the previous count.
 
         The hook value is DYNAMIC (`kind` is `active` or `history`) and `EmptyState` renders
         `dataValue || true`, so it is forwarded as written rather than left bare.
@@ -117,6 +116,7 @@
       <div class="journal-list-empty">
         <EmptyState
           compact
+          fill
           icon={`fas ${emptyIcon}`}
           hint={emptyText}
           dataAttr="data-journal-empty"
@@ -133,7 +133,7 @@
 </section>
 
 <style>
-  /* Active takes the remaining space; Finished is content-sized by its browse host. */
+  /* The host allocates stable rows independently of either list's item count. */
   .journal-list-section {
     flex: 1 1 0;
     display: flex;
@@ -215,8 +215,10 @@
     min-width: 113px;
   }
 
-  /* THE WRAPPER ONLY: the one property that is the column's layout. See the markup. */
+  /* The wrapper fills the list body's allocation; EmptyState owns its stretched panel. */
   .journal-list-empty {
-    flex: 0 0 auto;
+    flex: 1 1 0;
+    min-height: 0;
+    display: grid;
   }
 </style>

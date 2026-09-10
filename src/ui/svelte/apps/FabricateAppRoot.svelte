@@ -548,7 +548,13 @@
          passed down so ActorSelectTopBar can render it adjacent to those
          conditions; see ActorSelectTopBar for the chip markup + aria-live. -->
     <div class="fabricate-app-topbar" class:has-journal-clock={activeTab === 'journal'}>
-      <ActorSelectTopBar store={services?.actorBar} {services} {activeTab} {activeCanvasTool} />
+      <ActorSelectTopBar
+        store={services?.actorBar}
+        {services}
+        {activeTab}
+        {activeCanvasTool}
+        sharedSurface={activeTab === 'journal'}
+      />
       {#if activeTab === 'journal' && journalWorldClock}
         <div class="fabricate-app-journal-clock">
           <WorldClockChip

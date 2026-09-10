@@ -207,6 +207,7 @@ function makeBuilder({
   getDismissedRunKeys = null,
   getJournalActionAvailability = null,
   resolutionModeService = null,
+  getTool = null,
 } = {}) {
   return new RunJournalBuilder({
     craftingRunManager: {
@@ -228,11 +229,11 @@ function makeBuilder({
     resolutionModeService: resolutionModeService ?? { getMode: () => mode },
     recipeVisibility,
     getSystem: (id) => (id === system.id ? system : null),
-    getTool: (systemId, toolId) => {
+    getTool: getTool ?? ((systemId, toolId) => {
       if (systemId !== SYSTEM.id) return null;
       const tool = SYSTEM.tools.find((entry) => entry.id === toolId);
       return tool ? { id: tool.id, name: tool.label } : null;
-    },
+    }),
     getGatheringTask,
     getGatheringBlindSecret,
     getResultItem,
@@ -246,6 +247,42 @@ function makeBuilder({
     nowWorldTime: () => worldTime,
   });
 }
+
+test('historical tool fallback follows affirmative entitlement without fabricating identity or state', () => {
+  const captured = { toolId: 't1', actorUuid: ACTOR.uuid, itemUuid: `${ACTOR.uuid}.Item.old`, quantity: 2,
+    name: 'Captured hammer', img: 'captured.webp', broken: true };
+  const record = terminalCraftingRun();
+  record.steps[0].usedTools = [captured, { toolId: 't1', quantity: null, virtual: true }, { toolId: 'deleted' }];
+  const lookups = [];
+  const getTool = (systemId, toolId) => {
+    lookups.push([systemId, toolId]);
+    if (toolId === 'deleted') throw new Error('deleted');
+    return { name: 'Current hammer', img: 'current.webp', registeredItemUuid: 'Item.never-invent' };
+  };
+  const project = (recipeVisibility, viewer = PLAYER) => makeBuilder({ history: [record], getTool, recipeVisibility })
+    .buildListing({ actor: ACTOR, viewer }).history[0];
+  const allowed = project({ evaluateRecipeAccess: () => ({ visible: true }) });
+  const tools = allowed.steps[0].usedTools;
+  assert.equal(tools[0].name, captured.name);
+  assert.equal(tools[0].img, captured.img);
+  assert.equal(tools[0].broken, true);
+  assert.equal(tools[1].name, 'Current hammer');
+  assert.equal(tools[1].img, 'current.webp');
+  assert.equal(tools[1].itemUuid, null);
+  assert.equal(tools[1].quantity, null);
+  assert.equal(tools[1].virtual, true);
+  assert.equal(Object.hasOwn(tools[1], 'broken'), false);
+  assert.equal(tools[2].img, null);
+  assert.equal(tools[2].name, null);
+  for (const visibility of [null, { evaluateRecipeAccess: () => ({}) },
+    { evaluateRecipeAccess: () => ({ visible: false }) }, { evaluateRecipeAccess: () => { throw new Error('unknown'); } }]) {
+    lookups.length = 0;
+    const denied = project(visibility);
+    assert.ok(denied.steps.every((step) => step.usedTools.length === 0));
+    assert.deepEqual(lookups, [], 'no tool metadata lookup before affirmative entitlement');
+  }
+  assert.equal(project(null, GM).steps[0].usedTools[1].img, 'current.webp');
+});
 
 test('buildListing returns an empty shape with no actor', () => {
   const listing = makeBuilder({ active: [activeCraftingRun()] }).buildListing({ viewer: PLAYER });
@@ -978,7 +1015,7 @@ test('gathering run falls back to the raw taskId + default image when the task i
   }).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
 
   assert.equal(run.names.title, 'mwTaskUnknown');
-  assert.equal(run.img, 'icons/svg/item-bag.svg');
+  assert.equal(run.img, 'icons/containers/bags/pouch-leather-brown-green.webp');
 });
 
 test('gathering yield projects straight and d100 authored previews without replacing historical awards', () => {
@@ -1265,7 +1302,7 @@ test('gathering run with a blind/null taskId does not consult the task resolver'
   // other blind surface uses. The resolver assertion above is what this test is for and
   // is unchanged.
   assert.equal(run.names.title, 'FABRICATE.Gathering.BlindTaskLabel');
-  assert.equal(run.img, 'icons/svg/item-bag.svg');
+  assert.equal(run.img, 'icons/containers/bags/pouch-leather-brown-green.webp');
 });
 
 test('crafting step exposes the recorded roll (resolved formula, total, dc) on lastCheckResult', () => {

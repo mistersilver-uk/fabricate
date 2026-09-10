@@ -920,7 +920,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
   });
 
   for (const capture of VIEW_LAB_CASES.filter((entry) =>
-    entry.id.startsWith('fabricate-journal-lifecycle-')
+    entry.id.startsWith('fabricate-journal-lifecycle-') || entry.id.startsWith('fabricate-journal-history-batch-')
   )) {
     const suffix = capture.id.replace('fabricate-journal-lifecycle-', '');
     it(`TP5 ${suffix}: operates its case walk against populated authoring/receipt data`, async () => {
@@ -990,6 +990,12 @@ describe('Journal versioned lifecycle (mounted)', () => {
         const availability = mounted.store.selectedRun.steps[0].selectionAvailability;
         assert.equal(availability.success, true, 'alchemy has every required reagent');
         assert.equal(availability.knownMaterialShortfall, false);
+      }
+      if (capture.id.startsWith('fabricate-journal-history-batch-')) {
+        const count = ({ empty: 0, partial: 3 })[capture.id.split('-').at(-2)] ?? 4;
+        for (const list of ['journal-run-list', 'journal-history-list']) {
+          assert.equal(mounted.target.querySelectorAll(`.${list} > [role="listitem"]`).length, count, `${suffix} ${list}`);
+        }
       }
       assertCaseWitness(mounted.target, capture);
       if (state === 'material-shortage') {

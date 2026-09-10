@@ -19,6 +19,7 @@ import { getRunLifecycleContract } from './runLifecycleState.js';
 import { resolvedEssencesFor } from './scopedEntityReads.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
+const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';
 // Generic player-facing label for a blind gathering run, shared with the
 // gathering listing so both surfaces say the same thing.
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
@@ -215,7 +216,7 @@ export class RunJournalBuilder {
    * @param {object} [deps.resolutionModeService] Resolution-mode reads (`getMode(recipe)`).
    * @param {object} [deps.recipeVisibility] RecipeVisibilityService for viewer redaction.
    * @param {Function} [deps.getSystem] `(systemId) => system|null`.
-   * @param {Function} [deps.getTool] `(systemId, toolId) => { name }|null`.
+   * @param {Function} [deps.getTool] `(systemId, toolId) => { name, img }|null`.
    * @param {Function} [deps.getGatheringBlindSecret] `(runId) => { taskId, snapshot }|null`
    *   — reads the GM-owned blind-run store (issue 901). Present only so a GM's
    *   journal can preview the task an in-flight blind run will yield; the
@@ -815,13 +816,9 @@ export class RunJournalBuilder {
         this._mapResult(entry, systemId)
       ),
       createdResultsRecorded: historyEntitled && Array.isArray(runStep?.createdResults),
-      usedTools: normalizeList(historyEntitled ? runStep?.usedTools : null).map((entry) => ({
-        ...this._mapResult(entry, systemId),
-        broken: entry?.broken === true,
-        virtual: entry?.virtual === true,
-        spared: entry?.spared === true,
-        skippedImmune: entry?.skippedImmune === true,
-      })),
+      usedTools: normalizeList(historyEntitled ? runStep?.usedTools : null).map((entry) =>
+        this._historicalTool(entry, systemId)
+      ),
       selectionPlan: cloneJson(runStep?.selectionPlan) ?? null,
       selectedRequirementSnapshot: historyEntitled
         ? (cloneJson(runStep?.selectedRequirementSnapshot) ?? null)
@@ -1577,6 +1574,31 @@ export class RunJournalBuilder {
     };
   }
 
+  // Called only after affirmative history entitlement. Catalogue fallback fills display
+  // metadata only; it cannot establish an Item identity, quantity or historical state.
+  _historicalTool(entry, systemId) {
+    const mapped = this._mapResult(entry, systemId);
+    const toolId = stringOrNull(entry?.toolId);
+    if ((!mapped.name || !mapped.img) && toolId && systemId) {
+      try {
+        const tool = this._getTool(systemId, toolId);
+        mapped.name ||= stringOrNull(tool?.name);
+        mapped.img ||= stringOrNull(tool?.img);
+      } catch {
+        // Deleted or unavailable definitions leave the captured/unknown display intact.
+      }
+    }
+    return {
+      ...mapped,
+      toolId,
+      ...Object.fromEntries(
+        ['broken', 'virtual', 'spared', 'skippedImmune']
+          .filter((flag) => typeof entry?.[flag] === 'boolean')
+          .map((flag) => [flag, entry[flag]])
+      ),
+    };
+  }
+
   _craftingResults(runSteps, redacted, systemId = null) {
     if (redacted) return { createdResults: [], createdResultCount: 0 };
     const createdResults = normalizeList(runSteps).flatMap((step) =>
@@ -1801,7 +1823,7 @@ export class RunJournalBuilder {
     return {
       title:
         stringOrEmpty(task?.name) || (blind ? this.localize(BLIND_TASK_LABEL_KEY) : fallbackTitle),
-      img: stringOrNull(task?.img) || DEFAULT_RUN_IMAGE,
+      img: stringOrNull(task?.img) || DEFAULT_GATHERING_IMAGE,
       blindSecretPreview: secret,
     };
   }

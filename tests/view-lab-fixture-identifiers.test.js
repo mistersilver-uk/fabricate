@@ -394,6 +394,23 @@ function journalProjection(
   return builder.buildListing({ actor, viewer });
 }
 
+test('compact history witnesses have real short last pages, five long-name materials and distinct tool images', () => {
+  for (const state of ['history-compact-grid', 'history-compact-tools']) {
+    const listing = journalProjection(state);
+    assert.equal(listing.activeRuns.length, 11);
+    assert.equal(listing.history.length, 11);
+    const run = listing.history.find((entry) => entry.id === `lab-v1-${state}`);
+    assert.equal(run.steps[0].consumedIngredients.length, 5);
+    assert.equal(run.steps[0].createdResults.length, 5);
+    assert.ok(run.steps[0].consumedIngredients.every((entry) => entry.name.length > 70));
+    assert.equal(new Set(run.steps[0].usedTools.map((entry) => entry.img)).size, 5);
+    if (state === 'history-compact-tools') {
+      assert.equal(run.steps[0].usedTools[0].itemUuid, run.steps[1].usedTools[0].itemUuid);
+      assert.equal(run.steps[1].usedTools[0].broken, true);
+    }
+  }
+});
+
 test('ordinary future Journal stages contain no executed check or completion evidence', () => {
   const { containers } = journalFixture('future-stage');
   const run = Object.values(containers.craftingRuns.active).find(

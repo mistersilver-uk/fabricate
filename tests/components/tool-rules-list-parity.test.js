@@ -825,8 +825,8 @@ test('the Tool Rules toolbar renders the design’s own type and geometry', asyn
     assert.equal(measured['selected-still-chip'].fontSize, '9px', 'proto:4872 chip size');
     assert.equal(measured['selected-still-chip'].fontWeight, '600', 'proto:4872 chip weight');
     assert.ok(
-      measured['selected-still-chip'].height <= 16,
-      `proto:4872 draws a ~15px pill, measured ${JSON.stringify(measured['selected-still-chip'])}`
+      Math.abs(measured['selected-still-chip'].height - 18.4) < 0.1,
+      `the canonical list specimen uses 9px × 1.6 + padding + border, measured ${JSON.stringify(measured['selected-still-chip'])}`
     );
   } finally {
     await close();

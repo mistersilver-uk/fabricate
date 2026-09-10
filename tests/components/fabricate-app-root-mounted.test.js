@@ -456,6 +456,8 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     const root = await harness.mount(host.props());
     const clock = root.querySelector('[data-world-clock]');
     assert.ok(clock, 'the Journal top bar contains the world clock');
+    assert.equal(root.querySelector('.fabricate-app-actor-bar').style.background, 'transparent', 'the actor child releases its second translucent fill');
+    assert.ok(clock.classList.contains('is-clock'));
     assert.match(clock.textContent, /"day":14,"time":"08:00"/, 'it uses the existing calendar formatter');
     assert.equal(clock.querySelector('button, input'), null, 'the clock is read-only');
 
@@ -463,6 +465,7 @@ describe('FabricateAppRoot (mounted, against a real player registry)', () => {
     await tick();
     await harness.setProps(host.props());
     assert.equal(root.querySelector('[data-world-clock]'), null, 'other tabs do not duplicate it');
+    assert.equal(root.querySelector('.fabricate-app-actor-bar').style.background, '', 'other tabs keep the ordinary actor surface');
   });
 
   it('appends provider tabs after the Core tabs and addresses them by route key', async () => {

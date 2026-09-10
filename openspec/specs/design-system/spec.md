@@ -37,6 +37,8 @@ Where a primitive ships and its props differ from its specimen, the specimen is 
 The dense ListRow form MUST render a 22px Medallion, a 12px semibold sans name and an inline caller-formatted quantity, with space-2/space-3 padding, space-2 gap and 9px radius.
 The caller owns entitlement, localization and actual-versus-preview meaning; a missing quantity MUST NOT be coerced to an award.
 The supported read-only API is `name`, `art`, `icon`, `tint`, `quantity`, `detail`, `tone`, `muted` and the optional `trailing` snippet.
+The opt-in `truncateName` form MUST keep name and detail on one ellipsized line, retaining their complete DOM text and title text; the default MUST continue wrapping.
+The host MAY arrange dense rows in a four-column `minmax(0, 1fr)` grid without changing their 22px image/name/quantity anatomy.
 The broader browse, selection, loading and error forms remain targets in the library.
 HistoricalRunDetail and StageCard are the initial independent result-row callers.
 
@@ -47,6 +49,17 @@ Journal browse density uses the existing 30px search rung, inline Select and spa
 RadioCardGroup's optional `optionBody(option)` snippet MAY render read-only consequence content such as dense ListRow results inside a choice; it MUST NOT introduce nested interactive controls.
 StageCard `io` groups MAY supply a `content` snippet in place of plain items so a future requirement group and its route/ladder output stay paired inside the stage.
 Their default absent-snippet forms retain existing geometry and behavior.
+
+### Requirement: Compact Journal geometry is owned by the existing primitives
+
+WorldClockChip MUST compose Chip's opt-in `presentation="clock"` with direct icon, label and value flex children aligned centrally inside a 28px border-box, 28px minimum height, radius 7, space-2 horizontal padding and gap.
+Its info-family fill, border and ink MUST remain distinct from the single shared player-header surface behind it.
+Other Chip presentations MUST retain their default geometry.
+Chip's `density="list"` MUST explicitly use the rendered library specimen's 1.6 line-height with 9px/600 type, 1px/space-2 padding and stadium radius: 18.4px bordered or 16.4px bare for a single text line.
+The independently specified icon-only list square MUST remain 15px; the default density's line-height MUST remain 1.
+IconButton's opt-in numeric `size={24}` MUST own a 24px-square border-box, both minimum dimensions, zero padding and a fixed 24px flex-basis; other callers retain their existing default or pager geometry.
+EmptyState's opt-in `fill` MUST stretch its border-box to the bounded host's full width and height with a zero minimum height while preserving its chosen variant's appearance and content.
+The host owns that allocation and MUST NOT derive it from the current page's record count.
 
 ### Requirement: The primitive set is a closed, versioned vocabulary
 

@@ -3515,7 +3515,7 @@ StepModel = {
   completedAt: number | null,
   createdResults: Array<{ actorUuid, componentId, itemUuid, quantity, name, img }>,
   createdResultsRecorded: boolean,
-  usedTools: Array<{ actorUuid, componentId, itemUuid, quantity, name, img, broken, virtual, spared, skippedImmune }>,
+  usedTools: Array<{ actorUuid, componentId, itemUuid, toolId, quantity, name, img, broken?, virtual?, spared?, skippedImmune? }>,
   resolutionSnapshot: object | null, // allowlisted CraftingRunStepState shape above
   presentationSnapshot: object | null,
   essenceSpend: object | null,
@@ -3563,6 +3563,13 @@ StepModel = {
    Captured material names take precedence over synchronous item-UUID resolution, then real component-ID resolution for a permitted reference.
    Result rows retain `actorUuid`; absent names and quantities remain `null`, never the string `"null"`, a fabricated unit quantity or a zero roll.
    A legacy timed consumed summary remains historical input evidence before and after finalization.
+   Historical tool enrichment MUST require affirmative current-viewer entitlement, with explicit GM access permitted.
+   The projection MUST preserve recorded actor and Item UUIDs, tool id, nullable quantity and the presence of recorded boolean state fields; absence MUST remain unknown rather than an inferred intact state.
+   Captured name and image MUST win over fallback metadata.
+   After the existing recorded-Item and actual component-reference lookups, the tool lookup MAY fill only missing name or image from the recorded tool id; unavailable or deleted tool definitions MUST retain unknown/default presentation.
+   Current tool metadata MUST NOT invent physical identity, quantities or historical state.
+   Presentation MAY group occurrences only by a recorded actor-qualified Item address whose optional actor qualifier agrees, retaining all stage-associated quantities and affirmative states in first-occurrence order without summing repeated uses.
+   Virtual tools and missing or contradictory identities MUST remain separate occurrences.
 
 5. **Recovery evidence is allowlisted, not a raw execution journal.**
    The projection MUST retain ordered effect phases, known receipt presence, safe actual item/currency receipt rows for entitled viewers, and the index of the applying effect as an uncertain boundary.
