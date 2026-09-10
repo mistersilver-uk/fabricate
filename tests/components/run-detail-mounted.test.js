@@ -42,8 +42,11 @@ const harness = createMountedComponentHarness({
     // `PLAYER_APP_COMPILED_MODULES` in the harness for why it is one roster and not a
     // list per suite.
     ...PLAYER_APP_COMPILED_MODULES,
-    ...['RunActionBar', 'ManagerButton', 'IconButton', 'InspectorCard', 'SlotTile',
-      'SlotRow', 'ChoiceOptionList', 'EssencePool', 'Stepper', 'RunProgress', 'StageNav',
+    'src/ui/svelte/components/IconButton.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
+    'src/ui/svelte/components/Stepper.svelte',
+    ...['RunActionBar', 'ManagerButton', 'SlotTile',
+      'SlotRow', 'ChoiceOptionList', 'EssencePool', 'RunProgress', 'StageNav',
       'StageCard', 'YieldScale', 'OutcomeLadder'].map((name) => `src/ui/svelte/components/${name}.svelte`),
     'src/ui/svelte/apps/journal/JournalCard.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
