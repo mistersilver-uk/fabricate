@@ -1986,6 +1986,56 @@ test('a missing held item remains pinned and blocked even when another candidate
   assert.equal(availability.choices[0].options[0].available, true, 'replacement choice remains independently available');
 });
 
+test('two stale singleton groups can be repaired incrementally without replacing intent or bypassing shared stock', () => {
+  const option = (id, quantity = 1) => ({ quantity, match: { type: 'component', componentId: id } });
+  const set = new IngredientSet({ id: 'repair', ingredientGroups: [
+    { id: 'a', options: [option('iron')] },
+    { id: 'b', options: [option('silver')] },
+  ] });
+  const actor = { ...ACTOR, isOwner: true, items: ['iron', 'silver'].map((id) => ({
+    id, uuid: `Actor.actor-1.Item.${id}`, name: id, system: { quantity: 1 },
+  })) };
+  const plan = { selectedIngredientSetId: set.id, ingredientOptionOverrides: {
+    a: { optionIndex: 1 }, b: { optionIndex: 1 },
+  } };
+  const raw = activeSingleStepRun({ lifecycleVersion: 1, steps: [{ stepId: 's0', selectionPlan: plan }] });
+  const recipe = { ...SINGLE_STEP_RECIPE, getExecutionSteps: () => [{ id: 's0', ingredientSets: [set] }] };
+  const builder = makeBuilder({ active: [raw], recipe,
+    ingredientMatchesItem: (_recipe, ingredient, item) => ingredient.match.componentId === item.id,
+  });
+  const project = () => builder.buildListing({ actor, viewer: PLAYER }).activeRuns[0];
+  const before = structuredClone(plan);
+  const initial = project();
+  assert.equal(initial.currentStep.selectionAvailability.success, false);
+  for (const choice of initial.currentStep.selectionAvailability.choices) {
+    assert.equal(choice.selectedOptionIndex, null);
+    assert.equal(choice.options[0].available, true);
+    assert.equal(choice.options[0].candidates[0].available, true);
+  }
+  assert.deepEqual(plan, before, 'probing candidates never replaces the other stale choice');
+
+  plan.ingredientOptionOverrides.a = { optionIndex: 0, heldItemId: actor.items[0].uuid };
+  const partial = project();
+  assert.equal(partial.currentStep.selectionAvailability.success, false);
+  assert.equal(partial.currentStep.selectionAvailability.choices[1].options[0].available, true);
+  assert.deepEqual(plan.ingredientOptionOverrides.b, { optionIndex: 1 });
+
+  plan.ingredientOptionOverrides.b = { optionIndex: 0, heldItemId: actor.items[1].uuid };
+  const repaired = project();
+  assert.equal(repaired.currentStep.selectionAvailability.success, true);
+  assert.deepEqual(actor.items.map((item) => item.system.quantity), [1, 1]);
+
+  // A later fixed claim still competes with a candidate while another choice is stale.
+  plan.ingredientOptionOverrides.b = { optionIndex: 1 };
+  set.ingredientGroups.push(new IngredientSet({ id: 'fixed-probe', ingredientGroups: [
+    { id: 'fixed', options: [option('iron')] },
+  ] }).ingredientGroups[0]);
+  const contested = project().currentStep.selectionAvailability;
+  assert.equal(contested.choices[0].options[0].available, false);
+  assert.equal(contested.choices[0].options[0].candidates[0].available, false);
+  assert.equal(contested.success, false);
+});
+
 test('same run id across native run types remains collision-free while same-type duplicates are dropped', () => {
   const duplicateId = 'shared-id';
   const listing = makeBuilder({

@@ -8,6 +8,7 @@ import {
 import { CraftingFizzleExecutor } from '../src/systems/CraftingFizzleExecutor.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
+import { IngredientSet } from '../src/models/IngredientSet.js';
 import {
   evaluatePreparedRunCheck,
   postCheckRollHandoff,
@@ -865,6 +866,68 @@ test('CraftingEngine local v1 cancellation forfeits deferred work without revers
   assert.equal(cancelled.cancelled, true);
   assert.equal(cancelled.refunded, false);
   assert.equal(itemWrites, 0);
+});
+
+test('CraftingEngine refuses stale route and singleton intent until both material repairs are persisted', async () => {
+  const { engine, recipe, recipeManager, runManager } = setupEngineFixture();
+  const set = new IngredientSet({ id: 'set-1', ingredientGroups: ['a', 'b'].map((id) => ({
+    id, options: [{ quantity: 1, match: { type: 'component', componentId: id } }],
+  })) });
+  recipe.getExecutionSteps = () => [{ id: 'step-1', ingredientSets: [set], resultGroups: [], toolIds: [] }];
+  recipeManager.ingredientMatchesItem = (_recipe, option, item) => option.match.componentId === item.id;
+  const actor = new FakeActor('repair-crafter');
+  const source = new FakeActor('repair-stock');
+  source.items = ['a', 'b'].map((id) => ({ id, uuid: `${source.uuid}.Item.${id}`, system: { quantity: 1 } }));
+  let spends = 0;
+  engine._consumeIngredients = async () => { spends += 1; return []; };
+  engine._createResultItems = async () => ({ items: [], resolutionMeta: null });
+  const plan = { selectedIngredientSetId: set.id, ingredientOptionOverrides: {
+    a: { optionIndex: 1 }, b: { optionIndex: 1 },
+  } };
+  const started = await startReadyVersionedRun({ engine, recipe, actor, source, selectionPlan: plan });
+  assert.equal(started.canExecuteImmediately, false);
+  engine.installVersionedRunAuthority({ consumeExecutionGrant: async () => ({
+    operationId: 'repaired-execution',
+    resolvedCheckResult: { success: true, outcome: null, value: null, data: {} },
+  }) });
+  const execute = (selectionPlan) => engine.executeVersionedStage({
+    actor, componentSourceActors: [source], runId: started.runId,
+    expectedRevision: runManager.getActiveRun(actor, started.runId).runRevision,
+    executionGrant: 'grant', requestId: 'repair-execute', selectionPlan,
+  });
+  const assertRefused = async (selectionPlan) => {
+    const before = structuredClone(actor.flags);
+    const result = await execute(selectionPlan);
+    assert.equal(result.success, false);
+    assert.equal(spends, 0);
+    assert.deepEqual(actor.flags, before, 'refusal leaves persisted intent, revision and evidence alone');
+  };
+  await assertRefused();
+  const repair = async (groupId) => {
+    plan.ingredientOptionOverrides[groupId] = { optionIndex: 0 };
+    const current = runManager.getActiveRun(actor, started.runId);
+    await runManager.setStepSelectionPlan(actor, started.runId, 0, plan, { expectedRevision: current.runRevision });
+  };
+  await repair('a');
+  await assertRefused();
+  assert.deepEqual(runManager.getActiveRun(actor, started.runId).steps[0].selectionPlan.ingredientOptionOverrides.b, { optionIndex: 1 });
+  await repair('b');
+  await assertRefused({ ...plan, selectedIngredientSetId: 'removed' });
+  for (const optionIndex of [null, false, '', ' ', -1, 0.5, 2]) {
+    await assertRefused({ ...plan, ingredientOptionOverrides: {
+      ...plan.ingredientOptionOverrides, b: { optionIndex },
+    } });
+  }
+  await assertRefused({ ...plan, ingredientOptionOverrides: {
+    ...plan.ingredientOptionOverrides, b: { optionIndex: 0, heldItemId: 'Item.missing' },
+  } });
+  const removedStock = source.items.pop();
+  await assertRefused();
+  source.items.push(removedStock);
+  const result = await execute();
+  assert.equal(result.success, true);
+  assert.equal(spends, 1);
+  assert.equal(runManager.getRunHistory(actor)[0].executionJournal.status, 'committed');
 });
 
 test('CraftingEngine executes a matured v1 stage with only its trusted check result and commits history evidence', async () => {

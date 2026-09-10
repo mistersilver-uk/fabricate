@@ -995,19 +995,33 @@ export class RunJournalBuilder {
     items,
     optionOverrides,
     essenceAllocation,
+    editFeasibility = false,
   }) {
     // The shared resolver treats invalid overrides as absent for legacy callers.
     // Persisted Journal intent must instead remain blocked until explicitly replaced.
     const invalidGroups = normalizeList(ingredientSet.ingredientGroups).filter(
       (group) => ingredientOverrideIndex(group, optionOverrides) === null
     );
-    if (invalidGroups.length > 0) {
+    if (invalidGroups.length > 0 && !editFeasibility) {
       return {
         success: false,
         selectedIngredients: [],
         missingGroups: invalidGroups.map((group) => ({ group })),
       };
     }
+    // An unresolvable option has no physical claim to test. Omit it ONLY from a
+    // candidate-edit probe: every resolvable group still shares the canonical stock
+    // ledger, and the persisted plan/full-stage readiness above remain untouched.
+    const resolvableSet =
+      invalidGroups.length === 0
+        ? ingredientSet
+        : Object.create(ingredientSet, {
+            ingredientGroups: {
+              value: ingredientSet.ingredientGroups.filter(
+                (group) => !invalidGroups.includes(group)
+              ),
+            },
+          });
     const ingredientMatchesItem = this._recipeManager?.ingredientMatchesItem;
     const matcher =
       typeof ingredientMatchesItem === 'function'
@@ -1020,7 +1034,7 @@ export class RunJournalBuilder {
               this._resolveComponentForItem
             )
         : null;
-    return ingredientSet.resolveIngredientSelection(items, matcher, {
+    return resolvableSet.resolveIngredientSelection(items, matcher, {
       optionOverrides,
       essenceAllocation,
       resolveItemEssences:
@@ -1058,6 +1072,7 @@ export class RunJournalBuilder {
           [groupId]: { optionIndex: index },
         },
         essenceAllocation,
+        editFeasibility: true,
       });
       const presentation = this._ingredientOptionPresentation({
         group,
@@ -1075,6 +1090,7 @@ export class RunJournalBuilder {
           actor,
           items,
           essenceAllocation,
+          editFeasibility: true,
           optionOverrides: {
             ...optionOverrides,
             [groupId]: { optionIndex: index, heldItemId: item.itemId },

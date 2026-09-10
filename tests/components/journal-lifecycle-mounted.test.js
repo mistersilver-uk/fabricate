@@ -479,19 +479,34 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.ok(mounted.target.querySelector('[data-slot-id="metal"]'));
   });
 
-  it('offers explicit option repair even when removal leaves a single candidate', async () => {
-    const remaining = ingredientSet('remaining', [{ id: 'metal', options: [componentOption('iron', 'iron')] }]);
+  it('repairs two stale singleton choices one at a time and satisfies the stage only after both repairs', async () => {
+    const remaining = ingredientSet('remaining', [
+      { id: 'metal', options: [componentOption('iron', 'iron')] },
+      { id: 'other', options: [componentOption('copper', 'copper')] },
+    ]);
     const mounted = await mountState('ready-single', selectionFixture([remaining], {
-      selectedIngredientSetId: remaining.id, ingredientOptionOverrides: { metal: { optionIndex: 1 } },
+      selectedIngredientSetId: remaining.id, ingredientOptionOverrides: {
+        metal: { optionIndex: 1 }, other: { optionIndex: 1 },
+      },
     }));
     assert.match(mounted.target.textContent, /no longer available/i);
-    mounted.target.querySelector('[data-slot-id="metal"] button').click();
-    await settleAction();
-    const candidate = mounted.target.querySelector('[data-choice-id]');
-    assert.equal(candidate.disabled, false);
-    candidate.click();
-    await settleAction();
-    assert.equal(mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan.ingredientOptionOverrides.metal.optionIndex, 0);
+    for (const groupId of ['metal', 'other']) {
+      assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, false);
+      mounted.target.querySelector(`[data-slot-id="${groupId}"] button`).click();
+      await settleAction();
+      const candidate = mounted.target.querySelector('[data-choice-id]');
+      assert.equal(candidate.disabled, false);
+      candidate.click();
+      await settleAction();
+      const overrides = mounted.containers.craftingRuns.active['lab-v1-ready-single'].steps[0].selectionPlan.ingredientOptionOverrides;
+      assert.equal(overrides[groupId].optionIndex, 0);
+      if (groupId === 'metal') {
+        assert.deepEqual(overrides.other, { optionIndex: 1 });
+        assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, false);
+        assert.match(mounted.target.textContent, /no longer available/i);
+      }
+    }
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, true);
   });
 
   it('states each option quantity and disables candidates that conflict with shared fixed stock', async () => {

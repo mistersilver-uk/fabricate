@@ -1070,7 +1070,8 @@ export class CraftingEngine {
 
   _selectedIngredientSet(step, selectedId) {
     const sets = Array.isArray(step?.ingredientSets) ? step.ingredientSets : [];
-    return sets.find((set) => String(set?.id) === String(selectedId ?? '')) || sets[0] || null;
+    if (selectedId == null || selectedId === '') return sets[0] ?? null;
+    return sets.find((set) => String(set?.id) === String(selectedId)) ?? null;
   }
 
   _versionedGateReady(run) {
@@ -1140,20 +1141,20 @@ export class CraftingEngine {
 
   _versionedSelectionInputsComplete(selectedSet, selectionPlan, step) {
     const groups = Array.isArray(selectedSet?.ingredientGroups) ? selectedSet.ingredientGroups : [];
-    const overrides = selectionPlan?.ingredientOptionOverrides;
-    let requiresEssenceAllocation = Object.keys(selectedSet?.essences ?? {}).length > 0;
-    for (const group of groups) {
+    const overrides = selectionPlan?.ingredientOptionOverrides ?? {};
+    const selectedOptions = groups.map((group) => {
       const options = Array.isArray(group?.options) ? group.options : [];
-      const selectedIndex = Number(overrides?.[group?.id]?.optionIndex);
-      if (
-        options.length > 1 &&
-        (!Number.isInteger(selectedIndex) || selectedIndex < 0 || selectedIndex >= options.length)
-      ) {
-        return false;
-      }
-      const selected = options[Number.isInteger(selectedIndex) ? selectedIndex : 0];
-      if (selected?.match?.type === 'essence') requiresEssenceAllocation = true;
-    }
+      const supplied = Object.hasOwn(overrides, group?.id);
+      const raw = supplied ? overrides[group?.id]?.optionIndex : 0;
+      const selectedIndex =
+        ['number', 'string'].includes(typeof raw) && String(raw).trim() ? Number(raw) : NaN;
+      if (options.length > 1 && !supplied) return null;
+      return Number.isSafeInteger(selectedIndex) ? (options[selectedIndex] ?? null) : null;
+    });
+    if (selectedOptions.includes(null)) return false;
+    const requiresEssenceAllocation =
+      Object.keys(selectedSet?.essences ?? {}).length > 0 ||
+      selectedOptions.some((option) => option.match?.type === 'essence');
     if (!requiresEssenceAllocation) return true;
     const allocation = this._scopedEssenceAllocation(
       selectionPlan?.ingredientEssenceAllocation,
@@ -1175,6 +1176,12 @@ export class CraftingEngine {
     selectedSet,
     selectionPlan,
   }) {
+    if (!this._versionedSelectionInputsComplete(selectedSet, selectionPlan, step)) {
+      return {
+        valid: false,
+        message: 'Choose the crafting requirements before executing this step.',
+      };
+    }
     if (
       !sameStringSet(
         run?.componentSourceActorUuids,
@@ -1225,6 +1232,9 @@ export class CraftingEngine {
       executionRecipe
     );
     if (allocationError) return { valid: false, message: allocationError };
+    if (craftSelection.success !== true) {
+      return { valid: false, message: 'The selected crafting requirements are unavailable.' };
+    }
     const toolsForSet = this.recipeManager.getToolsForSet?.(executionRecipe, selectedSet) ?? [];
     const toolValidation = await this._validateTools(
       componentSourceActors,
