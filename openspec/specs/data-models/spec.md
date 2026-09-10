@@ -3263,6 +3263,9 @@ Missing optional evidence stays absent in persistence and projects as `null` (No
 Legacy records gain no retrospective mode, presentation or contribution data from the current catalogue.
 
 New evidence is allowlisted before actor-flag or receipt persistence and independently gated by viewer entitlement before projection.
+New historical enrichments require an affirmative current-viewer access evaluation or an explicit GM viewer; absent, throwing or indeterminate evaluators MUST withhold them, and actor ownership is not disclosure authority.
+Versioned consumption MUST confirm the actual document delete/update return before recording positive consumption/contribution receipts or allowing subsequent awards.
+A veto or unconfirmed write, including after a successful prefix, leaves the invoked batch uncertain and recovery-required without replay or automatic rollback.
 Arming uses the attested initiating viewer and later GM execution resolves the run's recorded initiator, never ambient GM access as permission to expose protected identity.
 Opaque records omit these new snapshots and contribution evidence; arbitrary document flags, private formula/DC, modifier configuration and GM-only component configuration do not enter the allowlist.
 
@@ -3552,6 +3555,8 @@ StepModel = {
    Inactive stages retain selected-set requirements or legacy array requirements alongside actual consumption, rolls and failures.
    An unexecuted stage in a cancelled or failed run MUST NOT be presented as completed merely because it is before the browse anchor.
    Terminal historical evidence retains every attempted stage's consumed inputs, created results, used tools and completion timestamp separately.
+   A future stage's entitled authored input preview MUST retain all requirement kinds, every option and all routes separately from selectedRequirementSnapshot; projecting it MUST NOT select, consume or persist future intent.
+   Confirmed empty arrays and recorded zero quantities MUST remain distinct from absent evidence or unknown quantities.
    `attempted` requires an explicit succeeded/failed state, actual check or actual effect evidence; a manager-initialized next step's `startedAt` does not establish an attempt.
    Terminal `multiStep` counts recorded attempts rather than consulting later recipe structure or system feature edits.
    Terminal mode labels use captured resolution only, and terminal check/time detail does not consult live check configuration.

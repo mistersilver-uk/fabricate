@@ -523,7 +523,11 @@ export class RunJournalBuilder {
       return this._fizzleRunModel({ run, actor, actorUuid, viewer, authority });
     }
     const system = this._getSystem(stringOrNull(run.craftingSystemId));
-    const redacted = this._isCraftingRedacted({ recipe, actor, viewer, snapshot });
+    const access = this._craftingAccess({ recipe, actor, viewer, snapshot });
+    // Keep the inherited identity fallback bounded; new evidence requires an
+    // affirmative disclosure decision, independently of ownership/action access.
+    const redacted = viewer?.isGM !== true && (!recipe || access?.visible === false);
+    const historyEntitled = viewer?.isGM === true || access?.visible === true;
 
     const runSteps = normalizeList(run.steps);
     const recipeSteps =
@@ -563,6 +567,7 @@ export class RunJournalBuilder {
             availabilitySnapshot,
             isCurrent: !terminal && index === currentStepIndex,
             terminal,
+            historyEntitled,
           })
         );
     const currentStep =
@@ -595,6 +600,7 @@ export class RunJournalBuilder {
       hasPlayerCheck,
       knownMaterialShortfall: currentStep?.selectionAvailability?.knownMaterialShortfall === true,
       entitled: !redacted,
+      evidenceEntitled: historyEntitled,
       authority,
     });
 
@@ -771,25 +777,30 @@ export class RunJournalBuilder {
     availabilitySnapshot = null,
     isCurrent = false,
     terminal = false,
+    historyEntitled = false,
   }) {
-    const evidence = craftingStepHistoryEvidence(runStep);
-    const consumed = historicalConsumedIngredients(runStep);
+    const evidence = historyEntitled ? craftingStepHistoryEvidence(runStep) : {};
+    const consumed = historyEntitled
+      ? historicalConsumedIngredients(runStep)
+      : normalizeList(runStep?.consumedIngredients);
     return {
       stepId: stringOrNull(runStep?.stepId),
       stepName: stringOrEmpty(runStep?.stepName),
       index,
       status: stringOrNull(runStep?.status) || 'pending',
       attempted: historicalStepAttempted(runStep, run, index),
-      completedAt: recordedNumber(runStep?.completedAt),
+      completedAt: historyEntitled ? recordedNumber(runStep?.completedAt) : null,
       presentationSnapshot: evidence.presentationSnapshot ?? null,
       resolutionSnapshot: evidence.resolutionSnapshot ?? null,
       essenceSpend: evidence.essenceSpend ?? null,
       currencySpends:
         evidence.currencySpends ??
-        craftingStepHistoryEvidence(runStep?.preparedConsumption).currencySpends ??
+        (historyEntitled
+          ? craftingStepHistoryEvidence(runStep?.preparedConsumption).currencySpends
+          : null) ??
         null,
       timeGate: plainObjectOrNull(runStep?.timeGate),
-      detail: this._stepDetail({ runStep, recipeStep, system, recipe, terminal }),
+      detail: this._stepDetail({ runStep, recipeStep, system, recipe, terminal, historyEntitled }),
       lastCheckResult: this._checkResultModel(runStep?.lastCheckResult),
       // The recipe's authored ingredient requirements (persisted snapshot at run
       // creation) and the items actually consumed this step, each resolved to a
@@ -800,11 +811,11 @@ export class RunJournalBuilder {
         this._mapResult(entry, systemId)
       ),
       consumedIngredients: consumed.map((entry) => this._mapResult(entry, systemId)),
-      createdResults: normalizeList(runStep?.createdResults).map((entry) =>
+      createdResults: normalizeList(historyEntitled ? runStep?.createdResults : null).map((entry) =>
         this._mapResult(entry, systemId)
       ),
-      createdResultsRecorded: Array.isArray(runStep?.createdResults),
-      usedTools: normalizeList(runStep?.usedTools).map((entry) => ({
+      createdResultsRecorded: historyEntitled && Array.isArray(runStep?.createdResults),
+      usedTools: normalizeList(historyEntitled ? runStep?.usedTools : null).map((entry) => ({
         ...this._mapResult(entry, systemId),
         broken: entry?.broken === true,
         virtual: entry?.virtual === true,
@@ -812,15 +823,29 @@ export class RunJournalBuilder {
         skippedImmune: entry?.skippedImmune === true,
       })),
       selectionPlan: cloneJson(runStep?.selectionPlan) ?? null,
-      selectedRequirementSnapshot: cloneJson(runStep?.selectedRequirementSnapshot) ?? null,
+      selectedRequirementSnapshot: historyEntitled
+        ? (cloneJson(runStep?.selectedRequirementSnapshot) ?? null)
+        : null,
       requirementSnapshot:
-        cloneJson(runStep?.selectedRequirementSnapshot) ?? cloneJson(runStep?.requirements) ?? [],
+        (historyEntitled ? cloneJson(runStep?.selectedRequirementSnapshot) : null) ??
+        cloneJson(runStep?.requirements) ??
+        [],
       craftingYield: isCurrent
         ? this._craftingYieldPreview({ runStep, recipeStep, system, recipe, index })
         : null,
       yieldPreview:
-        !terminal && Number.isInteger(run?.currentStepIndex) && index > run.currentStepIndex
+        historyEntitled &&
+        !terminal &&
+        Number.isInteger(run?.currentStepIndex) &&
+        index > run.currentStepIndex
           ? this._futureCraftingYieldPreview({ recipeStep, system, recipe, index })
+          : null,
+      inputPreview:
+        historyEntitled &&
+        !terminal &&
+        Number.isInteger(run?.currentStepIndex) &&
+        index > run.currentStepIndex
+          ? this._futureCraftingInputs({ recipeStep, system, recipe, index })
           : null,
       selectionAvailability: isCurrent
         ? this._selectionAvailability({
@@ -863,6 +888,33 @@ export class RunJournalBuilder {
             recipe,
             index,
           })?.entries ?? [],
+      })),
+    };
+  }
+
+  _futureCraftingInputs({ recipeStep, system, recipe, index }) {
+    return {
+      source: 'preview',
+      stageIndex: index,
+      routes: normalizeList(recipeStep?.ingredientSets).map((set) => ({
+        id: stringOrNull(set?.id),
+        name: stringOrEmpty(set?.name),
+        groups: normalizeList(set?.ingredientGroups).map((group) => ({
+          id: stringOrNull(group?.id),
+          name: stringOrEmpty(group?.name),
+          options: normalizeList(group?.options).map((option, optionIndex) => {
+            const { id, kind, name, img, icon, colorToken, need } =
+              this._ingredientOptionPresentation({
+                group,
+                option,
+                index: optionIndex,
+                recipe,
+                system,
+                items: [],
+              });
+            return { id, kind, name, img, icon, colorToken, need };
+          }),
+        })),
       })),
     };
   }
@@ -1084,6 +1136,34 @@ export class RunJournalBuilder {
       })
     );
     const choicesByGroup = new Map(choices.map((choice) => [choice.groupId, choice]));
+    if (routes.length > 1) {
+      for (const route of routes) {
+        const set = sets.find((candidate) => candidate.id === route.id);
+        const probe =
+          route.id === setId
+            ? selection
+            : this._resolveIngredientSelection({
+                ingredientSet: set,
+                recipe,
+                actor,
+                items,
+                optionOverrides: {},
+                essenceAllocation: null,
+              });
+        route.shortfallCount = normalizeList(probe?.missingGroups).filter(
+          isPhysicalMaterialShortfall
+        ).length;
+        route.needsSelection = probe?.success !== true && route.shortfallCount === 0;
+        route.entries =
+          this._craftingYieldPreview({
+            runStep: { selectedIngredientSetId: route.id },
+            recipeStep,
+            recipe,
+            system,
+            index: 0,
+          })?.entries ?? [];
+      }
+    }
     return {
       selectedIngredientSetId: setId,
       routes,
@@ -1254,9 +1334,7 @@ export class RunJournalBuilder {
       name: stringOrEmpty(group?.name),
       selectedOptionIndex,
       selectedItemId: stringOrNull(optionOverrides?.[groupId]?.heldItemId),
-      option: option
-        ? { ...presentation, available: presentation.available && !selectedMissing }
-        : null,
+      option: option ? { ...presentation, available: !selectedMissing } : null,
     };
   }
 
@@ -1354,7 +1432,7 @@ export class RunJournalBuilder {
     return plainObjectOrNull(scoped.allocation);
   }
 
-  _stepDetail({ runStep, recipeStep, system, recipe, terminal = false }) {
+  _stepDetail({ runStep, recipeStep, system, recipe, terminal = false, historyEntitled = false }) {
     if (terminal) {
       return {
         requiredSeconds: recordedNumber(runStep?.timeGate?.requiredSeconds),
@@ -1378,6 +1456,7 @@ export class RunJournalBuilder {
       primaryToolName: toolNames[0] ?? null,
       toolNames,
       checkLabel: this._checkLabel({ system, recipe }),
+      checkKind: historyEntitled ? this._activeCheckKind({ system, recipe }) : 'unknown',
       failureText:
         failureReason ||
         (runStep?.status === 'failed'
@@ -1426,6 +1505,16 @@ export class RunJournalBuilder {
     return dc === null
       ? formula
       : this.localize('FABRICATE.App.Journal.StepDetails.CheckWithDc', { formula, dc });
+  }
+
+  _activeCheckKind({ system, recipe }) {
+    if (!system || !recipe) return 'unknown';
+    const check = resolveActiveCraftingCheckFormula({
+      ...system,
+      resolutionMode: this._resolveMode(recipe, system),
+    });
+    if (check.checkUsable) return 'check';
+    return check.requiresCheck ? 'unknown' : 'none';
   }
 
   _resolveCheckDc({ config, recipe, mode }) {
@@ -1536,22 +1625,19 @@ export class RunJournalBuilder {
   }
 
   /**
-   * Whether a crafting run's recipe identity must be redacted for the viewer.
-   * Mirrors {@link GatheringListingBuilder._isOpaqueBlindRun}: a missing recipe
-   * or a recipe the viewer cannot see (undiscovered alchemy / knowledge-gated
-   * crafting) is redacted to a generic label. GMs and global-visible recipes are
-   * never redacted. No visibility service ⇒ no redaction.
+   * Read current-viewer disclosure once. Missing or failed evaluation is unknown,
+   * never affirmative entitlement for historical enrichments.
    * @private
    */
-  _isCraftingRedacted({ recipe, actor, viewer, snapshot = null }) {
+  _craftingAccess({ recipe, actor, viewer, snapshot = null }) {
     // The GM bypass must precede the missing-recipe guard (issue 738): a recipe that
     // no longer resolves (edited id / deleted) still has a run whose persisted step
     // snapshots (requirements, roll, consumed items) the GM must see — collapsing it
     // to a redacted empty card hid a GM's own history. A non-GM viewer still cannot
     // verify visibility of an unresolvable recipe, so it stays redacted for them.
-    if (viewer?.isGM === true) return false;
-    if (!recipe) return true;
-    if (typeof this._recipeVisibility?.evaluateRecipeAccess !== 'function') return false;
+    if (viewer?.isGM === true) return { visible: true };
+    if (!recipe) return null;
+    if (typeof this._recipeVisibility?.evaluateRecipeAccess !== 'function') return null;
     try {
       const access = this._recipeVisibility.evaluateRecipeAccess({
         recipe,
@@ -1562,9 +1648,9 @@ export class RunJournalBuilder {
         // walk per run.
         snapshot,
       });
-      return access?.visible === false;
+      return access;
     } catch {
-      return false;
+      return null;
     }
   }
 
@@ -1665,6 +1751,7 @@ export class RunJournalBuilder {
       blindSecretPreview,
       flavor: '',
       failureReason: stringOrNull(run.failureReason),
+      createdResultsRecorded: Array.isArray(resultRun.createdResults),
       ...this._passthroughResults(resultRun.createdResults, stringOrNull(run.craftingSystemId)),
       manualAdvance: false,
     };
@@ -2021,12 +2108,13 @@ export class RunJournalBuilder {
     hasPlayerCheck = false,
     knownMaterialShortfall = false,
     entitled = true,
+    evidenceEntitled = entitled,
     authority = null,
   }) {
     const lifecycleContract = getRunLifecycleContract(run);
     const recoveryEvidence = this._recoveryEvidence(
       run?.executionJournal,
-      entitled,
+      evidenceEntitled,
       stringOrNull(run?.craftingSystemId)
     );
     const blockedReason = terminal
@@ -2190,7 +2278,15 @@ function routedOutcomeBand(outcome, routed, task) {
   // override, then the routed slot's DC, then its canonical legacy fallback.
   const baseDc = numberOrNull(task?.dcOverride) ?? numberOrNull(routed?.dc) ?? 15;
   const threshold = baseDc + (numberOrNull(outcome?.dc) ?? 0);
-  return routed?.thresholdMode === 'exceed' ? `>${threshold}` : `${threshold}+`;
+  const thresholds = normalizeList(routed?.relativeOutcomes).map(
+    (entry) => baseDc + (numberOrNull(entry?.dc) ?? 0)
+  );
+  const next = Math.min(...thresholds.filter((value) => value > threshold));
+  const lowest = threshold === Math.min(...thresholds);
+  const exceed = routed?.thresholdMode === 'exceed';
+  if (!Number.isFinite(next)) return lowest ? '−∞–∞' : `${exceed ? '>' : '≥'}${threshold}`;
+  if (lowest) return `${exceed ? '≤' : '<'}${next}`;
+  return `${exceed ? '>' : '≥'}${threshold}, ${exceed ? '≤' : '<'}${next}`;
 }
 
 function craftingOutcomeBand(outcome, routed, dc) {

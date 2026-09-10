@@ -9,6 +9,7 @@
   let {
     runs = [],
     totalCount = 0,
+    filtered = false,
     pageIndex = 0,
     pageSize = 4,
     pageSizeOptions = [4, 6, 12, 25],
@@ -48,7 +49,9 @@
   {onSortChange}
   isEmpty={totalCount === 0}
   emptyIcon="fa-clock-rotate-left"
-  emptyText={localize('FABRICATE.App.Journal.Empty.History')}
+  emptyText={localize(
+    filtered ? 'FABRICATE.App.Journal.Empty.MatchingHistory' : 'FABRICATE.App.Journal.Empty.History'
+  )}
 >
   <div class="journal-history-list" role="list">
     {#each runs as run (keyOf(run))}
@@ -83,7 +86,7 @@
   .journal-history-list {
     display: grid;
     min-width: 0;
-    gap: var(--fab-space-2);
+    gap: var(--fab-space-1);
   }
   .journal-history-list > div {
     min-width: 0;

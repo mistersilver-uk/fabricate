@@ -8,6 +8,7 @@
   let {
     runs = [],
     totalCount = 0,
+    filtered = false,
     selectedRunKey = '',
     onSelect = null,
     now = 0,
@@ -42,7 +43,9 @@
   {onSortChange}
   isEmpty={totalCount === 0}
   emptyIcon="fa-hourglass-start"
-  emptyText={localize('FABRICATE.App.Journal.Empty.Active')}
+  emptyText={localize(
+    filtered ? 'FABRICATE.App.Journal.Empty.MatchingActive' : 'FABRICATE.App.Journal.Empty.Active'
+  )}
 >
   <div class="journal-run-list" role="list">
     {#each runs as run (keyOf(run))}
@@ -71,7 +74,7 @@
   .journal-run-list {
     display: grid;
     min-width: 0;
-    gap: var(--fab-space-2);
+    gap: var(--fab-space-1);
   }
   .journal-run-list > div {
     min-width: 0;

@@ -156,7 +156,7 @@
     box-sizing: border-box;
     display: block;
     width: 100%;
-    padding: var(--fab-space-3);
+    padding: var(--fab-space-2);
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     background: var(--fab-bg-2);
@@ -278,6 +278,6 @@
     flex: 1 1 auto;
   }
   .journal-run-card-timing {
-    margin-top: var(--fab-space-2);
+    margin-top: var(--fab-space-1);
   }
 </style>

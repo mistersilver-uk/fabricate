@@ -167,7 +167,7 @@ export function makeSucceededRun(overrides = {}) {
  */
 export async function createPersistedCraftingHistory({
   failLast = false, cancelAfter = null, armNext = false, opaque = false,
-  resumePrefix = false, stageCount = 2, mode = 'simple', checked = true,
+  resumePrefix = false, stageCount = 2, mode = 'simple', checked = true, awardQuantity = undefined, previewOnly = false,
 } = {}) {
   const { CraftingEngine } = await import('../../src/systems/CraftingEngine.js');
   const { CraftingRunManager } = await import('../../src/systems/CraftingRunManager.js');
@@ -184,7 +184,7 @@ export async function createPersistedCraftingHistory({
     id: 'history-system', name: 'Recorded crafting', resolutionMode: mode,
     features: { multiStepRecipes: true, essences: true },
     craftingCheck: { simple: { rollFormula: checked ? '1d20' : '' } },
-    essences: [{ id: 'sun', name: 'Sun' }, { id: 'moon', name: 'Moon' }],
+    essenceDefinitions: [{ id: 'sun', name: 'Sun' }, { id: 'moon', name: 'Moon' }],
     components: [],
   };
   const set = new IngredientSet({ id: 'route', name: 'Recorded route',
@@ -192,6 +192,13 @@ export async function createPersistedCraftingHistory({
       { id: 'moon', options: [{ match: { type: 'essence', essenceId: 'moon', amount: 6 } }] }],
   });
   const emptySet = new IngredientSet({ id: 'next-route', name: 'Next route', ingredientGroups: [] });
+  if (previewOnly) emptySet.ingredientGroups = new IngredientSet({ id: 'future-inputs', ingredientGroups: [
+    { id: 'choice', name: 'Binder', options: ['Wax', 'Oil'].map((componentId) => ({ quantity: 1, match: { type: 'component', componentId } })) },
+    { id: 'essence', options: [{ match: { type: 'essence', essenceId: 'sun', amount: 4 } }] },
+    { id: 'tag', options: [{ quantity: 2, match: { type: 'tags', tags: ['fresh'], tagMatch: 'all' } }] },
+    { id: 'currency', options: [{ match: { type: 'currency', unit: 'gp', amount: 3 } }] },
+    { id: 'item', name: 'Bottle', options: [{ quantity: 1, itemUuid: 'Item.bottle' }] },
+  ] }).ingredientGroups;
   const steps = Array.from({ length: stageCount }, (_, index) => ({
     id: `stage-${index}`, name: `Stage ${index + 1}`, description: `Purpose ${index + 1}`,
     ingredientSets: [index === 0 ? set : emptySet], resultGroups: [], toolIds: [], timeRequirement: { minutes: 1 },
@@ -225,9 +232,9 @@ export async function createPersistedCraftingHistory({
     engine._spendCraftCurrencyVersioned = async () => ({ settledSpends: [{ unit: 'gp', amount: 2 }] });
     engine._versionedFailureAwardAllowed = () => true;
     engine._createResultItems = async (_actor, _recipe, step) => ({
-      items: [{ id: `award-${step.id}`, uuid: `${actor.uuid}.Item.award-${step.id}`,
+      items: awardQuantity === null ? [] : [{ id: `award-${step.id}`, uuid: `${actor.uuid}.Item.award-${step.id}`,
         name: `Award ${step.id}`, img: 'icons/commodities/gems/gem-faceted-round-blue.webp',
-        system: { quantity: step.id === 'stage-0' ? 1 : 3 } }],
+         system: { quantity: awardQuantity ?? (step.id === 'stage-0' ? 1 : 3) } }],
       resolutionMeta: null,
     });
     return engine;
@@ -248,6 +255,13 @@ export async function createPersistedCraftingHistory({
       },
       requestId: 'start', executionGrant: 'grant' });
     const armedRecord = structuredClone(manager.getActiveRun(actor, started.runId));
+    if (previewOnly) {
+      const before = structuredClone(actor.flags);
+      const model = new RunJournalBuilder({ craftingRunManager: new CraftingRunManager(),
+        recipeManager, recipeVisibility: visibility, getSystem: () => system,
+      }).buildListing({ actor, viewer }).activeRuns[0];
+      return { record: armedRecord, model, before, after: structuredClone(actor.flags) };
+    }
     steps[0].description = 'Later live purpose';
     const execute = (requestId) => engine.executeVersionedStage({ viewer: gm, actor,
       componentSourceActors: sources, runId: started.runId,
@@ -313,7 +327,7 @@ function historyItem(actor, index) {
     name: `Carrier ${index + 1}`, img: 'icons/commodities/flowers/flower-white.webp',
     system: { quantity: 1 }, flags: {},
     getFlag: (_namespace, key) => key.endsWith('essences') ? { sun: 2, moon: 3 } : undefined,
-    async delete() { actor.items = actor.items.filter((entry) => entry !== this); },
+    async delete() { actor.items = actor.items.filter((entry) => entry !== this); return this; },
     toObject() { return { name: this.name, img: this.img, type: 'loot', system: { ...this.system } }; },
   };
   actor.items.push(item);

@@ -121,6 +121,10 @@
         ? String(gatheringYield.roll)
         : ''
   );
+  const confirmedNoCheck = $derived(
+    !run?.redacted &&
+      (viewedStage?.detail?.checkKind === 'none' || gatheringYield?.mode === 'straight')
+  );
   const runIdentity = $derived(
     String(
       run?.key ??
@@ -169,6 +173,8 @@
     if (run?.actions?.disabledReason === 'unsupportedLifecycle')
       return 'FABRICATE.App.Journal.Actions.UnsupportedLifecycle';
     if (terminal) return 'FABRICATE.App.Journal.WhatToExpect.Terminal';
+    if (run?.actions?.disabledReason && run?.actions?.execute !== true)
+      return 'FABRICATE.App.Journal.WhatToExpect.Blocked';
     if (!viewedIsCurrent)
       return viewedIndex < currentIndex
         ? 'FABRICATE.App.Journal.WhatToExpect.Past'
@@ -179,7 +185,8 @@
         ? 'FABRICATE.App.Journal.WhatToExpect.GatheringManual'
         : 'FABRICATE.App.Journal.WhatToExpect.Gathering';
     if (run?.runType === 'salvage') return 'FABRICATE.App.Journal.WhatToExpect.Salvage';
-    if (run?.lifecycleContract === 'current' && !currentHasCheck)
+    if (run?.redacted) return 'FABRICATE.App.Journal.WhatToExpect.Protected';
+    if (run?.lifecycleContract === 'current' && !currentHasCheck && confirmedNoCheck)
       return run?.multiStep
         ? 'FABRICATE.App.Journal.WhatToExpect.CraftingNoCheck'
         : 'FABRICATE.App.Journal.WhatToExpect.CraftingSingleStepNoCheck';
@@ -227,54 +234,6 @@
     }
     return '';
   }
-  function stageRequirementFacts(stage) {
-    const facts = [];
-    const snapshot = stage?.requirementSnapshot;
-    if (!snapshot?.ingredientGroups?.length) {
-      for (const [index, requirement] of (stage?.requirements ?? []).entries()) {
-        facts.push({
-          id: `requirement-${index}`,
-          icon: 'fas fa-box',
-          label: localize('FABRICATE.App.Journal.Stage.Requirements'),
-          name: requirement.name || localize('FABRICATE.App.Journal.History.UnknownMaterial'),
-          img: requirement.img,
-          quantityText: quantityText(requirement.quantity),
-        });
-      }
-    }
-    for (const [index, group] of (snapshot?.ingredientGroups ?? []).entries()) {
-      if (viewedIndex > currentIndex && group.options?.length > 1) {
-        facts.push({
-          id: `choice-${index}`,
-          name: localize('FABRICATE.App.Journal.History.FutureChoice', {
-            count: group.options.length,
-          }),
-        });
-        continue;
-      }
-      const picked = Number(
-        stage?.selectionPlan?.ingredientOptionOverrides?.[group?.id]?.optionIndex
-      );
-      const option =
-        group?.options?.[Number.isSafeInteger(picked) ? picked : 0] ?? group?.options?.[0];
-      const name =
-        option?.name ??
-        option?.match?.value ??
-        option?.componentId ??
-        localize('FABRICATE.App.Journal.Yields.Item');
-      const quantity = Math.max(1, Number(option?.quantity ?? group?.quantity) || 1);
-      facts.push({
-        id: `requirement-${group?.id ?? index}`,
-        icon: 'fas fa-box',
-        label: group?.name ?? localize('FABRICATE.App.Journal.Stage.Requirement', { n: index + 1 }),
-        name,
-        img: option?.img,
-        quantityText: quantityText(quantity),
-      });
-    }
-    return facts;
-  }
-
   function stageFacts(stage) {
     const facts = [];
     if (Number(stage?.detail?.requiredSeconds) > 0)
@@ -319,7 +278,7 @@
     return facts;
   }
 
-  function stageIo() {
+  function stageIo(preview, inputs) {
     const text = (key) => localize(`FABRICATE.App.Journal.History.${key}`);
     const past = viewedIndex < currentIndex;
     const produced = !past
@@ -329,24 +288,23 @@
           quantityText: quantityText(item.qty),
         }))
       : viewedEvidence.produced;
-    const io =
-      craftingYield && craftingYield.presentation !== 'entries'
-        ? []
-        : [
-            {
-              kind: 'produced',
-              label: text(past ? 'Produced' : viewedIsCurrent ? 'Produces' : 'WillProduce'),
-              items: produced,
-              emptyText: text(
-                past && viewedStage?.createdResultsRecorded ? 'NothingBanked' : 'NotRecorded'
-              ),
-            },
-          ];
+    const io = [
+      {
+        kind: 'produced',
+        label: text(past ? 'Produced' : viewedIsCurrent ? 'Produces' : 'WillProduce'),
+        items: produced,
+        content: craftingYield && craftingYield.presentation !== 'entries' ? preview : null,
+        emptyText: text(
+          past && viewedStage?.createdResultsRecorded ? 'NothingBanked' : 'NotRecorded'
+        ),
+      },
+    ];
     if (!viewedIsCurrent)
       io.unshift({
         kind: 'consumed',
         label: text(past ? 'Consumed' : 'WillConsume'),
-        items: past ? viewedEvidence.consumed : stageRequirementFacts(viewedStage),
+        items: past ? viewedEvidence.consumed : [],
+        content: !past ? inputs : null,
         emptyText: text('NotRecorded'),
       });
     return io;
@@ -607,7 +565,8 @@
             index={viewedIndex}
             current={!terminal && viewedIndex === currentIndex}
             state={stageState(viewedIndex)}
-            tag={viewedIsCurrent && (status === 'ready' || run?.pauseState)
+            tag={viewedIsCurrent &&
+            ((status === 'ready' && run?.actions?.execute === true) || run?.pauseState)
               ? {
                   label: localize(
                     run?.pauseState
@@ -620,10 +579,7 @@
             facts={stageFacts(viewedStage)}
             showHeading={true}
             showNumber={stages.length > 1}
-            io={stageIo()}
-            output={craftingYield && craftingYield.presentation !== 'entries'
-              ? craftingPreview
-              : null}
+            io={stageIo(craftingPreview, futureInputs)}
             note={!viewedIsCurrent
               ? localize(
                   viewedIndex < currentIndex
@@ -668,6 +624,7 @@
         tiers={outcomeTiers}
         emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
         label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
+        hint={localize('FABRICATE.App.Journal.Yields.RoutedRule')}
       />
     {:else if gatheringYield && displayedYieldEntries.length > 0}
       {#if yieldPreviewLoading}
@@ -691,7 +648,12 @@
         label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
         labels={{
           threshold: (entry) =>
-            localize('FABRICATE.App.Journal.Yields.Chance', { chance: entry.chance }),
+            localize(
+              gatheringYield.mode === 'd100'
+                ? 'FABRICATE.App.Journal.Yields.HighRollThreshold'
+                : 'FABRICATE.App.Journal.Yields.Chance',
+              { chance: entry.chance, threshold: 101 - entry.chance }
+            ),
           cleared: (entry) =>
             localize('FABRICATE.App.Journal.Yields.Awarded', { chance: entry.chance }),
           missed: (entry) =>
@@ -703,6 +665,30 @@
       />
     {/if}
 
+    {#snippet futureInputs()}
+      {#each viewedStage?.inputPreview?.routes ?? [] as route, routeIndex (route.id ?? routeIndex)}
+        <section class="fab-stack" data-gap="1" data-journal-future-input-route={route.id}>
+          {#if (viewedStage?.inputPreview?.routes?.length ?? 0) > 1}<Kicker>{route.name}</Kicker
+            >{/if}
+          {#each route.groups as group, groupIndex (group.id ?? groupIndex)}
+            {#if group.options.length > 1}<span
+                >{localize('FABRICATE.App.Journal.History.FutureChoice', {
+                  count: group.options.length,
+                })}</span
+              >{/if}
+            {#each group.options as option (option.id)}
+              <ListRow
+                name={option.name || localize('FABRICATE.App.Journal.History.UnknownMaterial')}
+                art={option.img ?? ''}
+                icon={option.icon ?? 'fas fa-box'}
+                quantity={quantityText(option.need)}
+              />
+            {/each}
+          {:else}<span>{localize('FABRICATE.App.Journal.History.NoInputs')}</span>{/each}
+        </section>
+      {:else}<span>{localize('FABRICATE.App.Journal.History.NotRecorded')}</span>{/each}
+    {/snippet}
+
     {#snippet craftingPreview()}
       {#if craftingYield}
         <div data-journal-crafting-yield={craftingYield.presentation}>
@@ -711,7 +697,11 @@
               tiers={previewTiers(craftingYield.tiers)}
               emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
               label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
-              hint={localize('FABRICATE.App.Journal.Yields.CraftingPreviewHint')}
+              hint={localize(
+                viewedIsCurrent
+                  ? 'FABRICATE.App.Journal.Yields.CraftingPreviewHint'
+                  : 'FABRICATE.App.Journal.Yields.FuturePreviewHint'
+              )}
             />
           {:else if craftingYield.presentation === 'progressive'}
             <InspectorCard>
@@ -788,20 +778,25 @@
             />
             <h3>
               {localize(
-                checkLabel
-                  ? 'FABRICATE.App.Journal.Summary.Check'
-                  : 'FABRICATE.App.Journal.Summary.NoCheck'
+                confirmedNoCheck
+                  ? 'FABRICATE.App.Journal.Summary.NoCheck'
+                  : 'FABRICATE.App.Journal.Summary.Check'
               )}
             </h3>
           </div>
           <JournalFactRow
             icon={checkLabel ? 'fa-dice-d20' : 'fa-circle-check'}
             label={localize(
-              checkLabel
-                ? 'FABRICATE.App.Journal.Summary.DecidedBy'
-                : 'FABRICATE.App.Journal.Summary.NothingToRoll'
+              confirmedNoCheck
+                ? 'FABRICATE.App.Journal.Summary.NothingToRoll'
+                : 'FABRICATE.App.Journal.Summary.DecidedBy'
             )}
-            value={checkLabel || localize('FABRICATE.App.Journal.Summary.SimplyCompletes')}
+            value={checkLabel ||
+              localize(
+                confirmedNoCheck
+                  ? 'FABRICATE.App.Journal.Summary.SimplyCompletes'
+                  : 'FABRICATE.App.Journal.Summary.CheckUnavailable'
+              )}
           />
           {#if checkOutcome}<JournalFactRow
               icon="fa-check"

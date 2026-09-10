@@ -68,15 +68,17 @@
         <div class="fab-stage-card-io-group" data-stage-io={group.kind}>
           <Kicker>{group.label}</Kicker>
           <div class="fab-stage-card-items">
-            {#each group.items ?? [] as item, index (item.id ?? index)}
-              <ListRow
-                name={item.name ?? item.label ?? ''}
-                art={item.img ?? item.art ?? ''}
-                icon={item.icon ?? 'fas fa-box'}
-                tint={item.tint ?? ''}
-                quantity={item.quantityText ?? null}
-              />
-            {:else}<span class="fab-stage-card-summary">{group.emptyText}</span>{/each}
+            {#if group.content}{@render group.content()}{:else}
+              {#each group.items ?? [] as item, index (item.id ?? index)}
+                <ListRow
+                  name={item.name ?? item.label ?? ''}
+                  art={item.img ?? item.art ?? ''}
+                  icon={item.icon ?? 'fas fa-box'}
+                  tint={item.tint ?? ''}
+                  quantity={item.quantityText ?? null}
+                />
+              {:else}<span class="fab-stage-card-summary">{group.emptyText}</span>{/each}
+            {/if}
           </div>
         </div>
       {/each}

@@ -1588,10 +1588,8 @@ function journalLifecycleCases() {
       { selector: '[data-choice-id]:not(:disabled)' },
     ],
     'material-shortage': [
-      { selector: '[data-journal-route]' },
-      { selector: '[data-popover-option="boss-stage-1-verdant"]' },
-      { selector: '[data-journal-route]' },
-      { selector: '[data-popover-option="boss-stage-1-sunward"]' },
+      { selector: '[data-journal-route] input[value="boss-stage-1-verdant"]' },
+      { selector: '[data-journal-route] input[value="boss-stage-1-sunward"]' },
     ],
     'automatic-blocker': [{ selector: '[data-run-action="primary"]' }],
     'cancel-confirmation': [{ selector: '[data-run-action="cancel-arm"]' }],
@@ -1733,7 +1731,7 @@ function journalLifecycleCases() {
     'ingredient-route':
       detail +
       has(
-        '[data-journal-route]:not(:disabled)',
+        '[data-journal-route] input:not(:disabled)',
         '[data-slot-id="boss-stage-1-verdant-g1"]',
         '[data-journal-stage-details][data-editable="true"]'
       ) +

@@ -121,7 +121,7 @@
             <div class="journal-search-field">
               <ManagerSearchField
                 class="journal-search-control"
-                size="38"
+                size="30"
                 value={journal?.search ?? ''}
                 onInput={(value) => journal?.setSearch?.(value)}
                 placeholder={localize('FABRICATE.App.Journal.Filters.SearchPlaceholder')}
@@ -131,7 +131,7 @@
             </div>
             <div class="journal-kind-field">
               <Select
-                size="form"
+                size="inline"
                 minWidth={240}
                 maxWidth={340}
                 value={journal?.kindFilter ?? 'all'}
@@ -155,6 +155,9 @@
           <div class="journal-browse-lists">
             <ActiveRunsList
               runs={activeRuns}
+              filtered={Boolean(journal?.search?.trim()) ||
+                (journal?.kindFilter ?? 'all') !== 'all' ||
+                (journal?.activeStatusFilter ?? 'all') !== 'all'}
               totalCount={journal?.activeCount ?? activeRuns.length}
               {selectedRunKey}
               onSelect={(run) => journal?.select?.(run)}
@@ -169,6 +172,8 @@
             />
             <HistoryList
               runs={historyRuns}
+              filtered={Boolean(journal?.search?.trim()) ||
+                (journal?.kindFilter ?? 'all') !== 'all'}
               totalCount={journal?.historyCount ?? historyRuns.length}
               pageIndex={journal?.historyPage ?? 0}
               pageSize={journal?.historyPageSize ?? 4}
@@ -229,8 +234,8 @@
     min-width: 0;
     min-height: 0;
     flex-direction: column;
-    gap: var(--fab-space-3);
-    padding: var(--fab-space-3);
+    gap: var(--fab-space-2);
+    padding: var(--fab-space-2);
     border-right: 1px solid var(--fab-border);
     background: var(--fab-bg-1);
   }
@@ -260,12 +265,12 @@
     flex-direction: column;
     min-height: 0;
     flex: 1 1 auto;
-    gap: var(--fab-space-3);
+    gap: var(--fab-space-2);
   }
   .journal-browse-lists > :global([data-journal-list='finished']) {
     flex: 0 1 auto;
     max-height: 50%;
-    padding-top: var(--fab-space-3);
+    padding-top: var(--fab-space-2);
     border-top: 1px solid var(--fab-border);
   }
   .journal-detail-pane {

@@ -62,6 +62,7 @@ const harness = createMountedComponentHarness({
     component('SlotTile'),
     component('ChoiceOptionList'),
     component('SlotRow'),
+    'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/components/Stepper.svelte',
     component('EssencePool'),
     component('RunProgress'),
@@ -735,7 +736,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     );
     assert.ok(mounted.target.querySelector('[data-slot-id="a"]'));
     assert.match(mounted.target.querySelector('[data-stage-io="produced"]').textContent, /Iron/);
-    await chooseSelectOption(mounted.target, '[data-journal-route]', second.id);
+    mounted.target.querySelector(`[data-journal-route] input[value="${second.id}"]`).click();
     await settleAction();
     assert.ok(mounted.target.querySelector('[data-slot-id="b"]'));
     assert.ok(!mounted.target.querySelector('[data-slot-id="a"]'));
@@ -762,7 +763,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.success, false);
     assert.equal(mounted.store.selectedRun.craftingYield, null);
     assert.ok(!mounted.target.querySelector('[data-slot-id="metal"]'));
-    await chooseSelectOption(mounted.target, '[data-journal-route]', 'remaining');
+    mounted.target.querySelector('[data-journal-route] input[value="remaining"]').click();
     await settleAction();
     assert.ok(mounted.target.querySelector('[data-slot-id="metal"]'));
   });
@@ -991,6 +992,25 @@ describe('Journal versioned lifecycle (mounted)', () => {
         assert.equal(availability.knownMaterialShortfall, false);
       }
       assertCaseWitness(mounted.target, capture);
+      if (state === 'material-shortage') {
+        const requirements = mounted.store.selectedRun.currentStep.selectionAvailability.requirements;
+        for (const requirement of requirements) {
+          const tile = mounted.target.querySelector(`[data-slot-id="${requirement.groupId}"] .fab-slot-tile`);
+          assert.equal(tile.classList.contains('is-short'), requirement.option.available === false, requirement.option.name);
+        }
+        const cards = mounted.target.querySelectorAll('[data-journal-route] [data-radio-card-option]');
+        assert.equal(cards.length, 2);
+        assert.ok([...cards].every((card) => card.querySelector('[data-list-row]')));
+        assert.match(cards[1].textContent, /Short 1 requirements/);
+      }
+      if (state === 'authority-unavailable') {
+        assert.match(mounted.target.querySelector('[data-journal-action-blocker]').textContent, /GM must be online/i);
+        assert.doesNotMatch(mounted.target.querySelector('[data-journal-detail]').textContent, /Your move/);
+      }
+      if (state === 'empty-search') {
+        assert.match(mounted.target.textContent, /No matching active runs/);
+        assert.match(mounted.target.textContent, /No matching finished runs/);
+      }
       if (state === 'waiting-auto-eligible' || state === 'automatic-blocker') {
         assert.equal(
           mounted.target.querySelectorAll('[data-essence-source]').length,

@@ -97,7 +97,7 @@ describe('JournalView layout + effects', () => {
     );
     assert.ok(viewSource.includes('<ManagerSearchField'));
     assert.ok(viewSource.includes('class="journal-search-control"'));
-    assert.ok(viewSource.includes('size="38"'));
+    assert.ok(viewSource.includes('size="30"'));
     assert.ok(viewSource.includes('<div class="journal-kind-field">'));
     assert.equal(viewSource.includes("import Field from '../../components/Field.svelte'"), false);
     assert.equal(viewSource.includes('Filters.SearchKicker'), false, 'the accessible search name is not duplicated as a visible kicker');

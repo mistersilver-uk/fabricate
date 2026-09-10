@@ -2,6 +2,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import RunActionBar from '../../components/RunActionBar.svelte';
+  import Notice from '../../components/Notice.svelte';
   import { formatDurationHMS } from '../../util/formatDuration.js';
 
   let { run = null, journal = null, now = 0 } = $props();
@@ -146,4 +147,12 @@
     onCancel={() => journal?.cancel?.(run)}
     bind:armed={cancelArmed}
   />
+  {#if actions.disabledReason && !canExecute}
+    <Notice
+      tone="warning"
+      title={reason}
+      dataAttr="data-journal-action-blocker"
+      dataValue={actions.disabledReason}
+    />
+  {/if}
 </div>

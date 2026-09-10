@@ -104,21 +104,25 @@ function closedKey(run, stages, results) {
     return stages.length ? 'ClosedCancelled' : 'ClosedCancelledBefore';
   }
   if (run?.status === 'failed') {
-    if (results.length) return 'ClosedFailureAwards';
+    if (results.some((entry) => finite(entry.quantity) && Number(entry.quantity) > 0))
+      return 'ClosedFailureAwards';
     if (stages.some((stage) => stage.check) || run?.gatheringYield?.check)
       return 'ClosedFailedCheck';
-    if (
-      stages.length &&
-      stages.every((stage) => stage.createdResultsRecorded && stage.kind !== 'unknown')
-    )
-      return 'ClosedFailedEmpty';
+    if (recordedEmptyAwards(run, stages, results)) return 'ClosedFailedEmpty';
     return 'ClosedMissing';
   }
-  if (results.length) return 'ClosedSuccess';
-  const drops = list(run?.gatheringYield?.entries);
-  return drops.length && drops.every((entry) => entry.qty === 0)
-    ? 'ClosedSuccessEmpty'
-    : 'ClosedMissing';
+  if (results.some((entry) => finite(entry.quantity) && Number(entry.quantity) > 0))
+    return 'ClosedSuccess';
+  return recordedEmptyAwards(run, stages, results) ? 'ClosedSuccessEmpty' : 'ClosedMissing';
+}
+
+function recordedEmptyAwards(run, stages, results) {
+  const recorded =
+    run?.createdResultsRecorded === true ||
+    (stages.length > 0 && stages.every((stage) => stage.createdResultsRecorded === true));
+  return (
+    recorded && results.every((entry) => finite(entry.quantity) && Number(entry.quantity) === 0)
+  );
 }
 
 function gatheringSummary(run, localize) {
@@ -149,14 +153,20 @@ function historySummary(run, stages, localize) {
   return run?.status === 'failed' && summary.kind === 'check' ? null : summary;
 }
 
-function usableHistoricalScale(run, results) {
+function usableHistoricalScale(run) {
   const drops = list(run?.gatheringYield?.entries);
   if (run?.gatheringYield?.mode !== 'd100' || !finite(run.gatheringYield.roll) || !drops.length)
     return false;
-  const complete = drops.every(
-    (entry) => typeof entry.cleared === 'boolean' && finite(entry.chance) && finite(entry.qty)
-  );
-  if (!complete || !results.every((entry) => finite(entry.quantity))) return false;
+  return drops.every((entry) => typeof entry.cleared === 'boolean' && finite(entry.chance));
+}
+
+function attributedScaleAwards(run, results) {
+  const drops = list(run?.gatheringYield?.entries);
+  if (
+    !drops.every((entry) => finite(entry.qty)) ||
+    !results.every((entry) => finite(entry.quantity))
+  )
+    return false;
   return (
     drops.reduce((sum, entry) => sum + Number(entry.qty), 0) ===
     results.reduce((sum, entry) => sum + Number(entry.quantity), 0)
@@ -183,7 +193,8 @@ export function presentHistory(run, localize) {
     multi,
     gathering,
     mode,
-    usableScale: usableHistoricalScale(run, results),
+    usableScale: usableHistoricalScale(run),
+    attributedScaleAwards: attributedScaleAwards(run, results),
     settling: run?.recoveryEvidence?.status === 'planned',
     gatheringCheck: checkText(run?.gatheringYield?.check, localize),
     gatheringOutcome: run?.gatheringYield?.check?.outcome || localize(`${prefix}NotRecorded`),

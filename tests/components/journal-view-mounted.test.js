@@ -56,6 +56,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/HistoryRow.svelte',
     'src/ui/svelte/apps/journal/HistoryList.svelte',
     'src/ui/svelte/apps/journal/StepDetails.svelte',
+    'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
     'src/ui/svelte/apps/journal/ActionsPanel.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
@@ -347,6 +348,8 @@ describe('JournalView mounted behavior', () => {
     harness.remount();
     const futureStep = {
       ...run.steps[1],
+      inputPreview: { source: 'preview', stageIndex: 1, routes: [{ id: 'future-set', name: '',
+        groups: [{ id: 'fuel', options: [{ id: 'coal', name: 'Coal', kind: 'component', need: 2 }] }] }] },
       detail: { ...run.steps[1].detail, failureText: 'The metal cracked.' },
       lastCheckResult: { formula: '1d20 + 2', total: 16, value: 14, dc: 10, success: false },
       requirementSnapshot: {
@@ -608,7 +611,7 @@ describe('JournalView mounted behavior', () => {
     const base = makeCraftingRun();
     const step = {
       ...base.steps[0],
-      detail: { ...base.steps[0].detail, checkLabel: null },
+      detail: { ...base.steps[0].detail, checkLabel: null, checkKind: 'none' },
       timeGate: { availableAt: 100, initiatedAt: 0, requiredSeconds: 100 },
     };
     const run = makeCraftingRun({

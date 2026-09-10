@@ -4853,7 +4853,7 @@ It is a tab in the unified Fabricate window (`Crafting`, `Alchemy`, `Gathering`,
 
 Scope:
 
-- The Journal does NOT consume the `narrative` invalidation domain: it reads no authored description anywhere, and its flavour fields are empty by construction.
+- The Journal does NOT consume the `narrative` invalidation domain: stage purpose comes from permitted presentation captured when armed, never a live description lookup.
   An edit that changes only prose therefore MUST NOT rebuild it — see _Shared-store refresh routing_ above and `data-models/spec.md` § Invalidation Domains.
 - The Journal monitors active and historical runs, advances crafting runs, and collects eligible versioned gathering runs.
 - It never CREATES runs; run creation stays in the Crafting, Alchemy, and Gathering flows.
@@ -4887,14 +4887,13 @@ Active status filters are mutually exclusive All, Ready, Waiting and Paused.
 Status counts use the selected kind cohort before search, active-status filtering, paging or selection.
 - Each list defaults to four rows per page and retains existing page-size and sorting choices.
 Both pagers MUST use the shared compact single-row presentation with independently named region and navigation landmarks, accessible page-size choice and at least 24px interactive targets.
-At the populated wide layout, all four default Finished entries MUST fit visibly in their pane.
+At the populated wide layout, all four default Active and all four default Finished entries MUST fit visibly in their panes without undersizing shared primitives.
 Filtering and removal clamp its page independently.
 Selection is keyed by actor UUID, run type and run ID and remains selected when its row leaves the visible page or filter; fallback occurs only after actual removal or dismissal.
-- Selected detail follows identity/actions, notices, verdict, progress/stage navigation, stage requirements, yields and record facts.
-Readable run names remain visible, and the record labels identifiers explicitly as Run ID, Recipe ID or Task ID rather than presenting an identifier as a name.
-The record retains available mode and start/finish timestamps without exposing redacted identities.
-One bottom guidance callout combines contextual explanations with world-time and history advice.
-Active guidance distinguishes manual collection and no-check crafting from check-driven execution; paused guidance explains frozen time, terminal guidance describes an ended run, and recovery guidance explains confirmed receipts, uncertainty and manual GM reconciliation without replay or automatic rollback.
+- Selected detail MUST use the active-current, active-browsed, ordinary-history or recovery composition below rather than a universal section order.
+Readable permitted identity, known mode and terminal status/closed timestamp remain in the header; internal identifiers MUST NOT become an expanded Run record section.
+Compact This run retains Started, Closed when known, and known nonzero pause duration.
+One untitled neutral bottom callout provides guidance appropriate to that composition.
 Finished is the Journal's sole history browser, including full pagination; there is no duplicate Recent Results column or separate View full history control.
 - Current-stage choices and shared essence allocation remain editable only when the run permits them.
 Browsing past or future stages never changes the executable stage and exposes no editable controls.
@@ -4905,11 +4904,68 @@ Only entitled projected names and images are displayed; unknown quantities remai
 It does not delete actor history, and another user retains independent visibility.
 The same user's clients refresh on the first setting creation as well as later setting updates.
 - Loading, error/retry, no-actor, empty and filtered-empty states remain explicit; an empty filter result does not erase selected detail.
+Filtered-empty copy MUST say No matching active runs or No matching finished runs rather than claiming the actor has never had runs.
 - All countdowns and timestamps are world-time based.
 - **Single-step recipes suppress redundant step chrome.**
   A run whose projection reports `multiStep: false` (see `data-models/spec.md`) omits redundant stage navigation and Step X of Y labels.
   The current-stage requirements compose the shared slot and essence controls, with an accessible crafting-progress label where a progress bar is rendered.
   Single-step and multi-step active crafting guidance use their corresponding check or no-check explanation; terminal and recovery guidance take precedence over either active explanation.
+
+#### Active current and browsed stages
+
+The current-stage order MUST be identity/actions and applicable notices, progress/navigation, stage purpose/name, Produces above Consumes, current TIME/CHECK summaries, This run, and guidance.
+An ingredient-route comparison MUST use visible RadioCardGroup choices showing each route's output through dense ListRow and its shortage or unresolved-selection consequence, including alternatives not selected.
+A supplied material MUST NOT be painted short solely because another requirement blocks the whole plan; execution and candidate feasibility still respect the canonical shared-stock ledger.
+Known physical shortage MUST disable execution while keeping permitted selection repair available.
+Automatic blockers MUST spend nothing and retain the completion preference.
+An unavailable authority reason MUST remain visibly adjacent to disabled controls, and the stage and guidance MUST NOT invite execution while that reason applies.
+No check, Nothing to roll and It simply completes require affirmative disclosed no-check configuration; protected or indeterminate configuration MUST say unavailable without removing owner actions.
+A check-driven primary action MUST say Roll check.
+
+Past/future browsing MUST retain progress/navigation but omit separate TIME/CHECK summaries and current countdowns.
+The browsed stage MUST pair its own inert Consumed/Produced or Will consume/Will produce evidence, including route or outcome-ladder output within that pairing, followed by This run and looking-back/ahead guidance.
+Future input previews MUST enumerate every entitled authored requirement kind, option and route without selecting, consuming or persisting intent.
+Future output copy MUST identify a future-stage preview rather than the current stage.
+Past stages use recorded checks and routes; future choices open only when the stage becomes current.
+
+#### Ordinary closed history
+
+Ordinary history MUST NOT show active progress, StageNav, editable materials, primary/pause/cancel/preference controls, countdowns, the TIME/CHECK pair, expanded Run record, or a titled What to expect card.
+Typed recorded evidence, never localized mode text or subsequently edited configuration, selects the history branch.
+Checked successful single-stage history MUST show Final check once, recorded materials/choices, actual Crafted, This run and closed guidance.
+Confirmed no-check history uses Resolution instead; missing check evidence is Not recorded, never proof of No check.
+A failed checked single-stage verdict owns its actual roll without a duplicate summary; failed no-check history may retain Resolution after its verdict.
+Salvage results use Recovered and gathering results use Brought back instead of Crafted.
+
+Multiple attempted stages MUST appear together under How each stage went with per-stage checks and paired actual consumed/produced evidence, without duplicate run-level Crafted or Final check.
+An attempt requires completed/failed status or actual check/effect evidence; a preinitialized next stage or started timestamp alone does not establish execution.
+Cancellation MUST NOT use a failed verdict or mark unexecuted stages successful.
+Before any attempt, cancellation shows timing and cancellation guidance only; after one completed stage it shows compact prior effects, and after multiple stages it shows their ordered recaps.
+Earlier awards/spending and known legacy refunds remain visible without implying a rollback of versioned effects.
+
+Direct gathering history MUST show Resolution/No roll and actual Brought back once.
+D100 history MUST preserve its recorded roll, effective high-roll thresholds and cleared/missed outcomes in one historical scale/cut, without duplicate Final check or Received lists.
+Unknown per-row award attribution MUST NOT erase known check evidence: retain those outcomes with Not recorded amounts and show the unattributed actual award once with an explanation.
+Routed gathering success shows Final check, Brought back and How the check landed; routed failure shows its verdict and actual outcome log without repeating the log's roll in the verdict.
+The full OutcomeLadder remains an active preview; its native selection bands and highest-matching/lowest-relative-fallback rule MUST be stated truthfully rather than adopting prototype low-roll semantics.
+
+A matching just-resolved notice may temporarily own a single-record summary and receipts; reselecting clears it and restores ordinary history.
+Stage recaps and d100 scales remain visible, and an unrelated notice MUST NOT suppress the selected account.
+Successful positive awards use: "A closed run.
+Its results are already in your inventory; the entry stays here as a record."
+Failed final checks use: "This run failed its final check.
+Failed runs are kept so you can see what was attempted and when."
+Confirmed failed-no-output uses: "This run could not meet what it needed, so nothing was produced.
+Failed runs are kept so you can see what was attempted and when."
+Confirmed empty and zero-only successful receipts MUST state no items were awarded, while unknown quantities remain missing evidence; a zero row stays visible and never proves a positive award.
+Cancellation guidance names recorded position or cancellation before resolution, forfeited time, no resume, retained prior spending and dismissal.
+Truthful variants cover actual failure awards, legacy refunds, redaction and missing evidence.
+
+#### Recovery precedence
+
+Recovery takes precedence over ordinary closed success or failure, and retains confirmed, uncertain and unstarted distinctions without claiming every planned result reached inventory.
+Versioned gathering awards MUST come from an applied createGatheredResults receipt rather than the terminal record's pre-effect plan.
+An uncertain effect MUST NOT replay or trigger automatic rollback; guidance directs manual reconciliation under the authority contract.
 
 ### Run-Type-Aware Actions Panel
 
@@ -4937,7 +4993,8 @@ The setup action MUST NOT clear a retained claim; reconciliation follows the sep
 Legacy actions retain the projection's `manualAdvance` contract:
 
 - **Crafting (`manualAdvance: true`)** shows a primary advance button.
-  On a non-final step it reads **"Trigger Next Step"** with the `FABRICATE.App.Journal.Actions.TriggerHint` ready hint and the `FABRICATE.App.Journal.TimeRemaining.WhenPassed` gate hint; on the **final step** (`isFinalStep: true` — a single-step recipe, or the last step of a multi-step recipe, where there is no next step to trigger) it reads **"Finish Crafting"** with the `FinishHint` ready hint and the `WhenPassedFinal` gate hint, and the left run card's matured countdown reads "Ready to finish" (`Countdown.ReadyToFinish`) rather than "Ready to continue".
+  It uses the shared check-aware primary copy: Roll check for a disclosed check, Brew for alchemy, otherwise Complete stage or Complete on the final stage.
+  The left run card's matured countdown reads Ready to finish on the final stage rather than Ready to continue.
   It is DISABLED until the active step's time gate has matured — readiness is derived from `timeGate.availableAt <= worldTime` (race-free), NOT from the run's persisted status — and while an advance is in flight.
   Triggering invokes the crafting advance contract in `recipes-and-steps/spec.md` (_Run Progression — Player-Initiated Advance_); the final-step variant is copy-only and re-enters the same advance flow.
 - **Legacy gathering / salvage (`manualAdvance: false`)** show an explanatory "resolves automatically when world time advances" line plus the time-remaining box, and offer no trigger button, because those matured runs auto-resolve on world time.
@@ -4945,7 +5002,7 @@ Legacy actions retain the projection's `manualAdvance` contract:
 ### World-Time Disclosure
 
 The Journal shows a read-only WorldClockChip using the existing calendar formatter and fallback.
-Detail guidance (`FABRICATE.App.Journal.Tips.WorldTime`) explains that all countdowns and timestamps use world time.
+The shared clock identifies the time domain; all detail countdowns and compact This run timestamps MUST use that same world-time domain.
 
 ### Crafting / Alchemy Viewer Redaction
 

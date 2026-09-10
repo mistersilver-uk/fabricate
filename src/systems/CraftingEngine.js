@@ -1485,7 +1485,9 @@ export class CraftingEngine {
         kind: 'consumeIngredients',
         planned: prepared.plan.items,
         apply: async () => {
-          state.consumedItems = await this._consumeIngredients(prepared.craftSelection.plan);
+          state.consumedItems = await this._consumeIngredients(prepared.craftSelection.plan, {
+            requireConfirmation: true,
+          });
           return this._versionedConsumptionReceipt(
             state,
             prepared.executionRecipe,
@@ -1503,6 +1505,7 @@ export class CraftingEngine {
             await this._consumeAlchemyExtraItems(state.consumedItems, componentSourceActors, {
               isAlchemyAttempt: true,
               alchemySubmittedItems,
+              requireConfirmation: true,
             });
             return this._versionedConsumptionReceipt(
               state,
@@ -1627,7 +1630,8 @@ export class CraftingEngine {
             ...historySnapshots,
             // Purpose was captured on arm, not rebuilt from a later edit.
             presentationSnapshot:
-              current.steps?.[stepIndex]?.presentationSnapshot ?? historySnapshots.presentationSnapshot,
+              current.steps?.[stepIndex]?.presentationSnapshot ??
+              historySnapshots.presentationSnapshot,
             essenceSpend: state.essenceSpend,
             currencySpends: historySnapshots.resolutionSnapshot
               ? this._historicalCurrencySpends(state, recipe)
@@ -1698,7 +1702,11 @@ export class CraftingEngine {
       this._getRecipeSystem(recipe)
     );
     if (historySnapshots.resolutionSnapshot) {
-      state.essenceSpend = this._historicalEssenceSpend(state.consumedItems, essenceSources, recipe);
+      state.essenceSpend = this._historicalEssenceSpend(
+        state.consumedItems,
+        essenceSources,
+        recipe
+      );
     }
     return {
       items: state.consumedItems.map(mapConsumedIngredientRef),
@@ -2003,7 +2011,7 @@ export class CraftingEngine {
     const receipts = [];
     for (const [item, count] of counts) {
       const before = readStoredStackQuantity(item, { absentDefault: 1 });
-      await (count >= before ? item.delete() : updateStackQuantity(item, before - count));
+      await this._consumeItemQuantity(item, count, true);
       receipts.push({
         actorUuid: item.parent?.uuid ?? null,
         itemUuid: item.uuid,
@@ -4522,8 +4530,7 @@ export class CraftingEngine {
       for (const item of actor.items || []) {
         const count = essenceConsumeCounts.get(item.uuid);
         if (!count) continue;
-        const qty = readStoredStackQuantity(item, { absentDefault: 1 });
-        await (count >= qty ? item.delete() : updateStackQuantity(item, qty - count));
+        await this._consumeItemQuantity(item, count, options.requireConfirmation === true);
         consumedItems.push({ item, quantity: count, ingredient: null });
       }
     }
@@ -5097,28 +5104,41 @@ export class CraftingEngine {
    * recomputes the match against possibly-mutated items.
    * @private
    * @param {Array<{item: Item, quantity: number, ingredient: object}>} consumptionPlan
+   * @param {{requireConfirmation?: boolean}} [options] Versioned effects require document acknowledgement.
    */
-  async _consumeIngredients(consumptionPlan = []) {
+  async _consumeIngredients(consumptionPlan = [], { requireConfirmation = false } = {}) {
     const consumedItems = [];
 
     // Execute consumption
     for (const { item, quantity, ingredient } of consumptionPlan) {
-      const itemQuantity = readStoredStackQuantity(item, { absentDefault: 1 });
-
-      // Store consumed item info for effect transfer
+      await this._consumeItemQuantity(item, quantity, requireConfirmation);
+      // A versioned receipt may describe only confirmed writes. If a later item
+      // refuses, the executor retains the batch as uncertain and never replays it.
       consumedItems.push({
         item,
         quantity,
         ingredient,
       });
-
-      // Update or delete the item
-      await (quantity >= itemQuantity
-        ? item.delete()
-        : updateStackQuantity(item, itemQuantity - quantity));
     }
 
     return consumedItems;
+  }
+
+  /** Consume one physical stack, retaining legacy return tolerance outside versioned effects. */
+  async _consumeItemQuantity(item, quantity, requireConfirmation) {
+    const before = readStoredStackQuantity(item, { absentDefault: 1 });
+    const result = await (quantity >= before
+      ? item.delete()
+      : updateStackQuantity(item, before - quantity));
+    if (
+      requireConfirmation &&
+      (result == null || typeof result !== 'object' || !item.uuid || result.uuid !== item.uuid)
+    ) {
+      throw new CraftingLifecycleExecutionError(
+        'Ingredient consumption was not confirmed by the document write',
+        'CONSUMPTION_UNCONFIRMED'
+      );
+    }
   }
 
   /**

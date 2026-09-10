@@ -1039,6 +1039,65 @@ test('CraftingEngine refuses stale route and singleton intent until both materia
   assert.equal(runManager.getRunHistory(actor)[0].executionJournal.status, 'committed');
 });
 
+for (const scenario of ['delete-veto', 'update-refusal', 'prefix-then-veto', 'document-return', 'update-document-return']) {
+  test(`versioned consumption confirms document writes: ${scenario}`, async () => {
+    const { engine, recipe, recipeManager, runManager } = setupEngineFixture();
+    const actor = new FakeActor('confirmation');
+    const source = new FakeActor('stock');
+    const ids = scenario === 'prefix-then-veto' ? ['first', 'last'] : ['last'];
+    const set = new IngredientSet({ id: 'set-1', ingredientGroups: ids.map((id) => ({
+      id, options: [{ quantity: 1, match: { type: 'component', componentId: id } }],
+    })) });
+    recipe.getExecutionSteps = () => [{ id: 'step-1', ingredientSets: [set], resultGroups: [], toolIds: [] }];
+    recipeManager.ingredientMatchesItem = (_recipe, option, item) => option.match.componentId === item.id;
+    const writes = [];
+    source.items = ids.map((id) => ({ id, uuid: `${source.uuid}.Item.${id}`, parent: source,
+      system: { quantity: scenario.startsWith('update-') ? 2 : 1 },
+      async delete() {
+        writes.push(id);
+        if (id === 'last' && scenario !== 'document-return') return undefined;
+        source.items = source.items.filter((item) => item !== this);
+        return this;
+      },
+      async update() {
+        writes.push(id);
+        if (scenario !== 'update-document-return') return undefined;
+        this.system.quantity = 1;
+        return this;
+      },
+    }));
+    let awards = 0;
+    engine._createResultItems = async () => { awards += 1; return { items: [], resolutionMeta: null }; };
+    const started = await startReadyVersionedRun({ engine, recipe, actor, source,
+      selectionPlan: { selectedIngredientSetId: set.id } });
+    engine.installVersionedRunAuthority({ consumeExecutionGrant: async () => ({
+      operationId: 'confirmed-execution', resolvedCheckResult: { success: true, data: {} },
+    }) });
+    const execute = () => engine.executeVersionedStage({ actor, componentSourceActors: [source],
+      runId: started.runId, expectedRevision: runManager.getRun(actor, started.runId).runRevision,
+      executionGrant: 'grant', requestId: 'confirm-execute' });
+    if (scenario.endsWith('document-return')) {
+      assert.equal((await execute()).success, true);
+      assert.equal(awards, 1);
+      assert.equal(source.items.length, scenario.startsWith('update-') ? 1 : 0);
+      assert.equal(runManager.getRunHistory(actor)[0].steps[0].consumedIngredients[0].quantity, 1);
+    } else {
+      await assert.rejects(execute, (error) => error.code === 'RECOVERY_REQUIRED');
+      const reloaded = new CraftingRunManager().getRun(actor, started.runId);
+      assert.equal(reloaded.executionJournal.status, 'recoveryRequired');
+      const consumption = reloaded.executionJournal.effects.find((effect) => effect.effectId === 'consume-ingredients');
+      assert.notEqual(consumption.status, 'applied');
+      assert.equal(consumption.receipt == null, true);
+      assert.equal(awards, 0);
+      assert.equal(source.items.length, 1, 'a successful prefix stays spent, the vetoed item remains');
+      try { assert.equal((await execute()).success, false); }
+      catch (error) { assert.equal(error.code, 'RECOVERY_REQUIRED'); }
+      assert.deepEqual(writes, ids, 'ambiguous batches never replay');
+      assert.equal(awards, 0);
+    }
+  });
+}
+
 test('CraftingEngine executes a matured v1 stage with only its trusted check result and commits history evidence', async () => {
   const { engine, runManager } = setupEngineFixture();
   const actor = new FakeActor('crafter');
@@ -1473,6 +1532,7 @@ test('CraftingEngine journals a recipe-less fizzle and does not consume it twice
     delete: async () => {
       deletes += 1;
       source.items = [];
+      return item;
     },
   };
   source.items = [item];

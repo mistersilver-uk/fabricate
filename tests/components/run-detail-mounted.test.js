@@ -18,6 +18,7 @@ import { GatheringRichStateService } from '../../src/systems/GatheringRichStateS
 import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
 import { GatheringRunManager } from '../../src/systems/GatheringRunManager.js';
 import { GatheringEngine } from '../../src/systems/GatheringEngine.js';
+import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -50,6 +51,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/IconButton.svelte',
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/Stepper.svelte',
+    'src/ui/svelte/components/RadioCardGroup.svelte',
     ...['RunActionBar', 'ManagerButton', 'SlotTile',
       'SlotRow', 'ChoiceOptionList', 'EssencePool', 'RunProgress', 'StageNav',
       'StageCard', 'YieldScale', 'OutcomeLadder', 'ListRow'].map((name) => `src/ui/svelte/components/${name}.svelte`),
@@ -92,6 +94,77 @@ describe('RunDetail mounted behavior', () => {
   after(() => harness.teardown());
 
   const forbiddenHistory = '[data-run-progress], [data-stage-nav], [data-journal-actions], [data-journal-summary], [data-journal-record], [data-journal-stage-details], [data-journal-time-remaining]';
+  it('renders all authored future requirement kinds without selecting or persisting them', async () => {
+    const fixture = await createPersistedCraftingHistory({ previewOnly: true });
+    const future = fixture.model.steps[1].inputPreview;
+    assert.deepEqual(future.routes[0].groups.map((group) => group.options.map((option) => option.kind)),
+      [['component', 'component'], ['essence'], ['tag'], ['currency'], ['item']]);
+    assert.equal(future.routes[0].groups[1].options[0].need, 4);
+    assert.deepEqual(fixture.after, fixture.before);
+    assert.equal(fixture.record.steps[1].selectionPlan == null, true);
+    const target = await harness.mount({ run: fixture.model, journal: { viewedStageIndex: 1 } });
+    const inputs = target.querySelector('[data-stage-io="consumed"]');
+    for (const name of ['Wax', 'Oil', 'Sun', 'fresh', 'gp', 'Bottle']) assert.ok(inputs.textContent.includes(name), name);
+    assert.equal(inputs.querySelectorAll('button, input').length, 0);
+    assert.ok(!target.querySelector('[data-journal-summary]'));
+  });
+
+  for (const status of ['succeeded', 'failed']) {
+    it(`keeps zero crafting receipts visible without claiming positive awards (${status})`, async () => {
+      const flags = {};
+      const actor = { id: 'zero', uuid: 'Actor.zero', getFlag: (_scope, key) => flags[key],
+        setFlag: async (_scope, key, value) => { flags[key] = structuredClone(value); } };
+      const recipe = { id: 'zero', craftingSystemId: 'system', getExecutionSteps: () => [{ id: 'only', name: 'Zero award' }] };
+      const savedFoundry = globalThis.foundry;
+      globalThis.foundry = { utils: { randomID: () => 'zero-run' } };
+      let run;
+      try {
+        const manager = new CraftingRunManager();
+        const record = await manager.createRun(actor, recipe);
+        const payload = { createdResults: [{ itemUuid: 'Item.zero', name: 'Zero material', quantity: 0 }],
+          resolutionSnapshot: { kind: 'none', mode: 'simple' } };
+        if (status === 'failed') await manager.completeStepFailure(actor, record, 0, 'No yield', payload);
+        else await manager.completeStepSuccess(actor, record, 0, payload);
+        run = new RunJournalBuilder({ craftingRunManager: new CraftingRunManager() })
+          .buildListing({ actor, viewer: { isGM: true } }).history[0];
+      } finally { globalThis.foundry = savedFoundry; }
+      const target = await harness.mount({ run });
+      assert.equal(run.createdResults[0].quantity, 0);
+      assert.ok(target.querySelector('[data-history-items="produced"]').textContent.includes('Zero material'));
+      const guidance = target.querySelector('[data-journal-guidance]').textContent;
+      assert.match(guidance, status === 'failed' ? /ClosedFailedEmpty/ : /ClosedSuccessEmpty/);
+      assert.doesNotMatch(guidance, /already in your inventory|results recorded above were awarded/);
+    });
+  }
+
+  it('retains the d100 cut and thresholds alongside one unattributed actual award', async () => {
+    const rows = [31, 81].map((threshold, index) => ({ id: `drop-${index}`, componentId: 'herb',
+      dropped: true, finalDropRate: 101 - threshold, threshold, effectiveRoll: 100 }));
+    const awards = [{ itemUuid: 'Actor.gatherer.Item.herb', componentId: 'herb', name: 'Shared herb', quantity: 4 }];
+    const run = await projectGatheringRecord({ checkResult: { provider: 'd100', value: 100, itemRows: rows, items: rows },
+      createdResults: awards }, 'succeeded', { status: 'committed', effects: [{ effectId: 'results', kind: 'createGatheredResults', phase: 'applied', receipt: awards }] });
+    const target = await harness.mount({ run });
+    assert.ok(target.querySelector('[data-yield-scale]'));
+    assert.match(target.textContent, /HighRollEvidence.*"threshold":31/);
+    assert.match(target.textContent, /HighRollEvidence.*"threshold":81/);
+    assert.equal(target.querySelectorAll('[data-history-items="produced"]').length, 1);
+    assert.ok(target.querySelector('[data-history-unattributed]'));
+  });
+
+  it('does not call unavailable protected checks no-check while preserving owner controls', async () => {
+    const run = makeCraftingRun({ redacted: true, steps: [], currentStep: null, lifecycleContract: 'current',
+      actions: { execute: true, cancel: true }, status: 'ready', derivedStatus: 'ready' });
+    const target = await harness.mount({ run });
+    assert.match(target.querySelector('[data-journal-summary-card="check"]').textContent, /unavailable/i);
+    assert.doesNotMatch(target.textContent, /Nothing to roll|It simply completes/);
+    assert.equal(target.querySelector('[data-run-action="primary"]').disabled, false);
+  });
+  it('labels salvage awards Recovered rather than Crafted', async () => {
+    const target = await harness.mount({ run: makeSucceededRun({ runType: 'salvage', steps: [] }) });
+    const results = target.querySelector('[data-history-items="produced"]');
+    assert.match(results.textContent, /Recovered/);
+    assert.doesNotMatch(results.textContent, /Crafted/);
+  });
   it('never expands an opaque applied count from private planned awards', async () => {
     const run = await projectGatheringRecord({ checkResult: { blind: true },
       createdResults: [{ actorUuid: 'Actor.gatherer', itemUuid: 'Item.secret', name: 'PRIVATE_AWARD', quantity: 99 }],

@@ -50,6 +50,32 @@ test('historical steps retain nullable source identities, distinct awards and re
 });
 
 // localize stub: surfaces key + interpolation data so label composition is testable.
+for (const access of ['visible', 'denied', 'throws', 'null', 'absent']) {
+  test(`captured enrichments require affirmative current viewer entitlement: ${access}`, () => {
+    const run = terminalCraftingRun({ steps: [{ stepId: 's0', status: 'succeeded',
+      presentationSnapshot: { name: 'ENRICHED_NAME', description: 'ENRICHED_PURPOSE' },
+      resolutionSnapshot: { kind: 'none', mode: 'simple' }, currencySpends: [{ unit: 'SECRET_UNIT', amount: 3 }],
+      essenceSpend: { labels: { sun: 'SECRET_ESSENCE' }, carriers: [] }, createdResults: [],
+    }] });
+    const recipeVisibility = access === 'absent' ? null : { evaluateRecipeAccess() {
+      if (access === 'throws') throw new Error('unavailable');
+      return access === 'null' ? null : { visible: access === 'visible' };
+    } };
+    for (const viewer of [PLAYER, GM]) {
+      const model = makeBuilder({ history: [run], recipeVisibility })
+        .buildListing({ actor: { ...ACTOR, isOwner: true }, viewer }).history[0];
+      const entitled = viewer === GM || access === 'visible';
+      assert.equal(JSON.stringify(model).includes('ENRICHED_PURPOSE'), entitled);
+      assert.equal(JSON.stringify(model).includes('SECRET_UNIT'), entitled);
+      assert.equal(JSON.stringify(model).includes('SECRET_ESSENCE'), entitled);
+      if (!entitled && model.steps.length) {
+        assert.equal(model.steps[0].resolutionSnapshot, null);
+        assert.equal(model.steps[0].createdResultsRecorded, false);
+      }
+    }
+  });
+}
+
 const localize = (key, data) => (data ? `${key}|${JSON.stringify(data)}` : key);
 
 const SYSTEM = {
@@ -162,7 +188,7 @@ function makeBuilder({
   active = [],
   history = [],
   worldTime = 200,
-  recipeVisibility = null,
+  recipeVisibility = { evaluateRecipeAccess: () => ({ visible: true }) },
   gatheringActive = [],
   gatheringHistory = [],
   salvageActive = [],
@@ -1115,11 +1141,11 @@ test('gathering routed yield uses authored tier bands, normalized group names, a
     entries: [],
     roll: null,
     tiers: [
-      { id: 'fail', name: 'Setback', band: '10+', fail: true, yields: [] },
+      { id: 'fail', name: 'Setback', band: '<17', fail: true, yields: [] },
       {
         id: 'pass',
         name: 'Bounty',
-        band: '17+',
+        band: '≥17',
         fail: false,
         yields: [{ id: 'venison', name: 'venison', quantity: '×4' }],
       },
@@ -2622,6 +2648,9 @@ test('current-step availability delegates material choices and shared essence al
   expectedAvailability.requirements[1].option.available = false;
   expectedAvailability.choices.push({ groupId: 'essence', selectedOptionIndex: 0,
     options: [structuredClone(expectedAvailability.requirements[1].option)] });
+  // A supplied selected requirement is met even when another group blocks the plan.
+  expectedAvailability.requirements[0].option.available = true;
+  expectedAvailability.requirements[1].option.available = true;
   assert.deepEqual(step.selectionAvailability, expectedAvailability);
   assert.equal(JSON.stringify(step.selectionAvailability).includes('system'), false, 'held document internals are not spread');
 });

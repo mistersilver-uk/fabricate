@@ -3,7 +3,9 @@
   import { localize } from '../../util/foundryBridge.js';
   import EssencePool from '../../components/EssencePool.svelte';
   import SlotRow from '../../components/SlotRow.svelte';
-  import Select from '../../components/Select.svelte';
+  import RadioCardGroup from '../../components/RadioCardGroup.svelte';
+  import ListRow from '../../components/ListRow.svelte';
+  import Chip from '../../components/Chip.svelte';
   import JournalFactRow from './JournalFactRow.svelte';
 
   let { step = null, run = null, journal = null, editable = false } = $props();
@@ -282,15 +284,46 @@
   aria-busy={busy || undefined}
 >
   {#if routes.length > 1 || availability?.staleRoute}
-    <Select
-      label={localize('FABRICATE.App.Journal.Stage.Route')}
-      options={routes.map((route) => ({ value: route.id, label: route.name || route.id }))}
-      value={availability?.selectedIngredientSetId ?? ''}
-      placeholder={localize('FABRICATE.App.Journal.Stage.ChooseRoute')}
+    <RadioCardGroup
+      legend={localize('FABRICATE.App.Journal.Stage.Route')}
+      legendVisible
+      options={routes.map((route) => ({
+        ...route,
+        value: route.id,
+        label: route.name || route.id,
+      }))}
+      selectedValue={availability?.selectedIngredientSetId ?? ''}
+      groupName={`journal-route-${step?.stepId}`}
       disabled={!editable || busy}
       onChange={chooseRoute}
-      triggerData={{ 'data-journal-route': 'true' }}
-    />
+      dataAttr="data-journal-route"
+    >
+      {#snippet optionBody(route)}
+        <div class="fab-stack" data-gap="1">
+          {#if route.id === availability?.selectedIngredientSetId}
+            <Chip density="list">{localize('FABRICATE.App.Journal.Stage.ChosenRoute')}</Chip>
+          {/if}
+          {#if route.shortfallCount > 0}
+            <Chip density="list" tone="danger" icon="fas fa-triangle-exclamation"
+              >{localize('FABRICATE.App.Journal.Stage.RouteShortfall', {
+                count: route.shortfallCount,
+              })}</Chip
+            >
+          {:else if route.needsSelection}
+            <span>{localize('FABRICATE.App.Journal.Stage.RequirementsHint')}</span>
+          {/if}
+          {#each route.entries ?? [] as entry, index (entry.id ?? index)}
+            <ListRow
+              name={entry.name || localize('FABRICATE.App.Journal.History.UnknownMaterial')}
+              art={entry.art ?? ''}
+              quantity={entry.qty == null
+                ? localize('FABRICATE.App.Journal.History.NotRecorded')
+                : localize('FABRICATE.App.Journal.Quantity', { n: entry.qty })}
+            />
+          {/each}
+        </div>
+      {/snippet}
+    </RadioCardGroup>
     {#if availability?.staleRoute}<p>
         {localize('FABRICATE.App.Journal.Stage.StaleSelection')}
       </p>{/if}

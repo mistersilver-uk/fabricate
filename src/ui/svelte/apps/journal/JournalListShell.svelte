@@ -138,7 +138,7 @@
     flex: 1 1 0;
     display: flex;
     flex-direction: column;
-    gap: var(--fab-space-2);
+    gap: var(--fab-space-1);
     min-height: 0;
   }
 

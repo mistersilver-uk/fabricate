@@ -22,7 +22,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 promotes the specified stage card on RunDetail and HistoricalRunDetail. The history presentation and paired io extend its existing meaning; current-only body controls remain unchanged. The components path selects broad evidence; rendered acceptance remains pending."
+      "why": "Issue 1648 promotes the specified stage card on RunDetail and HistoricalRunDetail. The history presentation and paired io, including read-only content snippets for future alternatives and route/ladder output, extend its existing meaning; current-only body controls remain unchanged. The components path selects broad evidence; rendered acceptance remains pending."
     },
     {
       "path": "src/ui/svelte/components/YieldScale.svelte",

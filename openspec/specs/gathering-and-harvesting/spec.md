@@ -903,6 +903,8 @@ The lifecycle does not change the shared d100 item-drop resolver or independent 
 Versioned start effects, including blind-store, reservation and economy writes, MUST carry execution-journal evidence rather than being hidden inside an unrecorded aggregate effect.
 - The terminal history record, including its planned execution journal, is persisted before terminal side effects.
 Applying phases and actual receipts are updated in that same history record by run ID.
+Versioned Journal history MUST prefer the applied createGatheredResults receipt over pre-effect planned createdResults, including failure awards; missing or opaque receipts MUST NOT establish itemized awards.
+Recorded d100 roll, threshold and cleared/missed evidence remains usable when individual awarded quantities cannot be attributed; the Journal retains unknown per-row amounts and shows the unattributed actual receipt once.
 Stale, duplicate or ambiguous operations cannot repeat spending or awards; uncertain writes require recovery.
 Recovery MUST retain blind-task redaction and expose only permitted receipt evidence, never the private task snapshot or arbitrary journal payloads.
 A retained global authority claim can also block unrelated versioned runs until the active GM records its manual disposition; releasing that claim does not replay the old attempt.

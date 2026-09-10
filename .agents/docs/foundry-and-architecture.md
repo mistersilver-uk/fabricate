@@ -288,6 +288,9 @@ So `{ diff: false }` sends the full payload and resolves the document at either 
 A write REJECTS only for a server-side refusal, via `SocketInterface.dispatch`, which means the write did not happen.
 At V14 both returns are additionally filtered by `response.sideEffect`, which defaults `false` and is never set anywhere in the client bundle, so it is server-driven and whether a plain embedded create could ever come back marked is **unverified** from source.
 The consequence for any caller reporting an amount: derive it from what the write returned, never from the request.
+`Document#delete` also resolves `undefined` when a pre-delete veto drops the document on both V13.351 and V14.365; a successful deletion resolves the deleted document.
+Versioned consumption in `_consumeItemQuantity` in `src/systems/CraftingEngine.js` requires a document return before recording spending or allowing subsequent awards.
+A partially applied ingredient batch remains uncertain in the execution journal and requires reconciliation without replay or automatic rollback.
 - **A `Macro`'s `command` is a `StringField({ required: true, blank: true })` on EVERY macro type, so `typeof command === 'string'` does not mean "this is a script macro".**
 A `chat`-type macro passes that guard and has its chat text compiled as JavaScript by `MacroExecutor.run` (`src/utils/MacroExecutor.js`), so it throws for any body that is not also valid JS.
 Discriminating script from chat is therefore a **call-site** job, and deliberately not centralised: `MacroExecutor`'s own module docblock (`src/utils/MacroExecutor.js`) records that centralising it would turn a chat-type essence property macro from a silent `console.warn` into a per-essence-per-result error notification, and `tests/macro-executor.test.js` pins that decision as the ABSENCE of `/\.type\b/` and `/script/i` from the module's comment-stripped source.

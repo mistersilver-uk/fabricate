@@ -6,6 +6,38 @@ import { createPersistedCraftingHistory } from '../helpers/journal-fixtures.js';
 const text = (key, data) => `${key.split('.').at(-1)}${data ? JSON.stringify(data) : ''}`;
 
 describe('recorded Journal presentation', () => {
+  for (const failLast of [false, true]) {
+    for (const awardQuantity of [null, 2]) {
+      it(`writer/reload distinguishes empty, zero and positive awards (${awardQuantity}, failed=${failLast})`, async () => {
+        const { model } = await createPersistedCraftingHistory({ stageCount: 1, checked: false, failLast, awardQuantity });
+        const account = presentHistory(model, text);
+        const expected = awardQuantity > 0
+          ? (failLast ? 'ClosedFailureAwards' : 'ClosedSuccess')
+          : (failLast ? 'ClosedFailedEmpty' : 'ClosedSuccessEmpty');
+        assert.ok(account.closed.startsWith(expected), account.closed);
+        assert.equal(account.results.length, awardQuantity === null ? 0 : 1);
+        if (awardQuantity === 0) assert.equal(account.results[0].quantity, 0);
+      });
+    }
+  }
+  it('keeps check evidence when two winning rows share an unattributed award', () => {
+    const account = presentHistory({ runType: 'gathering', status: 'succeeded',
+      createdResults: [{ name: 'Herb', quantity: 4 }],
+      gatheringYield: { mode: 'd100', roll: 100, entries: [31, 81].map((threshold) => ({
+        threshold, chance: 101 - threshold, cleared: true, qty: null,
+      })) },
+    }, text);
+    assert.equal(account.usableScale, true);
+    assert.equal(account.attributedScaleAwards, false);
+    assert.equal(account.results[0].quantity, 4);
+  });
+  it('distinguishes unknown quantities from confirmed-empty direct awards', () => {
+    for (const createdResults of [[], [{ quantity: 0 }], [{ quantity: null }]]) {
+      const account = presentHistory({ runType: 'gathering', status: 'succeeded', createdResults,
+        createdResultsRecorded: true, gatheringYield: { mode: 'straight' } }, text);
+      assert.ok(account.closed.startsWith(createdResults[0]?.quantity === null ? 'ClosedMissing' : 'ClosedSuccessEmpty'));
+    }
+  });
   it('does not turn an armed stage into an attempt or missing evidence into no check', () => {
     const account = presentHistory({ status: 'cancelled', steps: [{ attempted: false, startedAt: 10 }] }, text);
     assert.equal(account.stages.length, 0);

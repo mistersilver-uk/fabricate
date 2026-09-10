@@ -19,6 +19,15 @@
   const single = $derived(account.stages[0]);
   const recovery = $derived(run?.recoveryEvidence?.required === true);
   const text = (key, data) => localize(`FABRICATE.App.Journal.History.${key}`, data);
+  const resultHeading = $derived(
+    text(run?.runType === 'salvage' ? 'Recovered' : account.gathering ? 'BroughtBack' : 'Crafted')
+  );
+  function dropEvidence(entry) {
+    const outcome = text(entry.cleared ? 'CheckCleared' : 'MissedRoll');
+    if (entry.threshold == null || entry.effectiveRoll == null)
+      return `${outcome} · ${text('NotRecorded')}`;
+    return `${outcome} · ${text('HighRollEvidence', { roll: entry.effectiveRoll, threshold: entry.threshold })}`;
+  }
   function facts(stage) {
     return [
       {
@@ -103,11 +112,7 @@
           {#if showTransient && !account.multi && account.mode !== 'd100'}
             {#if account.summary}<span>{account.summary.value}</span>{/if}
             {@render items(text('Consumed'), single?.consumed ?? [], 'transient-consumed')}
-            {@render items(
-              text(account.gathering ? 'BroughtBack' : 'Crafted'),
-              account.results,
-              'transient-produced'
-            )}
+            {@render items(resultHeading, account.results, 'transient-produced')}
           {/if}
         {/snippet}
       </Notice>
@@ -158,11 +163,7 @@
           value={`${spend.amount} ${spend.unit}`}
         />{/each}
       {@render essenceRecaps()}
-      {@render items(
-        text(account.gathering ? 'BroughtBack' : 'Crafted'),
-        account.results,
-        'produced'
-      )}
+      {@render items(resultHeading, account.results, 'produced')}
     {/if}
     {#if showTransient && !account.multi}{@render essenceRecaps()}{/if}
     {#if account.usableScale}
@@ -171,11 +172,11 @@
         roll={run.gatheringYield.roll}
         label={text('Scale')}
         labels={{
-          cleared: () => text('CameBack'),
-          missed: () => text('MissedRoll'),
+          cleared: dropEvidence,
+          missed: dropEvidence,
           threshold: () => text('NotRecorded'),
           quantity: (entry) =>
-            entry.qty == null
+            !account.attributedScaleAwards || entry.qty == null
               ? text('NotRecorded')
               : localize('FABRICATE.App.Journal.Quantity', { n: entry.qty }),
           chance: (entry) => (entry.chance == null ? text('NotRecorded') : `${entry.chance}%`),
@@ -185,6 +186,10 @@
           cutNote: () => text('Cut'),
         }}
       />
+      {#if !account.attributedScaleAwards}
+        <p data-history-unattributed>{text('UnattributedAwards')}</p>
+        {@render items(text('BroughtBack'), account.results, 'produced')}
+      {/if}
     {:else if account.mode === 'd100'}
       <JournalFactRow label={text('Scale')} value={text('NotRecorded')} />
       {@render items(text('BroughtBack'), account.results, 'produced')}

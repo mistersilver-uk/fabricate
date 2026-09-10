@@ -43,6 +43,10 @@ HistoricalRunDetail and StageCard are the initial independent result-row callers
 Pagination's opt-in `compact` presentation MUST keep the range, arrows and page-size control in one row while retaining accessible page-position and page-size labels.
 The default presentation and arithmetic MUST remain unchanged for callers that do not opt in.
 Compact controls MUST retain at least 24px hit areas, and both landmarks MUST retain their caller-supplied names.
+Journal browse density uses the existing 30px search rung, inline Select and spacing tokens so four default Active and four Finished entries can share the wide window's vertical budget.
+RadioCardGroup's optional `optionBody(option)` snippet MAY render read-only consequence content such as dense ListRow results inside a choice; it MUST NOT introduce nested interactive controls.
+StageCard `io` groups MAY supply a `content` snippet in place of plain items so a future requirement group and its route/ladder output stay paired inside the stage.
+Their default absent-snippet forms retain existing geometry and behavior.
 
 ### Requirement: The primitive set is a closed, versioned vocabulary
 
