@@ -3143,6 +3143,19 @@ CraftingRunStepState = {
   },
   selectedRequirementSnapshot?: object, // full selected authored set, including route/currency/tag/essence
 
+  // Optional permitted historical meaning and purpose; never a live narrative lookup.
+  resolutionSnapshot?: { kind: "check" | "ingredients" | "none", mode: string },
+  presentationSnapshot?: { name: string, description: string },
+  currencySpends?: Array<{ unit: string, amount: number }>, // applied settledSpends only
+  essenceSpend?: {
+    labels: Record<string, string>, // essenceId -> captured label
+    carriers: Array<{
+      actorUuid: string | null, itemUuid: string, quantity: number,
+      name: string | null, img: string | null,
+      contributions: Array<{ essenceId: string, amount: number }>,
+    }>,
+  },
+
   // Legacy START-phase consumption snapshot for a time-gated step, written when the gate is ARMED
   // and read at FINISH (source items are already deleted) and by the cancel reversal.
   // Absent for instant / non-timed steps and on pre-snapshot historical records.
@@ -3231,6 +3244,27 @@ CraftingRunStepState = {
    It is a **complete** map over every key in `resolvedEssences`, not only the disabled ones, because run persistence is a flag merge that cannot delete a key inside a surviving run and an omitted key would resurrect with its old value.
    An ABSENT map — a run armed before the field existed — reads as all-enabled.
    A collapsed multi-step chain has no such snapshot at all, because it consumes nothing when its single gate is armed and executes every step live at maturity; it therefore evaluates enabled-ness at maturity, consistent with its already-live essence resolution.
+
+#### Optional historical evidence
+
+Versioned stage arming captures `presentationSnapshot` from the authoritative execution step when the initiating viewer may see the recipe.
+Its first permitted name and description remain unchanged through execution and completion; later narrative edits do not rewrite history or require whole-Journal invalidation.
+`resolutionSnapshot` captures effective resolution meaning, with the executed meaning retained at completion and across an applied-prefix reload.
+The canonical active-check resolver determines `kind: "check"`; an unchecked ingredient-routed stage records `"ingredients"`, and another confirmed unchecked stage records `"none"`.
+Actual rolls remain in `lastCheckResult` and selected route identity and authored thresholds remain in `selectedRequirementSnapshot`.
+Neither snapshot duplicates check formula, DC or modifier configuration.
+
+The consumption receipt captures each actor-qualified carrier's source contributions before source deletion can prevent later reads.
+`essenceSpend` retains one row per physical `(actorUuid, itemUuid)` carrier, its actual consumed quantity and every recorded essence contribution; spent totals are derived from those contributions rather than stored again.
+Applied-prefix reconstruction hydrates this evidence, and both successful and failed stage finalization retain it through the manager's persistence allowlist.
+`currencySpends` copies applied `settledSpends` only; prepared intent and an Item Piles deducted boolean are not itemized spend evidence.
+Legacy timed `preparedConsumption.currencySpends` remains a valid settled receipt.
+Missing optional evidence stays absent in persistence and projects as `null` (Not recorded), while an explicitly recorded empty array or empty carrier list establishes zero.
+Legacy records gain no retrospective mode, presentation or contribution data from the current catalogue.
+
+New evidence is allowlisted before actor-flag or receipt persistence and independently gated by viewer entitlement before projection.
+Arming uses the attested initiating viewer and later GM execution resolves the run's recorded initiator, never ambient GM access as permission to expose protected identity.
+Opaque records omit these new snapshots and contribution evidence; arbitrary document flags, private formula/DC, modifier configuration and GM-only component configuration do not enter the allowlist.
 
 ## Actor Flags
 
@@ -3472,8 +3506,17 @@ StepModel = {
   } | null,
   // The step's authored required ingredients (persisted snapshot) and the items it
   // actually consumed, each a UI-safe result row. `[]` when absent or for a redacted run.
-  requirements: Array<{ componentId, itemUuid, quantity, name, img }>,
-  consumedIngredients: Array<{ componentId, itemUuid, quantity, name, img }>,
+  requirements: Array<{ actorUuid, componentId, itemUuid, quantity, name, img }>,
+  consumedIngredients: Array<{ actorUuid, componentId, itemUuid, quantity, name, img }>,
+  attempted: boolean, // completed/failed state or actual effects/checks, not startedAt alone
+  completedAt: number | null,
+  createdResults: Array<{ actorUuid, componentId, itemUuid, quantity, name, img }>,
+  createdResultsRecorded: boolean,
+  usedTools: Array<{ actorUuid, componentId, itemUuid, quantity, name, img, broken, virtual, spared, skippedImmune }>,
+  resolutionSnapshot: object | null, // allowlisted CraftingRunStepState shape above
+  presentationSnapshot: object | null,
+  essenceSpend: object | null,
+  currencySpends: Array<{ unit: string, amount: number }> | null,
   selectionPlan: object | null,
   selectedRequirementSnapshot: object | null,
   requirementSnapshot: object | object[], // full selected-set snapshot, else legacy requirements
@@ -3508,7 +3551,13 @@ StepModel = {
    Browsing MUST NOT mutate the persisted step index or selections.
    Inactive stages retain selected-set requirements or legacy array requirements alongside actual consumption, rolls and failures.
    An unexecuted stage in a cancelled or failed run MUST NOT be presented as completed merely because it is before the browse anchor.
-   Legacy terminal detail defaults to the last executed stage; versioned terminal browsing may anchor on the final stage without changing that stage's recorded status.
+   Terminal historical evidence retains every attempted stage's consumed inputs, created results, used tools and completion timestamp separately.
+   `attempted` requires an explicit succeeded/failed state, actual check or actual effect evidence; a manager-initialized next step's `startedAt` does not establish an attempt.
+   Terminal `multiStep` counts recorded attempts rather than consulting later recipe structure or system feature edits.
+   Terminal mode labels use captured resolution only, and terminal check/time detail does not consult live check configuration.
+   Captured material names take precedence over synchronous item-UUID resolution, then real component-ID resolution for a permitted reference.
+   Result rows retain `actorUuid`; absent names and quantities remain `null`, never the string `"null"`, a fabricated unit quantity or a zero roll.
+   A legacy timed consumed summary remains historical input evidence before and after finalization.
 
 5. **Recovery evidence is allowlisted, not a raw execution journal.**
    The projection MUST retain ordered effect phases, known receipt presence, safe actual item/currency receipt rows for entitled viewers, and the index of the applying effect as an uncertain boundary.
@@ -3554,7 +3603,8 @@ The GM-only cascade walkers (`removeRunsForSystem`, `removeRunsForComponent`, an
    Gathering's permitted mode-specific yield projection supplies its Direct, d100 or Check label independently of crafting step fields.
    A step's `requirements` come from its persisted snapshot and `consumedIngredients` from the persisted consumed refs; both resolve name/img via the same shared result mapper (consume-time capture, then the item-uuid and component-id fallbacks), so a deleted consumed item still labels from its captured or component name.
    A redacted crafting run also projects `steps: []` (its requirements / consumed items never leak).
-   `multiStep` is `recipe.steps.length > 1`; `isFinalStep` is `stepCount <= 1 || currentStepIndex >= stepCount - 1` (true on a single-step recipe or the last step of a multi-step recipe, and — harmlessly, since a terminal run drives no action — on any terminal run whose `currentStepIndex` is null).
+   Active `multiStep` follows the enabled multi-step feature and `recipe.steps.length > 1`; terminal `multiStep` follows recorded attempts as specified above.
+   `isFinalStep` is `stepCount <= 1 || currentStepIndex >= stepCount - 1` for an active run; terminal records drive no execution action.
    `stepLabel` is a localized "Step X of Y" string only for a non-redacted multi-step crafting run; it is `""` for a single-step recipe (the structure label already conveys the single-step shape) and for a redacted run (so a hidden multi-step recipe never leaks its step count or active step name).
 5. **`manualAdvance` is a legacy compatibility signal, not a versioned capability.**
    It is `true` for crafting runs — including redacted ones (issue 966) — and `false` for gathering, salvage and recipe-less alchemy fizzle history entries.

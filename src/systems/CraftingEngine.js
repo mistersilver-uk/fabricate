@@ -56,6 +56,7 @@ import {
   CraftingLifecycleExecutionError,
   CraftingLifecycleExecutor,
 } from './CraftingLifecycleExecutor.js';
+import { craftingStepHistoryEvidence } from './CraftingRunManager.js';
 import {
   buildCurrencyAffordProbe,
   checkCurrencySpends,
@@ -203,6 +204,14 @@ function mapConsumedIngredientRef({ item, quantity }) {
     name: item.name ?? null,
     img: item.img ?? null,
   };
+}
+
+function addHistoricalEssenceContribution(carriers, essenceId, source) {
+  const carrier = carriers.get(JSON.stringify([source.actorUuid, source.itemUuid]));
+  if (!carrier) return;
+  const prior = carrier.contributions.find((entry) => entry.essenceId === essenceId);
+  if (prior) prior.amount += source.essenceTotal;
+  else carrier.contributions.push({ essenceId, amount: source.essenceTotal });
 }
 
 /**
@@ -830,6 +839,7 @@ export class CraftingEngine {
         ingredientOptionOverrides: selectionPlan.ingredientOptionOverrides,
         ingredientEssenceAllocation: selectionPlan.ingredientEssenceAllocation,
         selectedRequirementSnapshot: snapshotRequirementSet(selectedSet),
+        ...this._stageHistorySnapshots({ recipe, step, actor, viewer, sourceActors }),
       },
       { expectedRevision: run.runRevision }
     );
@@ -857,6 +867,7 @@ export class CraftingEngine {
   }
 
   async executeVersionedStage({
+    viewer = null,
     actor,
     componentSourceActors,
     runId,
@@ -903,6 +914,21 @@ export class CraftingEngine {
     const stepIndex = resuming ? Number(journal.intent?.stepIndex) : Number(run.currentStepIndex);
     const step = this._executionSteps(recipe)[stepIndex];
     if (!step) return versionedFailure('There is no active crafting step available.');
+    // Timed/GM execution is on behalf of the recorded initiator. Never substitute
+    // the elected GM's ambient visibility for that user's entitlement.
+    const historyViewer =
+      game.users?.get?.(run.userId) ?? (viewer?.id === run.userId ? viewer : null);
+    const permittedSnapshots = this._stageHistorySnapshots({
+      recipe,
+      step,
+      actor,
+      viewer: historyViewer,
+      sourceActors: componentSourceActors,
+    });
+    const historySnapshots =
+      resuming && permittedSnapshots.resolutionSnapshot
+        ? craftingStepHistoryEvidence(run.steps?.[stepIndex])
+        : permittedSnapshots;
     const persistedSelection = selectionPlan || run.steps?.[stepIndex]?.selectionPlan || {};
     const selectedSet = this._selectedIngredientSet(
       step,
@@ -928,6 +954,7 @@ export class CraftingEngine {
           ...persistedSelection,
           selectedIngredientSetId: selectedSet.id,
           selectedRequirementSnapshot: snapshotRequirementSet(selectedSet),
+          ...historySnapshots,
         },
         { expectedRevision }
       );
@@ -991,6 +1018,7 @@ export class CraftingEngine {
               ...persistedSelection,
               selectedIngredientSetId: selectedSet.id,
               selectedRequirementSnapshot: snapshotRequirementSet(selectedSet),
+              ...historySnapshots,
             },
         operation: ({ trusted }) =>
           this._buildVersionedStageOperation({
@@ -1004,6 +1032,7 @@ export class CraftingEngine {
             prepared,
             trusted,
             trigger,
+            historySnapshots,
           }),
       });
       return versionedTransitionResult(execution.run, execution.outcome);
@@ -1067,6 +1096,39 @@ export class CraftingEngine {
 
   _executionSteps(recipe) {
     return typeof recipe?.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
+  }
+
+  _stageHistorySnapshots({ recipe, step, actor, viewer, sourceActors }) {
+    if (!this._mayRecordStageHistory({ recipe, actor, viewer, sourceActors })) return {};
+    const system = this._getRecipeSystem(recipe);
+    const mode = this.resolutionModeService?.getMode?.(recipe) ?? system?.resolutionMode ?? 'simple';
+    const check = resolveActiveCraftingCheckFormula({ ...system, resolutionMode: mode });
+    let kind = 'none';
+    if (check.requiresCheck || check.checkUsable) kind = 'check';
+    else if (mode === 'routedByIngredients') kind = 'ingredients';
+    return craftingStepHistoryEvidence({
+      resolutionSnapshot: { kind, mode },
+      presentationSnapshot: { name: step.name ?? '', description: step.description ?? '' },
+    });
+  }
+
+  _mayRecordStageHistory({ recipe, actor, viewer, sourceActors }) {
+    if (!viewer) return false;
+    if (viewer.isGM === true) return true;
+    try {
+      const visibility = game.fabricate?.getRecipeVisibilityService?.();
+      return (
+        visibility?.evaluateRecipeAccess?.({
+          recipe,
+          viewer,
+          craftingActor: actor,
+          componentSourceActors: sourceActors,
+        })?.visible === true
+      );
+    } catch {
+      // Optional historical enrichment must not strand an otherwise valid run.
+      return false;
+    }
   }
 
   _selectedIngredientSet(step, selectedId) {
@@ -1360,6 +1422,7 @@ export class CraftingEngine {
     prepared,
     trusted,
     trigger,
+    historySnapshots = {},
   }) {
     const checkResult = trusted?.resolvedCheckResult;
     if (!checkResult || typeof checkResult !== 'object') {
@@ -1406,6 +1469,7 @@ export class CraftingEngine {
       currencySettlement: null,
       resolvedEssences: null,
       essenceEnabled: null,
+      essenceSpend: historySnapshots.resolutionSnapshot ? { labels: {}, carriers: [] } : undefined,
       toolPairs: [...prepared.toolValidation.tools],
     };
     const effects = [];
@@ -1420,7 +1484,8 @@ export class CraftingEngine {
           return this._versionedConsumptionReceipt(
             state,
             prepared.executionRecipe,
-            prepared.resolveComponent
+            prepared.resolveComponent,
+            historySnapshots
           );
         },
       });
@@ -1437,7 +1502,8 @@ export class CraftingEngine {
             return this._versionedConsumptionReceipt(
               state,
               prepared.executionRecipe,
-              prepared.resolveComponent
+              prepared.resolveComponent,
+              historySnapshots
             );
           },
         });
@@ -1552,6 +1618,16 @@ export class CraftingEngine {
           consumedIngredients: state.consumedItems.map(mapConsumedIngredientRef),
           usedTools: state.usedTools,
           createdResults: state.resultRecords,
+          ...craftingStepHistoryEvidence({
+            ...historySnapshots,
+            // Purpose was captured on arm, not rebuilt from a later edit.
+            presentationSnapshot:
+              current.steps?.[stepIndex]?.presentationSnapshot ?? historySnapshots.presentationSnapshot,
+            essenceSpend: state.essenceSpend,
+            currencySpends: historySnapshots.resolutionSnapshot
+              ? this._historicalCurrencySpends(state, recipe)
+              : undefined,
+          }),
         };
         const options = {
           expectedRevision: current.runRevision,
@@ -1604,8 +1680,8 @@ export class CraftingEngine {
     };
   }
 
-  _versionedConsumptionReceipt(state, recipe, resolveComponent) {
-    const { resolvedEssences } = this._buildEssenceContext(
+  _versionedConsumptionReceipt(state, recipe, resolveComponent, historySnapshots = {}) {
+    const { resolvedEssences, essenceSources } = this._buildEssenceContext(
       state.consumedItems,
       recipe,
       null,
@@ -1616,11 +1692,15 @@ export class CraftingEngine {
       resolvedEssences,
       this._getRecipeSystem(recipe)
     );
+    if (historySnapshots.resolutionSnapshot) {
+      state.essenceSpend = this._historicalEssenceSpend(state.consumedItems, essenceSources, recipe);
+    }
     return {
       items: state.consumedItems.map(mapConsumedIngredientRef),
       consumedItems: state.consumedItems.map(snapshotVersionedConsumedItem),
       resolvedEssences: cloneJsonValue(state.resolvedEssences),
       essenceEnabled: cloneJsonValue(state.essenceEnabled),
+      ...craftingStepHistoryEvidence({ essenceSpend: state.essenceSpend }),
     };
   }
 
@@ -1631,6 +1711,7 @@ export class CraftingEngine {
       state.consumedItems = snapshots.map(rehydrateVersionedConsumedItem);
       state.resolvedEssences = cloneJsonValue(consumption.resolvedEssences) ?? null;
       state.essenceEnabled = cloneJsonValue(consumption.essenceEnabled) ?? null;
+      state.essenceSpend = craftingStepHistoryEvidence(consumption).essenceSpend;
     }
     const toolReceipt = receipts['apply-tools'];
     if (toolReceipt) {
@@ -1653,6 +1734,42 @@ export class CraftingEngine {
         fired: cloneJsonValue(receipts['fire-complications'].fired) ?? [],
       };
     }
+  }
+
+  _historicalEssenceSpend(consumedItems, essenceSources, recipe) {
+    const definitions = resolvedEssencesFor(this._getRecipeSystem(recipe));
+    const labels = Object.fromEntries(
+      definitions
+        .filter((definition) => Object.hasOwn(essenceSources, definition.id))
+        .map((definition) => [definition.id, definition.name])
+    );
+    const carriers = new Map();
+    for (const consumed of consumedItems) {
+      const ref = mapConsumedIngredientRef(consumed);
+      if (!ref.itemUuid || !Number.isFinite(ref.quantity) || ref.quantity <= 0) continue;
+      const key = JSON.stringify([ref.actorUuid, ref.itemUuid]);
+      const prior = carriers.get(key);
+      if (prior) prior.quantity += ref.quantity;
+      else carriers.set(key, { ...ref, contributions: [] });
+    }
+    for (const [essenceId, sources] of Object.entries(essenceSources)) {
+      for (const source of sources) {
+        addHistoricalEssenceContribution(carriers, essenceId, source);
+      }
+    }
+    return craftingStepHistoryEvidence({
+      essenceSpend: {
+        labels,
+        carriers: [...carriers.values()].filter((carrier) => carrier.contributions.length > 0),
+      },
+    }).essenceSpend;
+  }
+
+  _historicalCurrencySpends(state, recipe) {
+    if (Array.isArray(state.currencySettlement?.settledSpends)) {
+      return state.currencySettlement.settledSpends;
+    }
+    return this._hasItemPilesCurrencyCost(recipe) ? undefined : [];
   }
 
   _appendVersionedPostEffects(
@@ -7271,6 +7388,8 @@ export class CraftingEngine {
         essenceSources[essenceId] ||= [];
         essenceSources[essenceId].push({
           itemId: item.id,
+          actorUuid: item.parent?.uuid ?? null,
+          itemUuid: item.uuid ?? null,
           itemName: item.name,
           quantityConsumed: quantity,
           essencePerItem: value,

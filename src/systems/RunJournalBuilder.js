@@ -2,6 +2,7 @@ import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 
 import { resolveActiveCraftingCheckFormula } from './checkModifierResolver.js';
+import { craftingStepHistoryEvidence } from './CraftingRunManager.js';
 import {
   actorToOption,
   idOf,
@@ -22,6 +23,28 @@ const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 // gathering listing so both surfaces say the same thing.
 const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
 const DAY_SECONDS = 24 * 60 * 60;
+
+function recordedNumber(value) {
+  return value == null || value === '' ? null : numberOrNull(value);
+}
+
+function historicalConsumedIngredients(step) {
+  const consumed = normalizeList(step?.consumedIngredients);
+  return consumed.length > 0 ? consumed : normalizeList(step?.preparedConsumption?.consumedSummary);
+}
+
+function historicalStepAttempted(step, run, index) {
+  if (['succeeded', 'failed'].includes(step?.status) || step?.lastCheckResult) return true;
+  if (
+    historicalConsumedIngredients(step).length > 0 ||
+    normalizeList(step?.createdResults).length > 0 ||
+    normalizeList(step?.usedTools).length > 0
+  ) {
+    return true;
+  }
+  if (Number(run?.executionJournal?.intent?.stepIndex) !== index) return false;
+  return normalizeList(run?.executionJournal?.effects).some((effect) => effect?.phase === 'applied');
+}
 
 // Localized player-facing resolution-mode label keys. The crafting
 // `resolutionMode` token is system-internal, so the projection maps it to a
@@ -498,20 +521,19 @@ export class RunJournalBuilder {
             run,
             availabilitySnapshot,
             isCurrent: !terminal && index === currentStepIndex,
+            terminal,
           })
         );
     const currentStep =
       activeStep && Number.isFinite(currentStepIndex) ? (steps[currentStepIndex] ?? null) : null;
 
     const derivedStatus = this._deriveCraftingStatus({ status, activeStep, worldTime, run });
-    // A recipe presents as multi-step only while its system's multi-step feature is
-    // ON. When the feature is OFF the recipe is COLLAPSED (issue 710): it ran as one
-    // atomic chain, so the Journal renders it as a single-step run even though the
-    // run record retains per-step detail. Re-enabling the feature restores the
-    // multi-step presentation from the same untouched record.
+    // Active browsing follows the enabled multi-step feature. A terminal account
+    // follows actual recorded attempts, independently of later authoring changes.
     const multiStepFeatureEnabled = system?.features?.multiStepRecipes === true;
-    const multiStep =
-      multiStepFeatureEnabled && Array.isArray(recipe?.steps) && recipe.steps.length > 1;
+    const multiStep = terminal
+      ? steps.filter((step) => step.attempted).length > 1
+      : multiStepFeatureEnabled && Array.isArray(recipe?.steps) && recipe.steps.length > 1;
     const failureReason = redacted ? null : this._craftingFailureReason(runSteps);
     // The step whose name annotates the label: the active step for a live run,
     // else the final step for a terminal run.
@@ -583,7 +605,9 @@ export class RunJournalBuilder {
           ? 'FABRICATE.App.Journal.Structure.MultiStep'
           : 'FABRICATE.App.Journal.Structure.SingleStep'
       ),
-      resolutionModeLabel: this._resolutionModeLabel(recipe, system),
+      resolutionModeLabel: terminal
+        ? this._historicalModeLabel(steps)
+        : this._resolutionModeLabel(recipe, system),
       recipeId: redacted ? null : stringOrNull(run.recipeId),
       taskId: null,
       flavor: '',
@@ -704,14 +728,26 @@ export class RunJournalBuilder {
     run = null,
     availabilitySnapshot = null,
     isCurrent = false,
+    terminal = false,
   }) {
+    const evidence = craftingStepHistoryEvidence(runStep);
+    const consumed = historicalConsumedIngredients(runStep);
     return {
       stepId: stringOrNull(runStep?.stepId),
       stepName: stringOrEmpty(runStep?.stepName),
       index,
       status: stringOrNull(runStep?.status) || 'pending',
+      attempted: historicalStepAttempted(runStep, run, index),
+      completedAt: recordedNumber(runStep?.completedAt),
+      presentationSnapshot: evidence.presentationSnapshot ?? null,
+      resolutionSnapshot: evidence.resolutionSnapshot ?? null,
+      essenceSpend: evidence.essenceSpend ?? null,
+      currencySpends:
+        evidence.currencySpends ??
+        craftingStepHistoryEvidence(runStep?.preparedConsumption).currencySpends ??
+        null,
       timeGate: plainObjectOrNull(runStep?.timeGate),
-      detail: this._stepDetail({ runStep, recipeStep, system, recipe }),
+      detail: this._stepDetail({ runStep, recipeStep, system, recipe, terminal }),
       lastCheckResult: this._checkResultModel(runStep?.lastCheckResult),
       // The recipe's authored ingredient requirements (persisted snapshot at run
       // creation) and the items actually consumed this step, each resolved to a
@@ -721,9 +757,18 @@ export class RunJournalBuilder {
       requirements: normalizeList(runStep?.requirements).map((entry) =>
         this._mapResult(entry, systemId)
       ),
-      consumedIngredients: normalizeList(runStep?.consumedIngredients).map((entry) =>
+      consumedIngredients: consumed.map((entry) => this._mapResult(entry, systemId)),
+      createdResults: normalizeList(runStep?.createdResults).map((entry) =>
         this._mapResult(entry, systemId)
       ),
+      createdResultsRecorded: Array.isArray(runStep?.createdResults),
+      usedTools: normalizeList(runStep?.usedTools).map((entry) => ({
+        ...this._mapResult(entry, systemId),
+        broken: entry?.broken === true,
+        virtual: entry?.virtual === true,
+        spared: entry?.spared === true,
+        skippedImmune: entry?.skippedImmune === true,
+      })),
       selectionPlan: cloneJson(runStep?.selectionPlan) ?? null,
       selectedRequirementSnapshot: cloneJson(runStep?.selectedRequirementSnapshot) ?? null,
       requirementSnapshot:
@@ -1236,7 +1281,16 @@ export class RunJournalBuilder {
     return plainObjectOrNull(scoped.allocation);
   }
 
-  _stepDetail({ runStep, recipeStep, system, recipe }) {
+  _stepDetail({ runStep, recipeStep, system, recipe, terminal = false }) {
+    if (terminal) {
+      return {
+        requiredSeconds: recordedNumber(runStep?.timeGate?.requiredSeconds),
+        primaryToolName: null,
+        toolNames: [],
+        checkLabel: null,
+        failureText: stringOrNull(runStep?.failureReason),
+      };
+    }
     const toolNames = normalizeList(recipeStep?.toolIds)
       .map((toolId) =>
         stringOrEmpty(this._getTool(stringOrNull(recipe?.craftingSystemId), toolId)?.name)
@@ -1269,11 +1323,11 @@ export class RunJournalBuilder {
     return {
       success: lastCheckResult.success === true,
       outcome: stringOrNull(lastCheckResult.outcome),
-      value: numberOrNull(lastCheckResult.value),
+      value: recordedNumber(lastCheckResult.value),
       reason: stringOrNull(lastCheckResult.reason),
       formula: stringOrNull(data.resolvedFormula) || stringOrNull(data.formula),
-      total: numberOrNull(data.total) ?? numberOrNull(lastCheckResult.value),
-      dc: numberOrNull(data.dc),
+      total: recordedNumber(data.total) ?? recordedNumber(lastCheckResult.value),
+      dc: recordedNumber(data.dc),
     };
   }
 
@@ -1352,9 +1406,10 @@ export class RunJournalBuilder {
       img ||= stringOrNull(component?.img);
     }
     return {
+      actorUuid: stringOrNull(result?.actorUuid),
       componentId,
       itemUuid,
-      quantity: numberOrNull(result?.quantity) ?? 1,
+      quantity: recordedNumber(result?.quantity),
       name,
       img,
     };
@@ -1399,6 +1454,12 @@ export class RunJournalBuilder {
   _resolutionModeLabel(recipe, system) {
     const mode = this._resolveMode(recipe, system);
     return this.localize(MODE_LABEL_KEYS[mode] || MODE_LABEL_KEYS.simple);
+  }
+
+  _historicalModeLabel(steps) {
+    const mode = steps.find((step) => step.attempted && step.resolutionSnapshot)?.resolutionSnapshot
+      .mode;
+    return MODE_LABEL_KEYS[mode] ? this.localize(MODE_LABEL_KEYS[mode]) : '';
   }
 
   /**

@@ -52,6 +52,34 @@ function setupGlobals(worldTime = 1000) {
   };
 }
 
+for (const failed of [false, true]) {
+  test(`stage evidence is allowlisted before persistence and survives reload (failed=${failed})`, async () => {
+    setupGlobals();
+    const actor = new FakeActor(`Evidence ${failed}`);
+    const manager = new CraftingRunManager();
+    const run = await manager.createRun(actor, singleStepRecipe('evidence'));
+    const secret = 'PRIVATE_CONFIG_SENTINEL';
+    const payload = {
+      resolutionSnapshot: { kind: 'ingredients', mode: 'routedByIngredients', formula: secret, dc: secret },
+      presentationSnapshot: { name: 'Captured', description: 'Purpose', gmOnly: secret },
+      currencySpends: [{ unit: 'gp', amount: 2, config: secret }],
+      essenceSpend: { labels: { sun: 'Sun' }, private: secret, carriers: [{
+        actorUuid: 'Actor.source', itemUuid: 'Actor.source.Item.carrier', quantity: 1,
+        name: null, img: null, flags: secret,
+        contributions: [{ essenceId: 'sun', amount: 2, macro: secret }],
+      }] },
+    };
+    if (failed) await manager.completeStepFailure(actor, run, 0, 'Failed', payload);
+    else await manager.completeStepSuccess(actor, run, 0, payload);
+    const restored = new CraftingRunManager().getRunHistory(actor)[0];
+    assert.equal(JSON.stringify(actor._flags).includes(secret), false);
+    assert.equal(restored.steps[0].essenceSpend.carriers[0].name, null);
+    assert.deepEqual(restored.steps[0].currencySpends, [{ unit: 'gp', amount: 2 }]);
+    payload.essenceSpend.carriers[0].contributions[0].amount = 100;
+    assert.equal(restored.steps[0].essenceSpend.carriers[0].contributions[0].amount, 2);
+  });
+}
+
 test('CraftingRunManager: create/advance/cancel flow moves active run into history', async () => {
   setupGlobals();
   const manager = new CraftingRunManager();

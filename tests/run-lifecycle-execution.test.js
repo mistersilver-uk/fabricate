@@ -14,6 +14,79 @@ import {
   postCheckRollHandoff,
 } from '../src/systems/checkRoll.js';
 import { transitionExecutionJournal } from '../src/systems/runExecutionJournal.js';
+import { createPersistedCraftingHistory } from './helpers/journal-fixtures.js';
+
+for (const failLast of [false, true]) {
+  test(`writer/reload/projection retains distinct stage awards, source-qualified essence and settled currency (failure=${failLast})`, async () => {
+    const fixture = await createPersistedCraftingHistory({ failLast });
+    const { record, model } = fixture;
+    assert.equal(record.status, failLast ? 'failed' : 'succeeded');
+    assert.equal(record.steps[0].presentationSnapshot.description, 'Purpose 1');
+    assert.deepEqual(record.steps[0].resolutionSnapshot, { kind: 'check', mode: 'simple' });
+    assert.deepEqual(model.steps.map((step) => step.createdResults[0].name), ['Award stage-0', 'Award stage-1']);
+    assert.deepEqual(model.steps.map((step) => step.createdResults[0].quantity), [1, 3]);
+    assert.deepEqual(model.steps[0].currencySpends, [{ unit: 'gp', amount: 2 }]);
+    const carriers = record.steps[0].essenceSpend.carriers;
+    assert.equal(carriers.length, 2);
+    assert.notEqual(carriers[0].actorUuid, carriers[1].actorUuid);
+    assert.notEqual(carriers[0].itemUuid, carriers[1].itemUuid);
+    for (const carrier of carriers) {
+      assert.equal(carrier.quantity, 1);
+      assert.deepEqual(carrier.contributions, [{ essenceId: 'sun', amount: 2 }, { essenceId: 'moon', amount: 3 }]);
+    }
+    assert.deepEqual(fixture.sourceItemsRemaining, [0, 0]);
+    assert.equal(model.steps[0].consumedIngredients[0].name, 'Carrier 1');
+    assert.equal(fixture.deletedRecipeModel.steps[0].presentationSnapshot.description, 'Purpose 1');
+    assert.equal(JSON.stringify(model).includes('CHANGED_PRIVATE_FORMULA'), false);
+  });
+}
+
+test('applied consumption prefix restores essence spending after the source documents disappear', async () => {
+  const { interruptedRecord, record } = await createPersistedCraftingHistory({ resumePrefix: true });
+  const receipt = interruptedRecord.executionJournal.effects.find((effect) => effect.effectId === 'consume-ingredients').receipt;
+  assert.equal(receipt.essenceSpend.carriers.length, 2);
+  assert.deepEqual(record.steps[0].essenceSpend, receipt.essenceSpend);
+});
+
+for (const cancelAfter of [0, 1, 2]) {
+  for (const armNext of [false, true]) {
+    test(`cancel after ${cancelAfter} attempts (next armed=${armNext}) does not invent an attempted stage`, async () => {
+      const { model } = await createPersistedCraftingHistory({ cancelAfter, armNext, stageCount: 3 });
+      assert.equal(model.status, 'cancelled');
+      assert.equal(model.steps.filter((step) => step.attempted).length, cancelAfter);
+      assert.equal(model.steps[cancelAfter].createdResults.length, 0);
+      assert.equal(model.steps[cancelAfter].completedAt, null);
+    });
+  }
+}
+
+test('executing GM never captures opaque initiator stage metadata or contribution labels', async () => {
+  const { armedRecord, record, model } = await createPersistedCraftingHistory({ opaque: true, stageCount: 1 });
+  for (const run of [armedRecord, record]) {
+    for (const step of run.steps) {
+      for (const field of ['presentationSnapshot', 'resolutionSnapshot', 'essenceSpend', 'currencySpends']) {
+        assert.equal(Object.hasOwn(step, field), false, field);
+      }
+    }
+  }
+  assert.deepEqual(model.steps, []);
+  assert.equal(JSON.stringify(model).includes('Carrier'), false);
+  assert.equal(JSON.stringify(model).includes('Purpose'), false);
+  for (const effect of record.executionJournal.effects) {
+    assert.equal(effect.receipt?.essenceSpend, undefined);
+  }
+});
+
+for (const mode of ['simple', 'routedByIngredients']) {
+  test(`no-check history captures effective ${mode} resolution rather than inferring from an empty roll`, async () => {
+    const { model } = await createPersistedCraftingHistory({ stageCount: 1, mode, checked: false });
+    assert.deepEqual(model.steps[0].resolutionSnapshot, {
+      kind: mode === 'simple' ? 'none' : 'ingredients', mode,
+    });
+    assert.equal(model.steps[0].lastCheckResult.total, null);
+    assert.equal(model.steps[0].lastCheckResult.dc, null);
+  });
+}
 
 function fakeRunManager(run, events) {
   return {
@@ -445,6 +518,19 @@ async function startReadyVersionedRun({ engine, recipe, actor, source, selection
     executionGrant: `grant-${actor.id}`,
   });
 }
+
+test('an unavailable history visibility read omits optional snapshots without stranding a valid start', async () => {
+  const { engine, recipe, runManager } = setupEngineFixture();
+  makeCurrentStageImmediate(recipe);
+  const visibility = game.fabricate.getRecipeVisibilityService();
+  game.fabricate.getRecipeVisibilityService = () => ({ ...visibility,
+    evaluateRecipeAccess: () => { throw new Error('optional history visibility unavailable'); },
+  });
+  const actor = new FakeActor('history-read-failure');
+  const started = await startReadyVersionedRun({ engine, recipe, actor, source: new FakeActor('source') });
+  assert.equal(started.canExecuteImmediately, true);
+  assert.equal(runManager.getActiveRun(actor, started.runId).steps[0].presentationSnapshot, undefined);
+});
 
 test('CraftingEngine versioned start arms a timed stage with exact intent and zero consumption', async () => {
   const { engine, runManager } = setupEngineFixture();

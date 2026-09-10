@@ -18,6 +18,37 @@ const ACTOR = { id: 'actor-1', uuid: 'Actor.actor-1', name: 'Akra', img: 'icons/
 const PLAYER = { id: 'user-1', isGM: false };
 const GM = { id: 'gm-1', isGM: true };
 
+test('historical steps retain nullable source identities, distinct awards and recorded meaning', () => {
+  const run = terminalCraftingRun({ steps: [
+    { stepId: 'first', stepName: 'Old name', status: 'succeeded', completedAt: 42,
+      presentationSnapshot: { name: 'Captured name', description: 'Captured purpose' },
+      resolutionSnapshot: { kind: 'none', mode: 'simple', privateFormula: 'SECRET' },
+      currencySpends: [],
+      consumedIngredients: [{ actorUuid: 'Actor.source', itemUuid: 'Actor.source.Item.gone', quantity: 2, name: null, img: null }],
+      usedTools: [{ itemUuid: 'Item.hammer', quantity: 1, broken: true }],
+      createdResults: [{ itemUuid: 'Item.first', quantity: 1, name: 'First award' }] },
+    { stepId: 'second', status: 'failed', completedAt: 50,
+      createdResults: [{ itemUuid: 'Item.second', quantity: 3, name: 'Failure award' }] },
+    { stepId: 'unexecuted', status: 'inProgress', startedAt: 50, consumedIngredients: [], createdResults: [] },
+  ] });
+  const model = makeBuilder({ history: [run], mode: 'progressive' }).buildListing({ actor: ACTOR, viewer: GM }).history[0];
+  const [first, second, untouched] = model.steps;
+  assert.deepEqual(first.resolutionSnapshot, { kind: 'none', mode: 'simple' });
+  assert.equal(first.presentationSnapshot.description, 'Captured purpose');
+  assert.equal(first.consumedIngredients[0].actorUuid, 'Actor.source');
+  assert.equal(first.consumedIngredients[0].name, null);
+  assert.equal(first.createdResults[0].name, 'First award');
+  assert.equal(second.createdResults[0].name, 'Failure award');
+  assert.equal(first.usedTools[0].broken, true);
+  assert.equal(first.completedAt, 42);
+  assert.equal(first.attempted, true);
+  assert.equal(untouched.attempted, false);
+  assert.deepEqual(first.currencySpends, []);
+  assert.equal(second.currencySpends, null);
+  assert.equal(second.resolutionSnapshot, null);
+  assert.equal(JSON.stringify(model).includes('SECRET'), false);
+});
+
 // localize stub: surfaces key + interpolation data so label composition is testable.
 const localize = (key, data) => (data ? `${key}|${JSON.stringify(data)}` : key);
 
@@ -401,11 +432,8 @@ test('aggregates createdResults across steps', () => {
   });
   const run = listing.history[0];
   assert.equal(run.derivedStatus, 'succeeded');
-  // Terminal run: the final step (s0 "Forge") name annotates the label.
-  assert.equal(
-    run.stepLabel,
-    'FABRICATE.App.Journal.Step.LabelNamed|{"index":1,"count":1,"name":"Forge"}'
-  );
+  // The single recorded attempt stays single-stage after live recipe changes.
+  assert.equal(run.stepLabel, '');
   assert.equal(run.createdResultCount, 1);
   assert.equal(run.createdResults[0].itemUuid, 'Item.z');
   assert.equal(run.createdResults[0].quantity, 1);
@@ -943,6 +971,7 @@ test('gathering yield projects straight and d100 authored previews without repla
   });
   assert.deepEqual(listing.history[0].createdResults, [
     {
+      actorUuid: null,
       componentId: 'moss',
       itemUuid: null,
       quantity: 2,

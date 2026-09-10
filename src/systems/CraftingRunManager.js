@@ -333,6 +333,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     step.consumedIngredients = payload.consumedIngredients || step.consumedIngredients || [];
     step.usedTools = payload.usedTools || step.usedTools || [];
     step.createdResults = payload.createdResults || step.createdResults || [];
+    applyStepHistoryEvidence(step, payload);
 
     const nextIndex = stepIndex + 1;
     if (nextIndex >= (run.steps?.length || 0)) {
@@ -373,6 +374,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     step.consumedIngredients = payload.consumedIngredients || step.consumedIngredients || [];
     step.usedTools = payload.usedTools || step.usedTools || [];
     step.createdResults = payload.createdResults || step.createdResults || [];
+    applyStepHistoryEvidence(step, payload);
 
     return this.completeRun(actor, run, 'failed', options);
   }
@@ -656,6 +658,11 @@ export class CraftingRunManager extends RunContainerManagerBase {
     step.selectionPlan = plan;
     step.selectedIngredientSetId = plan.selectedIngredientSetId;
     step.selectedRequirementSnapshot = snapshot;
+    const evidence = craftingStepHistoryEvidence(selection);
+    if (!step.presentationSnapshot && evidence.presentationSnapshot) {
+      step.presentationSnapshot = evidence.presentationSnapshot;
+    }
+    if (evidence.resolutionSnapshot) step.resolutionSnapshot = evidence.resolutionSnapshot;
     step.updatedAt = this._nowWorldTime();
     incrementRunRevision(run);
     return location.persist();
@@ -956,6 +963,89 @@ function buildSelectionPlan(selection) {
     ingredientOptionOverrides: cloneObject(selection.ingredientOptionOverrides),
     ingredientEssenceAllocation: cloneObject(selection.ingredientEssenceAllocation),
   };
+}
+
+/**
+ * Allowlist optional historical stage evidence before it enters an actor flag or
+ * an execution receipt. Callers own initiating-viewer disclosure; absent evidence
+ * stays absent, and captured empty arrays remain an explicit zero.
+ * @param {object} source
+ * @returns {object}
+ */
+export function craftingStepHistoryEvidence(source = {}) {
+  source ??= {};
+  const evidence = {};
+  const resolution = source.resolutionSnapshot;
+  if (
+    ['check', 'ingredients', 'none'].includes(resolution?.kind) &&
+    typeof resolution.mode === 'string'
+  ) {
+    evidence.resolutionSnapshot = { kind: resolution.kind, mode: resolution.mode };
+  }
+  const presentation = source.presentationSnapshot;
+  if (typeof presentation?.name === 'string' && typeof presentation.description === 'string') {
+    evidence.presentationSnapshot = {
+      name: presentation.name,
+      description: presentation.description,
+    };
+  }
+  if (Array.isArray(source.currencySpends) && source.currencySpends.every(validHistoricalSpend)) {
+    evidence.currencySpends = source.currencySpends.map(({ unit, amount }) => ({ unit, amount }));
+  }
+  if (
+    Array.isArray(source.essenceSpend?.carriers) &&
+    source.essenceSpend.carriers.every(validHistoricalCarrier)
+  ) {
+    evidence.essenceSpend = {
+      labels: Object.fromEntries(
+        Object.entries(source.essenceSpend.labels ?? {}).filter(
+          ([, label]) => typeof label === 'string'
+        )
+      ),
+      carriers: source.essenceSpend.carriers.map(historicalCarrier),
+    };
+  }
+  return evidence;
+}
+
+function validHistoricalCarrier(carrier) {
+  return (
+    typeof carrier?.itemUuid === 'string' &&
+    carrier.itemUuid.length > 0 &&
+    Number.isFinite(carrier.quantity) &&
+    carrier.quantity > 0 &&
+    Array.isArray(carrier.contributions) &&
+    carrier.contributions.every(validHistoricalContribution)
+  );
+}
+
+function validHistoricalSpend(entry) {
+  return typeof entry?.unit === 'string' && Number.isFinite(entry.amount) && entry.amount >= 0;
+}
+
+function validHistoricalContribution(entry) {
+  return typeof entry?.essenceId === 'string' && Number.isFinite(entry.amount) && entry.amount > 0;
+}
+
+function historicalCarrier(carrier) {
+  return {
+    actorUuid: historyText(carrier.actorUuid),
+    itemUuid: carrier.itemUuid,
+    quantity: carrier.quantity,
+    name: historyText(carrier.name),
+    img: historyText(carrier.img),
+    contributions: carrier.contributions.map(({ essenceId, amount }) => ({ essenceId, amount })),
+  };
+}
+
+function historyText(value) {
+  return typeof value === 'string' ? value.trim() || null : null;
+}
+
+function applyStepHistoryEvidence(step, payload) {
+  const evidence = craftingStepHistoryEvidence(payload);
+  if (step.presentationSnapshot) delete evidence.presentationSnapshot;
+  Object.assign(step, evidence);
 }
 
 function cloneObject(value) {

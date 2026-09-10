@@ -539,12 +539,13 @@ function createCraftingJournalOperations(fabricate, getService) {
       });
     },
     authorizeRollHandoff,
-    execute: async ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
+    execute: async ({ actor, run, payload, executionGrant, requestId, expectedRevision, sender }) => {
       const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
       if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
       const execute = fabricate.craftingEngine?.executeVersionedStage;
       if (typeof execute !== 'function') return { success: false, reason: 'unsupported-operation' };
       return execute.call(fabricate.craftingEngine, {
+        viewer: sender,
         actor,
         componentSourceActors,
         runId: run.id,

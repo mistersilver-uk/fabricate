@@ -20,6 +20,18 @@ import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
+import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
+
+function reloadLegacyHistory(actor, recipe, system) {
+  actor._flags = JSON.parse(JSON.stringify(actor._flags));
+  return new RunJournalBuilder({
+    craftingRunManager: new CraftingRunManager(),
+    recipeManager: { getRecipe: () => recipe },
+    getSystem: () => system,
+    getResultItem: () => null,
+    getComponent: () => null,
+  }).buildListing({ actor, viewer: game.user }).history[0];
+}
 
 // ---------------------------------------------------------------------------
 // Foundry / game globals
@@ -522,6 +534,13 @@ test('timed step FINISH produces results without the components present and comp
   assert.equal(consumed[0].componentId, 'wood', 'the timed-step run persists the componentId');
   assert.equal(consumed[0].itemUuid, 'Item.wood');
   assert.equal(consumed[0].quantity, 2);
+  const projected = reloadLegacyHistory(craftingActor, recipe, system).steps[0];
+  assert.equal(projected.consumedIngredients[0].name, 'Wood');
+  assert.equal(projected.consumedIngredients[0].actorUuid, sourceActor.uuid);
+  assert.equal(projected.createdResults[0].name, 'Plank');
+  assert.equal(projected.completedAt, game.time.worldTime);
+  assert.equal(projected.resolutionSnapshot, null, 'legacy completion does not fabricate mode evidence');
+  assert.deepEqual(projected.currencySpends, [], 'the legacy START receipt recorded zero settlement');
 });
 
 test('timed FINISH excludes partially consumed ingredient docs while revalidating replacement Tools', async () => {
@@ -770,6 +789,11 @@ test('timed step failed FINISH check does not refund and completes the run as fa
   const history = runManager.getRunHistory(craftingActor);
   assert.equal(history.length, 1, 'the failed run is archived');
   assert.equal(history[0].status, 'failed');
+  const projected = reloadLegacyHistory(craftingActor, recipe, system).steps[0];
+  assert.equal(projected.attempted, true);
+  assert.equal(projected.consumedIngredients[0].name, 'Wood');
+  assert.deepEqual(projected.createdResults, []);
+  assert.equal(projected.presentationSnapshot, null);
 });
 
 // ---------------------------------------------------------------------------
