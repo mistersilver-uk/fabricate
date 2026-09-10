@@ -499,8 +499,62 @@ test('active simple crafting previews current authored yields without rewriting 
   });
   assert.equal(active.steps[0].craftingYield, null, 'past stages use their recorded awards');
   assert.equal(active.steps[1].craftingYield, active.craftingYield);
-  assert.equal(active.steps[2].craftingYield, null, 'future choices cannot be treated as selected');
+  assert.equal(active.steps[2].craftingYield, null, 'current preview stays current-only');
+  assert.equal(active.steps[2].yieldPreview.stageIndex, 2);
+  assert.equal(active.steps[2].yieldPreview.entries[0].qty, 2);
+  assert.deepEqual(active.steps[2].createdResults, [], 'future preview is not an award');
   assert.equal(listing.history[0].craftingYield, null, 'terminal entries retain actual awards only');
+});
+
+test('future ingredient routes preview their own outcomes without selecting a current route', () => {
+  const system = { ...SYSTEM, resolutionMode: 'routedByIngredients' };
+  const future = { id: 'future', ingredientSets: [
+    { id: 'red', name: 'Red route', resultGroupId: 'red-output' },
+    { id: 'blue', name: 'Blue route', resultGroupId: 'blue-output' },
+  ], resultGroups: [
+    { id: 'red-output', results: [{ id: 'red-result', name: 'Red prize', quantity: 2 }] },
+    { id: 'blue-output', results: [{ id: 'blue-result', name: 'Blue prize', quantity: 5 }] },
+  ] };
+  const recipe = { ...RECIPE, getExecutionSteps: () => [{ id: 'current', resultGroups: [] }, future] };
+  const raw = activeCraftingRun({ currentStepIndex: 0, steps: [
+    { stepId: 'current', selectionPlan: { selectedIngredientSetId: 'red' } },
+    { stepId: 'future', status: 'pending', selectionPlan: { selectedIngredientSetId: 'red' } },
+  ] });
+  const before = structuredClone(raw);
+  const options = { active: [raw], recipe, system, resolutionModeService: new ResolutionModeService({ getSystem: () => system }) };
+  const model = makeBuilder(options).buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+  assert.equal(model.steps[1].yieldPreview.presentation, 'routes');
+  assert.deepEqual(model.steps[1].yieldPreview.routes.map((route) => route.entries.map((entry) => entry.name)), [['Red prize'], ['Blue prize']]);
+  assert.deepEqual(raw, before, 'a preview cannot write future intent');
+  assert.deepEqual(model.steps[1].createdResults, []);
+  assert.equal(model.steps[0].yieldPreview, null);
+  const hidden = makeBuilder({ ...options, recipeVisibility: { evaluateRecipeAccess: () => ({ visible: false }) } })
+    .buildListing({ actor: ACTOR, viewer: PLAYER }).activeRuns[0];
+  assert.doesNotMatch(JSON.stringify(hidden), /Red prize|Blue prize/);
+});
+
+test('recorded gathering quantities require unique receipt attribution and never use live configuration', () => {
+  const rows = [
+    { id: 'first', componentId: 'herb', quantity: 99, finalDropRate: 70, dropped: true },
+    { id: 'second', componentId: 'herb', quantity: 99, finalDropRate: 20, dropped: true },
+    { id: 'missed', componentId: 'seed', quantity: 99, finalDropRate: 5, dropped: false },
+  ];
+  const run = { id: 'actual', taskId: 'forage', status: 'succeeded', checkResult: { provider: 'd100', roll: 100, itemRows: rows, items: rows.slice(0, 2) },
+    createdResults: [{ componentId: 'herb', name: 'Actual Herb', quantity: 4 }] };
+  const project = (record) => makeBuilder({ gatheringHistory: [record], getGatheringTask: () => ({ resolutionMode: 'straight', dropRows: [{ name: 'LIVE_SECRET' }] }) })
+    .buildListing({ actor: ACTOR, viewer: PLAYER }).history[0];
+  assert.deepEqual(project(run).gatheringYield.entries.map((entry) => entry.qty), [null, null, 0]);
+  const limited = { ...run, checkResult: { ...run.checkResult, items: [rows[0]] } };
+  assert.deepEqual(project(limited).gatheringYield.entries.map((entry) => entry.qty), [4, 0, 0]);
+  const incomplete = { ...run, createdResults: undefined };
+  assert.deepEqual(project(incomplete).gatheringYield.entries.map((entry) => entry.qty), [null, null, null]);
+  assert.doesNotMatch(JSON.stringify(project(run)), /LIVE_SECRET|99/);
+  assert.equal(project({ ...run, taskId: 'blind:env' }).gatheringYield, null);
+  assert.equal(project({ ...run, checkResult: { blind: true, ...run.checkResult } }).gatheringYield, null);
+  const legacy = { ...run, checkResult: { provider: 'd100', items: [{ ...rows[0], roll: 90 }] } };
+  assert.equal(project(legacy).gatheringYield.roll, 90);
+  assert.equal(project(legacy).gatheringYield.entries[0].qty, 4);
+  assert.equal(project({ ...legacy, checkResult: { provider: 'd100', roll: null } }).gatheringYield.roll, null);
 });
 
 test('routed-by-ingredients crafting previews the persisted selected route', () => {
@@ -909,8 +963,8 @@ test('gathering yield projects straight and d100 authored previews without repla
       roll: 42,
       items: [{ id: 'moss-row', roll: 42, finalDropRate: 71 }],
       itemRows: [
-        { id: 'moss-row', roll: 42, finalDropRate: 71, dropped: true },
-        { id: 'reed-row', roll: 42, finalDropRate: 23, dropped: false },
+        { id: 'moss-row', componentId: 'moss', roll: 42, finalDropRate: 71, dropped: true },
+        { id: 'reed-row', name: 'Bog Reed', roll: 42, finalDropRate: 23, dropped: false },
       ],
     },
     createdResults: [{ componentId: 'moss', quantity: 2, name: 'Bog Moss', img: 'icons/moss.webp' }],
@@ -950,6 +1004,7 @@ test('gathering yield projects straight and d100 authored previews without repla
     tiers: [],
   });
   assert.deepEqual(listing.history[0].gatheringYield, {
+    source: 'recorded',
     mode: 'd100',
     entries: [
       {
@@ -958,16 +1013,23 @@ test('gathering yield projects straight and d100 authored previews without repla
         art: 'icons/moss.webp',
         qty: 2,
         chance: 71,
+        cleared: true,
+        effectiveRoll: null,
+        threshold: null,
       },
       {
         id: 'reed-row',
         name: 'Bog Reed',
-        qty: 1,
+        qty: 0,
         chance: 23,
+        cleared: false,
+        effectiveRoll: null,
+        threshold: null,
       },
     ],
     roll: 42,
     tiers: [],
+    check: null,
   });
   assert.deepEqual(listing.history[0].createdResults, [
     {

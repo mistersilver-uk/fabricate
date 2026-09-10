@@ -22,7 +22,7 @@
       "status": "target",
       "evidence": "broad",
       "scope": "shared",
-      "why": "Issue 1648 promotes the specified scale on RunDetail and HistoricalRunDetail, separating active previews from historical cuts. The components path selects broad evidence; rendered acceptance remains pending."
+      "why": "Issue 1648 promotes the specified scale on RunDetail and HistoricalRunDetail, separating active previews from historical cuts. Optional entry.cleared records high-roll outcomes without changing raw roll display or low-roll default callers; null denotes missing evidence. Historical quantities are actual attributable awards. The components path selects broad evidence; rendered acceptance remains pending."
     },
     {
       "path": "src/ui/svelte/components/ArmedDangerButton.svelte",

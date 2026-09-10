@@ -167,10 +167,13 @@
         label={text('Scale')}
         labels={{
           cleared: () => text('CameBack'),
-          missed: (entry) => text('NeededChance', { chance: entry.chance }),
+          missed: () => text('MissedRoll'),
           threshold: () => text('NotRecorded'),
-          quantity: () => text('NotRecorded'),
-          chance: (entry) => `${entry.chance}%`,
+          quantity: (entry) =>
+            entry.qty == null
+              ? text('NotRecorded')
+              : localize('FABRICATE.App.Journal.Quantity', { n: entry.qty }),
+          chance: (entry) => (entry.chance == null ? text('NotRecorded') : `${entry.chance}%`),
           cut: (roll) => text('RolledValue', { roll }),
           topCutNote: () => text('TopCut'),
           bottomCutNote: () => text('BottomCut'),
@@ -181,11 +184,11 @@
     {#if account.mode === 'routed'}
       <InspectorCard data-history-outcome-log>
         <Kicker>{text('OutcomeLog')}</Kicker>
-        {#if account.failed && run.gatheringYield.roll != null}<JournalFactRow
+        {#if account.failed}<JournalFactRow
             label={text('Rolled')}
-            value={String(run.gatheringYield.roll)}
+            value={account.gatheringCheck || text('NotRecorded')}
           />{/if}
-        <JournalFactRow label={text('Outcome')} value={text('NotRecorded')} />
+        <JournalFactRow label={text('Outcome')} value={account.gatheringOutcome} />
       </InspectorCard>
     {/if}
   {/if}

@@ -14,16 +14,17 @@
       )
   );
   const hasRoll = $derived(roll !== null && roll !== undefined && Number.isFinite(Number(roll)));
-  const cutIndex = $derived(
-    hasRoll ? sorted.findIndex((entry) => Number(roll) > Number(entry.chance)) : -1
-  );
+  const cutIndex = $derived(hasRoll ? sorted.findIndex((entry) => cleared(entry) === false) : -1);
+  const hasCut = $derived(hasRoll && sorted.every((entry) => cleared(entry) !== null));
 
   function cleared(entry) {
-    return hasRoll && Number(roll) <= Number(entry.chance);
+    if (Object.hasOwn(entry, 'cleared'))
+      return typeof entry.cleared === 'boolean' ? entry.cleared : null;
+    return hasRoll ? Number(roll) <= Number(entry.chance) : null;
   }
 
   function reading(entry) {
-    if (!hasRoll) return labels.threshold?.(entry);
+    if (cleared(entry) === null) return labels.threshold?.(entry);
     return cleared(entry)
       ? labels.cleared?.(entry, Number(roll))
       : labels.missed?.(entry, Number(roll));
@@ -45,7 +46,7 @@
   {/if}
   <div class="fab-yield-rows">
     {#each sorted as entry, index (entry.id)}
-      {#if hasRoll && cutIndex === index}
+      {#if hasCut && cutIndex === index}
         <div class="fab-yield-cut" data-yield-cut>
           <Chip density="list" tone="accent" mono icon="fas fa-dice"
             >{labels.cut?.(Number(roll)) ?? String(roll)}</Chip
@@ -56,8 +57,8 @@
       {/if}
       <div
         class="fab-yield-row"
-        class:is-cleared={cleared(entry)}
-        class:is-missed={hasRoll && !cleared(entry)}
+        class:is-cleared={cleared(entry) === true}
+        class:is-missed={cleared(entry) === false}
         data-yield-entry={entry.id}
       >
         <Medallion
@@ -79,7 +80,7 @@
         >
       </div>
     {/each}
-    {#if hasRoll && sorted.length > 0 && cutIndex === -1}
+    {#if hasCut && sorted.length > 0 && cutIndex === -1}
       <div class="fab-yield-cut" data-yield-cut>
         <Chip density="list" tone="accent" mono icon="fas fa-dice"
           >{labels.cut?.(Number(roll)) ?? String(roll)}</Chip

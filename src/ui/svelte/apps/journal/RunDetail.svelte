@@ -66,9 +66,9 @@
 
   const gatheringYield = $derived(run?.gatheringYield ?? null);
   const craftingYield = $derived.by(() => {
-    if (terminal || run?.redacted === true || !viewedIsCurrent) return null;
-    const preview = run?.craftingYield;
-    return preview?.source === 'preview' && preview.stageIndex === currentIndex ? preview : null;
+    if (terminal || run?.redacted === true || viewedIndex < currentIndex) return null;
+    const preview = viewedIsCurrent ? run?.craftingYield : viewedStage?.yieldPreview;
+    return preview?.source === 'preview' && preview.stageIndex === viewedIndex ? preview : null;
   });
   const yieldEntries = $derived(
     Array.isArray(gatheringYield?.entries) ? gatheringYield.entries : []
@@ -300,7 +300,7 @@
         label: localize('FABRICATE.App.Journal.StepDetails.Failure'),
         value: stage.detail.failureText,
       });
-    if (stage?.selectedRequirementSnapshot?.name)
+    if (viewedIndex <= currentIndex && stage?.selectedRequirementSnapshot?.name)
       facts.push({
         id: 'route',
         label: localize('FABRICATE.App.Journal.Stage.Route'),
@@ -310,25 +310,27 @@
   }
 
   function stageIo() {
-    if (viewedIsCurrent && craftingYield && craftingYield.presentation !== 'entries') return [];
     const text = (key) => localize(`FABRICATE.App.Journal.History.${key}`);
     const past = viewedIndex < currentIndex;
-    const produced = viewedIsCurrent
+    const produced = !past
       ? (craftingYield?.entries ?? []).map((item) => ({
           ...item,
           label: materialText({ ...item, quantity: item.qty }, localize),
         }))
       : viewedEvidence.produced;
-    const io = [
-      {
-        kind: 'produced',
-        label: text(past ? 'Produced' : viewedIsCurrent ? 'Produces' : 'WillProduce'),
-        items: produced,
-        emptyText: text(
-          past && viewedStage?.createdResultsRecorded ? 'NothingBanked' : 'NotRecorded'
-        ),
-      },
-    ];
+    const io =
+      craftingYield && craftingYield.presentation !== 'entries'
+        ? []
+        : [
+            {
+              kind: 'produced',
+              label: text(past ? 'Produced' : viewedIsCurrent ? 'Produces' : 'WillProduce'),
+              items: produced,
+              emptyText: text(
+                past && viewedStage?.createdResultsRecorded ? 'NothingBanked' : 'NotRecorded'
+              ),
+            },
+          ];
     if (!viewedIsCurrent)
       io.unshift({
         kind: 'consumed',
@@ -586,7 +588,7 @@
             showHeading={true}
             showNumber={stages.length > 1}
             io={stageIo()}
-            output={viewedIsCurrent && craftingYield && craftingYield.presentation !== 'entries'
+            output={craftingYield && craftingYield.presentation !== 'entries'
               ? craftingPreview
               : null}
             note={!viewedIsCurrent
@@ -700,6 +702,16 @@
                 />
               {/each}
             </InspectorCard>
+          {:else if craftingYield.presentation === 'routes'}
+            <p>{localize('FABRICATE.App.Journal.History.FutureRoutes')}</p>
+            {#each craftingYield.routes ?? [] as route, index (index)}
+              <JournalFactRow
+                label={route.name || localize('FABRICATE.App.Journal.Stage.Route')}
+                value={route.entries
+                  .map((entry) => materialText({ ...entry, quantity: entry.qty }, localize))
+                  .join(' · ') || localize('FABRICATE.App.Journal.History.NotRecorded')}
+              />
+            {/each}
           {/if}
         </div>
       {/if}

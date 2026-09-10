@@ -14,6 +14,10 @@ import {
   createMountedComponentHarness
 } from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun, createPersistedCraftingHistory } from '../helpers/journal-fixtures.js';
+import { GatheringRichStateService } from '../../src/systems/GatheringRichStateService.js';
+import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
+import { GatheringRunManager } from '../../src/systems/GatheringRunManager.js';
+import { GatheringEngine } from '../../src/systems/GatheringEngine.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -67,6 +71,18 @@ function services() {
 
 const mount = (props) => harness.mount({ ...props, journal: props.services?.journal });
 
+async function projectGatheringRecord(payload, status = 'succeeded') {
+  const flags = {};
+  const actor = { id: 'gatherer', uuid: 'Actor.gatherer',
+    getFlag: (_scope, key) => flags[key],
+    setFlag: async (_scope, key, value) => { flags[key] = JSON.parse(JSON.stringify(value)); },
+  };
+  const manager = new GatheringRunManager({ randomID: () => 'gathered', nowWorldTime: () => 100, getUserId: () => 'player' });
+  await manager.createTerminalRun(actor, { craftingSystemId: 'system', environmentId: 'environment', taskId: 'forage' }, status, payload);
+  return new RunJournalBuilder({ gatheringRunSource: new GatheringRunManager() })
+    .buildListing({ actor, viewer: { isGM: true } }).history[0];
+}
+
 describe('RunDetail mounted behavior', () => {
   before(() => harness.setup());
   afterEach(() => harness.remount());
@@ -107,13 +123,47 @@ describe('RunDetail mounted behavior', () => {
     assert.doesNotMatch(text, /null|undefined|×1|×0/);
   });
 
-  for (const roll of [1, 41, 100]) {
-    it(`d100 history keeps one cut and no duplicate award list for roll ${roll}`, async () => {
-      const run = makeGatheringRun({ status: 'succeeded', derivedStatus: 'succeeded', gatheringYield: { mode: 'd100', roll, entries: [{ id: 'common', name: 'Herb', chance: 70 }, { id: 'rare', name: 'Seed', chance: 20 }] } });
+  for (const [roll, extraModifier, hits] of [[1, 0, 0], [41, 0, 1], [100, 0, 2], [21, 10, 1]]) {
+    it(`native d100 history keeps actual outcomes and awards for ${roll}+${extraModifier}`, async () => {
+      const task = { id: 'forage', resolutionMode: 'd100', dropRows: [
+        { id: 'common', componentId: 'herb', name: 'Herb', quantity: 99, dropRate: 70 },
+        { id: 'rare', componentId: 'seed', name: 'Seed', quantity: 99, dropRate: 20 },
+      ] };
+      const resolved = await new GatheringRichStateService({ rollD100: () => roll }).resolveD100Attempt({ task, environment: { rules: { rewardSelectionMode: 'allDrops' } }, extraModifier });
+      const run = await projectGatheringRecord({
+        checkResult: { provider: 'd100', roll: resolved.roll, itemRows: resolved.itemRows, items: resolved.items },
+        createdResults: resolved.items.map((row) => ({ actorUuid: 'Actor.gatherer', componentId: row.componentId, name: row.name, quantity: 3 })),
+      });
       const target = await harness.mount({ run });
       assert.equal(target.querySelectorAll('[data-yield-cut]').length, 1);
       assert.ok(!target.querySelector('[data-history-summary], [data-history-items="produced"], [data-outcome-ladder]'));
       assert.equal(target.querySelectorAll('[data-yield-entry]').length, 2);
+      assert.equal(target.querySelectorAll('.is-cleared').length, hits);
+      assert.equal(target.querySelectorAll('.is-missed').length, 2 - hits);
+      const order = [...target.querySelector('.fab-yield-rows').children];
+      assert.equal(order.indexOf(target.querySelector('[data-yield-cut]')), hits, 'the cut follows the recorded successes');
+      assert.match(target.querySelector('[data-yield-cut]').textContent, new RegExp(String(roll)));
+      assert.equal(run.gatheringYield.entries[0].effectiveRoll, roll + extraModifier);
+      assert.deepEqual(run.gatheringYield.entries.map((entry) => entry.qty), Array.from({ length: 2 }, (_entry, index) => index < hits ? 3 : 0));
+      assert.doesNotMatch(target.querySelector('[data-yield-scale]').textContent, /99|NotRecorded/);
+      if (hits === 0) assert.match(target.querySelector('[data-journal-guidance]').textContent, /ClosedSuccessEmpty/);
+    });
+  }
+  for (const success of [true, false]) {
+    it(`routed gathering renders its persisted check and outcome (success=${success})`, async () => {
+      const outcome = success ? 'Fine' : 'Setback';
+      const result = await GatheringEngine.prototype._resolveRoutedFormulaOutcome.call(Object.create(GatheringEngine.prototype), {
+        routed: { dc: 15 }, rollFormula: 'LIVE_FORMULA', task: { resultGroups: [{ id: 'result', name: outcome, results: [] }] },
+        resolvedCheckResult: { success, outcome, value: 17, data: { resolvedFormula: '1d20 + 3', total: 17, dc: 15, privateConfiguration: 'SECRET' } },
+      });
+      const run = await projectGatheringRecord({ checkResult: result.checkResult, createdResults: [] }, success ? 'succeeded' : 'failed');
+      const target = await harness.mount({ run });
+      assert.match(target.querySelector('[data-history-outcome-log]').textContent, new RegExp(outcome));
+      assert.ok(!target.querySelector('[data-outcome-ladder], [data-history-verdict-check]'));
+      assert.equal(target.querySelectorAll('[data-history-summary="check"]').length, success ? 1 : 0);
+      assert.equal(target.textContent.split('1d20 + 3').length - 1, 1, 'roll appears once');
+      assert.doesNotMatch(target.textContent, /LIVE_FORMULA|SECRET/);
+      assert.equal(run.gatheringYield.check.dc, 15);
     });
   }
   for (const [state, options, summary, count] of [

@@ -417,7 +417,10 @@ function craftingPreviewFixture(mode, checkMode = 'none') {
   if (mode === 'routedByIngredients') groups.push({
     id: 'other-route', name: 'Other route', results: [{ id: 'other', componentId: 'horseshoe', quantity: 9 }],
   });
-  for (const step of authored.steps) step.resultGroups = groups;
+  for (const [index, step] of authored.steps.entries()) {
+    step.resultGroups = structuredClone(groups);
+    if (index === 2) step.resultGroups[0].results[0].quantity = 7;
+  }
   return {
     builderOptions: { system, recipes: [authored] },
     prepare({ containers }) {
@@ -766,7 +769,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.doesNotMatch(target.textContent, /1d20/);
   });
 
-  it('renders real-builder crafting previews only for the viewed current stage across resolution modes', async () => {
+  it('renders stage-owned current and future previews while past stages keep actual awards', async () => {
     for (const [mode, checkMode, presentation] of [
       ['simple', 'none', 'entries'], ['simple', 'simple', 'entries'],
       ['routedByIngredients', 'none', 'entries'], ['routedByCheck', 'none', 'tiers'],
@@ -795,7 +798,18 @@ describe('Journal versioned lifecycle (mounted)', () => {
       for (const index of [0, 2]) {
         mounted.target.querySelector(`[data-stage-nav-index="${index}"]`).click();
         flushSync();
-        assert.ok(!mounted.target.querySelector('[data-journal-crafting-yield]'), `stage ${index} has no current preview`);
+        if (index === 0) {
+          assert.ok(!mounted.target.querySelector('[data-journal-crafting-yield]'), 'past uses only actual awards');
+        } else {
+          const future = mounted.target.querySelector('[data-stage-state="future"]');
+          assert.ok(!future.querySelector('button, input, select'));
+          const futurePreview = future.querySelector(presentation === 'entries' && mode !== 'routedByIngredients' ? '[data-stage-io="produced"]' : '[data-journal-crafting-yield]');
+          assert.ok(futurePreview, `${mode} future stage has its own preview`);
+          assert.match(futurePreview.textContent, /Iron/);
+          if (presentation !== 'progressive') assert.match(futurePreview.textContent, /7/, 'future authored output differs from current output');
+          assert.ok(!mounted.target.querySelector('[data-journal-summary], [data-journal-time-remaining]'));
+          assert.equal(mounted.store.selectedRun.steps[2].yieldPreview.stageIndex, 2);
+        }
       }
       mounted.target.querySelector('[data-stage-nav-return]').click();
       flushSync();
@@ -1147,10 +1161,10 @@ describe('Journal versioned lifecycle (mounted)', () => {
       if (mode === 'straight') assert.equal(mounted.store.selectedRun.gatheringYield.roll, null);
       if (mode === 'd100') {
         assert.equal(mounted.store.selectedRun.gatheringYield.roll, 25);
-        assert.equal(mounted.target.querySelectorAll('[data-yield-cut]').length, 1);
+        assert.equal(mounted.target.querySelectorAll('[data-yield-cut]').length, 0, 'legacy fixture has no evaluated rows; live authored rows cannot invent a historical cut');
       }
       if (mode === 'routed') {
-        assert.equal(mounted.store.selectedRun.gatheringYield.tiers.length, 2);
+        assert.equal(mounted.store.selectedRun.gatheringYield.tiers.length, 0, 'history never projects live outcome bands');
         assert.equal(mounted.store.selectedRun.createdResults[0].componentId, 'iron');
       }
       harness.remount();

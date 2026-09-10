@@ -101,7 +101,8 @@ function closedKey(run, stages, results) {
   }
   if (run?.status === 'failed') {
     if (results.length) return 'ClosedFailureAwards';
-    if (stages.some((stage) => stage.check)) return 'ClosedFailedCheck';
+    if (stages.some((stage) => stage.check) || run?.gatheringYield?.check)
+      return 'ClosedFailedCheck';
     if (
       stages.length &&
       stages.every((stage) => stage.createdResultsRecorded && stage.kind !== 'unknown')
@@ -109,15 +110,22 @@ function closedKey(run, stages, results) {
       return 'ClosedFailedEmpty';
     return 'ClosedMissing';
   }
-  return results.length ? 'ClosedSuccess' : 'ClosedMissing';
+  if (results.length) return 'ClosedSuccess';
+  const drops = list(run?.gatheringYield?.entries);
+  return drops.length && drops.every((entry) => entry.qty === 0)
+    ? 'ClosedSuccessEmpty'
+    : 'ClosedMissing';
 }
 
 function gatheringSummary(run, localize) {
   const mode = run?.gatheringYield?.mode;
   if (run?.runType === 'gathering') {
     if (mode === 'straight') return { kind: 'none', value: localize(`${prefix}NoRoll`) };
-    if (mode === 'routed' && finite(run.gatheringYield.roll))
-      return { kind: 'check', value: String(run.gatheringYield.roll) };
+    if (mode === 'routed')
+      return {
+        kind: 'check',
+        value: checkText(run.gatheringYield.check, localize) || localize(`${prefix}NotRecorded`),
+      };
   }
   return { kind: 'unknown', value: localize(`${prefix}NotRecorded`) };
 }
@@ -157,6 +165,8 @@ export function presentHistory(run, localize) {
     multi,
     gathering,
     mode,
+    gatheringCheck: checkText(run?.gatheringYield?.check, localize),
+    gatheringOutcome: run?.gatheringYield?.check?.outcome || localize(`${prefix}NotRecorded`),
     summary: historySummary(run, stages, localize),
     failed,
     cancelled,

@@ -28,6 +28,28 @@ function recordedNumber(value) {
   return value == null || value === '' ? null : numberOrNull(value);
 }
 
+function dropMatchesAward(row, award) {
+  if (row?.componentId && award?.componentId) return row.componentId === award.componentId;
+  return Boolean(row?.itemUuid && row.itemUuid === award?.itemUuid);
+}
+
+// An evaluated quantity is authored intent. Only uniquely attributable receipts
+// establish an award; duplicate winning references cannot divide a shared total.
+function recordedDropQuantity(row, winners, awards, recordedAwards, selectionRecorded) {
+  if (!Array.isArray(recordedAwards)) return null;
+  if (row?.dropped === false) return 0;
+  if (!winners.includes(row)) return selectionRecorded ? 0 : null;
+  if (awards.length === 0) return recordedAwards.length === 0 ? 0 : null;
+  if (
+    awards.some((award) => winners.filter((winner) => dropMatchesAward(winner, award)).length !== 1)
+  )
+    return null;
+  const quantities = awards.map((award) => recordedNumber(award.quantity));
+  return quantities.some((quantity) => quantity === null || quantity < 0)
+    ? null
+    : quantities.reduce((sum, quantity) => sum + quantity, 0);
+}
+
 function historicalConsumedIngredients(step) {
   const consumed = normalizeList(step?.consumedIngredients);
   return consumed.length > 0 ? consumed : normalizeList(step?.preparedConsumption?.consumedSummary);
@@ -43,7 +65,9 @@ function historicalStepAttempted(step, run, index) {
     return true;
   }
   if (Number(run?.executionJournal?.intent?.stepIndex) !== index) return false;
-  return normalizeList(run?.executionJournal?.effects).some((effect) => effect?.phase === 'applied');
+  return normalizeList(run?.executionJournal?.effects).some(
+    (effect) => effect?.phase === 'applied'
+  );
 }
 
 // Localized player-facing resolution-mode label keys. The crafting
@@ -776,6 +800,10 @@ export class RunJournalBuilder {
       craftingYield: isCurrent
         ? this._craftingYieldPreview({ runStep, recipeStep, system, recipe, index })
         : null,
+      yieldPreview:
+        !terminal && Number.isInteger(run?.currentStepIndex) && index > run.currentStepIndex
+          ? this._futureCraftingYieldPreview({ recipeStep, system, recipe, index })
+          : null,
       selectionAvailability: isCurrent
         ? this._selectionAvailability({
             runStep,
@@ -790,14 +818,37 @@ export class RunJournalBuilder {
   }
 
   /**
-   * Project the current active crafting step's authored output without presenting it as an
-   * award. ResolutionModeService remains the source of truth for group routing and progressive
-   * order; this method only maps its selected authored models into the Journal's plain rows.
-   * Past/future/terminal guards are owned by `_craftingStepModel`'s `isCurrent` call site.
+   * Future StepModel.yieldPreview uses the stage's authored output and never borrows
+   * current intent. Ingredient routing enumerates {id,name,entries} routes without
+   * selecting one; other modes retain the existing entries/tiers/progressive shape.
    *
    * @private
    * @returns {object|null}
    */
+  _futureCraftingYieldPreview({ recipeStep, system, recipe, index }) {
+    if (this._resolveMode(recipe, system) !== 'routedByIngredients') {
+      return this._craftingYieldPreview({ runStep: {}, recipeStep, system, recipe, index });
+    }
+    return {
+      source: 'preview',
+      stageIndex: index,
+      mode: 'routedByIngredients',
+      presentation: 'routes',
+      routes: normalizeList(recipeStep?.ingredientSets).map((set) => ({
+        id: stringOrNull(set?.id),
+        name: stringOrEmpty(set?.name),
+        entries:
+          this._craftingYieldPreview({
+            runStep: { selectedIngredientSetId: set?.id },
+            recipeStep,
+            system,
+            recipe,
+            index,
+          })?.entries ?? [],
+      })),
+    };
+  }
+
   _craftingYieldPreview({ runStep, recipeStep, system, recipe, index }) {
     if (!runStep || !recipeStep || !system || !recipe) return null;
     const mode = this._resolveMode(recipe, system);
@@ -1580,7 +1631,7 @@ export class RunJournalBuilder {
       resolutionModeLabel: '',
       gatheringYield:
         runType === 'gathering'
-          ? this._gatheringYield({ run, system, context: gatheringContext })
+          ? this._gatheringYield({ run, system, context: gatheringContext, terminal })
           : null,
       recipeId: null,
       environmentId:
@@ -1677,8 +1728,11 @@ export class RunJournalBuilder {
     return { blind: true, secret: Boolean(task), task };
   }
 
-  _gatheringYield({ run, system, context }) {
-    if (!context?.task || (context.blind && !context.secret)) return null;
+  _gatheringYield({ run, system, context, terminal = false }) {
+    if (context?.blind && !context.secret) return null;
+    if (run?.checkResult?.blind === true) return null;
+    if (terminal) return this._gatheringHistoryYield(run);
+    if (!context?.task) return null;
     const mode = stringOrNull(context.task.resolutionMode) || 'd100';
     if (!['straight', 'd100', 'routed'].includes(mode)) return null;
     return {
@@ -1695,6 +1749,71 @@ export class RunJournalBuilder {
           ? this._routedYieldTiers(context.task, system, stringOrNull(run.craftingSystemId))
           : [],
     };
+  }
+
+  /**
+   * Recorded gatheringYield carries source, mode, roll, safe check, entries and no
+   * preview tiers. Drop entries retain cleared/effectiveRoll/threshold; qty is an
+   * attributable actual award or null, never the evaluated row's authored quantity.
+   * A deleted or edited task cannot change recorded mode, odds, check or outcomes.
+   * @private
+   */
+  _gatheringHistoryYield(run) {
+    const result = plainObjectOrNull(run?.checkResult);
+    const task = plainObjectOrNull(run?.economyEvidence?.runtimeSnapshot?.task);
+    let mode = stringOrNull(task?.resolutionMode);
+    if (result?.provider === 'd100') mode = 'd100';
+    else if (Object.hasOwn(result ?? {}, 'outcome')) mode = 'routed';
+    if (!['straight', 'd100', 'routed'].includes(mode)) return null;
+    return {
+      source: 'recorded',
+      mode,
+      entries: mode === 'd100' ? this._historicalDropEntries(run) : [],
+      roll: this._gatheringActualRoll(run),
+      check: mode === 'routed' ? this._checkResultModel(result) : null,
+      tiers: [],
+    };
+  }
+
+  _historicalDropEntries(run) {
+    const result = run.checkResult ?? {};
+    const rows = Array.isArray(result.itemRows) ? result.itemRows : normalizeList(result.items);
+    const winners = Array.isArray(result.items)
+      ? rows.filter((row) => result.items.some((winner) => winner?.id === row?.id))
+      : rows.filter((row) => row?.dropped === true);
+    return rows.map((row, index) => {
+      const awards = normalizeList(run.createdResults).filter((award) =>
+        dropMatchesAward(row, award)
+      );
+      const mapped = this._mapResult(
+        {
+          ...row,
+          name: stringOrNull(awards[0]?.name) || stringOrNull(row?.name),
+          img: stringOrNull(awards[0]?.img) || stringOrNull(row?.img),
+        },
+        stringOrNull(run.craftingSystemId)
+      );
+      return {
+        ...compactPresentation({
+          id: stringOrNull(row?.id) || `drop-${index + 1}`,
+          name:
+            stringOrNull(mapped.name) ||
+            this.localize('FABRICATE.App.Journal.History.UnknownMaterial'),
+          art: stringOrNull(mapped.img),
+        }),
+        chance: recordedNumber(row?.finalDropRate),
+        cleared: typeof row?.dropped === 'boolean' ? row.dropped : null,
+        effectiveRoll: recordedNumber(row?.effectiveRoll),
+        threshold: recordedNumber(row?.threshold),
+        qty: recordedDropQuantity(
+          row,
+          winners,
+          awards,
+          run.createdResults,
+          Array.isArray(result.items)
+        ),
+      };
+    });
   }
 
   _straightYieldEntries(task, systemId) {
@@ -1746,9 +1865,9 @@ export class RunJournalBuilder {
       result?.value,
       result?.roll,
       result?.data?.total,
-      ...normalizeList(result?.items).map((item) => item?.roll),
+      ...normalizeList(result?.itemRows ?? result?.items).map((item) => item?.roll),
     ];
-    return candidates.map(numberOrNull).find((value) => value !== null) ?? null;
+    return candidates.map(recordedNumber).find((value) => value !== null) ?? null;
   }
 
   _routedYieldTiers(task, system, systemId) {

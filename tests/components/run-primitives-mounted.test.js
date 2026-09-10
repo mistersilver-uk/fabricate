@@ -427,6 +427,14 @@ describe('run primitives mounted behavior', () => {
     assert.ok(!headingless.querySelector('.fab-stage-card-heading'), 'a single-stage caller can suppress redundant numbering');
   });
 
+  it('keeps explicitly unrecorded outcomes neutral instead of applying the default comparison', async () => {
+    const target = await yieldHarness.mount({ entries: [{ id: 'unknown', name: 'Unknown', chance: 100, cleared: null }], roll: 1,
+      labels: { threshold: () => 'Not recorded' } });
+    assert.ok(!target.querySelector('.is-cleared, .is-missed, [data-yield-cut]'));
+    assert.match(target.textContent, /Not recorded/);
+    yieldHarness.remount();
+  });
+
   it('sorts the d100 scale commonest first and inserts exactly one roll cut', async () => {
     const entries = [
       { id: 'rare', name: 'Skyfall Shard', icon: 'fas fa-star', tint: 'lavender', qty: 1, chance: 5 },
