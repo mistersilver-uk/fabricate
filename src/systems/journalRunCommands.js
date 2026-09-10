@@ -1,3 +1,4 @@
+/** Request/reply discriminators multiplexed on the existing module socket. */
 export const JOURNAL_RUN_SOCKET_KIND = Object.freeze({
   REQUEST: 'fabricate.journalRun.request',
   REPLY: 'fabricate.journalRun.reply',
@@ -58,10 +59,20 @@ function safeRollDecision(value) {
   };
 }
 
+/**
+ * Encode native identity for per-user, per-world terminal hiding, without deleting actor history.
+ * @param {{actorUuid: string, runType: string, runId: string}} identity
+ * @returns {string} JSON tuple key. Alchemy uses its native `crafting` run type.
+ */
 export function journalRunDismissalKey({ actorUuid, runType, runId }) {
   return JSON.stringify([String(actorUuid ?? ''), String(runType ?? ''), String(runId ?? '')]);
 }
 
+/**
+ * Keep valid identity/timestamp entries, bounded to the 500 most recently hidden runs.
+ * @param {object} value User-scoped dismissal map.
+ * @returns {object} A new map suitable for the replacing user-setting write.
+ */
 export function normalizeJournalRunDismissals(value) {
   const entries = Object.entries(value && typeof value === 'object' ? value : {})
     .filter(([key, hiddenAt]) => {
@@ -104,7 +115,23 @@ function installEngineAuthority(engine, authority) {
   return engine;
 }
 
-/** Route a public craft through the current lifecycle unless it resumes legacy persisted state. */
+/**
+ * Preserve one-call execution when the stage is ready and all choices are supplied.
+ * New starts select version 1 and use the installed active-GM boundary for start and execution.
+ * Waiting stages or incomplete choices return their run for later Journal execution without
+ * editable-material spending. Existing unstamped runs retain legacy behavior.
+ * @param {object} options
+ * @param {object} options.engine Crafting engine with its authority adapter installed.
+ * @param {object} options.runManager Native crafting-run lookup.
+ * @param {object} options.actor Resolved Actor document, not an actor ID or UUID string.
+ * @param {object[]} options.sourceActors Resolved material-source Actor documents.
+ * @param {object} options.recipe Resolved Recipe.
+ * @param {string|null} [options.ingredientSetId]
+ * @param {object} [options.options] Run ID and explicit ingredient/essence choices.
+ * @param {Function} [options.executeCommand] Authoritative command client.
+ * @param {Function} [options.resolveUuid] Optional created-result document resolver.
+ * @returns {Promise<object>} Start/wait, execution or refusal result, with resolved results when available.
+ */
 export async function executePublicCraft({
   engine,
   runManager,
@@ -175,7 +202,15 @@ export async function executePublicCraft({
   return { ...settled, results: results.filter(Boolean) };
 }
 
-/** Compose both persisted run managers into the authority's reconstruction boundary. */
+/**
+ * Compose both persisted run managers into the authority's exclusive reconstruction boundary.
+ * The returned function requires exactly one scope: a nonempty `operationId` or `orphaned: true`.
+ * It reconstructs evidence and never performs spending, awards or rollback.
+ * @param {object} [options]
+ * @param {Function} options.getCraftingRunManager
+ * @param {Function} options.getGatheringRunManager
+ * @returns {Function} Async scoped reconstruction returning `{success, results?}` or a reason.
+ */
 export function createJournalExecutionReconstructor({
   getCraftingRunManager,
   getGatheringRunManager,
@@ -199,7 +234,12 @@ export function createJournalExecutionReconstructor({
   };
 }
 
-/** Install the crafting engine's current-lifecycle requests through the command service. */
+/**
+ * Install crafting start, execute and cancel requests through the command service.
+ * Resolved Actor inputs become UUID targets, whose sender ownership is checked by the authority.
+ * @param {{engine: object, service: object}} options
+ * @returns {object} The supplied engine with its versioned authority adapter installed.
+ */
 export function installCraftingJournalRunAuthority({ engine, service } = {}) {
   if (typeof service?.executeJournalRunCommand !== 'function') {
     throw new TypeError('The journal run command service is unavailable');
@@ -278,7 +318,11 @@ export function installCraftingJournalRunAuthority({ engine, service } = {}) {
   });
 }
 
-/** Install the gathering engine's current-lifecycle requests through the command service. */
+/**
+ * Install gathering start, execute and cancel requests through the command service.
+ * @param {{engine: object, service: object, evaluatePreparedRunCheck: Function}} options
+ * @returns {object} The supplied engine with authority and prepared-check evaluation installed.
+ */
 export function installGatheringJournalRunAuthority({
   engine,
   service,
@@ -338,7 +382,13 @@ export function installGatheringJournalRunAuthority({
   });
 }
 
-/** Build the gathering side of the explicit journal operation registry. */
+/**
+ * Build gathering operations for use inside the authenticated authority claim.
+ * Start resolves the initiating user by sender ID, rather than recording the executing GM.
+ * Every mutation consumes its matching execution grant before calling the engine or manager.
+ * @param {object} [options] Engine/getEngine, runManager, getService and getUser collaborators.
+ * @returns {object} Native gathering lookup, start, check, execute, cancel and waiting-run operations.
+ */
 export function createGatheringJournalRunOperations({
   engine,
   getEngine,
@@ -479,8 +529,35 @@ function serializedOperationResult(result, { secret = false, runId = '' } = {}) 
 }
 
 /**
- * Browser-realm command client plus elected-GM command handler. All collaborators are explicit;
- * the Foundry socket and globals remain at the composition edge in main.js.
+ * Browser-realm command client plus elected-GM command handler.
+ * Commands carry `{actorUuid, runType, runId, expectedRevision, action, payload}`.
+ * Start uses an empty run ID and revision zero. Alchemy dispatches as native `crafting`.
+ * Existing-run requests are resolved again under the claim, including sender/source ownership,
+ * revision and any `payload.expectedStage`. Client totals and awards are never authoritative.
+ * `handleSocketMessage(payload, senderId)` requires the server-attested second callback argument.
+ * Replies use transport recipients plus user/session/request/run/revision correlation.
+ * Player checks prepare an expiring one-use token, prompt locally, then resolve on the GM.
+ * Cancelling releases the token without stage execution. Secret prompt redaction and fresh
+ * post-commit roll entitlement belong to the operation adapters. Chat failure permits no replay.
+ * Terminal dismissal awaits a per-user, per-world setting write, preserving actor history.
+ *
+ * @param {object} deps
+ * @param {object} deps.authority Private-ledger authority from `createJournalRunAuthority`.
+ * @param {object} [deps.operations] Registry keyed by native run type.
+ * @param {Function} deps.currentUser Current realm's User supplier.
+ * @param {Function} deps.activeGM Elected GM supplier.
+ * @param {Function} deps.getUser Attested sender-ID lookup.
+ * @param {Function} deps.resolveUuid Async Actor UUID resolver.
+ * @param {Function} deps.emit `(message, options?)` socket adapter, normalizing absent options to `{}`.
+ * @param {Function} deps.randomId Secure request/session ID supplier.
+ * @param {number} [deps.timeoutMs=15000] Remote-reply timeout, not cancellation of server work.
+ * @param {Function|null} [deps.promptCheck] Local safe-descriptor prompt returning a roll decision.
+ * @param {Function|null} [deps.postRollHandoff] Post an already evaluated, entitled roll without rerolling.
+ * @param {Function} [deps.getDismissals] Read this user's dismissal map.
+ * @param {Function} [deps.setDismissals] Awaited replacing write of this user's dismissal map.
+ * @param {Function} [deps.now] Wall-clock milliseconds for tokens and dismissal timestamps.
+ * @param {Function} [deps.onDismissalsChanged] Notify after successful persistence.
+ * @returns {object} Command, dismissal, socket, authority and recovery service methods.
  */
 export function createJournalRunCommandService({
   authority,

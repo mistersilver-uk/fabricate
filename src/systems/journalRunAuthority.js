@@ -3,6 +3,7 @@ const AUTHORITY_FLAG = 'journalRunAuthorityLedger';
 const AUTHORITY_STATE_FLAG = 'journalRunAuthorityState';
 const NON_MUTATING_GRANTS = new Set(['describeCheck', 'prepareAlchemyStart']);
 
+/** Fixed embedded-page ID used for arbitration, distinct from the claim's random `claimId`. */
 export const JOURNAL_RUN_CLAIM_PAGE_ID = 'FabRunAuthority1';
 
 function emptyState() {
@@ -71,8 +72,30 @@ function createSecureRandomId(webCrypto) {
 }
 
 /**
- * Durable run-command arbitration. Foundry access is supplied at this boundary so tests can
- * model two browser realms sharing one server-side embedded-document database.
+ * Durable run-command arbitration with injected persistence and identity collaborators.
+ * The local queue orders this realm only. Cross-realm exclusion requires `createClaim` to
+ * arbitrate a fixed embedded-page ID under the one private ledger.
+ * `setup` is an explicit active-GM operation whose caller must establish a single GM session.
+ * Missing or multiple ledgers refuse commands. Claims never expire automatically.
+ * `run(request, handler)` retains uncertain claims and durably deduplicates settled requests.
+ * `reconcile({claimId, disposition})` reconstructs matching evidence, records `reconciled` or
+ * `abandoned`, and releases only the matching claim. It never retries or compensates effects.
+ * Ordinary availability refresh does not reconstruct execution journals.
+ *
+ * @param {object} deps
+ * @param {Function} deps.currentUser `() => User|null` for this executing realm.
+ * @param {Function} deps.activeGM `() => User|null` for the elected GM.
+ * @param {Function} deps.listLedgers `async () => ledger[]`.
+ * @param {Function} deps.createLedger `async (source) => ledger`.
+ * @param {Function} deps.readState `async (ledger) => state`.
+ * @param {Function} deps.writeState `async (ledger, state) => void`.
+ * @param {Function} deps.createClaim `async (ledger, source) => claim|null` with exclusive creation.
+ * @param {Function} deps.readClaim `async (ledger) => {claimId, requestId}|null`.
+ * @param {Function} deps.deleteClaim `async (ledger, claimId) => boolean`, matching the exact claim.
+ * @param {Function} deps.reconstructExecutions `async ({operationId, orphaned}) => {success}`.
+ * @param {Function} deps.randomId Secure nonempty ID supplier.
+ * @param {Function} [deps.now] Wall-clock milliseconds for request/token records, not run timing.
+ * @returns {object} Setup, command, reconciliation, grant, availability and boot-recovery methods.
  */
 export function createJournalRunAuthority({
   currentUser,
@@ -520,7 +543,13 @@ export function createJournalRunAuthority({
   };
 }
 
-/** Create the Foundry V13/V14 JournalEntry-backed authority adapter. */
+/**
+ * Create the Foundry V13/V14 JournalEntry-backed authority adapter.
+ * Ledger ownership defaults to NONE and claims use `JournalEntryPage` creation with `keepId`.
+ * Construction does not provision a ledger. Explicit setup must follow single-session confirmation.
+ * @param {object} [options] Foundry globals, secure randomness, clock and reconstruction seams.
+ * @returns {object} The authority API from {@link createJournalRunAuthority}.
+ */
 export function createFoundryJournalRunAuthority({
   game = globalThis.game,
   JournalEntry = globalThis.JournalEntry,

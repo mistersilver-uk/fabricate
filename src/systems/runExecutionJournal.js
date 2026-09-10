@@ -3,6 +3,7 @@ import { incrementRunRevision, RunLifecycleError } from './runLifecycleState.js'
 const JOURNAL_STATUSES = new Set(['planned', 'committed', 'recoveryRequired']);
 const EFFECT_PHASES = new Set(['planned', 'applying', 'applied']);
 
+/** Invalid journal data or transition, identified by a stable `code`. */
 export class RunExecutionJournalError extends Error {
   constructor(message, code) {
     super(message);
@@ -11,10 +12,24 @@ export class RunExecutionJournalError extends Error {
   }
 }
 
+/**
+ * Validate and clone execution evidence without reconstructing or changing live state.
+ * Effects must form an applied prefix, at most one applying effect, then planned effects.
+ * An applied effect requires a receipt, which may be null. Plans are never receipts.
+ * @param {object} journal Persisted operation/request IDs, base revision, status, intent and effects.
+ * @returns {object} Normalized clone, including any recorded outcome.
+ * @throws {RunExecutionJournalError} When evidence is absent or malformed.
+ */
 export function observeExecutionJournal(journal) {
   return normalizeJournal(journal);
 }
 
+/**
+ * Read the recorded outcome only for the matching committed request, without replaying effects.
+ * @param {object} journal
+ * @param {string} requestId
+ * @returns {object|null|undefined} Cloned outcome, null on mismatch, or undefined if unrecorded.
+ */
 export function getCommittedExecutionOutcome(journal, requestId) {
   const current = normalizeJournal(journal);
   if (current.status !== 'committed' || current.requestId !== String(requestId ?? '').trim()) {
@@ -23,6 +38,19 @@ export function getCommittedExecutionOutcome(journal, requestId) {
   return cloneJson(current.outcome);
 }
 
+/**
+ * Build the next evidence state without performing effects or persistence.
+ * `plan` supplies `{operationId, requestId, baseRunRevision, intent, effects}`.
+ * `effectApplying` names `effectId`, and `effectApplied` also supplies the actual `receipt`.
+ * `commit` may carry `outcome` and requires every effect applied.
+ * `reconstructAfterReload` marks an interrupted applying effect recovery-required.
+ * `recoveryRequired` explicitly stops an unsettled operation. Neither permits uncertain replay.
+ * Reconstruction belongs to exclusive authority recovery, never an observing-client refresh.
+ * @param {object|null} journal Null only when creating the first plan.
+ * @param {object} [transition]
+ * @returns {object} A new journal, not an atomic transaction or rollback instruction.
+ * @throws {RunExecutionJournalError}
+ */
 export function transitionExecutionJournal(journal, transition = {}) {
   if (transition.type === 'plan') return createPlan(journal, transition.plan);
 
@@ -47,6 +75,14 @@ export function transitionExecutionJournal(journal, transition = {}) {
   }
 }
 
+/**
+ * Validate a manager-owned versioned run, apply one evidence transition and persist its revision.
+ * An identical journal is a no-op. A new plan must match the run's current revision.
+ * @param {object|null} location Supplies `run`, `assertMutation` and async `persist`.
+ * @param {object} transition See {@link transitionExecutionJournal}.
+ * @param {{expectedRevision?: number}} [options]
+ * @returns {Promise<object|null>} The run, or null when its location is absent.
+ */
 export async function persistExecutionJournalTransition(location, transition, options = {}) {
   if (!location) return null;
   location.assertMutation({ ...options, currentOnly: true, allowExecutionJournal: true });

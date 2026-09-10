@@ -1,7 +1,9 @@
+/** Current opt-in run contract. Missing versions retain legacy behavior. */
 export const RUN_LIFECYCLE_VERSION = 1;
 
 const COMPLETION_MODES = new Set(['manual', 'worldTime']);
 
+/** Lifecycle refusal with a stable `code` for callers to present or handle. */
 export class RunLifecycleError extends Error {
   constructor(message, code) {
     super(message);
@@ -10,11 +12,22 @@ export class RunLifecycleError extends Error {
   }
 }
 
+/**
+ * Classify without coercion or migration. A present undefined/null/string version is unsupported.
+ * @param {object|null} run
+ * @returns {'legacy'|'current'|'unsupported'}
+ */
 export function getRunLifecycleContract(run) {
   if (!hasOwn(run, 'lifecycleVersion')) return 'legacy';
   return run?.lifecycleVersion === RUN_LIFECYCLE_VERSION ? 'current' : 'unsupported';
 }
 
+/**
+ * Build explicitly opted-in lifecycle fields with revision zero and manual completion by default.
+ * Unstamped callers receive no lifecycle fields. Unsupported versions throw.
+ * @param {object} [data]
+ * @returns {object}
+ */
 export function buildNewRunLifecycleFields(data = {}) {
   const contract = getRunLifecycleContract(data);
   if (contract === 'legacy') return {};
@@ -27,6 +40,12 @@ export function buildNewRunLifecycleFields(data = {}) {
   });
 }
 
+/**
+ * Project lifecycle fields for persistence without upgrading legacy or unsupported records.
+ * For an unsupported contract, only its version is returned by this helper.
+ * @param {object} [data]
+ * @returns {object}
+ */
 export function preserveRunLifecycleFields(data = {}) {
   const contract = getRunLifecycleContract(data);
   if (contract === 'legacy') return {};
@@ -36,6 +55,14 @@ export function preserveRunLifecycleFields(data = {}) {
   return normalizeCurrentFields(data);
 }
 
+/**
+ * Refuse unsupported, recovery-required, paused or stale mutations as applicable.
+ * This guard does not acquire authority, validate resources or persist a transition.
+ * @param {object} run
+ * @param {{currentOnly?: boolean, expectedRevision?: number, allowPaused?: boolean}} [options]
+ * @returns {'legacy'|'current'}
+ * @throws {RunLifecycleError}
+ */
 export function assertRunLifecycleMutation(
   run,
   { currentOnly = false, expectedRevision, allowPaused = false } = {}
@@ -70,12 +97,21 @@ export function assertRunLifecycleMutation(
   return contract;
 }
 
+/** Increment a current run in place, returning legacy and unsupported runs unchanged. */
 export function incrementRunRevision(run) {
   if (getRunLifecycleContract(run) !== 'current') return run;
   run.runRevision = normalizeRevision(run.runRevision) + 1;
   return run;
 }
 
+/**
+ * Set a current run's preference in place and increment its revision.
+ * Preference is intent, not automatic-execution eligibility or permission to spend materials.
+ * @param {object} run
+ * @param {'manual'|'worldTime'} completionMode
+ * @param {{expectedRevision?: number}} [options]
+ * @returns {object} The mutated run, not yet persisted.
+ */
 export function applyCompletionMode(run, completionMode, options = {}) {
   assertRunLifecycleMutation(run, { ...options, currentOnly: true, allowPaused: true });
   if (!COMPLETION_MODES.has(completionMode)) {
@@ -88,6 +124,13 @@ export function applyCompletionMode(run, completionMode, options = {}) {
   return incrementRunRevision(run);
 }
 
+/**
+ * Freeze remaining world-time seconds in place, retaining selections and completion preference.
+ * The caller validates that this is a pausable waiting gate.
+ * @param {object} run
+ * @param {{now?: number, availableAt?: number, expectedRevision?: number}} [options]
+ * @returns {object} The mutated run, not yet persisted.
+ */
 export function applyPause(run, { now, availableAt, expectedRevision } = {}) {
   assertRunLifecycleMutation(run, { currentOnly: true, expectedRevision, allowPaused: true });
   if (run.pauseState) {
@@ -101,6 +144,13 @@ export function applyPause(run, { now, availableAt, expectedRevision } = {}) {
   return incrementRunRevision(run);
 }
 
+/**
+ * Clear pause in place and accumulate paused duration, returning the new gate deadline.
+ * The caller assigns `availableAt` to the gate and persists it with the run.
+ * @param {object} run
+ * @param {{now?: number, expectedRevision?: number}} [options]
+ * @returns {{run: object, availableAt: number}}
+ */
 export function applyResume(run, { now, expectedRevision } = {}) {
   assertRunLifecycleMutation(run, { currentOnly: true, expectedRevision, allowPaused: true });
   if (!run.pauseState) {
@@ -116,6 +166,13 @@ export function applyResume(run, { now, expectedRevision } = {}) {
   return { run, availableAt: resumedAt + remainingSeconds };
 }
 
+/**
+ * Validate, change and persist preference through a manager-owned run location.
+ * @param {object|null} location Supplies `run`, `assertMutation` and async `persist`.
+ * @param {'manual'|'worldTime'} completionMode
+ * @param {{expectedRevision?: number}} [options]
+ * @returns {Promise<object|null>} Persisted run, or null when the location is absent.
+ */
 export async function persistCompletionMode(location, completionMode, options = {}) {
   if (!location) return null;
   location.assertMutation({ ...options, currentOnly: true, allowPaused: true });
@@ -123,6 +180,12 @@ export async function persistCompletionMode(location, completionMode, options = 
   return location.persist();
 }
 
+/**
+ * Pause a current waiting gate through its manager location and persist the revised run.
+ * @param {object|null} location Supplies `run`, `assertMutation`, `getTimeGate`, `now`, `persist`.
+ * @param {{expectedRevision?: number}} [options]
+ * @returns {Promise<object|null>}
+ */
 export async function persistPausedRun(location, options = {}) {
   if (!location) return null;
   location.assertMutation({ ...options, currentOnly: true, allowPaused: true });
@@ -135,6 +198,12 @@ export async function persistPausedRun(location, options = {}) {
   return location.persist();
 }
 
+/**
+ * Resume and reanchor a waiting gate through its manager location, then persist it.
+ * @param {object|null} location As for pause, with optional `touchTimeGate` for native timestamps.
+ * @param {{expectedRevision?: number}} [options]
+ * @returns {Promise<object|null>}
+ */
 export async function persistResumedRun(location, options = {}) {
   if (!location) return null;
   location.assertMutation({ ...options, currentOnly: true, allowPaused: true });

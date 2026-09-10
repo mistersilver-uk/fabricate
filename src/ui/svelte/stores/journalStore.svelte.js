@@ -7,6 +7,13 @@ const ACTIVE_STATUS_FILTERS = new Set(['all', 'ready', 'waiting', 'paused']);
  * Reactive state for the player Journal. Foundry reads and writes remain behind
  * the injected service boundary so this module can be compiled and exercised as
  * an ordinary Svelte store.
+ * Active and Finished have independent pages and sorts, with shared search/kind filtering.
+ * Status counts use the kind cohort before search, status filtering or paging.
+ * Native run keys retain selected detail off-page or filtered out until removal/dismissal.
+ * Viewed-stage state is transient and never overwrites the executable stage.
+ * Versioned actions send revision/stage-scoped commands, while legacy crafting uses its old seam.
+ * Successful terminal dismissal awaits user-scoped persistence before refreshing the listing.
+ * Setup eligibility is active-GM plus missing-ledger state. Its service owns prerequisite confirmation.
  *
  * @param {object} deps
  * @param {object} deps.services

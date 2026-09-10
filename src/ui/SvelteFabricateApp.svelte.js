@@ -121,6 +121,9 @@ function normalizeInteractableRef(ref) {
  * Alchemy tab). Each tab renders its implemented consumer surface; this class owns
  * the active tab and wires the crafting, inventory, salvage, alchemy, and gathering
  * service seams the tab views call.
+ * Journal services route versioned actions through active-GM commands and confirm the
+ * single-GM-session prerequisite before explicit authority setup.
+ * The shared Journal store supplies both the tab and the navigation badge.
  *
  * The Alchemy tab is conditional: it appears only when an enabled alchemy
  * crafting system has at least one recipe (see {@link isAlchemyTabAvailable}),

@@ -87,10 +87,31 @@ It is not the chance the whole attempt succeeds, so it can read high while an at
 Tasks that have no enabled drop rows carry no bar.
 The opaque blind action never shows per-task success chances.
 
-Attempting a routed or progressive task opens an interactive roll dialog before anything is gathered, and the roll posts to chat so a module like Dice So Nice can animate it.
-Cancelling the dialog aborts the attempt with no changes.
-The immediate d100 mode and timed tasks do not prompt.
-See [Rolling a check from the UI]({% link checks/crafting.md %}#rolling-a-check-from-the-ui) for the full behaviour.
+New gathering runs wait for manual collection by default.
+After starting a task, open the [Journal]({% link player-app/journal.md %}) and use **Collect** when the run is ready.
+A timed run must first finish its world-time countdown.
+Eligible waiting runs can be paused and resumed, or use **When ready** to choose automatic completion where no player check is needed.
+Starting still applies the task's established stamina, node, and reservation rules.
+Cancelling later retains costs already incurred and results already delivered.
+
+The task's mode determines its yields.
+**Direct** gives its authored result set without a yield roll.
+**d100** compares one shared roll against the item chances.
+**Check** uses a check outcome to select its result set.
+Existing **Progressive** tasks keep their accumulated-budget behavior.
+The Journal separates **Possible yields** from what was actually **Received**.
+
+A required player check opens an interactive dialog when you execute the ready run.
+Cancelling that dialog leaves the stage unexecuted rather than cancelling the whole run or refunding its start-time costs.
+For non-secret checks you are entitled to see, the evaluated roll can post from your client so a module like Dice So Nice can animate it.
+Secret checks use a generic prompt and GM private posting without sending secret roll details back to the player.
+Foundry's private presentation does not guarantee confidentiality.
+See [Rolling a check from the UI]({% link checks/crafting.md %}#rolling-a-check-from-the-ui) for the check controls.
+
+Current-lifecycle starts and changes require active GM authority.
+The Journal explains missing authority and offers the active GM its setup action when the ledger is missing.
+If an interrupted operation needs recovery, ask the GM to inspect the recorded effects rather than repeating the attempt.
+Older timed gathering runs keep their automatic completion behavior.
 
 {% include screenshot.html case="player-gathering-task-ready" caption="A targeted environment, with one of its task rows selected." %}
 

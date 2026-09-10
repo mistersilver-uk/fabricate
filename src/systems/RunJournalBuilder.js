@@ -116,24 +116,27 @@ function durationToSeconds(timeRequirement = null) {
  * Unified, UI-safe projection over the three actor-scoped run managers
  * (crafting, salvage, gathering) for the player-facing Journal screen.
  *
- * The Journal monitors and (for crafting only) advances *existing* runs; it
- * never creates them. This builder reads the selected actor's active + terminal
- * runs and projects each into a single superset `RunModel`:
- *  - crafting/salvage populate step fields (`steps`, `currentStep`, `stepLabel`,
+ * The Journal monitors existing runs and exposes lifecycle-permitted crafting and
+ * versioned gathering actions. This builder never creates or executes a run.
+ * It projects active and terminal records into a superset `RunModel`:
+ *  - crafting populates step fields (`steps`, `currentStep`, `stepLabel`,
  *    per-step `timeGate`/`detail`);
- *  - gathering carries no steps and re-maps its `*WorldTime` fields onto the
+ *  - salvage and gathering carry no crafting steps, and gathering maps `*WorldTime` onto
  *    common `startedAt/updatedAt/finishedAt`.
+ * Native actor/type/id keys retain identity while `activityKind` distinguishes alchemy.
+ * Lifecycle actions, paused-first readiness, current-stage selection intent and allowlisted
+ * recovery evidence supplement the legacy `manualAdvance` compatibility flag.
+ * The completion-preference action describes visibility, not automatic material-spending eligibility.
+ * Authored requirements and possible yields remain distinct from actual spending and awards.
  *
  * Like {@link GatheringListingBuilder} it never returns raw Foundry documents:
  * every model is built from cloned primitives, and undiscovered crafting/alchemy
  * recipes are redacted to a generic label for non-GM viewers.
  *
- * Redaction hides a run's IDENTITY (name, image, steps, results, recipe id) and
- * NOTHING ELSE. It is not an authorization gate: an owner may still advance and
- * cancel a redacted run (issue 966). Conflating the two deadlocked every timed
- * craft of a recipe the crafter cannot see — alchemy brews an undiscovered
- * recipe by design, so a timed brew consumed its ingredients, armed its gate, and
- * then offered neither a Finish nor a Cancel affordance for the rest of time.
+ * Redaction hides protected identity and evidence, not otherwise permitted owner actions.
+ * Authority, pause, execution/recovery and unsupported-version refusals still apply.
+ * The projection's actions guide the UI and never replace the command boundary's authorization.
+ * User dismissal filters terminal visibility without deleting the underlying actor history.
  *
  * All collaborators are injected; the class touches no Foundry globals.
  */

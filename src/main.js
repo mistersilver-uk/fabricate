@@ -3740,26 +3740,25 @@ class Fabricate {
    * Resolves the crafting actor + component sources from the supplied ids (or the
    * persisted defaults) so the attempt uses the same inventory scope the listing
    * was computed for.
+   * New starts use version 1 and preserve ready, fully supplied one-call execution.
+   * Waiting or unresolved choices leave the run in the Journal without editable-material spending.
+   * Unlike {@link Fabricate#craft}, this player-facing method accepts actor IDs, not documents.
    *
    * @param {object} options
    * @param {string|null} [options.actorId] Crafting actor id.
    * @param {string} options.recipeId Recipe id.
    * @param {string|null} [options.ingredientSetId] Chosen ingredient set id.
+   * @param {Object<string, {optionIndex: number, heldItemId?: string}>|null}
+   *   [options.ingredientOptionOverrides] Explicit ingredient-group choices.
    * @param {{stepId: string|null, ingredientSetId: string|null,
    *   allocation: Record<string, number>}|null} [options.ingredientEssenceAllocation]
-   *   The player's funding for the set's shared essence block (issue 917), scoped to
-   *   the step and set the rail was computed against. Passed straight through: the
-   *   ENGINE drops it when either id disagrees with the step it resolves from the
-   *   active run, because a facade-side guard would check an index that can move
-   *   between the derived rail and the click. Omitted (null) is today's behaviour.
+   *   Physical carrier units scoped to the current step and ingredient set.
+   *   Stale or mismatched intent blocks versioned execution until explicitly repaired.
    * @param {string[]|null} [options.componentSourceActorIds] Source actor ids.
-   * @param {boolean} [options.interactive] When true, prompt the player with the
-   *   confirm-roll dialog (optional situational modifier) and post the roll to chat
-   *   so Dice So Nice animates it. Defaults to false so macros and automation keep
-   *   the original silent behaviour. The Fabricate Crafting tab passes true. A
-   *   dismissed prompt returns `{ success: false, cancelled: true }` with zero
-   *   mutation (no ingredients, currency, or tools consumed, no run created).
-   * @returns {Promise<{success: boolean, results: Array|null, message: string, cancelled?: boolean}>}
+   * @param {boolean} [options.interactive=false] Forwarded crafting option.
+   *   Versioned required checks use the authority's prepare/prompt/resolve exchange regardless
+   *   of this legacy opt-in. Cancelling the prompt leaves the stage unexecuted, not the run absent.
+   * @returns {Promise<object>} Start/wait, execution, cancellation or refusal result.
    */
   async craftRecipe({ actorId = null, recipeId, ingredientSetId = null, ingredientOptionOverrides = null, ingredientEssenceAllocation = null, componentSourceActorIds = null, interactive = false } = {}) {
     this._requireReady();
@@ -4791,32 +4790,91 @@ class Fabricate {
     if (game.user?.isGM !== true) throw new Error('Gathering rich state changes require a GM user');
   }
 
+  /**
+   * Submit a current-lifecycle operation through active-GM authority after initialization.
+   * Actor UUIDs address this authenticated command boundary, whose GM handler rechecks the
+   * attested sender's ownership. They do not replace actor IDs in the player crafting facades.
+   * A timeout is an unknown response, not proof that execution failed or permission to replay.
+   * @param {{actorUuid: string, runType: 'crafting'|'gathering', runId: string,
+   *   expectedRevision: number, action: string, payload?: object}} command
+   *   Start uses an empty runId and revision zero. Alchemy uses runType `crafting`.
+   * @returns {Promise<object>} Authoritative result or explicit refusal.
+   */
   executeJournalRunCommand(command) {
     this._requireReady();
     return this.journalRunCommands?.executeJournalRunCommand(command)
       ?? Promise.resolve({ success: false, reason: 'authority-unavailable' });
   }
 
+  /**
+   * Hide a terminal entry for the current user in this world, preserving actor history.
+   * The awaited user-scoped setting write follows the user across devices and can reject.
+   * @param {{actorUuid: string, runType: string, runId: string}} options Native run identity.
+   * @returns {Promise<object>} `{success, key}` on persistence or a refusal for an invalid target.
+   */
   dismissJournalRun(options) {
     this._requireReady();
     return this.journalRunCommands?.dismissJournalRun(options)
       ?? Promise.resolve({ success: false, reason: 'authority-unavailable' });
   }
 
+  /**
+   * Read this user's hidden native run keys for one actor, without changing history.
+   * @param {{actorUuid: string, viewerId?: string}} options A different viewer gets an empty set.
+   * @returns {Set<string>}
+   */
   getDismissedJournalRunKeys(options) {
     return this.journalRunCommands?.getDismissedJournalRunKeys(options) ?? new Set();
   }
 
+  /**
+   * Read cached authority availability. This neither provisions a ledger nor releases a claim.
+   * @returns {{available: boolean, reason: string|null}}
+   */
   getJournalRunAuthorityAvailability() {
     return this.journalRunCommands?.getJournalRunAuthorityAvailability()
       ?? { available: false, reason: 'authority-unavailable' };
   }
 
+  /**
+   * Explicitly provision the private run-authority ledger as the active GM.
+   * Call after Fabricate initialization, with every other GM session for this world closed,
+   * including other tabs signed in as the same user. This API does not display a confirmation.
+   * The Journal's visible setup action obtains that confirmation before calling this method.
+   * Existing or duplicate ledgers refuse setup. Setup never clears a retained execution claim.
+   * @returns {Promise<object>} `{success: true, ledgerId}` or `{success: false, reason}`.
+   */
   setupJournalRunAuthority() {
     return this.journalRunCommands?.setupJournalRunAuthority()
       ?? Promise.resolve({ success: false, reason: 'authority-unavailable' });
   }
 
+  /**
+   * Record manual disposition of an exact retained execution claim as the active GM.
+   * Inspect actual receipts and the uncertain applying boundary first, after confirming no
+   * other GM realm is still executing. Planned amounts are not proof of awards or spending.
+   * Matching run evidence is reconstructed and disposition persisted before releasing the claim.
+   * This releases authority only: the old request stays non-replayable and an uncertain run
+   * effect remains recovery-required. It performs no replay, compensation or automatic rollback.
+   * @param {{claimId: string, disposition: 'reconciled'|'abandoned'}} options
+   *   claimId is the claim's random token, not the fixed embedded page ID or a run ID.
+   * @returns {Promise<object>} `{success: true, disposition}` or `{success: false, reason}`.
+   * @example
+   * // Active-GM macro after reviewing the interrupted operation and its receipts.
+   * await game.fabricate.whenReady();
+   * const ledgers = [...game.journal].filter(
+   *   (entry) => entry.getFlag('fabricate', 'journalRunAuthorityLedger') === true
+   * );
+   * if (ledgers.length !== 1) throw new Error('Expected one authority ledger');
+   * const page = ledgers[0].pages.get('FabRunAuthority1');
+   * const claimId = page?.getFlag('fabricate', 'journalRunClaimId');
+   * if (!claimId) throw new Error('No retained claim to reconcile');
+   * const result = await game.fabricate.reconcileJournalRunAuthority({
+   *   claimId,
+   *   disposition: 'reconciled',
+   * });
+   * if (!result.success) throw new Error(result.reason);
+   */
   reconcileJournalRunAuthority(options) {
     return this.journalRunCommands?.reconcileJournalRunAuthority(options)
       ?? Promise.resolve({ success: false, reason: 'authority-unavailable' });
@@ -5120,10 +5178,29 @@ class Fabricate {
   }
 
   /**
-   * Quick craft helper - craft a recipe for an actor
-   * @param {Actor} actor - The actor performing the craft
-   * @param {string|Recipe} recipe - Recipe ID or Recipe object
-   * @param {Object} options - Crafting options
+   * Craft a recipe for a resolved Actor, preserving one-call execution when the stage is ready
+   * and all choices are supplied. New starts use version 1 through active-GM authority.
+   * Waiting stages or unresolved choices remain in the Journal without editable-material spending.
+   * Resuming an existing unversioned run preserves its legacy contract.
+   * Use {@link Fabricate#craftRecipe} for the player-facing actor-ID selection facade.
+   * Required versioned checks still use the authority's player prompt and GM evaluation.
+   * Secret checks use a generic prompt and GM private posting without player roll-data handoff.
+   * Foundry whisper/private-roll presentation is not a server confidentiality guarantee.
+   * @param {Actor} actor The Actor document performing the craft, not its ID or UUID string.
+   * @param {string|Recipe} recipe Recipe ID or resolved Recipe.
+   * @param {object} [options]
+   * @param {Actor[]} [options.componentSourceActors] Resolved source documents, defaulting to actor.
+   * @param {string} [options.runId] Existing active run to continue.
+   * @param {string|null} [options.ingredientSetId] Chosen ingredient route.
+   * @param {Object<string, {optionIndex: number, heldItemId?: string}>}
+   *   [options.ingredientOptionOverrides] Explicit group choices.
+   * @param {{stepId: string, ingredientSetId: string, allocation: Object<string, number>}}
+   *   [options.ingredientEssenceAllocation] Shared physical carrier allocation.
+   * @returns {Promise<object>} Execution, start/wait or refusal result.
+   * @example
+   * await game.fabricate.whenReady();
+   * const actor = game.actors.get('YOUR_ACTOR_ID');
+   * const result = await game.fabricate.craft(actor, 'YOUR_RECIPE_ID');
    */
   async craft(actor, recipe, options = {}) {
     if (!this.ready) {
