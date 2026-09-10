@@ -149,10 +149,11 @@ const BASE_SCAN = Object.freeze({
  * record the save writes and not the read union's merged copies.
  */
 const SCAN_TOTALS = Object.freeze({
-  matches: 163,
-  lines: 147,
+  // #1648: eight unique validated-tool/receipt reads in the same two engine files.
+  matches: 171,
+  lines: 155,
   files: 19,
-  pairs: 118,
+  pairs: 126,
   collisionGroups: 17,
   collisionSites: 46,
 });
@@ -163,6 +164,15 @@ const SCAN_TOTALS = Object.freeze({
  * exact case the count exists to make visible.
  */
 const LEDGER = Object.freeze([
+  // #1648: validated tool pairs and durable effect receipts, never system libraries.
+  ['src/systems/CraftingEngine.js', "toolItemUuids: toolValidation.tools", 1, 'not-a-system'],
+  ['src/systems/CraftingEngine.js', "toolItems: toolValidation.tools.map((entry) => entry.item).filter(Boolean),", 1, 'not-a-system'],
+  ['src/systems/CraftingEngine.js', "toolPairs: [...prepared.toolValidation.tools],", 1, 'not-a-system'],
+  ['src/systems/CraftingEngine.js', "if (shouldUseTools && prepared.toolValidation.tools.length > 0) {", 1, 'not-a-system'],
+  ['src/systems/CraftingEngine.js', "prepared.toolValidation.tools,", 1, 'not-a-system'],
+  ['src/systems/CraftingEngine.js', "state.usedTools = cloneJsonValue(toolReceipt.tools) ?? [];", 1, 'not-a-system'],
+  ['src/systems/GatheringEngine.js', "if (resolvedTools.tools.length > 0) {", 1, 'not-a-system'],
+  ['src/systems/GatheringEngine.js', "tools: resolvedTools.tools,", 1, 'not-a-system'],
   ['src/systems/AlchemySignatureReport.js', "this.components = components;", 1, 'parameter'],
   ['src/systems/AlchemySignatureReport.js', "this.components,", 1, 'parameter'],
   ['src/systems/AlchemySignatureReport.js', "this._validator.describeConflict(first, second, this.components)", 1, 'parameter'],

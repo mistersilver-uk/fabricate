@@ -29,7 +29,7 @@
  * rather than these 112, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,045 `(at-context, selector)` keys, of which 2,933 appear exactly
+ * Unfiltered, the sheet holds 3,042 `(at-context, selector)` keys, of which 2,930 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -37,11 +37,11 @@
  * is a VANISHED row rather than a silent pass.
  *
  * ── WHERE THE NUMBERS COME FROM ─────────────────────────────────────────────────────────
- * MEASURED over this branch's own head, rebased onto the merged main at 75dd8bf9 (which carries
- * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
+ * MEASURED after #1648's gate reconciliation removes the unused Journal primary button's
+ * base, hover and disabled rules, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,562 rules at that head, 112 repeated keys and 229 appearances
+ * printed from. The sheet holds 2,559 rules at that head, 112 repeated keys and 229 appearances
  * between them; five keys appear three times and none appears four or more.
  *
  * ISSUE 1517 PHASE 3 RE-KEYED NO ROW AND MOVED THE THREE CONTEXTUAL FIGURES, by adding ONE rule

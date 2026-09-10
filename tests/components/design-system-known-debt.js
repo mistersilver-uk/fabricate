@@ -806,7 +806,8 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 230;
+// #1648: ActionsPanel delegates its four former raw controls to RunActionBar (230 - 4).
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 226;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.

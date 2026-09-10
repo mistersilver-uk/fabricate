@@ -1568,7 +1568,6 @@ describe('CraftingSystemManager source contract', () => {
       'SalvageResolutionProgressiveDesc',
       'SalvageResolutionRouted',
       'SalvageResolutionRoutedDesc',
-      'ResolutionComingSoon',
     ]) {
       const value = lang.FABRICATE.Admin.SystemSettings[key];
       assert.equal(typeof value, 'string', `SystemSettings.${key} should be a string`);

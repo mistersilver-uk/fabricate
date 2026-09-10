@@ -627,7 +627,6 @@ export const KNOWN_ORPHANS = [
   'FABRICATE.App.Gathering.Detail.AwardModeLabel',
   'FABRICATE.App.Gathering.Detail.FindChanceLabel',
   'FABRICATE.App.Gathering.Detail.MissingTools',
-  'FABRICATE.App.Journal.Actions.WaitingHint',
   'FABRICATE.App.Journal.TimeRemaining.Title',
   'FABRICATE.Canvas.Interactable.Config.ActivationLabel',
   'FABRICATE.Canvas.Interactable.Config.DeletePrompt',

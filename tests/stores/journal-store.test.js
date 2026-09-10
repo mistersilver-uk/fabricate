@@ -374,6 +374,29 @@ describe('journalStore', () => {
     assert.equal(store.selectedRun.stepIndex, null);
   });
 
+  for (const lifecycleContract of ['legacy', undefined, 'current']) {
+    for (const status of ['succeeded', 'failed', 'done']) {
+      it(`anchors ${lifecycleContract ?? 'missing-contract'} terminal history at ${status} evidence`, async () => {
+        const terminal = run({ id: 'early-terminal', stepIndex: null, derivedStatus: 'failed',
+          steps: [{ index: 0, status: 'succeeded' }, { index: 1, status }, { index: 2, status: 'pending' }] });
+        terminal.lifecycleContract = lifecycleContract;
+        const setup = makeServices({ listing: baseListing({ activeRuns: [], history: [terminal] }) });
+        const store = await loadedStore(setup);
+        const expected = lifecycleContract === 'current' ? 2 : 1;
+        assert.equal(store.viewedStageIndex, expected);
+        assert.equal(store.viewedStage.status, terminal.steps[expected].status);
+        store.viewStage(terminal, 0);
+        flushSync();
+        await store.load(true);
+        assert.equal(store.viewedStageIndex, 0, 'explicit browsing survives refresh');
+        store.returnToCurrentStage();
+        flushSync();
+        assert.equal(store.viewedStageIndex, expected);
+        assert.equal(store.selectedRun.stepIndex, null, 'browsing never changes execution history');
+      });
+    }
+  }
+
   for (const staleOutcome of ['success', 'failure', 'empty']) {
     for (const latestFirst of [false, true]) {
       it(`ignores stale actor load ${staleOutcome} with latestFirst=${latestFirst}`, async () => {

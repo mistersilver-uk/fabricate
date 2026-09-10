@@ -189,13 +189,9 @@ describe('Journal label mirrors resolve in lang/en.json (drift guard)', () => {
 });
 
 describe('Journal global CSS treatments', () => {
-  it('adds the player-scoped green primary button overriding Foundry button chrome', () => {
-    assert.ok(cssSource.includes('.fabricate-app .fabricate-app-primary-button'), 'primary button rule present');
-    assert.ok(
-      cssSource.includes('background: var(--fab-success);'),
-      'primary button uses the success token (no colour literal)'
-    );
-    assert.ok(cssSource.includes('height: auto;'), 'overrides Foundry button fixed height');
+  it('delegates primary controls to RunActionBar and retires the unused Journal button skin', () => {
+    assert.ok(actionsSource.includes('<RunActionBar'), 'the shared primitive owns action chrome');
+    assert.ok(!cssSource.includes('.fabricate-app-primary-button'), 'no dead primary skin remains');
   });
 
   it('adds the namespaced nav-count badge with no colour literals', () => {

@@ -42,7 +42,7 @@
       class="fab-stage-nav-arrow"
       ariaLabel={previousLabel}
       disabled={safeView === 0}
-      data-stage-nav-previous
+      data-stage-nav-previous=""
       onclick={() => select(safeView - 1)}
     >
       <i class="fas fa-chevron-left" aria-hidden="true"></i>
@@ -66,7 +66,7 @@
       class="fab-stage-nav-arrow"
       ariaLabel={nextLabel}
       disabled={safeView === count - 1}
-      data-stage-nav-next
+      data-stage-nav-next=""
       onclick={() => select(safeView + 1)}
     >
       <i class="fas fa-chevron-right" aria-hidden="true"></i>

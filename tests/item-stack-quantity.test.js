@@ -301,6 +301,32 @@ const SITE_MAPPING = [
     anchors: [/if \(hasStackQuantity\(itemData\) \|\| !sourceItem\)/],
   },
   {
+    site: 'CraftingEngine versioned alchemy validation and consumption base (#1648)',
+    file: 'src/systems/CraftingEngine.js',
+    accessor: 'readStoredStackQuantity',
+    sites: 2,
+    absentDefault: 1,
+    deleteSites: 1,
+    anchors: [
+      /if \(readStoredStackQuantity\(item, \{ absentDefault: 1 \}\) < count\)/,
+      /const before = readStoredStackQuantity\(item, \{ absentDefault: 1 \}\);/,
+    ],
+  },
+  {
+    site: 'CraftingEngine versioned alchemy decrement write (#1648)',
+    file: 'src/systems/CraftingEngine.js',
+    accessor: 'updateStackQuantity',
+    sites: 1,
+    anchors: [/updateStackQuantity\(item, before - count\)/],
+  },
+  {
+    site: 'RunJournalBuilder candidate held quantity (#1648)',
+    file: 'src/systems/RunJournalBuilder.js',
+    accessor: 'readStackQuantity',
+    sites: 1,
+    anchors: [/const held = readStackQuantity\(item\);/],
+  },
+  {
     site: 'CraftingEngine._restoreComponentItem + award creation (payload writes)',
     file: 'src/systems/CraftingEngine.js',
     accessor: 'setStackQuantity',
@@ -698,7 +724,7 @@ describe('the per-site accessor mapping', () => {
     assert.deepEqual(asSortedPairs(countAbsentDefaults(1)), asSortedPairs(declared));
   });
 
-  it('records exactly four delete-on-underrun sites, and four decrement writes beside them', () => {
+  it('records exactly five delete-on-underrun sites, and five decrement writes beside them', () => {
     // Counted from an explicit field rather than parsed out of the label: a label-substring
     // filter reads as a check while actually depending on prose nobody validates.
     const total = SITE_MAPPING.reduce((sum, entry) => sum + (entry.deleteSites ?? 0), 0);
@@ -708,7 +734,7 @@ describe('the per-site accessor mapping', () => {
     const contributors = SITE_MAPPING.filter((entry) => (entry.deleteSites ?? 0) > 0).map(
       (entry) => `${entry.site} (${entry.deleteSites})`
     );
-    assert.equal(total, 4, `expected four delete-on-underrun sites: ${contributors.join('; ')}`);
+    assert.equal(total, 5, `expected five delete-on-underrun sites: ${contributors.join('; ')}`);
     for (const entry of SITE_MAPPING) {
       assert.ok(
         (entry.deleteSites ?? 0) <= entry.sites,
@@ -722,7 +748,7 @@ describe('the per-site accessor mapping', () => {
       (entry) =>
         entry.file === 'src/systems/CraftingEngine.js' && entry.accessor === 'updateStackQuantity'
     ).reduce((sum, entry) => sum + entry.sites, 0);
-    assert.equal(engineWrites, 4);
+    assert.equal(engineWrites, 5);
   });
 });
 

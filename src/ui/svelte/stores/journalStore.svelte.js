@@ -305,11 +305,7 @@ export function createJournalStore({ services } = {}) {
     if (!request) return;
     const all = [...allActiveRuns, ...allHistoryRuns];
     const run = all.find((candidate) => runKey(candidate, listing) === request.runKey);
-    if (
-      !run ||
-      run.lifecycleContract !== 'current' ||
-      run.actions?.[request.action] !== true
-    ) {
+    if (!run || run.lifecycleContract !== 'current' || run.actions?.[request.action] !== true) {
       clearCommandError();
       return;
     }
@@ -565,7 +561,14 @@ function runKey(run, listing) {
 
 function stageAnchor(run) {
   const current = run.stepIndex == null ? null : Number(run.stepIndex);
-  return Number.isSafeInteger(current) ? current : Math.max(0, (run.steps?.length ?? 1) - 1);
+  if (Number.isSafeInteger(current)) return current;
+  if (!run.lifecycleContract || run.lifecycleContract === 'legacy') {
+    const executed =
+      run.steps?.findLastIndex((step) => ['succeeded', 'failed', 'done'].includes(step?.status)) ??
+      -1;
+    if (executed >= 0) return executed;
+  }
+  return Math.max(0, (run.steps?.length ?? 1) - 1);
 }
 
 function normalizeStageIndex(run, value) {

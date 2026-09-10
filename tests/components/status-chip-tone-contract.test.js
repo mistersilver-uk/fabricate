@@ -180,7 +180,7 @@ describe('1506 the outlined emphasis — an exact census', () => {
 });
 
 /**
- * The class the four journal rows pass to their status chip. It is the caller's own name rather
+ * The class the journal rows pass to their status chip. It is the caller's own name rather
  * than the chip's, so the rule below cannot be answered by a rule about chips in general.
  */
 const RUN_CHIP_CLASS = 'journal-run-status';
@@ -190,8 +190,8 @@ describe('1506 the journal run chip — its shrink protection is restated per ca
     const callers = COMPONENTS.filter(({ source }) => source.includes(`class="${RUN_CHIP_CLASS}"`));
     assert.equal(
       callers.length,
-      4,
-      'the run status chip is rendered by the four journal rows that rendered the retired pill. ' +
+      3,
+      'RunDetail now owns a header chip without the row class (#1648); three row callers remain. ' +
         `Found: ${callers.map(({ path }) => path).join(', ')}`
     );
 

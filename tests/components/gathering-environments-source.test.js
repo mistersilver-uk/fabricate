@@ -18,8 +18,8 @@ const responsiveViewSources = [
   ['gathering', viewSource, '220px'],
   ['crafting', read('../../src/ui/svelte/apps/crafting/CraftingView.svelte'), '220px'],
   ['alchemy', read('../../src/ui/svelte/apps/alchemy/AlchemyView.svelte'), '240px'],
-  ['journal', read('../../src/ui/svelte/apps/journal/JournalView.svelte'), '220px'],
 ];
+const journalSource = read('../../src/ui/svelte/apps/journal/JournalView.svelte');
 const listSource = read('../../src/ui/svelte/apps/gathering/GatheringEnvironmentList.svelte');
 const cardSource = read('../../src/ui/svelte/apps/gathering/EnvironmentCard.svelte');
 const cssSource = read('../../styles/fabricate.css');
@@ -116,6 +116,25 @@ describe('GatheringView 3-column layout and states', () => {
         `${name} should explain the 1024px window, approximately 938px content box, and 960px coupling`
       );
     }
+  });
+
+  it('stacks Journal browse sections before detail at the shared breakpoint', () => {
+    assert.match(journalSource, /container:\s*fabricate-journal\s*\/\s*inline-size;/);
+    const marker = '@container fabricate-journal (max-width: 960px)';
+    assert.ok(journalSource.includes(marker));
+    const narrow = journalSource.slice(journalSource.indexOf(marker));
+    assert.match(narrow, /\.journal-view-grid\s*\{[^}]*grid-template-columns:\s*1fr;[^}]*height:\s*auto;/);
+    for (const wrapper of ['journal-browse', 'journal-browse-lists']) {
+      assert.match(narrow, new RegExp(`\\.${wrapper}\\s*\\{\\s*display: contents;`));
+    }
+    assert.match(narrow, /journal-list-section\)[^{]*\{[^}]*min-height:\s*220px;[^}]*max-height:\s*360px;/);
+    assert.match(narrow, /\.journal-detail-pane\s*\{[^}]*min-height:\s*220px;[^}]*overflow:\s*visible;/);
+    const positions = ['<ActiveRunsList', '<HistoryList', '<RunDetail'].map((tag) => {
+      const index = journalSource.indexOf(tag);
+      assert.ok(index >= 0, `${tag} remains rendered`);
+      return index;
+    });
+    assert.ok(positions[0] < positions[1] && positions[1] < positions[2]);
   });
 
   it('enforces a minimum window size on the Fabricate app so the columns cannot be clipped', () => {

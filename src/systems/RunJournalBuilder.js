@@ -1,6 +1,7 @@
 import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
 
+import { resolveActiveCraftingCheckFormula } from './checkModifierResolver.js';
 import {
   actorToOption,
   idOf,
@@ -15,7 +16,6 @@ import { readStackQuantity } from './itemStackQuantity.js';
 import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
 import { resolvedEssencesFor } from './scopedEntityReads.js';
-import { resolveActiveCraftingCheckFormula } from './checkModifierResolver.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 // Generic player-facing label for a blind gathering run, shared with the
@@ -921,7 +921,10 @@ export class RunJournalBuilder {
     const setId = stringOrNull(plan?.selectedIngredientSetId ?? runStep?.selectedIngredientSetId);
     const sets = normalizeList(recipeStep?.ingredientSets);
     const ingredientSet = sets.find((set) => stringOrNull(set?.id) === setId) ?? null;
-    const routes = sets.map((set) => ({ id: stringOrNull(set?.id), name: stringOrEmpty(set?.name) }));
+    const routes = sets.map((set) => ({
+      id: stringOrNull(set?.id),
+      name: stringOrEmpty(set?.name),
+    }));
     if (!ingredientSet) {
       return {
         success: false,
@@ -934,10 +937,7 @@ export class RunJournalBuilder {
         essencePool: null,
       };
     }
-    if (
-      typeof ingredientSet.resolveIngredientSelection !== 'function' ||
-      !snapshot
-    ) {
+    if (typeof ingredientSet.resolveIngredientSelection !== 'function' || !snapshot) {
       return null;
     }
     const items = snapshot.heldItems().map((entry) => entry.item);
@@ -1001,7 +1001,7 @@ export class RunJournalBuilder {
     const invalidGroups = normalizeList(ingredientSet.ingredientGroups).filter(
       (group) => ingredientOverrideIndex(group, optionOverrides) === null
     );
-    if (invalidGroups.length) {
+    if (invalidGroups.length > 0) {
       return {
         success: false,
         selectedIngredients: [],
@@ -1980,7 +1980,7 @@ function craftingOutcomeBand(outcome, routed, dc) {
 
 function ingredientOverrideIndex(group, optionOverrides) {
   const groupId = stringOrNull(group?.id);
-  if (!Object.hasOwn(optionOverrides, groupId)) return undefined;
+  if (!Object.hasOwn(optionOverrides, groupId)) return;
   const raw = optionOverrides[groupId]?.optionIndex;
   if (typeof raw !== 'number' && typeof raw !== 'string') return null;
   if (typeof raw === 'string' && !raw.trim()) {

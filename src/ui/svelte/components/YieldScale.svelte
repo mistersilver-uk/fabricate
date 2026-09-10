@@ -47,7 +47,7 @@
     {#each sorted as entry, index (entry.id)}
       {#if hasRoll && cutIndex === index}
         <div class="fab-yield-cut" data-yield-cut>
-          <Chip density="list" tone="accent" mono icon="fas fa-dice-d10"
+          <Chip density="list" tone="accent" mono icon="fas fa-dice"
             >{labels.cut?.(Number(roll)) ?? String(roll)}</Chip
           >
           <span class="fab-yield-cut-rule"></span>
@@ -81,7 +81,7 @@
     {/each}
     {#if hasRoll && sorted.length > 0 && cutIndex === -1}
       <div class="fab-yield-cut" data-yield-cut>
-        <Chip density="list" tone="accent" mono icon="fas fa-dice-d10"
+        <Chip density="list" tone="accent" mono icon="fas fa-dice"
           >{labels.cut?.(Number(roll)) ?? String(roll)}</Chip
         >
         <span class="fab-yield-cut-rule"></span>

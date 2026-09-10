@@ -163,8 +163,10 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
   const objectResolving = resolved.filter(([, value]) => value !== undefined && typeof value !== 'string');
   assert.equal(
     objectResolving.length,
-    41,
-    'expected 41 legitimate namespace bases to resolve to an object — ' +
+    46,
+    'expected 46 legitimate namespace bases to resolve to an object — ' +
+      '#1648 adds Journal Actions, Mode, Verdict, Stage.State and Yields.AwardModes, whose ' +
+      'leaf suffixes are selected from run state. ' +
       'update this count only if the number of such bases genuinely changes. It fell from 44 ' +
       'when issue 1282 deleted `GatheringTravelTabs.svelte`, whose template literal was the ' +
       'sole reference to the `FABRICATE.Admin.Manager.Travel.Tabs` base, and from 43 to 40 ' +

@@ -330,7 +330,6 @@
     "src/ui/svelte/apps/inventory/detail/InventoryDetailPager.svelte | 2",
     "src/ui/svelte/apps/inventory/detail/InventorySalvagePanel.svelte | 2",
     "src/ui/svelte/apps/inventory/detail/salvage/SalvageProgressiveBody.svelte | 1",
-    "src/ui/svelte/apps/journal/ActionsPanel.svelte | 4",
     "src/ui/svelte/apps/journal/RecentResults.svelte | 1",
     "src/ui/svelte/apps/manager/AccessTabView.svelte | 1",
     "src/ui/svelte/components/ArmedDangerButton.svelte | 1",
