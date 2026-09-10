@@ -170,8 +170,6 @@
   );
   const guidanceKey = $derived.by(() => {
     if (run?.recoveryEvidence?.required) return 'FABRICATE.App.Journal.WhatToExpect.Recovery';
-    if (run?.actions?.disabledReason === 'unsupportedLifecycle')
-      return 'FABRICATE.App.Journal.Actions.UnsupportedLifecycle';
     if (terminal) return 'FABRICATE.App.Journal.WhatToExpect.Terminal';
     if (run?.actions?.disabledReason && run?.actions?.execute !== true)
       return 'FABRICATE.App.Journal.WhatToExpect.Blocked';
@@ -806,7 +804,9 @@
         </InspectorCard>
       </div>{/if}
     <ThisRun {run} {services} />
-    <Callout tone="neutral" text={guidance} dataAttr="data-journal-guidance" />
+    {#if run?.actions?.disabledReason !== 'unsupportedLifecycle'}
+      <Callout tone="neutral" text={guidance} dataAttr="data-journal-guidance" />
+    {/if}
   {/if}
 </article>
 
