@@ -52,7 +52,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/Stepper.svelte',
     ...['RunActionBar', 'ManagerButton', 'SlotTile',
       'SlotRow', 'ChoiceOptionList', 'EssencePool', 'RunProgress', 'StageNav',
-      'StageCard', 'YieldScale', 'OutcomeLadder'].map((name) => `src/ui/svelte/components/${name}.svelte`),
+      'StageCard', 'YieldScale', 'OutcomeLadder', 'ListRow'].map((name) => `src/ui/svelte/components/${name}.svelte`),
     'src/ui/svelte/apps/journal/JournalCard.svelte',
     'src/ui/svelte/apps/journal/JournalFactRow.svelte',
     'src/ui/svelte/apps/journal/StepTimeline.svelte',
@@ -541,7 +541,7 @@ describe('RunDetail mounted behavior', () => {
       ]
     });
     const target = await harness.mount({ run, now: 5000, services: services() });
-    const rows = target.querySelectorAll('[data-history-items="consumed"] .manager-chip');
+    const rows = target.querySelectorAll('[data-history-items="consumed"] [data-list-row="dense"]');
     assert.equal(rows.length, 2, 'both same-component requirement rows render');
   });
 
@@ -600,7 +600,8 @@ describe('RunDetail mounted behavior', () => {
     const consumed = target.querySelector('[data-history-items="consumed"]');
     assert.ok(!target.querySelector('[data-stage-fact^="requirement-"]'), 'history does not repeat authored requirements as actual spending');
     assert.ok(consumed, 'consumed section rendered');
-    assert.ok(consumed.querySelector('.manager-chip'), 'actual consumption rendered');
+    assert.ok(consumed.querySelector('[data-list-row="dense"]'), 'actual consumption rendered');
+    assert.equal(consumed.querySelector('img').getAttribute('src'), 'icons/herb.webp');
     assert.ok(consumed.textContent.includes('Dried Herb'), 'consumed name rendered');
   });
 
@@ -630,7 +631,7 @@ describe('RunDetail mounted behavior', () => {
     assert.ok(results.textContent.includes('Healing Potion'), 'result name rendered');
     // The harness's localize stub echoes the key + data, so assert the Quantity
     // key + the count rather than the rendered "×N" glyph.
-    const resultText = results.querySelector('.manager-chip').textContent;
+    const resultText = results.querySelector('.fabricate-list-row-quantity').textContent;
     assert.ok(resultText.includes('Quantity'), 'quantity badge uses the localized quantity key');
     assert.ok(resultText.includes('3'), 'quantity badge shows the produced count');
     assert.ok(!target.querySelector('[data-journal-actions]'), 'terminal run shows no actions panel');

@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import Chip from './Chip.svelte';
-  import Medallion from './Medallion.svelte';
+  import ListRow from './ListRow.svelte';
 
   let { entries = [], roll = null, labels = {}, label = '', hint = '' } = $props();
 
@@ -61,23 +61,24 @@
         class:is-missed={cleared(entry) === false}
         data-yield-entry={entry.id}
       >
-        <Medallion
+        <ListRow
+          name={entry.name}
           art={entry.art || ''}
           icon={entry.icon || 'fas fa-circle'}
           tint={hasRoll && !cleared(entry) ? '' : entry.tint || ''}
-          alt=""
-          size={26}
-        />
-        <span class="fab-yield-copy">
-          <span class="fab-yield-name">{entry.name}</span>
-          <span class="fab-yield-reading">{reading(entry)}</span>
-        </span>
-        <span class="fab-yield-quantity">{labels.quantity?.(entry) ?? entry.qty}</span>
-        <Chip
-          density="list"
-          tone={!hasRoll && Number(entry.chance) >= 100 ? 'positive' : 'neutral'}
-          mono>{labels.chance?.(entry) ?? entry.chance}</Chip
+          detail={reading(entry)}
+          quantity={labels.quantity?.(entry) ?? entry.qty}
+          tone={cleared(entry) === true ? 'positive' : 'neutral'}
+          muted={cleared(entry) === false}
         >
+          {#snippet trailing()}
+            <Chip
+              density="list"
+              tone={!hasRoll && Number(entry.chance) >= 100 ? 'positive' : 'neutral'}
+              mono>{labels.chance?.(entry) ?? entry.chance}</Chip
+            >
+          {/snippet}
+        </ListRow>
       </div>
     {/each}
     {#if hasCut && sorted.length > 0 && cutIndex === -1}
@@ -118,56 +119,6 @@
   .fab-yield-cut-note {
     color: var(--fab-text-subtle);
     font-size: 9.5px;
-  }
-
-  .fab-yield-row {
-    display: flex;
-    align-items: center;
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-1) var(--fab-space-2);
-    border: 1px solid var(--fab-border);
-    border-radius: 9px;
-    background: var(--fab-bg-2);
-  }
-
-  .fab-yield-row.is-cleared {
-    border-color: var(--fab-success-border);
-    background: var(--fab-success-soft);
-  }
-
-  .fab-yield-row.is-missed {
-    border-style: dashed;
-  }
-
-  .fab-yield-copy {
-    display: grid;
-    min-width: 0;
-    flex: 1 1 auto;
-    gap: 1px;
-  }
-
-  .fab-yield-name {
-    color: var(--fab-text);
-    font-size: 11px;
-    font-weight: 600;
-    overflow-wrap: anywhere;
-  }
-
-  .is-missed .fab-yield-name,
-  .fab-yield-reading {
-    color: var(--fab-text-subtle);
-  }
-
-  .fab-yield-reading {
-    font-size: 9.5px;
-  }
-
-  .fab-yield-quantity {
-    color: var(--fab-text-secondary);
-    font-family: var(--fab-font-mono);
-    font-size: 11px;
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
   }
 
   .fab-yield-cut {

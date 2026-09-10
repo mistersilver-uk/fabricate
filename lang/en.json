@@ -937,7 +937,8 @@
           "inProgress": "In progress",
           "succeeded": "Succeeded",
           "failed": "Failed",
-          "cancelled": "Cancelled"
+          "cancelled": "Cancelled",
+          "unknown": "Outcome unknown"
         },
         "Mode": {
           "Standard": "Standard (DC)",

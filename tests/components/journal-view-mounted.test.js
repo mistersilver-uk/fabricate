@@ -44,6 +44,7 @@ const harness = createMountedComponentHarness({
     component('RunProgress'),
     component('StageNav'),
     component('StageCard'),
+    component('ListRow'),
     component('YieldScale'),
     component('OutcomeLadder'),
     'src/ui/svelte/components/InspectorCard.svelte',
@@ -172,6 +173,29 @@ describe('JournalView mounted behavior', () => {
     assert.equal(calls.load.length, beforeRetry + 1);
   });
 
+  it('renders four Finished entries with truthful outcome glyphs and compact independent pagers', async () => {
+    const statuses = ['succeeded', 'failed', 'cancelled', undefined];
+    const runs = statuses.map((status, index) => makeSucceededRun({
+      id: `outcome-${index}`, key: `outcome-${index}`, status, derivedStatus: status,
+      createdResults: [{ name: 'Award does not establish success', quantity: 42 }],
+    }));
+    const { store, calls } = makeJournal({ historyPageItems: runs, historyCount: 12, activeCount: 11 });
+    const target = await harness.mount({ services: makeServices(store) });
+    await settle();
+    const rows = [...target.querySelectorAll('[data-history-run-id]')];
+    assert.equal(rows.length, 4);
+    assert.equal(target.querySelectorAll('[data-pagination-compact]').length, 2);
+    assert.ok(!target.querySelector('[data-history-quantity], .journal-history-meta .manager-chip'));
+    assert.deepEqual(rows.map((row) => row.querySelector('[data-history-outcome]')?.getAttribute('data-history-outcome')),
+      ['succeeded', 'failed', 'cancelled', 'unknown']);
+    assert.ok(rows.every((row) => row.querySelector('[data-history-outcome]')?.getAttribute('aria-label')));
+    rows[3].dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    assert.equal(calls.select[0].id, 'outcome-3');
+    target.querySelector('[data-journal-dismiss="outcome-3"]').click();
+    assert.equal(calls.dismiss[0].id, 'outcome-3');
+    assert.equal(calls.select.length, 1, 'dismissal does not select the entry');
+  });
+
   it('renders Browse and Detail as two zones with independently paged Active and Finished lists', async () => {
     const active = makeCraftingRun();
     const finished = makeSucceededRun();
@@ -190,8 +214,8 @@ describe('JournalView mounted behavior', () => {
     const finishedList = target.querySelector('[data-journal-list="finished"]');
     assert.ok(activeList.querySelector('[data-journal-list-scroll]'));
     assert.ok(finishedList.querySelector('[data-journal-list-scroll]'));
-    assert.ok(!activeList.querySelector('[data-journal-list-scroll]').contains(activeList.querySelector('[data-pagination]')));
-    assert.ok(!finishedList.querySelector('[data-journal-list-scroll]').contains(finishedList.querySelector('[data-pagination]')));
+    assert.ok(!activeList.querySelector('[data-journal-list-scroll]').contains(activeList.querySelector('.manager-pagination')));
+    assert.ok(!finishedList.querySelector('[data-journal-list-scroll]').contains(finishedList.querySelector('.manager-pagination')));
     assert.equal(target.querySelectorAll('.journal-list-footer .manager-pagination').length, 2);
     assert.ok(target.querySelector('[data-journal-list="active"] [data-pagination-page]'));
     assert.ok(target.querySelector('[data-journal-list="finished"] [data-pagination-page]'));
@@ -200,6 +224,23 @@ describe('JournalView mounted behavior', () => {
     assert.equal(target.querySelectorAll('[data-journal-summary-card]').length, 2);
     assert.ok(!target.querySelector('.journal-view-column-right'));
     assert.ok(!target.querySelector('[data-journal-card="recent"]'));
+  });
+
+  it('gives unknown, recovery and unsettled Finished outcomes localized non-success labels', async () => {
+    const runs = [
+      { derivedStatus: 'unrecognized', status: 'unrecognized' },
+      { recoveryEvidence: { required: true } },
+      { recoveryEvidence: { status: 'planned' } },
+    ].map((fields, index) => makeSucceededRun({ ...fields, id: `uncertain-${index}`, key: `uncertain-${index}` }));
+    const { store } = makeJournal({ historyPageItems: runs, historyCount: runs.length });
+    const target = await harness.mount({ services: makeServices(store) });
+    await settle();
+    const outcomes = [...target.querySelectorAll('[data-history-outcome]')];
+    assert.deepEqual(outcomes.map((node) => node.dataset.historyOutcome), ['unknown', 'recovery', 'inProgress']);
+    assert.ok(outcomes.every((node) => !node.classList.contains('is-success')));
+    assert.match(outcomes[0].getAttribute('aria-label'), /unknown/i);
+    assert.match(outcomes[1].getAttribute('aria-label'), /Recovery/i);
+    assert.match(outcomes[2].getAttribute('aria-label'), /progress/i);
   });
 
   it('operates search, kind, status, and both independent sort controls', async () => {
@@ -514,10 +555,11 @@ describe('JournalView mounted behavior', () => {
       status: 'succeeded',
       finishedAt: 100,
       environmentId: 'env-1',
+      createdResults: [{ componentId: 'herb', name: 'Moon herb', quantity: 2 }],
       gatheringYield: {
         mode: 'd100',
-        entries: [{ id: 'herb', name: 'Moon herb', qty: 2, chance: 41 }],
-        roll: 40,
+        entries: [{ id: 'herb', name: 'Moon herb', qty: 2, chance: 41, cleared: true }],
+        roll: 80,
         tiers: [],
       },
     });

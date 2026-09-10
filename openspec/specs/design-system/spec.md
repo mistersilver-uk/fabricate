@@ -32,6 +32,18 @@ Where a primitive ships and its props differ from its specimen, the specimen is 
 
 ## Requirements
 
+### Requirement: Dense result rows and compact rail pagination retain their meaning
+
+The dense ListRow form MUST render a 22px Medallion, a 12px semibold sans name and an inline caller-formatted quantity, with space-2/space-3 padding, space-2 gap and 9px radius.
+The caller owns entitlement, localization and actual-versus-preview meaning; a missing quantity MUST NOT be coerced to an award.
+The supported read-only API is `name`, `art`, `icon`, `tint`, `quantity`, `detail`, `tone`, `muted` and the optional `trailing` snippet.
+The broader browse, selection, loading and error forms remain targets in the library.
+HistoricalRunDetail and StageCard are the initial independent result-row callers.
+
+Pagination's opt-in `compact` presentation MUST keep the range, arrows and page-size control in one row while retaining accessible page-position and page-size labels.
+The default presentation and arithmetic MUST remain unchanged for callers that do not opt in.
+Compact controls MUST retain at least 24px hit areas, and both landmarks MUST retain their caller-supplied names.
+
 ### Requirement: The primitive set is a closed, versioned vocabulary
 
 The shared primitive set MUST be the set `openspec/specs/design-system/library.html` enumerates, one member per `div.spec-head > h4` heading, and a surface MUST reach for a member of it before writing a new component.

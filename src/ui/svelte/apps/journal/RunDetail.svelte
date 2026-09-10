@@ -8,6 +8,8 @@
   import Chip from '../../components/Chip.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
   import Medallion from '../../components/Medallion.svelte';
+  import ListRow from '../../components/ListRow.svelte';
+  import Kicker from '../../components/Kicker.svelte';
   import ManagerButton from '../../components/ManagerButton.svelte';
   import Notice from '../../components/Notice.svelte';
   import OutcomeLadder from '../../components/OutcomeLadder.svelte';
@@ -22,7 +24,7 @@
   import TimeRemainingBox from './TimeRemainingBox.svelte';
   import HistoricalRunDetail from './HistoricalRunDetail.svelte';
   import ThisRun from './ThisRun.svelte';
-  import { presentStage, materialText } from './historyPresentation.js';
+  import { presentStage } from './historyPresentation.js';
 
   let { run = null, journal = null, now = 0, services = null } = $props();
 
@@ -78,8 +80,10 @@
   let personalizedYieldEntries = $state(null);
   let yieldPreviewLoading = $state(false);
   let yieldPreviewError = $state(false);
-  const displayedYieldEntries = $derived(personalizedYieldEntries ?? yieldEntries);
-  const outcomeTiers = $derived(Array.isArray(gatheringYield?.tiers) ? gatheringYield.tiers : []);
+  const displayedYieldEntries = $derived(
+    (personalizedYieldEntries ?? yieldEntries).map((item) => ({ ...item, name: previewName(item) }))
+  );
+  const outcomeTiers = $derived(previewTiers(gatheringYield?.tiers));
   const resolutionModeLabel = $derived(
     gatheringYield?.mode
       ? localize(`FABRICATE.App.Journal.Mode.${gatheringYield.mode}`)
@@ -232,7 +236,9 @@
           id: `requirement-${index}`,
           icon: 'fas fa-box',
           label: localize('FABRICATE.App.Journal.Stage.Requirements'),
-          value: materialText(requirement, localize),
+          name: requirement.name || localize('FABRICATE.App.Journal.History.UnknownMaterial'),
+          img: requirement.img,
+          quantityText: quantityText(requirement.quantity),
         });
       }
     }
@@ -240,7 +246,7 @@
       if (viewedIndex > currentIndex && group.options?.length > 1) {
         facts.push({
           id: `choice-${index}`,
-          value: localize('FABRICATE.App.Journal.History.FutureChoice', {
+          name: localize('FABRICATE.App.Journal.History.FutureChoice', {
             count: group.options.length,
           }),
         });
@@ -261,7 +267,9 @@
         id: `requirement-${group?.id ?? index}`,
         icon: 'fas fa-box',
         label: group?.name ?? localize('FABRICATE.App.Journal.Stage.Requirement', { n: index + 1 }),
-        value: `${name} ${localize('FABRICATE.App.Journal.Quantity', { n: quantity })}`,
+        name,
+        img: option?.img,
+        quantityText: quantityText(quantity),
       });
     }
     return facts;
@@ -317,7 +325,8 @@
     const produced = !past
       ? (craftingYield?.entries ?? []).map((item) => ({
           ...item,
-          label: materialText({ ...item, quantity: item.qty }, localize),
+          name: previewName(item),
+          quantityText: quantityText(item.qty),
         }))
       : viewedEvidence.produced;
     const io =
@@ -337,12 +346,33 @@
       io.unshift({
         kind: 'consumed',
         label: text(past ? 'Consumed' : 'WillConsume'),
-        items: past
-          ? viewedEvidence.consumed
-          : stageRequirementFacts(viewedStage).map((fact) => ({ ...fact, label: fact.value })),
+        items: past ? viewedEvidence.consumed : stageRequirementFacts(viewedStage),
         emptyText: text('NotRecorded'),
       });
     return io;
+  }
+
+  function quantityText(quantity) {
+    return quantity != null && Number.isFinite(Number(quantity))
+      ? localize('FABRICATE.App.Journal.Quantity', { n: quantity })
+      : localize('FABRICATE.App.Journal.History.NotRecorded');
+  }
+
+  function previewName(item) {
+    return typeof item?.name === 'string' && item.name.trim()
+      ? item.name
+      : localize('FABRICATE.App.Journal.History.UnknownMaterial');
+  }
+
+  function previewTiers(tiers) {
+    return (Array.isArray(tiers) ? tiers : []).map((tier) => ({
+      ...tier,
+      yields: (tier.yields ?? []).map((item) => ({
+        ...item,
+        name: previewName(item),
+        quantity: item.quantity ?? localize('FABRICATE.App.Journal.History.NotRecorded'),
+      })),
+    }));
   }
 
   function personalizedChance(drop) {
@@ -454,9 +484,10 @@
             danger={effect.phase === 'applying'}
           />
           {#each effect.receipt?.items ?? [] as item, index (index)}
-            <JournalFactRow
-              label={item.name || localize('FABRICATE.App.Journal.Yields.Item')}
-              value={localize('FABRICATE.App.Journal.Quantity', { n: item.quantity })}
+            <ListRow
+              art={item.img ?? ''}
+              name={item.name || localize('FABRICATE.App.Journal.History.UnknownMaterial')}
+              quantity={quantityText(item.quantity)}
             />
           {/each}
           {#each effect.receipt?.currencies ?? [] as spend, index (index)}
@@ -665,7 +696,7 @@
             localize('FABRICATE.App.Journal.Yields.Awarded', { chance: entry.chance }),
           missed: (entry) =>
             localize('FABRICATE.App.Journal.Yields.Missed', { chance: entry.chance }),
-          quantity: (entry) => localize('FABRICATE.App.Journal.Quantity', { n: entry.qty }),
+          quantity: (entry) => quantityText(entry.qty),
           chance: (entry) => `${entry.chance}%`,
           cut: (roll) => String(roll),
         }}
@@ -677,7 +708,7 @@
         <div data-journal-crafting-yield={craftingYield.presentation}>
           {#if craftingYield.presentation === 'tiers'}
             <OutcomeLadder
-              tiers={craftingYield.tiers ?? []}
+              tiers={previewTiers(craftingYield.tiers)}
               emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
               label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
               hint={localize('FABRICATE.App.Journal.Yields.CraftingPreviewHint')}
@@ -693,9 +724,11 @@
                 )}
               />
               {#each craftingYield.progressive?.stages ?? [] as entry, index (index)}
-                <JournalFactRow
-                  label={`${index + 1}. ${entry.name}`}
-                  value={entry.cost == null
+                <ListRow
+                  name={`${index + 1}. ${previewName(entry)}`}
+                  art={entry.art ?? ''}
+                  quantity={entry.quantity ?? localize('FABRICATE.App.Journal.History.NotRecorded')}
+                  detail={entry.cost == null
                     ? localize('FABRICATE.App.Journal.Yields.UnknownCost')
                     : localize('FABRICATE.App.Journal.Yields.BudgetCost', {
                         quantity: entry.quantity,
@@ -707,12 +740,16 @@
           {:else if craftingYield.presentation === 'routes'}
             <p>{localize('FABRICATE.App.Journal.History.FutureRoutes')}</p>
             {#each craftingYield.routes ?? [] as route, index (index)}
-              <JournalFactRow
-                label={route.name || localize('FABRICATE.App.Journal.Stage.Route')}
-                value={route.entries
-                  .map((entry) => materialText({ ...entry, quantity: entry.qty }, localize))
-                  .join(' · ') || localize('FABRICATE.App.Journal.History.NotRecorded')}
-              />
+              <section class="fab-stack" data-gap="1">
+                <Kicker>{route.name || localize('FABRICATE.App.Journal.Stage.Route')}</Kicker>
+                {#each route.entries ?? [] as entry, itemIndex (entry.id ?? itemIndex)}
+                  <ListRow
+                    name={previewName(entry)}
+                    art={entry.art ?? ''}
+                    quantity={quantityText(entry.qty)}
+                  />
+                {:else}<p>{localize('FABRICATE.App.Journal.History.NotRecorded')}</p>{/each}
+              </section>
             {/each}
           {/if}
         </div>

@@ -302,7 +302,8 @@ export function isExemptSpacingPixels(pixels) {
 // than relocated. Measured on the tree, not subtracted.
 // Issue 1648 banks 18 removed Journal literals. The new run primitives derive their specific
 // 3px pip gap and 48px stage indent from the published scale without changing library geometry.
-export const KNOWN_RAW_SPACING_TOTAL = 813;
+// Its compact correction retires HistoryRow's badge padding and status-chip gap: two more literals.
+export const KNOWN_RAW_SPACING_TOTAL = 811;
 
 /**
  * The per-corpus spacing-declaration counts the floors were CHOSEN AGAINST, at the commit that

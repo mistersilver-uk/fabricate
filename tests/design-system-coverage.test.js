@@ -274,7 +274,7 @@ test('every manifest library name resolves to a library entry', () => {
  */
 const SPECIFIED_ONLY = [
   'AppRail', 'AppTitleBar', 'BandedBar', 'BrowseCard', 'ChoiceGroup',
-  'DataTable', 'InfoStrip', 'ListRow', 'LogList', 'Menu',
+  'DataTable', 'InfoStrip', 'LogList', 'Menu',
   'Meter', 'NavSidebar', 'PageHeader', 'PickerRow', 'Rail',
   'RequirementChooser', 'RuleRow', 'RuleSentence', 'Search', 'SetPicker',
   'SortableList', 'StageBars', 'TierTrack', 'ValidationList', 'ValidationSummary',

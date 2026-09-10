@@ -246,6 +246,7 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/components/InspectorCard.svelte',
     'src/ui/svelte/components/StageNav.svelte',
     'src/ui/svelte/components/StageCard.svelte',
+    'src/ui/svelte/components/ListRow.svelte',
     'src/ui/svelte/components/YieldScale.svelte',
     'src/ui/svelte/components/OutcomeLadder.svelte',
     'src/ui/svelte/components/WorldClockChip.svelte',

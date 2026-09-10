@@ -1,10 +1,7 @@
 // Shared, pure tone+icon+label vocabulary for the player-facing Journal run
-// status badge. Mirrors the structure of `gatheringBlockedReasons.js`: a frozen
-// presentation map keyed by `RunModel.derivedStatus`, consumed by the four journal
-// rows that draw that badge — `HistoryRow`, `RecentResults`, `RunCard` and
-// `RunDetail` — each of which renders the shared `Chip` at `density="list"` and
-// routes this tone through `util/statusChipTone.js`, so the reading stays a dumb
-// projection and the paint stays the primitive's (issue 1506).
+// status presentation. The frozen map supplies the active/detail chips and
+// HistoryRow's labeled outcome glyph. HistoryRow explicitly requests unknown,
+// recovery or inProgress for incomplete evidence rather than assuming success.
 //
 // Tones reuse the existing status palette (no new `--fab-*` tokens) and the
 // RuntimeStatePill vocabulary: paused=neutral+pause; waiting=warning+hourglass; ready=success+play;
@@ -21,6 +18,16 @@
 
 /** @type {Readonly<Record<string, RunStatusPresentation>>} */
 const STATUS_PRESENTATION = Object.freeze({
+  unknown: {
+    tone: 'neutral',
+    icon: 'fa-circle-question',
+    labelKey: 'FABRICATE.App.Journal.Status.unknown',
+  },
+  recovery: {
+    tone: 'warning',
+    icon: 'fa-triangle-exclamation',
+    labelKey: 'FABRICATE.App.Journal.Notice.RecoveryTitle',
+  },
   paused: {
     tone: 'neutral',
     icon: 'fa-pause',

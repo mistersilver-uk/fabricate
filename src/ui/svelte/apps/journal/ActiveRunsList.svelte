@@ -58,6 +58,7 @@
       {pageIndex}
       {pageSizeOptions}
       persistent
+      compact
       label={localize('FABRICATE.App.Journal.ActiveRuns.Title')}
       navLabel={localize('FABRICATE.App.Journal.ActiveRuns.Title')}
       onPageChange={(index) => onPageChange?.(index)}
@@ -74,11 +75,5 @@
   }
   .journal-run-list > div {
     min-width: 0;
-  }
-  :global(.journal-list-section .manager-pagination) {
-    gap: var(--fab-space-2);
-    padding: var(--fab-space-2) 0 0;
-    border-top: 1px solid var(--fab-border);
-    background: transparent;
   }
 </style>

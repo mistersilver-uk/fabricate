@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import Chip from './Chip.svelte';
+  import ListRow from './ListRow.svelte';
 
   let { tiers = [], emptyTierText = '', label = '', hint = '' } = $props();
 </script>
@@ -27,10 +28,13 @@
         </header>
         <div class="fab-outcome-yields">
           {#each tier.yields ?? [] as item, itemIndex (item.id || `${item.name}-${itemIndex}`)}
-            <Chip density="list" icon={item.icon || ''} tint={item.tint || ''} tone="neutral">
-              {item.name}{#if item.quantity}<span class="fab-outcome-quantity">{item.quantity}</span
-                >{/if}
-            </Chip>
+            <ListRow
+              name={item.name}
+              art={item.art ?? item.img ?? ''}
+              icon={item.icon || 'fas fa-box'}
+              tint={item.tint || ''}
+              quantity={item.quantity}
+            />
           {:else}
             <span class="fab-outcome-empty" data-outcome-empty
               >{tier.emptyText || emptyTierText}</span
@@ -104,17 +108,8 @@
   }
 
   .fab-outcome-yields {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
     gap: var(--fab-space-1);
     padding: var(--fab-space-2);
-  }
-
-  .fab-outcome-quantity {
-    margin-left: var(--fab-space-chip);
-    color: var(--fab-text-subtle);
-    font-family: var(--fab-font-mono);
-    font-size: 10px;
-    font-variant-numeric: tabular-nums;
   }
 </style>

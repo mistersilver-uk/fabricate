@@ -315,8 +315,6 @@
   "src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte | gap | 6 | 2",
   "src/ui/svelte/apps/inventory/detail/salvage/SalvageToolRequirements.svelte | gap | 8 | 1",
   "src/ui/svelte/apps/journal/AboutThisRun.svelte | gap | 2 | 1",
-  "src/ui/svelte/apps/journal/HistoryRow.svelte | gap | 6 | 1",
-  "src/ui/svelte/apps/journal/HistoryRow.svelte | padding | 8 | 1",
   "src/ui/svelte/apps/journal/JournalFactRow.svelte | gap | 8 | 1",
   "src/ui/svelte/apps/journal/JournalFactRow.svelte | padding | 4 | 1",
   "src/ui/svelte/apps/journal/JournalListShell.svelte | gap | 6 | 1",

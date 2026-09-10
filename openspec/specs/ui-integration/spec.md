@@ -4873,8 +4873,11 @@ Scope:
 ### Run Monitoring
 
 - The view resolves the selected actor through the shared Actor selection top bar and shows a no-actor empty state when none is selected.
-- Active runs and history are shown across all three run types (crafting, gathering, salvage) in one unified surface; each row presents the run's title, run type, status pill, crafting progress, and a time-remaining/countdown where a `timeGate` exists.
-- Each run's status pill reflects the projection's `derivedStatus` (`paused` | `waiting` | `ready` | `inProgress` | `succeeded` | `failed` | `cancelled`), with pause taking precedence over time-gate readiness (see `data-models/spec.md`).
+- Active runs and history are shown across all three run types (crafting, gathering, salvage) in one unified surface.
+Active rows retain title, run type, status pill, crafting progress and a time-remaining/countdown where a `timeGate` exists.
+- Active status pills reflect the projection's `derivedStatus`, with pause taking precedence over time-gate readiness (see `data-models/spec.md`).
+Finished rows MUST show a labeled right-side outcome icon instead of an aggregate result quantity or below-title status chip.
+Succeeded, failed and cancelled remain distinct; absent or unrecognized terminal status shows localized Outcome unknown, and settlement or recovery evidence takes precedence over a terminal success face.
 - The layout has a browse zone and a selected-detail zone.
 Active and Finished lists scroll independently, with their sort controls and pagers outside the scrolling bodies; the detail scrolls independently.
 At content widths at or below 960px, stack Active, Finished and detail while preserving access to every control.
@@ -4883,6 +4886,8 @@ The stacked layout MUST remain usable at the real 1024px minimum application-win
 Active status filters are mutually exclusive All, Ready, Waiting and Paused.
 Status counts use the selected kind cohort before search, active-status filtering, paging or selection.
 - Each list defaults to four rows per page and retains existing page-size and sorting choices.
+Both pagers MUST use the shared compact single-row presentation with independently named region and navigation landmarks, accessible page-size choice and at least 24px interactive targets.
+At the populated wide layout, all four default Finished entries MUST fit visibly in their pane.
 Filtering and removal clamp its page independently.
 Selection is keyed by actor UUID, run type and run ID and remains selected when its row leaves the visible page or filter; fallback occurs only after actual removal or dismissal.
 - Selected detail follows identity/actions, notices, verdict, progress/stage navigation, stage requirements, yields and record facts.
@@ -4894,6 +4899,8 @@ Finished is the Journal's sole history browser, including full pagination; there
 - Current-stage choices and shared essence allocation remain editable only when the run permits them.
 Browsing past or future stages never changes the executable stage and exposes no editable controls.
 Historical authored requirements, actual spending, actual rolls and actual awards remain distinct evidence.
+Journal result items MUST use the dense ListRow image/name/quantity form for current previews, browsed past and future stages, historical receipts, outcome tiers and rarity scales.
+Only entitled projected names and images are displayed; unknown quantities remain Not recorded, and preview headings never imply inventory awards.
 - Dismissal hides only a terminal record for the current user, persisted by actor UUID, run type and run ID.
 It does not delete actor history, and another user retains independent visibility.
 The same user's clients refresh on the first setting creation as well as later setting updates.

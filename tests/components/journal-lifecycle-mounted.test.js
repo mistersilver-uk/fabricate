@@ -67,6 +67,7 @@ const harness = createMountedComponentHarness({
     component('RunProgress'),
     component('StageNav'),
     component('StageCard'),
+    component('ListRow'),
     component('YieldScale'),
     component('OutcomeLadder'),
     'src/ui/svelte/apps/journal/JournalCard.svelte',

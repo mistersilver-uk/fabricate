@@ -171,6 +171,8 @@
     // that make two bars tell apart are composed from the caller's own roster title.
     label = '',
     navLabel = '',
+    // Compact browse rails keep one row; the full page sentence remains accessible.
+    compact = false,
   } = $props();
 
   const totalPages = $derived(Math.max(1, Math.ceil(totalCount / Math.max(1, pageSize))));
@@ -235,6 +237,8 @@
 {#if showPagination}
   <section
     class="fabricate-pagination manager-pagination"
+    class:is-compact={compact}
+    data-pagination-compact={compact || undefined}
     aria-label={label || text('FABRICATE.Admin.Manager.Pagination.Label', 'Pagination')}
   >
     <span class="manager-pagination-summary" data-pagination-summary>
@@ -257,7 +261,11 @@
         >
           <i class="fas fa-chevron-left" aria-hidden="true"></i>
         </IconButton>
-        <span class="manager-pagination-page" data-pagination-page>
+        <span
+          class="manager-pagination-page"
+          class:manager-pagination-hidden={compact}
+          data-pagination-page
+        >
           {text('FABRICATE.Admin.Manager.Pagination.PageOf', 'Page {page} of {total}')
             .replace('{page}', pageIndex + 1)
             .replace('{total}', totalPages)}
@@ -288,7 +296,9 @@
            it is what the five player pagers' and the journal's own per-site trigger fills hang
            off, and what the manager's 64px floor is stated through. -->
       <span class="manager-pagination-size">
-        <span id={captionId}>{text('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span>
+        <span id={captionId} class:manager-pagination-hidden={compact}
+          >{text('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span
+        >
         <Select
           size="inline"
           showTick={false}

@@ -5931,6 +5931,104 @@
   min-width: 64px;
 }
 
+/* Compact rails opt in; the default browse pager keeps its full three-part layout. */
+.fabricate-pagination.manager-pagination.is-compact {
+  flex-wrap: nowrap;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) 0 0;
+  background: transparent;
+  font-size: 9.5px;
+}
+
+.fabricate-pagination.is-compact .manager-pagination-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fabricate-pagination.is-compact .manager-pagination-nav,
+.fabricate-pagination.is-compact .manager-pagination-size {
+  flex: 0 0 auto;
+}
+
+.fabricate-pagination.manager-pagination.is-compact .manager-icon-button {
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  flex: 0 0 26px;
+  font-size: 10px;
+}
+
+.fabricate-pagination.is-compact .manager-pagination-size [data-pagination-size] {
+  min-width: 48px;
+  min-height: 26px;
+  height: 26px;
+  padding: 0 var(--fab-space-2);
+  font-size: 10.5px;
+}
+
+.fabricate-pagination .manager-pagination-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-width: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ListRow dense: the library's inline image / name / quantity form.
+   skin census (issue 1523): not a field-skin adopter; this read-only result row
+   takes its geometry from the ListRow dense specimen (issue 1648). */
+.fabricate-list-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--fab-space-2);
+  padding: var(--fab-space-2) var(--fab-space-3);
+  border: 1px solid var(--fab-border);
+  border-radius: 9px;
+  background: var(--fab-bg-1);
+  color: var(--fab-text-subtle);
+  font-size: 10.5px;
+}
+
+.fabricate-list-row .fabricate-list-row-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--fab-text);
+  font-family: var(--font-primary, sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.fabricate-list-row .fabricate-list-row-quantity {
+  flex: 0 0 auto;
+  font-family: var(--fab-font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.fabricate-list-row .fabricate-list-row-detail {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fabricate-list-row.is-positive {
+  border-color: var(--fab-success-border);
+  background: var(--fab-success-soft);
+}
+
+.fabricate-list-row.is-muted {
+  border-style: dashed;
+}
+
+.fabricate-list-row.is-muted .fabricate-list-row-name {
+  color: var(--fab-text-subtle);
+}
+
 .fabricate-manager .manager-table-scroll {
   min-height: 0;
   min-width: 0;

@@ -1,6 +1,14 @@
 {
   "designSystemPrimitives": [
     {
+      "path": "src/ui/svelte/components/ListRow.svelte",
+      "library": "<ListRow>",
+      "status": "target",
+      "evidence": "broad",
+      "scope": "shared",
+      "why": "Issue 1648 implements the dense read-only image/name/quantity form for HistoricalRunDetail and StageCard, with OutcomeLadder and YieldScale adopting the same row. Medallion supplies the 22px art. The broader browse, selection, loading and error forms remain targets; the supported display API is recorded in the library. Rendered acceptance remains pending."
+    },
+    {
       "path": "src/ui/svelte/components/EssencePool.svelte",
       "library": "<EssencePool>",
       "status": "target",

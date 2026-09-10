@@ -17,6 +17,9 @@ function materials(items, localize) {
     ...item,
     id: JSON.stringify([item.actorUuid, item.itemUuid ?? item.componentId, index]),
     name: named(item.name) ? item.name : localize(`${prefix}UnknownMaterial`),
+    quantityText: finite(item.quantity)
+      ? localize('FABRICATE.App.Journal.Quantity', { n: item.quantity })
+      : localize(`${prefix}NotRecorded`),
     label: materialText(item, localize),
   }));
 }

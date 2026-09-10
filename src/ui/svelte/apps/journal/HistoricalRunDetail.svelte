@@ -1,7 +1,7 @@
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Callout from '../manager/Callout.svelte';
-  import Chip from '../../components/Chip.svelte';
+  import ListRow from '../../components/ListRow.svelte';
   import Kicker from '../../components/Kicker.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
   import Notice from '../../components/Notice.svelte';
@@ -47,7 +47,6 @@
         kind: 'produced',
         label: text('Produced'),
         items: stage.produced,
-        tone: 'positive',
         emptyText: text(stage.createdResultsRecorded ? 'NothingBanked' : 'NotRecorded'),
       },
     ];
@@ -58,9 +57,12 @@
   {#if entries.length}
     <section class="journal-history-items" data-history-items={kind}>
       <Kicker>{label}</Kicker>
-      <div class="journal-history-chips">
-        {#each entries as item (item.id)}<Chip tone="neutral" icon="fas fa-box">{item.label}</Chip
-          >{/each}
+      <div class="journal-history-results">
+        {#each entries as item (item.id)}<ListRow
+            name={item.name}
+            art={item.img ?? ''}
+            quantity={item.quantityText}
+          />{/each}
       </div>
     </section>
   {/if}
@@ -212,9 +214,8 @@
     display: grid;
     gap: var(--fab-space-2);
   }
-  .journal-history-chips {
-    display: flex;
-    flex-wrap: wrap;
+  .journal-history-results {
+    display: grid;
     gap: var(--fab-space-1);
   }
 </style>

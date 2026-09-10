@@ -1257,13 +1257,13 @@ a{color:var(--fab-accent)}
           <div class="k-row sel"><div class="k-ic s38" style="color:var(--fab-tag-peach)"><svg class="i"><use href="#i-book"/></svg></div><div class="grow"><div style="display:flex;gap:8px;align-items:center"><span class="k-name">Riverbridge</span><span class="k-badge success">Reopened Mine</span><span class="k-badge">L 2</span></div><div class="k-meta"><span><svg class="i"><use href="#i-grid"/></svg>Frontier Mining Town</span><span><svg class="i"><use href="#i-leaf"/></svg>Ironvale</span><span><svg class="i"><use href="#i-star"/></svg>3 businesses</span></div></div><button class="k-status on"><svg class="i"><use href="#i-check"/></svg>Enabled</button><button class="k-btn icon"><svg class="i"><use href="#i-dots"/></svg></button></div>
           <div class="k-row"><div class="k-ic s38" style="color:var(--fab-tag-sage)"><svg class="i"><use href="#i-leaf"/></svg></div><div class="grow"><div style="display:flex;gap:8px;align-items:center"><span class="k-name">Oakhollow</span><span class="k-badge">L 1</span></div><div class="k-meta"><span><svg class="i"><use href="#i-grid"/></svg>Farming Hamlet</span><span><svg class="i"><use href="#i-leaf"/></svg>Greenmarch</span></div></div><button class="k-status">Disabled</button><button class="k-btn icon"><svg class="i"><use href="#i-dots"/></svg></button></div>
         </div></div>
-      <div class="unit"><span class="cap">dense &mdash; the cross-reference form</span>
+      <div class="unit"><span class="cap">dense &mdash; the cross-reference and result form</span>
         <div style="display:grid;gap:5px;max-width:420px">
           <span class="k-kicker">Appears in</span>
           <div class="k-row dense"><div class="k-ic s22" style="color:var(--fab-tag-mist)"><svg class="i"><use href="#i-hammer"/></svg></div><span class="k-name grow">Karrun Warblade</span><span class="k-count">&times;2</span></div>
           <div class="k-row dense"><div class="k-ic s22" style="color:var(--fab-tag-mist)"><svg class="i"><use href="#i-hammer"/></svg></div><span class="k-name grow">Ironvale Plate</span><span class="k-count">&times;4</span></div>
         </div>
-        <span class="k-hint">Five prototypes render this at a 32px chip and 12px sans. Adopting the full ListRow as written would have upsized every one.</span></div>
+        <span class="k-hint">The dense form uses a 22px Medallion, 12px semibold sans name, inline quantity, space-2/space-3 padding, space-2 gap and 9px radius. Journal results adopt this form under issue 1648 instead of the prototype's result chips.</span></div>
       <div class="unit"><span class="cap">card grid &mdash; same row model, one track</span>
         <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px"><div class="k-seg"><button class="sel"><svg class="i" style="width:11px;height:11px"><use href="#i-list"/></svg></button><button><svg class="i" style="width:11px;height:11px"><use href="#i-grid"/></svg></button></div><span class="k-hint">the switcher&rsquo;s source is literally identical across six files</span></div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:10px">
@@ -1272,6 +1272,9 @@ a{color:var(--fab-accent)}
         </div>
         <span class="k-hint">The grid had already drifted to four track widths across the corpus &mdash; 190, 210, 212, 216. One track, settled here.</span></div>
     </div>
+
+  <div class="notes"><div><h5>ListRow Svelte API</h5><p class="k-hint">Issue 1648 implements the dense read-only form in <code>ListRow.svelte</code>, first consumed independently by <code>HistoricalRunDetail.svelte</code> and <code>StageCard.svelte</code>. <code>name</code>, <code>art</code>, <code>tint</code> and <code>detail</code> default to empty strings; <code>icon</code> defaults to <code>fas fa-box</code>. <code>quantity</code> is a caller-formatted string or number; null hides it and zero remains visible. <code>tone</code> accepts neutral (default) or positive; <code>muted</code> defaults false and draws a dashed edge with subdued name. Optional <code>trailing</code> supplies inline contextual evidence such as a chance chip. No lookup or quantity inference occurs here. The default browse, selection, loading and error forms above remain unimplemented, so ListRow stays target.</p></div></div>
+
   </div>
 
   <div class="spec" data-status="target" data-status-SelectionBar="target" data-status-BulkEditPanel="target">
@@ -1467,6 +1470,7 @@ a{color:var(--fab-accent)}
   </div>
 
   <div class="spec" data-status="target" data-status-Pagination="target" data-status-FilterBar="target">
+    <p class="k-hint">Issue 1648 adds <code>compact=false</code>: opt in for a single rail row with a 9.5px range, 26px arrow and page-size controls, visually hidden page-position and Per page captions that retain their accessible names. <code>label</code> and <code>navLabel</code> name the independent landmarks. Default callers retain the full presentation and all modes retain the same arithmetic.</p>
     <div class="spec-head"><h4>&lt;Pagination&gt; &lt;FilterBar&gt;</h4><span class="st st-target">Pagination &middot; target</span><span class="st st-target">FilterBar &middot; target</span></div>
     <div class="stage col">
       <div class="unit" style="width:100%"><span class="cap">pagination &mdash; count left, pager centred, size right</span>
@@ -2118,7 +2122,7 @@ a{color:var(--fab-accent)}
         <li><b>stage.status</b> when supplied owns the completion marker independently of browse position; failed or unexecuted stages never acquire a success checkmark from <code>state="past"</code>.</li>
         <li><b>showHeading</b> boolean = true — a single-stage surface may suppress the redundant numeral/name header while retaining the stage body</li>
         <li><b>showNumber</b> boolean = true — a single stage retains its captured purpose heading while omitting the redundant numbered marker.</li>
-        <li><b>io</b> {kind, label, items, emptyText, tone}[] — paired inert input/output chip groups, before facts and the current-only body. Current shows Produces only; past shows Consumed/Produced; future shows Will consume/Will produce. The groups use the 48px name indent and a 12px gap.</li>
+        <li><b>io</b> {kind, label, items, emptyText}[] - paired inert input/output groups of dense ListRow, before facts and the current-only body. Items carry name, img/art, icon, tint and caller-formatted quantityText; a label-only item remains readable. Current shows Produces only; past shows Consumed/Produced; future shows Will consume/Will produce. The groups use the 48px name indent and a 12px gap.</li>
         <li><b>presentation</b> active | history, default active — history has the filled radius-9 recap, never current controls or a browse-state dashed shell. A failed recap takes the danger edge. Every attempted stage renders together; unattempted stages have no recap.</li>
         <li><b>note</b> optional inert looking-back/ahead sentence beneath the facts, in 10.5px subtle ink.</li>
         <li><b>output()</b> optional preview snippet at the same summary indent, above the live control separator, for routed or progressive output compositions that need more than entry chips.</li>
@@ -2129,6 +2133,7 @@ a{color:var(--fab-accent)}
     <div class="delta warn"><b>Candidate implementation.</b> Issue 1648 task 6 now supplies all three components and mounted current/view separation, but their entries remain <b>target</b> until the coordinated Journal consumer and current/past/future frames are registered and reviewed.</div>
   </div>
 <div class="spec" data-status="target" data-status-YieldScale="target" data-status-OutcomeLadder="target">
+    <p class="k-hint">Issue 1648 result-row override: both render dense ListRow with 22px Medallion, inline name and quantity. YieldScale adds the threshold/recorded outcome sentence and chance chip inline; its cut and ordering are unchanged. OutcomeLadder retains tier headings, bands and empty-tier text, and passes each result's art/img and caller-formatted quantity to the row. Neither turns previews into actual awards.</p>
     <p class="api"><code>YieldScale: entries=[{id,name,art?,icon?,tint?,qty?,chance,cleared?: boolean|null}], roll=null, labels={}, label='', hint=''</code>. An absent <code>cleared</code> retains the default low-roll comparison. Recorded history supplies each row's cleared/missed boolean, which governs row treatment and the single cut without changing the displayed raw roll; native gathering uses a high-roll threshold and may include a modifier. Explicit null means unrecorded outcome: render neutral evidence and omit a cut that cannot be established. Quantity labels receive actual awarded amounts or null, never authored amounts presented as awards. Existing label callbacks remain threshold, cleared, missed, quantity, chance, cut, topCutNote, bottomCutNote and cutNote. Issue #1648 extends the entry contract; rendered acceptance remains pending.</p>
     <div class="spec-head"><h4>&lt;YieldScale&gt; &lt;OutcomeLadder&gt;</h4><span class="st st-target">YieldScale &middot; target</span><span class="st st-target">OutcomeLadder &middot; target</span><p class="why">What a gathering run might bring back, and afterwards where the roll landed. A drop table is <b>one</b> roll read against an ordered scale, so it is stated in that order — commonest first — rather than as a list of independent chances.</p></div>
     <div class="stage col">

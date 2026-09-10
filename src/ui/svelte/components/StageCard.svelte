@@ -2,6 +2,7 @@
 <script>
   import Chip from './Chip.svelte';
   import Kicker from './Kicker.svelte';
+  import ListRow from './ListRow.svelte';
 
   let {
     stage = {},
@@ -68,9 +69,13 @@
           <Kicker>{group.label}</Kicker>
           <div class="fab-stage-card-items">
             {#each group.items ?? [] as item, index (item.id ?? index)}
-              <Chip tone={group.tone ?? 'neutral'} icon={item.icon ?? 'fas fa-box'}
-                >{item.label}</Chip
-              >
+              <ListRow
+                name={item.name ?? item.label ?? ''}
+                art={item.img ?? item.art ?? ''}
+                icon={item.icon ?? 'fas fa-box'}
+                tint={item.tint ?? ''}
+                quantity={item.quantityText ?? null}
+              />
             {:else}<span class="fab-stage-card-summary">{group.emptyText}</span>{/each}
           </div>
         </div>
@@ -123,8 +128,8 @@
     padding: 0 var(--fab-space-3) var(--fab-space-3) calc(var(--fab-space-6) * 2);
   }
   .fab-stage-card-items {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    width: 100%;
     gap: var(--fab-space-1);
   }
   .fab-stage-card-note {

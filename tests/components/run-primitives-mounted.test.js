@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
-import { createMountedComponentHarness } from '../helpers/svelte-component-harness.js';
+import { createMountedComponentHarness, SELECT_COMPILED_MODULES, SEARCHABLE_POPOVER_RAW_MODULES } from '../helpers/svelte-component-harness.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
@@ -40,9 +40,11 @@ const essenceHarness = createHarness('EssencePool', [
 ]);
 const progressHarness = createHarness('RunProgress', [component('FillBar')]);
 const stageNavHarness = createHarness('StageNav', [component('IconButton'), component('ManagerButton')]);
-const stageCardHarness = createHarness('StageCard', [component('Chip'), component('Kicker')]);
-const yieldHarness = createHarness('YieldScale', [component('Chip'), component('Medallion')]);
-const outcomeHarness = createHarness('OutcomeLadder', [component('Chip')]);
+const resultModules = ['ListRow', 'Medallion', 'Chip'].map(component);
+const stageCardHarness = createHarness('StageCard', [...resultModules, component('Kicker')]);
+const yieldHarness = createHarness('YieldScale', resultModules);
+const outcomeHarness = createHarness('OutcomeLadder', resultModules);
+const pagerHarness = createHarness('Pagination', [...SELECT_COMPILED_MODULES, component('IconButton')], SEARCHABLE_POPOVER_RAW_MODULES);
 const harnesses = [
   runActionHarness,
   worldClockHarness,
@@ -53,6 +55,7 @@ const harnesses = [
   stageCardHarness,
   yieldHarness,
   outcomeHarness,
+  pagerHarness,
 ];
 
 function flushRender() {
@@ -84,6 +87,23 @@ describe('run primitives mounted behavior', () => {
     for (const harness of harnesses) harness.remount();
     await flushRender();
     for (const harness of harnesses) harness.teardown();
+  });
+
+  it('keeps the default pager face and opts into compact without changing its named controls', async () => {
+    const props = { totalCount: 12, pageSize: 4, pageSizeOptions: [4, 6, 12], persistent: true,
+      label: 'Finished runs', navLabel: 'Finished pages' };
+    const target = await pagerHarness.mount(props);
+    assert.ok(!target.querySelector('[data-pagination-compact], .manager-pagination-hidden'));
+    const page = target.querySelector('[data-pagination-page]').textContent;
+    await pagerHarness.setProps({ ...props, compact: true });
+    assert.equal(target.querySelector('[data-pagination-page]').textContent, page);
+    assert.equal(target.querySelector('section').getAttribute('aria-label'), 'Finished runs');
+    assert.equal(target.querySelector('nav').getAttribute('aria-label'), 'Finished pages');
+    assert.equal(target.querySelector('[data-pagination-prev]').disabled, true);
+    assert.equal(target.querySelector('[data-pagination-next]').disabled, false);
+    const caption = target.querySelector('[data-pagination-size]').getAttribute('aria-labelledby');
+    assert.ok(target.querySelector(`[id="${caption}"]`)?.textContent.trim());
+    pagerHarness.remount();
   });
 
   it('acts on completion, busy primary, pause, and the in-bar cancellation decision', async () => {
@@ -435,6 +455,27 @@ describe('run primitives mounted behavior', () => {
     yieldHarness.remount();
   });
 
+  it('renders dense stage result identity, artwork, zero and unknown quantity without chip labels', async () => {
+    stageCardHarness.remount();
+    const name = 'A very long recorded component name with several words and an unbrokenSuffix'.repeat(2);
+    const target = await stageCardHarness.mount({
+      io: [{ kind: 'produced', label: 'Produced', items: [
+        { id: 'actual', name, img: 'icons/commodities/metal/ingot-stamped-steel.webp', quantityText: '×0' },
+        { id: 'unknown', name: 'Unknown material', quantityText: 'Not recorded' },
+      ] }],
+    });
+    const rows = [...target.querySelectorAll('[data-list-row="dense"]')];
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0].querySelector('.fabricate-list-row-name').textContent, name);
+    assert.equal(rows[0].querySelector('img').getAttribute('src'), 'icons/commodities/metal/ingot-stamped-steel.webp');
+    assert.equal(rows[0].querySelector('[data-medallion]').style.width, '22px');
+    assert.equal(rows[0].querySelector('.fabricate-list-row-quantity').textContent, '×0');
+    assert.ok(rows[1].querySelector('[data-medallion="glyph"]'));
+    assert.equal(rows[1].querySelector('.fabricate-list-row-quantity').textContent, 'Not recorded');
+    assert.ok(!target.querySelector('.manager-chip, button, input'));
+    stageCardHarness.remount();
+  });
+
   it('sorts the d100 scale commonest first and inserts exactly one roll cut', async () => {
     const entries = [
       { id: 'rare', name: 'Skyfall Shard', icon: 'fas fa-star', tint: 'lavender', qty: 1, chance: 5 },
@@ -459,7 +500,7 @@ describe('run primitives mounted behavior', () => {
     );
     assert.equal(target.querySelectorAll('[data-yield-cut]').length, 1);
     assert.equal(target.querySelectorAll('button').length, 0, 'the scale is read-only');
-    expectGeometry('YieldScale', '.fab-yield-row', [/border-radius:\s*9px/u, /background:\s*var\(--fab-bg-2\)/u]);
+    assert.equal(target.querySelectorAll('[data-yield-entry] [data-list-row="dense"]').length, 3);
     yieldHarness.remount();
 
     const top = await yieldHarness.mount({ entries, roll: 101, labels });
@@ -481,6 +522,8 @@ describe('run primitives mounted behavior', () => {
     assert.equal(target.querySelector('[data-outcome-tier].is-failure').textContent.includes('Barren'), true);
     assert.match(target.querySelector('[data-outcome-empty]').textContent, /trail goes cold/u);
     assert.equal(target.querySelectorAll('button, input, select').length, 0);
+    assert.equal(target.querySelectorAll('[data-list-row="dense"]').length, 1, 'empty tier never gains a result');
+    assert.equal(target.querySelector('.fabricate-list-row-quantity').textContent, '×4');
     expectGeometry('OutcomeLadder', '.fab-outcome-tier', [/border-radius:\s*9px/u, /background:\s*var\(--fab-bg-2\)/u]);
   });
 });
