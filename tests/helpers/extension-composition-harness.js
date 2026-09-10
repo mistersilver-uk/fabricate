@@ -7,13 +7,10 @@
  * second time is the exact near-identical block SonarCloud's new-code duplication gate counts
  * against `tests/**` just as it does against `src/`, so they live here once (issue 1198).
  *
- * THE TWO BOOTS ARE DELIBERATELY NOT UNIFIED. `withFabricateLifecycleReplay` runs middleware
- * mode with HMR disabled, a `/lang/en.json` fetch shim and a `CONFIG` stub, because it
- * evaluates `src/main.js` inside `buildLabWorld`'s Foundry host, which fetches during boot.
- * `captureCloseOrdering` runs middleware mode alone against hand-stubbed globals and no lab
- * world, because it evaluates one application module and must control every global that
- * module's class hierarchy reads. Collapsing them onto one option set would silently change
- * what the second runs under.
+ * The boots share an isolated middleware server, but retain distinct Foundry hosts.
+ * `withFabricateLifecycleReplay` supplies a `/lang/en.json` fetch shim and a `CONFIG` stub
+ * because it evaluates `src/main.js` inside `buildLabWorld`, which fetches during boot.
+ * `captureCloseOrdering` evaluates one application against hand-stubbed globals instead.
  */
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -24,6 +21,17 @@ import { createServer } from 'vite';
 import { viteDepCacheDir } from './vite-dep-cache-dir.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+async function startCompositionServer() {
+  const vite = await createServer({
+    root: repoRoot,
+    cacheDir: viteDepCacheDir(),
+    // Test processes own their cache; sequential boots retain warm prebundles.
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null },
+    appType: 'custom',
+  });
+  return { vite, close: () => vite.close() };
+}
 
 /**
  * Boot the real entry module inside `buildLabWorld`'s Foundry host and hand the caller the
@@ -42,20 +50,7 @@ export async function withFabricateLifecycleReplay(run) {
   const originalFetch = globalThis.fetch;
   const originalConfig = globalThis.CONFIG;
   let world = null;
-  // NO FILE WATCHER. `root` is the repository, and a developer who has harvested Foundry chrome
-  // for the View Lab has ~7,100 read-only art files under `.foundry-chrome/`. Vite watches what it
-  // serves, chokidar costs one inotify handle per file, and a stock Linux box allows 65,536 for the
-  // whole user session — so one harvest exhausts it and these suites die with
-  // `ENOSPC ... watch '<something>.webp'` raised from inside chokidar, on tests about window
-  // lifecycle that never touch art. Nothing is edited mid-run, so the watcher buys nothing.
-  const vite = await createServer({
-    root: repoRoot,
-    // Per process: the default is shared with every other test process. See
-    // `vite-dep-cache-dir.js` for the `ERR_OUTDATED_OPTIMIZED_DEP` failure that causes.
-    cacheDir: viteDepCacheDir(),
-    server: { middlewareMode: true, hmr: false, watch: null },
-    appType: 'custom',
-  });
+  const { vite, close } = await startCompositionServer();
 
   globalThis.fetch = async (url) => {
     if (String(url) !== '/lang/en.json') return new Response('', { status: 404 });
@@ -79,7 +74,7 @@ export async function withFabricateLifecycleReplay(run) {
     world?.shim.restore();
     globalThis.fetch = originalFetch;
     globalThis.CONFIG = originalConfig;
-    await vite.close();
+    await close();
   }
 }
 
@@ -120,23 +115,11 @@ export async function captureCloseOrdering({
     }
   }
 
-  globalThis.foundry = { applications: { api: { ApplicationV2 } } };
-  globalThis.Hooks = { on: () => 1, off: () => {}, once: () => 1 };
-  globalThis.game = { i18n: { localize: (key) => key, format: (key) => key } };
-
-  // NO FILE WATCHER. `root` is the repository, and a developer who has harvested Foundry chrome
-  // for the View Lab has ~7,100 read-only art files under `.foundry-chrome/`. Vite watches what it
-  // serves, chokidar costs one inotify handle per file, and a stock Linux box allows 65,536 for the
-  // whole user session — so one harvest exhausts it and these suites die with
-  // `ENOSPC ... watch '<something>.webp'` raised from inside chokidar, on tests about window
-  // lifecycle that never touch art. Nothing is edited mid-run, so the watcher buys nothing.
-  const vite = await createServer({
-    root: repoRoot,
-    cacheDir: viteDepCacheDir(),
-    server: { middlewareMode: true, watch: null },
-    appType: 'custom',
-  });
+  const { vite, close } = await startCompositionServer();
   try {
+    globalThis.foundry = { applications: { api: { ApplicationV2 } } };
+    globalThis.Hooks = { on: () => 1, off: () => {}, once: () => 1 };
+    globalThis.game = { i18n: { localize: (key) => key, format: (key) => key } };
     const module = await vite.ssrLoadModule(modulePath);
     const ApplicationClass = module[exportName];
     assert.equal(
@@ -155,10 +138,10 @@ export async function captureCloseOrdering({
 
     await app.close(closeOptions);
   } finally {
-    await vite.close();
     globalThis.foundry = originalFoundry;
     globalThis.Hooks = originalHooks;
     globalThis.game = originalGame;
+    await close();
   }
   return lifecycle;
 }
