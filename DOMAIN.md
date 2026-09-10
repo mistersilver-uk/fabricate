@@ -491,6 +491,13 @@ A valid version-1 instant run can wait for a manual action and is not a legacy p
 Fixed ingredients, alternatives and essence carriers share one physical stock ledger, and one carrier unit contributes all applicable essences while being consumed once.
 Changing an ingredient route replaces its scoped overrides and allocation; stale routes, options or held-item references stay blocked until explicitly repaired.
 The authority snapshots the chosen authored requirement set, including its route, independently of the actual spending and award receipts.
+Future-stage input and yield previews instead enumerate entitled authored possibilities without choosing a route or persisting selection intent.
+
+**Historical Stage Evidence** records execution meaning separately from current configuration: `resolutionSnapshot` identifies check, ingredient-route or confirmed no-check resolution, while `presentationSnapshot` preserves permitted stage purpose captured when armed.
+An implicit single stage may capture the recipe description; later description edits do not rewrite that purpose or invalidate the Journal listing.
+Actual checks remain in `lastCheckResult`; `essenceSpend` records actor-qualified consumed carriers and their contributions, and `currencySpends` records settled amounts only.
+An absent receipt is Not recorded, an explicit empty receipt establishes zero, and a recorded zero quantity never establishes a positive award.
+New evidence requires affirmative initiating-viewer entitlement before persistence and affirmative current-viewer entitlement before enrichment; explicit GM access is permitted, but unknown access and actor ownership alone are insufficient.
 
 **Completion Mode** is a run-level preference: `manual` asks the player to execute a ready stage, while `worldTime` permits eligible completion when world time advances.
 The switch may appear during a no-check countdown even with unresolved materials; its visibility is not permission to spend them automatically.
@@ -502,8 +509,11 @@ Public crafting preserves one-call execution when the stage is ready and all cho
 **Execution Journal** is durable evidence of an ordered operation, not an atomic transaction or a promise of rollback.
 Its effects distinguish `planned`, `applying` and `applied`: confirmed effects form a prefix, followed by at most one uncertain applying effect and then unstarted effects.
 An ambiguous effect or an unpersisted receipt requires manual recovery; it is never replayed automatically.
+Versioned ingredient consumption requires the delete/update operation to return the matching Item document before recording confirmed spending or allowing later awards; a partially applied batch remains uncertain rather than being retried or rolled back.
 Gathering persists terminal history with the planned journal before terminal side effects and records receipts in that same history entry.
+Its versioned historical awards come from the applied result-creation receipt, including permitted failure awards, rather than the pre-effect plan.
 Versioned gathering preserves start-time stamina, node/reservation, blind-store and runtime/economy behavior while adding manual collection and eligible automatic completion.
+Native d100 cleared/missed evidence uses the recorded high-roll threshold; an all-miss item result does not itself make the run failed, and terminal status is never inferred from award count.
 
 **Run Authority Ledger** is the private Foundry JournalEntry that owns request deduplication, one-use prepare tokens and the global embedded-page execution claim.
 Every versioned mutation requires the active GM and exactly one ledger, even for a ready one-call craft.
@@ -514,7 +524,13 @@ Until then the claim can block other runs as well; ordinary Journal refresh does
 
 The **Journal** derives safe run models from actor history; **Finished** is its sole history browser, and dismissal is a per-user, per-world hiding preference rather than deletion of that history.
 Native `runType` remains crafting, gathering or salvage, while derived `activityKind` distinguishes alchemy for browsing.
-Readable names remain visible and the run record labels identifiers explicitly; terminal and recovery guidance describe recorded evidence rather than inviting another execution.
+Active current-stage detail, inert past/future browsing, ordinary closed history and recovery have separate presentation contracts.
+Ordinary history presents Final check, Resolution or a failure verdict according to recorded evidence, all attempted stages where applicable, actual receipts, compact This run timing and untitled closed guidance; it has no active controls, progress/navigation, TIME/CHECK pair or expanded Run record.
+A preinitialized next stage is not an attempt merely because it has a start timestamp.
+**Tools used** groups attempted-stage occurrences only when a recorded Actor Item address proves the same physical source and any separate actor qualifier agrees, including synthetic-token Actor addresses.
+Every occurrence retains its stage, quantity and affirmative breakage/virtual/spared/immune evidence; repeated uses are not summed as consumption, and ambiguous or virtual identities stay separate.
+Missing tool names or images may use entitled display metadata fallbacks, but those fallbacks establish neither physical identity nor historical state.
+Terminal and recovery guidance distinguish positive awards, confirmed zero and unknown evidence rather than inviting another execution; the shared world clock is a read-only display of application-supplied world time.
 Initial secret-check prompts omit protected identity, image, formula, DC and modifier details, independently of the post-commit entitlement check for any evaluated-roll handoff.
 Secret checks use GM private posting and a sanitized response; a permitted non-secret handoff lets the initiating client post the evaluated roll without rolling again.
 Socket recipient routing protects the reply's audience, while session/request/run/revision correlation prevents another tab from accepting it.

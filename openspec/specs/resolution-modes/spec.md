@@ -253,7 +253,9 @@ The player-facing Journal screen (see `ui-integration/spec.md` *Journal App*) ma
 
 - There is no canonical "Standard" resolution mode.
 `simple` (a DC pass/fail check) renders as "Standard (DC)" for players, even though its internal token stays `simple`.
-- A run whose recipe resolves to an unknown or absent mode falls back to the `simple` ("Standard (DC)") label rather than emitting a raw token.
+- Active crafting mode labels fall back to `simple` ("Standard (DC)") for an unknown or absent resolved mode rather than emitting a raw token.
+- Terminal recipe-backed crafting mode labels MUST use the first attempted stage carrying a captured resolution mode; an absent or unrecognized captured mode yields no mode label, never a fallback inferred from current configuration.
+Recipe-less alchemy fizzle history retains its Alchemy label.
 
 ## Gathering Task Modes
 
@@ -271,6 +273,8 @@ Inactive mode data may remain stored but never contributes awards jointly.
 8. Journal previews MUST distinguish authored possible yields from actual received results.
 Direct displays its one result set, d100 displays one shared roll cut against drop chances, and Check displays the complete noninteractive outcome ladder including failure.
 Progressive retains ordered component costs and accumulated-budget semantics rather than being rendered as drop chances or outcome tiers.
+Historical d100 uses recorded high-roll thresholds and cleared/missed evidence, and historical routed gathering uses its recorded check/outcome log rather than the authored preview ladder.
+Actual awards and terminal status remain independent evidence: all-miss d100 item rows do not themselves establish a failed run, and a permitted routed failure award does not make a failed run successful.
 
 ## Versioned Check Entitlement
 

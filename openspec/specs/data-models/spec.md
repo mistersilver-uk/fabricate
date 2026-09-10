@@ -3206,6 +3206,7 @@ CraftingRunStepState = {
     itemUuid: string | null,
     quantity: number,
     componentId: string | null,
+    toolId?: string | null, // recorded library reference, not physical Item identity
     broken: boolean,
     // checkDriven-only evidence:
     authority?: string,
@@ -3248,6 +3249,7 @@ CraftingRunStepState = {
 #### Optional historical evidence
 
 Versioned stage arming captures `presentationSnapshot` from the authoritative execution step when the initiating viewer may see the recipe.
+For an implicit single stage whose wrapper has no description, the permitted recipe description supplies that captured purpose.
 Its first permitted name and description remain unchanged through execution and completion; later narrative edits do not rewrite history or require whole-Journal invalidation.
 `resolutionSnapshot` captures effective resolution meaning, with the executed meaning retained at completion and across an applied-prefix reload.
 The canonical active-check resolver determines `kind: "check"`; an unchecked ingredient-routed stage records `"ingredients"`, and another confirmed unchecked stage records `"none"`.
@@ -3264,7 +3266,7 @@ Legacy records gain no retrospective mode, presentation or contribution data fro
 
 New evidence is allowlisted before actor-flag or receipt persistence and independently gated by viewer entitlement before projection.
 New historical enrichments require an affirmative current-viewer access evaluation or an explicit GM viewer; absent, throwing or indeterminate evaluators MUST withhold them, and actor ownership is not disclosure authority.
-Versioned consumption MUST confirm the actual document delete/update return before recording positive consumption/contribution receipts or allowing subsequent awards.
+Versioned consumption MUST receive an object whose UUID matches the consumed Item from the actual delete/update operation before recording positive consumption/contribution receipts or allowing subsequent awards.
 A veto or unconfirmed write, including after a successful prefix, leaves the invoked batch uncertain and recovery-required without replay or automatic rollback.
 Arming uses the attested initiating viewer and later GM execution resolves the run's recorded initiator, never ambient GM access as permission to expose protected identity.
 Opaque records omit these new snapshots and contribution evidence; arbitrary document flags, private formula/DC, modifier configuration and GM-only component configuration do not enter the allowlist.
@@ -3450,7 +3452,7 @@ RunModel = {
   img: string,
   stepIndex: number | null,
   stepCount: number,
-  multiStep: boolean,                    // crafting only: the recipe has more than one step (false for single-step and non-crafting)
+  multiStep: boolean,                    // active crafting: enabled recipe structure; terminal crafting: more than one recorded attempt
   isFinalStep: boolean,                  // crafting only: the run is on its last step (single-step, or the last step of a multi-step recipe)
   stepLabel: string,                     // "" for single-step, gathering/salvage, and redacted crafting runs
   steps: StepModel[],                    // [] for gathering/salvage and for redacted crafting runs
@@ -3460,12 +3462,13 @@ RunModel = {
   updatedAt: number | null,
   finishedAt: number | null,
   structureLabel: string,                // localized single-step vs multi-step label (crafting only)
-  resolutionModeLabel: string,           // localized player-facing mode label (crafting only)
+  resolutionModeLabel: string,           // crafting: active mode or recorded terminal mode; unknown terminal mode is empty
   recipeId: string | null,               // null for non-crafting and redacted runs
   taskId: string | null,                 // gathering/salvage task reference
   flavor: string,
   failureReason: string | null,
-  createdResults: Array<{ componentId, itemUuid, quantity, name, img }>,
+  createdResults: Array<{ actorUuid, componentId, itemUuid, quantity, name, img }>,
+  createdResultsRecorded?: boolean,      // gathering/salvage receipt presence; crafting keeps this per stage
   createdResultCount: number,
   craftingYield: object | null,          // current-stage authored preview, never an actual award
   gatheringYield: object | null,         // permitted mode-specific preview and recorded roll evidence
@@ -3496,6 +3499,7 @@ StepModel = {
     primaryToolName: string | null,
     toolNames: string[],
     checkLabel: string | null,           // rollFormula + resolved DC; no skill name (none is stored)
+    checkKind?: "check" | "none" | "unknown", // active disclosed configuration; omitted from terminal detail
     failureText: string | null,
   },
   lastCheckResult: {
@@ -3524,7 +3528,19 @@ StepModel = {
   selectedRequirementSnapshot: object | null,
   requirementSnapshot: object | object[], // full selected-set snapshot, else legacy requirements
   selectionAvailability: object | null,  // current-stage live solver projection only
-  craftingYield: object | null,
+  craftingYield: object | null,          // current-stage authored output only
+  yieldPreview: object | null,           // entitled future-stage authored output, never historical awards
+  inputPreview: {                        // entitled future-stage authored inputs, never selection intent
+    source: "preview",
+    stageIndex: number,
+    routes: Array<{
+      id: string | null, name: string,
+      groups: Array<{
+        id: string | null, name: string,
+        options: Array<{ id, kind, name, img, icon, colorToken, need }>,
+      }>,
+    }>,
+  } | null,
 }
 ```
 
@@ -4265,9 +4281,10 @@ Closing the five stores over those four gates moves exactly one of them.
 `journal` already consumes every domain feeding all four gates — the recipe-access evaluation it reads for redaction is `access-and-knowledge` plus `held-inventory` for the owned-copy branch, both of which it consumes.
 `gathering` gains `resolution-config` and `materials-and-yield` from the system-validity gate, taking it from three domains to five.
 
-`journal`'s exclusion from `narrative` survives the closure, and is structurally robust rather than incidental: the run journal's redaction reads a single boolean off the access result, and the builder has NO prose-bearing output field at all — its three flavour fields are hardcoded empty literals and every other value it emits is a name, an image, a structural count or a boolean, so prose returned by a collaborator would have nowhere to land.
+`journal`'s exclusion from `narrative` survives the closure: its recipe-access evaluation consumes access facts, while its permitted stage-purpose prose comes from the run's captured `presentationSnapshot`, not the live authored description.
+The snapshot changes through run persistence, whose refresh path is independent of authored narrative invalidation.
 
-The single routing decision this taxonomy exists to make observable is that the run journal does NOT consume `narrative`: it reads no authored description anywhere.
+The single routing decision this taxonomy exists to make observable is that the run journal does NOT consume `narrative`: later authored description changes do not change captured purpose.
 A description-only edit therefore MUST NOT rebuild it, and that assertion MUST be made from a WARMED counter — a "did not rebuild" assertion against a cold fixture compares zero with zero and observes nothing.
 
 ## Summary Projections

@@ -158,8 +158,11 @@ Several stale selections MAY be repaired incrementally, but execution MUST wait 
 The selected authored-requirement snapshot MUST be resolved by the authority from the actual selected set, not accepted as client-supplied evidence.
 It includes route, component, tag, essence and currency requirements and remains distinct from actual spending receipts in history.
 - Each irreversible spending, award and publication operation persists its applying phase before invocation and its actual receipt before the next operation.
+Versioned physical-item consumption MUST receive the matching Item document from delete/update before recording confirmed spending or proceeding to awards; a non-throwing unconfirmed return is insufficient.
 Ambiguous writes preserve recovery evidence and cannot be replayed or automatically compensated.
 History distinguishes authored requirements, actual spending, actual rolls and actual awards.
+Successful and failed stage finalization MUST retain the optional permitted historical evidence defined in `data-models/spec.md`, including captured purpose, executed resolution meaning, carrier contributions and settled currency amounts.
+Future-stage previews remain authored possibilities rather than captured execution or selected intent.
 - New runs default to manual completion.
 An actively counting-down stage without a player check may retain a world-time completion preference even while editable requirements remain unresolved.
 Automatic execution uses the same guarded operation as manual execution and stops without spending when the stage requires material, choice, currency, essence, Tool or player-check input, or validation fails.

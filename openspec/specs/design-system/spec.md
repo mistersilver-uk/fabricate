@@ -1578,13 +1578,13 @@ The second difference is structural and smaller — `Kicker` forwards no `id` an
 
 ### Requirement: Run detail composes the specified run controls
 
-The player Journal MUST order the selected run's identity and actions before its notices, terminal verdict, progress, stage, yield evidence and run record.
+The player Journal MUST use the active-current, active-browsed, ordinary-history and recovery compositions specified by `ui-integration` rather than a universal detail order.
 It MUST reuse the run-control contracts and geometry specified in `library.html`.
 `RunActionBar` MUST retain cancel, pause or resume, completion preference and primary action order.
 An armed cancellation decision MUST replace the other actions in that bar until confirmed or dismissed; this is the run bar's explicit carve-out from the default Foundry confirmation dialog.
 `WorldClockChip` MUST remain read-only and accept the application's calendar-formatted value.
 Completion-preference visibility MUST follow the no-player-check countdown contract in `ui-integration`, independently of the zero-spend automatic blockers in `recipes-and-steps`.
-The detail MUST preserve readable identity separately from explicitly labeled record identifiers, followed by one contextual guidance callout with world-time and history advice.
+The detail MUST preserve readable permitted identity, compact This run timing and one untitled contextual guidance callout; ordinary history MUST NOT show an expanded Run record, active progress/navigation or the TIME/CHECK pair.
 Terminal and recovery guidance MUST describe recorded evidence and uncertainty rather than inviting another execution.
 Finished MUST remain the Journal's sole history browser, and the browse/detail composition MUST preserve Active, Finished, detail order when stacked at the player window's minimum width.
 
@@ -1598,7 +1598,8 @@ Repeated thresholds for the same essence MUST sum their required amounts before 
 Stale selections MUST remain visibly repairable, including a single surviving option; a route change MUST replace route-scoped choices and allocation rather than silently carrying them into another set.
 `StageCard` MUST derive its completion marker from an explicit stage status when supplied; past browse position alone cannot mark an unexecuted or failed stage successful.
 `YieldScale` MUST show one shared d100 cut against the item chances rather than implying separate item rolls.
-`OutcomeLadder` MUST display the complete routed outcome ladder as evidence, without making its outcomes selectable.
+An explicitly recorded `cleared` boolean MUST govern historical row outcomes, preserving native high-roll semantics; an explicit unknown outcome MUST remain unknown, while callers omitting that field retain the default low-roll comparison.
+`OutcomeLadder` MUST display the complete noninteractive routed outcome ladder for authored previews; ordinary routed history MUST instead use its recorded outcome log as specified by `ui-integration`.
 
 #### Scenario: A player views another stage while allocating materials
 
