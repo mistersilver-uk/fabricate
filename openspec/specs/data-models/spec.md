@@ -3038,6 +3038,33 @@ It does not delay terminal history until effects finish.
 Authority request deduplication and prepare tokens live in the private authority ledger; the run record retains effect evidence.
 9. Stage browsing is transient UI state and never changes the persisted executable stage index.
 
+### Authority Ledger and Recovery Boundary
+
+Every version-1 start or mutation MUST pass through the active-GM command authority, including an immediately executable public craft.
+The authority MUST re-resolve the actor, sender ownership, source actors, run revision and executable stage under its execution claim before applying the operation.
+The actor UUID identifies the command target; ownership MUST be checked against the attested sender rather than the executing GM's ambient `isOwner`.
+A local queue or revision comparison alone MUST NOT be treated as a cross-browser lock.
+
+The authority requires exactly one private JournalEntry ledger, provisioned explicitly by the active GM in a single GM session.
+Missing or multiple ledgers MUST block versioned mutations; setup MUST NOT replace an existing ledger or silently elect one among duplicates.
+The ledger holds durable request outcomes and one-use prepare tokens; an embedded JournalEntryPage with a fixed ID and `keepId` arbitrates the global execution claim.
+Its claim MUST NOT expire automatically, because an interrupted operation may already have produced irreversible effects.
+This arbitration and the execution journal are not a transaction across Foundry document writes, macros and publications, and MUST NOT be described as atomic execution or automatic rollback.
+
+Boot reconstruction MAY scan orphaned execution journals only under an exclusively acquired claim when no prior claim exists.
+An ordinary observing-client refresh MUST NOT reconstruct a potentially live execution.
+For a retained claim, `reconcileJournalRunAuthority({ claimId, disposition })` requires the active GM, the exact claim ID and a disposition of `reconciled` or `abandoned`.
+It MUST reconstruct that claim's matching execution evidence and durably record the disposition before releasing the claim.
+Reconciliation releases the authority claim only; the prior request remains non-replayable and any uncertain run effect remains recovery-required.
+A retained claim can block other versioned runs, and its availability reason MUST remain visible.
+
+Command replies MUST use transport-level recipient routing as well as attested-GM and recipient/session/request/run/revision correlation.
+The private ledger MUST NOT be copied into actor flags or reply payloads.
+Initial prompt redaction MUST use the initiating viewer's current entitlement before returning protected identity, image, formula, DC or modifier information.
+Post-commit evaluated-roll handoff MUST independently recheck entitlement against the current actor, viewer and run; that later check cannot protect an already-disclosed initial prompt.
+Secret checks MUST use generic local prompts, GM private posting and sanitized transition replies without serialized roll data.
+Non-secret entitled handoffs carry already-evaluated roll data for initiating-client posting, never client-supplied authoritative totals or awards.
+
 ## CraftingRun
 
 ### Purpose
@@ -3491,7 +3518,9 @@ StepModel = {
 
 ### Startup Maintenance Passes
 
-The housekeeping passes `Fabricate#initialize` runs — `CraftingRunManager.cleanupInvalidRuns`, `CraftingRunManager.pruneInstantaneousActiveRuns`, `SalvageRunManager.cleanupInvalidRuns`, and `RecipeVisibilityService.cleanupLearnedRecipes` — drop run and learned-knowledge entries that name deleted content.
+The housekeeping passes `Fabricate#initialize` runs remove invalid references and legacy instantaneous phantom runs through their respective cleanup methods.
+`CraftingRunManager.pruneInstantaneousActiveRuns` MUST inspect legacy records only: valid version-1 instant runs can await manual execution, and unsupported present versions are preserved rather than treated as legacy phantoms.
+Removing an authored time requirement likewise MUST NOT cause this legacy pruning pass to delete a versioned run.
 They are governed by two rules that are deliberately DIFFERENT from the `processWorldTime` gate above (issue 970).
 
 **Write scoping.** Each pass walks only the actors the CURRENT client may update (`selectWritableActors`, keyed on `Actor#isOwner`), not all of `game.actors`.
@@ -3515,20 +3544,22 @@ The GM-only cascade walkers (`removeRunsForSystem`, `removeRunsForComponent`, an
    Gathering re-maps its native `*WorldTime` fields (`startedAtWorldTime` / `updatedAtWorldTime` / `completedAtWorldTime`) onto the common `startedAt` / `updatedAt` / `finishedAt`; salvage already uses the crafting `startedAt` / `updatedAt` / `finishedAt` names.
 3. **Viewer redaction (`redacted`).**
    For a non-GM viewer, a crafting or alchemy run whose recipe the viewer cannot see — a recipe that no longer resolves, or an undiscovered alchemy / knowledge-gated crafting recipe — is redacted: `redacted: true`, `names.title` becomes the generic localized label (`FABRICATE.App.Journal.Redacted.Title`), `recipeId` is `null`, `steps` / `createdResults` / `failureReason` / `stepLabel` are blanked, and `img` falls back to the default run image.
-   Redaction hides IDENTITY ONLY and is NOT an authorization gate (issue 966): `manualAdvance` and `canCancel` are unaffected by it, so an owner can still finish and abandon a redacted run.
+   Redaction is NOT an authorization gate (issue 966): an owner retains actions permitted by the lifecycle, while authority, pause, unsupported-version and execution/recovery refusals still apply.
    The GM bypass precedes the missing-recipe guard: a GM viewer is never redacted, even for a run whose recipe no longer resolves, so the GM still sees the run's persisted step snapshots (requirements, roll, consumed items) rather than a redacted empty card.
    Globally-visible recipes are likewise never redacted; with no recipe-visibility service available no redaction occurs.
    This mirrors the gathering blind-run redaction (the gathering listing builder), so the Journal never leaks a hidden crafting/alchemy recipe identity to a non-GM viewer.
    Gathering and salvage runs are not redacted by this projection (`redacted: false`); gathering's own blind-task redaction is applied upstream by its listing builder.
 4. **Step projection is crafting-only.**
-   `steps`, `currentStep`, `structureLabel`, `resolutionModeLabel`, `multiStep`, `isFinalStep`, each step's `detail.checkLabel`, and each step's `requirements` / `consumedIngredients` are populated for crafting runs only; gathering and salvage project `steps: []`, `currentStep: null`, empty structure/mode labels, and `multiStep: false` / `isFinalStep: false`.
+   `steps`, `currentStep`, `structureLabel`, `multiStep`, `isFinalStep`, each step's `detail.checkLabel`, and each step's `requirements` / `consumedIngredients` are populated for crafting runs only; gathering and salvage project `steps: []`, `currentStep: null`, empty structure labels, and `multiStep: false` / `isFinalStep: false`.
+   Gathering's permitted mode-specific yield projection supplies its Direct, d100 or Check label independently of crafting step fields.
    A step's `requirements` come from its persisted snapshot and `consumedIngredients` from the persisted consumed refs; both resolve name/img via the same shared result mapper (consume-time capture, then the item-uuid and component-id fallbacks), so a deleted consumed item still labels from its captured or component name.
    A redacted crafting run also projects `steps: []` (its requirements / consumed items never leak).
    `multiStep` is `recipe.steps.length > 1`; `isFinalStep` is `stepCount <= 1 || currentStepIndex >= stepCount - 1` (true on a single-step recipe or the last step of a multi-step recipe, and — harmlessly, since a terminal run drives no action — on any terminal run whose `currentStepIndex` is null).
    `stepLabel` is a localized "Step X of Y" string only for a non-redacted multi-step crafting run; it is `""` for a single-step recipe (the structure label already conveys the single-step shape) and for a redacted run (so a hidden multi-step recipe never leaks its step count or active step name).
-5. **`manualAdvance` states what the run TYPE needs, not what the viewer may do.**
-   It is `true` for every crafting run — including a redacted one (issue 966) — and `false` for gathering, salvage, and recipe-less alchemy fizzle history entries, which resolve off the world-time hook or are terminal.
-   Authorization belongs to the advance seam (`resolveAdvanceSources`), not the projection; the player-facing advance contract is defined in `recipes-and-steps/spec.md` (_Run Progression — Player-Initiated Advance_).
+5. **`manualAdvance` is a legacy compatibility signal, not a versioned capability.**
+   It is `true` for crafting runs — including redacted ones (issue 966) — and `false` for gathering, salvage and recipe-less alchemy fizzle history entries.
+   Versioned gathering can nevertheless expose manual collection through `actions.execute`; every versioned mutation obeys the authoritative capability/refusal contract rather than this flag.
+   Legacy authorization belongs to the advance seam (`resolveAdvanceSources`); versioned authorization belongs to the active-GM command boundary.
 6. **`resolutionModeLabel` uses the player-facing label map.**
    It resolves through the localized mode-label map defined in `resolution-modes/spec.md` (_Player-Facing Mode Labels_) and never emits the raw `resolutionMode` token.
 7. **`counts.active` feeds the nav badge.**

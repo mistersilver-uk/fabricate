@@ -144,15 +144,26 @@ New applicable crafting and alchemy runs use lifecycle version 1, as defined in 
 Only an absent version selects the legacy contract; unsupported present versions are preserved and refuse mutation.
 The versioned rules in this section supersede arm-time consumption and cancellation refunds for those new runs alone.
 
+Public `Fabricate.craft`, the global crafting helper and `/craft` MUST preserve one-call execution when the stage is ready and all choices are supplied.
+New public starts MUST select version 1 and use the same active-GM authority for start and execution; this convenience does not bypass ownership, validation, checks or execution receipts.
+Waiting stages and unresolved choices remain in the Journal without editable-material spending.
+Journal start controls may create a run for later manual completion rather than promising immediate execution.
+
 - Arming a timed stage persists its scoped choices and full selected authored-requirement snapshot without spending editable materials or currency.
 - Execution re-resolves the current run, revision, source actors, selected ingredient set, inventory, Tools and requirements under the authoritative operation.
 Fixed ingredients, alternatives and essence carriers share the canonical physical-item allocation, so one unit cannot fund two requirements.
+- A stale route, option or held-item reference MUST remain blocked instead of selecting a surviving alternative implicitly.
+Explicit route changes replace the previous route's option overrides and shared essence allocation.
+Several stale selections MAY be repaired incrementally, but execution MUST wait for the whole stage to validate.
+The selected authored-requirement snapshot MUST be resolved by the authority from the actual selected set, not accepted as client-supplied evidence.
+It includes route, component, tag, essence and currency requirements and remains distinct from actual spending receipts in history.
 - Each irreversible spending, award and publication operation persists its applying phase before invocation and its actual receipt before the next operation.
 Ambiguous writes preserve recovery evidence and cannot be replayed or automatically compensated.
 History distinguishes authored requirements, actual spending, actual rolls and actual awards.
 - New runs default to manual completion.
 An actively counting-down stage without a player check may retain a world-time completion preference even while editable requirements remain unresolved.
-Automatic execution uses the same guarded operation as manual execution and stops without spending when choices, materials, currency, essence allocation or a player check require input, or validation fails.
+Automatic execution uses the same guarded operation as manual execution and stops without spending when the stage requires material, choice, currency, essence, Tool or player-check input, or validation fails.
+Selecting materials in advance does not authorize automatic material spending; eligible no-input stages alone may complete automatically.
 The preference survives that blocker; world-time jumps cannot bypass a check or execute a stage twice.
 - Pausing freezes remaining world time and retains choices; resuming reanchors readiness.
 Paused runs cannot advance manually or through world-time processing, but may be cancelled.
@@ -230,9 +241,7 @@ It honors the existing consume-on-failure policy and history visibility rules wi
    for an instant (non-timed) step the craft aborts BEFORE any consumption (a zero-mutation
    abort — no ingredients, currency, or tools consumed or broken) and reports failure, never
    a player success with zero items.
-   Timed exception: a time-gated step consumes at START (the check outcome is unknowable
-   until the gate matures), so the same misconfiguration detected at FINISH records a step
-   FAILURE with no refund and still reports failure — never a false success with zero items.
+   Legacy timed exception: an unversioned time-gated step consumes at START (the check outcome is unknowable until the gate matures), so the same misconfiguration detected at FINISH records a step FAILURE with no refund and still reports failure — never a false success with zero items.
 
 3. **A FAILED check resolves an authored FAILURE result group when the policy permits it**
    (`craftingCheck.failureResultPolicy`, `data-models` requirement 35).
@@ -306,8 +315,8 @@ A progressive craft fires the component complications its committed award earned
 
 #### Player-Initiated Advance ("Trigger Next Step")
 
-Crafting is the only player-triggerable run type.
-A matured crafting step — one whose `timeGate.availableAt` has been reached, or that never carried a time gate — does NOT auto-advance: it requires a manual player trigger.
+This subsection describes legacy crafting advance; version-1 crafting and gathering use the authoritative execution contract above and in `gathering-and-harvesting/spec.md`.
+A matured legacy crafting step — one whose `timeGate.availableAt` has been reached, or that never carried a time gate — does NOT auto-advance: it requires a manual player trigger.
 The player-facing Journal screen exposes this as a "Trigger Next Step" action (see `ui-integration/spec.md` *Journal App*).
 
 - Triggering re-invokes the crafting flow for the run's id (`advanceCraftingRun({ actorId, runId, recipeId })` re-enters `craft(actor, recipe, { runId, componentSourceActors })`), so the same engine path that started the run advances it.
@@ -319,9 +328,9 @@ A non-owner is told to ask an owner or GM rather than the run advancing silently
 
 #### Maturity Asymmetry Between Run Types
 
-A matured crafting step waits for the manual trigger above.
-By contrast, matured gathering and salvage runs **auto-resolve** on world time: their timed-completion path resolves them without any player action (see *Salvage Execution* below and `gathering-and-harvesting/spec.md`).
-The Journal therefore presents gathering and salvage runs as auto-resolving and offers them no trigger button.
+A matured legacy crafting step waits for the manual trigger above.
+By contrast, matured legacy gathering and salvage runs **auto-resolve** on world time: their timed-completion path resolves them without any player action (see *Salvage Execution* below and `gathering-and-harvesting/spec.md`).
+The Journal therefore offers legacy gathering and salvage no trigger button, while version-1 crafting and gathering default to manual completion and expose their eligible actions explicitly.
 
 ## Alchemy Execution Lifecycle
 

@@ -1554,6 +1554,10 @@ It MUST reuse the run-control contracts and geometry specified in `library.html`
 `RunActionBar` MUST retain cancel, pause or resume, completion preference and primary action order.
 An armed cancellation decision MUST replace the other actions in that bar until confirmed or dismissed; this is the run bar's explicit carve-out from the default Foundry confirmation dialog.
 `WorldClockChip` MUST remain read-only and accept the application's calendar-formatted value.
+Completion-preference visibility MUST follow the no-player-check countdown contract in `ui-integration`, independently of the zero-spend automatic blockers in `recipes-and-steps`.
+The detail MUST preserve readable identity separately from explicitly labeled record identifiers, followed by one contextual guidance callout with world-time and history advice.
+Terminal and recovery guidance MUST describe recorded evidence and uncertainty rather than inviting another execution.
+Finished MUST remain the Journal's sole history browser, and the browse/detail composition MUST preserve Active, Finished, detail order when stacked at the player window's minimum width.
 
 `RunProgress` and `StageNav` MUST keep the executable stage distinct from the stage being viewed.
 Past and future `StageCard` presentations MUST be inert; browsing them MUST NOT change persisted selections or the executable stage.
@@ -1562,6 +1566,7 @@ Past and future `StageCard` presentations MUST be inert; browsing them MUST NOT 
 Repeated thresholds for the same essence MUST sum their required amounts before comparing the shared contribution and render one keyed pool, so Fire 2 plus Fire 2 requires four Fire rather than counting the same two Fire twice.
 `ChoiceOptionList` MUST use each option's own `needed` amount when provided, falling back to the slot-level amount only for uniform-quantity callers.
 `SlotRow` MUST retain a caller's explicit infeasibility verdict even when held stock alone reaches the required quantity.
+Stale selections MUST remain visibly repairable, including a single surviving option; a route change MUST replace route-scoped choices and allocation rather than silently carrying them into another set.
 `StageCard` MUST derive its completion marker from an explicit stage status when supplied; past browse position alone cannot mark an unexecuted or failed stage successful.
 `YieldScale` MUST show one shared d100 cut against the item chances rather than implying separate item rolls.
 `OutcomeLadder` MUST display the complete routed outcome ladder as evidence, without making its outcomes selectable.

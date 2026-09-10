@@ -894,13 +894,18 @@ Missing-version records retain legacy automatic completion; unsupported present 
 - New runs default to manual collection when their time gate is ready.
 Eligible waiting stages may retain world-time completion, but player checks remain manual.
 Manual collection and automatic completion enter the same authoritative, revision-guarded operation.
+Every versioned start and mutation requires the active GM and a uniquely provisioned private authority ledger as specified in `data-models/spec.md`.
+The run records the attested initiating user rather than the executing GM as its owner.
 - Pause freezes remaining world time and retains the run's choices; resume reanchors readiness.
 Paused runs do not advance through world-time processing.
 - Stamina spending, node depletion and reservations, start-time runtime/economy snapshots, independent hazards, blind storage and Tool timing remain at their established lifecycle points.
 The lifecycle does not change the shared d100 item-drop resolver or independent event rolls.
+Versioned start effects, including blind-store, reservation and economy writes, MUST carry execution-journal evidence rather than being hidden inside an unrecorded aggregate effect.
 - The terminal history record, including its planned execution journal, is persisted before terminal side effects.
 Applying phases and actual receipts are updated in that same history record by run ID.
 Stale, duplicate or ambiguous operations cannot repeat spending or awards; uncertain writes require recovery.
+Recovery MUST retain blind-task redaction and expose only permitted receipt evidence, never the private task snapshot or arbitrary journal payloads.
+A retained global authority claim can also block unrelated versioned runs until the active GM records its manual disposition; releasing that claim does not replay the old attempt.
 - Versioned cancellation forfeits elapsed time and retains costs already incurred and awards already delivered.
 It releases applicable reservations without refunding sunk costs or touching unconsumed materials.
 

@@ -4878,6 +4878,7 @@ Scope:
 - The layout has a browse zone and a selected-detail zone.
 Active and Finished lists scroll independently, with their sort controls and pagers outside the scrolling bodies; the detail scrolls independently.
 At content widths at or below 960px, stack Active, Finished and detail while preserving access to every control.
+The stacked layout MUST remain usable at the real 1024px minimum application-window width; the container breakpoint describes inner content rather than the outer window.
 - One shared search and kind filter covers crafting, gathering, salvage and alchemy.
 Active status filters are mutually exclusive All, Ready, Waiting and Paused.
 Status counts use the selected kind cohort before search, active-status filtering, paging or selection.
@@ -4885,7 +4886,11 @@ Status counts use the selected kind cohort before search, active-status filterin
 Filtering and removal clamp its page independently.
 Selection is keyed by actor UUID, run type and run ID and remains selected when its row leaves the visible page or filter; fallback occurs only after actual removal or dismissal.
 - Selected detail follows identity/actions, notices, verdict, progress/stage navigation, stage requirements, yields and record facts.
-About-this-run facts remain in the record, contextual explanations and Tips remain in detail guidance, and Finished retains full access to recent results and history.
+Readable run names remain visible, and the record labels identifiers explicitly as Run ID, Recipe ID or Task ID rather than presenting an identifier as a name.
+The record retains available mode and start/finish timestamps without exposing redacted identities.
+One bottom guidance callout combines contextual explanations with world-time and history advice.
+Active guidance distinguishes manual collection and no-check crafting from check-driven execution; paused guidance explains frozen time, terminal guidance describes an ended run, and recovery guidance explains confirmed receipts, uncertainty and manual GM reconciliation without replay or automatic rollback.
+Finished is the Journal's sole history browser, including full pagination; there is no duplicate Recent Results column or separate View full history control.
 - Current-stage choices and shared essence allocation remain editable only when the run permits them.
 Browsing past or future stages never changes the executable stage and exposes no editable controls.
 Historical authored requirements, actual spending, actual rolls and actual awards remain distinct evidence.
@@ -4895,9 +4900,9 @@ The same user's clients refresh on the first setting creation as well as later s
 - Loading, error/retry, no-actor, empty and filtered-empty states remain explicit; an empty filter result does not erase selected detail.
 - All countdowns and timestamps are world-time based.
 - **Single-step recipes suppress redundant step chrome.**
-  A run whose projection reports `multiStep: false` (see `data-models/spec.md`) hides the "Step X of Y" step-label chip on both the left run card and the centre identity row (its `stepLabel` is `""`) and omits the centre step timeline; the "Single-Step Recipe" structure chip is retained.
-  A single-step run's requirements card uses the single-step title (`FABRICATE.App.Journal.StepDetails.TitleSingleStep`, "Craft requirements") while a multi-step run's card keeps "Step requirements" (`FABRICATE.App.Journal.StepDetails.Title`), and the run-card progress bar carries a run-neutral "Crafting progress" (`FABRICATE.App.Journal.Progress.Label`) aria-label for every run.
-  A single-step crafting run's detail guidance uses the single-step explainer (`FABRICATE.App.Journal.WhatToExpect.CraftingSingleStep`) instead of the multi-step crafting copy.
+  A run whose projection reports `multiStep: false` (see `data-models/spec.md`) omits redundant stage navigation and Step X of Y labels.
+  The current-stage requirements compose the shared slot and essence controls, with an accessible crafting-progress label where a progress bar is rendered.
+  Single-step and multi-step active crafting guidance use their corresponding check or no-check explanation; terminal and recovery guidance take precedence over either active explanation.
 
 ### Run-Type-Aware Actions Panel
 
@@ -4905,7 +4910,22 @@ Versioned crafting and gathering actions use the shared RunActionBar and the pro
 It exposes pause/resume, manual execution, cancellation and an eligible completion preference with visible disabled reasons and busy state.
 Arming cancellation replaces the sibling actions with confirm/keep controls in the bar.
 The completion switch is visible on an actively counting-down stage without a player check even when unresolved materials block automatic execution.
+Its displayed choices are Ask me (`manual`) and Complete (`worldTime`); the run-level preference survives automatic blockers and never grants permission to spend editable materials automatically.
 The clock remains read-only; pausing a run never changes world time.
+
+### Explicit Authority Setup and Recovery
+
+A versioned run blocked by a missing authority ledger MUST expose a visible setup action to the active GM.
+The action MUST state the single-session prerequisite before confirmation: close all other GM tabs and sessions for the world, including other tabs signed in as the same GM.
+Confirmation uses the Foundry dialog seam and invokes `setupJournalRunAuthority`; cancellation performs no setup.
+Setup MUST create one private ledger only when none exists, refuse replacement or duplicate-ledger resolution, and refresh the Journal after the attempt.
+Players and non-active GMs MUST receive the applicable authority reason rather than an actionable setup control.
+
+Recovery details MUST distinguish confirmed receipts, an uncertain applying effect and unstarted effects without treating planned amounts as received awards.
+They MUST explain that a retained claim can block other runs until the active GM manually records a disposition through `reconcileJournalRunAuthority({ claimId, disposition })`.
+The setup action MUST NOT clear a retained claim; reconciliation follows the separate non-replayable recovery contract in `data-models/spec.md`.
+
+### Legacy Run Actions
 
 Legacy actions retain the projection's `manualAdvance` contract:
 
@@ -4928,12 +4948,15 @@ Runs of recipes the viewer cannot see are redacted, mirroring the gathering blin
 - GM viewers and globally-visible recipes are never redacted.
 - The redaction is enforced in the projection (`data-models/spec.md` _Run Journal Projection_), so no hidden crafting/alchemy recipe identity reaches a non-GM viewer through the Journal.
 - **Redaction hides IDENTITY ONLY and is never an authorization gate** (issue 966).
-A redacted run still projects `manualAdvance: true` and, for an owner, `canCancel: true`, so its owner can finish it and abandon it exactly as they could a visible one.
+A redacted crafting run retains its manual-advance compatibility signal and the owner actions its lifecycle permits, subject to the same authority, pause, execution/recovery and unsupported-version refusals as a visible run.
 Legacy crafting requires manual advancement: its world-time processing only flips a matured `waitingTime` step to `inProgress`.
 Versioned checks and automatic blockers also require owner actions, so redaction must not suppress those affordances.
 Alchemy makes that the DEFAULT case: brewing is never gated by visibility, and discovery lands at FINISH, so an undiscovered timed brew could never reach the FINISH that would have revealed it.
 - Because a redacted model carries no `recipeId`, `Fabricate#advanceCraftingRun` resolves the recipe from the PERSISTED RUN rather than from its caller.
 The client-supplied `recipeId` is ignored; trusting it also allowed advancing one run while naming another run's recipe.
+- The initial versioned secret-check prompt MUST remain generic, omitting protected subject names, artwork, formula, DC and modifier details before any reply leaves the GM.
+Secret evaluation uses GM private posting and a sanitized response without player roll-data handoff.
+A non-secret evaluated-roll handoff MUST separately recheck the initiating viewer's entitlement after commit; this cannot substitute for initial-prompt redaction.
 
 ## Downtime Preview and Premium Extension
 

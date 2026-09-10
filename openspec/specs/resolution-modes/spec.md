@@ -238,7 +238,7 @@ This is a defensive guard rather than a fix: legacy salvage tokens are normalize
 ## Player-Facing Mode Labels
 
 The `resolutionMode` token is system-internal and must never surface raw in player UI.
-The player-facing Journal screen (see `ui-integration/spec.md` *Journal App*) maps each mode to a localized display label through a frozen label-key map (`RunJournalBuilder.MODE_LABEL_KEYS`), resolved against the `FABRICATE.App.Journal.Mode.*` localization keys.
+The player-facing Journal screen (see `ui-integration/spec.md` *Journal App*) maps crafting modes through `RunJournalBuilder.MODE_LABEL_KEYS` and gathering yield modes through their dedicated keys, all resolved against `FABRICATE.App.Journal.Mode.*`.
 
 | Mode                  | Localization key                                 | Player label          |
 |-----------------------|--------------------------------------------------|-----------------------|
@@ -247,6 +247,9 @@ The player-facing Journal screen (see `ui-integration/spec.md` *Journal App*) ma
 | `routedByCheck`       | `FABRICATE.App.Journal.Mode.RoutedByCheck`       | Routed by Check       |
 | `progressive`         | `FABRICATE.App.Journal.Mode.Progressive`         | Progressive           |
 | `alchemy`             | `FABRICATE.App.Journal.Mode.Alchemy`             | Alchemy               |
+| `straight` (gathering) | `FABRICATE.App.Journal.Mode.straight` | Direct |
+| `d100` (gathering) | `FABRICATE.App.Journal.Mode.d100` | d100 |
+| `routed` (gathering) | `FABRICATE.App.Journal.Mode.routed` | Check |
 
 - There is no canonical "Standard" resolution mode.
 `simple` (a DC pass/fail check) renders as "Standard (DC)" for players, even though its internal token stays `simple`.
@@ -264,6 +267,19 @@ Gathering does not use recipe `checkOutcomeIds` as routing authority.
 5. `progressive` retains its distinct accumulated numeric-budget semantics; it is never an alias for routed resolution.
 6. Immediate and matured-waiting execution select the same active result source, and production/reference reporting follows that source.
 Inactive mode data may remain stored but never contributes awards jointly.
+7. New task authoring offers Direct, d100 and Check; a persisted progressive task retains its legacy budget behavior until explicitly changed to an authorable mode.
+8. Journal previews MUST distinguish authored possible yields from actual received results.
+Direct displays its one result set, d100 displays one shared roll cut against drop chances, and Check displays the complete noninteractive outcome ladder including failure.
+Progressive retains ordered component costs and accumulated-budget semantics rather than being rendered as drop chances or outcome tiers.
+
+## Versioned Check Entitlement
+
+The canonical active-check resolver MUST govern both Journal check labels and completion-preference eligibility.
+Alchemy `none` has no check, `simple` reads the simple check slot, and `tiered` reads the routed slot.
+Versioned player checks use an authenticated prepare/resolve exchange: the player chooses permitted roll options, while the active GM evaluates the authoritative check.
+Initial secret prompts MUST omit protected subject, artwork, formula, DC and modifier details before transport.
+Secret checks use GM private posting without serialized roll-data handoff; non-secret roll handoff additionally requires a fresh post-commit entitlement check and never rolls a second time.
+Roll delivery and chat posting are separate from run settlement; missing chat delivery MUST NOT authorize replay of spending or awards.
 
 ## Simple Mode
 
@@ -743,7 +759,7 @@ The reserved-keyword "nothing" rule must not collide with Simple's producing fai
 - The projected revealed-recipe **signature summary** must be rich enough to display alternatives, per-option quantities, and set-level essence requirements (an alchemy recipe now carries exactly one ingredient set, so multi-set richness no longer applies — issue 554).
 - **Client mode is advisory; the engine is authoritative on brew.** The client resolves TWO signature shapes: a concrete plain-component multiset AND an essence-only requirement (via a projected `essenceRequirement`, using `>=` matching that mirrors the engine's `_matchAlchemySignature`).
 It fails safe to `untried` for everything else — alternatives (multi-option groups), tag-based requirements, and mixed group+essence sets (`AlchemyListingBuilder._essenceRequirement` deliberately returns null for those) — and NEVER emits a false `ready`/`assembling`.
-- **Brew-result banner status enum.** A brew reports one of five banner states, styled distinctly: `success` (a passed brew produced its success result set); `tiered-tier` (a passed Tiered brew produced its outcome-tier result set); `produced-on-failure` (a matched Simple brew FAILED its check and produced the reserved failure result set — styled with the warning tone, NEVER success-green, and composing with a discovery); `brewing` (a TIME-GATED brew that STARTED — the signature matched, the inputs are consumed, and the run is live in the Journal awaiting world time; styled informationally, never as a failure, and composing with a discovery); `no-match-fizzle` (no reaction, a Tiered fail, or a misconfiguration).
+- **Brew-result banner status enum.** A brew reports one of five banner states, styled distinctly: `success` (a passed brew produced its success result set); `tiered-tier` (a passed Tiered brew produced its outcome-tier result set); `produced-on-failure` (a matched Simple brew FAILED its check and produced the reserved failure result set — styled with the warning tone, NEVER success-green, and composing with a discovery); `brewing` (a TIME-GATED brew that STARTED — the signature matched and the run is live in the Journal; version 1 defers editable-material spending to execution, while legacy runs consumed at START; styled informationally, never as a failure, and composing with a discovery); `no-match-fizzle` (no reaction, a Tiered fail, or a misconfiguration).
 A started time-gated brew is identified by the engine's `disposition: 'timed-start'`, NOT by `success` — which is `false` for it, because nothing has been produced yet (issue 966).
 Without that disposition the workbench read a successfully started brew as a no-signature fizzle and told the player it had failed while their ingredients were being consumed.
 A `simple`/`tiered` learned recipe carries a "check gates this outcome" hint; the reserved failure-group result is NEVER surfaced to the player Produces panel (leak invariant).

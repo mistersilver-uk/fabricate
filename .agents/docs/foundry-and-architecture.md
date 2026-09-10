@@ -196,6 +196,10 @@ What matters is the **transitive import graph, not the rendered tree**: the harn
 The server sets it from the authenticated session in `dist/server/sockets.mjs handleCustomSocket` (`this.user.id`), so it is non-forgeable; a payload `userId` field is client-supplied and spoofable.
 Authenticate socket senders via the 2nd arg (e.g. gate privileged edges on `game.users.get(senderId)?.isGM`), never via the payload — `socketlib` merely wraps this same mechanism and adds no stronger guarantee (so it is not needed for sender auth).
 The interactable socket layer does this: `handleInteractableSocketMessage` (`src/canvas/interactableSocketBridge.js`) takes `{ senderId, isSenderGM }` from `main.js` and gates the visual write/delete edges (GM-only), the behaviour-update edge (non-GM restricted to `system.node`), and activation (requester must be the sender) — see issue 593.
+- **A custom-socket options argument must be an object, including on the untargeted leg.**
+Passing `undefined` as an explicit argument inside the serialized socket argument array turns it into `null`, and core's options destructuring throws on both V13.351 and V14.365 (issue 1648 runtime-boundary review).
+`createJournalCommandsForFabricate` in `src/main.js` therefore emits `options ?? {}`; targeted replies supply `{ recipients: [senderId] }` rather than relying on a recipient field inside a broadcast payload.
+Transport recipients bound the audience; attested sender and session/request/run/revision correlation still govern acceptance.
 - **Foundry's `Localization#localize()` is a dotted-path WALK (`foundry.utils.getProperty`) over the nested `lang/` tree — not a flat-key lookup — and returns the key VERBATIM on any non-string result.** `lang/en.json` is a nested object, so every key segment is a real node.
 The consequence: **a string occupying a namespace slot silently shadows every key beneath it.** If `FABRICATE.Component.Salvage` is authored as a string and something also reads `FABRICATE.Component.Salvage.Enabled`, the walk steps into the string, finds no such property, and returns the key — whereupon Fabricate's `text(key, fallback)` idiom (`translated && translated !== key ? translated : fallback`, e.g. in `ProgressiveStageList.svelte`) quietly renders its **hardcoded English fallback**.
 **Nothing fails.** The UI reads correctly in English, screenshots look right, and mounted tests pass — so the whole class is invisible until a translator ships a locale where the fallback is wrong-language.
@@ -308,6 +312,14 @@ Cite code by symbol name and file path only — for example `_playerListingField
 
 Some contributor-workflow deep-dives moved into `CONTRIBUTING.md`: the Foundry smoke harness (`npm run test:foundry` phases, outputs, Phase D0 selector drift) is the "Foundry integration (smoke) tests" section; UI PR screenshot evidence is the "UI PR screenshot evidence" section; the Foundry-vs-Fabricate CSS override map (button layout, focus rings, specificity ladder) is the "Foundry vs Fabricate CSS overrides" section.
 Interrupted or stale per-worktree smoke recovery is defined in `.agents/skills/fabricate-orchestrator/references/foundry-smoke-lifecycle.md`.
+
+### Versioned Journal authority and recovery
+
+`journalRunCommands.js` and `journalRunAuthority.js` in `src/systems/` own version-1 arbitration; an absent lifecycle version alone selects legacy behavior.
+`executePublicCraft` preserves ready, fully supplied one-call crafting through the same active-GM boundary, while `CraftingRunManager.pruneInstantaneousActiveRuns` excludes versioned records that may legitimately wait for manual execution.
+The explicit Journal setup action provisions one private ledger only after single-GM-session confirmation; active-GM identity alone cannot distinguish two tabs for the same user.
+`reconcileJournalRunAuthority({ claimId, disposition })` records `reconciled` or `abandoned` and releases the matching retained claim only after reconstructing its run evidence; it never retries uncertain effects or promises transactional rollback.
+Initial crafting check descriptors are redacted in `createCraftingJournalOperations` in `src/main.js` before transport, independently of the post-commit roll-handoff entitlement check.
 
 ### Manager confirm-discard guard
 
