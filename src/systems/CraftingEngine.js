@@ -1149,7 +1149,9 @@ export class CraftingEngine {
       const selectedIndex =
         ['number', 'string'].includes(typeof raw) && String(raw).trim() ? Number(raw) : NaN;
       if (options.length > 1 && !supplied) return null;
-      return Number.isSafeInteger(selectedIndex) ? (options[selectedIndex] ?? null) : null;
+      return Number.isSafeInteger(selectedIndex) && selectedIndex >= 0
+        ? (options.at(selectedIndex) ?? null)
+        : null;
     });
     if (selectedOptions.includes(null)) return false;
     const requiresEssenceAllocation =
