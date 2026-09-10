@@ -373,6 +373,12 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-future-stage',
   ]),
+  'src/ui/svelte/components/ListRow.svelte': Object.freeze([
+    'fabricate-journal-lifecycle-ready-single',
+    'fabricate-journal-lifecycle-finished-success',
+    'fabricate-journal-lifecycle-gathering-d100',
+    'fabricate-journal-lifecycle-gathering-check',
+  ]),
   'src/ui/svelte/components/YieldScale.svelte': Object.freeze([
     'fabricate-journal-lifecycle-gathering-d100',
   ]),

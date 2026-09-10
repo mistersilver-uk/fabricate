@@ -209,6 +209,7 @@ const EXPECTED_OVERRIDE_KEYS = [
   // ladder in the crafting detail, and three field labels changing size, weight and tracking in
   // the recipe-item editor.
   'src/ui/svelte/components/Kicker.svelte',
+  'src/ui/svelte/components/ListRow.svelte',
   'src/ui/svelte/components/ManagerSearchField.svelte',
   'src/ui/svelte/components/ManagerToolbar.svelte',
   // Issue 1506: the app's ONE art tile, after it absorbed both crafting thumbnails. ONE frame,
