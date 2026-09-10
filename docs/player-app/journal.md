@@ -38,7 +38,9 @@ Its counts describe the selected kind before search or paging, so a search can s
 
 Both lists start with four runs per page and have independent page sizes and page controls.
 You can choose 4, 6, 12, or 25 runs per page.
+Each compact pager keeps its range, arrows, and page-size choice on one row.
 Changing one list's page does not move the other list's page.
+The list sections keep their space when a page is short or empty, and an empty-state panel fills the available list area.
 Your selected detail stays open even when its row is on another page or hidden by a filter, including a search with no matches.
 Removing or dismissing the selected run lets the Journal select another entry.
 
@@ -60,7 +62,8 @@ It also keeps pace when another player or your GM starts, advances, or finishes 
 
 ## Finished history and hiding entries
 
-A finished run carries a status of **Succeeded**, **Failed**, or **Cancelled**.
+A finished row uses an outcome icon for **Succeeded**, **Failed**, or **Cancelled**.
+An unrecognized outcome stays **Outcome unknown**, and settlement or recovery takes precedence over a success indication.
 Sort Finished by **Newest** or **Oldest**, then use its pages to browse history.
 The selected detail distinguishes what the run required, what was actually spent, its recorded checks, and what was actually received.
 An upcoming or unexecuted stage is not marked completed just because the run ended.
@@ -77,9 +80,14 @@ It does not carry into other worlds, and active runs cannot be dismissed.
 
 ## Run detail
 
-The detail opens with the run's identity and available actions, followed by notices, its outcome when finished, progress, stage requirements, yields, and the **Run record**.
-The record labels identifiers separately from readable names and includes the available mode and start or finish times.
-One guidance callout at the bottom explains the current activity or state and reminds you how world time and history work.
+An active run opens with its identity, available actions, and relevant notices.
+For the current crafting stage, progress and stage navigation lead into the stage's purpose, **Produces**, and **Consumes**.
+The current stage's **Time** and **Check** summaries follow.
+Protected or unknown check details are not described as **No check**.
+
+The compact **This run** section shows the start time, the closed time for a finished run, and recorded pause timing where applicable.
+An untitled guidance callout at the bottom explains the selected state.
+Its advice changes when you browse another stage, open finished history, or encounter a blocker or recovery requirement.
 
 {% include screenshot.html case="fabricate-journal-craft-detail" %}
 
@@ -87,6 +95,11 @@ One guidance callout at the bottom explains the current activity or state and re
 
 For a multi-stage craft, use the stage navigator to inspect past and upcoming stages, then **Return to current stage** to continue your work.
 Viewing another stage never advances the run.
+Past stages pair their recorded **Consumed** and **Produced** evidence with recorded checks and routes.
+Upcoming stages pair **Will consume** and **Will produce** previews, including the permitted alternatives and ingredient routes.
+These views are read-only and omit the current stage's countdown and separate Time and Check summaries.
+Previewing an option does not select it or reserve materials.
+Its choices become available when that stage becomes current.
 Only the current stage can offer editable material controls, and only while the run permits changes.
 A single-stage recipe omits the redundant stage navigator.
 
@@ -103,27 +116,71 @@ Repeated requirements for the same essence add together.
 For example, two requirements of two Fire each need four Fire in total.
 Extra contribution appears below the carrier list as overshoot.
 
-### Possible yields and Received
+### Possible yields and actual results
 
 **Possible yields** describe what the authored activity could produce.
 They are previews, not items already awarded to your character.
-**Received** reports recorded results after execution.
+After execution, history reports actual awards as **Crafted**, **Brought back**, or **Recovered**, according to the activity.
 
 - **Direct** gathering previews its result set without a yield roll.
 - **d100** gathering compares one shared roll against the item drop chances.
   It does not roll separately for each item.
+  Higher effective rolls clear the displayed thresholds.
 - **Check** gathering shows the outcome ladder, including failure.
-  The ladder explains outcomes and does not let you select one.
+  The preview ladder explains outcomes and does not let you select one.
 - Existing **Progressive** gathering uses its accumulated yield budget and ordered component costs.
   Those costs are not drop chances or outcome tiers.
+
+### Reading a closed run
+
+Finished history is a read-only account of what happened.
+It has no active actions, progress bar, stage navigation, editable materials, or Time and Check pair.
+
+A successful single-stage craft with a recorded check starts with **Final check**.
+A confirmed no-check resolution shows **Resolution** instead.
+A failed checked single-stage craft puts its roll in the failure verdict without a second check summary.
+Missing check evidence remains **Not recorded** rather than becoming proof that no check was needed.
+
+When more than one stage was attempted, **How each stage went** presents them together in order, with each stage's check and actual consumed and produced items.
+An initialized next stage is not an attempt by itself.
+Cancelling before execution leaves timing and cancellation guidance, while cancelling after completed stages retains their actual earlier spending and awards.
+
+**Materials used**, **Crafted**, and **Tools used** use compact image cards in four columns.
+Long names are shortened visually, with the full text available in the tooltip.
+**Tools used** groups repeated uses only when the history identifies the same physical item.
+Each use retains its stage, recorded quantity, and any recorded broken, virtual, spared, or immune state.
+Repeated use is not a total of tools consumed, and missing breakage evidence does not mean a tool was intact.
+Matching names or images alone do not combine separate tools.
+
+Material, essence-carrier, currency, and award receipts describe recorded spending or delivery, not the recipe's planned amounts.
+A carrier's recorded contributions can include several essences even though that physical unit was consumed once.
+Missing evidence is unknown, while an explicitly recorded empty receipt or zero amount establishes zero.
+A displayed zero quantity is never a positive award.
+Missing item details can appear as **Unknown material** or **Not recorded**.
+Later recipe edits do not rewrite captured stage purpose or executed resolution evidence.
+
+Direct gathering shows **Resolution** with **No roll** and its **Brought back** items.
+D100 history keeps the recorded roll, high-roll thresholds, cleared or missed rows, and attributable awarded quantities together on one scale.
+If an actual award cannot be attributed to individual rows, their amounts remain **Not recorded** and the award appears once with an explanation.
+Check-based gathering records **How the check landed**, rather than repeating the preview ladder.
+The recorded run status and actual awards are separate facts.
+An absence of drops does not by itself mean failure, and a permitted failure award does not turn a failed run into a success.
+
+Immediately after resolution, a result notice may show the selected run's summary and receipts.
+Reselecting the run restores its ordinary history layout.
+The bottom guidance describes a closed record, distinguishing delivered results, confirmed no awards, missing evidence, cancellation, and recovery.
+It does not invite another execution of the finished run.
 
 ## Continue, pause, or cancel
 
 New crafting, alchemy, and gathering runs use the current run lifecycle.
-When ready, use **Trigger Next Step**, **Finish Crafting**, **Brew**, or **Collect**, as appropriate to the selected run.
+When ready, use **Complete stage**, **Complete**, **Brew**, or **Collect**, as appropriate to the selected run.
+An available check action says **Roll check**, while d100 gathering says **Roll a d100**.
 Any required player check stays manual.
 The action explains why it is unavailable when the run cannot proceed.
 You must own the crafting character and its material-source characters, or ask your GM to act.
+When a crafting stage is already ready and all its choices are supplied, the starting action can execute it immediately through the same active-GM authority.
+Manual completion does not require an extra Journal visit for that fully supplied case.
 
 Starting a timed craft records the wait and your selections without spending editable ingredients or currency.
 They are rechecked and spent only when the ready stage executes.
@@ -170,7 +227,8 @@ A planned quantity is not proof of spending or an award.
 Ordinary execution and cancellation remain unavailable for a run requiring recovery.
 
 An unresolved execution claim can also block other current-lifecycle runs.
-The active GM must inspect the recorded receipts and the uncertain boundary, then manually record a reconciliation or abandonment through the recovery API.
+The active GM must inspect the recorded receipts and the uncertain boundary, then manually record a reconciliation or abandonment.
+This is a separate recovery procedure, not the **Set up authority…** action.
 That releases the matching claim only.
 It never retries the uncertain effect, makes the old request replayable, or automatically rolls anything back.
 The uncertain run remains marked as requiring recovery.
@@ -180,6 +238,8 @@ The uncertain run remains marked as requiring recovery.
 A hidden crafting recipe or blind gathering task keeps its protected details out of your Journal view.
 The owner still has the actions the run's lifecycle permits, subject to the same timing, authority, and recovery restrictions as other runs.
 The GM can see permitted secret previews.
+Anonymous gathering entries use a generic pouch image, while an entitled GM preview can retain the task's own image.
+Owning the character does not by itself reveal protected historical materials, tools, or results.
 
 For a secret check, the player receives a generic prompt and the GM evaluates and privately posts the roll.
 Secret roll details are not handed back for player-side posting or dice animation.
@@ -202,7 +262,8 @@ Fabricate does not reinterpret it as an older run or allow ordinary mutations.
 Every countdown, timestamp, and "ready" state in the Journal is measured in the game world's time, not real time.
 A countdown only moves when your GM advances the game clock.
 The world clock is read-only in the Journal.
-The detail guidance reminds you of this so an unmoving countdown is not mistaken for a stuck timer.
+The clock and recorded times use the world's existing calendar formatting and fallback.
+Pausing one run does not pause the world's clock.
 
 ## See Also
 
