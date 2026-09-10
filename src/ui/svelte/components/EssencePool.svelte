@@ -1,5 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
+  import { SvelteMap } from 'svelte/reactivity';
   import FillBar from './FillBar.svelte';
   import Medallion from './Medallion.svelte';
   import Stepper from './Stepper.svelte';
@@ -30,7 +31,7 @@
   // Repeated requirements consume the same essence budget, rather than each
   // independently claiming the full contribution of the shared carrier.
   const pools = $derived.by(() => {
-    const byEssence = new Map();
+    const byEssence = new SvelteMap();
     for (const threshold of thresholds) {
       const pool = byEssence.get(threshold.essence) ?? { ...threshold, amount: 0, sources: [] };
       pool.amount += Math.max(0, Number(threshold.amount) || 0);
