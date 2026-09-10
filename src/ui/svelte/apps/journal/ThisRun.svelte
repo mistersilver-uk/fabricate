@@ -17,7 +17,7 @@
   }
 </script>
 
-<InspectorCard data-journal-this-run>
+<InspectorCard data-journal-this-run="">
   <Kicker>{localize('FABRICATE.App.Journal.History.ThisRun')}</Kicker>
   <div class="journal-timing-facts">
     <JournalFactRow

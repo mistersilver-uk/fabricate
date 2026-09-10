@@ -13898,8 +13898,8 @@ test('the pager names its per-page control with the words a GM can see', () => {
   );
   assert.match(
     source,
-    /<span id=\{captionId\}\s*>\{text\('FABRICATE\.Admin\.Manager\.Pagination\.PerPage'/,
-    'the visible caption carries the per-instance id'
+    /<span id=\{captionId\}\s+class:manager-pagination-hidden=\{compact\}\s*>\{text\('FABRICATE\.Admin\.Manager\.Pagination\.PerPage'/,
+    'the caption carries the per-instance id, visually hidden only in compact mode'
   );
   assert.match(
     source,

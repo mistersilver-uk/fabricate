@@ -280,17 +280,25 @@ const SITE_MAPPING = [
     deleteSites: 1,
   },
   {
-    site: 'CraftingEngine._consumeAlchemyExtraItems + _consumeSubmittedAlchemyItems + _consumeIngredients',
+    site: 'CraftingEngine._consumeSubmittedAlchemyItems legacy no-match consumption',
     file: 'src/systems/CraftingEngine.js',
     accessor: 'readStoredStackQuantity',
-    sites: 3,
+    sites: 1,
     absentDefault: 1,
-    deleteSites: 3,
-    // The two alchemy consume sites are spelled identically, so the first anchor accounts
-    // for two of the three occurrences and the totals assertion covers the rest.
+    deleteSites: 1,
+    anchors: [/const qty = readStoredStackQuantity\(item, \{ absentDefault: 1 \}\);/],
+  },
+  {
+    site: 'CraftingEngine._consumeItemQuantity shared ingredient and alchemy consumption',
+    file: 'src/systems/CraftingEngine.js',
+    accessor: 'readStoredStackQuantity',
+    sites: 1,
+    absentDefault: 1,
+    deleteSites: 1,
+    // One physical read/delete site now serves ingredients, alchemy extras and versioned
+    // alchemy. Anchor the owning helper to distinguish its read from the receipt base read.
     anchors: [
-      /const qty = readStoredStackQuantity\(item, \{ absentDefault: 1 \}\);/,
-      /const itemQuantity = readStoredStackQuantity\(item, \{ absentDefault: 1 \}\);/,
+      /async _consumeItemQuantity\(item, quantity, requireConfirmation\)\s*\{\s*const before = readStoredStackQuantity\(item, \{ absentDefault: 1 \}\);/,
     ],
   },
   {
@@ -306,18 +314,17 @@ const SITE_MAPPING = [
     accessor: 'readStoredStackQuantity',
     sites: 2,
     absentDefault: 1,
-    deleteSites: 1,
     anchors: [
       /if \(readStoredStackQuantity\(item, \{ absentDefault: 1 \}\) < count\)/,
-      /const before = readStoredStackQuantity\(item, \{ absentDefault: 1 \}\);/,
+      /const before = readStoredStackQuantity\(item, \{ absentDefault: 1 \}\);\s*await this\._consumeItemQuantity\(item, count, true\);/,
     ],
   },
   {
-    site: 'CraftingEngine versioned alchemy decrement write (#1648)',
+    site: 'CraftingEngine._consumeItemQuantity shared decrement write (#1648)',
     file: 'src/systems/CraftingEngine.js',
     accessor: 'updateStackQuantity',
     sites: 1,
-    anchors: [/updateStackQuantity\(item, before - count\)/],
+    anchors: [/updateStackQuantity\(item, before - quantity\)/],
   },
   {
     site: 'RunJournalBuilder candidate held quantity (#1648)',
@@ -334,13 +341,12 @@ const SITE_MAPPING = [
     anchors: [/setStackQuantity\(itemData, qty\);/, /setStackQuantity\(itemData, result\.quantity\);/],
   },
   {
-    site: 'CraftingEngine decrement writes on the four delete sites',
+    site: 'CraftingEngine legacy no-match alchemy and pooled salvage decrement writes',
     file: 'src/systems/CraftingEngine.js',
     accessor: 'updateStackQuantity',
-    sites: 4,
+    sites: 2,
     anchors: [
       /updateStackQuantity\(item, qty - count\)/,
-      /updateStackQuantity\(item, itemQuantity - quantity\)/,
       /updateStackQuantity\(take\.item, take\.remainingQuantity\)/,
     ],
   },
@@ -724,7 +730,7 @@ describe('the per-site accessor mapping', () => {
     assert.deepEqual(asSortedPairs(countAbsentDefaults(1)), asSortedPairs(declared));
   });
 
-  it('records exactly five delete-on-underrun sites, and five decrement writes beside them', () => {
+  it('records exactly three delete-on-underrun sites, and three decrement writes beside them', () => {
     // Counted from an explicit field rather than parsed out of the label: a label-substring
     // filter reads as a check while actually depending on prose nobody validates.
     const total = SITE_MAPPING.reduce((sum, entry) => sum + (entry.deleteSites ?? 0), 0);
@@ -734,7 +740,7 @@ describe('the per-site accessor mapping', () => {
     const contributors = SITE_MAPPING.filter((entry) => (entry.deleteSites ?? 0) > 0).map(
       (entry) => `${entry.site} (${entry.deleteSites})`
     );
-    assert.equal(total, 5, `expected five delete-on-underrun sites: ${contributors.join('; ')}`);
+    assert.equal(total, 3, `expected three delete-on-underrun sites: ${contributors.join('; ')}`);
     for (const entry of SITE_MAPPING) {
       assert.ok(
         (entry.deleteSites ?? 0) <= entry.sites,
@@ -748,7 +754,7 @@ describe('the per-site accessor mapping', () => {
       (entry) =>
         entry.file === 'src/systems/CraftingEngine.js' && entry.accessor === 'updateStackQuantity'
     ).reduce((sum, entry) => sum + entry.sites, 0);
-    assert.equal(engineWrites, 5);
+    assert.equal(engineWrites, 3);
   });
 });
 

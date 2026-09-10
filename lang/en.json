@@ -1181,7 +1181,6 @@
         "Stage": {
           "Number": "Stage {index}",
           "Route": "Ingredient route",
-          "ChooseRoute": "Choose an ingredient route",
           "ChosenRoute": "Chosen",
           "RouteShortfall": "Short {count} requirements",
           "CandidateReading": "{held} held · needs {needed} · {spare} spare",
@@ -1207,30 +1206,19 @@
           "ReturnFinal": "Return to final stage {index}",
           "StaleSelection": "A selected material is no longer available. Choose a replacement explicitly.",
           "State": {
-            "failed": "Failed",
-            "unexecuted": "Not completed",
-            "past": "Completed",
-            "current": "Current",
-            "future": "Upcoming",
             "paused": "Paused"
           }
         },
         "Yields": {
           "PreviewTitle": "Possible yields",
-          "AwardedTitle": "Received",
-          "Item": "Result",
           "None": "No items",
           "Chance": "{chance}% chance",
           "HighRollThreshold": "Effective roll {threshold} or higher",
           "RoutedRule": "One outcome is selected: the highest matching threshold, or the lowest outcome below every relative threshold. Fixed ranges include both ends; gaps match nothing. Critical outcomes and the configured minimum success outcome still apply.",
           "Awarded": "Awarded at {chance}%",
           "Missed": "Not awarded at {chance}%",
-          "Received": "Received",
-          "AwardedChip": "Awarded",
-          "PreviewChip": "Preview",
           "CraftingPreviewHint": "Current stage preview; received items are recorded after execution.",
           "FuturePreviewHint": "Future stage preview; its choices open when this stage is reached. Received items are recorded after execution.",
-          "OnSuccess": "On successful completion",
           "ProgressiveTitle": "Progressive yield budget",
           "ProgressiveHint": "The accumulated result pays component costs in this order; these are not outcome tiers or drop chances.",
           "BudgetCost": "{quantity} · budget cost {cost}",
@@ -1243,12 +1231,6 @@
           },
           "LoadingPreview": "Working out your current chances…",
           "PreviewError": "Current chances could not be loaded. Showing the authored chances."
-        },
-        "Record": {
-          "Title": "Run record",
-          "RecipeId": "Recipe ID",
-          "TaskId": "Task ID",
-          "Finished": "Finished"
         },
         "AuthoritySetup": {
           "Title": "Set up Journal authority",

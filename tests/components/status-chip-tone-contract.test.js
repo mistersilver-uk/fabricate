@@ -77,7 +77,8 @@ const MAP_READERS = COMPONENTS.filter(({ source }) => source.includes(MAP_MODULE
  * this corpus binds a tone the map never sees" is satisfied by a corpus with no dynamic chips in
  * it at all, which is exactly what a regression that reverted the conversion would produce.
  */
-const MAPPED_TONE_SITES = 24;
+// #1648 replaces HistoryRow's mapped status chip with a labeled outcome glyph.
+const MAPPED_TONE_SITES = 23;
 
 /** The one shipped chip that asks for the flat plate. */
 const OUTLINED_CHIP = 'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte';
@@ -108,13 +109,13 @@ function dynamicToneOf(tag) {
 }
 
 describe('1506 the tone map — its landed domain', () => {
-  it('is read by the nineteen files the conversion routed through it', () => {
+  it('is read by the eighteen files retaining mapped status chips', () => {
     assert.equal(
       MAP_READERS.length,
-      19,
+      18,
       'the number of files importing the tone map moved. A file JOINING it is a later phase ' +
         'converting more sites and this pin moves with it; a file LEAVING it is a converted ' +
-        'site that has gone back to binding a projected tone straight onto a chip, which ' +
+        'site that must be checked for retired chips or a projected tone bound directly, which ' +
         'renders untoned and fails nothing else. Found: ' +
         MAP_READERS.map(({ path }) => path).join(', ')
     );
@@ -190,8 +191,8 @@ describe('1506 the journal run chip — its shrink protection is restated per ca
     const callers = COMPONENTS.filter(({ source }) => source.includes(`class="${RUN_CHIP_CLASS}"`));
     assert.equal(
       callers.length,
-      3,
-      'RunDetail now owns a header chip without the row class (#1648); three row callers remain. ' +
+      2,
+      'RunDetail owns a header chip and HistoryRow an outcome glyph (#1648); two row chip callers remain. ' +
         `Found: ${callers.map(({ path }) => path).join(', ')}`
     );
 

@@ -127,7 +127,7 @@ describe('GatheringView 3-column layout and states', () => {
     for (const wrapper of ['journal-browse', 'journal-browse-lists']) {
       assert.match(narrow, new RegExp(`\\.${wrapper}\\s*\\{\\s*display: contents;`));
     }
-    assert.match(narrow, /journal-list-section\)[^{]*\{[^}]*min-height:\s*220px;[^}]*max-height:\s*360px;/);
+    assert.match(narrow, /journal-list-section\)[^{]*\{[^}]*box-sizing:\s*border-box;[^}]*height:\s*360px;[^}]*min-height:\s*360px;/);
     assert.match(narrow, /\.journal-detail-pane\s*\{[^}]*min-height:\s*220px;[^}]*overflow:\s*visible;/);
     const positions = ['<ActiveRunsList', '<HistoryList', '<RunDetail'].map((tag) => {
       const index = journalSource.indexOf(tag);

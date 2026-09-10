@@ -1086,7 +1086,7 @@ for (const scenario of ['delete-veto', 'update-refusal', 'prefix-then-veto', 'do
       const reloaded = new CraftingRunManager().getRun(actor, started.runId);
       assert.equal(reloaded.executionJournal.status, 'recoveryRequired');
       const consumption = reloaded.executionJournal.effects.find((effect) => effect.effectId === 'consume-ingredients');
-      assert.notEqual(consumption.status, 'applied');
+      assert.notEqual(consumption.phase, 'applied');
       assert.equal(consumption.receipt == null, true);
       assert.equal(awards, 0);
       assert.equal(source.items.length, 1, 'a successful prefix stays spent, the vetoed item remains');

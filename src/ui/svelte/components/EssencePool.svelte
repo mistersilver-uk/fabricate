@@ -125,7 +125,7 @@
     <div class="fab-essence-sources">
       {#each history.carriers ?? [] as source (source.id)}
         <div class="fab-essence-source" data-essence-history-carrier={source.id}>
-          <Medallion art={source.img || ''} icon="fas fa-flask" size={26} />
+          <Medallion art={source.img || ''} alt="" icon="fas fa-flask" size={26} />
           <div class="fab-essence-source-copy">
             <span class="fab-essence-source-name">{source.label}</span>
             <span class="fab-essence-source-reading"

@@ -192,7 +192,7 @@
       {@render items(text('BroughtBack'), account.results, 'produced')}
     {/if}
     {#if account.mode === 'routed'}
-      <InspectorCard data-history-outcome-log>
+      <InspectorCard data-history-outcome-log="">
         <Kicker>{text('OutcomeLog')}</Kicker>
         {#if account.failed}<JournalFactRow
             label={text('Rolled')}

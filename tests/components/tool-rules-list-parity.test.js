@@ -314,6 +314,7 @@ const READ_PROBES = () =>
         element.dataset.probe,
         {
           fontSize: style.fontSize,
+          lineHeight: style.lineHeight,
           fontWeight: style.fontWeight,
           letterSpacing: style.letterSpacing,
           color: style.color,
@@ -330,6 +331,7 @@ const READ_PROBES = () =>
           minWidth: style.minWidth,
           width: Math.round(box.width),
           height: Math.round(box.height),
+          fractionalHeight: box.height,
         },
       ];
     })
@@ -824,8 +826,9 @@ test('the Tool Rules toolbar renders the design’s own type and geometry', asyn
     // variant on the primitive rather than a caller override; see its docblock.
     assert.equal(measured['selected-still-chip'].fontSize, '9px', 'proto:4872 chip size');
     assert.equal(measured['selected-still-chip'].fontWeight, '600', 'proto:4872 chip weight');
+    assert.equal(measured['selected-still-chip'].lineHeight, '14.4px', 'the canonical list line-height is 1.6');
     assert.ok(
-      Math.abs(measured['selected-still-chip'].height - 18.4) < 0.1,
+      Math.abs(measured['selected-still-chip'].fractionalHeight - 18.4) < 0.1,
       `the canonical list specimen uses 9px × 1.6 + padding + border, measured ${JSON.stringify(measured['selected-still-chip'])}`
     );
   } finally {
