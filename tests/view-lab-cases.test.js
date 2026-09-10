@@ -1012,12 +1012,12 @@ test('all Journal lifecycle captures assert defining product state rather than a
   }
   assert.match(byState.get('legacy').expectSelector, /data-run-action="pause"\]:disabled/);
   assert.equal(
-    byState.get('filter-paused').steps[0].selector,
+    byState.get('filter-paused').steps.at(-1).selector,
     '[data-journal-status-filter] label:has(input[value="paused"])'
   );
   assert.equal(
     byState.get('filter-paused').expectCenterHit,
-    byState.get('filter-paused').steps[0].selector
+    byState.get('filter-paused').steps.at(-1).selector
   );
   assert.match(byState.get('filter-paused').expectSelector, /:checked/);
   assert.match(byState.get('empty-search').expectSelector, /data-journal-empty="active"/);

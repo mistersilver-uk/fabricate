@@ -1517,6 +1517,11 @@ function journalLifecycleCases() {
     'kind-menu-open',
     'history-settling',
   ];
+  const selectRivets = [
+    { selector: '[data-journal-search] input', fill: 'Forge Iron Rivets' },
+    { selector: '[data-run-id="lab-v1-active-4"]' },
+    { selector: '[data-journal-search] input', fill: '' },
+  ];
   const steps = {
     paused: [
       { selector: '[data-run-action="pause"]' },
@@ -1542,8 +1547,14 @@ function journalLifecycleCases() {
       { selector: '[data-run-action="cancel-confirm"]' },
       { selector: '[data-history-run-id="lab-v1-finished-cancelled"]' },
     ],
-    'active-page-two': [{ selector: '[data-journal-list="active"] [data-pagination-next]' }],
-    'finished-page-two': [{ selector: '[data-journal-list="finished"] [data-pagination-next]' }],
+    'active-page-two': [
+      ...selectRivets,
+      { selector: '[data-journal-list="active"] [data-pagination-next]' },
+    ],
+    'finished-page-two': [
+      ...selectRivets,
+      { selector: '[data-journal-list="finished"] [data-pagination-next]' },
+    ],
     ...Object.fromEntries(
       ['straight', 'd100', 'check'].map((mode) => [
         `gathering-${mode}-finished`,
@@ -1554,6 +1565,7 @@ function journalLifecycleCases() {
       ])
     ),
     'filter-paused': [
+      ...selectRivets,
       { selector: '[data-journal-status-filter] label:has(input[value="paused"])' },
     ],
     'empty-search': [{ selector: '[data-journal-search] input', fill: 'No matching Journal run' }],
@@ -1638,7 +1650,7 @@ function journalLifecycleCases() {
       otherRow,
       `[data-journal-list="${kind}"] [data-pagination-prev]:not(:disabled)`,
       `[data-journal-list="${kind}"] [data-pagination-next]:not(:disabled)`,
-      detail
+      `${detail}[data-run-key*="lab-v1-active-4"]`
     );
   const roomy =
     detail + has('[data-stage-card="1"][data-stage-state="current"]', '[data-stage-nav-index="2"]');
@@ -1768,6 +1780,7 @@ function journalLifecycleCases() {
       '.journal-view-container' +
       has(
         '[data-journal-status-filter] input[value="paused"]:checked',
+        `${detail}[data-run-key*="lab-v1-active-4"]`,
         '[data-run-id="lab-v1-filter-paused"][data-run-status="paused"]'
       ) +
       lacks('[data-run-status="ready"]'),
@@ -1992,7 +2005,7 @@ function journalLifecycleCases() {
       expectTab: 'journal',
       expectSelector: expected[state],
       ...(pointerTargets[state] && { expectCenterHit: pointerTargets[state] }),
-      ...(state === 'filter-paused' && { expectCenterHit: steps[state][0].selector }),
+      ...(state === 'filter-paused' && { expectCenterHit: steps[state].at(-1).selector }),
       ...(state === 'kind-menu-open' && { expectCenterHit: '[data-popover-option="gathering"]' }),
       ...(state === 'current-choice-closed' && {
         expectCenterHit: '[data-slot-row] button.fab-slot-tile',
