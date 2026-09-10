@@ -1032,6 +1032,8 @@
           "Scale": "Where the roll landed",
           "CameBack": "Cleared the roll",
           "MissedRoll": "Missed the roll",
+          "SettlementTitle": "Settling results",
+          "SettlementPending": "This run is still settling. Only confirmed awards are shown; its remaining effects have not finished yet.",
           "ClosedSuccessEmpty": "A closed run. Nothing was brought back; the entry stays here as a record.",
           "FutureRoutes": "What this stage produces depends on the route you choose when it becomes current.",
           "NeededChance": "Needed {chance} or less",

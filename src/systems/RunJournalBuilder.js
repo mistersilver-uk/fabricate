@@ -33,6 +33,23 @@ function dropMatchesAward(row, award) {
   return Boolean(row?.itemUuid && row.itemUuid === award?.itemUuid);
 }
 
+// Versioned terminal history is persisted BEFORE effects. Its createdResults is
+// a plan, even after commit; the applied results receipt is the award authority.
+function gatheringActualAwards(run) {
+  if (getRunLifecycleContract(run) !== 'current') {
+    // Older failure normalization erased these refs; an empty list cannot prove zero.
+    return run.status === 'failed' && normalizeList(run.createdResults).length === 0
+      ? null
+      : run.createdResults;
+  }
+  if (run.checkResult?.blind === true) return null;
+  const effects = normalizeList(run.executionJournal?.effects).filter(
+    (effect) => effect?.effectId === 'results' && effect?.kind === 'createGatheredResults'
+  );
+  if (effects.length !== 1 || effects[0].phase !== 'applied') return null;
+  return Array.isArray(effects[0].receipt) ? effects[0].receipt : null;
+}
+
 // An evaluated quantity is authored intent. Only uniquely attributable receipts
 // establish an award; duplicate winning references cannot divide a shared total.
 function recordedDropQuantity(row, winners, awards, recordedAwards, selectionRecorded) {
@@ -1579,6 +1596,8 @@ export class RunJournalBuilder {
 
     const gatheringContext =
       runType === 'gathering' ? this._gatheringRunDisplayTask({ run, viewer }) : null;
+    const resultRun =
+      runType === 'gathering' ? { ...run, createdResults: gatheringActualAwards(run) } : run;
     const { title, img, blindSecretPreview } = this._passthroughRunIdentity({
       run,
       runType,
@@ -1631,7 +1650,7 @@ export class RunJournalBuilder {
       resolutionModeLabel: '',
       gatheringYield:
         runType === 'gathering'
-          ? this._gatheringYield({ run, system, context: gatheringContext, terminal })
+          ? this._gatheringYield({ run: resultRun, system, context: gatheringContext, terminal })
           : null,
       recipeId: null,
       environmentId:
@@ -1641,7 +1660,7 @@ export class RunJournalBuilder {
       blindSecretPreview,
       flavor: '',
       failureReason: stringOrNull(run.failureReason),
-      ...this._passthroughResults(run.createdResults, stringOrNull(run.craftingSystemId)),
+      ...this._passthroughResults(resultRun.createdResults, stringOrNull(run.craftingSystemId)),
       manualAdvance: false,
     };
   }

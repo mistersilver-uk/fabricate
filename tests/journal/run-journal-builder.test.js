@@ -533,6 +533,31 @@ test('future ingredient routes preview their own outcomes without selecting a cu
   assert.doesNotMatch(JSON.stringify(hidden), /Red prize|Blue prize/);
 });
 
+test('v1 gathering awards come only from applied result receipts, including old lost failure refs', () => {
+  const award = { actorUuid: ACTOR.uuid, itemUuid: 'Item.actual', componentId: 'herb', name: 'Actual award', quantity: 3 };
+  const planned = { ...award, name: 'PRIVATE_PLAN', quantity: 99 };
+  for (const [status, phase, receipt, expected] of [
+    ['planned', 'planned', undefined, []],
+    ['planned', 'applying', [award], []],
+    ['planned', 'applied', [award], [3]],
+    ['committed', 'applied', [award], [3]],
+    ['recoveryRequired', 'applying', undefined, []],
+    ['recoveryRequired', 'applied', [award], [3]],
+    ['committed', 'applied', { count: 1 }, []],
+  ]) {
+    const record = { id: 'v1-awards', lifecycleVersion: 1, taskId: 'forage', status: 'failed', createdResults: [planned],
+      checkResult: { provider: 'd100', roll: 80, itemRows: [{ id: 'herb', componentId: 'herb', dropped: true, finalDropRate: 70 }], items: [{ id: 'herb' }] },
+      executionJournal: { status, effects: [{ effectId: 'results', kind: 'createGatheredResults', phase, receipt, planned: [planned] }] } };
+    const builder = makeBuilder({ gatheringHistory: [record] });
+    const model = builder.buildListing({ actor: ACTOR, viewer: PLAYER }).history[0];
+    assert.deepEqual(model.createdResults.map((entry) => entry.quantity), expected, `${status}/${phase}`);
+    assert.equal(model.gatheringYield.entries[0].qty, expected[0] ?? null);
+    assert.doesNotMatch(JSON.stringify(model), /PRIVATE_PLAN|99/);
+    record.createdResults = [];
+    assert.deepEqual(builder.buildListing({ actor: ACTOR, viewer: PLAYER }).history[0].createdResults, model.createdResults, 'old normalization loss does not erase the independent applied receipt');
+  }
+});
+
 test('recorded gathering quantities require unique receipt attribution and never use live configuration', () => {
   const rows = [
     { id: 'first', componentId: 'herb', quantity: 99, finalDropRate: 70, dropped: true },
@@ -548,6 +573,7 @@ test('recorded gathering quantities require unique receipt attribution and never
   assert.deepEqual(project(limited).gatheringYield.entries.map((entry) => entry.qty), [4, 0, 0]);
   const incomplete = { ...run, createdResults: undefined };
   assert.deepEqual(project(incomplete).gatheringYield.entries.map((entry) => entry.qty), [null, null, null]);
+  assert.deepEqual(project({ ...run, status: 'failed', createdResults: [] }).gatheringYield.entries.map((entry) => entry.qty), [null, null, null], 'legacy failure normalization may have lost awards; empty is not proof of zero');
   assert.doesNotMatch(JSON.stringify(project(run)), /LIVE_SECRET|99/);
   assert.equal(project({ ...run, taskId: 'blind:env' }).gatheringYield, null);
   assert.equal(project({ ...run, checkResult: { blind: true, ...run.checkResult } }).gatheringYield, null);

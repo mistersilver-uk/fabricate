@@ -15,6 +15,7 @@
 
   let { run, services = null, transient = false } = $props();
   const account = $derived(presentHistory(run, localize));
+  const showTransient = $derived(transient && !account.settling);
   const single = $derived(account.stages[0]);
   const recovery = $derived(run?.recoveryEvidence?.required === true);
   const text = (key, data) => localize(`FABRICATE.App.Journal.History.${key}`, data);
@@ -84,7 +85,9 @@
 
 <div class="journal-history-detail" data-journal-history-detail>
   {#if !recovery}
-    {#if transient || account.failed}
+    {#if account.settling}
+      <Notice tone="info" title={text('SettlementTitle')} dataAttr="data-journal-settling" />
+    {:else if showTransient || account.failed}
       <Notice
         tone={account.failed ? 'danger' : 'success'}
         title={localize(`FABRICATE.App.Journal.Verdict.${run.status}`)}
@@ -95,7 +98,7 @@
         {#snippet evidence()}
           {#if account.verdictCheck}<span data-history-verdict-check>{account.verdictCheck}</span
             >{/if}
-          {#if transient && !account.multi && account.mode !== 'd100'}
+          {#if showTransient && !account.multi && account.mode !== 'd100'}
             {#if account.summary}<span>{account.summary.value}</span>{/if}
             {@render items(text('Consumed'), single?.consumed ?? [], 'transient-consumed')}
             {@render items(
@@ -107,7 +110,7 @@
         {/snippet}
       </Notice>
     {/if}
-    {#if account.summary && !transient}
+    {#if account.summary && !showTransient}
       <InspectorCard data-history-summary={account.summary.kind}>
         <div class="journal-summary-heading">
           <Medallion
@@ -137,7 +140,7 @@
         {/each}
       </section>
       {@render essenceRecaps()}
-    {:else if !transient && account.mode !== 'd100'}
+    {:else if !showTransient && account.mode !== 'd100'}
       {@render items(
         text(account.cancelled ? 'AlreadySpent' : 'MaterialsUsed'),
         single?.consumed ?? [],
@@ -159,8 +162,8 @@
         'produced'
       )}
     {/if}
-    {#if transient && !account.multi}{@render essenceRecaps()}{/if}
-    {#if account.mode === 'd100' && run.gatheringYield?.entries?.length}
+    {#if showTransient && !account.multi}{@render essenceRecaps()}{/if}
+    {#if account.usableScale}
       <YieldScale
         entries={run.gatheringYield.entries}
         roll={run.gatheringYield.roll}
@@ -180,6 +183,9 @@
           cutNote: () => text('Cut'),
         }}
       />
+    {:else if account.mode === 'd100'}
+      <JournalFactRow label={text('Scale')} value={text('NotRecorded')} />
+      {@render items(text('BroughtBack'), account.results, 'produced')}
     {/if}
     {#if account.mode === 'routed'}
       <InspectorCard data-history-outcome-log>

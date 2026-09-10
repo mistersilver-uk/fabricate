@@ -1139,7 +1139,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.match(essence.target.querySelector('[data-essence-total="fire"]').textContent, /3 \/ 3/);
   });
 
-  it('collects all three gathering modes from active previews into actual history evidence', async () => {
+  it('collects all three gathering modes but never treats fixture plans without receipts as awards', async () => {
     const cases = [
       ['gathering-straight', 'straight'],
       ['gathering-d100', 'd100'],
@@ -1157,7 +1157,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       await settleAction();
       assert.ok(!mounted.containers.gatheringRuns.active[runId]);
       assert.ok(mounted.target.querySelector(`[data-history-run-id="${runId}"]`));
-      assert.ok(mounted.store.selectedRun.createdResults.length > 0);
+      assert.deepEqual(mounted.store.selectedRun.createdResults, [], 'the fixture command writes no applied award receipt');
       if (mode === 'straight') assert.equal(mounted.store.selectedRun.gatheringYield.roll, null);
       if (mode === 'd100') {
         assert.equal(mounted.store.selectedRun.gatheringYield.roll, 25);
@@ -1165,7 +1165,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       }
       if (mode === 'routed') {
         assert.equal(mounted.store.selectedRun.gatheringYield.tiers.length, 0, 'history never projects live outcome bands');
-        assert.equal(mounted.store.selectedRun.createdResults[0].componentId, 'iron');
+        assert.ok(!mounted.target.querySelector('[data-history-items="produced"]'));
       }
       harness.remount();
     }

@@ -27,7 +27,9 @@
   let { run = null, journal = null, now = 0, services = null } = $props();
 
   const status = $derived(String(run?.derivedStatus ?? run?.status ?? 'inProgress'));
-  const statusView = $derived(runStatusPresentation(status));
+  const statusView = $derived(
+    runStatusPresentation(run?.recoveryEvidence?.status === 'planned' ? 'inProgress' : status)
+  );
   const terminal = $derived(['succeeded', 'failed', 'cancelled'].includes(status));
   const stages = $derived(Array.isArray(run?.steps) ? run.steps : []);
   const currentIndex = $derived.by(() => {

@@ -71,7 +71,7 @@ function services() {
 
 const mount = (props) => harness.mount({ ...props, journal: props.services?.journal });
 
-async function projectGatheringRecord(payload, status = 'succeeded') {
+async function projectGatheringRecord(payload, status = 'succeeded', executionJournal = null) {
   const flags = {};
   const actor = { id: 'gatherer', uuid: 'Actor.gatherer',
     getFlag: (_scope, key) => flags[key],
@@ -79,6 +79,9 @@ async function projectGatheringRecord(payload, status = 'succeeded') {
   };
   const manager = new GatheringRunManager({ randomID: () => 'gathered', nowWorldTime: () => 100, getUserId: () => 'player' });
   await manager.createTerminalRun(actor, { craftingSystemId: 'system', environmentId: 'environment', taskId: 'forage' }, status, payload);
+  if (executionJournal) Object.assign(flags.gatheringRuns.history[0], { lifecycleVersion: 1, executionJournal: {
+    operationId: 'gathering-operation', requestId: 'gathering-request', baseRunRevision: 0, ...structuredClone(executionJournal),
+  } });
   return new RunJournalBuilder({ gatheringRunSource: new GatheringRunManager() })
     .buildListing({ actor, viewer: { isGM: true } }).history[0];
 }
@@ -89,6 +92,42 @@ describe('RunDetail mounted behavior', () => {
   after(() => harness.teardown());
 
   const forbiddenHistory = '[data-run-progress], [data-stage-nav], [data-journal-actions], [data-journal-summary], [data-journal-record], [data-journal-stage-details], [data-journal-time-remaining]';
+  it('never expands an opaque applied count from private planned awards', async () => {
+    const run = await projectGatheringRecord({ checkResult: { blind: true },
+      createdResults: [{ actorUuid: 'Actor.gatherer', itemUuid: 'Item.secret', name: 'PRIVATE_AWARD', quantity: 99 }],
+    }, 'succeeded', { status: 'committed', effects: [{ effectId: 'results', kind: 'createGatheredResults', phase: 'applied', receipt: { count: 1 } }] });
+    const target = await harness.mount({ run });
+    assert.deepEqual(run.createdResults, []);
+    assert.doesNotMatch(JSON.stringify(run), /PRIVATE_AWARD|Item.secret|99/);
+    assert.ok(!target.querySelector('[data-history-items="produced"], [data-yield-scale]'));
+  });
+  for (const [status, phase, failed] of [
+    ['planned', 'planned', false], ['planned', 'applying', false], ['planned', 'applied', false],
+    ['committed', 'applied', false], ['committed', 'applied', true],
+    ['recoveryRequired', 'applying', false], ['recoveryRequired', 'applied', true],
+  ]) {
+    it(`shows only confirmed awards and honest settlement copy for ${status}/${phase}/failed=${failed}`, async () => {
+      const actual = [{ actorUuid: 'Actor.gatherer', itemUuid: 'Item.actual', name: 'Actual shipment', quantity: 3 }];
+      const run = await projectGatheringRecord({ checkResult: { provider: 'd100', roll: 80 },
+        createdResults: [{ ...actual[0], name: 'UNAPPLIED_PLAN', quantity: 99 }],
+      }, failed ? 'failed' : 'succeeded', { status, effects: [{ effectId: 'results', kind: 'createGatheredResults', phase, receipt: actual }] });
+      const target = await harness.mount({ run, journal: { commandResult: { runKey: run.key } } });
+      assert.doesNotMatch(target.textContent, /UNAPPLIED_PLAN|99/);
+      assert.equal(target.textContent.split('Actual shipment').length - 1, phase === 'applied' ? 1 : 0);
+      assert.equal(Boolean(target.querySelector('[data-journal-settling]')), status === 'planned');
+      assert.equal(Boolean(target.querySelector('[data-journal-recovery]')), status === 'recoveryRequired');
+      const guidance = target.querySelector('[data-journal-guidance]').textContent;
+      if (status === 'planned') {
+        assert.match(guidance, /SettlementPending/);
+        assert.ok(!target.querySelector('[data-journal-verdict]'));
+      } else if (status === 'committed') {
+        assert.match(guidance, failed ? /ClosedFailureAwards/ : /ClosedSuccess/);
+        assert.match(target.querySelector('[data-journal-history-detail]').textContent, /NotRecorded/, 'missing scale is explained beside actual awards');
+      } else assert.match(guidance, /ClosedRecovery/);
+      assert.ok(!target.querySelector('[data-yield-scale]'));
+    });
+  }
+
   it('history-just-resolved owns its single summary until the correlated notice clears', async () => {
     const { model } = await createPersistedCraftingHistory({ stageCount: 1 });
     const target = await harness.mount({ run: model, journal: { commandResult: { runKey: model.key } } });
@@ -130,10 +169,11 @@ describe('RunDetail mounted behavior', () => {
         { id: 'rare', componentId: 'seed', name: 'Seed', quantity: 99, dropRate: 20 },
       ] };
       const resolved = await new GatheringRichStateService({ rollD100: () => roll }).resolveD100Attempt({ task, environment: { rules: { rewardSelectionMode: 'allDrops' } }, extraModifier });
+      const actualAwards = resolved.items.map((row) => ({ actorUuid: 'Actor.gatherer', componentId: row.componentId, name: row.name, quantity: 3 }));
       const run = await projectGatheringRecord({
         checkResult: { provider: 'd100', roll: resolved.roll, itemRows: resolved.itemRows, items: resolved.items },
-        createdResults: resolved.items.map((row) => ({ actorUuid: 'Actor.gatherer', componentId: row.componentId, name: row.name, quantity: 3 })),
-      });
+        createdResults: actualAwards.map((award) => ({ ...award, quantity: 99 })),
+      }, 'succeeded', { status: 'committed', effects: [{ effectId: 'results', kind: 'createGatheredResults', phase: 'applied', receipt: actualAwards }] });
       const target = await harness.mount({ run });
       assert.equal(target.querySelectorAll('[data-yield-cut]').length, 1);
       assert.ok(!target.querySelector('[data-history-summary], [data-history-items="produced"], [data-outcome-ladder]'));

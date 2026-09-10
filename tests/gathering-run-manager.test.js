@@ -608,7 +608,7 @@ test('GatheringRunManager keeps terminal identity refs from the active run', asy
   assert.equal(runs.getRunHistory(actor)[0].taskId, 'task-original');
 });
 
-test('GatheringRunManager clears created results for failed and cancelled completions', async () => {
+test('GatheringRunManager retains permitted failure awards across completion and fresh reload', async () => {
   const actor = new FakeActor();
   const runs = manager();
   const failedRun = await runs.createRun(actor, runData({ taskId: 'task-failed' }));
@@ -621,9 +621,9 @@ test('GatheringRunManager clears created results for failed and cancelled comple
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }]
   });
 
-  assert.deepEqual(failed.createdResults, []);
+  assert.deepEqual(failed.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 1 }]);
   assert.deepEqual(cancelled.createdResults, []);
-  assert.deepEqual(runs.getRunHistory(actor).map(run => run.createdResults), [[], []]);
+  assert.deepEqual(manager().getRunHistory(actor).map(run => run.createdResults), [[], failed.createdResults]);
 });
 
 test('GatheringRunManager preserves waiting time gates on completion and cancellation', async () => {
@@ -682,13 +682,14 @@ test('GatheringRunManager creates terminal history directly for immediate attemp
   });
   worldTime += 10;
   const failed = await runs.createTerminalRun(actor, runData({ taskId: 'task-failed' }), 'failed', {
-    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.should-drop', quantity: 1 }]
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.failure-award', quantity: 1 }]
   });
 
   assert.equal(succeeded.status, 'succeeded');
   assert.deepEqual(succeeded.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 3 }]);
   assert.equal(failed.status, 'failed');
-  assert.deepEqual(failed.createdResults, []);
+  assert.deepEqual(failed.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.failure-award', quantity: 1 }]);
+  assert.deepEqual(manager().getRunHistory(actor)[0].createdResults, failed.createdResults);
   assert.deepEqual(runs.getActiveRuns(actor), []);
   assert.deepEqual(runs.getRunHistory(actor).map(run => run.taskId), ['task-failed', 'task-success']);
 });

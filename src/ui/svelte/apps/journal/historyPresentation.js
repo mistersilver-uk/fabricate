@@ -94,6 +94,7 @@ function attempted(stage) {
 
 function closedKey(run, stages, results) {
   if (run?.recoveryEvidence?.required) return 'ClosedRecovery';
+  if (run?.recoveryEvidence?.status === 'planned') return 'SettlementPending';
   if (run?.redacted) return 'ClosedRedacted';
   if (run?.status === 'cancelled') {
     if (run?.lifecycleContract === 'legacy') return 'ClosedLegacyCancelled';
@@ -145,6 +146,20 @@ function historySummary(run, stages, localize) {
   return run?.status === 'failed' && summary.kind === 'check' ? null : summary;
 }
 
+function usableHistoricalScale(run, results) {
+  const drops = list(run?.gatheringYield?.entries);
+  if (run?.gatheringYield?.mode !== 'd100' || !finite(run.gatheringYield.roll) || !drops.length)
+    return false;
+  const complete = drops.every(
+    (entry) => typeof entry.cleared === 'boolean' && finite(entry.chance) && finite(entry.qty)
+  );
+  if (!complete || !results.every((entry) => finite(entry.quantity))) return false;
+  return (
+    drops.reduce((sum, entry) => sum + Number(entry.qty), 0) ===
+    results.reduce((sum, entry) => sum + Number(entry.quantity), 0)
+  );
+}
+
 /** Choose the terminal composition from typed receipts, never from translated mode labels. */
 export function presentHistory(run, localize) {
   const stages = run?.redacted
@@ -165,6 +180,8 @@ export function presentHistory(run, localize) {
     multi,
     gathering,
     mode,
+    usableScale: usableHistoricalScale(run, results),
+    settling: run?.recoveryEvidence?.status === 'planned',
     gatheringCheck: checkText(run?.gatheringYield?.check, localize),
     gatheringOutcome: run?.gatheringYield?.check?.outcome || localize(`${prefix}NotRecorded`),
     summary: historySummary(run, stages, localize),

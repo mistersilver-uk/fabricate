@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
 import { GatheringRichStateService } from '../src/systems/GatheringRichStateService.js';
+import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
 import {
   evaluatePreparedRunCheck,
   postCheckRollHandoff
@@ -117,6 +118,7 @@ function makeEngine({
   environments = [environment()],
   systems = [system()],
   createdResults = [],
+  plannedResults = createdResults,
   usedTools = [],
   calls = {},
   getRunViewer = null,
@@ -166,7 +168,7 @@ function makeEngine({
     resultCreator: {
       plan: async (payload) => {
         calls.planResults.push(payload);
-        return createdResults;
+        return plannedResults;
       },
       create: async (payload) => {
         calls.createResults.push(payload);
@@ -1015,6 +1017,50 @@ test('authoritative manual collection persists and settles ordered gathering eff
   assert.equal(published.length, 1);
 });
 
+for (const failed of [false, true]) {
+  test(`versioned completion projects actual receipts through every persisted phase (failed=${failed})`, async () => {
+    resetActor();
+    let now = 1000;
+    const manager = makeRunManager({ now: () => now });
+    const active = await createWaitingRun(manager, actor, { lifecycleVersion: 1 });
+    now = 1060;
+    const name = failed ? 'Barren' : 'Iron';
+    const task = timedTask({ resultGroups: [{ id: 'output', name, results: [{ id: 'authored', componentId: 'comp-a', quantity: 99 }] }] });
+    const actual = [{ actorUuid: actor.uuid, itemUuid: 'Item.actual', componentId: 'comp-a', name: 'Actual ore', quantity: 3 }];
+    const snapshots = [];
+    const save = actor.setFlag.bind(actor);
+    actor.setFlag = async (...args) => { const result = await save(...args); snapshots.push(structuredClone(actor.flags)); return result; };
+    const calls = {};
+    try {
+      const engine = makeEngine({ runManager: manager, environments: [environment(task)], createdResults: actual,
+        plannedResults: [{ ...actual[0], name: 'UNAPPLIED_PLAN', quantity: 99 }], calls, getRunViewer: async () => viewer,
+        versionedRunAuthority: { consumeExecutionGrant: async () => ({ operationId: 'receipt-operation', resolvedCheckResult: { success: !failed, outcome: name, value: failed ? 1 : 21, data: {} } }) },
+      });
+      await engine.executeVersionedStage({ actor, runId: active.id, expectedRevision: 0, executionGrant: {}, requestId: 'receipt-request' });
+      const phases = new Set();
+      for (const flags of snapshots) {
+        const reader = new FakeActor();
+        reader.flags = flags;
+        const fresh = makeRunManager();
+        const raw = fresh.getRunHistory(reader)[0];
+        if (!raw) continue;
+        const effect = raw.executionJournal.effects.find((entry) => entry.effectId === 'results');
+        phases.add(`${raw.executionJournal.status}/${effect.phase}`);
+        const projected = new RunJournalBuilder({ gatheringRunSource: fresh }).buildListing({ actor: reader, viewer }).history[0];
+        assert.deepEqual(projected.createdResults.map((entry) => entry.quantity), effect.phase === 'applied' ? [3] : []);
+        assert.doesNotMatch(JSON.stringify(projected), /UNAPPLIED_PLAN|99/);
+      }
+      for (const phase of ['planned/planned', 'planned/applying', 'planned/applied', 'committed/applied']) assert.ok(phases.has(phase), phase);
+      const reloaded = makeRunManager().getRunHistory(actor)[0];
+      assert.equal(reloaded.status, failed ? 'failed' : 'succeeded');
+      assert.equal(reloaded.executionJournal.effects.find((entry) => entry.effectId === 'results').receipt[0].quantity, 3);
+      assert.equal(calls.createResults.length, 1, 'no projection replays the award');
+    } finally {
+      actor.setFlag = save;
+    }
+  });
+}
+
 test('versioned routed collection describes and consumes only the GM-resolved check', async () => {
   resetActor();
   let worldTime = 1000;
@@ -1279,6 +1325,9 @@ test('ambiguous versioned award requires recovery and is never replayed', async 
     (error) => error.code === 'RECOVERY_REQUIRED'
   );
   assert.equal(runManager.getRunHistory(actor)[0].executionJournal.status, 'recoveryRequired');
+  const projected = new RunJournalBuilder({ gatheringRunSource: makeRunManager() }).buildListing({ actor, viewer }).history[0];
+  assert.deepEqual(projected.createdResults, [], 'an unacknowledged award is not an applied receipt');
+  assert.equal(projected.recoveryEvidence.required, true);
 
   await assert.rejects(
     () => engine.executeVersionedStage({

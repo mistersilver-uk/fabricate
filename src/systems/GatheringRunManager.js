@@ -542,7 +542,7 @@ export class GatheringRunManager {
     copyGatheringRunEvidence(run, record);
     run.usedTools = normalizeRunItems(record.usedTools);
     run.createdResults =
-      terminal && status !== 'succeeded' ? [] : normalizeRunItems(record.createdResults);
+      terminal && status === 'cancelled' ? [] : normalizeRunItems(record.createdResults);
 
     return run;
   }
@@ -639,7 +639,7 @@ export class GatheringRunManager {
       terminalPayload.chatMessageIds = payload.chatMessageIds;
     if (payload.revealEvents !== undefined) terminalPayload.revealEvents = payload.revealEvents;
     if (payload.usedTools !== undefined) terminalPayload.usedTools = payload.usedTools;
-    terminalPayload.createdResults = status === 'succeeded' ? payload.createdResults : [];
+    terminalPayload.createdResults = status === 'cancelled' ? [] : payload.createdResults;
     return terminalPayload;
   }
 
