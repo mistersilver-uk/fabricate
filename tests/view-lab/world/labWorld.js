@@ -636,11 +636,36 @@ function createLabRunAuthorityLedger() {
 function installLabJournalTransport(game, service) {
   let delivery = Promise.resolve();
   let reply = null;
+  const listeners = new Map();
   game.socket = {
-    emit(channel, payload) {
+    // Retain the real ready-hook registrations and Socket.IO-style disposal.
+    // Outbound emits do not echo to these local listeners. The virtual remote
+    // GM and the Journal reply below already have one explicit service route;
+    // invoking main's registered router too would duplicate command handling.
+    on(channel, listener) {
+      const entries = listeners.get(channel) ?? [];
+      entries.push(listener);
+      listeners.set(channel, entries);
+      return this;
+    },
+    off(channel, listener) {
+      if (channel === undefined) listeners.clear();
+      else if (listener === undefined) listeners.delete(channel);
+      else {
+        const entries = listeners.get(channel) ?? [];
+        const index = entries.indexOf(listener);
+        if (index !== -1) entries.splice(index, 1);
+        if (entries.length === 0) listeners.delete(channel);
+      }
+      return this;
+    },
+    listeners(channel) {
+      return [...(listeners.get(channel) ?? [])];
+    },
+    emit(channel, payload, options) {
       if (channel !== 'module.fabricate') return;
       if (payload?.kind === JOURNAL_RUN_SOCKET_KIND.REPLY) {
-        reply = { payload, senderId: game.user.id };
+        reply = { payload, senderId: game.user.id, recipients: options?.recipients };
         return;
       }
       if (payload?.kind !== JOURNAL_RUN_SOCKET_KIND.REQUEST) return;
@@ -654,7 +679,9 @@ function installLabJournalTransport(game, service) {
         } finally {
           game.user = viewer;
         }
-        if (reply) service.acceptReply(reply.payload, reply.senderId);
+        if (reply && (!Array.isArray(reply.recipients) || reply.recipients.includes(viewer.id))) {
+          service.acceptReply(reply.payload, reply.senderId);
+        }
       }).catch((error) => {
         console.error('view lab: Journal command delivery failed', error);
       });

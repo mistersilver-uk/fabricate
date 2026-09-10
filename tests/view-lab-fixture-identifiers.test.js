@@ -425,6 +425,65 @@ test('legacy capture targets remain in the real Journal projection and on their 
   assert.ok(listing.activeRuns.length <= 4, 'legacy blind row needs no active-page navigation');
 });
 
+function installJournalTransport(game, service) {
+  fixtureFunction('./view-lab/world/labWorld.js', 'installLabJournalTransport', {
+    JOURNAL_RUN_SOCKET_KIND,
+  })(game, service);
+  return game.socket;
+}
+
+test('lab socket retains and disposes lifecycle listeners without echoing outbound Journal traffic', () => {
+  const socket = installJournalTransport({}, {});
+  const handler = () => assert.fail('an outbound emit must not echo to the local listener');
+  const sibling = () => {};
+  assert.equal(socket.on('module.fabricate', handler), socket);
+  socket.on('module.fabricate', sibling).on('other-channel', handler);
+  assert.deepEqual(socket.listeners('module.fabricate'), [handler, sibling]);
+  socket.listeners('module.fabricate').pop();
+  assert.deepEqual(socket.listeners('module.fabricate'), [handler, sibling], 'inspection cannot dispose listeners');
+  assert.equal(socket.off('module.fabricate', handler), socket);
+  assert.deepEqual(socket.listeners('module.fabricate'), [sibling]);
+  assert.deepEqual(socket.listeners('other-channel'), [handler]);
+  socket.off('module.fabricate', handler).off('module.fabricate');
+  assert.deepEqual(socket.listeners('module.fabricate'), []);
+  socket.off();
+  assert.deepEqual(socket.listeners('other-channel'), []);
+});
+
+test('lab Journal replies honor recipient options and attest the GM before restoring the viewer', async () => {
+  const player = { id: 'player' };
+  const gm = { id: 'gm', isGM: true };
+  const game = { user: player, users: { activeGM: gm } };
+  const accepted = [];
+  const delivered = [];
+  const service = {
+    handleSocketMessage: async (payload, senderId) => {
+      delivered.push([payload.requestId, senderId, game.user.id]);
+      game.socket.emit('module.fabricate', {
+        kind: JOURNAL_RUN_SOCKET_KIND.REPLY, requestId: payload.requestId, recipientId: player.id,
+      }, payload.replyOptions);
+    },
+    acceptReply: (payload, senderId) => accepted.push([payload.requestId, senderId, game.user.id]),
+  };
+  const socket = installJournalTransport(game, service);
+  socket.on('module.fabricate', () => assert.fail('the explicit GM transport owns Journal delivery'));
+  for (const [requestId, replyOptions] of [
+    ['wrong-recipient', { recipients: ['other'] }],
+    ['no-recipients', { recipients: [] }],
+    ['targeted', { recipients: [player.id] }],
+    ['broadcast', undefined],
+  ]) {
+    socket.emit('module.fabricate', {
+      kind: JOURNAL_RUN_SOCKET_KIND.REQUEST, requestId, senderId: 'forged', replyOptions,
+    });
+  }
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(delivered, ['wrong-recipient', 'no-recipients', 'targeted', 'broadcast']
+    .map((id) => [id, player.id, gm.id]));
+  assert.deepEqual(accepted, [['targeted', gm.id, player.id], ['broadcast', gm.id, player.id]]);
+  assert.equal(game.user, player);
+});
+
 test('lab authority transport runs real prepare/resolve commands and restores the player before prompting/posting', async () => {
   const ledger = fixtureFunction('./view-lab/world/labWorld.js', 'createLabRunAuthorityLedger', {
     installUpdateSemantics, makeGetFlag,
@@ -467,9 +526,11 @@ test('lab authority transport runs real prepare/resolve commands and restores th
       },
     } },
   });
-  fixtureFunction('./view-lab/world/labWorld.js', 'installLabJournalTransport', {
-    JOURNAL_RUN_SOCKET_KIND,
-  })(game, service);
+  const socket = installJournalTransport(game, service);
+  // Ready replay registers this local route. The simulated remote GM must not
+  // execute through both it and the adapter's explicit awaited service call.
+  const localRoute = (payload, senderId) => service.handleSocketMessage(payload, senderId);
+  socket.on('module.fabricate', localRoute);
   assert.equal((await service.bootstrapJournalRunAuthority()).success, true);
   game.user = player;
   const result = await service.executeJournalRunCommand({
@@ -482,6 +543,8 @@ test('lab authority transport runs real prepare/resolve commands and restores th
   assert.equal(ledger.pages.size, 0);
   assert.ok(Object.values(ledger.getFlag('fabricate', 'journalRunAuthorityState').requests)
     .every((request) => request.status === 'settled'));
+  socket.off('module.fabricate', localRoute);
+  assert.deepEqual(socket.listeners('module.fabricate'), []);
 });
 
 test('alchemy Journal uses an authored recipe revealed to its player, not a missing/redacted fallback', () => {
