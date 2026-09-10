@@ -158,6 +158,27 @@ test('CraftingRunManager persists explicit lifecycle v1 state and exact current-
   assert.deepEqual(manager.getActiveRun(actor, run.id).steps[0].selectionPlan, updated.steps[0].selectionPlan);
 });
 
+test('CraftingRunManager refuses a route change without its matching snapshot before mutating', async () => {
+  setupGlobals();
+  const manager = new CraftingRunManager();
+  const actor = new FakeActor('Route guard');
+  const run = await manager.createRun(actor, singleStepRecipe('routes'), [actor], 'user-1', {
+    lifecycleVersion: 1,
+  });
+  await manager.setStepSelectionPlan(actor, run.id, 0, {
+    selectedIngredientSetId: 'a', selectedRequirementSnapshot: { id: 'a', ingredientGroups: [] },
+  }, { expectedRevision: 0 });
+  const before = structuredClone(manager.getActiveRun(actor, run.id));
+  for (const snapshot of [undefined, null, { id: 'a' }]) {
+    await assert.rejects(() => manager.setStepSelectionPlan(actor, run.id, 0, {
+      selectedIngredientSetId: 'b', selectedRequirementSnapshot: snapshot,
+    }, { expectedRevision: 1 }), (error) => error.code === 'INVALID_SELECTION_SNAPSHOT');
+    assert.deepEqual(manager.getActiveRun(actor, run.id), before);
+    manager.invalidateCache(actor.id);
+    assert.deepEqual(manager.getActiveRun(actor, run.id), before);
+  }
+});
+
 test('CraftingRunManager persists journal transitions and recovery blocks cancellation', async () => {
   setupGlobals(1000);
   const manager = new CraftingRunManager();

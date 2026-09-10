@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { compileFunction } from 'node:vm';
+import { IngredientSet } from '../src/models/IngredientSet.js';
+import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
+import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
 
 import {
   JOURNAL_RUN_SOCKET_KIND,
@@ -75,6 +80,132 @@ function commandHarness({
 }
 
 describe('journal run command protocol', () => {
+  async function assertAuthoritativeRouteSnapshot(clientSnapshot) {
+    // Execute the actual composition-edge declarations without importing main's
+    // Foundry boot side effects or maintaining a second copy of its callback.
+    const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+    const start = source.indexOf('async function resolveJournalSourceActors(');
+    const end = source.indexOf('function createJournalCommandsForFabricate(', start);
+    assert.ok(start >= 0 && end > start, 'the production operation factory must be present');
+    const createOperations = compileFunction(
+      `${source.slice(start, end)}\nreturn createCraftingJournalOperations;`
+    )();
+    const oldGlobals = { game: globalThis.game, foundry: globalThis.foundry, fromUuid: globalThis.fromUuid };
+    try {
+      globalThis.foundry = { utils: { randomID: () => 'route-run' } };
+      globalThis.game = { user: { id: 'player' }, time: { worldTime: 1000 } };
+      const sets = ['a', 'b'].map((id) => new IngredientSet({
+        id, name: `Route ${id.toUpperCase()}`, resultGroupId: `yield-${id}`,
+        ingredientGroups: [{ id: `group-${id}`, name: `Material ${id.toUpperCase()}`, options: [
+          { id: `option-${id}`, quantity: id === 'b' ? 2 : 1, match: { type: 'component', componentId: id } },
+        ] }],
+      }));
+      const recipe = { id: 'recipe', craftingSystemId: 'system', name: 'Routes',
+        getExecutionSteps: () => [{ id: 'step', ingredientSets: sets }],
+      };
+      const fabricate = {
+        craftingRunManager: new CraftingRunManager(),
+        recipeManager: { getRecipe: (id) => id === recipe.id ? recipe : null },
+      };
+      let harness;
+      const operations = createOperations(fabricate, () => harness.service);
+      harness = commandHarness({ currentUserId: 'gm', operations: { crafting: operations } });
+      const { actor, service } = harness;
+      actor.id = 'a';
+      actor.isOwner = true;
+      actor.items = [];
+      const flags = {};
+      const writes = [];
+      actor.getFlag = (scope, key) => flags[scope]?.[key];
+      actor.setFlag = async (scope, key, value) => {
+        flags[scope] ??= {};
+        flags[scope][key] = structuredClone(value);
+        writes.push(structuredClone(value));
+        return value;
+      };
+      globalThis.fromUuid = async (uuid) => uuid === actor.uuid ? actor : null;
+      const run = await fabricate.craftingRunManager.createRun(actor, recipe, [actor], 'player', { lifecycleVersion: 1 });
+      await fabricate.craftingRunManager.setStepSelectionPlan(actor, run.id, 0, {
+        selectedIngredientSetId: 'a', selectedRequirementSnapshot: sets[0].toJSON(),
+      }, { expectedRevision: 0 });
+      const request = (selectionPlan, expectedRevision = 1, extra = {}) => ({
+        requestId: `selection-${writes.length}-${selectionPlan.selectedIngredientSetId}`,
+        sessionId: 'player-session', actorUuid: actor.uuid, runType: 'crafting', runId: run.id,
+        expectedRevision, action: 'setSelection',
+        payload: { stepIndex: 0, expectedStage: 0, selectionPlan, ...extra },
+      });
+      const clientPlan = {
+        selectedIngredientSetId: 'b', ingredientOptionOverrides: {},
+        ingredientEssenceAllocation: { stepId: 'step', ingredientSetId: 'b', allocation: {} },
+      };
+      const expected = structuredClone(sets[1].toJSON());
+      const writeCount = writes.length;
+      // Client evidence is unnecessary and cannot override the authored route.
+      const changed = await service.handleRequest(request({
+        ...clientPlan, ...(clientSnapshot && { selectedRequirementSnapshot: clientSnapshot }),
+      }), 'player');
+      assert.equal(changed.success, true);
+      assert.equal(changed.runRevision, 2);
+      assert.equal(writes.length, writeCount + 1, 'plan, snapshot and revision share one write');
+      const transition = writes.at(-1).active[run.id];
+      assert.deepEqual(transition.steps[0].selectionPlan, clientPlan);
+      assert.deepEqual(transition.steps[0].selectedRequirementSnapshot, expected);
+      assert.equal(transition.runRevision, 2);
+
+      // New manager instance reads document persistence, not a retained in-memory run.
+      fabricate.craftingRunManager = new CraftingRunManager();
+      const persisted = () => fabricate.craftingRunManager.getActiveRun(actor, run.id);
+      assert.deepEqual(persisted().steps[0].selectedRequirementSnapshot, expected);
+      const builder = () => new RunJournalBuilder({
+        craftingRunManager: fabricate.craftingRunManager, recipeManager: fabricate.recipeManager,
+      }).buildListing({ actor, viewer: { id: 'gm', isGM: true } });
+      assert.equal(builder().activeRuns[0].currentStep.selectionAvailability.selectedIngredientSetId, 'b');
+      const beforeRefusals = structuredClone(persisted());
+      for (const [command, sender, reason] of [
+        [request(clientPlan), 'player', 'stale-run'],
+        [request(clientPlan, 2), 'other', 'owner-required'],
+        [request(clientPlan, 2, { expectedStage: 1 }), 'player', 'stale-stage'],
+        [request({ selectedIngredientSetId: 'removed' }, 2), 'player', 'ingredient-set-not-found'],
+      ]) {
+        const refused = await service.handleRequest(command, sender);
+        assert.equal(refused.success, false);
+        assert.equal(refused.reason, reason);
+        assert.deepEqual(persisted(), beforeRefusals);
+      }
+      assert.equal(writes.length, writeCount + 1);
+
+      const removedRoute = sets.pop();
+      assert.equal(builder().activeRuns[0].currentStep.selectionAvailability.staleRoute, true);
+      const staleRoute = await service.handleRequest(request(clientPlan, 2), 'player');
+      assert.equal(staleRoute.reason, 'ingredient-set-not-found');
+      assert.deepEqual(persisted(), beforeRefusals);
+      sets.push(removedRoute);
+      const grantless = await operations.setSelection({
+        actor, run: persisted(), runId: run.id, expectedRevision: 2,
+        payload: { stepIndex: 0, selectionPlan: clientPlan }, executionGrant: null,
+      });
+      assert.equal(grantless.reason, 'execution-grant-invalid');
+      assert.equal(writes.length, writeCount + 1);
+
+      sets[1].name = 'Changed after selection';
+      sets[1].ingredientGroups[0].options[0].quantity = 99;
+      await fabricate.craftingRunManager.cancelRun(actor, run.id, { expectedRevision: 2 });
+      fabricate.craftingRunManager = new CraftingRunManager();
+      const history = builder().history[0];
+      assert.equal(history.status, 'cancelled');
+      assert.deepEqual(history.steps[0].requirementSnapshot, expected);
+      assert.deepEqual(history.steps[0].selectionPlan, clientPlan);
+      assert.equal(history.steps[0].requirementSnapshot.ingredientGroups[0].name, 'Material B');
+      assert.deepEqual(history.steps[0].consumedIngredients, []);
+    } finally {
+      Object.assign(globalThis, oldGlobals);
+    }
+  }
+  for (const clientSnapshot of [undefined, { id: 'b', name: 'Forged', ingredientGroups: [] }]) {
+    it(`captures route B at the actual main command boundary with ${clientSnapshot ? 'forged' : 'absent'} client evidence and retains it after reload and cancellation`, () =>
+      assertAuthoritativeRouteSnapshot(clientSnapshot));
+  }
+
   it('defaults new public crafts to v1 while preserving a persisted legacy continuation', async () => {
     const calls = [];
     const engine = {

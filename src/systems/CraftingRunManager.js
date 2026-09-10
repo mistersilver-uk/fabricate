@@ -641,11 +641,21 @@ export class CraftingRunManager extends RunContainerManagerBase {
         'STALE_RUN_STAGE'
       );
     }
-    step.selectionPlan = buildSelectionPlan(selection);
-    step.selectedIngredientSetId = step.selectionPlan.selectedIngredientSetId;
-    if (selection.selectedRequirementSnapshot !== undefined) {
-      step.selectedRequirementSnapshot = cloneJson(selection.selectedRequirementSnapshot);
+    // Authority callers supply authored evidence. Validate and clone both values
+    // before touching the live container so a refused edit cannot leak into it.
+    const plan = buildSelectionPlan(selection);
+    const snapshot = cloneJson(
+      selection.selectedRequirementSnapshot ?? step.selectedRequirementSnapshot
+    );
+    if (!snapshot || stringOrNull(snapshot.id) !== plan.selectedIngredientSetId) {
+      throw new RunLifecycleError(
+        'The selected crafting route requires its matching authored snapshot',
+        'INVALID_SELECTION_SNAPSHOT'
+      );
     }
+    step.selectionPlan = plan;
+    step.selectedIngredientSetId = plan.selectedIngredientSetId;
+    step.selectedRequirementSnapshot = snapshot;
     step.updatedAt = this._nowWorldTime();
     incrementRunRevision(run);
     return location.persist();

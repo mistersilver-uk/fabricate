@@ -565,14 +565,28 @@ function createCraftingJournalOperations(fabricate, getService) {
         args.payload.completionMode,
         { expectedRevision: args.expectedRevision }
       )),
-    setSelection: (args) => managerMutation(args, 'setSelection', () =>
-      fabricate.craftingRunManager?.setStepSelectionPlan?.(
-        args.actor,
-        args.runId,
-        args.payload.stepIndex,
-        args.payload.selectionPlan,
-        { expectedRevision: args.expectedRevision }
-      )),
+    setSelection: (args) => {
+      const recipe = fabricate.recipeManager?.getRecipe?.(args.run.recipeId);
+      const step = recipe?.getExecutionSteps?.()?.[args.payload.stepIndex];
+      const selection = args.payload.selectionPlan ?? {};
+      const selectedId = String(selection.selectedIngredientSetId ?? '').trim();
+      const selectedSet = step?.ingredientSets?.find((set) => set.id === selectedId);
+      if (!selectedSet) return { success: false, reason: 'ingredient-set-not-found' };
+      // This callback runs inside the authority claim, after actor/source ownership
+      // and revision checks. Snapshot the authored route here, never client evidence.
+      return managerMutation(args, 'setSelection', () =>
+        fabricate.craftingRunManager?.setStepSelectionPlan?.(
+          args.actor,
+          args.runId,
+          args.payload.stepIndex,
+          {
+            ...selection,
+            selectedIngredientSetId: selectedSet.id,
+            selectedRequirementSnapshot: selectedSet.toJSON?.() ?? selectedSet,
+          },
+          { expectedRevision: args.expectedRevision }
+        ));
+    },
   };
 }
 
