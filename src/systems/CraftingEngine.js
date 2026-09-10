@@ -1101,14 +1101,19 @@ export class CraftingEngine {
   _stageHistorySnapshots({ recipe, step, actor, viewer, sourceActors }) {
     if (!this._mayRecordStageHistory({ recipe, actor, viewer, sourceActors })) return {};
     const system = this._getRecipeSystem(recipe);
-    const mode = this.resolutionModeService?.getMode?.(recipe) ?? system?.resolutionMode ?? 'simple';
+    const mode =
+      this.resolutionModeService?.getMode?.(recipe) ?? system?.resolutionMode ?? 'simple';
     const check = resolveActiveCraftingCheckFormula({ ...system, resolutionMode: mode });
     let kind = 'none';
     if (check.requiresCheck || check.checkUsable) kind = 'check';
     else if (mode === 'routedByIngredients') kind = 'ingredients';
+    const implicit = step.id === 'implicit-step' && !recipe.steps?.length;
     return craftingStepHistoryEvidence({
       resolutionSnapshot: { kind, mode },
-      presentationSnapshot: { name: step.name ?? '', description: step.description ?? '' },
+      presentationSnapshot: {
+        name: step.name ?? '',
+        description: step.description || (implicit ? recipe.description : '') || '',
+      },
     });
   }
 

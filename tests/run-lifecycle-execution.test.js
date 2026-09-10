@@ -9,6 +9,7 @@ import { CraftingFizzleExecutor } from '../src/systems/CraftingFizzleExecutor.js
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { IngredientSet } from '../src/models/IngredientSet.js';
+import { Recipe } from '../src/models/Recipe.js';
 import {
   evaluatePreparedRunCheck,
   postCheckRollHandoff,
@@ -518,6 +519,28 @@ async function startReadyVersionedRun({ engine, recipe, actor, source, selection
     executionGrant: `grant-${actor.id}`,
   });
 }
+
+test('implicit execution step captures permitted recipe purpose once at arm', async () => {
+  const { engine, recipe, runManager, ingredientSet } = setupEngineFixture();
+  recipe.description = 'Captured implicit purpose';
+  recipe.steps = [];
+  recipe.ingredientSets = [ingredientSet];
+  recipe.resultGroups = [];
+  recipe.getExecutionSteps = Recipe.prototype.getExecutionSteps;
+  assert.equal(recipe.getExecutionSteps()[0].description, '', 'actual implicit wrapper omits purpose');
+  const visibility = game.fabricate.getRecipeVisibilityService();
+  game.fabricate.getRecipeVisibilityService = () => ({ ...visibility, evaluateRecipeAccess: () => ({ visible: true }) });
+  const actor = new FakeActor('implicit-purpose');
+  const started = await startReadyVersionedRun({ engine, recipe, actor, source: new FakeActor('source') });
+  const armed = runManager.getActiveRun(actor, started.runId);
+  assert.equal(armed.steps[0].presentationSnapshot.description, 'Captured implicit purpose');
+  recipe.description = 'Later live narrative';
+  assert.equal(new CraftingRunManager().getActiveRun(actor, started.runId).steps[0].presentationSnapshot.description, 'Captured implicit purpose');
+  const explicit = engine._stageHistorySnapshots({ recipe, step: { id: 'explicit', name: 'Named step', description: '' }, actor, viewer: game.user, sourceActors: [] });
+  assert.equal(explicit.presentationSnapshot.description, '', 'an explicit empty stage does not borrow recipe narrative');
+  game.fabricate.getRecipeVisibilityService = () => ({ ...visibility, evaluateRecipeAccess: () => ({ visible: false }) });
+  assert.deepEqual(engine._stageHistorySnapshots({ recipe, step: recipe.getExecutionSteps()[0], actor, viewer: game.user, sourceActors: [] }), {});
+});
 
 test('an unavailable history visibility read omits optional snapshots without stranding a valid start', async () => {
   const { engine, recipe, runManager } = setupEngineFixture();
