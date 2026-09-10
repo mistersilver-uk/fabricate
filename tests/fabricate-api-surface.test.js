@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compileFunction } from 'node:vm';
 
 import { FABRICATE_HOOKS, MANAGER_HOOKS, PLAYER_HOOKS } from '../src/config/hooks.js';
 
@@ -320,12 +321,6 @@ test('Fabricate exposes the versioned Journal command and per-user dismissal sea
     'embedded authority-claim release should refresh the synchronous availability cache'
   );
   assert.ok(
-    mainSource.includes(
-      'emit: (message, options) => game.socket?.emit(EVENT_SCENE_SOCKET, message, options)'
-    ),
-    'journal command replies should pass targeted-recipient options to the Foundry socket'
-  );
-  assert.ok(
     mainSource.includes("Hooks.on('updateUser', bootstrapJournalRunAuthority)"),
     'a GM election update should trigger guarded recovery bootstrap in the newly active realm'
   );
@@ -333,6 +328,41 @@ test('Fabricate exposes the versioned Journal command and per-user dismissal sea
     mainSource.includes("Hooks.on('userConnected', bootstrapJournalRunAuthority)"),
     'a GM connection transition should trigger guarded recovery bootstrap'
   );
+});
+
+test('the real Journal composition emitter survives socket serialization and preserves recipients', () => {
+  const start = mainSource.indexOf('function createJournalCommandsForFabricate(');
+  const end = mainSource.indexOf('\n// The GM notice', start);
+  assert.ok(start >= 0 && end > start);
+  let composed;
+  const received = [];
+  // Foundry V13.351/V14.365 handleCustomSocket destructures this argument: a
+  // default covers omission, but cannot cover undefined serialized as array null.
+  const handleCustomSocket = (event, message, { recipients } = {}) => {
+    received.push({ event, message, recipients });
+  };
+  const dependencies = {
+    createFoundryJournalRunAuthority: () => ({}),
+    createJournalExecutionReconstructor: () => ({}),
+    createCraftingJournalOperations: () => ({}),
+    createGatheringJournalRunOperations: () => ({}),
+    createJournalRunCommandService: (options) => { composed = options; return {}; },
+    installCraftingJournalRunAuthority: () => {},
+    EVENT_SCENE_SOCKET: 'module.fabricate',
+    game: { socket: { emit: (...args) => handleCustomSocket(...JSON.parse(JSON.stringify(args))) } },
+  };
+  compileFunction(
+    `${mainSource.slice(start, end)}\nreturn createJournalCommandsForFabricate({});`,
+    Object.keys(dependencies)
+  )(...Object.values(dependencies));
+  const request = { kind: 'journalRunCommand', requestId: 'request' };
+  const reply = { kind: 'journalRunReply', requestId: 'request' };
+  composed.emit(request);
+  composed.emit(reply, { recipients: ['initiating-player'] });
+  assert.deepEqual(received, [
+    { event: 'module.fabricate', message: request, recipients: undefined },
+    { event: 'module.fabricate', message: reply, recipients: ['initiating-player'] },
+  ]);
 });
 
 test('player-facing starts explicitly select the current journal lifecycle', () => {

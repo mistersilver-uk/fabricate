@@ -346,6 +346,23 @@ function consumeJournalGrant(service, grant, context) {
 }
 
 function createCraftingJournalOperations(fabricate, getService) {
+  const authorizeRollHandoff = async ({ actor, run, payload, sender, privateEvaluation }) => {
+    const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
+    if (!componentSourceActors) return false;
+    const recipeId = privateEvaluation?.recipeId ?? run?.recipeId;
+    const recipe = fabricate.recipeManager?.getRecipe?.(recipeId) ?? null;
+    if (!recipe) return false;
+    if (sender?.isGM === true) return true;
+    if (!sender) return false;
+    return Boolean(
+      fabricate.recipeVisibilityService?.getVisibleRecipes?.({
+        viewer: sender,
+        craftingActor: actor,
+        componentSourceActors,
+        craftingSystemId: recipe.craftingSystemId,
+      })?.some?.((candidate) => candidate?.recipe?.id === recipe.id)
+    );
+  };
   const managerMutation = async (args, operation, mutate) => {
     const trusted = consumeJournalGrant(getService(), args.executionGrant, {
       operation,
@@ -472,14 +489,14 @@ function createCraftingJournalOperations(fabricate, getService) {
         requestId,
       });
     },
-    describeCheck: async ({ actor, run, payload, preparationGrant, requestId }) => {
+    describeCheck: async ({ actor, run, payload, sender, preparationGrant, requestId }) => {
       const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
       if (!componentSourceActors) return { required: false, blocked: 'source-actor-not-found' };
       const describe = fabricate.craftingEngine?.describeVersionedStageCheck;
       if (typeof describe !== 'function') {
         return { required: false, blocked: 'unsupported-operation' };
       }
-      return describe.call(fabricate.craftingEngine, {
+      const descriptor = await describe.call(fabricate.craftingEngine, {
         actor,
         componentSourceActors,
         runId: run.id,
@@ -487,6 +504,21 @@ function createCraftingJournalOperations(fabricate, getService) {
         preparationGrant,
         requestId,
       });
+      if (!descriptor?.required) return descriptor;
+      const visible = await authorizeRollHandoff({
+        actor, run, payload, sender, privateEvaluation: descriptor.privateEvaluation,
+      });
+      if (visible) return descriptor;
+      // The engine describes the check on the GM. Only the attested initiator's
+      // entitlement permits its subject or modifiers to enter the initial reply.
+      // An unnamed descriptor uses the local prompt's generic check title.
+      return {
+        ...descriptor,
+        publicPrompt: {
+          allowsSituationalModifier: descriptor.publicPrompt?.allowsSituationalModifier === true,
+          allowAdvantage: descriptor.publicPrompt?.allowAdvantage === true,
+        },
+      };
     },
     evaluateCheck: async ({ actor, privateEvaluation, decision, sender }) => {
       const componentSourceActors = await resolveJournalSourceActors(null, {
@@ -505,22 +537,7 @@ function createCraftingJournalOperations(fabricate, getService) {
         secret: !visible,
       });
     },
-    authorizeRollHandoff: async ({ actor, run, payload, sender, privateEvaluation }) => {
-      const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
-      if (!componentSourceActors) return false;
-      const recipeId = privateEvaluation?.recipeId ?? run?.recipeId;
-      const recipe = fabricate.recipeManager?.getRecipe?.(recipeId) ?? null;
-      if (!recipe) return false;
-      if (sender?.isGM === true) return true;
-      return Boolean(
-        fabricate.recipeVisibilityService?.getVisibleRecipes?.({
-          viewer: sender,
-          craftingActor: actor,
-          componentSourceActors,
-          craftingSystemId: recipe.craftingSystemId,
-        })?.some?.((candidate) => candidate?.recipe?.id === recipe.id)
-      );
-    },
+    authorizeRollHandoff,
     execute: async ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
       const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
       if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
@@ -613,7 +630,7 @@ function createJournalCommandsForFabricate(fabricate) {
     activeGM: () => game.users?.activeGM ?? null,
     getUser: (userId) => game.users?.get(userId) ?? null,
     resolveUuid: (uuid) => globalThis.fromUuid?.(uuid),
-    emit: (message, options) => game.socket?.emit(EVENT_SCENE_SOCKET, message, options),
+    emit: (message, options) => game.socket?.emit(EVENT_SCENE_SOCKET, message, options ?? {}),
     randomId: () => foundry.utils.randomID(),
     promptCheck: (descriptor) => promptCheckRoll({
       name: descriptor?.label,

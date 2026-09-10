@@ -630,6 +630,7 @@ export function createJournalRunCommandService({
       const descriptor = await operation.describeCheck({
         actor,
         run,
+        sender: context.sender,
         payload: request.payload ?? {},
         preparationGrant,
         requestId: request.requestId,

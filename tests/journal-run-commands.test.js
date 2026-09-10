@@ -80,16 +80,79 @@ function commandHarness({
 }
 
 describe('journal run command protocol', () => {
-  async function assertAuthoritativeRouteSnapshot(clientSnapshot) {
-    // Execute the actual composition-edge declarations without importing main's
-    // Foundry boot side effects or maintaining a second copy of its callback.
+  function loadCraftingOperations() {
     const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
     const start = source.indexOf('async function resolveJournalSourceActors(');
     const end = source.indexOf('function createJournalCommandsForFabricate(', start);
     assert.ok(start >= 0 && end > start, 'the production operation factory must be present');
-    const createOperations = compileFunction(
-      `${source.slice(start, end)}\nreturn createCraftingJournalOperations;`
-    )();
+    return compileFunction(`${source.slice(start, end)}\nreturn createCraftingJournalOperations;`)();
+  }
+
+  it('redacts initial crafting prompts for the attested sender rather than the executing GM', async () => {
+    const originalGame = globalThis.game;
+    const originalFromUuid = globalThis.fromUuid;
+    try {
+      globalThis.game = { user: { id: 'gm', isGM: true } };
+      const canary = 'PROTECTED-RECIPE-CANARY';
+      const run = { id: 'run-1', recipeId: 'recipe', lifecycleVersion: 1, runRevision: 3 };
+      const publicPrompt = {
+        label: canary, recipeName: canary, formula: '1d20+987', dc: 987,
+        mode: 'simple', allowsSituationalModifier: true, allowAdvantage: true,
+        modifierChoice: { modifiers: [{ id: canary, label: canary }] },
+        allowedModifierIds: [canary], protectedFields: { nested: canary },
+      };
+      const privateEvaluation = { recipeId: 'recipe', rollFormula: '1d20+987' };
+      let entitled = false;
+      const viewers = [];
+      const fabricate = {
+        craftingRunManager: { getRun: () => run },
+        craftingEngine: { describeVersionedStageCheck: async () => ({ required: true, publicPrompt, privateEvaluation }) },
+        recipeManager: { getRecipe: () => ({ id: 'recipe', craftingSystemId: 'system' }) },
+        recipeVisibilityService: { getVisibleRecipes: ({ viewer }) => {
+          viewers.push(viewer.id);
+          return entitled ? [{ recipe: { id: 'recipe' } }] : [];
+        } },
+      };
+      const operations = loadCraftingOperations()(fabricate, () => harness.service);
+      const harness = commandHarness({ currentUserId: 'gm', operations: { crafting: operations } });
+      const { service, actor, emitted, emissionOptions } = harness;
+      actor.isOwner = true;
+      globalThis.fromUuid = async () => actor;
+      const request = {
+        kind: JOURNAL_RUN_SOCKET_KIND.REQUEST, requestId: 'secret-prompt', sessionId: 'player-tab',
+        actorUuid: actor.uuid, runType: 'crafting', runId: run.id, expectedRevision: 3,
+        action: 'execute', senderId: 'gm', payload: {},
+      };
+      const hidden = await service.handleSocketMessage(request, 'player');
+      assert.equal(hidden.response.checkRequired, true);
+      assert.deepEqual(hidden.response.promptDescriptor, {
+        allowsSituationalModifier: true, allowAdvantage: true,
+      });
+      assert.equal(JSON.stringify(hidden).includes(canary), false);
+      assert.equal(JSON.stringify(hidden).includes('987'), false);
+      assert.deepEqual(emissionOptions[0], { recipients: ['player'] });
+      assert.equal(emissionOptions[0].recipients.includes('other'), false);
+      assert.equal(emitted.length, 1);
+      assert.deepEqual(viewers, ['player']);
+      assert.equal(await operations.authorizeRollHandoff({ actor, run, payload: {}, sender: { id: 'player' } }), false);
+      entitled = true;
+      const visible = await service.handleSocketMessage({ ...request, requestId: 'visible-prompt' }, 'player');
+      assert.deepEqual(visible.response.promptDescriptor, publicPrompt);
+      assert.equal(await operations.authorizeRollHandoff({ actor, run, payload: {}, sender: { id: 'player' } }), true);
+      const denied = await service.handleSocketMessage({ ...request, requestId: 'wrong-owner' }, 'other');
+      assert.equal(denied.response.reason, 'owner-required');
+      assert.equal(JSON.stringify(denied).includes(canary), false);
+      assert.equal(publicPrompt.label, canary, 'redaction must not mutate the engine descriptor');
+    } finally {
+      globalThis.game = originalGame;
+      globalThis.fromUuid = originalFromUuid;
+    }
+  });
+
+  async function assertAuthoritativeRouteSnapshot(clientSnapshot) {
+    // Execute the actual composition-edge declarations without importing main's
+    // Foundry boot side effects or maintaining a second copy of its callback.
+    const createOperations = loadCraftingOperations();
     const oldGlobals = { game: globalThis.game, foundry: globalThis.foundry, fromUuid: globalThis.fromUuid };
     try {
       globalThis.foundry = { utils: { randomID: () => 'route-run' } };
