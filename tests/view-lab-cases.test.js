@@ -925,9 +925,9 @@ test('exactly the declared 1024px cases carry complete layout expectations', () 
   }
 });
 
-test('all 42 Journal lifecycle captures assert defining product state rather than a populated shell', () => {
+test('all 43 Journal lifecycle captures assert defining product state rather than a populated shell', () => {
   const cases = VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-lifecycle-'));
-  assert.equal(cases.length, 42);
+  assert.equal(cases.length, 43);
   for (const entry of cases) {
     assert.equal(entry.expectTab, 'journal', entry.id);
     assert.ok(entry.expectSelector, `${entry.id} has an explicit assertion`);
@@ -935,6 +935,14 @@ test('all 42 Journal lifecycle captures assert defining product state rather tha
     assert.ok(!entry.expectSelector.includes('data-journal-case-state'), `${entry.id} checks product output`);
   }
   const byState = new Map(cases.map((entry) => [entry.id.replace('fabricate-journal-lifecycle-', ''), entry]));
+  const setup = byState.get('authority-setup');
+  assert.equal(setup.query.viewer, 'gm');
+  assert.equal(setup.query.journalCaseState, 'authority-setup');
+  assert.match(setup.expectSelector, /data-journal-authority-setup="ledger-missing"/);
+  assert.match(setup.expectSelector, /data-journal-authority-setup-action\]:not\(:disabled\)/);
+  assert.equal(setup.expectCenterHit, '[data-journal-authority-setup-action]');
+  assert.deepEqual(setup.position, { width: 1240, height: 880 });
+  assert.equal(byState.get('authority-unavailable').query.viewer, undefined, 'the existing player refusal frame is retained');
   for (const state of ['stale-action', 'command-timeout']) {
     assert.match(byState.get(state).expectSelector, /data-journal-command-error/);
     assert.match(byState.get(state).expectSelector, /data-notice-action/);

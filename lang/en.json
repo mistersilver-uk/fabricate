@@ -1060,6 +1060,9 @@
         },
         "WhatToExpect": {
           "Title": "What to expect",
+          "Terminal": "This run has ended. Review its recorded stages, spending and received results here.",
+          "Recovery": "Review the confirmed receipts and the uncertain effect above. Effects are never replayed or automatically rolled back; an unresolved execution claim can also block other runs until the GM records a manual reconciliation.",
+          "Paused": "This run is paused. Its countdown stays frozen until you resume; it cannot complete while paused.",
           "Crafting": "This is a crafting run. Trigger the next step when its time gate has passed; each step rolls its crafting check and the run completes (or fails) once the final step resolves.",
           "CraftingSingleStep": "This is a crafting run. Once its time gate has passed, finish crafting to roll its crafting check — the run completes (or fails) on that result.",
           "CraftingNoCheck": "This crafting run has no check. Trigger each step once its time gate has passed; the run completes after the final step.",
@@ -1162,13 +1165,26 @@
         "Record": {
           "Title": "Run record",
           "Task": "Task",
+          "RecipeId": "Recipe ID",
+          "TaskId": "Task ID",
           "Finished": "Finished"
+        },
+        "AuthoritySetup": {
+          "Title": "Set up Journal authority",
+          "Prerequisite": "Close all other GM tabs and sessions for this world, including other tabs signed in as you. Continue only as the active GM in a single GM session. Setup creates one private authority ledger for run changes; it never replaces an existing ledger or resolves duplicate ledgers.",
+          "Action": "Set up authority…",
+          "Confirm": "I am the only GM session — set up",
+          "Cancel": "Not now",
+          "Working": "Setting up authority…",
+          "Failed": "Journal authority setup could not be completed. Refresh the Journal before trying again; an existing ledger will not be replaced.",
+          "AlreadyExists": "A Journal authority ledger already exists. It was not replaced. Refresh the Journal for its current state.",
+          "RecoveryFailed": "The authority ledger exists, but its recovery check could not complete. Ask the active GM to inspect the retained execution claim; setup cannot replace it."
         },
         "Tips": {
           "Title": "Tips",
           "WorldTime": "Countdowns use world time, not real time — they only move when your GM advances the game clock.",
           "Trigger": "Crafting steps are triggered manually once their time gate has passed.",
-          "History": "Completed runs and their results stay in your history."
+          "History": "Finished is your history browser: use its pages to review ended runs and their results. Dismissing an entry hides it only for you; the actor's history is retained."
         },
         "Quantity": "×{n}",
         "Time": {

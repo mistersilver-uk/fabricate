@@ -402,6 +402,21 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       getJournalRunAuthorityAvailability: () =>
         game?.fabricate?.getJournalRunAuthorityAvailability?.()
         ?? { available: false, reason: 'authority-unavailable' },
+      isActiveGM: () => Boolean(game?.user?.isGM && game.user.id &&
+        game.user.id === game.users?.activeGM?.id),
+      setupJournalRunAuthority: async () => {
+        if (!services.isActiveGM()) return { success: false, reason: 'active-gm-required' };
+        const confirmed = await confirmDialog({
+          title: localize('FABRICATE.App.Journal.AuthoritySetup.Title'),
+          content: localize('FABRICATE.App.Journal.AuthoritySetup.Prerequisite'),
+          yes: localize('FABRICATE.App.Journal.AuthoritySetup.Confirm'),
+          no: localize('FABRICATE.App.Journal.AuthoritySetup.Cancel'),
+        });
+        if (!confirmed) return { cancelled: true };
+        if (!services.isActiveGM()) return { success: false, reason: 'active-gm-required' };
+        return game?.fabricate?.setupJournalRunAuthority?.()
+          ?? { success: false, reason: 'authority-unavailable' };
+      },
       advanceCraftingRun: (opts = {}) => game?.fabricate?.advanceCraftingRun?.(opts) ?? null,
       cancelCraftingRun: (opts = {}) => game?.fabricate?.cancelCraftingRun?.(opts) ?? null,
       getWorldTime: () => game?.fabricate?.getWorldTime?.() ?? 0,

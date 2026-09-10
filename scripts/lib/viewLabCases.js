@@ -1485,6 +1485,7 @@ function journalLifecycleCases() {
     'stale-action',
     'command-timeout',
     'authority-unavailable',
+    'authority-setup',
     'roll-cancelled',
     'unsupported-version',
     'recovery-required',
@@ -1727,6 +1728,15 @@ function journalLifecycleCases() {
       detail +
       has(`${primary}:disabled[title]:not([title=""])`, '[data-run-action="cancel-arm"]:disabled') +
       lacks('[data-journal-verdict]'),
+    'authority-setup':
+      detail +
+      has(
+        '[data-journal-authority-setup="ledger-missing"] .fab-notice-detail:not(:empty)',
+        '[data-journal-authority-setup-action]:not(:disabled)',
+        `${primary}:disabled`,
+        '[data-run-action="cancel-arm"]:disabled'
+      ) +
+      lacks('[data-journal-verdict]'),
     'roll-cancelled':
       '.journal-view-container' +
       has(
@@ -1765,6 +1775,7 @@ function journalLifecycleCases() {
       query: {
         tab: 'journal',
         journalCaseState: state.replace(/-finished$/, ''),
+        ...(state === 'authority-setup' && { viewer: 'gm' }),
         ...(state.startsWith('gathering-straight') && { gatheringTaskMode: 'straight' }),
         ...(state.startsWith('gathering-check') && { gatheringTaskMode: 'routed' }),
       },
@@ -1773,6 +1784,9 @@ function journalLifecycleCases() {
       expectTab: 'journal',
       expectSelector: expected[state],
       ...(state === 'filter-paused' && { expectCenterHit: steps[state][0].selector }),
+      ...(state === 'authority-setup' && {
+        expectCenterHit: '[data-journal-authority-setup-action]',
+      }),
       ...(['narrow', 'wide'].includes(state) && {
         expectLayout: {
           containerSelector: '.journal-view-container',
@@ -1786,6 +1800,7 @@ function journalLifecycleCases() {
         JOURNAL_SOURCES,
         /^src\/ui\/svelte\/stores\/journalStore/,
         /^src\/systems\/RunJournalBuilder\.js$/,
+        ...(state === 'authority-setup' ? [/^src\/ui\/SvelteFabricateApp\.svelte\.js$/] : []),
       ],
     })
   );

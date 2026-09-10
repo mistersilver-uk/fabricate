@@ -8,6 +8,7 @@
   import Chip from '../../components/Chip.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
   import Medallion from '../../components/Medallion.svelte';
+  import ManagerButton from '../../components/ManagerButton.svelte';
   import Notice from '../../components/Notice.svelte';
   import OutcomeLadder from '../../components/OutcomeLadder.svelte';
   import RunProgress from '../../components/RunProgress.svelte';
@@ -130,6 +131,23 @@
   const commandError = $derived(
     journal?.commandError?.runKey === runIdentity ? journal.commandError : null
   );
+  const canSetupAuthority = $derived(journal?.canSetupAuthority?.(run) === true);
+  const authoritySetupError = $derived(
+    journal?.authoritySetupError?.runKey === runIdentity ? journal.authoritySetupError : null
+  );
+  const authoritySetupErrorKey = $derived.by(() => {
+    const key = {
+      'active-gm-required': 'FABRICATE.App.Journal.Actions.ActiveGmRequired',
+      'ledger-already-exists': 'FABRICATE.App.Journal.AuthoritySetup.AlreadyExists',
+      'ledger-ambiguous': 'FABRICATE.App.Journal.Actions.LedgerAmbiguous',
+      'claim-held': 'FABRICATE.App.Journal.Actions.ClaimHeld',
+      'claim-release-failed': 'FABRICATE.App.Journal.Actions.ClaimReleaseFailed',
+      'secure-random-unavailable': 'FABRICATE.App.Journal.Actions.SecureRandomUnavailable',
+      'reconstruction-failed': 'FABRICATE.App.Journal.AuthoritySetup.RecoveryFailed',
+      'reconstruction-unavailable': 'FABRICATE.App.Journal.AuthoritySetup.RecoveryFailed',
+    }[authoritySetupError?.reason];
+    return key ?? 'FABRICATE.App.Journal.AuthoritySetup.Failed';
+  });
   function effectPhaseText(phase) {
     const key = {
       applied: 'FABRICATE.App.Journal.Notice.EffectPhase.applied',
@@ -147,6 +165,11 @@
     Boolean(currentStage?.detail?.checkLabel || currentStage?.lastCheckResult)
   );
   const guidanceKey = $derived.by(() => {
+    if (run?.recoveryEvidence?.required) return 'FABRICATE.App.Journal.WhatToExpect.Recovery';
+    if (run?.actions?.disabledReason === 'unsupportedLifecycle')
+      return 'FABRICATE.App.Journal.Actions.UnsupportedLifecycle';
+    if (terminal) return 'FABRICATE.App.Journal.WhatToExpect.Terminal';
+    if (run?.pauseState) return 'FABRICATE.App.Journal.WhatToExpect.Paused';
     if (run?.activityKind === 'gathering' || run?.runType === 'gathering')
       return run?.lifecycleContract === 'current'
         ? 'FABRICATE.App.Journal.WhatToExpect.GatheringManual'
@@ -414,6 +437,36 @@
     />
   {/if}
 
+  {#if canSetupAuthority}
+    <Notice
+      tone="warning"
+      title={localize('FABRICATE.App.Journal.AuthoritySetup.Title')}
+      detail={localize('FABRICATE.App.Journal.AuthoritySetup.Prerequisite')}
+      dataAttr="data-journal-authority-setup"
+      dataValue="ledger-missing"
+    />
+    <ManagerButton
+      role="primary"
+      disabled={journal?.authoritySetupBusy === true || Boolean(journal?.busyRunKey)}
+      aria-busy={journal?.authoritySetupBusy === true}
+      data-journal-authority-setup-action
+      onclick={() => journal?.setupAuthority?.(run)}
+      >{localize(
+        journal?.authoritySetupBusy
+          ? 'FABRICATE.App.Journal.AuthoritySetup.Working'
+          : 'FABRICATE.App.Journal.AuthoritySetup.Action'
+      )}</ManagerButton
+    >
+  {/if}
+  {#if authoritySetupError}
+    <Notice
+      tone="danger"
+      title={localize(authoritySetupErrorKey)}
+      dataAttr="data-journal-authority-setup-error"
+      dataValue={authoritySetupError.reason}
+    />
+  {/if}
+
   {#if commandError}
     <Notice
       tone="danger"
@@ -663,12 +716,12 @@
     />
     {#if run?.recipeId}<JournalFactRow
         icon="fa-scroll"
-        label={localize('FABRICATE.App.Journal.About.Recipe')}
+        label={localize('FABRICATE.App.Journal.Record.RecipeId')}
         value={run.recipeId}
       />{/if}
     {#if run?.taskId}<JournalFactRow
         icon="fa-leaf"
-        label={localize('FABRICATE.App.Journal.Record.Task')}
+        label={localize('FABRICATE.App.Journal.Record.TaskId')}
         value={run.taskId}
       />{/if}
     {#if resolutionModeLabel}<JournalFactRow
@@ -691,7 +744,7 @@
   <Callout
     tone="info"
     title={localize('FABRICATE.App.Journal.WhatToExpect.Title')}
-    text={`${guidance} ${localize('FABRICATE.App.Journal.Tips.WorldTime')}`}
+    text={`${guidance} ${localize('FABRICATE.App.Journal.Tips.WorldTime')} ${localize('FABRICATE.App.Journal.Tips.History')}`}
     dataAttr="data-journal-guidance"
   />
 </article>

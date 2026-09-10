@@ -445,6 +445,92 @@ describe('Journal versioned lifecycle (mounted)', () => {
   afterEach(() => harness.remount());
   after(() => harness.teardown());
 
+  it('labels persisted identifiers while retaining the readable recipe identity', async () => {
+    const { target } = await mountState('ready-single');
+    assert.match(target.querySelector('.journal-detail-identity').textContent, /Bend Horseshoe/);
+    const record = target.querySelector('[data-journal-record]').textContent;
+    assert.match(record, /Recipe ID\s*sm-r-horseshoe/);
+    assert.match(record, /Run ID\s*lab-v1-ready-single/);
+    await harness.remount();
+    const gathering = await mountState('gathering-straight');
+    assert.match(gathering.target.querySelector('.journal-detail-identity').textContent, /straight task/);
+    assert.match(gathering.target.querySelector('[data-journal-record]').textContent, /Task ID\s*task-straight/);
+  });
+
+  it('combines timing and history advice with guidance for the actual run state', async () => {
+    for (const [state, expected] of [
+      ['ready-single', /finish crafting/i],
+      ['paused', /resume/i],
+      ['finished-success', /run has ended/i],
+      ['finished-failure', /run has ended/i],
+      ['finished-cancelled', /run has ended/i],
+      ['recovery-required', /uncertain effect/i],
+    ]) {
+      const { target } = await mountState(state);
+      const guidance = target.querySelector('[data-journal-guidance]').textContent;
+      assert.match(guidance, expected, state);
+      assert.match(guidance, /world time, not real time/, state);
+      assert.match(guidance, /Finished/, state);
+      if (state.startsWith('finished-') || state === 'recovery-required') {
+        assert.doesNotMatch(guidance, /finish crafting|trigger|use the available action/i, state);
+      }
+      await harness.remount();
+    }
+  });
+
+  it('offers explicit GM setup, reports failure and retries through the setup service', async () => {
+    const authority = { available: false, reason: 'ledger-missing' };
+    let calls = 0;
+    const { target, store, commands } = await mountState('authority-setup', {
+      builderOptions: { authority },
+      prepare({ services }) {
+        services.isActiveGM = () => true;
+        services.setupJournalRunAuthority = async () => {
+          calls += 1;
+          if (calls === 1) throw new Error('setup transport failed');
+          authority.available = true;
+          authority.reason = null;
+          return { success: true };
+        };
+      },
+    });
+    await settleAction();
+    assert.equal(calls, 0, 'opening the Journal never provisions authority');
+    const capture = getCaseById('fabricate-journal-lifecycle-authority-setup');
+    assert.ok(target.querySelector(capture.expectSelector), 'the defining capture selector matches actual rendered product state');
+    assert.match(target.querySelector('[data-journal-authority-setup]').textContent, /Close all other GM tabs/);
+    assert.match(target.querySelector('[data-journal-authority-setup]').textContent, /single GM session/);
+    target.querySelector('[data-journal-authority-setup-action]').click();
+    await settleAction();
+    assert.equal(calls, 1);
+    assert.equal(store.authoritySetupBusy, false);
+    assert.match(target.querySelector('[data-journal-authority-setup-error]').textContent, /could not be completed/i);
+    target.querySelector('[data-journal-authority-setup-action]').click();
+    await settleAction();
+    assert.equal(calls, 2);
+    assert.equal(store.loading, false, 'setup reloads quietly');
+    assert.equal(store.selectedRun.actions.execute, true, 'authoritative listing is refreshed');
+    assert.ok(!target.querySelector('[data-journal-authority-setup-action]'));
+    assert.deepEqual(commands, [], 'setup does not execute or replay a run');
+  });
+
+  it('refuses setup for ineligible viewers and duplicate ledgers', async () => {
+    for (const [isActiveGM, reason] of [[false, 'ledger-missing'], [true, 'ledger-ambiguous']]) {
+      let calls = 0;
+      const { target, store } = await mountState('authority-unavailable', {
+        builderOptions: { authority: { available: false, reason } },
+        prepare({ services }) {
+          services.isActiveGM = () => isActiveGM;
+          services.setupJournalRunAuthority = async () => { calls += 1; };
+        },
+      });
+      await settleAction();
+      assert.ok(!target.querySelector('[data-journal-authority-setup-action]'));
+      await store.setupAuthority(store.selectedRun);
+      assert.equal(calls, 0, 'the store also refuses an ineligible direct invocation');
+      await harness.remount();
+    }
+  });
   it('changes the ingredient route through the real store and resets scoped intent and yields', async () => {
     const first = ingredientSet('route-a', [{ id: 'a', options: [componentOption('iron', 'iron')] }]);
     const second = ingredientSet('route-b', [{ id: 'b', options: [componentOption('copper', 'copper')] }]);

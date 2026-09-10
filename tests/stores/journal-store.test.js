@@ -144,6 +144,35 @@ describe('journalStore', () => {
     rmSync(tempRoot, { recursive: true, force: true });
   });
 
+  it('holds a single in-flight setup and treats cancellation and malformed replies truthfully', async () => {
+    const pending = run({ lifecycleContract: 'current', actions: { disabledReason: 'ledger-missing' } });
+    let complete;
+    let setupCalls = 0;
+    let listCalls = 0;
+    const store = createJournalStore({ services: {
+      isActiveGM: () => true,
+      getSelectedActorId: () => 'actor-1',
+      listJournalForActor: async () => { listCalls += 1; return baseListing({ activeRuns: [pending] }); },
+      setupJournalRunAuthority: () => { setupCalls += 1; return new Promise((resolve) => { complete = resolve; }); },
+    } });
+    await store.load();
+    const first = store.setupAuthority(store.selectedRun);
+    assert.equal(store.authoritySetupBusy, true);
+    await store.setupAuthority(store.selectedRun);
+    assert.equal(setupCalls, 1);
+    complete({ cancelled: true });
+    await first;
+    assert.equal(store.authoritySetupBusy, false);
+    assert.equal(store.authoritySetupError, null);
+    assert.equal(listCalls, 1, 'cancellation performs no refresh or write');
+    const retry = store.setupAuthority(store.selectedRun);
+    complete(undefined);
+    await retry;
+    assert.equal(store.authoritySetupError.reason, 'setup-failed');
+    assert.equal(store.authoritySetupBusy, false);
+    assert.equal(listCalls, 2, 'an unconfirmed result refreshes authoritative state');
+  });
+
   it('loads the listing and exposes navCount from counts.active', async () => {
     const setup = makeServices();
     const store = await loadedStore(setup);
