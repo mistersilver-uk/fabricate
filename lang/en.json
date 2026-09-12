@@ -69,6 +69,13 @@
         "SkippedErrors": "{count} document(s) could not be updated at all, so the repair is INCOMPLETE. Fabricate has kept its record of what to change and will retry on the next reload; you can also run it now from the console with game.fabricate.remapWorldScopeIdentityFlags().",
         "IdentityDrift": "Fabricate’s shared world record is out of date for {records} entry(ies) across {fields} field(s): {entities}. Each crafting system’s own copy is what everything reads, so nothing is wrong and nothing has been changed — this covers names, images, descriptions and source links only.",
         "IdentityDriftOverflow": "…and {count} more — the full list is in the console (F12)"
+      },
+      "WorldEssenceMerge": {
+        "Merged": "Fabricate found {count} set(s) of essences that were the same essence in more than one system — same name, same macro and same active-effect source — and made each set one shared essence: {names}. Every reference was updated. This cannot be undone: the other essences in each set are gone, along with their own icon, colour and description, and the systems that held them now draw the surviving essence's colour.",
+        "Refusals": "{count} set(s) could not be merged safely, so Fabricate left them exactly as they were and merged nothing there: {refusals}. This will not be retried — to merge them, delete the duplicate essence from the offending system's Essences tab yourself.",
+        "Declined": "{count} essence(s) were left alone because the crafting systems using them disagree about their macro or active-effect source, so Fabricate cannot tell whether they are one essence or several: {essences}. Nothing has been changed — review them under World › Essences.",
+        "ItemOverrideScope": "Fabricate could only update the per-item essence overrides on items your characters are carrying, so a world item, a compendium item or an unlinked token actor may still name a merged-away essence. Nothing resolves to the wrong essence — a retired id is never reused — but those items contribute no essence at all until you open and re-save them.",
+        "Overflow": "…and {count} more — the full list is in the console (F12)"
       }
     },
     "Update": {

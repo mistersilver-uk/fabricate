@@ -325,3 +325,181 @@ export function buildWorldIdentityDriftNotice(driftEntries, localize) {
     `Fabricate's world catalogue snapshot is out of date for ${records.length} record(s) across ${fieldCount} field(s): ${named}. Each crafting system's own copy is what every reader answers from, so nothing is wrong and nothing has been changed - this is identity only (names, images, descriptions and source links), not behaviour.`
   );
 }
+
+// ---------------------------------------------------------------------------
+// THE `1.34.0` EQUIVALENT-ESSENCE MERGE NOTICE (issue 1654)
+// ---------------------------------------------------------------------------
+
+/**
+ * How many essences the TOAST names before deferring to the console.
+ *
+ * The cap exists for the reason {@link IDENTITY_DRIFT_NOTICE_RECORD_CAP} states — `.notification`
+ * has no `max-height`, no `overflow` and `pointer-events: all` — and the call site logs the full,
+ * id-level enumeration at `console.info` through {@link describeWorldEssenceMerge}, which is the
+ * only thing that makes "the rest is in the console" a true sentence.
+ */
+const ESSENCE_MERGE_NOTICE_NAME_CAP = 5;
+
+/**
+ * The readable name of one merged, refused or declined essence group.
+ *
+ * **IT IS A NAME AND NEVER AN ID PAIR, AND THAT IS NOT A STYLE CHOICE.** The `Renames` clause this
+ * is otherwise modelled on prints `oldId → newId` because it was written when an essence id was
+ * believed to be a readable slug. It is not: `adminStore.addEssence` mints one with
+ * `crypto.randomUUID()`, so most ids `1.34.0` retires are 36-character UUIDs, and the channel is a
+ * corner toast. An enumeration of them is a wall of hex a GM can do nothing with. The equivalence
+ * key CASE-FOLDS the name, so every group has exactly one readable name by construction.
+ *
+ * THE RESOLUTION IS DEFENSIVE BECAUSE THE PRODUCER'S CONTRACT IS NOT YET FIXED.
+ * `buildWorldEssenceEquivalence` emits `{survivorId, loserIds, systemIds}` for a merged group and
+ * carries no `name` on it, while `retired` — keyed by loser id — does carry one. So the name is
+ * read from the entry first (the field the report SHOULD grow), then from the tombstone of any
+ * loser in the group, and only then does it fall back to the id, which is the one outcome this
+ * clause exists to avoid and is therefore the last resort rather than the default.
+ *
+ * @param {object|null} entry A `mergedGroups`, `refusals` or `declined` entry.
+ * @param {object|null} retired The `retired` tombstone map, when the report carries it.
+ * @returns {string}
+ */
+function essenceGroupName(entry, retired) {
+  if (typeof entry?.name === 'string' && entry.name) return entry.name;
+  const tombstones = retired && typeof retired === 'object' ? retired : {};
+  for (const loserId of arrayOf(entry?.loserIds)) {
+    const name = tombstones[loserId]?.name;
+    if (typeof name === 'string' && name) return name;
+  }
+  const fallbackId = entry?.essenceId ?? entry?.survivorId;
+  const tombstoned = tombstones[fallbackId]?.name;
+  if (typeof tombstoned === 'string' && tombstoned) return tombstoned;
+  return typeof fallbackId === 'string' && fallbackId ? fallbackId : 'an unnamed essence';
+}
+
+/** The first {@link ESSENCE_MERGE_NOTICE_NAME_CAP} descriptions, with an explicit remainder. */
+function describeCappedEssences(entries, describe, localize) {
+  const shown = entries.slice(0, ESSENCE_MERGE_NOTICE_NAME_CAP);
+  const withheld = entries.length - shown.length;
+  const named = shown.map((entry) => describe(entry)).join(', ');
+  if (withheld === 0) return named;
+  return `${named} ${localizeWith(
+    localize,
+    'FABRICATE.Migration.WorldEssenceMerge.Overflow',
+    { count: withheld },
+    `and ${withheld} more - the full list is in the console`
+  )}`;
+}
+
+/**
+ * EVERY group, by id, uncapped - the detail the notice's own cap defers to the console.
+ *
+ * Separate from the notice for the reason {@link describeWorldIdentityDrift} is: what core logs
+ * alongside a toast is the message it was HANDED, which is the CAPPED one, so a notice claiming
+ * the rest is in the console is false unless Fabricate logs it itself. The call site logs this at
+ * `console.info`, not `console.debug` — `debug` maps to DevTools' VERBOSE level, which Chromium's
+ * default filter excludes.
+ *
+ * @param {object|null} report The transient `_worldEssenceMergeReport`.
+ * @returns {string} the full enumeration, or `''` when there is nothing to say.
+ */
+export function describeWorldEssenceMerge(report) {
+  return [
+    ...arrayOf(report?.mergedGroups).map(
+      (group) =>
+        `merged ${arrayOf(group?.loserIds).join(', ')} into ${group?.survivorId} across ${arrayOf(group?.systemIds).join(', ')}`
+    ),
+    ...arrayOf(report?.refusals).map(
+      (refusal) =>
+        `refused ${arrayOf(refusal?.loserIds).join(', ')} -> ${refusal?.survivorId} (${refusal?.reason})`
+    ),
+    ...arrayOf(report?.declined).map(
+      (entry) => `declined ${entry?.essenceId} (${arrayOf(entry?.sections).join(', ')})`
+    ),
+    ...arrayOf(report?.orphaned).map((entry) => `orphaned ${entry?.essenceId}`),
+  ].join('; ');
+}
+
+/**
+ * The one-time notice describing what the `1.34.0` equivalent-essence merge did.
+ *
+ * SEVERITY IS CONSTANT-`warn` BY CONSTRUCTION, which is why this returns a bare string rather than
+ * the `{message, severity}` pair its `1.30.0` sibling returns. Every case that produces a message
+ * at all is one the GM has to act on or at least know about: a merge is IRREVERSIBLE, a refusal
+ * will NOT be retried, and a declined pair is a disagreement only the GM can settle. There is no
+ * informational case left to distinguish, so a derived severity would be a branch with one arm.
+ *
+ * SILENT WHEN NOTHING HAPPENED. `orphaned` alone produces NO message: a world essence with no live
+ * membership record is left exactly as it is, nothing changed, and a notice that always fires is a
+ * notice nobody reads.
+ *
+ * IT DISCLOSES ITS OWN REACH. The item-override remap walks OWNED ACTOR ITEMS only, so the same
+ * `flags.fabricate.essences` override on a world Item, a compendium Item or an unlinked synthetic
+ * token actor is never seen and stays stale permanently. That is stated rather than implied,
+ * because the GM is the only one who can find those documents.
+ *
+ * @param {object|null} report The transient `_worldEssenceMergeReport`.
+ * @param {(key: string, data?: object) => string|undefined} localize
+ * @returns {string} the message, or `''` when there is nothing to say.
+ */
+export function buildWorldEssenceMergeNotice(report, localize) {
+  const merged = arrayOf(report?.mergedGroups);
+  const refusals = arrayOf(report?.refusals);
+  const declined = arrayOf(report?.declined);
+  if (merged.length === 0 && refusals.length === 0 && declined.length === 0) return '';
+
+  const retired = report?.retired ?? null;
+  const nameOf = (entry) => essenceGroupName(entry, retired);
+  const clauses = [];
+
+  if (merged.length > 0) {
+    const names = describeCappedEssences(merged, nameOf, localize);
+    clauses.push(
+      localizeWith(
+        localize,
+        'FABRICATE.Migration.WorldEssenceMerge.Merged',
+        { count: merged.length, names },
+        `Fabricate found ${merged.length} set(s) of essences that were the same essence in more than one system — same name, same macro and same active-effect source — and made each set one shared essence: ${names}. Every reference was updated. This cannot be undone: the other essences in each set are gone, along with their own icon, colour and description, and the systems that held them now draw the surviving essence's colour.`
+      )
+    );
+  }
+  if (refusals.length > 0) {
+    const named = describeCappedEssences(
+      refusals,
+      (entry) => `${nameOf(entry)} (${entry?.reason})`,
+      localize
+    );
+    clauses.push(
+      localizeWith(
+        localize,
+        'FABRICATE.Migration.WorldEssenceMerge.Refusals',
+        { count: refusals.length, refusals: named },
+        `${refusals.length} set(s) could not be merged safely, so Fabricate left them exactly as they were and merged nothing there: ${named}. This will not be retried — to merge them, delete the duplicate essence from the offending system's Essences tab yourself.`
+      )
+    );
+  }
+  if (declined.length > 0) {
+    const named = describeCappedEssences(
+      declined,
+      (entry) => `${nameOf(entry)} (${arrayOf(entry?.sections).join(', ') || entry?.reason})`,
+      localize
+    );
+    clauses.push(
+      localizeWith(
+        localize,
+        'FABRICATE.Migration.WorldEssenceMerge.Declined',
+        { count: declined.length, essences: named },
+        `${declined.length} essence(s) were left alone because the crafting systems using them disagree about their macro or active-effect source, so Fabricate cannot tell whether they are one essence or several: ${named}. Nothing has been changed — review them under World › Essences.`
+      )
+    );
+  }
+  if (merged.length > 0) {
+    // ONLY WHEN SOMETHING MERGED, because only a merge retires an id for a stale override to name.
+    clauses.push(
+      localizeWith(
+        localize,
+        'FABRICATE.Migration.WorldEssenceMerge.ItemOverrideScope',
+        undefined,
+        'Fabricate could only update the per-item essence overrides on items your characters are carrying, so a world item, a compendium item or an unlinked token actor may still name a merged-away essence. Nothing resolves to the wrong essence — a retired id is never reused — but those items contribute no essence at all until you open and re-save them.'
+      )
+    );
+  }
+  return clauses.join(' ');
+}

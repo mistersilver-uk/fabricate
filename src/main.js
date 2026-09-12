@@ -146,7 +146,7 @@ import { resolvedComponentsFor, resolvedToolsFor } from './systems/scopedEntityR
 import { readPersistedCraftingSystems } from './systems/SettingsCraftingDefinitionRepository.js';
 import { reportWorldIdentityDrift } from './systems/worldIdentityDrift.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
-import { buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice, describeWorldIdentityDrift } from './migration/worldScopeEntityNotice.js';
+import { buildWorldEssenceMergeNotice, buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice, describeWorldEssenceMerge, describeWorldIdentityDrift } from './migration/worldScopeEntityNotice.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { buildRetiredCraftingModNotice } from './migration/migrateRetireCraftingModToken.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
@@ -1851,6 +1851,31 @@ class Fabricate {
       if (notice.message) {
         if (notice.severity === 'warn') ui.notifications?.warn?.(notice.message, { permanent: true });
         else ui.notifications?.info?.(notice.message);
+      }
+    }
+
+    // 1.34.0 (issue 1654): the equivalent-essence merge. The composition lives in
+    // `buildWorldEssenceMergeNotice` for the reason its 1.30.0 sibling above does; what is here
+    // is the GM gate, the localizer and the channel.
+    //
+    // ALWAYS PERMANENT AND ALWAYS A WARNING, because every case that produces a message at all is
+    // one the GM must act on or at least know about: the merge is IRREVERSIBLE, a refusal will NOT
+    // be retried, and a declined pair is a disagreement only the GM can settle.
+    //
+    // THE TOAST NAMES THE ESSENCES AND THE CONSOLE CARRIES THE IDS. Most ids 1.34.0 retires are
+    // `crypto.randomUUID()` values, so an id enumeration in a corner toast is a wall of hex — and
+    // what core logs beside a toast is the message it was HANDED, i.e. the capped one. The full
+    // id-level dump is therefore logged HERE, at `console.info` rather than `console.debug`,
+    // because `debug` maps to DevTools' VERBOSE level and Chromium's default filter excludes it.
+    const worldEssenceMergeReport = summary?._worldEssenceMergeReport ?? null;
+    if (worldEssenceMergeReport && game.user?.isGM) {
+      const essenceNotice = buildWorldEssenceMergeNotice(worldEssenceMergeReport, (key, data) =>
+        data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
+      );
+      if (essenceNotice) {
+        const detail = describeWorldEssenceMerge(worldEssenceMergeReport);
+        if (detail) console.info('Fabricate | 1.34.0 equivalent essence merge:', detail);
+        ui.notifications?.warn?.(essenceNotice, { permanent: true });
       }
     }
   }
