@@ -436,6 +436,36 @@ export function isWorldAddressableEffectSource(value, worldEntityIds = []) {
 }
 
 /**
+ * The id SET behind a roster handed as an array of records OR as an already-built Set.
+ *
+ * ── ONE COERCION, NAMED ONCE, BECAUSE THIS FILE IS LINT-BLIND AND SONAR-VISIBLE ─────────────
+ * Both readers below take "the world roster, in whatever form the call site already holds it",
+ * and each had transcribed the same map/filter to get an id set out of it. `mintEssenceId`'s
+ * retired leg would have been a THIRD copy. `npm run lint` does not read this file's directory
+ * tree at all while SonarCloud's duplication gate indexes it, so a copy here is invisible
+ * locally and fails the gate on the PR.
+ *
+ * A Set is returned AS GIVEN rather than copied: no caller writes to the result, and copying a
+ * roster on every keystroke of a picker filter is a cost with no reader. Callers must therefore
+ * treat it as the caller's own.
+ *
+ * A BARE STRING entry is taken as an id, so a caller holding ids rather than records — the
+ * retired leg is exactly that — needs no wrapper of its own.
+ *
+ * @param {Array<{id?: string}|string>|Set<string>|unknown} source
+ * @returns {Set<string>} the caller's own Set when it handed one.
+ */
+function worldEntityIdSet(source) {
+  if (source instanceof Set) return source;
+  const ids = new Set();
+  for (const entry of Array.isArray(source) ? source : []) {
+    const id = typeof entry === 'string' ? entry : entry?.id;
+    if (typeof id === 'string' && id !== '') ids.add(id);
+  }
+  return ids;
+}
+
+/**
  * The referents a WORLD-DEFAULTS `effectSource` picker may offer.
  *
  * ── THE ENFORCEMENT POINT IS THIS FUNCTION, AND NOTHING BELOW IT ────────────────────────────
@@ -453,14 +483,7 @@ export function isWorldAddressableEffectSource(value, worldEntityIds = []) {
  * @returns {Array<object>} a new array; the input is not mutated.
  */
 export function worldAddressableEffectSources(candidates, worldEntities = []) {
-  const ids =
-    worldEntities instanceof Set
-      ? worldEntities
-      : new Set(
-          (Array.isArray(worldEntities) ? worldEntities : [])
-            .map((entity) => (typeof entity?.id === 'string' ? entity.id : ''))
-            .filter(Boolean)
-        );
+  const ids = worldEntityIdSet(worldEntities);
   return (Array.isArray(candidates) ? candidates : []).filter((candidate) =>
     isWorldAddressableEffectSource(candidate?.id, ids)
   );
@@ -472,9 +495,31 @@ export function worldAddressableEffectSources(candidates, worldEntities = []) {
  * ── DERIVED FROM THE NAME, NOT MINTED AT RANDOM, AND THE REASON IS NOT AESTHETIC ────────────
  * `foundry.utils.randomID()` is unavailable to a pure leaf and `Math.random()` is a SonarCloud
  * VULNERABILITY (S2245) that fails the quality gate outright. A slug is neither, and it is also
- * the better answer here: an essence id is a durable reference every membership record and every
- * component quantity addresses, `## EssenceDefinition` never re-keys one, and a GM reading a
- * component's stored essence map gets `iron` rather than `kTz9QpLm2xR4vB1a`.
+ * the better answer here: an essence id is the reference every membership record and every
+ * component quantity addresses, and a GM reading a component's stored essence map gets `iron`
+ * rather than `kTz9QpLm2xR4vB1a`.
+ *
+ * ── AN ESSENCE ID IS NOT PERMANENT, AND THAT IS THE WHOLE OF WHY `retired` IS AN ARGUMENT ───
+ * The `1.34.0` migration merges semantically equivalent WORLD essences and RETIRES the losers'
+ * ids — the first time an essence id has ever been re-keyed (§ Equivalent World Essence Merge
+ * in `openspec/specs/destructive-changes-and-migrations/spec.md`). That migration deliberately
+ * LEAVES some references pointing at a retired id: an ambiguous item override it cannot prove
+ * an image for, and every document its one-shot never walks — a compendium item, an actor
+ * imported next week. What justifies leaving them is that a key matching no definition
+ * contributes nothing.
+ *
+ * REISSUING a retired id destroys exactly that justification. The stale key stops contributing
+ * nothing and starts contributing the WRONG essence's quantity, through the precedence override
+ * in `src/utils/essenceResolver.js`. Nor is reissue a remote risk: the only caller mints from a
+ * FIXED placeholder name, so the shipped sequence is `new-essence`, `new-essence-2`,
+ * `new-essence-3` — dense, deterministic and fully reclaimable, and retiring `new-essence-2`
+ * would hand it straight back to the next `+ New essence` press. `retired` is the tombstone leg
+ * of `fabricate.worldEssenceMergeMap`, which is never cleared, so a retired id stays TAKEN for
+ * the life of the world even though no live entity holds it.
+ *
+ * The two rosters are read through ONE PREDICATE rather than merged into a third Set, because
+ * {@link worldEntityIdSet} may hand back the caller's own Set and a union written into it would
+ * mutate a roster its owner is still rendering.
  *
  * COLLISIONS ARE RESOLVED BY SUFFIX rather than refused, because `createEntity` refuses a
  * duplicate id and reports nothing: a GM who names a second essence "Ash" would get a button
@@ -482,27 +527,24 @@ export function worldAddressableEffectSources(candidates, worldEntities = []) {
  * so the caller's own name validation stays the only thing that can reject a create.
  *
  * @param {string} name
- * @param {Array<{id?: string}>|Set<string>} existing the world roster.
+ * @param {Array<{id?: string}>|Set<string>} [existing] the LIVE world roster.
+ * @param {Array<string>|Set<string>} [retired] the retired ids — taken, but held by nothing.
+ *   Defaults to none, so a caller on a world that never merged behaves exactly as before.
  * @returns {string}
  */
-export function mintEssenceId(name, existing = []) {
-  const taken =
-    existing instanceof Set
-      ? existing
-      : new Set(
-          (Array.isArray(existing) ? existing : [])
-            .map((entity) => (typeof entity?.id === 'string' ? entity.id : ''))
-            .filter(Boolean)
-        );
+export function mintEssenceId(name, existing = [], retired = []) {
+  const live = worldEntityIdSet(existing);
+  const tombstoned = worldEntityIdSet(retired);
+  const isTaken = (candidate) => live.has(candidate) || tombstoned.has(candidate);
   const stem =
     String(name ?? '')
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '') || 'essence';
-  if (!taken.has(stem)) return stem;
+  if (!isTaken(stem)) return stem;
   let suffix = 2;
-  while (taken.has(`${stem}-${suffix}`)) suffix += 1;
+  while (isTaken(`${stem}-${suffix}`)) suffix += 1;
   return `${stem}-${suffix}`;
 }
 
