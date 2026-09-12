@@ -57,23 +57,6 @@ import { DOWNGRADE_ADVICE } from './migrationRecoveryPrompt.js';
 
 export { FatalMigrationError, isFatalMigrationError } from './migrationErrors.js';
 
-/**
- * The world setting the `1.34.0` essence merge map is persisted under (issue 1654).
- *
- * **THE LITERAL FALLBACK IS TEMPORARY AND MUST BE REMOVED.** `SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP`
- * is registered by the lane that owns `src/config/settings.js`; this lane does not own that file,
- * so until the two integrate the constant would be `undefined` and every read and write below
- * would silently address the `undefined` key rather than fail. Once the registration lands, this
- * whole constant collapses to `SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP` at its three use sites.
- *
- * The key name itself is NOT provisional: `adminStore.js` already reads
- * `fabricate.worldEssenceMergeMap` and `worldScopeProjection.js` already reads its `retired` leg,
- * so the spelling is fixed by shipped consumers rather than chosen here.
- *
- * @type {string}
- */
-const WORLD_ESSENCE_MERGE_MAP_KEY = SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP ?? 'worldEssenceMergeMap';
-
 // ---------------------------------------------------------------------------
 // Semver comparison utility (no npm dependency)
 // ---------------------------------------------------------------------------
@@ -996,7 +979,7 @@ export class MigrationRunner {
     const rawEssenceScope = this._getSetting(SETTING_KEYS.ESSENCE_SCOPE) ?? {};
     const rawToolScope = this._getSetting(SETTING_KEYS.TOOL_SCOPE) ?? {};
     const rawWorldScopeRekeyMap = this._getSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP) ?? {};
-    const rawWorldEssenceMergeMap = this._getSetting(WORLD_ESSENCE_MERGE_MAP_KEY) ?? {};
+    const rawWorldEssenceMergeMap = this._getSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP) ?? {};
 
     const originalRecipesJson = JSON.stringify(rawRecipes);
     const originalSystemsJson = JSON.stringify(rawSystems);
@@ -1267,7 +1250,7 @@ export class MigrationRunner {
     // caller with no `catch`.
     if (worldEssenceMergeMapChanged) {
       try {
-        await this._setSetting(WORLD_ESSENCE_MERGE_MAP_KEY, data.worldEssenceMergeMap);
+        await this._setSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, data.worldEssenceMergeMap);
       } catch (error) {
         return this._deferOnWriteFailure(error);
       }
