@@ -22,6 +22,10 @@ import { dirname, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { get } from 'svelte/store';
+
+import { createAdminStore } from '../src/ui/svelte/stores/adminStore.js';
+import { createServices, makeSystem } from './helpers/adminStoreServices.js';
 import { declaredPropNames } from './helpers/sveltePropsDeclaration.js';
 import {
   ESSENCE_SYSTEM_STATES,
@@ -1091,5 +1095,75 @@ describe('the shared-definition callout names the record its pill claims', () =>
     // into the in-system projection, so re-routing it through `worldEntry` would swap one correct
     // read for another and make the expression look uniform at the cost of saying less.
     assert.match(calloutSource, /tint=\{normalizeEssenceColorToken\(essence\?\.colorToken\)/);
+  });
+});
+
+// ── (15) THE GATEWAY LINE THAT MAKES THE GUARD REACHABLE (issue 1654) ─────────────────────────
+
+/**
+ * ── WHY THIS DRIVES THE REAL STORE RATHER THAN THE LEAF ───────────────────────────────────────
+ * Every assertion in section (13) calls `buildWorldScopeState` with an `essenceMergeMap` of its
+ * own, so deleting the one argument `adminStore.js` supplies leaves the whole of this file green
+ * — while the product publishes `retiredIds: []` on every world forever and `mintEssenceId`
+ * reclaims a retired id on the next `+ New essence` press. That is the exact failure the World
+ * Vocabulary's recipe-count line recorded against this same gateway call
+ * (`tests/world-vocabulary-admin-store-composition.test.js`): a bound nothing guards is a bound
+ * in name only.
+ *
+ * So the subject here is the PUBLISHED `viewState`, from the real `createAdminStore` over the
+ * shared services double, with `getSetting` answering as a settings registry would.
+ */
+describe('the gateway hands the merge map to the projection', () => {
+  /**
+   * The manager's published `worldScope`, through the real store.
+   *
+   * @param {(key: string) => unknown} getSetting the world settings registry, doubled.
+   * @returns {Promise<object>} the published `worldScope`.
+   */
+  async function publishedWorldScope(getSetting) {
+    const store = createAdminStore(createServices(makeSystem(), [], [], { getSetting }));
+    try {
+      // The publish is the tail of an ASYNC refresh, so a synchronous read sees the pre-publish
+      // shape. Selecting the fixture's system is what every adminStore suite drives it with.
+      await store.selectSystem('sys1');
+      return get(store.viewState).worldScope;
+    } finally {
+      store.destroy?.();
+    }
+  }
+
+  it('reads the setting and publishes its key set on the essence leg', async () => {
+    const reads = [];
+    const worldScope = await publishedWorldScope((key) => {
+      reads.push(key);
+      if (key === 'worldEssenceMergeMap') {
+        return { retired: { cinder: { name: 'Cinder' }, soot: { name: 'Soot' } } };
+      }
+      return key === 'lastManagedCraftingSystem' ? 'sys1' : '';
+    });
+
+    assert.ok(reads.includes('worldEssenceMergeMap'), 'the gateway reads the merge-map setting');
+    assert.deepEqual(
+      worldScope.essence.retiredIds,
+      ['cinder', 'soot'],
+      'and the value reaches the published essence leg the shell mints against'
+    );
+  });
+
+  it('publishes no retired ids rather than THROWING when the setting is unregistered', async () => {
+    // THE ORDINARY CASE UNTIL `1.34.0` HAS RUN, and on every services double that answers only
+    // the keys it knows: Foundry's `game.settings.get` raises on an unregistered key rather than
+    // answering a default, so an unguarded read here would take the whole manager publish down
+    // on precisely the worlds that have nothing to report.
+    const worldScope = await publishedWorldScope((key) => {
+      if (key === 'worldEssenceMergeMap') throw new Error('is not a registered game setting');
+      return key === 'lastManagedCraftingSystem' ? 'sys1' : '';
+    });
+
+    assert.deepEqual(worldScope.essence.retiredIds, []);
+    // NON-VACUITY: a store that had died on the way would also answer nothing here, so the
+    // publish this read is taken from has to be a real one with its other legs intact.
+    assert.equal(worldScope.essence.entityType, 'essence', 'the publish completed');
+    assert.ok(worldScope.component, 'with every other world leg on it');
   });
 });
