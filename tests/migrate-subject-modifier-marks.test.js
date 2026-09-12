@@ -424,7 +424,7 @@ test('the runner applies 1.33.0 across all three settings and bumps the version'
   const result = await runner.run();
 
   assert.equal(result.aborted, false);
-  assert.equal(store.get('migrationVersion'), '1.33.0');
+  assert.equal(store.get('migrationVersion'), '1.34.0');
   const migrated = store.get('craftingSystems')[0];
   assert.deepEqual(migrated.craftingCheck.defaultModifierIds, ['med']);
   assert.deepEqual(migrated.salvageCraftingCheck.defaultModifierIds, ['alch']);
@@ -439,7 +439,7 @@ test('the runner applies 1.33.0 across all three settings and bumps the version'
 
 test('the runner does not re-run 1.33.0 once the world is at that version', async () => {
   const store = new Map([
-    ['migrationVersion', '1.33.0'],
+    ['migrationVersion', '1.34.0'],
     ['craftingSystems', [system()]],
     ['recipes', [recipe('r-1', ['med'])]],
     ['gatheringConfig', gatheringConfig([])],
