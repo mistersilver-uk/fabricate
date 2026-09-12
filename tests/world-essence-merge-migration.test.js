@@ -260,14 +260,25 @@ test("a tool scope with nothing to re-key answers the CALLER'S OWN object", () =
 });
 
 test('a reference in a system the loser is NOT present in is left exactly as it is', () => {
-  // PRESENCE, NOT REACHABILITY. `sys-a` neither holds a membership record for the loser nor
-  // carries a definition row for it, so its map has no leg at all and this key resolves to
-  // NOTHING today. Rewriting it would convert a dangling reference into a live contribution of
-  // the survivor's weight — the very outcome the tombstone leg exists to prevent.
+  // PRESENCE, NOT REACHABILITY, and the case decided AGAINST widening the rule. `sys-a` holds
+  // neither a membership record nor a definition row for the loser, so its map has no leg.
+  //
+  // THE KEY IS NOT DANGLING TODAY, and the pin says so rather than overstating the case:
+  // `_scopeEntityBasis` unions the world roster with the system's own array WITHOUT filtering by
+  // membership, so this key survives normalization while the loser is a world entity, and
+  // `_normalizeEssenceQuantities` prunes it only once the merge retires that entity. What makes
+  // leaving it right is that it is REFUSED AT USE — `sys-a` holds no membership record — so it
+  // contributes NOTHING and the prune costs no behaviour. The second component shows the price of
+  // the alternative: re-keying would SUM the inert 9 into a live 4 and change what every craft in
+  // a system that never took part in the merge produces.
   const corpus = twoIrons();
-  corpus.systems[0].components = [{ id: 'comp-1', name: 'Ore', essences: { [MINTED]: 9 } }];
+  corpus.systems[0].components = [
+    { id: 'comp-1', name: 'Ore', essences: { [MINTED]: 9 } },
+    { id: 'comp-2', name: 'Slag', essences: { [MINTED]: 9, iron: 4 } },
+  ];
   const result = mergeEquivalentWorldEssences(payloadOf(corpus));
   assert.deepEqual(result.systems[0].components[0].essences, { [MINTED]: 9 });
+  assert.deepEqual(result.systems[0].components[1].essences, { [MINTED]: 9, iron: 4 });
   assert.equal(result.worldEssenceMergeMap.systems['sys-a'], undefined);
 });
 

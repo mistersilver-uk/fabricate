@@ -623,6 +623,53 @@ test('a NATIVE duplicate NO group touches refuses nothing', () => {
   assert.deepEqual(result.mergeMap, { 'sys-b': { essences: { kt9: 'iron' } } });
 });
 
+test('a system holding a ROW but no membership record still gets a leg', () => {
+  // PRESENCE, the case decided AGAINST narrowing the rule to membership records alone. `sys-c`
+  // holds an `essenceDefinitions` row under the loser id and no membership record, so it never
+  // voted on unanimity — and it is re-keyed anyway, because it holds the ENTITY rather than a
+  // reference to it. `unionScopedDefinitions` passes a row with no membership record through
+  // UNTOUCHED, so the re-key cannot change what that row resolves to; leaving it behind would
+  // leave a definition naming a world entity this pass deletes and tombstones.
+  const corpus = buildEssenceMergeCorpus({
+    systems: [
+      { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron' }] },
+      { id: 'sys-b', essences: [{ id: 'kt9', name: 'Iron' }] },
+      { id: 'sys-c', essences: [{ id: 'kt9', name: 'Slag', macro: 'Macro.other', member: false }] },
+    ],
+  });
+  const result = buildWorldEssenceEquivalence(corpus);
+  assert.deepEqual(result.refusals, [], 'the unvoted row is not itself a refusal');
+  assert.deepEqual(result.mergeMap, {
+    'sys-b': { essences: { kt9: 'iron' } },
+    'sys-c': { essences: { kt9: 'iron' } },
+  });
+});
+
+test('a system holding a row for the SURVIVOR too is REFUSED rather than re-keyed', () => {
+  // The bound on the case above, and the reason it is safe to keep the row leg: the one shape in
+  // which re-keying an unvoted row would make a definition unreachable is caught by requirement
+  // 6's output-uniqueness invariant, which is evaluated over exactly the row index that leg reads.
+  const corpus = buildEssenceMergeCorpus({
+    systems: [
+      { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron' }] },
+      { id: 'sys-b', essences: [{ id: 'kt9', name: 'Iron' }] },
+      {
+        id: 'sys-c',
+        essences: [
+          { id: 'kt9', name: 'Slag', member: false },
+          { id: 'iron', name: 'Iron', member: false },
+        ],
+      },
+    ],
+  });
+  const result = buildWorldEssenceEquivalence(corpus);
+  assert.deepEqual(
+    result.refusals.map((entry) => [entry.reason, entry.systemIds]),
+    [[ESSENCE_MERGE_REFUSAL_REASONS.outputIdCollision, ['sys-c']]]
+  );
+  assert.deepEqual(result.mergeMap, {});
+});
+
 test('the merge map is DISJOINT and a second application is a no-op, across every fixture', () => {
   for (const [seed, corpus] of everyMergeFixture().entries()) {
     const { mergeMap } = buildWorldEssenceEquivalence(corpus);

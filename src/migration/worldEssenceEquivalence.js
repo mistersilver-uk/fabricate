@@ -726,11 +726,58 @@ function partitionCandidates(candidates) {
  * Every system one candidate is PRESENT in: the systems it holds a live membership record for,
  * plus the systems whose `essenceDefinitions` carry its id — in corpus age order.
  *
- * PRESENCE, NOT REACHABILITY, and the narrowness is the decision. A system that is not a member
- * and carries no row may still name this id somewhere — in a component's `essences` map, say —
- * but that reference resolves to NOTHING today, and rewriting it would convert a dangling
- * reference into a live contribution of the survivor's weight. That is precisely the failure the
- * tombstone leg exists to prevent, so this pass must not commit it itself.
+ * PRESENCE, NOT REACHABILITY. Both legs have been challenged from OPPOSITE directions, this rule
+ * is the answer to both, and the rejected cases are recorded here rather than rediscovered.
+ *
+ * ## WHY THE ROW LEG STAYS (the "too wide" reading)
+ *
+ * The objection: {@link classifyCandidates} reads MEMBERSHIP RECORDS only, so a system holding an
+ * in-system row under a loser's id but no membership record never voted on unanimity — and this
+ * leg re-keys it anyway.
+ *
+ * That is true and it is still the right leg, because a system holding a ROW holds the ENTITY
+ * rather than a reference to it, and the re-key cannot change what that row RESOLVES to.
+ * `unionScopedDefinitions` opens with `if (!membership || !entity) { union.push(entry); continue }`
+ * — a row with no membership record is passed through UNTOUCHED, so its behaviour comes from its
+ * own fields before the re-key and after it. There is nothing for a world parent to change.
+ *
+ * Dropping the leg instead would leave that row naming a world entity this pass has DELETED and
+ * TOMBSTONED, which is the dangling-definition state `1.30.0` exists to remove.
+ *
+ * TWO NEIGHBOURING CASES BOUND THE RESIDUE. When the system also holds a row for the SURVIVOR,
+ * `findOutputCollisionGroups` refuses the whole group outright — requirement 6's output-uniqueness
+ * invariant, evaluated over exactly this `rowsBySystem` index. When it holds a MEMBERSHIP RECORD
+ * for the survivor but no row, the re-keyed row does newly acquire a world half; but that system
+ * is then a VOTING member of the survivor, and the row takes only the sections that system's own
+ * membership record marks inheriting. That is the whole of what this leg can change.
+ *
+ * ## WHY IT IS NOT WIDENED FURTHER (the "too narrow" reading)
+ *
+ * The objection: `_scopeEntityBasis` is the union of a system's own `essenceDefinitions` ids and
+ * the ENTIRE world roster, deliberately not membership-filtered, so a component in a system that
+ * is NOT a member of a loser legally carries the loser's id in its `essences` map and SURVIVES
+ * normalization today. `partEssenceFromSystem` produces exactly that state through a shipped verb.
+ * Once the loser is retired the key falls out of that system's basis and
+ * `_normalizeEssenceQuantities` PRUNES it on the next save.
+ *
+ * The mechanism is right and the conclusion does not follow. That key is REFUSED AT USE today —
+ * `## Scoped Entity Definitions` makes an absent membership record a refusal — so it contributes
+ * NOTHING, and the prune costs no behaviour at all. Re-keying it would make it contribute the
+ * SURVIVOR's weight, and where the component already carries the survivor
+ * {@link rewriteEssenceQuantityMap} SUMS the two, silently changing the outcome of every craft in
+ * a system that never took part in the merge. A trade of inert authored data for a silent
+ * quantity change is the wrong way round, and the `retired` tombstone keeps the loser's identity
+ * recoverable either way.
+ *
+ * ## THE QUESTION REALLY DOES DIFFER PER SITE, AND THAT IS WHY IT IS NOT SETTLED HERE
+ *
+ * A DEFINITION id must move with the system that holds it; a LEAF-VALUE reference must move only
+ * where it is live; a KEY POSITION is the one exposed to the prune. This function answers all
+ * three at once because its output is the per-system leg, and that leg reaches the shared walk as
+ * ONE `remapEssence`. Splitting it would need a second remapper `worldScopeReferenceRewrite.js`
+ * does not take, or a second enumeration of the corpus this module refuses to carry. The world-
+ * wide union beside it (`unionMergeMap`) is the existing half of that split and covers the
+ * positions that belong to no system at all.
  *
  * @param {object} candidate
  * @param {object} corpus
