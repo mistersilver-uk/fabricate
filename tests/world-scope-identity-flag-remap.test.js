@@ -363,13 +363,30 @@ test('the unsafe-systemId skips reach the SUMMARY, so the GM notice can name the
 // (b) the COMPOSITION mutation
 // ---------------------------------------------------------------------------
 
+/**
+ * The index of a LIVE `await <name>();` statement in `src/main.js`, or `-1`.
+ *
+ * MATCHED AS A STATEMENT, NEVER AS A SUBSTRING, and that is the whole reason this exists.
+ * `source.indexOf('await foo();')` is satisfied by the call COMMENTED OUT — which is exactly how
+ * a bisect or a revert disables one — so an `indexOf` probe stays green against the mutation it
+ * is there to catch. It was written for the essence arm at the bottom of this file and is hoisted
+ * here because the two older probes above had the defect it was written for.
+ *
+ * @param {string} source The `src/main.js` text.
+ * @param {string} name The function name.
+ * @returns {number}
+ */
+function liveCallIndex(source, name) {
+  return source.search(new RegExp(`\n +await ${name}\\(\\);`));
+}
+
 test('src/main.js calls the remap from its ready body, AFTER the owned-item restamp', () => {
   // DELETING THE `ready`-BODY CALL SITE MUST FLIP THIS TO FAIL. A planner that is perfect and
   // never invoked is indistinguishable, from every runtime observation, from one that is absent:
   // resolution falls through to the untouched source-reference tier either way.
   const source = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
-  const restampIndex = source.indexOf('await runOwnedItemComponentIdentityRestamp();');
-  const remapIndex = source.indexOf('await runWorldScopeIdentityFlagRemap();');
+  const restampIndex = liveCallIndex(source, 'runOwnedItemComponentIdentityRestamp');
+  const remapIndex = liveCallIndex(source, 'runWorldScopeIdentityFlagRemap');
   assert.ok(restampIndex > 0, 'the premise: the shipped owned-item restamp edge is still there');
   assert.ok(remapIndex > 0, 'the ready body must CALL the world-scope identity flag remap');
   assert.ok(
@@ -525,8 +542,7 @@ function plainMergeWriters() {
   return {
     replaceFabricateFlag: (document, key, value) =>
       replace(document, `flags.fabricate.fabricate.${key}`, value),
-    replaceBareFlag: (document, key, value) =>
-      replace(document, `flags.fabricate.${key}`, value),
+    replaceBareFlag: (document, key, value) => replace(document, `flags.fabricate.${key}`, value),
   };
 }
 
@@ -621,7 +637,10 @@ test('the item override is remapped ONLY when the whole corpus agrees, exactly a
 // --- the key-position rewrite ----------------------------------------------
 
 test('a collision SUMS quantities and ANDs enabled-ness', () => {
-  const container = craftingRunFlag({ 'fire-a': 1, 'fire-b': 2 }, { 'fire-a': true, 'fire-b': false });
+  const container = craftingRunFlag(
+    { 'fire-a': 1, 'fire-b': 2 },
+    { 'fire-a': true, 'fire-b': false }
+  );
   assert.equal(remapEssenceRunContainer(container, { 'sys-a': { 'fire-a': 'fire-b' } }), true);
   const prepared = container.active['run-1'].steps[0].preparedConsumption;
   assert.deepEqual(prepared.resolvedEssences, { 'fire-b': 3 });
@@ -689,7 +708,9 @@ test('a container shielded by an intervening ARRAY is shielded INCIDENTALLY, not
   // key there. Nothing about that is a decision: `active` is already a plain map, `steps` could
   // become one, and a run-level snapshot would be exposed the day it was added. The write idiom
   // must not depend on the shape of a container it does not own.
-  const actor = makeMergeDocument({ fabricate: { fabricate: { craftingRuns: craftingRunFlag() } } });
+  const actor = makeMergeDocument({
+    fabricate: { fabricate: { craftingRuns: craftingRunFlag() } },
+  });
   await runEssenceRemap([actor], plainMergeWriters());
   const stored = actor.flags.fabricate.fabricate.craftingRuns.active['run-1'];
   assert.deepEqual(stored.steps[0].preparedConsumption.resolvedEssences, { 'fire-b': 3 });
@@ -763,7 +784,10 @@ test('an AMBIGUOUS item-override key is left exactly as it is', async () => {
 });
 
 test('the forced-replacement path is the `==` prefix on the LAST segment, at both depths', () => {
-  assert.equal(forcedReplacementFlagPath('craftingRuns'), 'flags.fabricate.fabricate.==craftingRuns');
+  assert.equal(
+    forcedReplacementFlagPath('craftingRuns'),
+    'flags.fabricate.fabricate.==craftingRuns'
+  );
   assert.equal(
     forcedReplacementFlagPath('gatheringRuns', { bare: true }),
     'flags.fabricate.==gatheringRuns'
@@ -783,7 +807,10 @@ test('a refused write is a LOCKED skip and a broken document is a SKIPPED ERROR'
     throw new Error('locked pack');
   };
   const good = makeMergeDocument({ fabricate: { fabricate: { essences: { 'fire-a': 1 } } } });
-  const summary = await runEssenceRemap([{ items: [broken, locked, good] }], forcedReplacementWriters());
+  const summary = await runEssenceRemap(
+    [{ items: [broken, locked, good] }],
+    forcedReplacementWriters()
+  );
   assert.equal(summary.skippedErrors, 1);
   assert.equal(summary.lockedSkips, 1);
   assert.equal(summary.remappedItemOverrides, 1, 'one bad document never aborts the pass');
@@ -815,12 +842,9 @@ test('a world with no pending merge never walks the actor corpus', async () => {
 
 test('src/main.js runs the essence remap from its ready body, AFTER the 1.30.0 remap', () => {
   const source = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
-  // MATCHED AS A LIVE STATEMENT, never as a substring. `indexOf` alone is satisfied by the call
-  // COMMENTED OUT, which is exactly how a bisect or a revert disables it — so a control that
-  // comments the line out would have stayed green against an `indexOf` assertion.
-  const liveCall = (name) => source.search(new RegExp(`\\n +await ${name}\\(\\);`));
-  const rekeyIndex = liveCall('runWorldScopeIdentityFlagRemap');
-  const essenceIndex = liveCall('runWorldEssenceMergeFlagRemap');
+  // MATCHED AS A LIVE STATEMENT, never as a substring — see {@link liveCallIndex}.
+  const rekeyIndex = liveCallIndex(source, 'runWorldScopeIdentityFlagRemap');
+  const essenceIndex = liveCallIndex(source, 'runWorldEssenceMergeFlagRemap');
   const descriptionsIndex = source.indexOf('notifyUnresolvedItemDescriptions();');
   assert.ok(rekeyIndex > 0, 'the premise: the 1.30.0 ready-body edge is still there');
   assert.ok(essenceIndex > 0, 'the ready body must CALL the essence remap, not mention it');
@@ -841,8 +865,19 @@ test('the essence edge writes through the FORCED-REPLACEMENT path and never setF
   const start = source.indexOf('async function applyWorldEssenceMergeFlagRemap(');
   assert.ok(start > 0, 'the work half must exist');
   const body = source.slice(start, source.indexOf('\n}\n', start));
-  assert.match(body, /replaceFabricateFlag: \(document, key, value\) =>\s*\n?\s*replace\(document, forcedReplacementFlagPath\(key\), value\)/);
+  assert.match(
+    body,
+    /replaceFabricateFlag: \(document, key, value\) =>\s*\n?\s*replace\(document, forcedReplacementFlagPath\(key\), value\)/
+  );
   assert.match(body, /forcedReplacementFlagPath\(key, \{ bare: true \}\)/);
-  assert.doesNotMatch(body, /setFabricateFlag/, 'a plain merge write CANNOT persist a key-set rewrite');
-  assert.doesNotMatch(body, /recursive: false/, 'and that fix would destroy every other module’s flags');
+  assert.doesNotMatch(
+    body,
+    /setFabricateFlag/,
+    'a plain merge write CANNOT persist a key-set rewrite'
+  );
+  assert.doesNotMatch(
+    body,
+    /recursive: false/,
+    'and that fix would destroy every other module’s flags'
+  );
 });

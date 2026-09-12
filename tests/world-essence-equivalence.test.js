@@ -19,6 +19,7 @@ import {
   ESSENCE_MERGE_REFUSAL_REASONS,
   essenceSlugStem,
 } from '../src/migration/worldEssenceEquivalence.js';
+import { keyedRemapper } from '../src/migration/worldScopeReferenceRewrite.js';
 import { mintEssenceId } from '../src/ui/svelte/apps/manager/scoped/essenceScoped.js';
 import {
   buildEssenceMergeCorpus,
@@ -671,10 +672,12 @@ test('a system holding a row for the SURVIVOR too is REFUSED rather than re-keye
 });
 
 test('the merge map is DISJOINT and a second application is a no-op, across every fixture', () => {
+  let mapped = 0;
   for (const [seed, corpus] of everyMergeFixture().entries()) {
     const { mergeMap } = buildWorldEssenceEquivalence(corpus);
     for (const [systemId, legs] of Object.entries(mergeMap)) {
       const map = legs.essences ?? {};
+      mapped += Object.keys(map).length;
       const keys = new Set(Object.keys(map));
       for (const survivorId of Object.values(map)) {
         assert.ok(
@@ -682,13 +685,25 @@ test('the merge map is DISJOINT and a second application is a no-op, across ever
           `fixture ${seed}: ${systemId} maps onto a re-keyed id ${survivorId}`
         );
       }
-      // IDEMPOTENCE follows from disjointness, and is asserted directly because that is the
-      // property the migration actually relies on when it applies the map.
+      // IDEMPOTENCE follows from disjointness, and is asserted directly against the APPLIED map
+      // rather than against the identity fallback. `map[survivorId] ?? survivorId === survivorId`
+      // reduces to a tautology once the loop above has proved no survivor is a key, so it proved
+      // nothing; what the migration actually relies on is that applying the map to its own OUTPUT
+      // changes nothing, and that is what `keyedRemapper` is asked here.
+      const remap = keyedRemapper(map);
       for (const [loserId, survivorId] of Object.entries(map)) {
-        assert.equal(map[survivorId] ?? survivorId, survivorId, `fixture ${seed}: ${loserId}`);
+        assert.equal(
+          remap(remap(loserId)),
+          survivorId,
+          `fixture ${seed}: applying the map twice moved ${loserId} past its survivor`
+        );
       }
     }
   }
+  // THE NON-VACUITY FLOOR, on the repository's own convention (`tests/helpers/scale/scaleProbes.js`):
+  // fixture 0 is an EMPTY corpus, so without this a `buildMergeMap` that returned `{}` would leave
+  // every assertion above unexecuted and the suite green.
+  assert.ok(mapped > 0, 'the premise: at least one fixture actually produces a non-empty map');
 });
 
 // ---------------------------------------------------------------------------
@@ -835,11 +850,16 @@ test('every retired id keeps the four identity fields and the systems it lived i
 // ---------------------------------------------------------------------------
 
 test('the answer is BYTE-IDENTICAL on a re-run, across every fixture', () => {
+  let merged = 0;
   for (const [seed, corpus] of everyMergeFixture().entries()) {
-    const once = JSON.stringify(buildWorldEssenceEquivalence(corpus));
-    const twice = JSON.stringify(buildWorldEssenceEquivalence(corpus));
-    assert.equal(once, twice, `fixture ${seed} is not re-runnable`);
+    const once = buildWorldEssenceEquivalence(corpus);
+    const twice = buildWorldEssenceEquivalence(corpus);
+    assert.equal(JSON.stringify(once), JSON.stringify(twice), `fixture ${seed} is not re-runnable`);
+    merged += once.mergedGroups.length;
   }
+  // THE NON-VACUITY FLOOR. Determinism is trivially true of a derivation that decides nothing, so
+  // the property is worth asserting only over a set that reaches a real answer at least once.
+  assert.ok(merged > 0, 'the premise: at least one fixture actually merges a group');
 });
 
 test('the PARTITION is permutation-invariant when the corpus decides every election', () => {

@@ -495,7 +495,11 @@ test('an essence whose ONLY source spelling is `sourceItemUuid` survives the re-
 
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   const essence = manager._normalizeSystem(migratedYounger).essenceDefinitions[0];
-  assert.equal(essence.sourceComponentId, 'comp-1', 'the effect source still RESOLVES after hydrate');
+  assert.equal(
+    essence.sourceComponentId,
+    'comp-1',
+    'the effect source still RESOLVES after hydrate'
+  );
   assert.equal(essence.associatedSystemItemId, 'comp-1', 'and the transitional alias follows it');
   assert.equal(
     essence.sourceItemUuid,
@@ -1197,7 +1201,12 @@ test('the `1.34.0` merge leaves the `1.30.0` drift detector exactly as it found 
     seed: 1654,
     systems: [
       { id: 'sys-a', components: [], essences: [{ id: 'iron', name: 'Iron' }], tools: [] },
-      { id: 'sys-b', components: [], essences: [{ id: 'w7yh2ndfs0jq6xe3', name: 'Iron' }], tools: [] },
+      {
+        id: 'sys-b',
+        components: [],
+        essences: [{ id: 'w7yh2ndfs0jq6xe3', name: 'Iron' }],
+        tools: [],
+      },
     ],
   });
   const lifted = migrateAndSave(normalizeCorpus(CraftingSystemManager, raw));
@@ -1212,5 +1221,59 @@ test('the `1.34.0` merge leaves the `1.30.0` drift detector exactly as it found 
     reportWorldIdentityDrift(merged.systems, scopeCorpus),
     [],
     'two systems that agree about presentation still agree after the merge'
+  );
+});
+
+test('the `1.34.0` merge makes the drift detector report the disagreement it promises', () => {
+  // THE ZERO CASE ABOVE IS NOT THE CLAIM. Requirement 8a and the `1.34.0` registry `label` both
+  // promise a GM that the drift report will NAME the systems that disagree about presentation,
+  // and `icon` sits OUTSIDE the equivalence key — so two systems can merge on behaviour while
+  // disagreeing about how the essence looks. That NON-EMPTY branch is the whole disclosure, and
+  // until this arm existed only its zero point was pinned.
+  const raw = buildRawCorpus({
+    seed: 1654,
+    systems: [
+      { id: 'sys-a', components: [], essences: [{ id: 'iron', name: 'Iron' }], tools: [] },
+      {
+        id: 'sys-b',
+        components: [],
+        essences: [{ id: 'w7yh2ndfs0jq6xe3', name: 'Iron' }],
+        tools: [],
+      },
+    ],
+  });
+  // The one field the builder does not parameterise, set on the corpus it returns rather than
+  // through a second factory — the same rule the merge fixtures follow for a recipe or a tool.
+  raw.systems[0].essenceDefinitions[0].icon = 'fas fa-fire';
+  raw.systems[1].essenceDefinitions[0].icon = 'fas fa-flask';
+
+  const lifted = migrateAndSave(normalizeCorpus(CraftingSystemManager, raw));
+  const beforeCorpus = {
+    components: lifted.migrated.componentScope,
+    essences: lifted.migrated.essenceScope,
+    tools: lifted.migrated.toolScope,
+  };
+  assert.deepEqual(
+    reportWorldIdentityDrift(lifted.migrated.systems, beforeCorpus),
+    [],
+    'the premise: before the merge each system agrees with its OWN world entity'
+  );
+
+  const merged = mergeEquivalentWorldEssences({ ...lifted.migrated, worldEssenceMergeMap: {} });
+  const drift = reportWorldIdentityDrift(merged.systems, {
+    components: merged.componentScope,
+    essences: merged.essenceScope,
+    tools: lifted.migrated.toolScope,
+  });
+  assert.equal(merged._worldEssenceMergeReport.mergedGroups.length, 1, 'the premise: it merged');
+  assert.deepEqual(
+    drift.map((entry) => [entry.systemId, entry.entityType, entry.entityId, entry.field]),
+    [['sys-b', 'essences', 'iron', 'icon']],
+    'exactly the re-keyed system, on exactly the field outside the equivalence key'
+  );
+  assert.deepEqual(
+    [drift[0].systemValue, drift[0].worldValue],
+    ['fas fa-flask', 'fas fa-fire'],
+    'and it reports BOTH values, because the in-system copy is what every reader resolves through'
   );
 });

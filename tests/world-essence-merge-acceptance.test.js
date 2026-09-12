@@ -1007,14 +1007,19 @@ function assertNoSilentQuantityDeletion({ result }) {
  * THE WRITEBACK ORDER IS `worldScopeRekeyMap` -> `worldEssenceMergeMap` -> `recipes` -> ... ->
  * `componentScope` -> `essenceScope` -> `toolScope` -> `craftingSystems` -> `gatheringConfig`.
  *
- * **"`essenceScope` landed, `craftingSystems` did not" is the SAFE direction and is NOT pinned
- * here**, deliberately: the legacy `essenceDefinitions` array still carries the loser id, so the
- * basis UNION still vouches for it and nothing is pruned. A tear that cannot fail on the defect it
- * appears to test is a green assertion with no content. The two pinned below can fail:
+ * **"`essenceScope` landed, `craftingSystems` did not" is safe against the PRUNE hazard and is not
+ * pinned here for that**: the legacy `essenceDefinitions` array still carries the loser id, so the
+ * basis UNION still vouches for it and nothing is pruned. It is NOT safe against the FREEZE
+ * hazard, which is a different defect at the same tear, and that one is pinned as an accepted
+ * bound by its own test below. The three pinned here can all fail:
  *
- *  (a) `componentScope` landed, `essenceScope` did NOT — the re-run must RECONCILE rather than
+ *  (a) ONLY THE MERGE MAP LANDED — the highest-probability tear there is, because the map is the
+ *      SECOND writeback leg and every other leg is downstream of it. It drives the whole pass
+ *      through `reusingPersistedMap` against wholly UN-merged data, which is the one path on which
+ *      the persisted map is the sole source of truth;
+ *  (b) `componentScope` landed, `essenceScope` did NOT — the re-run must RECONCILE rather than
  *      double-apply the map to component maps that are already re-keyed;
- *  (b) `craftingSystems` landed, `gatheringConfig` did NOT — the re-run must rewrite the gathering
+ *  (c) `craftingSystems` landed, `gatheringConfig` did NOT — the re-run must rewrite the gathering
  *      slice from the PERSISTED map, because re-deriving one from already-re-keyed systems answers
  *      EMPTY. That is the exact failure `migrateWorldScopeEntities.js` records for `1.30.0` in its
  *      own "a torn run may already have re-keyed `craftingSystems`" note.
@@ -1024,6 +1029,7 @@ function assertNoSilentQuantityDeletion({ result }) {
 function assertTearRecovery({ before, result }) {
   const RECOVERED = ['systems', 'recipes', 'gatheringConfig', 'essenceScope', 'componentScope'];
   const tears = [
+    ['only the merge map landed', []],
     ['componentScope landed, essenceScope did NOT', ['recipes', 'componentScope']],
     [
       'craftingSystems landed, gatheringConfig did NOT',
@@ -1518,4 +1524,74 @@ test('the differential oracle reads a NON-TRIVIAL number of sites, and every sit
       `the oracle must reach ${label}`
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// The ONE tear the persisted map cannot repair — stated as an ACCEPTED BOUND
+// ---------------------------------------------------------------------------
+
+test('the FREEZE half of requirement 8 does not survive an `essenceScope`/`craftingSystems` tear', () => {
+  // THE DIRECTION THE PRUNE ARGUMENT IS SILENT ABOUT. `essenceScope` is written BEFORE
+  // `craftingSystems`, and requirement 8's freeze lands in BOTH: the membership record takes the
+  // resolved value as an override, and the in-system row takes it on `propertyMacroUuid`. A tear
+  // between those two writes lands the membership half alone.
+  //
+  // ON THE RE-RUN NOTHING IS RE-POINTED — the landed record already names the SURVIVOR, which is
+  // not a key of the map — so `freezeInheritedSections` never runs and the in-system half never
+  // lands. The union then answers the in-system row's own `propertyMacroUuid: null`, because
+  // `applyInheritedSections` skips a section the record marks OVERRIDING, and the essence's
+  // property macro silently stops for that system.
+  //
+  // IT IS ACCEPTED RATHER THAN REPAIRED, and the reason is that a repair arm cannot exist. The
+  // torn state — membership overriding with a value, in-system row carrying its own — is
+  // BYTE-INDISTINGUISHABLE from the state `worldScopeActions.setSectionInherited` produces on
+  // every world where a GM flipped a switch and left the row alone. An arm that wrote the
+  // membership value onto the row would destroy that GM's authored field on every re-run of every
+  // world that never tore, which is a strictly larger harm than the one it repairs.
+  const corpus = buildEssenceMergeCorpus({
+    systems: [
+      { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron', macro: 'Macro.forge' }] },
+      {
+        id: 'sys-b',
+        essences: [
+          { id: MINTED_B, name: 'Iron', inherit: { macro: true }, omitSections: ['macro'] },
+        ],
+      },
+    ],
+    worldDefaults: { [MINTED_B]: { macro: 'Macro.forge' } },
+  });
+  const before = payloadOf(corpus);
+  const result = mergeEquivalentWorldEssences(copy(before));
+  const rowOf = (systems) => systems.find((system) => system.id === 'sys-b').essenceDefinitions[0];
+
+  assert.deepEqual(
+    result._worldEssenceMergeReport.inSystemFreezes,
+    [{ systemId: 'sys-b', essenceId: 'iron', sections: ['macro'] }],
+    'the premise: an UNTORN run writes both halves and discloses the in-system one'
+  );
+  assert.equal(rowOf(result.systems).propertyMacroUuid, 'Macro.forge');
+
+  const repaired = mergeEquivalentWorldEssences(
+    tornPayload(before, result, ['recipes', 'componentScope', 'essenceScope'])
+  );
+  assert.deepEqual(
+    repaired.essenceScope.membership['iron|sys-b'].macro,
+    'Macro.forge',
+    'the membership half survives, because it is what landed'
+  );
+  assert.deepEqual(
+    repaired._worldEssenceMergeReport.inSystemFreezes,
+    [],
+    'and the re-run re-points nothing, so it re-freezes nothing'
+  );
+  assert.equal(
+    rowOf(repaired.systems).propertyMacroUuid,
+    null,
+    'THE ACCEPTED BOUND: the in-system half is lost, and the union answers null for this system'
+  );
+  assert.equal(
+    rowOf(repaired.systems).id,
+    'iron',
+    'the rewrite half still recovers, so the loss is bounded to the frozen VALUE'
+  );
 });
