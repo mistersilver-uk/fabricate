@@ -592,6 +592,16 @@ export function rewriteEssenceReferences(definition, { remapComponent = identity
 /**
  * Rewrite every reference one TOOL carries, in place.
  *
+ * BOTH ID FAMILIES, because `repairRequirements` is an `IngredientGroup[]` and an option inside it
+ * may be ESSENCE-TYPED as readily as component-typed (issue 1654). It is handed to
+ * {@link rewriteIngredientRef}, the one place an option's `match` is read, so the essence leg gets
+ * the `alternatives[]` recursion for free and cannot drift from the recipe leg.
+ *
+ * This is the function BOTH HALVES OF THE TOOL SCOPE reach through — `toolScope.membership[]` and
+ * `toolScope.defaults[]`, via {@link rewriteMembershipReferences} and the migration's own defaults
+ * walk — so a retired id left in either would be read as live by `resolveTool` or seeded into a
+ * system that does not exist yet.
+ *
  * @param {unknown} tool
  * @param {{remapComponent: Function, remapEssence: Function}} remappers
  */

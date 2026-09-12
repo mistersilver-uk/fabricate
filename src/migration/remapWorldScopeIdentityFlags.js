@@ -493,6 +493,14 @@ export async function remapWorldScopeIdentityFlags({
 // - **`flags.fabricate.fabricate.craftingRuns` and `.salvageRuns`**, at their `resolvedEssences`
 //   and `essenceEnabled` maps, wherever those appear inside a run record.
 // - **`flags.fabricate.gatheringRuns` AT ITS SINGLE-SCOPE DEPTH**, on the same two keys.
+// - OF THOSE THREE, ONLY `craftingRuns` CARRIES EITHER FIELD TODAY, and this list says so rather
+//   than implying three writers exist: `CraftingRunManager.markStepPrepared` is the ONLY writer of
+//   `resolvedEssences` or `essenceEnabled` anywhere in `src/`, and the container it writes is
+//   `craftingRuns` alone. The walker visits all three anyway and re-keys every essence-keyed map
+//   it finds AT ANY DEPTH, which is deliberate FUTURE-PROOFING rather than a description of the
+//   current corpus — a salvage or gathering run that starts snapshotting essences later is
+//   covered without a second edit to this list, and the site list is the wrong place to learn
+//   that it was not.
 // - **The system-less item override at the DOUBLY-nested `flags.fabricate.fabricate.essences`**,
 //   under a whole-corpus unambiguity tie-break, exactly as the legacy flat `componentId` scalar
 //   is treated above. `getFabricateFlag(item, 'essences')` normalizes to `fabricate.essences`, so
@@ -524,8 +532,8 @@ export async function remapWorldScopeIdentityFlags({
 //
 // THAT SHIELDING IS INCIDENTAL AND IS NOT RELIED ON: `active` one level up is already a plain map,
 // `steps` could become one, and a single container-shape change would turn a passing write into
-// the corruption below with nothing to signal it. In a CONSUMED `resolvedEssences` snapshot that
-// makes the resumed run transfer 4 units where 3 were paid for. That is data corruption, not
+// corruption with nothing to signal it — a stale key in a CONSUMED `resolvedEssences` snapshot
+// makes a resumed run transfer essences it never consumed. That is data corruption, not
 // untidiness.
 //
 // The write is therefore ONE ATOMIC UPDATE per container using Foundry's FORCED-REPLACEMENT key
@@ -803,10 +811,12 @@ export function remapEssenceKeyedMap(map, lookup, combine) {
 /**
  * Walk one node, re-keying every essence-keyed container found at any depth, IN PLACE.
  *
- * THE DEPTH IS NOT ASSUMED. `resolvedEssences` and `essenceEnabled` are written into a step's
- * `preparedConsumption`, and the three run containers nest their records differently, so a walker
- * that hard-coded one path would silently miss the others exactly as a pass assuming one flag
- * depth misses `gatheringRuns`.
+ * THE DEPTH IS NOT ASSUMED. `CraftingRunManager.markStepPrepared` writes `resolvedEssences` and
+ * `essenceEnabled` into a step's `preparedConsumption`, and it is the ONLY writer of either field
+ * in `src/` today — so walking to ANY depth is FUTURE-PROOFING rather than a description of three
+ * differently-nested shapes that already exist. A salvage or gathering run that starts
+ * snapshotting essences later is covered with no second edit, exactly as a pass that hard-coded
+ * one flag depth would have missed `gatheringRuns`.
  *
  * @param {unknown} node
  * @param {(value: unknown) => unknown} lookup
