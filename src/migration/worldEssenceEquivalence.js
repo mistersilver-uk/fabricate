@@ -156,6 +156,14 @@
  * on every input this pass can construct it finds nothing, and if it ever did, the group would be
  * refused rather than shipped.
  *
+ * ## The report names things (`#### D9`)
+ *
+ * EVERY REPORT LEG CARRIES A `name`, not only the two keyed by essence id. `mergedGroups` and
+ * `refusals` carry the SURVIVOR's display name, `declined` and `orphaned` carry the essence's own,
+ * and all four take it from the STORED record rather than from the canonical fold — the canonical
+ * name decides equality, and a GM reads the name. See {@link displayNameOf} for why the producer
+ * owns this rather than the notice that renders it.
+ *
  * ## The tombstone leg (`#### D12`)
  *
  * `retired` is why a merged id can never come back. `mintEssenceId` suffixes collisions against
@@ -558,6 +566,33 @@ function sectionsEqual(left, right) {
 }
 
 /**
+ * The DISPLAY name one world essence record carries, as a fragment to spread into a report entry.
+ *
+ * **EVERY REPORT LEG CARRIES A NAME, AND IT IS THE STORED ONE — never the canonical fold.** The
+ * canonical name decides EQUALITY and is trimmed and case-folded for that job alone; a GM reads
+ * the name. `## World scope notices` requirement 13 binds the merge notice to name a group by NAME
+ * rather than by id pair, and it binds for a concrete reason: most ids this pass retires are
+ * `crypto.randomUUID()` output, and the channel is a corner toast, so an enumeration of UUID pairs
+ * is unreadable exactly where readability is the whole point.
+ *
+ * **THE PRODUCER OWNS IT.** A consumer resolving a name from `retired` — or worse, falling back to
+ * the raw id — would be a second implementation of "what is this group called", and the two drift
+ * the first time this shape changes. So the name travels with the entry.
+ *
+ * ABSENCE-PRESERVING, and the rule is {@link identityOf}'s verbatim: an `undefined` name emits NO
+ * KEY, while a stored `null` is preserved as `null`. A world essence that never carried a name
+ * must not gain a minted one here — a report is a description of what is, and the notice lane's
+ * own fallback is the right place to decide what to print for a nameless essence.
+ *
+ * @param {object|undefined} record The world essence's roster entry.
+ * @returns {{name?: unknown}}
+ */
+function displayNameOf(record) {
+  const name = record?.name;
+  return name === undefined ? {} : { name };
+}
+
+/**
  * Split the world roster into merge candidates, declined essences and orphans.
  *
  * @param {object} scope The read essence scope.
@@ -568,23 +603,27 @@ function classifyCandidates(scope, corpus) {
   const candidates = [];
   const declined = [];
   const orphaned = [];
+  const decline = (entity, sections, reason) => {
+    declined.push({
+      essenceId: entity.id,
+      ...displayNameOf(entity.record),
+      sections,
+      reason,
+    });
+  };
 
   for (const entity of scope.entities) {
     const members = scope.membershipsByEntity.get(entity.id) ?? [];
     // THE ZERO POINT, tested explicitly: unanimity over no members is vacuously true, so without
     // this line an essence nobody resolves would be the most mergeable essence in the world.
     if (members.length === 0) {
-      orphaned.push({ essenceId: entity.id, name: entity.record?.name ?? null });
+      orphaned.push({ essenceId: entity.id, ...displayNameOf(entity.record) });
       continue;
     }
 
     const name = canonicalEssenceName(entity.record?.name);
     if (name === UNCANONICALISABLE) {
-      declined.push({
-        essenceId: entity.id,
-        sections: ['name'],
-        reason: ESSENCE_DECLINE_REASONS.uncanonicalisableKey,
-      });
+      decline(entity, ['name'], ESSENCE_DECLINE_REASONS.uncanonicalisableKey);
       continue;
     }
 
@@ -606,19 +645,11 @@ function classifyCandidates(scope, corpus) {
     }
 
     if (unreadable.length > 0) {
-      declined.push({
-        essenceId: entity.id,
-        sections: unreadable,
-        reason: ESSENCE_DECLINE_REASONS.uncanonicalisableKey,
-      });
+      decline(entity, unreadable, ESSENCE_DECLINE_REASONS.uncanonicalisableKey);
       continue;
     }
     if (disagreed.length > 0) {
-      declined.push({
-        essenceId: entity.id,
-        sections: disagreed,
-        reason: ESSENCE_DECLINE_REASONS.sectionDisagreement,
-      });
+      decline(entity, disagreed, ESSENCE_DECLINE_REASONS.sectionDisagreement);
       continue;
     }
 
@@ -945,11 +976,12 @@ function findGroupRefusals(mergeMap, groups, corpus) {
  *   mergeMap: {[systemId: string]: {essences: {[loserId: string]: string}}},
  *   retired: {[loserId: string]: {name?: unknown, icon?: unknown, colorToken?: unknown,
  *     description?: unknown, systems: string[]}},
- *   mergedGroups: Array<{survivorId: string, loserIds: string[], systemIds: string[]}>,
- *   refusals: Array<{survivorId: string, loserIds: string[], systemIds: string[],
- *     reason: string}>,
- *   declined: Array<{essenceId: string, sections: string[], reason: string}>,
- *   orphaned: Array<{essenceId: string, name: unknown}>
+ *   mergedGroups: Array<{survivorId: string, name?: unknown, loserIds: string[],
+ *     systemIds: string[]}>,
+ *   refusals: Array<{survivorId: string, name?: unknown, loserIds: string[],
+ *     systemIds: string[], reason: string}>,
+ *   declined: Array<{essenceId: string, name?: unknown, sections: string[], reason: string}>,
+ *   orphaned: Array<{essenceId: string, name?: unknown}>
  * }}
  */
 export function buildWorldEssenceEquivalence({ systems, essenceScope, componentScope } = {}) {
@@ -967,6 +999,8 @@ export function buildWorldEssenceEquivalence({ systems, essenceScope, componentS
     refused.add(group);
     refusals.push({
       survivorId: group[0].id,
+      // The SURVIVOR's display name, because a refusal names the same group a merge would have.
+      ...displayNameOf(group[0].record),
       loserIds: group.slice(1).map((candidate) => candidate.id),
       systemIds,
       reason,
@@ -1013,6 +1047,9 @@ export function buildWorldEssenceEquivalence({ systems, essenceScope, componentS
     }
     mergedGroups.push({
       survivorId: survivor.id,
+      // The SURVIVOR's display name: it is the name the merged essence will still be called, so it
+      // is the one a GM can act on. Every loser's own name is preserved in `retired`.
+      ...displayNameOf(survivor.record),
       loserIds: losers.map((loser) => loser.id),
       systemIds: [...systemIds].sort(
         (left, right) => corpus.order.get(left) - corpus.order.get(right)

@@ -119,6 +119,7 @@ test('a SELF-REFERENTIAL section value is declined rather than serialised', () =
   assert.deepEqual(result.declined, [
     {
       essenceId: 'e2',
+      name: 'Iron',
       sections: ['effectSource'],
       reason: ESSENCE_DECLINE_REASONS.uncanonicalisableKey,
     },
@@ -140,7 +141,7 @@ test('two world essences with the SAME NAME in different case are one essence', 
     })
   );
   assert.deepEqual(result.mergedGroups, [
-    { survivorId: 'iron', loserIds: ['a1b2c3'], systemIds: ['sys-a', 'sys-b'] },
+    { survivorId: 'iron', name: 'Iron', loserIds: ['a1b2c3'], systemIds: ['sys-a', 'sys-b'] },
   ]);
   assert.deepEqual(result.mergeMap, { 'sys-b': { essences: { a1b2c3: 'iron' } } });
 });
@@ -171,7 +172,12 @@ test('an ABSENT, an EMPTY and an ALL-NULL effectSource block all compare EQUAL',
     })
   );
   assert.deepEqual(result.mergedGroups, [
-    { survivorId: 'e-a', loserIds: ['e-b', 'e-c'], systemIds: ['sys-a', 'sys-b', 'sys-c'] },
+    {
+      survivorId: 'e-a',
+      name: 'Ash',
+      loserIds: ['e-b', 'e-c'],
+      systemIds: ['sys-a', 'sys-b', 'sys-c'],
+    },
   ]);
 });
 
@@ -185,7 +191,7 @@ test('an EMPTY-STRING macro reads as null, and a DIFFERENT macro is a different 
     })
   );
   assert.deepEqual(merged.mergedGroups, [
-    { survivorId: 'aa1', loserIds: ['bb2'], systemIds: ['sys-a', 'sys-b'] },
+    { survivorId: 'aa1', name: 'Ash', loserIds: ['bb2'], systemIds: ['sys-a', 'sys-b'] },
   ]);
 
   const split = buildWorldEssenceEquivalence(
@@ -210,7 +216,7 @@ test('`enabled` is NOT in the key: two essences differing only in it still merge
     })
   );
   assert.deepEqual(result.mergedGroups, [
-    { survivorId: 'aa1', loserIds: ['bb2'], systemIds: ['sys-a', 'sys-b'] },
+    { survivorId: 'aa1', name: 'Ash', loserIds: ['bb2'], systemIds: ['sys-a', 'sys-b'] },
   ]);
 });
 
@@ -237,7 +243,7 @@ test('THE ZERO POINT: a world essence with no live membership record never merge
   const merged = buildWorldEssenceEquivalence(buildEssenceMergeCorpus(spec(true)));
   assert.deepEqual(merged.orphaned, []);
   assert.deepEqual(merged.mergedGroups, [
-    { survivorId: 'iron', loserIds: ['ghost'], systemIds: ['sys-a', 'sys-b'] },
+    { survivorId: 'iron', name: 'Iron', loserIds: ['ghost'], systemIds: ['sys-a', 'sys-b'] },
   ]);
 });
 
@@ -278,7 +284,7 @@ test('candidacy compares the RESOLVED value, not the stored one', () => {
 
   const agreeing = buildWorldEssenceEquivalence(build('Macro.abc'));
   assert.deepEqual(agreeing.mergedGroups, [
-    { survivorId: 'iron', loserIds: ['xj7'], systemIds: ['sys-a', 'sys-b'] },
+    { survivorId: 'iron', name: 'Iron', loserIds: ['xj7'], systemIds: ['sys-a', 'sys-b'] },
   ]);
 
   const disagreeing = buildWorldEssenceEquivalence(build('Macro.zzz'));
@@ -296,7 +302,7 @@ test('an ABSENT world default reads as NO OPINION, never as disagreement', () =>
   );
   assert.deepEqual(result.declined, []);
   assert.deepEqual(result.mergedGroups, [
-    { survivorId: 'iron', loserIds: ['xj7'], systemIds: ['sys-a', 'sys-b'] },
+    { survivorId: 'iron', name: 'Iron', loserIds: ['xj7'], systemIds: ['sys-a', 'sys-b'] },
   ]);
 });
 
@@ -313,6 +319,7 @@ test('a world essence whose members DISAGREE is declined with the section they d
   assert.deepEqual(result.declined, [
     {
       essenceId: 'iron',
+      name: 'Iron',
       sections: ['macro'],
       reason: ESSENCE_DECLINE_REASONS.sectionDisagreement,
     },
@@ -348,6 +355,7 @@ test('equal sourceComponentIds from two REFUSED component pairs never merge', ()
   assert.deepEqual(refused.refusals, [
     {
       survivorId: 'iron',
+      name: 'Iron',
       loserIds: ['kt9'],
       systemIds: ['sys-a', 'sys-b'],
       reason: ESSENCE_MERGE_REFUSAL_REASONS.unresolvedEffectSourceComponent,
@@ -529,6 +537,7 @@ test('OUTPUT UNIQUENESS refuses a merge that would make one system emit a duplic
   assert.deepEqual(refused.refusals, [
     {
       survivorId: 'iron',
+      name: 'Iron',
       loserIds: ['kt9'],
       systemIds: ['sys-a'],
       reason: ESSENCE_MERGE_REFUSAL_REASONS.outputIdCollision,
@@ -564,6 +573,7 @@ test('MEMBERSHIP-KEY UNIQUENESS catches what the other two invariants cannot see
   assert.deepEqual(result.refusals, [
     {
       survivorId: 'iron',
+      name: 'Iron',
       loserIds: ['kt9'],
       systemIds: ['sys-a'],
       reason: ESSENCE_MERGE_REFUSAL_REASONS.membershipKeyCollision,
@@ -589,6 +599,7 @@ test('a NATIVE duplicate of a group member’s id refuses that group, as `1.30.0
   assert.deepEqual(result.refusals, [
     {
       survivorId: 'iron',
+      name: 'Iron',
       loserIds: ['kt9'],
       systemIds: ['sys-a'],
       reason: ESSENCE_MERGE_REFUSAL_REASONS.outputIdCollision,
@@ -631,6 +642,107 @@ test('the merge map is DISJOINT and a second application is a no-op, across ever
       }
     }
   }
+});
+
+// ---------------------------------------------------------------------------
+// The report names things (`#### D9`)
+// ---------------------------------------------------------------------------
+
+test('every report leg carries the STORED display name, not the canonical fold', () => {
+  // The stored name is padded and mixed-case, so the canonical fold (`iron ore`) and the display
+  // name are textually different and an assertion can tell which one the report carried.
+  const stored = '  Iron Ore  ';
+  const survivor = { id: 'iron-ore', name: stored };
+
+  const merged = buildWorldEssenceEquivalence(
+    buildEssenceMergeCorpus({
+      systems: [
+        { id: 'sys-a', essences: [survivor] },
+        { id: 'sys-b', essences: [{ id: 'kt9', name: 'IRON ORE' }] },
+      ],
+    })
+  );
+  assert.deepEqual(merged.mergedGroups, [
+    { survivorId: 'iron-ore', name: stored, loserIds: ['kt9'], systemIds: ['sys-a', 'sys-b'] },
+  ]);
+
+  // A REFUSAL names the same group a merge would have, so it carries the survivor's name too.
+  const refused = buildWorldEssenceEquivalence(
+    buildEssenceMergeCorpus({
+      systems: [
+        { id: 'sys-a', essences: [{ ...survivor, sourceComponentId: 'comp-1' }] },
+        { id: 'sys-b', essences: [{ id: 'kt9', name: 'IRON ORE', sourceComponentId: 'comp-1' }] },
+      ],
+    })
+  );
+  assert.deepEqual(refused.refusals, [
+    {
+      survivorId: 'iron-ore',
+      name: stored,
+      loserIds: ['kt9'],
+      systemIds: ['sys-a', 'sys-b'],
+      reason: ESSENCE_MERGE_REFUSAL_REASONS.unresolvedEffectSourceComponent,
+    },
+  ]);
+
+  // A DECLINED essence carries its OWN name — there is no survivor to borrow one from.
+  const declined = buildWorldEssenceEquivalence(
+    buildEssenceMergeCorpus({
+      systems: [
+        { id: 'sys-a', essences: [{ ...survivor, macro: 'Macro.a' }] },
+        { id: 'sys-b', essences: [{ ...survivor, macro: 'Macro.b' }] },
+      ],
+    })
+  );
+  assert.deepEqual(declined.declined, [
+    {
+      essenceId: 'iron-ore',
+      name: stored,
+      sections: ['macro'],
+      reason: ESSENCE_DECLINE_REASONS.sectionDisagreement,
+    },
+  ]);
+});
+
+test('an ABSENT name is never minted, and a stored null name is preserved', () => {
+  const member = (entityId) => ({
+    entityId,
+    systemId: 'sys-a',
+    inherit: { effectSource: false, macro: false },
+    effectSource: {},
+    macro: null,
+    enabled: true,
+  });
+  const result = buildWorldEssenceEquivalence({
+    systems: [{ id: 'sys-a', essenceDefinitions: [] }],
+    essenceScope: {
+      // `lonely` has no membership record, so it reaches the ORPHAN leg rather than the declined
+      // one — the two absence-preserving legs an essence with no name can actually reach.
+      entities: [{ id: 'nameless' }, { id: 'nulled', name: null }, { id: 'lonely' }],
+      defaults: {},
+      membership: { 'nameless|sys-a': member('nameless'), 'nulled|sys-a': member('nulled') },
+    },
+  });
+
+  // `deepEqual` here is the STRICT variant, so it already distinguishes a MISSING key from one
+  // holding `undefined`; the `in` assertions below say so out loud.
+  assert.deepEqual(result.declined, [
+    {
+      essenceId: 'nameless',
+      sections: ['name'],
+      reason: ESSENCE_DECLINE_REASONS.uncanonicalisableKey,
+    },
+    {
+      essenceId: 'nulled',
+      name: null,
+      sections: ['name'],
+      reason: ESSENCE_DECLINE_REASONS.uncanonicalisableKey,
+    },
+  ]);
+  assert.deepEqual(result.orphaned, [{ essenceId: 'lonely' }]);
+  assert.ok(!('name' in result.declined[0]), 'an absent name must not be minted');
+  assert.ok('name' in result.declined[1], 'a stored null name must be preserved');
+  assert.ok(!('name' in result.orphaned[0]), 'an absent name must not be minted');
 });
 
 // ---------------------------------------------------------------------------
@@ -713,8 +825,13 @@ test('the PARTITION is permutation-invariant when the corpus decides every elect
     );
   }
   assert.deepEqual(JSON.parse(expected).mergedGroups, [
-    { survivorId: 'iron', loserIds: ['zz1', 'mm4'], systemIds: ['sys-a', 'sys-b', 'sys-c'] },
-    { survivorId: 'ash', loserIds: ['p7q'], systemIds: ['sys-a', 'sys-b'] },
+    {
+      survivorId: 'iron',
+      name: 'Iron',
+      loserIds: ['zz1', 'mm4'],
+      systemIds: ['sys-a', 'sys-b', 'sys-c'],
+    },
+    { survivorId: 'ash', name: 'ash', loserIds: ['p7q'], systemIds: ['sys-a', 'sys-b'] },
   ]);
 });
 
