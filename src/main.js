@@ -116,7 +116,7 @@ import { playerExtensions } from './ui/playerExtensions.js';
 import { applyCurrentFabricateTheme } from './ui/theme.js';
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from './ui/itemsDirectoryButtons.js';
 import { buildCompendiumImportContextOption, promptSelectCraftingSystem } from './ui/compendiumDirectoryContext.js';
-import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET, WORLD_SCOPE_IDENTITY_FLAG_TARGET } from './config/settings.js';
+import { registerFabricateSettings, getSetting, setSetting, SETTING_KEYS, FABRICATE_SETTINGS_NAMESPACE, RECIPE_ITEM_FLAG_STAMP_TARGET, COMPONENT_FLAG_STAMP_TARGET, TOOL_FLAG_STAMP_TARGET, OWNED_ITEM_COMPONENT_STAMP_TARGET, WORLD_SCOPE_IDENTITY_FLAG_TARGET, WORLD_ESSENCE_MERGE_FLAG_TARGET } from './config/settings.js';
 import { notifyUnresolvedItemDescriptions } from './config/repairItemData.js';
 import { getFabricateFlag, setFabricateFlag } from './config/flags.js';
 import { isPlayerCharacterActor } from './config/playerCharacterTypes.js';
@@ -130,8 +130,12 @@ import { MIGRATION_DEFERRAL_REASONS, MigrationRunner } from './migration/Migrati
 // module is a readability trap on a public surface: a reader of `applyWorldScope...` cannot
 // tell which is which, and the wrong one is the ungated one.
 import {
+  forcedReplacementFlagPath,
+  hasPendingWorldEssenceMerge,
+  mayClearWorldEssenceMergeMap,
   mayClearWorldScopeRekeyMap,
   remapCompletedCleanly,
+  remapWorldEssenceIdentityFlags as remapEssenceFlagsAcrossActors,
   remapWorldScopeIdentityFlags as remapIdentityFlagsAcrossActors,
 } from './migration/remapWorldScopeIdentityFlags.js';
 import { hasPendingWorldScopeRekey } from './systems/worldScopeRekeyPending.js';
@@ -1966,6 +1970,40 @@ class Fabricate {
     const rekeyMap = getSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP) ?? {};
     if (!hasPendingWorldScopeRekey(() => rekeyMap)) return null;
     return applyWorldScopeIdentityFlagRemap(rekeyMap);
+  }
+
+  /**
+   * Re-run the `1.34.0` equivalent-essence merge's durable-flag repair (issue 1654).
+   *
+   * A GM-FACING RECOVERY ACTION, not a test hook, and reachable in exactly the two states its
+   * `1.30.0` sibling {@link remapWorldScopeIdentityFlags} is reachable in: a TORN MIGRATION
+   * leaves the merge map pending and the boot pass declines to consume a decision record the
+   * next boot may still need, and a PARTIAL REMAP withholds the clear too, because a transient
+   * rejection is a failure a re-run can genuinely fix. A LOCKED-PACK skip is deliberately not one
+   * of them - it is a standing condition a re-run cannot improve.
+   *
+   * **ACTIVE-GM ONLY**, and the warning is NOT optional. `game.fabricate` is bound on every
+   * client and the pass walks the UNFILTERED actor collection, so a player invoking it would have
+   * every write it does not own rejected by the server. A silent `return null` on a player client
+   * would leave a GM's "run it from the console" instruction looking like it had worked.
+   *
+   * IDEMPOTENT. It performs the remap ONLY; it does not clear the map or advance the one-shot
+   * version, so the ordinary boot-time gating still decides when the decision record may be
+   * destroyed - and the never-cleared `retired` tombstone is untouched either way.
+   *
+   * @returns {Promise<object|null>} the pass summary; `null` when this client is not the active
+   *   GM, or when no essence merge is pending.
+   */
+  async remapWorldEssenceIdentityFlags() {
+    if (game.users?.activeGM?.id !== game.user?.id) {
+      console.warn(
+        'Fabricate | world essence merge repair declined: it writes across every actor in the world, so it runs on the ACTIVE GM alone. Ask the active GM to run it, or take over as active GM first.'
+      );
+      return null;
+    }
+    const mergeMap = getSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP) ?? {};
+    if (!hasPendingWorldEssenceMerge(mergeMap)) return null;
+    return applyWorldEssenceMergeFlagRemap(mergeMap);
   }
 
   /**
@@ -5095,6 +5133,13 @@ Hooks.once('ready', async () => {
   // restamp, which never reaches this population because its planner returns early for any item
   // already carrying a durable identity flag.
   await runWorldScopeIdentityFlagRemap();
+  // Issue 1654: remap the durable essence references the 1.34.0 equivalent-essence merge
+  // invalidated. MUST run AFTER the 1.30.0 remap above: on a world migrating both in one boot the
+  // two passes read and rewrite the SAME run containers, and this one writes with a FORCED
+  // REPLACEMENT — so a container snapshot taken before the component/tool repair landed would
+  // replace that repair away. It walks the actor corpus only while its own map is pending, so no
+  // ordinary boot pays for a second traversal.
+  await runWorldEssenceMergeFlagRemap();
 
   // Issue 800: GM-only cue for a world whose stored descriptions predate write-time
   // resolution and still show raw `@UUID[…]` text. A DETECTOR only — it scans
@@ -5591,6 +5636,109 @@ async function applyWorldScopeIdentityFlagRemap(rekeyMap) {
     );
     if (notice && game.user?.isGM) ui.notifications?.warn?.(notice, { permanent: true });
     return summary;
+}
+
+/**
+ * Issue 1654 — one-shot, active-GM-gated pass that remaps every durable ESSENCE reference the
+ * `1.34.0` equivalent-essence merge invalidated, driven by the persisted
+ * `fabricate.worldEssenceMergeMap`. The pure logic lives in `remapWorldScopeIdentityFlags.js`;
+ * what is here is the Foundry edge and the gates.
+ *
+ * IT MIRRORS `runWorldScopeIdentityFlagRemap` DELIBERATELY AND COMPLETELY — the same DECISION/WORK
+ * split, the same two withholds, the same `compareSemver` gate — because the two passes face the
+ * same three hazards and a second, subtly different set of gates would be a set nobody could
+ * reason about together. What it does NOT share is the decision record: `1.34.0` carries its own
+ * map and its own Number version, so a world that has consumed one may still owe the other.
+ *
+ * IT RUNS AFTER THE `1.30.0` REMAP, AND THE ORDER IS LOAD-BEARING. On a world migrating `1.30.0`
+ * and `1.34.0` in one boot both passes read and rewrite the SAME run containers. This half writes
+ * with a FORCED REPLACEMENT, so a snapshot taken before the component/tool repair landed would
+ * replace that repair away. Reading after it cannot.
+ *
+ * NO SECOND CORPUS WALK IS ADDED TO AN ORDINARY BOOT. Each pass walks only while its OWN map is
+ * pending, so a world with no merge to apply returns before touching `game.actors`. The one boot
+ * that walks twice is the boot on which both migrations land, and on that boot both walks are
+ * doing real writes.
+ */
+async function runWorldEssenceMergeFlagRemap() {
+  try {
+    // Active-GM only, so exactly one client performs the writes.
+    if (game.users?.activeGM?.id !== game.user?.id) return;
+    if (
+      Number(getSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION)) >=
+      WORLD_ESSENCE_MERGE_FLAG_TARGET
+    ) {
+      return;
+    }
+    // THE RUN GATE, and the reason a world with nothing to remap still falls through to the
+    // version advance below rather than returning here: it must stop re-checking on every boot.
+    // That advance is itself gated on migration completion, so a world whose migration deferred
+    // BEFORE writing the map re-runs on a later boot rather than short-circuiting.
+    const mergeMap = getSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP) ?? {};
+    let summary = null;
+    if (hasPendingWorldEssenceMerge(mergeMap)) {
+      summary = await applyWorldEssenceMergeFlagRemap(mergeMap);
+    }
+
+    // THE CLEAR, and the version advance, share ONE gate. The predicate lives in the pure module,
+    // on `compareSemver`, so no reader can re-derive it as a bare JS `>=` on a STRING setting.
+    if (!mayClearWorldEssenceMergeMap(getSetting(SETTING_KEYS.MIGRATION_VERSION))) {
+      console.warn(
+        'Fabricate | world essence merge map RETAINED: the 1.34.0 migration has not completed on this world yet, so the decision record it may still need is not destroyed. This pass will run again after a successful migration pass.'
+      );
+      return;
+    }
+    // THE SECOND WITHHOLD, and it is a different question from the first. The gate above asks
+    // whether the PRODUCING migration completed; this asks whether THIS pass did.
+    if (!remapCompletedCleanly(summary)) {
+      console.warn(
+        `Fabricate | world essence merge map RETAINED: ${summary.skippedErrors} document(s) could not be updated, so the repair is incomplete and its decision record is not destroyed. Fix the cause and reload, or run game.fabricate.remapWorldEssenceIdentityFlags().`
+      );
+      return;
+    }
+    // THE PER-SYSTEM LEGS ONLY. `retired` is the never-cleared tombstone that keeps a retired
+    // essence id TAKEN for the life of the world, so clearing it would let `mintEssenceId` hand
+    // one straight back to the next essence named after a merged one.
+    const { retired = {} } = getSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP) ?? {};
+    await setSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, { retired });
+    await setSetting(
+      SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION,
+      WORLD_ESSENCE_MERGE_FLAG_TARGET
+    );
+  } catch (error) {
+    console.error('Fabricate | world essence merge flag remap failed', error);
+  }
+}
+
+/**
+ * Apply the essence remap itself. Split out of the gating above so the two are separately
+ * readable: everything here is WORK, everything there is a DECISION.
+ *
+ * EVERY WRITE IS A FORCED REPLACEMENT (`forcedReplacementFlagPath`), never `setFabricateFlag`. An
+ * essence id is an object KEY, so a re-key REMOVES one key and adds another — and `Document#update`
+ * merges inner objects recursively and performs no deletions, so a plain merge write would leave
+ * the retired key in place beside the new one. In a CONSUMED `resolvedEssences` snapshot that makes
+ * a resumed run transfer essences it never consumed.
+ *
+ * @param {object} mergeMap The pending `fabricate.worldEssenceMergeMap`.
+ */
+async function applyWorldEssenceMergeFlagRemap(mergeMap) {
+  const replace = (document, path, value) => document?.update?.({ [path]: value });
+  const summary = await remapEssenceFlagsAcrossActors({
+    actors: game.actors ?? [],
+    mergeMap,
+    // The same two read depths the `1.30.0` edge supplies, for the same reason.
+    readFlag: (document, key, fallback = null, options = {}) =>
+      options.bare
+        ? (document?.getFlag?.('fabricate', key) ?? fallback)
+        : getFabricateFlag(document, key, fallback),
+    replaceFabricateFlag: (document, key, value) =>
+      replace(document, forcedReplacementFlagPath(key), value),
+    replaceBareFlag: (document, key, value) =>
+      replace(document, forcedReplacementFlagPath(key, { bare: true }), value),
+  });
+  console.debug?.('Fabricate | world essence merge flag remap complete', summary);
+  return summary;
 }
 
 /**

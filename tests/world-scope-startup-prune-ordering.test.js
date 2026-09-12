@@ -32,13 +32,19 @@
  */
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { getFabricateFlag, setFabricateFlag } from '../src/config/flags.js';
 import { SETTING_KEYS } from '../src/config/settings.js';
 import { migrateWorldScopeEntities } from '../src/migration/migrateWorldScopeEntities.js';
 import { remapWorldScopeIdentityFlags } from '../src/migration/remapWorldScopeIdentityFlags.js';
-import { runStartupMaintenance } from '../src/systems/startupMaintenance.js';
+import {
+  runStartupMaintenance,
+  STARTUP_PASS_ENTITY_KINDS,
+} from '../src/systems/startupMaintenance.js';
 import { composeStartupPassList } from '../src/systems/startupPassComposition.js';
 import {
   hasPendingWorldScopeRekey,
@@ -46,6 +52,8 @@ import {
 } from '../src/systems/worldScopeRekeyPending.js';
 
 import { installFoundryStubs } from './helpers/worldScopeCorpus.js';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 installFoundryStubs();
 const { SalvageRunManager } = await import('../src/systems/SalvageRunManager.js');
@@ -384,4 +392,52 @@ test('_cleanupCraftingPreferences WITHHOLDS its sweep while a re-key map is pend
     ['salvage:comp-live'],
     'and with no re-key pending the sweep runs exactly as it always did'
   );
+});
+
+// ---------------------------------------------------------------------------
+// THE NEGATIVE PIN: `1.34.0` adds NO startup prune withhold (issue 1654)
+//
+// The `1.30.0` re-key needed one because a startup pass destroys exactly the data its remap
+// exists to repair. The `1.34.0` ESSENCE merge needs none, and that is an assertion about the
+// startup composition rather than a preference: no pass gated by the `componentIdentityRemap`
+// kind reads an essence id, and no essence id set exists anywhere in the composition. A
+// fail-closed gate on a question no pass asks would suppress housekeeping FOREVER in exchange for
+// protecting nothing.
+//
+// It is pinned NEGATIVELY so a future pass that starts pruning against essence ids fails HERE,
+// with this note, rather than silently needing a withhold nobody adds.
+// ---------------------------------------------------------------------------
+
+test('no startup pass declares an essence-derived entity kind', () => {
+  const declared = Object.values(STARTUP_PASS_ENTITY_KINDS).flatMap((kinds) => [...kinds]);
+  assert.ok(declared.length > 0, 'the premise: the declaration table is populated');
+  for (const kind of declared) {
+    assert.doesNotMatch(
+      kind,
+      /essence/i,
+      `${kind} prunes against essence ids, so the 1.34.0 merge now needs a withhold beside ` +
+        '`componentIdentityRemap` and a mirror predicate for it — see issue 1654'
+    );
+  }
+});
+
+test('the two passes gated on componentIdentityRemap hold no essence reference at all', () => {
+  // THE EVIDENCE BEHIND THE ABSENCE. The declaration table could be honest and the passes still
+  // read an essence id through some other route, so the sources themselves are measured.
+  const sources = [
+    ['src/systems/SalvageRunManager.js', 'salvage runs'],
+    ['src/config/preferencesCleanup.js', 'stale preferences'],
+    ['src/systems/startupPassComposition.js', 'the composition that derives every valid-id set'],
+  ];
+  for (const [path, label] of sources) {
+    const source = readFileSync(resolve(HERE, '..', ...path.split('/')), 'utf8');
+    assert.ok(source.length > 0, `the premise: ${path} is readable`);
+    const hits = source.match(/essence/gi) ?? [];
+    assert.equal(
+      hits.length,
+      0,
+      `${label} (${path}) now names an essence ${hits.length} time(s); a 1.34.0 startup withhold ` +
+        'may now be required — see issue 1654'
+    );
+  }
 });

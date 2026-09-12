@@ -25,10 +25,13 @@ import { fileURLToPath } from 'node:url';
 
 import {
   COMPONENT_FLAG_STAMP_TARGET,
+  SETTING_KEYS,
   TOOL_FLAG_STAMP_TARGET,
+  WORLD_ESSENCE_MERGE_FLAG_TARGET,
   WORLD_SCOPE_IDENTITY_FLAG_TARGET,
 } from '../src/config/settings.js';
 import {
+  mayClearWorldEssenceMergeMap,
   mayClearWorldScopeRekeyMap,
   remapCompletedCleanly,
 } from '../src/migration/remapWorldScopeIdentityFlags.js';
@@ -179,4 +182,92 @@ test('a PARTIAL remap withholds the clear AND the version advance', () => {
   assert.ok(clearIndex > withholdIndex, 'the clear sits after it');
   assert.ok(versionIndex > withholdIndex, 'and so does the version advance');
   assert.match(body.slice(withholdIndex, clearIndex), /return;/);
+});
+
+// ---------------------------------------------------------------------------
+// The `1.34.0` ESSENCE-MERGE one-shot (issue 1654)
+//
+// A SECOND decision record with a SECOND Number version, so a world that has consumed one may
+// still owe the other. Its gates mirror the `1.30.0` pair above exactly, and these assertions
+// exist because "mirrors it" is a claim a refactor can quietly falsify.
+// ---------------------------------------------------------------------------
+
+test('the essence one-shot has its OWN target, and its clear gate is never a lexicographic compare', () => {
+  assert.equal(WORLD_ESSENCE_MERGE_FLAG_TARGET, 1);
+  assert.equal(mayClearWorldEssenceMergeMap('1.33.0'), false);
+  assert.equal(
+    mayClearWorldEssenceMergeMap('1.4.0'),
+    false,
+    "a bare JS `>=` on this STRING setting answers TRUE here, and 1.4.0's population is the most " +
+      'tear-prone there is'
+  );
+  assert.equal(mayClearWorldEssenceMergeMap('1.34.0'), true);
+  assert.equal(mayClearWorldEssenceMergeMap('1.35.0'), true);
+  assert.equal(mayClearWorldEssenceMergeMap(undefined), false, 'an unstamped world has not run it');
+  // One spelling, one call site: the essence clear is the only thing that consults it.
+  assert.equal((MAIN.match(/mayClearWorldEssenceMergeMap\(/g) ?? []).length, 1);
+});
+
+test('the essence clear and its version advance are BOTH inside the same gate', () => {
+  const body = bodyOf('runWorldEssenceMergeFlagRemap');
+  const pendingIndex = body.indexOf('hasPendingWorldEssenceMerge(');
+  const gateIndex = body.indexOf('if (!mayClearWorldEssenceMergeMap(');
+  const withholdIndex = body.indexOf('if (!remapCompletedCleanly(summary))');
+  const clearIndex = body.indexOf('SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, {');
+  const versionIndex = body.indexOf('SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION,');
+  assert.ok(pendingIndex > 0, 'the RUN gate is the pending-map predicate');
+  assert.ok(gateIndex > pendingIndex, 'the CLEAR gate is a separate, later question');
+  assert.ok(withholdIndex > gateIndex, 'and the second withhold is later still');
+  assert.ok(clearIndex > withholdIndex, 'the clear sits after both');
+  assert.ok(versionIndex > withholdIndex, 'and so does the version advance');
+  assert.match(body.slice(gateIndex, clearIndex), /return;/);
+  assert.doesNotMatch(
+    body.slice(pendingIndex, gateIndex),
+    /\breturn;/,
+    'a world with nothing to remap must NOT return early: it would re-check on every boot forever'
+  );
+});
+
+test('the CLEAR keeps the retired tombstone, which is what stops a retired id being reissued', () => {
+  // `mintEssenceId` resolves a new id against the LIVE roster alone, so a cleared tombstone hands
+  // a retired id straight back to the next essence named after a merged one — and the reference
+  // this pass deliberately left on that key stops contributing NOTHING and starts contributing the
+  // WRONG essence.
+  const body = bodyOf('runWorldEssenceMergeFlagRemap');
+  const clear = body.slice(body.indexOf('SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, {'));
+  assert.match(
+    clear.slice(0, 80),
+    /SETTING_KEYS\.WORLD_ESSENCE_MERGE_MAP, \{ retired \}\)/,
+    'the clear writes the tombstone back, never `{}`'
+  );
+  assert.match(body, /const \{ retired = \{\} \} = getSetting\(SETTING_KEYS\.WORLD_ESSENCE_MERGE_MAP\)/);
+});
+
+test('the essence recovery action is ACTIVE-GM ONLY and SAYS SO when it declines', () => {
+  // A silent `return null` on a player client leaves a GM's "run it from the console"
+  // instruction looking like it had worked.
+  const body = methodBodyOf('remapWorldEssenceIdentityFlags');
+  const gateIndex = body.indexOf('game.users?.activeGM?.id !== game.user?.id');
+  const applyIndex = body.indexOf('applyWorldEssenceMergeFlagRemap(');
+  assert.ok(gateIndex > 0, 'the public method must carry the active-GM gate itself');
+  assert.ok(applyIndex > gateIndex, 'and it must gate BEFORE it does any work');
+  const declined = body.slice(gateIndex, applyIndex);
+  assert.match(declined, /console\.warn\(/, 'the decline is REPORTED, never silent');
+  assert.match(declined, /ACTIVE GM alone/);
+  assert.match(declined, /return null;/);
+  // The boot pass keeps its own copy of the same gate, so neither inherits from the other.
+  assert.match(
+    bodyOf('runWorldEssenceMergeFlagRemap'),
+    /game\.users\?\.activeGM\?\.id !== game\.user\?\.id/
+  );
+});
+
+test('the two one-shots are INDEPENDENT: separate settings, separate targets, separate gates', () => {
+  // A re-bump of the `1.30.0` stamp instead would gate the essence repair off on every world that
+  // had already consumed the re-key map, which is every world that has upgraded once.
+  assert.notEqual(SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION, SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION);
+  assert.notEqual(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, SETTING_KEYS.WORLD_SCOPE_REKEY_MAP);
+  const body = bodyOf('runWorldEssenceMergeFlagRemap');
+  assert.doesNotMatch(body, /WORLD_SCOPE_REKEY_MAP|WORLD_SCOPE_IDENTITY_FLAG/);
+  assert.doesNotMatch(bodyOf('runWorldScopeIdentityFlagRemap'), /WORLD_ESSENCE_MERGE/);
 });

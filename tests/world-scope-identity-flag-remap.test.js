@@ -21,11 +21,18 @@ import { fileURLToPath } from 'node:url';
 
 import { canonicalSignatureKey } from '../src/utils/alchemySignatureKey.js';
 import {
+  forcedReplacementFlagPath,
+  hasPendingWorldEssenceMerge,
   planItemIdentityFlagRemap,
+  readWorldEssenceMergeMap,
   remapAlchemyDeadEnds,
+  remapEssenceRunContainer,
   remapRunContainer,
+  remapWorldEssenceIdentityFlags,
   remapWorldScopeIdentityFlags,
   unambiguousComponentRemap,
+  unambiguousEssenceRemap,
+  worldEssenceMergeLegs,
 } from '../src/migration/remapWorldScopeIdentityFlags.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -397,4 +404,420 @@ test('the clear and the version advance are BOTH inside the same gate', () => {
     /return;/,
     'the gate returns rather than branching'
   );
+});
+
+// ---------------------------------------------------------------------------
+// (c) THE `1.34.0` EQUIVALENT-ESSENCE MERGE ARM (issue 1654)
+//
+// Its hazard is the OPPOSITE of the re-key arm's. There the ids are leaf VALUES and a plain
+// merge write is correct because no key is ever removed; here the ids are object KEYS, so every
+// rewrite REMOVES one. `Document#update` merges inner objects recursively and performs no
+// deletions, so a merge write leaves the retired key in place beside the new one — and in a
+// CONSUMED `resolvedEssences` snapshot that makes a resumed run transfer essences nobody paid
+// for. Both halves of that are asserted below against a document that applies the documented
+// merge semantics, rather than against a write double that reports success.
+// ---------------------------------------------------------------------------
+
+const MERGE_MAP = Object.freeze({
+  'sys-a': { essences: { 'fire-a': 'fire-b' } },
+  'sys-b': { essences: { 'shared-e': 'b-survivor' } },
+  'sys-c': { essences: { 'shared-e': 'c-survivor' } },
+  // NEVER A SYSTEM LEG. It is the tombstone that sits beside them in the same setting, and its
+  // values carry no `essences` key at all — which is what the shape test excludes it by.
+  retired: {
+    'fire-a': { name: 'Fire', icon: 'icons/fire.webp', systems: ['sys-a'] },
+  },
+});
+
+/** A stored run container holding one active run with a CONSUMED essence snapshot. */
+function craftingRunFlag(essences = { 'fire-a': 1, 'fire-b': 2 }, enabled = null) {
+  const prepared = { resolvedEssences: { ...essences } };
+  if (enabled) prepared.essenceEnabled = { ...enabled };
+  return {
+    active: {
+      'run-1': {
+        craftingSystemId: 'sys-a',
+        steps: [{ preparedConsumption: prepared }],
+      },
+    },
+    history: [],
+  };
+}
+
+function isObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Foundry's recursive inner-object merge, with `performDeletions` at its documented default of
+ * `false`: no key present in the original is ever removed by a write that omits it.
+ */
+function mergeRecursiveWithoutDeletions(original, other) {
+  if (!isObject(original) || !isObject(other)) return other;
+  for (const [key, value] of Object.entries(other)) {
+    original[key] = mergeRecursiveWithoutDeletions(original[key], value);
+  }
+  return original;
+}
+
+/**
+ * A document whose `update()` expands a dotted path and applies the merge semantics above,
+ * honouring the `==` FORCED-REPLACEMENT prefix on the last segment.
+ *
+ * THIS IS THE EVIDENCE SURFACE, and it is deliberately not a spy. A write double that records
+ * `[key, value]` pairs cannot tell a merge write from a replacement write — both "succeed" — so
+ * it would report the corrupting write as a pass. This one stores the result and the assertions
+ * read the STORED FLAGS back.
+ *
+ * `getFlag` answers a CLONE, so `flags` models PERSISTENCE and nothing else. Foundry's own
+ * `getFlag` answers a live reference, and that difference is exactly what makes the merge hazard
+ * insidious rather than obvious: a pass that rewrites the container in place leaves the
+ * IN-MEMORY document looking repaired for the rest of the session, however the write landed, and
+ * the retired key reappears on the next reload. Cloning the read removes that mask so the
+ * assertions can only see what a reload would.
+ */
+function makeMergeDocument(flags) {
+  const document = {
+    flags,
+    getFlag(scope, key) {
+      let node = flags?.[scope];
+      for (const segment of String(key).split('.')) {
+        if (node === null || typeof node !== 'object') return undefined;
+        node = node[segment];
+      }
+      return node === undefined ? undefined : structuredClone(node);
+    },
+    async update(changes) {
+      for (const [path, value] of Object.entries(changes)) {
+        const segments = path.split('.');
+        const leaf = segments.pop();
+        let node = document;
+        for (const segment of segments) {
+          if (!isObject(node[segment])) node[segment] = {};
+          node = node[segment];
+        }
+        if (leaf.startsWith('==')) node[leaf.slice(2)] = value;
+        else node[leaf] = mergeRecursiveWithoutDeletions(node[leaf], value);
+      }
+      return document;
+    },
+  };
+  return document;
+}
+
+/** The production write seams, built exactly as `applyWorldEssenceMergeFlagRemap` builds them. */
+function forcedReplacementWriters() {
+  const replace = (document, path, value) => document.update({ [path]: value });
+  return {
+    replaceFabricateFlag: (document, key, value) =>
+      replace(document, forcedReplacementFlagPath(key), value),
+    replaceBareFlag: (document, key, value) =>
+      replace(document, forcedReplacementFlagPath(key, { bare: true }), value),
+  };
+}
+
+/** The PLAIN merge writers `setFabricateFlag` would have produced, for the hazard control. */
+function plainMergeWriters() {
+  const replace = (document, path, value) => document.update({ [path]: value });
+  return {
+    replaceFabricateFlag: (document, key, value) =>
+      replace(document, `flags.fabricate.fabricate.${key}`, value),
+    replaceBareFlag: (document, key, value) =>
+      replace(document, `flags.fabricate.${key}`, value),
+  };
+}
+
+function runEssenceRemap(actors, writers, mergeMap = MERGE_MAP) {
+  return remapWorldEssenceIdentityFlags({ actors, mergeMap, readFlag, ...writers });
+}
+
+// --- the map reader --------------------------------------------------------
+
+test('the merge map reads by SHAPE, so the retired tombstone is never taken for a system leg', () => {
+  assert.deepEqual(worldEssenceMergeLegs(MERGE_MAP), {
+    'sys-a': { 'fire-a': 'fire-b' },
+    'sys-b': { 'shared-e': 'b-survivor' },
+    'sys-c': { 'shared-e': 'c-survivor' },
+  });
+  // A leg whose values carry no `essences` key is not a system leg however it is named. The
+  // tombstone's own values are `{name, icon, colorToken, description, systems}`.
+  assert.deepEqual(worldEssenceMergeLegs({ retired: { x: { systems: ['s'] } } }), {});
+  assert.deepEqual(worldEssenceMergeLegs({ 'sys-a': { essences: { same: 'same' } } }), {}, 'a self-map re-keys nothing');
+  assert.deepEqual(
+    worldEssenceMergeLegs({ systems: { 'sys-a': { essences: { a: 'b' } } }, retired: {} }),
+    { 'sys-a': { a: 'b' } },
+    'and a nested {systems: ...} layout reads the same, so this reader cannot make one irreversible'
+  );
+});
+
+test('hasPendingWorldEssenceMerge is true only for unconsumed PAIRS, and does NOT fail closed', () => {
+  assert.equal(hasPendingWorldEssenceMerge(MERGE_MAP), true);
+  assert.equal(hasPendingWorldEssenceMerge({}), false);
+  assert.equal(hasPendingWorldEssenceMerge(null), false);
+  assert.equal(hasPendingWorldEssenceMerge(undefined), false, 'an absent setting is NOT pending');
+  // THE TOMBSTONE SURVIVES THE CLEAR, so the post-clear value must not read as pending — which is
+  // what would make the pass walk every actor on every boot for the life of the world.
+  assert.equal(hasPendingWorldEssenceMerge({ retired: MERGE_MAP.retired }), false);
+});
+
+test('an id that is not a safe flag-key segment refuses its WHOLE group and is counted', () => {
+  const unsafeMap = {
+    'sys-a': {
+      essences: {
+        'dotted.loser': 'good-survivor',
+        'other-loser': 'good-survivor',
+        'clean-loser': 'clean-survivor',
+      },
+    },
+  };
+  const read = readWorldEssenceMergeMap(unsafeMap);
+  assert.deepEqual(
+    read.legs,
+    { 'sys-a': { 'clean-loser': 'clean-survivor' } },
+    'HALF a merge group is worse than none: the survivor would hold some references and an ' +
+      'unnameable loser the rest'
+  );
+  assert.deepEqual(read.unsafeEssenceIds, ['dotted.loser']);
+  assert.equal(read.refusedGroups, 1);
+  // The map is derived from the RAW settings corpus, so a hand-edited id may be anything.
+  assert.equal(readWorldEssenceMergeMap({ s: { essences: { a: 'sur.vivor' } } }).refusedGroups, 1);
+});
+
+test('the item override is remapped ONLY when the whole corpus agrees, exactly as the legacy scalar is', () => {
+  const unambiguous = unambiguousEssenceRemap(MERGE_MAP);
+  assert.equal(unambiguous.get('fire-a'), 'fire-b', 'named by exactly one system');
+  assert.equal(
+    unambiguous.has('shared-e'),
+    false,
+    'two systems DISAGREE about the survivor, so there is no general tie-break'
+  );
+});
+
+// --- the key-position rewrite ----------------------------------------------
+
+test('a collision SUMS quantities and ANDs enabled-ness', () => {
+  const container = craftingRunFlag({ 'fire-a': 1, 'fire-b': 2 }, { 'fire-a': true, 'fire-b': false });
+  assert.equal(remapEssenceRunContainer(container, { 'sys-a': { 'fire-a': 'fire-b' } }), true);
+  const prepared = container.active['run-1'].steps[0].preparedConsumption;
+  assert.deepEqual(prepared.resolvedEssences, { 'fire-b': 3 });
+  assert.deepEqual(
+    prepared.essenceEnabled,
+    { 'fire-b': false },
+    'AND, not OR: `essenceEnabled` snapshots a behaviour GATE, and OR would grant an effect the ' +
+      'GM had switched off'
+  );
+});
+
+test('the rewrite is SYSTEM-SCOPED and leaves a record with no system id alone', () => {
+  const foreign = craftingRunFlag();
+  foreign.active['run-1'].craftingSystemId = 'sys-z';
+  assert.equal(remapEssenceRunContainer(foreign, { 'sys-a': { 'fire-a': 'fire-b' } }), false);
+  const systemless = craftingRunFlag();
+  delete systemless.active['run-1'].craftingSystemId;
+  assert.equal(remapEssenceRunContainer(systemless, { 'sys-a': { 'fire-a': 'fire-b' } }), false);
+});
+
+test('the walker finds the containers at ANY depth, in history as well as active', () => {
+  const container = craftingRunFlag();
+  container.history = [
+    { craftingSystemId: 'sys-a', outcome: { deep: [{ resolvedEssences: { 'fire-a': 5 } }] } },
+  ];
+  assert.equal(remapEssenceRunContainer(container, { 'sys-a': { 'fire-a': 'fire-b' } }), true);
+  assert.deepEqual(container.history[0].outcome.deep[0].resolvedEssences, { 'fire-b': 5 });
+});
+
+// --- THE WRITE -------------------------------------------------------------
+
+test('a PLAIN merge write LEAVES THE RETIRED KEY BEHIND — the hazard, proven, not assumed', async () => {
+  // THE NEGATIVE CONTROL FOR THE WHOLE DESIGN, on the two containers that are exposed to it.
+  // Written as a merge, the rebuilt `{fire-b: N}` is merged INTO the stored map and the retired
+  // key survives: the item then contributes a phantom unit of a retired essence on top of the
+  // survivor's, and a resumed run transfers essences nobody consumed.
+  const item = makeMergeDocument({
+    fabricate: { fabricate: { essences: { 'fire-a': 1, 'fire-b': 2 } } },
+  });
+  const actor = makeMergeDocument({
+    fabricate: {
+      gatheringRuns: {
+        active: {
+          'g-1': { craftingSystemId: 'sys-a', resolvedEssences: { 'fire-a': 1, 'fire-b': 2 } },
+        },
+      },
+    },
+  });
+  await runEssenceRemap([{ items: [item] }, actor], plainMergeWriters());
+  assert.deepEqual(
+    item.flags.fabricate.fabricate.essences,
+    { 'fire-a': 1, 'fire-b': 3 },
+    'this is data corruption, not untidiness: 4 units where 3 were authored'
+  );
+  assert.deepEqual(actor.flags.fabricate.gatheringRuns.active['g-1'].resolvedEssences, {
+    'fire-a': 1,
+    'fire-b': 3,
+  });
+});
+
+test('a container shielded by an intervening ARRAY is shielded INCIDENTALLY, not by design', async () => {
+  // WORTH PINNING BECAUSE IT LOOKS LIKE A COUNTER-EXAMPLE AND IS NOT. Foundry's recursive merge
+  // recurses into plain Objects only and replaces an ARRAY wholesale, and today's crafting run
+  // reaches `resolvedEssences` through `steps[]` — so a merge write happens to clear the retired
+  // key there. Nothing about that is a decision: `active` is already a plain map, `steps` could
+  // become one, and a run-level snapshot would be exposed the day it was added. The write idiom
+  // must not depend on the shape of a container it does not own.
+  const actor = makeMergeDocument({ fabricate: { fabricate: { craftingRuns: craftingRunFlag() } } });
+  await runEssenceRemap([actor], plainMergeWriters());
+  const stored = actor.flags.fabricate.fabricate.craftingRuns.active['run-1'];
+  assert.deepEqual(stored.steps[0].preparedConsumption.resolvedEssences, { 'fire-b': 3 });
+  assert.ok(
+    Array.isArray(stored.steps),
+    'the premise: the shielding is the array, and it is the ONLY thing doing the shielding'
+  );
+});
+
+test('the FORCED-REPLACEMENT write removes the retired key and preserves every sibling flag', async () => {
+  const actor = makeMergeDocument({
+    core: { sheetClass: 'keep-me' },
+    'other-module': { state: { keep: 1 } },
+    fabricate: {
+      learnedRecipes: { 'recipe-1': {} },
+      fabricate: {
+        craftingRuns: craftingRunFlag(),
+        learnedRecipes: { 'recipe-2': {} },
+      },
+      gatheringRuns: {
+        active: {
+          'g-1': { craftingSystemId: 'sys-a', resolvedEssences: { 'fire-a': 4, 'fire-b': 1 } },
+        },
+      },
+    },
+  });
+  const summary = await runEssenceRemap([actor], forcedReplacementWriters());
+
+  const nested = actor.flags.fabricate.fabricate;
+  assert.deepEqual(
+    nested.craftingRuns.active['run-1'].steps[0].preparedConsumption.resolvedEssences,
+    { 'fire-b': 3 },
+    'THE RETIRED KEY IS GONE from the stored flag, which is the only thing that closes the ' +
+      'resumed-run over-transfer'
+  );
+  assert.deepEqual(
+    actor.flags.fabricate.gatheringRuns.active['g-1'].resolvedEssences,
+    { 'fire-b': 5 },
+    'and the SINGLE-scope depth is reached too — a pass that assumes one depth misses the other'
+  );
+  // `{recursive: false}` would have been the other way to force a replacement, and it replaces
+  // the whole `flags` field. These four are what that would have destroyed.
+  assert.deepEqual(actor.flags.core, { sheetClass: 'keep-me' });
+  assert.deepEqual(actor.flags['other-module'], { state: { keep: 1 } });
+  assert.deepEqual(nested.learnedRecipes, { 'recipe-2': {} }, 'recipe ids are never re-keyed');
+  assert.deepEqual(actor.flags.fabricate.learnedRecipes, { 'recipe-1': {} });
+  assert.ok(!Object.hasOwn(nested, '==craftingRuns'), 'the operator is consumed, not stored');
+  assert.equal(summary.remappedRunContainers, 2);
+});
+
+test('the doubly-nested item override is remapped, summed, and forced-replaced', async () => {
+  const item = makeMergeDocument({
+    fabricate: { fabricate: { essences: { 'fire-a': 2, 'fire-b': 1, keep: 7 } } },
+  });
+  const summary = await runEssenceRemap([{ items: [item] }], forcedReplacementWriters());
+  assert.deepEqual(item.flags.fabricate.fabricate.essences, { 'fire-b': 3, keep: 7 });
+  assert.equal(summary.remappedItemOverrides, 1);
+  assert.equal(summary.scannedItems, 1);
+});
+
+test('an AMBIGUOUS item-override key is left exactly as it is', async () => {
+  const item = makeMergeDocument({ fabricate: { fabricate: { essences: { 'shared-e': 1 } } } });
+  const summary = await runEssenceRemap([{ items: [item] }], forcedReplacementWriters());
+  assert.deepEqual(
+    item.flags.fabricate.fabricate.essences,
+    { 'shared-e': 1 },
+    'safe ONLY because a retired id is never reissued: a key naming no live essence contributes ' +
+      'nothing, so the item keeps the resolution it already had'
+  );
+  assert.equal(summary.remappedItemOverrides, 0);
+});
+
+test('the forced-replacement path is the `==` prefix on the LAST segment, at both depths', () => {
+  assert.equal(forcedReplacementFlagPath('craftingRuns'), 'flags.fabricate.fabricate.==craftingRuns');
+  assert.equal(
+    forcedReplacementFlagPath('gatheringRuns', { bare: true }),
+    'flags.fabricate.==gatheringRuns'
+  );
+});
+
+// --- the no-throw-per-document rule ----------------------------------------
+
+test('a refused write is a LOCKED skip and a broken document is a SKIPPED ERROR', async () => {
+  const broken = {
+    getFlag() {
+      throw new Error('broken document');
+    },
+  };
+  const locked = makeMergeDocument({ fabricate: { fabricate: { essences: { 'fire-a': 1 } } } });
+  locked.update = async () => {
+    throw new Error('locked pack');
+  };
+  const good = makeMergeDocument({ fabricate: { fabricate: { essences: { 'fire-a': 1 } } } });
+  const summary = await runEssenceRemap([{ items: [broken, locked, good] }], forcedReplacementWriters());
+  assert.equal(summary.skippedErrors, 1);
+  assert.equal(summary.lockedSkips, 1);
+  assert.equal(summary.remappedItemOverrides, 1, 'one bad document never aborts the pass');
+  assert.deepEqual(good.flags.fabricate.fabricate.essences, { 'fire-b': 1 });
+});
+
+test('a world with no pending merge never walks the actor corpus', async () => {
+  // THE REASON NO ORDINARY BOOT PAYS FOR A SECOND TRAVERSAL. Both `ready`-body passes are gated
+  // on their OWN pending map, so the only boot that walks twice is the one on which both
+  // migrations land — and on that boot both walks are doing real writes.
+  const walked = [];
+  const actors = {
+    [Symbol.iterator]: function* () {
+      walked.push('walked');
+      yield { items: [] };
+    },
+  };
+  const summary = await remapWorldEssenceIdentityFlags({
+    actors,
+    mergeMap: { retired: MERGE_MAP.retired },
+    readFlag,
+    ...forcedReplacementWriters(),
+  });
+  assert.deepEqual(walked, []);
+  assert.equal(summary.scannedActors, 0);
+});
+
+// --- the COMPOSITION mutation ----------------------------------------------
+
+test('src/main.js runs the essence remap from its ready body, AFTER the 1.30.0 remap', () => {
+  const source = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
+  // MATCHED AS A LIVE STATEMENT, never as a substring. `indexOf` alone is satisfied by the call
+  // COMMENTED OUT, which is exactly how a bisect or a revert disables it — so a control that
+  // comments the line out would have stayed green against an `indexOf` assertion.
+  const liveCall = (name) => source.search(new RegExp(`\\n +await ${name}\\(\\);`));
+  const rekeyIndex = liveCall('runWorldScopeIdentityFlagRemap');
+  const essenceIndex = liveCall('runWorldEssenceMergeFlagRemap');
+  const descriptionsIndex = source.indexOf('notifyUnresolvedItemDescriptions();');
+  assert.ok(rekeyIndex > 0, 'the premise: the 1.30.0 ready-body edge is still there');
+  assert.ok(essenceIndex > 0, 'the ready body must CALL the essence remap, not mention it');
+  assert.ok(
+    essenceIndex > rekeyIndex,
+    'the component/tool repair must land FIRST: both passes rewrite the same run containers, ' +
+      'and this one writes with a forced replacement that would replace that repair away'
+  );
+  assert.ok(essenceIndex < descriptionsIndex, 'and it sits inside the same migration-repair block');
+  assert.match(source, /async function runWorldEssenceMergeFlagRemap\(\)/);
+});
+
+test('the essence edge writes through the FORCED-REPLACEMENT path and never setFabricateFlag', () => {
+  // THE SINGLE HIGHEST-RISK LINE IN THE CHANGE. A `setFabricateFlag` write here is a merge write
+  // and silently corrupts a consumed run snapshot; both writes are indistinguishable at the seam,
+  // so the edge is pinned on its source text as well as through the merge document above.
+  const source = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
+  const start = source.indexOf('async function applyWorldEssenceMergeFlagRemap(');
+  assert.ok(start > 0, 'the work half must exist');
+  const body = source.slice(start, source.indexOf('\n}\n', start));
+  assert.match(body, /replaceFabricateFlag: \(document, key, value\) =>\s*\n?\s*replace\(document, forcedReplacementFlagPath\(key\), value\)/);
+  assert.match(body, /forcedReplacementFlagPath\(key, \{ bare: true \}\)/);
+  assert.doesNotMatch(body, /setFabricateFlag/, 'a plain merge write CANNOT persist a key-set rewrite');
+  assert.doesNotMatch(body, /recursive: false/, 'and that fix would destroy every other module’s flags');
 });
