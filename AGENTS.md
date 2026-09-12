@@ -532,9 +532,10 @@ When renaming variables, refactoring markup, or removing i18n keys, grep these a
 A comment survives only if it states an invariant, a non-obvious ordering or concurrency rule, a persisted-shape or public-API contract, or the test or spec line that pins one — in one to three lines.
 - Rejected alternatives, review rounds, and what the code used to do live in the issue and the pull request.
 A one-token `(issue 1234)` pointer back to that record is allowed; a paragraph retelling it is not.
+The exception is a comment another rule in this file, a canonical spec, or a test cites by name: that comment is part of a contract, and it is edited with its citation or not at all.
 - No ALL-CAPS emphasis, no Markdown headings inside a docblock, and no line-number code citations.
 Name the symbol or the test instead; a line number is stale the moment the file is edited.
-- Use a JSDoc tag only when its description adds something the type and the parameter name do not.
+- A JSDoc tag earns its line by carrying a type a reader cannot infer, or a description that adds something the type and the name do not; a tag supplying neither is deleted.
 Nothing in this repository consumes JSDoc — no `jsdoc`, no `typedoc`, no `checkJs`, no JSDoc ESLint plugin — so a tag that restates the signature costs its lines and returns nothing.
 - Svelte component headers follow the template in [`.agents/component-header-template.md`](.agents/component-header-template.md).
 - These rules apply to every line a change touches and to every new file in full.

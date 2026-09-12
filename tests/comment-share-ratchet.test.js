@@ -2,32 +2,29 @@
  * Ratchets the comment-line share per directory (issue 1657), so Phase 1 sweeps of this epic
  * can each lower `tests/comment-share-ledger.json` without a later sweep silently re-growing it.
  * Root roll-ups are derived here and printed on mismatch; the ledger itself pins directories only.
+ * This file is itself in the `tests` bucket it pins, so editing these comments moves that number.
  */
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { test } from 'node:test';
 
+import { byCodePoint } from './helpers/ratchetBaseline.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 
 // `readFileSync` + `JSON.parse`, not `import ... with { type: 'json' }`: this repo's ESLint
 // parser rejects the import-attribute syntax, as `scripts/lib/designSystemPrimitives.js` notes.
-const LEDGER = JSON.parse(
-  readFileSync(resolve(import.meta.dirname, 'comment-share-ledger.json'), 'utf8')
-);
+const LEDGER_PATH = resolve(import.meta.dirname, 'comment-share-ledger.json');
+const LEDGER = JSON.parse(readFileSync(LEDGER_PATH, 'utf8'));
+
+/** The command that re-derives the ledger, named in every drift message so it is actionable. */
+const REGENERATE =
+  'UPDATE_COMMENT_SHARE_LEDGER=1 node --conditions=browser --test ' +
+  'tests/comment-share-ratchet.test.js, then review the JSON diff';
 
 /** The corpus this gate polices. `.json` is excluded on purpose — see the ledger note below. */
 const SCAN_ROOTS = Object.freeze(['src', 'tests', 'scripts', 'styles']);
 const SCAN_EXTENSIONS = Object.freeze(['.js', '.mjs', '.svelte', '.css']);
-
-/** The three quote delimiters a JS/CSS syntax tracks across lines. */
-const QUOTE_CHARS = Object.freeze(['"', "'", '`']);
-
-/** Order by code point, not locale, so key order cannot differ between machines. */
-function byCodePoint(left, right) {
-  if (left === right) return 0;
-  return left < right ? -1 : 1;
-}
 
 const JS_SYNTAX = Object.freeze({
   blockOpen: '/*',
@@ -47,13 +44,41 @@ const MARKUP_SYNTAX = Object.freeze({
   lineComment: null,
   quotes: false,
 });
+const REGION_SYNTAX = Object.freeze({ js: JS_SYNTAX, css: CSS_SYNTAX, markup: MARKUP_SYNTAX });
+
+/** The three quote delimiters a JS or CSS syntax opens a string on. */
+const QUOTE_CHARS = Object.freeze(['"', "'", '`']);
+
+/**
+ * Resolve the block comment already open at this line's first character.
+ *
+ * @returns {{isComment: boolean, from: number}|true} `true` when the whole line is comment.
+ */
+function continueOpenBlock(line, trimmed, leading, state, syntax) {
+  if (trimmed.startsWith(syntax.blockClose)) {
+    state.inBlock = false;
+    if (trimmed.slice(syntax.blockClose.length).trim() === '') return true;
+    return { isComment: false, from: leading + syntax.blockClose.length };
+  }
+  const idx = line.indexOf(syntax.blockClose, leading);
+  if (idx === -1) return true;
+  state.inBlock = false;
+  return { isComment: true, from: idx + syntax.blockClose.length };
+}
+
+/** Consume one character inside an open string, honouring the escape, and return the next index. */
+function advanceInsideQuote(line, index, state, syntax) {
+  if (syntax.quotes && line[index] === '\\') return index + 2;
+  if (line[index] === state.quote) state.quote = null;
+  return index + 1;
+}
 
 /**
  * A line is a comment line iff it begins inside a block still open from a prior line, or its
- * first token opens one — except a lone `blockClose`, or code before a trailing `lineComment`,
- * deliberately undercounts as CODE, so a comment moved on/off its own line is a non-event, not a
- * ratchet trip. One function, called with a different `syntax` per extension and svelte region,
- * so no per-type copy exists for the duplication gate.
+ * first token opens one — except that a `blockClose` with code after it, and code before a
+ * trailing `lineComment`, deliberately count as CODE, so a comment moved on or off its own line
+ * is a non-event rather than a ratchet trip. One function, called with a different `syntax` per
+ * extension and svelte region, so no per-type copy exists for the duplication gate.
  *
  * @param {string} line
  * @param {{inBlock: boolean, quote: string|null}} state
@@ -61,38 +86,32 @@ const MARKUP_SYNTAX = Object.freeze({
  * @returns {boolean}
  */
 function classifyLine(line, state, syntax) {
+  // Only a template literal legally spans a line, so `'` and `"` state never carries: an
+  // unbalanced quote inside a regex character class would otherwise open a string that swallows
+  // the rest of the file, which is how this gate went silently blind for four files (issue 1657).
+  if (state.quote && state.quote !== '`') state.quote = null;
+
   const trimmed = line.trimStart();
   const leading = line.length - trimmed.length;
   let isComment;
   let from;
 
   if (state.quote) {
-    // Inside a quoted string carried over from a prior line: never a comment, whatever it looks like.
     isComment = false;
     from = 0;
   } else if (state.inBlock) {
-    if (trimmed.startsWith(syntax.blockClose)) {
-      const after = trimmed.slice(syntax.blockClose.length);
-      state.inBlock = false;
-      if (after.trim() === '') return true;
-      isComment = false;
-      from = leading + syntax.blockClose.length;
-    } else {
-      isComment = true;
-      const idx = line.indexOf(syntax.blockClose, leading);
-      if (idx === -1) return true;
-      state.inBlock = false;
-      from = idx + syntax.blockClose.length;
-    }
+    const resolved = continueOpenBlock(line, trimmed, leading, state, syntax);
+    if (resolved === true) return true;
+    ({ isComment, from } = resolved);
   } else if (syntax.lineComment && trimmed.startsWith(syntax.lineComment)) {
     return true;
   } else if (trimmed.startsWith(syntax.blockOpen)) {
-    isComment = true;
     const idx = line.indexOf(syntax.blockClose, leading + syntax.blockOpen.length);
     if (idx === -1) {
       state.inBlock = true;
       return true;
     }
+    isComment = true;
     from = idx + syntax.blockClose.length;
   } else {
     isComment = false;
@@ -101,32 +120,24 @@ function classifyLine(line, state, syntax) {
 
   // Advance state across the remainder so a later line is classified correctly, even though this
   // line's own classification is already decided above.
-  for (let i = from; i < line.length; ) {
+  let index = from;
+  while (index < line.length) {
     if (state.quote) {
-      if (syntax.quotes && line[i] === '\\') {
-        i += 2;
-        continue;
-      }
-      if (line[i] === state.quote) state.quote = null;
-      i += 1;
+      index = advanceInsideQuote(line, index, state, syntax);
       continue;
     }
-    if (syntax.lineComment && line.startsWith(syntax.lineComment, i)) break;
-    if (line.startsWith(syntax.blockOpen, i)) {
-      const idx = line.indexOf(syntax.blockClose, i + syntax.blockOpen.length);
+    if (syntax.lineComment && line.startsWith(syntax.lineComment, index)) break;
+    if (line.startsWith(syntax.blockOpen, index)) {
+      const idx = line.indexOf(syntax.blockClose, index + syntax.blockOpen.length);
       if (idx === -1) {
         state.inBlock = true;
         break;
       }
-      i = idx + syntax.blockClose.length;
+      index = idx + syntax.blockClose.length;
       continue;
     }
-    if (syntax.quotes && QUOTE_CHARS.includes(line[i])) {
-      state.quote = line[i];
-      i += 1;
-      continue;
-    }
-    i += 1;
+    if (syntax.quotes && QUOTE_CHARS.includes(line[index])) state.quote = line[index];
+    index += 1;
   }
   return isComment;
 }
@@ -137,6 +148,15 @@ const SCRIPT_OPEN = /^<script(\s[^>]*)?>$/i;
 const SCRIPT_CLOSE = /^<\/script>$/i;
 const STYLE_OPEN = /^<style(\s[^>]*)?>$/i;
 const STYLE_CLOSE = /^<\/style>$/i;
+
+/** The region a svelte tag line switches into, or `undefined` when the line is not a switch. */
+function regionAfterTag(region, trimmed) {
+  if (region === 'markup' && SCRIPT_OPEN.test(trimmed)) return 'js';
+  if (region === 'js' && SCRIPT_CLOSE.test(trimmed)) return 'markup';
+  if (region === 'markup' && STYLE_OPEN.test(trimmed)) return 'css';
+  if (region === 'css' && STYLE_CLOSE.test(trimmed)) return 'markup';
+  return undefined;
+}
 
 /**
  * Two gaps are accepted, not fixed: a JS comment inside a `{...}` mustache expression in markup
@@ -152,25 +172,12 @@ function countSvelteCommentLines(text) {
   let region = 'markup';
   let count = 0;
   for (const line of text.split('\n')) {
-    const trimmed = line.trim();
-    if (region === 'markup' && SCRIPT_OPEN.test(trimmed)) {
-      region = 'js';
+    const switched = regionAfterTag(region, line.trim());
+    if (switched) {
+      region = switched;
       continue;
     }
-    if (region === 'js' && SCRIPT_CLOSE.test(trimmed)) {
-      region = 'markup';
-      continue;
-    }
-    if (region === 'markup' && STYLE_OPEN.test(trimmed)) {
-      region = 'css';
-      continue;
-    }
-    if (region === 'css' && STYLE_CLOSE.test(trimmed)) {
-      region = 'markup';
-      continue;
-    }
-    const syntax = region === 'js' ? JS_SYNTAX : region === 'css' ? CSS_SYNTAX : MARKUP_SYNTAX;
-    if (classifyLine(line, states[region], syntax)) count += 1;
+    if (classifyLine(line, states[region], REGION_SYNTAX[region])) count += 1;
   }
   return count;
 }
@@ -211,6 +218,13 @@ function buildLedger(corpus) {
   return Object.fromEntries([...buckets].sort(([a], [b]) => byCodePoint(a, b)));
 }
 
+/** One corpus walk per run: three assertions read it, and the tree is ~550 files. */
+let cachedLedger;
+function currentLedger() {
+  cachedLedger ??= buildLedger(collectWorkingTreeSources(SCAN_ROOTS, SCAN_EXTENSIONS));
+  return cachedLedger;
+}
+
 function rollUpByRoot(ledger) {
   const rollup = {};
   for (const [dir, count] of Object.entries(ledger)) {
@@ -237,7 +251,7 @@ function describeStructuralDrift(actual, expected) {
     `directory set changed — added: [${added.join(', ')}], removed: [${removed.join(', ')}]. ` +
     'A stray untracked file under src/, tests/, scripts/, or styles/ is the likely cause before a ' +
     'real regression, because this corpus is the working tree, not the git index (`git status` ' +
-    'will show it). If the change is real, regenerate the ledger to match.'
+    `will show it). If the change is real, re-derive with ${REGENERATE}.`
   );
 }
 
@@ -250,7 +264,8 @@ function describeValueDrift(actual, expected) {
   return (
     `comment-line counts drifted on existing directories: ${changed.join('; ')}. This gate fails ` +
     'in both directions: a count that ROSE needs justification or a revert, and a count that FELL ' +
-    'needs the ledger lowered to bank the win.'
+    'needs the ledger lowered to bank the win. One key down and another up by the same amount is ' +
+    `a file moved between two existing directories, not a regression. Re-derive with ${REGENERATE}.`
   );
 }
 
@@ -284,17 +299,21 @@ function findSymlinkedDirectories(root) {
 }
 
 test('the comment-line ledger matches the pinned baseline exactly, per directory', () => {
-  const corpus = collectWorkingTreeSources(SCAN_ROOTS, SCAN_EXTENSIONS);
-  const actual = buildLedger(corpus);
+  const actual = currentLedger();
+  if (process.env.UPDATE_COMMENT_SHARE_LEDGER) {
+    writeFileSync(LEDGER_PATH, `${JSON.stringify(actual, null, 2)}\n`);
+    return;
+  }
   const message = describeStructuralDrift(actual, LEDGER) ?? describeValueDrift(actual, LEDGER);
   assert.deepStrictEqual(actual, LEDGER, message);
 });
 
-test('the ledger reports as the root-level roll-up epic 1656 tracks', () => {
-  const corpus = collectWorkingTreeSources(SCAN_ROOTS, SCAN_EXTENSIONS);
-  const actual = rollUpByRoot(buildLedger(corpus));
-  const expected = rollUpByRoot(LEDGER);
-  assert.deepStrictEqual(actual, expected);
+/** Prints the four numbers epic 1656's definition of done reads; it cannot fail alone. */
+test('the ledger reports as the root-level roll-up epic 1656 tracks', (t) => {
+  // The regeneration run rewrote the file the pinned copy above was read from, so this comparison
+  // is against a stale constant and means nothing until the next run.
+  if (process.env.UPDATE_COMMENT_SHARE_LEDGER) return t.skip('ledger regenerated this run');
+  assert.deepStrictEqual(rollUpByRoot(currentLedger()), rollUpByRoot(LEDGER));
 });
 
 test('none of the four scanned roots contains a symlinked directory', () => {
