@@ -9,6 +9,7 @@
 
 import { SETTING_KEYS } from '../config/settings.js';
 
+import { mergeEquivalentWorldEssences } from './mergeEquivalentWorldEssences.js';
 import { migrateAlchemyCheckMode } from './migrateAlchemyCheckMode.js';
 import { migrateBreakToolsOnFail } from './migrateBreakToolsOnFail.js';
 import { migrateCatalystsToTools } from './migrateCatalystsToTools.js';
@@ -55,6 +56,23 @@ import { isFatalMigrationError } from './migrationErrors.js';
 import { DOWNGRADE_ADVICE } from './migrationRecoveryPrompt.js';
 
 export { FatalMigrationError, isFatalMigrationError } from './migrationErrors.js';
+
+/**
+ * The world setting the `1.34.0` essence merge map is persisted under (issue 1654).
+ *
+ * **THE LITERAL FALLBACK IS TEMPORARY AND MUST BE REMOVED.** `SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP`
+ * is registered by the lane that owns `src/config/settings.js`; this lane does not own that file,
+ * so until the two integrate the constant would be `undefined` and every read and write below
+ * would silently address the `undefined` key rather than fail. Once the registration lands, this
+ * whole constant collapses to `SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP` at its three use sites.
+ *
+ * The key name itself is NOT provisional: `adminStore.js` already reads
+ * `fabricate.worldEssenceMergeMap` and `worldScopeProjection.js` already reads its `retired` leg,
+ * so the spelling is fixed by shipped consumers rather than chosen here.
+ *
+ * @type {string}
+ */
+const WORLD_ESSENCE_MERGE_MAP_KEY = SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP ?? 'worldEssenceMergeMap';
 
 // ---------------------------------------------------------------------------
 // Semver comparison utility (no npm dependency)
@@ -744,6 +762,53 @@ const MIGRATIONS = [
     downgradeLosesData: false,
     migrate: (data) => migrateSubjectModifierMarks(data),
   },
+  {
+    version: '1.34.0',
+    label:
+      'Give the world ONE record per essence BEHAVIOUR, instead of one per crafting system. ' +
+      "Until now the world's essence list held a separate record for every system's copy of the " +
+      'same essence — three systems with Iron gave you three Iron essences — because the world ' +
+      'scope migration matched essences by id, and an essence id is minted separately inside ' +
+      'each system rather than shared between them. World essences whose name, property macro ' +
+      'and active-effect source all match are now ONE essence, and every reference to the ones ' +
+      'retired is rewritten across your recipes, components, crafting systems and gathering ' +
+      'config in the same pass. Every essence that merged is listed for you by name with the ' +
+      'systems it came from. NO SYSTEM CHANGES BEHAVIOUR: each system keeps its own effect ' +
+      'source, property macro and enabled switch — written down as its own override wherever it ' +
+      'was relying on the world record it is leaving — and two component essence values that ' +
+      'land on the same essence are ADDED together rather than one replacing the other. Each ' +
+      'system also keeps the name, icon, colour and description it gave its own copy, so the ' +
+      'catalogue may now report that your systems DISAGREE about how one essence looks; that ' +
+      'report is accurate, it is what your systems really say, and it is not an error. Where a ' +
+      'merge could not be made safely — two equivalent essences inside ONE system, or an effect ' +
+      'source this pass cannot prove names the same component — the whole group is REFUSED and ' +
+      'reported rather than merged on a guess: nothing is changed for those essences and you can ' +
+      'still merge them yourself. THE MERGE IS IRREVERSIBLE: a retired essence record is deleted ' +
+      'with its name, icon, colour and description, its id is never handed out again, and no ' +
+      'downgrade brings it back. DOWNGRADING IS LOSSLESS FOR DATA even so: 1.33.0 reads every ' +
+      'setting this pass touched with unchanged rules and the new merge record survives ' +
+      'untouched for a re-upgrade, so going back costs you nothing further — it simply does not ' +
+      'undo the merge',
+    downgradeTo: '1.33.0',
+    // DELIBERATELY NOT MARKED `downgradeLosesData`, and CHECKED rather than copied from the
+    // `1.30.0` entry above (issue 1654, requirement 15). Three candidate losses were examined and
+    // each fails the test the registry applies. The retired world essences are a loss at
+    // MIGRATION time rather than one the downgrade causes — the same reading `1.30.0` takes of
+    // its merged identities. `1.33.0` reads `recipes`, `craftingSystems`, `gatheringConfig`,
+    // `essenceScope` and `componentScope` with UNCHANGED normalizers, so no key this pass wrote
+    // is dropped on read there. And `worldEssenceMergeMap` is a setting `1.33.0` neither reads
+    // nor writes, so it survives as an orphaned `Setting` document that a re-upgrade finds
+    // intact, exactly as `1.30.0` requirement 22 states for the three scope settings. The label
+    // still carries the irreversibility caveat beside the Downgrade button, because "no data is
+    // lost by downgrading" and "the merge can be undone" are DIFFERENT claims and only the first
+    // is true. `tests/world-essence-merge-migration.test.js` holds the declaration executable.
+    downgradeLosesData: false,
+    // Reports the groups it merged, the groups it REFUSED with their reasons, the world essences
+    // whose members disagreed (`declined`) and the ones no system is a member of (`orphaned`),
+    // through the transient `_worldEssenceMergeReport` field — captured and deleted by the runner
+    // below for the GM notice.
+    migrate: (data) => mergeEquivalentWorldEssences(data),
+  },
   // Future migrations added here in version order
 ];
 
@@ -811,6 +876,7 @@ function emptyPassSummary(overrides = {}) {
     unifiedModifierCollisions: [],
     characterLibraryCollisions: [],
     worldScopeEntityReport: null,
+    worldEssenceMergeReport: null,
     ...overrides,
   };
 }
@@ -930,6 +996,7 @@ export class MigrationRunner {
     const rawEssenceScope = this._getSetting(SETTING_KEYS.ESSENCE_SCOPE) ?? {};
     const rawToolScope = this._getSetting(SETTING_KEYS.TOOL_SCOPE) ?? {};
     const rawWorldScopeRekeyMap = this._getSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP) ?? {};
+    const rawWorldEssenceMergeMap = this._getSetting(WORLD_ESSENCE_MERGE_MAP_KEY) ?? {};
 
     const originalRecipesJson = JSON.stringify(rawRecipes);
     const originalSystemsJson = JSON.stringify(rawSystems);
@@ -943,6 +1010,7 @@ export class MigrationRunner {
     const originalEssenceScopeJson = JSON.stringify(rawEssenceScope);
     const originalToolScopeJson = JSON.stringify(rawToolScope);
     const originalWorldScopeRekeyMapJson = JSON.stringify(rawWorldScopeRekeyMap);
+    const originalWorldEssenceMergeMapJson = JSON.stringify(rawWorldEssenceMergeMap);
 
     let data = {
       recipes: rawRecipes,
@@ -957,6 +1025,7 @@ export class MigrationRunner {
       essenceScope: rawEssenceScope,
       toolScope: rawToolScope,
       worldScopeRekeyMap: rawWorldScopeRekeyMap,
+      worldEssenceMergeMap: rawWorldEssenceMergeMap,
     };
     let highestVersion = lastRunVersion;
     let migratedCatalystCount = 0;
@@ -1110,6 +1179,18 @@ export class MigrationRunner {
     }
     delete data._worldScopeEntityReport;
 
+    // 1.34.0 reports what the equivalent-world-essence merge did (issue 1654): the groups it
+    // merged with their survivors, losers and systems; the groups it REFUSED with the reason; the
+    // world essences whose members disagreed about a section; and the ones no system is a member
+    // of. Captured for the GM notice and stripped so the transient field is never persisted —
+    // the loop above spread-merges a migration's return into the DATA payload rather than into
+    // this summary, so a report can only travel this way.
+    let worldEssenceMergeReport = null;
+    if (data._worldEssenceMergeReport && typeof data._worldEssenceMergeReport === 'object') {
+      worldEssenceMergeReport = data._worldEssenceMergeReport;
+    }
+    delete data._worldEssenceMergeReport;
+
     const recipesChanged = JSON.stringify(data.recipes) !== originalRecipesJson;
     const systemsChanged = JSON.stringify(data.systems) !== originalSystemsJson;
     const gatheringConfigChanged =
@@ -1128,6 +1209,8 @@ export class MigrationRunner {
     const toolScopeChanged = JSON.stringify(data.toolScope) !== originalToolScopeJson;
     const worldScopeRekeyMapChanged =
       JSON.stringify(data.worldScopeRekeyMap) !== originalWorldScopeRekeyMapJson;
+    const worldEssenceMergeMapChanged =
+      JSON.stringify(data.worldEssenceMergeMap) !== originalWorldEssenceMergeMapJson;
 
     // ---------------------------------------------------------------------------
     // Writeback. The recipe corpus goes FIRST, and the order is pinned rather than
@@ -1160,6 +1243,31 @@ export class MigrationRunner {
     if (worldScopeRekeyMapChanged) {
       try {
         await this._setSetting(SETTING_KEYS.WORLD_SCOPE_REKEY_MAP, data.worldScopeRekeyMap);
+      } catch (error) {
+        return this._deferOnWriteFailure(error);
+      }
+    }
+    // `worldEssenceMergeMap` is the SECOND leg, immediately after the map above and still ahead of
+    // `recipes` (issue 1654, § Equivalent World Essence Merge requirement 10). It is the `1.34.0`
+    // pass's own DURABLE DECISION RECORD and is a SETTING OF ITS OWN rather than an essence leg on
+    // the `1.30.0` map, for three structural reasons that requirement states: `normalizeRekeyMap`
+    // drops any leg outside `REKEYABLE_ENTITY_TYPES`, widening that list would newly REFUSE a
+    // `1.30.0` pair on a world carrying a native duplicate essence id, and
+    // `mayClearWorldScopeRekeyMap` is read by two `1.30.0` source-Item stamp gates that have no
+    // business consulting an essence decision.
+    //
+    // It is ordered here for the reason the map above is: a tear at ANY later leg leaves a re-run
+    // able to finish the rewrite whichever legs landed, and re-deriving the map from a
+    // `craftingSystems` that has already been re-keyed would answer EMPTY. It also carries the
+    // TOMBSTONE leg, which is what stops the authoring surface reissuing a retired essence id, so
+    // a tear that dropped it would let a later `+ New essence` hand one straight back.
+    //
+    // IT CARRIES ITS OWN CONTAINMENT for the reason the leg above does: this sits OUTSIDE both
+    // shipped try/catch blocks, so an escaping rejection would propagate out of `run()` past a
+    // caller with no `catch`.
+    if (worldEssenceMergeMapChanged) {
+      try {
+        await this._setSetting(WORLD_ESSENCE_MERGE_MAP_KEY, data.worldEssenceMergeMap);
       } catch (error) {
         return this._deferOnWriteFailure(error);
       }
@@ -1257,6 +1365,7 @@ export class MigrationRunner {
       unifiedModifierCollisions,
       characterLibraryCollisions,
       worldScopeEntityReport,
+      worldEssenceMergeReport,
     };
   }
 
