@@ -571,6 +571,55 @@ export function subscribeTravelMarkerMove(handler) {
 }
 
 /**
+ * The run-container flag base paths, MIRRORED from `src/systems/runFlagInvalidation.js`'s
+ * `RUN_CONTAINER_FLAG_PATHS`, and the update-operator prefixes mirrored from its
+ * `FLAG_UPDATE_OPERATOR_PREFIXES`.
+ *
+ * ── WHY THIS IS A MIRROR AND NOT AN IMPORT ──────────────────────────────────────────────────
+ * `foundryBridge.js` is DECLARED IN 102 MOUNTED-COMPONENT TEST MANIFESTS, each of which
+ * enumerates its module's whole transitive closure by hand. Any import this file gains must be
+ * added to all 102, and a manifest that misses one does not fail — the suite HANGS and reports
+ * `# cancelled`, never `# fail`. Importing the matcher here was tried and measured: it cancels
+ * all 517 subtests of `tests/components/manager-mounted.test.js` with
+ * `Cannot find module .../src/systems/runFlagInvalidation.js`.
+ *
+ * This is the same trade `src/systems/worldScopeRekeyPending.js` already makes for the same
+ * reason — it spells `'worldScopeRekeyMap'` rather than importing `SETTING_KEYS`, because its
+ * consumer's import graph is load-bearing — and it takes the same protection: THE MIRROR IS
+ * GUARDED BY TEST, NOT MAINTAINED BY HAND. `tests/util/foundry-bridge-subscriptions.test.js`
+ * asserts {@link RUN_FLAG_DIFF_PATHS} equals the shared module's own derivation, so a new run
+ * container, a new operator prefix, or a change to where the prefix sits all fail there rather
+ * than silently leaving this bridge one spelling behind. Drifting once is what produced the
+ * defect this replaces: a forced-replacement write arrives as
+ * `flags.fabricate.fabricate.==craftingRuns`, and the bare-spelling probes matched none of it,
+ * so the Journal listing and the nav active-run badge never refreshed.
+ */
+const RUN_FLAG_BASE_PATHS = Object.freeze([
+  'flags.fabricate.fabricate.craftingRuns',
+  'flags.fabricate.fabricate.salvageRuns',
+  'flags.fabricate.gatheringRuns',
+]);
+
+/** Mirrored from `FLAG_UPDATE_OPERATOR_PREFIXES`; see {@link RUN_FLAG_BASE_PATHS}. */
+const RUN_FLAG_OPERATOR_PREFIXES = Object.freeze(['-=', '==']);
+
+/**
+ * Every change-diff path that means a run container was touched: each base path, plus one per
+ * update-operator prefix applied to its LAST segment (the only segment an operator may sit on).
+ *
+ * Exported for the drift guard described on {@link RUN_FLAG_BASE_PATHS}; it is not part of this
+ * module's runtime surface.
+ */
+export const RUN_FLAG_DIFF_PATHS = Object.freeze(
+  RUN_FLAG_BASE_PATHS.flatMap((path) => {
+    const lastDot = path.lastIndexOf('.');
+    const parent = path.slice(0, lastDot + 1);
+    const key = path.slice(lastDot + 1);
+    return [path, ...RUN_FLAG_OPERATOR_PREFIXES.map((operator) => `${parent}${operator}${key}`)];
+  })
+);
+
+/**
  * Subscribe to run-flag writes on the relevant actor so callers can quietly re-fetch
  * run-derived views (the Journal listing, the nav active-run count badge) when a run
  * is created, advanced, or archived by ANY client — including the primary-GM
@@ -592,11 +641,15 @@ export function subscribeActorRunFlagChange(handler, { isRelevantActor } = {}) {
   if (!hooks?.on || typeof handler !== 'function') return () => {};
   const relevant = typeof isRelevantActor === 'function' ? isRelevantActor : () => true;
   const hasProperty = globalThis.foundry?.utils?.hasProperty;
+  // THE `typeof` GUARD IS KEPT ON PURPOSE, and it is a decision rather than leftover
+  // defensiveness. The shared matcher falls back to its own POSIX-dotted probe when handed a
+  // non-function, so dropping the guard would silently change this bridge from "refresh
+  // nothing when the engine's own probe is unavailable" to "refresh on a diff shape we
+  // guessed at". That may even be an improvement, but it is a behaviour change and not this
+  // fix's business; `tests/util/foundry-bridge-subscriptions.test.js` pins the choice.
   const touchesRunFlag = (changes) =>
     typeof hasProperty === 'function' &&
-    (hasProperty(changes, 'flags.fabricate.fabricate.craftingRuns') ||
-      hasProperty(changes, 'flags.fabricate.fabricate.salvageRuns') ||
-      hasProperty(changes, 'flags.fabricate.gatheringRuns'));
+    RUN_FLAG_DIFF_PATHS.some((path) => hasProperty(changes, path));
   const onUpdate = (actor, changes) => {
     const actorId = actor?.id ?? null;
     if (actorId && relevant(actorId) && touchesRunFlag(changes)) handler();
