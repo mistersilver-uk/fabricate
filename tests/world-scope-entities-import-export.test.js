@@ -2029,3 +2029,80 @@ test('export: the three slices are FILTERED BY MEMBERSHIP to the exported system
   assert.deepEqual(payload.componentScope.entities.map((r) => r.id), ['mine']);
   assert.deepEqual(payload.componentScope.defaults.map((r) => r.id), ['mine']);
 });
+// ---------------------------------------------------------------------------
+// The 1.34.0 equivalent-essence merge over the bundle (issue 1654)
+// ---------------------------------------------------------------------------
+
+/**
+ * A bundle carrying TWO equivalent same-name essences inside its ONE system — the shape the
+ * authoring store's same-name guard prevents and the normalizer does not, so it reaches the
+ * importer through a hand-edited or a legacy bundle.
+ */
+function duplicateEssenceEnvelope(schemaVersion) {
+  return envelope({
+    schemaVersion,
+    system: {
+      essenceDefinitions: [
+        { id: 'iron', name: 'Iron' },
+        { id: 'kTz9QpLm2xR4vB1a', name: 'iron' },
+      ],
+    },
+  });
+}
+
+for (const schemaVersion of [undefined, FABRICATE_EXPORT_SCHEMA_VERSION]) {
+  const branch = schemaVersion === undefined ? 'legacy' : 'current-schema';
+  test(`1654 (${branch}): the merge runs BRANCH-INDEPENDENTLY and carries its refusal`, () => {
+    const migrated = migrateExportPayload(duplicateEssenceEnvelope(schemaVersion));
+    // THE PREMISE: the derivation above really did lift two world essences for this one system,
+    // or there would be nothing for the merge to reason about.
+    assert.equal(migrated.essenceScope.entities.length, 2, 'two world essences were derived');
+
+    const refusals = migrated._worldScopeEntityReport.essenceMergeRefusals;
+    assert.ok(Array.isArray(refusals), 'the refusal leg is present on BOTH branches');
+    assert.equal(refusals.length, 1, 'the equivalent pair is seen');
+    // A ONE-SYSTEM CORPUS REFUSES EVERY GROUP, and the refusal is the payload. Both members hold a
+    // membership record for the one system and both carry an `essenceDefinitions` row, so merging
+    // them would make that array emit one id twice. Reported rather than silently done.
+    assert.equal(refusals[0].reason, 'outputIdCollision');
+    assert.deepEqual(
+      migrated.essenceScope.entities.map((entity) => entity.id),
+      ['iron', 'kTz9QpLm2xR4vB1a'],
+      'and a REFUSED group leaves the slice exactly as the derivation built it'
+    );
+  });
+}
+
+test('1654: `migrate(migrate(x))` is deep-equal on the essence slice', () => {
+  // The idempotence pin requirement 12 asks for, and it is not vacuous: the merge is applied
+  // rather than refused by THIS path, so a non-idempotent re-point would re-key a re-keyed id on
+  // the second pass and the two slices would diverge.
+  for (const schemaVersion of [undefined, FABRICATE_EXPORT_SCHEMA_VERSION]) {
+    const once = migrateExportPayload(duplicateEssenceEnvelope(schemaVersion));
+    const twice = migrateExportPayload(once);
+    assert.deepEqual(twice.essenceScope, once.essenceScope);
+    assert.deepEqual(twice.componentScope, once.componentScope);
+    assert.deepEqual(twice.system.essenceDefinitions, once.system.essenceDefinitions);
+  }
+});
+
+test('1654: a bundle with nothing to merge is untouched, and grows no key it did not carry', () => {
+  const raw = envelope({ system: { essenceDefinitions: [{ id: 'iron', name: 'Iron' }] } });
+  const before = JSON.parse(JSON.stringify(raw));
+  const migrated = migrateExportPayload(raw);
+  assert.deepEqual(raw, before, 'the input is never reached');
+  assert.deepEqual(migrated._worldScopeEntityReport.essenceMergeRefusals, []);
+  assert.deepEqual(migrated.system.essenceDefinitions, [{ id: 'iron', name: 'Iron' }]);
+  // The synthesized corpus defaults an absent gathering slice to `{}` and an absent recipe list to
+  // `[]`; an ungated write-back would ADD both keys to every bundle that lacked them, forever. The
+  // envelope builder always supplies them, so the gate is exercised on a payload that does not.
+  assert.deepEqual(migrated.gatheringConfig, { system: {}, shared: {} });
+  const sparse = migrateExportPayload({
+    schemaVersion: FABRICATE_EXPORT_SCHEMA_VERSION,
+    fabricateVersion: '9.9.9',
+    system: { id: SOURCE_SYSTEM_ID, name: 'Source System', essenceDefinitions: [] },
+    gatheringConfig: { shared: {} },
+  });
+  assert.deepEqual(sparse.gatheringConfig, { shared: {} }, 'no `system` slice is invented');
+  assert.equal('recipes' in sparse, false, 'and no `recipes` array is invented');
+});
