@@ -77,7 +77,7 @@ export function createViteFixtureServer({ styleMountPrefix, extraPlugins = [] })
         // proxy on `serve`, which these fixtures neither need nor should depend on.
         configFile: false,
         root: repoRoot,
-        // PER PROCESS, because the default is shared with every other test process. See
+        // Per process: the default is shared with every other test process. See
         // `vite-dep-cache-dir.js` for the `ERR_OUTDATED_OPTIMIZED_DEP` failure that causes.
         cacheDir: viteDepCacheDir(),
         // NO FILE WATCHER, for the reason `tests/view-lab/vite.config.js` records at length: the

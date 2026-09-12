@@ -50,7 +50,7 @@ export async function withFabricateLifecycleReplay(run) {
   // lifecycle that never touch art. Nothing is edited mid-run, so the watcher buys nothing.
   const vite = await createServer({
     root: repoRoot,
-    // PER PROCESS, because the default is shared with every other test process. See
+    // Per process: the default is shared with every other test process. See
     // `vite-dep-cache-dir.js` for the `ERR_OUTDATED_OPTIMIZED_DEP` failure that causes.
     cacheDir: viteDepCacheDir(),
     server: { middlewareMode: true, hmr: false, watch: null },
