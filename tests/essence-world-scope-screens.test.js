@@ -38,7 +38,10 @@ import {
 import { WORLD_IDENTITY_FIELDS } from '../src/migration/worldScopeEntityGrouping.js';
 import { membershipKey } from '../src/systems/scopedDefinitions.js';
 import { createWorldScopeActions } from '../src/ui/svelte/stores/worldScopeActions.js';
-import { projectWorldScopeEntity } from '../src/ui/svelte/stores/worldScopeProjection.js';
+import {
+  buildWorldScopeState,
+  projectWorldScopeEntity,
+} from '../src/ui/svelte/stores/worldScopeProjection.js';
 import {
   ESSENCE_VALIDATION_CHECKS,
   essenceEditorValidation,
@@ -965,5 +968,128 @@ describe('the essence world-scope presentation leaf', () => {
       'ember-dust-3'
     );
     assert.equal(mintEssenceId('  ***  ', []), 'essence');
+  });
+});
+
+// ── (13) A RETIRED ESSENCE ID IS NEVER REISSUED (issue 1654) ──────────────────────────────────
+
+/**
+ * `1.34.0` merges semantically equivalent world essences and RETIRES the losers' ids — the first
+ * time an essence id has ever been re-keyed. That migration deliberately leaves some references
+ * pointing at a retired id, and what justifies leaving them is that a key matching no definition
+ * contributes nothing. Reissuing the id is the one event that makes that false: the stale key
+ * then resolves to a DIFFERENT essence's quantity, silently and on documents the migration never
+ * walked.
+ *
+ * The risk is not theoretical arithmetic. The shell mints from a FIXED placeholder name, so the
+ * shipped sequence is `new-essence`, `new-essence-2`, `new-essence-3` — dense, deterministic, and
+ * reclaimed by the very next `+ New essence` press.
+ */
+describe('a retired essence id is never reissued', () => {
+  it('treats a retired id as taken even though no live entity holds it', () => {
+    assert.equal(mintEssenceId('Ember Dust', [], ['ember-dust']), 'ember-dust-2');
+    assert.equal(
+      mintEssenceId('New essence', [{ id: 'new-essence' }], ['new-essence-2']),
+      'new-essence-3'
+    );
+  });
+
+  it('and the same mint WITHOUT the retired leg reclaims it, which is what this guard changes', () => {
+    // NON-VACUITY for the pair above: the ids asserted refused are exactly the ids the shipped
+    // two-argument minter hands back, so neither assertion can be passing on an unrelated slug.
+    assert.equal(mintEssenceId('Ember Dust', []), 'ember-dust');
+    assert.equal(mintEssenceId('New essence', [{ id: 'new-essence' }]), 'new-essence-2');
+  });
+
+  it('defaults to none, so a world that never merged mints exactly as it did before', () => {
+    assert.equal(mintEssenceId('Ember Dust', [{ id: 'ember-dust' }]), 'ember-dust-2');
+    assert.equal(mintEssenceId('Ember Dust', [{ id: 'ember-dust' }], []), 'ember-dust-2');
+  });
+
+  it('takes either roster as a Set and writes to neither', () => {
+    // `worldEntityIdSet` hands a Set back AS GIVEN rather than copying it, so a minter that
+    // unioned the two would mutate the live roster a picker is still rendering.
+    const live = new Set(['ash']);
+    const retired = new Set(['ash-2']);
+    assert.equal(mintEssenceId('Ash', live, retired), 'ash-3');
+    assert.deepEqual([...live], ['ash']);
+    assert.deepEqual([...retired], ['ash-2']);
+  });
+
+  it('publishes the retired KEY SET on the essence leg the shell already holds', () => {
+    const { worldScope } = buildWorldScopeState({
+      stores: { essence: { corpus: () => corpusOf({}) } },
+      systems: ROSTER,
+      essenceMergeMap: {
+        retired: {
+          cinder: { name: 'Cinder', icon: 'fas fa-fire', colorToken: '', description: '' },
+          soot: { name: 'Soot', icon: 'fas fa-cloud', colorToken: '', description: '' },
+        },
+      },
+    });
+    assert.deepEqual(worldScope.essence.retiredIds, ['cinder', 'soot']);
+    // NON-VACUITY: the leg carrying it is the real projection of the real corpus, not an empty
+    // state that would answer `[]` to anything asked of it.
+    assert.deepEqual(
+      worldScope.essence.entities.map((entity) => entity.id),
+      ['ash', 'brine'],
+      'and the live roster beside it is the corpus this publish actually read'
+    );
+  });
+
+  it('reads every shape an unmerged or hand-edited world can hold as "no retired ids"', () => {
+    // A world that never merged has NO setting, a migration that found nothing to merge leaves
+    // `{}`, and a hand-edited setting may hold anything. None of those may throw on the publish
+    // path, and none may read as a retired id.
+    const shapes = [undefined, null, {}, { retired: null }, { retired: [] }, { retired: 'ash' }, 7];
+    for (const essenceMergeMap of shapes) {
+      const { worldScope } = buildWorldScopeState({ systems: ROSTER, essenceMergeMap });
+      assert.deepEqual(
+        worldScope.essence.retiredIds,
+        [],
+        `${JSON.stringify(essenceMergeMap) ?? 'undefined'} reads as no retired ids`
+      );
+    }
+    assert.deepEqual(
+      buildWorldScopeState().worldScope.essence.retiredIds,
+      [],
+      'as does a publish that was handed no merge map at all'
+    );
+  });
+
+  it('is WIRED — the guard is unreachable unless the shell mints against it', () => {
+    const [, args] = rootSource.match(/mintEssenceId\(([\s\S]*?)\);/) ?? [];
+    assert.ok(args, 'the shell mints the new world essence id');
+    assert.match(args, /worldScopeState\.essence\?\.entities/, 'against the live roster');
+    assert.match(args, /worldScopeState\.essence\?\.retiredIds/, 'AND the retired ids');
+  });
+});
+
+// ── (14) THE SHARED-DEFINITION CALLOUT NAMES THE WORLD RECORD (issue 1654) ────────────────────
+
+describe('the shared-definition callout names the record its pill claims', () => {
+  const editorSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/EssenceEditView.svelte'),
+    'utf8'
+  );
+  const [calloutSource] = editorSource.match(/<SharedDefinitionCallout[\s\S]*?\/>/) ?? [];
+
+  it("draws name and icon from the world entry rather than this system's projection", () => {
+    // The pill reads `World definition` and the sentence reads "Name, icon and colour are world
+    // vocabulary", both of which were true BY CONSTRUCTION while the `1.30.0` lift was 1:1. After
+    // `1.34.0` one world entity backs N in-system records whose `icon` is not in the equivalence
+    // key, so the in-system projection can caption `World definition` with a different glyph in
+    // every system that holds the essence.
+    assert.ok(calloutSource, 'the rules tab renders the callout');
+    assert.match(calloutSource, /World definition/, 'under the world-definition pill');
+    assert.match(calloutSource, /name=\{worldEntry\?\.entity\?\.name/);
+    assert.match(calloutSource, /icon=\{normalizeEssenceIcon\(\s*worldEntry\?\.entity\?\.icon/);
+  });
+
+  it('and keeps the in-system colorToken as the tint, because THAT one is the world value', () => {
+    // Maintainer ruling M29: `colorToken` is the single identity field the world overlay carries
+    // into the in-system projection, so re-routing it through `worldEntry` would swap one correct
+    // read for another and make the expression look uniform at the cost of saying less.
+    assert.match(calloutSource, /tint=\{normalizeEssenceColorToken\(essence\?\.colorToken\)/);
   });
 });

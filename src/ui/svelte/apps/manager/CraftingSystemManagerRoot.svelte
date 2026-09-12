@@ -3719,7 +3719,15 @@
 
   async function createWorldEssence() {
     const name = text('FABRICATE.Admin.Manager.Scoped.Essence.NewName', 'New essence');
-    const id = mintEssenceId(name, worldScopeState.essence?.entities ?? []);
+    // THE RETIRED LEG IS NOT OPTIONAL HERE (issue 1654). This mints from a FIXED placeholder
+    // name, so the id sequence is dense and every id `1.34.0` retired is reclaimable on the
+    // next press; reissuing one re-points the references that migration knowingly left behind
+    // at the wrong essence. See `mintEssenceId`.
+    const id = mintEssenceId(
+      name,
+      worldScopeState.essence?.entities ?? [],
+      worldScopeState.essence?.retiredIds ?? []
+    );
     const created = await store?.worldScope?.essence?.createEntity?.({
       id,
       name,
