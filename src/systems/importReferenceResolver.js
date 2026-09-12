@@ -178,9 +178,11 @@ function reportEntry(kind, ownerType, owner, referenceValue) {
  *
  * **THE ESSENCE ARM IS VACUOUS IN PRACTICE, AND SAYING SO IS THE POINT.** The DESTINATION side is
  * what makes it so: `WORLD_IDENTITY_FIELDS.essences` lifts only `name` / `icon` / `colorToken` /
- * `description`, because an essence id is a stable semantic slug the `1.30.0` grouping treats as
- * the identity itself, so no world essence entity the migration or an export ever produced
- * carries a source link and `destination.refs.size` is 0 for every one of them. The INCOMING side
+ * `description` and NO SOURCE LINK, so no world essence entity the migration or an export ever
+ * produced carries one and `destination.refs.size` is 0 for every one of them. The reason is that
+ * IDENTITY FIELD LIST, not any claim that an essence id is a stable semantic slug — it is not one,
+ * and `1.34.0` re-keys essence ids (issue 1654) — so the arm stays vacuous on a ground the merge
+ * does not disturb. The INCOMING side
  * is not empty - an essence definition's own `sourceItemUuid` is a THIRD, unrelated field family
  * that `sourceReferencesOf` happens to read - so it is the destination half alone that
  * short-circuits the positive-evidence guard. The loop still covers all three entity types
@@ -566,7 +568,9 @@ function dropMatchedWorldEntities(prepared, matched, idMap) {
  * branch is a deliberate no-op (`category` holds no component reference) and its tools branch
  * deliberately WITHHOLDS `componentId`, because neither record class carries one.
  *
- * Only the COMPONENT scope's own identifiers move: essence and tool ids are never re-keyed.
+ * Only the COMPONENT scope's own identifiers move HERE: this copy-mode remap re-keys no essence
+ * or tool id. (The `1.34.0` equivalent-essence merge re-keys essence ids under its own map, in the
+ * export upcast that runs BEFORE copy mode — see issue 1654; nothing in this function changes.)
  *
  * @param {object} prepared
  * @param {{remapComponent: Function}} remappers

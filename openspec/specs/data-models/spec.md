@@ -1349,6 +1349,9 @@ SCOPE and SUBJECT-COPIED-FROM separate them: requirement 9's snapshot is PER-SYS
    The `enabled` clamp — a Simple config with no success group cannot be enabled — is unchanged.
 6. Runtime essence matching, craftability checks, discovered-recipe craftability, crafting-check contexts, and effect-transfer contexts must count `Component.essences` for actor items that match the component by source reference or name.
    Explicit `fabricate.essences` item flags remain a compatibility override for that item.
+   `fabricate.essences` there is the `getFlag` KEY; the STORED path is the doubly-nested `flags.fabricate.fabricate.essences`.
+   The `1.34.0` essence merge REMAPS THAT MAP'S KEYS on OWNED ACTOR ITEMS under a whole-corpus unambiguity tie-break, leaves an AMBIGUOUS key alone, and never reaches a world Item or a compendium Item at all (`destructive-changes-and-migrations/spec.md` § Equivalent World Essence Merge requirement 9).
+   Leaving a key alone is safe only because of that section's requirement 17 TOMBSTONE, which never reissues a retired id — so a left-alone key can only ever contribute NOTHING, never the WRONG essence.
    The source-reference half of that match is governed by the shared **Component Item Matching** resolver defined below (its identity tier, then the raw-reference fall-through).
    The separate name fallback some callers apply after the resolver returns null is not part of this matcher and is unchanged here.
    That fallback is case-insensitive in `RecipeManager.ingredientMatchesItem`, `RecipeManager.toolMatchesItem`, and `essenceResolver.findMatchingComponent`, and case-sensitive in `CraftingEngine.findComponentItems` (the private `_findComponentItems` spelling survives only as a thin delegate for existing callers).
@@ -2522,7 +2525,11 @@ The `1.30.0` pass applies the same rule to the records it writes, so a fresh wor
    An empty `{}` is a real overriding value every reader treats as "no source", which is what makes the unconditional write expressible here and not for `category` or for `### Tool scope`'s `breakage` and `onBreak`.
    `effectSource` and `macro` are NEW section names that collide with nothing on the in-system record, so writing them can never overwrite a live in-system block through requirement 15's read union — which is the property the other three lack, and why those take an every-member precondition on their world default instead of an unconditional membership write.
    So a non-world-addressable referent still reaches the system side exactly as this requirement mandates; what changes is that a world-addressable one ALSO seeds the world default.
-   Essences group by trimmed `id` and their ids are NEVER re-keyed, so no essence reference is rewritten by that pass and its re-key map carries no essence leg.
+   Essences group by trimmed `id` AT `1.30.0` and that pass re-keys none of them, so no essence reference is rewritten there and ITS re-key map carries no essence leg.
+   **`1.34.0` DOES RE-KEY AN ESSENCE ID.**
+   § Equivalent World Essence Merge merges world essences whose canonicalised `(name, macro, effectSource)` triples are equal, carries its OWN map in `fabricate.worldEssenceMergeMap` rather than a leg on the `1.30.0` one, and rewrites EVERY reference the re-key invalidates.
+   So A WORLD ESSENCE ID IS OPAQUE AND MAY BE RETIRED — and once retired is never reissued, on that section's requirement 17 tombstone — and NO READER MAY TREAT IT AS A STABLE SLUG or derive anything from its spelling.
+   A membership record that `1.34.0` RE-POINTS carries its previously-INHERITED sections as explicit OVERRIDES, because the re-key moves its world parent and an inherited section would otherwise resolve through a different one.
    Issue 1362 ships the SECOND, `worldScope.essence.updateWorldDefaultSection`, and it writes OPAQUELY by design: requirement 11's section values are opaque to the store, and the normalizer coerces a section's SHAPE rather than its ADDRESSABILITY, so neither can enforce this.
    **The enforcement point is therefore the PICKER.**
    A world-defaults editor offers only world-addressable referents — it lists world components and document UUIDs, and it does not offer a system's own component list — because the layer below it accepts whatever it is handed.
