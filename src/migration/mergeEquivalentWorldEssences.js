@@ -46,16 +46,42 @@
  * Changing a membership record's `entityId` changes its WORLD PARENT, so a section it was
  * INHERITING would resolve through a different world default — or through none at all — the
  * moment the re-key lands, and the loser's own world default is deleted with the loser. So a
- * re-pointed record that was inheriting a section has that section's CURRENTLY RESOLVED value
- * written as an explicit override and the switch flipped to `false`. That is `1.30.0`
- * requirement 6's "every section overridden" applied at the one moment the parent MOVES, and it
- * is what keeps a merge behaviour-neutral for a record that authored nothing of its own.
+ * re-pointed record that was inheriting a section is frozen at the value it resolves to TODAY,
+ * and the freeze lands at BOTH scopes because the two are read by different consumers.
  *
- * AN ABSENT RESOLVED VALUE IS WRITTEN AS THE CANONICAL EMPTY — `macro: null`, `effectSource: {}`
- * — and NOT as absence. `resolveScopedDefinition` falls back to the world value for an ABSENT
- * local section even under `inherit: false`, so an absence-preserving write would silently hand
- * the record the SURVIVOR's macro or effect source. `buildMembershipRecord` writes both sections
- * unconditionally for exactly this reason; this is the same rule at the same seam.
+ * - THE MEMBERSHIP RECORD takes the resolved value as an explicit override with the switch
+ *   flipped to `false`. That is `1.30.0` requirement 6's "every section overridden" applied at
+ *   the one moment the parent MOVES, and it is what `resolveEssence` — and therefore the world
+ *   catalogue's per-system rows (`worldScopeProjection.buildSystemRow`) and this pass's own
+ *   unanimity walk on a re-run — answers from.
+ * - THE IN-SYSTEM `essenceDefinitions` ROW takes the same value on its SHIPPED FIELD NAMES, and
+ *   WITHOUT THIS HALF THE MERGE IS NOT BEHAVIOUR-NEUTRAL AT ALL. `unionScopedDefinitions` spreads
+ *   the in-system record LAST and then calls `applyInheritedSections`, whose first guard is
+ *   `if (inherited?.[section] === false) continue` — so the world value reaches the shipped field
+ *   only while the record still marks the section INHERITING, and flipping the switch is the very
+ *   act that stops the row taking the frozen value. A record that authored nothing would fall
+ *   back to its own `propertyMacroUuid: null` and its property macro would silently stop running.
+ *   Because the in-system record is spread LAST, writing it is what makes the union answer
+ *   identically before and after.
+ *
+ * THE IN-SYSTEM WRITE IS BOUNDED AND REPORTED. It happens only for a section the record was
+ * INHERITING — an already-OVERRIDING record, which is every record `1.30.0` itself wrote through
+ * `buildMembershipRecord`, is not touched — and only when the old world parent had a value to
+ * freeze. It is a write to a row the GM authored, so every one is named in the transient report's
+ * `inSystemFreezes` leg rather than made silently.
+ *
+ * AN ABSENT RESOLVED VALUE IS WRITTEN AS THE CANONICAL EMPTY ON THE MEMBERSHIP RECORD — `macro:
+ * null`, `effectSource: {}` — and NOT as absence. `resolveScopedDefinition` falls back to the
+ * world value for an ABSENT local section even under `inherit: false`, so an absence-preserving
+ * write would silently hand the record the SURVIVOR's macro or effect source.
+ * `buildMembershipRecord` writes both sections unconditionally for exactly this reason; this is
+ * the same rule at the same seam.
+ *
+ * AND NOTHING AT ALL IS WRITTEN TO THE IN-SYSTEM ROW IN THAT CASE, which is the OPPOSITE rule and
+ * is right for the opposite reason. `applyInheritedSections` skips an `undefined` world value, so
+ * a record inheriting a section its old world parent never authored ALREADY reads its own
+ * in-system field — before the re-key and after it. Writing the canonical empty there would
+ * DESTROY that authored value and be the only behaviour change this pass made.
  *
  * ## WHAT IS DELIBERATELY NOT TOUCHED (requirement 8a)
  *
@@ -87,7 +113,7 @@ import { membershipKey } from '../systems/scopedDefinitions.js';
 import { readScopePayload } from './migrateWorldScopeEntities.js';
 import { clone, isPlainObject } from './migrationHelpers.js';
 import { buildWorldEssenceEquivalence } from './worldEssenceEquivalence.js';
-import { ENTITY_TYPE_FIELDS } from './worldScopeEntityGrouping.js';
+import { ENTITY_TYPE_FIELDS, ESSENCE_EFFECT_SOURCE_FIELDS } from './worldScopeEntityGrouping.js';
 import {
   keyedRemapper,
   rewriteEssenceQuantityMap,
@@ -114,6 +140,43 @@ const ESSENCES = 'essences';
  * @type {Readonly<Record<string, unknown>>}
  */
 const EMPTY_SECTION_OVERRIDE = Object.freeze({ macro: null, effectSource: Object.freeze({}) });
+
+/**
+ * How a frozen section is written onto the IN-SYSTEM `essenceDefinitions` row, on the SHIPPED
+ * field names the read union and every reader beyond it actually consume.
+ *
+ * NEITHER SECTION NAME NAMES ANYTHING ON THAT RECORD, which is the whole reason this is a
+ * projection rather than an assignment: `macro` is spelled `propertyMacroUuid`, and
+ * `effectSource` is a BLOCK spread over {@link ESSENCE_EFFECT_SOURCE_FIELDS}. A write under the
+ * section name would sit on the row under a key no consumer reads, and the freeze would be true
+ * of the membership record and false of every craft.
+ *
+ * IT IS A DELIBERATE MIRROR of `INHERITED_SECTION_WRITERS.essences` in
+ * `src/systems/scopedDefinitionStore.js`, which is the table the read union applies for an
+ * INHERITING section. That is exactly the point: this pass writes what the union would have
+ * written, at the moment it stops being able to write it. The table is module-private there and
+ * cannot be imported, so the mirror is checked BEHAVIOURALLY instead:
+ * `tests/world-essence-merge-acceptance.test.js` drives EVERY section `ESSENCE_SECTIONS` declares
+ * through the real `resolveEssenceScope` and asserts the union's answer is unchanged across the
+ * merge. A key-set comparison could not do that job — it cannot see a writer that projects onto
+ * the wrong field name, which is the failure mode this table's two entries are made of.
+ *
+ * `effectSource` uses `?? null` per field rather than a conditional write, for
+ * {@link writeInheritedEffectSource}'s reason: the UNSET state of all three is `null` and not
+ * absence on this record, so leaving a stale `sourceComponentId` standing would be the per-field
+ * fallback `## Scoped Entity Definitions` forbids by name.
+ *
+ * @type {Readonly<Record<string, (record: object, value: unknown) => void>>}
+ */
+const IN_SYSTEM_SECTION_WRITERS = Object.freeze({
+  macro(record, value) {
+    record.propertyMacroUuid = value;
+  },
+  effectSource(record, value) {
+    const block = isPlainObject(value) ? value : {};
+    for (const field of ESSENCE_EFFECT_SOURCE_FIELDS) record[field] = block[field] ?? null;
+  },
+});
 
 function arrayOf(value) {
   return Array.isArray(value) ? value : [];
@@ -223,28 +286,103 @@ function rekeySystemEssenceIds(system, remapEssence) {
 }
 
 /**
- * Freeze every section a RE-POINTED membership record was inheriting, in place.
+ * Freeze every section a RE-POINTED membership record was inheriting, at BOTH scopes, in place.
  *
  * Requirement 8. The resolution is taken against the record's CURRENT world parent — the LOSER's
  * world default, read before this pass deletes it — because the value being frozen is the one the
  * record resolves to TODAY. Resolving against the survivor instead would freeze the value the
  * re-key is about to produce, which is not a freeze at all.
  *
- * A section the record already OVERRIDES is left exactly as it is: it authored its own value, the
- * world parent never decided it, and moving the parent cannot change it.
+ * A section the record already OVERRIDES is left exactly as it is at BOTH scopes: it authored its
+ * own value, the world parent never decided it, and moving the parent cannot change it. That is
+ * what bounds the in-system write to the GM who has since flipped a switch to inheriting.
+ *
+ * THE IN-SYSTEM WRITE IS CONDITIONAL ON A VALUE EXISTING, and the membership write is not. See
+ * the module header: an absent world value is skipped by `applyInheritedSections` both before and
+ * after the flip, so the row already answers its own field and writing the canonical empty over
+ * it would be the one behaviour change this pass made.
  *
  * @param {object} record The membership record, already cloned.
  * @param {object|null} loserDefault The world default of the entity being retired.
+ * @param {Array<object>} inSystemRows This system's own `essenceDefinitions` rows for the entity,
+ *   already re-keyed. Every one is written, because the union emits every in-system row.
+ * @returns {string[]} The sections whose value was written onto the in-system rows, for the
+ *   report. Empty when nothing was, which is the common case.
  */
-function freezeInheritedSections(record, loserDefault) {
+function freezeInheritedSections(record, loserDefault, inSystemRows) {
   const resolved = resolveEssence(loserDefault, record);
+  const written = [];
   for (const section of ESSENCE_SECTIONS) {
     if (resolved.inherited?.[section] !== true) continue;
     const value = resolved[section];
     record[section] = value === undefined ? clone(EMPTY_SECTION_OVERRIDE[section]) : clone(value);
     if (!isPlainObject(record.inherit)) record.inherit = {};
     record.inherit[section] = false;
+    if (value === undefined || inSystemRows.length === 0) continue;
+    for (const row of inSystemRows) IN_SYSTEM_SECTION_WRITERS[section](row, clone(value));
+    written.push(section);
   }
+  return written;
+}
+
+/**
+ * Index one corpus's ALREADY-RE-KEYED in-system essence rows by system and by id.
+ *
+ * EVERY row per id rather than the first, because {@link unionScopedDefinitions} emits the
+ * in-system array's rows one for one and a duplicate id is PRESERVED there rather than collapsed.
+ * A single-row write would leave the second row answering the pre-freeze value. Duplicates are
+ * unreachable from a derived map — requirement 6's output-uniqueness invariant refuses such a
+ * group outright — and reachable from a hand-edited persisted one, which is the corpus this pass
+ * is written to survive.
+ *
+ * @param {Array<object>} systems The cloned, re-keyed system array.
+ * @returns {Map<string, Map<string, Array<object>>>}
+ */
+function indexInSystemEssences(systems) {
+  const bySystem = new Map();
+  for (const system of systems) {
+    const systemId = trimmedString(system?.id);
+    if (!systemId) continue;
+    const byId = new Map();
+    for (const record of arrayOf(system[ESSENCE_DEFINITIONS_FIELD])) {
+      if (!isPlainObject(record)) continue;
+      const id = trimmedString(record.id);
+      if (!id) continue;
+      if (!byId.has(id)) byId.set(id, []);
+      byId.get(id).push(record);
+    }
+    bySystem.set(systemId, byId);
+  }
+  return bySystem;
+}
+
+/**
+ * Re-point ONE membership record at its survivor, freezing what it was inheriting FIRST.
+ *
+ * THE ORDER INSIDE IS LOAD-BEARING: the freeze resolves the record through the parent it is
+ * LEAVING, so it has to run while `entityId` still names the loser. The in-system rows are looked
+ * up under the SURVIVOR id instead, because the rewrite half has already re-keyed them.
+ *
+ * @param {{record: object, loserId: string, survivorId: string}} entry
+ * @param {object} defaults The cloned world defaults, read BEFORE the loser keys are deleted.
+ * @param {Map<string, Map<string, Array<object>>>} inSystemEssences
+ * @returns {{key: string, freeze: {systemId: string, essenceId: string, sections: string[]}}|null}
+ *   The rebuilt key, and the report entry for this record — whose `sections` is EMPTY when nothing
+ *   was written in-system, which the caller filters out. `null` for a record that names no system:
+ *   it cannot be keyed for its new parent and cannot be resolved for, so it is DROPPED exactly as
+ *   `readEssenceScope` never counted it as a live member.
+ */
+function repointMembershipRecord({ record, loserId, survivorId }, defaults, inSystemEssences) {
+  const systemId = trimmedString(record.systemId);
+  if (!systemId) return null;
+  const sections = freezeInheritedSections(
+    record,
+    isPlainObject(defaults[loserId]) ? defaults[loserId] : null,
+    inSystemEssences.get(systemId)?.get(survivorId) ?? []
+  );
+  record.entityId = survivorId;
+  const freeze = { systemId, essenceId: survivorId, sections };
+  return { key: membershipKey(survivorId, systemId), freeze };
 }
 
 /**
@@ -265,11 +403,15 @@ function freezeInheritedSections(record, loserDefault) {
  * @param {object} membership The cloned membership map.
  * @param {object} defaults The cloned world defaults, read BEFORE the loser keys are deleted.
  * @param {{[loserId: string]: string}} remap The world-wide old-to-new lookup.
- * @returns {object} The rebuilt map.
+ * @param {Map<string, Map<string, Array<object>>>} inSystemEssences The re-keyed in-system rows,
+ *   from {@link indexInSystemEssences}, so a frozen section can reach the field the union reads.
+ * @returns {{membership: object, inSystemFreezes: Array<object>}} The rebuilt map, and every
+ *   in-system row this freeze wrote.
  */
-function rebuildMembership(membership, defaults, remap) {
+function rebuildMembership(membership, defaults, remap, inSystemEssences) {
   const rebuilt = {};
   const repointed = [];
+  const inSystemFreezes = [];
   for (const [key, record] of Object.entries(membership)) {
     const entityId = isPlainObject(record) ? trimmedString(record.entityId) : null;
     const survivorId = entityId ? remap[entityId] : undefined;
@@ -279,17 +421,19 @@ function rebuildMembership(membership, defaults, remap) {
     }
     repointed.push({ record, loserId: entityId, survivorId });
   }
-  for (const { record, loserId, survivorId } of repointed) {
-    const systemId = trimmedString(record.systemId);
-    // A record that names no system cannot be keyed for its new parent and cannot be resolved
-    // for; it is dropped exactly as `readEssenceScope` never counted it as a live member.
-    if (!systemId) continue;
-    freezeInheritedSections(record, isPlainObject(defaults[loserId]) ? defaults[loserId] : null);
-    record.entityId = survivorId;
-    const key = membershipKey(survivorId, systemId);
-    if (!(key in rebuilt)) rebuilt[key] = record;
+  for (const entry of repointed) {
+    const repoint = repointMembershipRecord(entry, defaults, inSystemEssences);
+    if (!repoint) continue;
+    inSystemFreezes.push(repoint.freeze);
+    if (!(repoint.key in rebuilt)) rebuilt[repoint.key] = entry.record;
   }
-  return rebuilt;
+  // FILTERED RATHER THAN BRANCHED AT THE PUSH, because the empty case is the COMMON one and the
+  // leg is a disclosure: a record that froze nothing in-system — already overriding, or inheriting
+  // a section its old parent never authored — has nothing to disclose and must not appear.
+  return {
+    membership: rebuilt,
+    inSystemFreezes: inSystemFreezes.filter((freeze) => freeze.sections.length > 0),
+  };
 }
 
 /**
@@ -374,12 +518,15 @@ export function mergeEquivalentWorldEssences(data) {
   // -------------------------------------------------------------------------
   // The membership rebuild reads the world defaults, so it runs BEFORE the loser keys are deleted:
   // a re-pointed inheriting record freezes the value it resolves to through the parent it is
-  // LEAVING, and that parent's default is about to go.
-  essenceScope.membership = rebuildMembership(
+  // LEAVING, and that parent's default is about to go. It runs AFTER the rewrite half because the
+  // in-system half of that freeze writes the rows the rewrite half has already re-keyed.
+  const rebuilt = rebuildMembership(
     essenceScope.membership,
     essenceScope.defaults,
-    remap
+    remap,
+    indexInSystemEssences(systems)
   );
+  essenceScope.membership = rebuilt.membership;
   for (const loserId of Object.keys(remap)) delete essenceScope.defaults[loserId];
   essenceScope.entities = essenceScope.entities.filter(
     (entity) => !(trimmedString(entity?.id) && trimmedString(entity.id) in remap)
@@ -402,11 +549,19 @@ export function mergeEquivalentWorldEssences(data) {
   // -------------------------------------------------------------------------
   // 4. THE REPORT — transient, captured and DELETED by the runner (requirement 13).
   // -------------------------------------------------------------------------
+  //
+  // `inSystemFreezes` is the one leg that does NOT come from the derivation, and it is here for a
+  // reason the other four do not need: it names a write this pass made to a row the GM AUTHORED.
+  // Everything else the merge touches is world-scope bookkeeping or a re-key; requirement 8's
+  // in-system half is the only place it changes an authored field's VALUE, so it is disclosed
+  // rather than made silently. It is empty on the migrated-world common case by construction —
+  // every record `buildMembershipRecord` wrote is fully overriding.
   const report = {
     mergedGroups: equivalence.mergedGroups,
     refusals: equivalence.refusals,
     declined: equivalence.declined,
     orphaned: equivalence.orphaned,
+    inSystemFreezes: rebuilt.inSystemFreezes,
   };
 
   // -------------------------------------------------------------------------

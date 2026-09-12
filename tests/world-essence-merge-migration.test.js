@@ -248,10 +248,14 @@ test('a re-pointed record inheriting `macro` with NO world default gets the CANO
 });
 
 test('a re-pointed record inheriting a REAL world value keeps that value across the merge', () => {
-  // The behaviour-load-bearing half. `sys-b` resolves its macro through the LOSER's world default;
-  // the survivor has none, and the loser's is deleted with it. Without the freeze this record
-  // would resolve to NOTHING the instant the re-key landed — a silent behaviour change on a world
-  // nobody edited.
+  // `sys-b` resolves its macro through the LOSER's world default; the survivor has none, and the
+  // loser's is deleted with it. Without the freeze this record would resolve to NOTHING the
+  // instant the re-key landed — a silent behaviour change on a world nobody edited.
+  //
+  // THIS ASSERTS AT THE SCOPE LAYER ONLY AND IS STRUCTURALLY BLIND TO THE READ SEAM, which is
+  // said here because it was once read as the whole of requirement 8. `resolveEssence` answers
+  // the frozen value; the READ UNION does not consult it, and the in-system half pinned in
+  // PIN 1b is what makes the merge behaviour-neutral where a GM can see it.
   const corpus = buildEssenceMergeCorpus({
     systems: [
       { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron', macro: 'Macro.shared' }] },
@@ -281,6 +285,201 @@ test('a section the re-pointed record already OVERRODE is left exactly as author
   // Every other authored key on the record survives the re-point untouched.
   assert.equal(record.enabled, true);
   assert.equal(record.systemId, 'sys-b');
+});
+
+// ---------------------------------------------------------------------------
+// PIN 1b — the IN-SYSTEM half of that rule, which is the half a GM can observe
+// ---------------------------------------------------------------------------
+
+/**
+ * The world default `sys-b` inherits, per section, paired with the SHIPPED FIELDS the frozen
+ * value must land on in `systems[].essenceDefinitions[]`.
+ *
+ * THE FIELD NAMES ARE WRITTEN OUT RATHER THAN DERIVED, deliberately: this is the WRITE suite, and
+ * the one thing it owns about this rule is that the projection lands on the names the read union
+ * reads (`macro` is spelled `propertyMacroUuid`; `effectSource` is a block over three fields). A
+ * derivation would restate the projection under test and agree with a wrong one.
+ * `world-essence-merge-acceptance.test.js` checks the same mirror BEHAVIOURALLY, through the real
+ * `resolveEssenceScope`, section by section.
+ */
+const IN_SYSTEM_FREEZE_CASES = Object.freeze([
+  Object.freeze({
+    section: 'macro',
+    worldDefault: { macro: 'Macro.shared' },
+    donor: { macro: 'Macro.shared' },
+    expected: { propertyMacroUuid: 'Macro.shared' },
+  }),
+  Object.freeze({
+    section: 'effectSource',
+    worldDefault: {
+      effectSource: {
+        sourceComponentId: 'comp-x',
+        sourceItemUuid: 'comp-x',
+        associatedSystemItemId: 'comp-x',
+      },
+    },
+    donor: { sourceComponentId: 'comp-x' },
+    expected: {
+      sourceComponentId: 'comp-x',
+      sourceItemUuid: 'comp-x',
+      associatedSystemItemId: 'comp-x',
+    },
+  }),
+]);
+
+/**
+ * A world in which `sys-b` INHERITS one section from the LOSER's world default while `sys-a`
+ * overrides it with the same value, so the two are equivalent and the group merges.
+ *
+ * @param {object} testCase An {@link IN_SYSTEM_FREEZE_CASES} entry.
+ * @returns {object} `{systems, essenceScope, componentScope}`
+ */
+function inheritingOneSection({ section, worldDefault, donor }) {
+  return buildEssenceMergeCorpus({
+    systems: [
+      {
+        id: 'sys-a',
+        essences: [{ id: 'iron', name: 'Iron', ...donor }],
+        components: [{ id: 'comp-x' }],
+      },
+      {
+        id: 'sys-b',
+        essences: [
+          { id: MINTED, name: 'Iron', inherit: { [section]: true }, omitSections: [section] },
+        ],
+        components: [{ id: 'comp-x' }],
+      },
+    ],
+    worldDefaults: { [MINTED]: worldDefault },
+  });
+}
+
+for (const testCase of IN_SYSTEM_FREEZE_CASES) {
+  const { section, expected } = testCase;
+  test(`freezing \`${section}\` also writes the IN-SYSTEM row, on the SHIPPED field names`, () => {
+    // WITHOUT THIS HALF THE FREEZE INVERTS. `unionScopedDefinitions` spreads the in-system record
+    // LAST and `applyInheritedSections` writes the world value onto the row only while the record
+    // still marks the section INHERITING, so flipping the switch to `false` is the very act that
+    // stops the row taking the frozen value. Because the in-system record is spread last, writing
+    // it is what makes the union answer identically before and after.
+    const corpus = inheritingOneSection(testCase);
+    const row = corpus.systems[1].essenceDefinitions[0];
+    for (const [field, value] of Object.entries(expected)) {
+      assert.notEqual(
+        row[field],
+        value,
+        `the premise: the in-system row has no ${field} of its own`
+      );
+    }
+
+    const result = mergeEquivalentWorldEssences(payloadOf(corpus));
+    assert.equal(result._worldEssenceMergeReport.mergedGroups.length, 1, 'the premise: merged');
+    const frozenRow = result.systems[1].essenceDefinitions[0];
+    assert.equal(frozenRow.id, 'iron', 'the premise: the row really was re-keyed');
+    for (const [field, value] of Object.entries(expected)) {
+      assert.equal(frozenRow[field], value, `${field} carries the frozen value`);
+    }
+
+    // IT IS A WRITE TO A ROW THE GM AUTHORED, so it is DISCLOSED rather than made silently — and
+    // `sys-a`, which already overrode the section, is not named because it was not written.
+    assert.deepEqual(result._worldEssenceMergeReport.inSystemFreezes, [
+      { systemId: 'sys-b', essenceId: 'iron', sections: [section] },
+    ]);
+    assert.deepEqual(
+      result.systems[0].essenceDefinitions[0],
+      corpus.systems[0].essenceDefinitions[0],
+      'the ALREADY-OVERRIDING system’s own row is byte-identical'
+    );
+  });
+}
+
+test('a section the old world parent NEVER AUTHORED leaves the in-system row untouched', () => {
+  // THE OPPOSITE RULE, right for the opposite reason. `applyInheritedSections` SKIPS an
+  // `undefined` world value, so this row was ALREADY answering its own field before the re-key
+  // and still is after it. The MEMBERSHIP record takes the canonical empty — an absent local
+  // section under `inherit: false` falls back to the SURVIVOR's value — but writing that same
+  // empty onto the in-system row would DESTROY the authored macro and be the one behaviour change
+  // this pass made.
+  const corpus = buildEssenceMergeCorpus({
+    systems: [
+      { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron' }] },
+      {
+        id: 'sys-b',
+        essences: [{ id: MINTED, name: 'Iron', inherit: { macro: true }, omitSections: ['macro'] }],
+      },
+    ],
+  });
+  assert.deepEqual(corpus.essenceScope.defaults, {}, 'the premise: the world decided NOTHING');
+  corpus.systems[1].essenceDefinitions[0].propertyMacroUuid = 'Macro.own';
+
+  const result = mergeEquivalentWorldEssences(payloadOf(corpus));
+  assert.equal(result._worldEssenceMergeReport.mergedGroups.length, 1, 'the premise: merged');
+  assert.equal(result.systems[1].essenceDefinitions[0].propertyMacroUuid, 'Macro.own');
+  assert.equal(result.essenceScope.membership['iron|sys-b'].macro, null);
+  assert.deepEqual(result._worldEssenceMergeReport.inSystemFreezes, []);
+});
+
+test('EVERY in-system row under a duplicated id is frozen, because the union emits every row', () => {
+  // Unreachable from a DERIVED map — requirement 6's output-uniqueness invariant refuses such a
+  // group outright — and reachable from a hand-edited PERSISTED one, which skips those invariants
+  // by design. `unionScopedDefinitions` walks the in-system array row for row and PRESERVES a
+  // duplicate id rather than collapsing it, so a single-row write would leave the second row
+  // answering the pre-freeze value.
+  const corpus = buildEssenceMergeCorpus({
+    systems: [
+      { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron', macro: 'Macro.shared' }] },
+      {
+        id: 'sys-b',
+        essences: [
+          { id: MINTED, name: 'Iron', inherit: { macro: true }, omitSections: ['macro'] },
+          { id: 'iron', name: 'Iron', member: false },
+        ],
+      },
+    ],
+    worldDefaults: { [MINTED]: { macro: 'Macro.shared' } },
+  });
+  const result = mergeEquivalentWorldEssences(
+    payloadOf(corpus, {
+      worldEssenceMergeMap: { systems: { 'sys-b': { essences: { [MINTED]: 'iron' } } } },
+    })
+  );
+  const rows = result.systems[1].essenceDefinitions;
+  assert.deepEqual(
+    rows.map((row) => row.id),
+    ['iron', 'iron'],
+    'the premise: the hand-edited map really did collide two rows onto one id'
+  );
+  assert.deepEqual(
+    rows.map((row) => row.propertyMacroUuid),
+    ['Macro.shared', 'Macro.shared'],
+    'both rows carry the frozen value'
+  );
+});
+
+test('the component scope has NO such hazard, because this pass never moves a component’s parent', () => {
+  // THE CHECK REQUIREMENT 8 NEEDS AND DOES NOT STATE. `rewriteMembershipReferences(record,
+  // 'components', …)` rewrites the `essences` QUANTITY MAP and nothing else: a component
+  // membership record's `entityId` and its `inherit` map are never touched, so no component's
+  // world parent moves and no component section is ever frozen. The map keys move on BOTH sides
+  // together — the world default through the unioned lookup, the membership record and the
+  // in-system row through their system's leg — so an INHERITING component still inherits, from a
+  // default whose keys moved the same way.
+  const corpus = twoIrons();
+  corpus.componentScope.defaults = { 'comp-1': { id: 'comp-1', essences: { [MINTED]: 2 } } };
+  corpus.componentScope.membership['comp-1|sys-b'] = {
+    entityId: 'comp-1',
+    systemId: 'sys-b',
+    inherit: { essences: true },
+  };
+  const result = mergeEquivalentWorldEssences(payloadOf(corpus));
+  const record = result.componentScope.membership['comp-1|sys-b'];
+  assert.deepEqual(record.inherit, { essences: true }, 'the switch is NOT flipped');
+  assert.equal(record.entityId, 'comp-1', 'and the parent did NOT move');
+  assert.deepEqual(
+    result.componentScope.defaults['comp-1'].essences,
+    { iron: 2 },
+    'while the world default it follows was re-keyed, so the inherited map still resolves'
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -488,7 +687,7 @@ test('a world essence whose member system has NO definition row is refused on th
 // The transient report's FIELD NAMES, which the GM-notice lane consumes
 // ---------------------------------------------------------------------------
 
-test('the report carries exactly the four named legs', () => {
+test('the report carries exactly the five named legs', () => {
   const report = mergeEquivalentWorldEssences(
     payloadOf(
       buildEssenceMergeCorpus({
@@ -515,7 +714,13 @@ test('the report carries exactly the four named legs', () => {
       })
     )
   )._worldEssenceMergeReport;
-  assert.deepEqual(Object.keys(report), ['mergedGroups', 'refusals', 'declined', 'orphaned']);
+  assert.deepEqual(Object.keys(report), [
+    'mergedGroups',
+    'refusals',
+    'declined',
+    'orphaned',
+    'inSystemFreezes',
+  ]);
   assert.deepEqual(report.mergedGroups, [
     { survivorId: 'iron', name: 'Iron', loserIds: [MINTED], systemIds: ['sys-a', 'sys-b'] },
   ]);
@@ -523,6 +728,11 @@ test('the report carries exactly the four named legs', () => {
   assert.deepEqual(report.declined, [
     { essenceId: 'mixed', name: 'Mixed', sections: ['macro'], reason: 'sectionDisagreement' },
   ]);
+  // THE FIFTH LEG IS THE ONE THAT IS NOT A DERIVATION: it names the in-system rows requirement 8
+  // wrote. It is EMPTY here, and that is the common case by construction — every membership
+  // record `buildMembershipRecord` produced is fully overriding, so only a GM who has since
+  // flipped a switch to inheriting ever puts a row in it.
+  assert.deepEqual(report.inSystemFreezes, []);
 });
 
 // ---------------------------------------------------------------------------

@@ -43,7 +43,7 @@ import test from 'node:test';
 import { mergeEquivalentWorldEssences } from '../src/migration/mergeEquivalentWorldEssences.js';
 import { migrateWorldScopeEntities } from '../src/migration/migrateWorldScopeEntities.js';
 import { buildWorldEssenceEquivalence } from '../src/migration/worldEssenceEquivalence.js';
-import { resolveEssenceScope } from '../src/systems/essenceScope.js';
+import { ESSENCE_SECTIONS, resolveEssenceScope } from '../src/systems/essenceScope.js';
 
 import {
   buildEssenceMergeCorpus,
@@ -886,8 +886,9 @@ const SCENARIOS = [
     merged: [{ survivorId: 'iron', loserIds: [MINTED_B], systemIds: ['sys-a', 'sys-b', 'sys-c'] }],
     entities: ['iron'],
     members: { iron: ['sys-a', 'sys-b', 'sys-c'] },
-    // THE MEASURED DIVERGENCE, recorded rather than asserted away. See the dedicated arm below.
-    behaviourDifferences: ['sys-a|essence|iron.propertyMacroUuid'],
+    // NO DECLARED DIFFERENCE. `sys-a` was INHERITING its macro, so requirement 8 freezes it at
+    // BOTH scopes and the read union answers `Macro.forge` before and after. This row carried a
+    // declared allowance while the in-system half was missing; the dedicated arm below is why.
     extra: ({ result }) => {
       assert.equal(
         result.essenceScope.membership['iron|sys-a'].macro,
@@ -900,6 +901,17 @@ const SCENARIOS = [
         result.essenceScope.defaults[MINTED_B],
         undefined,
         "the loser's world default is deleted with its entity row"
+      );
+      // AND THE IN-SYSTEM HALF, which is what makes the row carry no declared difference:
+      // `sys-a` alone was inheriting, so `sys-a` alone is written and reported.
+      assert.deepEqual(result._worldEssenceMergeReport.inSystemFreezes, [
+        { systemId: 'sys-a', essenceId: 'iron', sections: ['macro'] },
+      ]);
+      assert.equal(
+        result.systems.find((system) => system.id === 'sys-a').essenceDefinitions[0]
+          .propertyMacroUuid,
+        'Macro.forge',
+        'the in-system row carries the frozen value, which is the field the union answers from'
       );
     },
   },
@@ -1252,35 +1264,199 @@ test('idempotence (ii): with the map ABSENT, the re-derivation over merged data 
 });
 
 // ---------------------------------------------------------------------------
-// A MEASURED FINDING, recorded rather than asserted away
+// REQUIREMENT 8 AT THE READ SEAM — the only place a GM can observe it
 // ---------------------------------------------------------------------------
 
-test('requirement 8 freezes the MEMBERSHIP RECORD, and the READ UNION does not follow it', () => {
-  // THIS IS A CORRECTION TO THE ACCEPTANCE RECORD, not a new claim, and it is the reason this file
+/**
+ * One corpus per essence SECTION, in which `sys-b` INHERITS that section from the LOSER's world
+ * default and `sys-a` overrides it with the same value, so the two are equivalent and merge.
+ *
+ * KEYED BY SECTION AND DRIVEN BY {@link ESSENCE_SECTIONS} BELOW, which is what makes this a guard
+ * over the whole rule rather than over `macro`. The section names name NOTHING on the in-system
+ * record — `macro` is spelled `propertyMacroUuid` and `effectSource` is a block over three fields
+ * — so the write the migration makes is a PROJECTION, and a projection onto the wrong field name
+ * is exactly the mistake a key-set comparison cannot see. Reading the answer back through the
+ * real union catches it, because a value on a key no reader reads is a value the union does not
+ * answer.
+ *
+ * The `effectSource` block spells ALL THREE fields, matching what `rawEssence` puts on an
+ * in-system row carrying a source: a partial block would compare unequal at the canonical key and
+ * the group would never merge, which is a green test measuring nothing.
+ */
+/** One projection of {@link UNION_FIELDS} off any essence-shaped record, absence reading as null. */
+const unionFieldsOf = (row) =>
+  Object.fromEntries(UNION_FIELDS.map((field) => [field, row?.[field] ?? null]));
+
+const INHERITED_SECTION_FIXTURES = Object.freeze({
+  macro: () =>
+    buildEssenceMergeCorpus({
+      systems: [
+        { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron', macro: 'Macro.forge' }] },
+        {
+          id: 'sys-b',
+          essences: [
+            { id: MINTED_B, name: 'Iron', inherit: { macro: true }, omitSections: ['macro'] },
+          ],
+        },
+      ],
+      worldDefaults: { [MINTED_B]: { macro: 'Macro.forge' } },
+    }),
+  effectSource: () =>
+    buildEssenceMergeCorpus({
+      systems: [
+        {
+          id: 'sys-a',
+          essences: [{ id: 'iron', name: 'Iron', sourceComponentId: 'comp-x' }],
+          components: [{ id: 'comp-x' }],
+        },
+        {
+          id: 'sys-b',
+          essences: [
+            {
+              id: MINTED_B,
+              name: 'Iron',
+              inherit: { effectSource: true },
+              omitSections: ['effectSource'],
+            },
+          ],
+          components: [{ id: 'comp-x' }],
+        },
+      ],
+      worldDefaults: {
+        [MINTED_B]: {
+          effectSource: {
+            sourceComponentId: 'comp-x',
+            sourceItemUuid: 'comp-x',
+            associatedSystemItemId: 'comp-x',
+          },
+        },
+      },
+    }),
+});
+
+test('requirement 8 freezes the MEMBERSHIP RECORD **and** the IN-SYSTEM ROW, so the READ UNION follows', () => {
+  // THIS ARM IS THE CORRECTION TO AN EARLIER ACCEPTANCE RECORD, and it is the reason this file
   // reads through `resolveEssenceScope` rather than through `resolveEssence`.
   //
-  // Requirement 8 makes a re-pointed INHERITING record fully overriding on the section it was
-  // inheriting, and at the SCOPE layer that is exactly behaviour-neutral: `resolveEssence` answers
-  // the frozen value, which is the value the record resolved to before the re-key.
+  // At the SCOPE layer the membership freeze alone is exactly behaviour-neutral: `resolveEssence`
+  // answers the frozen value, which is the value the record resolved to before the re-key.
   //
-  // The PRODUCTION READ is one layer further out. While `## CraftingSystem` requirement 36 holds,
-  // `unionScopedDefinitions` re-spreads the IN-SYSTEM record LAST and then writes the world
-  // default onto the row ONLY for a section the membership record still marks INHERITING
-  // (`applyInheritedSections`). So the very act of freezing the switch to `false` stops the row
-  // taking the frozen value, and the row falls back to whatever the in-system record carries.
+  // THE PRODUCTION READ IS ONE LAYER FURTHER OUT, AND THERE THE FREEZE ALONE INVERTS. While
+  // `## CraftingSystem` requirement 36 holds, `unionScopedDefinitions` spreads the IN-SYSTEM
+  // record LAST and then writes the world default onto the row ONLY for a section the membership
+  // record still marks INHERITING (`applyInheritedSections`'s `=== false` guard). So flipping the
+  // switch to `false` is the very act that stops the row taking the frozen value, and a record
+  // that authored nothing of its own fell back to its own `propertyMacroUuid: null`.
   //
   // The pre-state is production-reachable: `worldScopeActions.setSectionInherited` flips the
   // membership switch alone and never touches `essenceDefinitions[].propertyMacroUuid`, which is
   // the documented opt-in. And the field is load-bearing:
   // `CraftingEngine._runEssencePropertyMacros` reads `definition.propertyMacroUuid` off
-  // `resolvedEssencesFor`, which is this very union.
+  // `resolvedEssencesFor`, which is this very union — so the essence's property macro silently
+  // stopped running for that system, and the same mechanism silently dropped Active Effect
+  // transfer for the three `effectSource` fields.
   //
-  // It is MEASURED here rather than asserted away, and it is NOT locked in: the arm states both
-  // halves separately, so a fix that teaches the union to follow a frozen section turns exactly
-  // the second assertion red and leaves the first green.
-  const corpus = buildEssenceMergeCorpus({
+  // The fix is the IN-SYSTEM half of the freeze, at the shipped field names. Both halves are
+  // asserted separately below, because they answer to different consumers.
+  for (const section of ESSENCE_SECTIONS) {
+    const build = INHERITED_SECTION_FIXTURES[section];
+    assert.ok(
+      build,
+      `every section ESSENCE_SECTIONS declares needs a fixture here; ${section} has none`
+    );
+    const corpus = build();
+    const frozen = copy(corpus.essenceScope.defaults[MINTED_B][section]);
+    const before = readResolvedWorld(corpus);
+    // THE PREMISE, per section, and it is the sharp one: the union's answer for `sys-b` is NOT
+    // what that system's own in-system row carries. So the row is reading THROUGH the world
+    // default, and there is something for the re-key to break.
+    const inSystemRow = corpus.systems[1].essenceDefinitions[0];
+    assert.notDeepEqual(
+      unionFieldsOf(inSystemRow),
+      unionFieldsOf(before[`sys-b|essence|${MINTED_B}`]),
+      `${section}: the inheriting row must answer something its OWN record does not carry`
+    );
+
+    const result = mergeEquivalentWorldEssences(payloadOf(corpus));
+    assert.equal(
+      result._worldEssenceMergeReport.mergedGroups.length,
+      1,
+      `${section}: the premise — the two equivalent essences really did merge`
+    );
+
+    // HALF ONE — the scope layer, which `resolveEssence` and the world catalogue's per-system
+    // rows answer from. Unchanged by this fix.
+    const record = result.essenceScope.membership['iron|sys-b'];
+    assert.equal(record.inherit[section], false, `${section}: the switch is FLIPPED`);
+    assert.deepEqual(
+      record[section],
+      frozen,
+      `${section}: the frozen record carries the value it resolved to through the parent it LEFT`
+    );
+
+    // HALF TWO — THE READ SEAM. This is the assertion the earlier record measured as a
+    // divergence; a fix that teaches the merge to write the in-system row turns it green while
+    // leaving half one exactly as it was.
+    const after = readResolvedWorld(corpusOf(result));
+    for (const field of UNION_FIELDS) {
+      assert.deepEqual(
+        after['sys-b|essence|iron'][field] ?? null,
+        before[`sys-b|essence|${MINTED_B}`][field] ?? null,
+        `${section}: the union must answer ${field} identically before and after the merge`
+      );
+    }
+
+    // AND THE WRITE IS DISCLOSED. It is a write to a row the GM authored, so it is named rather
+    // than made silently — and it names `sys-b` alone, never the already-overriding `sys-a`.
+    assert.deepEqual(
+      result._worldEssenceMergeReport.inSystemFreezes,
+      [{ systemId: 'sys-b', essenceId: 'iron', sections: [section] }],
+      `${section}: the in-system write is reported`
+    );
+    assert.ok(
+      inSystemRow !== result.systems[1].essenceDefinitions[0],
+      `${section}: and the pass is non-mutating — the caller's own row was not written through`
+    );
+  }
+});
+
+test('an ALREADY-OVERRIDING record is untouched at BOTH scopes, which bounds the in-system write', () => {
+  // THE BOUND, and it is the whole of why writing an authored in-system row is admissible here:
+  // every record `1.30.0` wrote through `buildMembershipRecord` is fully OVERRIDING, so the only
+  // world exposed to either half of requirement 8 is one whose GM has since flipped a switch to
+  // inheriting. A world that merely upgraded is byte-identical through the union.
+  const overriding = buildEssenceMergeCorpus({
     systems: [
       { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron', macro: 'Macro.forge' }] },
+      { id: 'sys-b', essences: [{ id: MINTED_B, name: 'Iron', macro: 'Macro.forge' }] },
+    ],
+  });
+  const before = copy(payloadOf(overriding));
+  const overridden = mergeEquivalentWorldEssences(payloadOf(overriding));
+  assert.equal(overridden._worldEssenceMergeReport.mergedGroups.length, 1, 'the premise: merged');
+  assert.deepEqual(
+    behaviourDifferences(before, corpusOf(overridden), unionOf(overridden.worldEssenceMergeMap)),
+    [],
+    'an ALREADY-OVERRIDING record — which is every record `1.30.0` wrote — is untouched'
+  );
+  assert.deepEqual(
+    overridden._worldEssenceMergeReport.inSystemFreezes,
+    [],
+    'and NO in-system row is written, so the report has nothing to disclose'
+  );
+});
+
+test('a section whose OLD world parent authored NOTHING leaves the in-system row alone', () => {
+  // THE OPPOSITE RULE, and it is right for the opposite reason. `applyInheritedSections` SKIPS an
+  // `undefined` world value, so a record inheriting a section its old parent never authored was
+  // ALREADY reading its own in-system field — before the re-key and after it. The membership
+  // record still takes the CANONICAL EMPTY, because an absent local section under `inherit: false`
+  // falls back to the SURVIVOR's value; the in-system row takes NOTHING, because writing that same
+  // canonical empty there would DESTROY the authored value and be the only behaviour change this
+  // pass made.
+  const corpus = buildEssenceMergeCorpus({
+    systems: [
+      { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron' }] },
       {
         id: 'sys-b',
         essences: [
@@ -1288,56 +1464,30 @@ test('requirement 8 freezes the MEMBERSHIP RECORD, and the READ UNION does not f
         ],
       },
     ],
-    worldDefaults: { [MINTED_B]: { macro: 'Macro.forge' } },
   });
-  const before = readResolvedWorld(corpus);
-  assert.equal(
-    before[`sys-b|essence|${MINTED_B}`].propertyMacroUuid,
-    'Macro.forge',
-    'BEFORE: the inheriting record makes the union answer the WORLD default'
-  );
+  // THE PREMISE: the world decided nothing, and the SYSTEM authored a macro of its own.
+  assert.deepEqual(corpus.essenceScope.defaults, {});
+  corpus.systems[1].essenceDefinitions[0].propertyMacroUuid = 'Macro.own';
+  const before = copy(payloadOf(corpus));
 
   const result = mergeEquivalentWorldEssences(payloadOf(corpus));
-  // HALF ONE — the scope layer, which requirement 8 is written about, is neutral.
+  assert.equal(result._worldEssenceMergeReport.mergedGroups.length, 1, 'the premise: merged');
   assert.deepEqual(
-    result.essenceScope.membership['iron|sys-b'],
-    {
-      entityId: 'iron',
-      systemId: 'sys-b',
-      inherit: { effectSource: false, macro: false },
-      enabled: true,
-      effectSource: { sourceComponentId: null },
-      macro: 'Macro.forge',
-    },
-    'the frozen record carries the value it resolved to through the parent it LEFT'
-  );
-
-  // HALF TWO — THE DIVERGENCE. The union now answers the in-system record's own `null`.
-  const after = readResolvedWorld(corpusOf(result));
-  assert.equal(
-    after['sys-b|essence|iron'].propertyMacroUuid,
-    null,
-    'MEASURED: the read union does NOT follow a frozen section, so the macro stops running'
-  );
-
-  // AND THE CONTRAST that bounds it: a record whose IN-SYSTEM row already carried the same value
-  // is wholly unaffected, which is every record `1.30.0` itself created.
-  const overriding = buildEssenceMergeCorpus({
-    systems: [
-      { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron', macro: 'Macro.forge' }] },
-      { id: 'sys-b', essences: [{ id: MINTED_B, name: 'Iron', macro: 'Macro.forge' }] },
-    ],
-  });
-  const overridden = mergeEquivalentWorldEssences(payloadOf(overriding));
-  assert.deepEqual(
-    behaviourDifferences(
-      copy(payloadOf(overriding)),
-      corpusOf(overridden),
-      unionOf(overridden.worldEssenceMergeMap)
-    ),
+    behaviourDifferences(before, corpusOf(result), unionOf(result.worldEssenceMergeMap)),
     [],
-    'an ALREADY-OVERRIDING record — which is every record `1.30.0` wrote — is untouched'
+    'the union answers `Macro.own` before and after, because it never followed the world here'
   );
+  assert.equal(
+    result.systems[1].essenceDefinitions[0].propertyMacroUuid,
+    'Macro.own',
+    "the system's OWN authored macro is not overwritten with the canonical empty"
+  );
+  assert.equal(
+    result.essenceScope.membership['iron|sys-b'].macro,
+    null,
+    'while the MEMBERSHIP record still takes the canonical empty, so it cannot fall back to the survivor'
+  );
+  assert.deepEqual(result._worldEssenceMergeReport.inSystemFreezes, []);
 });
 
 // ---------------------------------------------------------------------------
