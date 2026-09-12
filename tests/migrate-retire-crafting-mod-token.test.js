@@ -453,9 +453,9 @@ test('the runner applies 1.21.0 to craftingSystems and bumps the migration versi
   // mark that keeps every existing subject modifier pick rolling (issue 1608).
   // The count is asserted rather than loosened so a FOURTEENTH migration landing here is
   // noticed rather than absorbed — which is exactly how the fourth through thirteenth were.
-  assert.equal(result.ran, 13);
+  assert.equal(result.ran, 14);
   assert.equal(store.get('craftingSystems')[0].craftingCheck.simple.rollFormula, '1d20');
-  assert.equal(store.get('migrationVersion'), '1.33.0');
+  assert.equal(store.get('migrationVersion'), '1.34.0');
 });
 
 // THE CHANNEL. The counts reach `main.js` ONLY through a transient field the runner
