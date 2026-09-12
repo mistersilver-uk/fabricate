@@ -101,12 +101,9 @@ test('CI semantically isolates edited metadata runs and fully gates ready_for_re
 test('a red unit-tests job re-prints its failing tests at the END of the job log', () => {
   const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
 
-  // WHY THIS IS PINNED. `node --test`'s TAP reporter writes each failure where it happens and emits
-  // roughly 119,000 lines, so on a red run every `not ok` line sits in the first ~96% of the log,
-  // past the reach of the log APIs, which serve a bounded tail. At issue 1654 that made a ONE-TEST
-  // failure cost two CI cycles to place, twice reporting counts with no name attached. The re-print
-  // is the only reason a red run is readable, and it is invisible on a green one — so nothing else
-  // would notice it being dropped.
+  // `node --test`'s TAP reporter emits ~119,000 lines, so every `not ok` on a red run sits past
+  // the bounded tail the log APIs serve. The end-of-job re-print is the only thing that makes a
+  // red run readable, and a green run never exercises it (issue 1654).
   assert.match(
     workflow,
     /npm test 2>&1 \| tee "\$RUNNER_TEMP\/unit-tests\.tap"/,

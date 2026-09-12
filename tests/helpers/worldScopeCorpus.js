@@ -732,12 +732,12 @@ export function malformedCorpus() {
 }
 
 // ---------------------------------------------------------------------------
-// The POST-migration merge corpus (issue 1654)
+// The post-migration merge corpus (issue 1654)
 // ---------------------------------------------------------------------------
 
 /**
  * The `effectSource` block a membership record or world default carries, read off a raw essence
- * row through the SHARED field list rather than a second spelling of the three names.
+ * row through the shared field list rather than a second spelling of the three names.
  *
  * @param {object} row A raw essence definition.
  * @returns {Record<string, unknown>}
@@ -751,29 +751,17 @@ function effectSourceBlockOf(row) {
 }
 
 /**
- * Build an ALREADY-MIGRATED world: a `craftingSystems` corpus PLUS the essence and component scope
- * payloads `1.30.0` would have left behind, in the STORED map shape.
+ * Build an already-migrated world: a `craftingSystems` corpus plus the essence and component scope
+ * payloads `1.30.0` would have left behind, in the stored map shape.
  *
- * The `1.30.0` builders above produce a PRE-migration world, which is the wrong starting state for
- * anything that reasons about world essences — there are none yet. This is the same declarative
- * idea one migration later: it is still the ONE shared factory, it reuses {@link rawEssence} for
- * the in-system rows so the row shape cannot drift from the older fixtures, and it defaults every
- * membership record to FULLY OVERRIDING, which is exactly the state `buildMembershipRecord` leaves
- * every pair in.
+ * The builders above produce a pre-migration world, which has no world essences at all. This is the
+ * same declarative idea one migration later: it reuses {@link rawEssence} for the in-system rows,
+ * and defaults every membership record to fully overriding, as `buildMembershipRecord` leaves each.
  *
- * Per-essence declaration fields, all optional but `id`:
- *
- * | field                            | default            | models                                   |
- * |----------------------------------|--------------------|------------------------------------------|
- * | `name` / `icon` / `colorToken` / `description` | derived | the world entity's identity, FIRST declaration wins |
- * | `macro`                          | `null`             | the membership record's `macro` override |
- * | `sourceComponentId`              | `null`             | the row's three effect-source fields      |
- * | `effectSource`                   | derived from the row | an explicit block, for key-order and absence cases |
- * | `inherit`                        | both `false`       | the two section switches                  |
- * | `enabled`                        | `true`             | the membership record's flag              |
- * | `member`                         | `true`             | whether a membership record exists at all |
- * | `inSystem`                       | `true`             | whether an `essenceDefinitions` row exists |
- * | `omitSections`                   | `[]`               | sections the membership record OMITS      |
+ * Per-essence declaration fields, all optional but `id`: `name`, `icon`, `colorToken` and
+ * `description` give the world entity's identity and the first declaration wins; `macro`,
+ * `sourceComponentId` and `effectSource` give the membership record's overrides; `inherit` flips
+ * the two section switches; `enabled`, `member`, `inSystem` and `omitSections` shape what exists.
  *
  * @param {object} [spec]
  * @param {Array<object>} [spec.systems] `[{id, name, essences: [...], components: [{id, member}]}]`
@@ -809,7 +797,7 @@ export function buildEssenceMergeCorpus({
         ...(essence.description === undefined ? {} : { description: essence.description }),
         enabled: essence.enabled !== false,
       };
-      // FIRST DECLARATION WINS the world identity, mirroring the donor rule `1.30.0` lifted under.
+      // The first declaration wins the world identity, as the donor rule `1.30.0` lifted under.
       if (!entitiesById.has(essence.id)) {
         entitiesById.set(essence.id, {
           id: essence.id,

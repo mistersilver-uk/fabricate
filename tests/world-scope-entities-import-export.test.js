@@ -2034,7 +2034,7 @@ test('export: the three slices are FILTERED BY MEMBERSHIP to the exported system
 // ---------------------------------------------------------------------------
 
 /**
- * A bundle carrying TWO equivalent same-name essences inside its ONE system — the shape the
+ * A bundle carrying two equivalent same-name essences inside its one system — the shape the
  * authoring store's same-name guard prevents and the normalizer does not, so it reaches the
  * importer through a hand-edited or a legacy bundle.
  */
@@ -2054,14 +2054,14 @@ for (const schemaVersion of [undefined, FABRICATE_EXPORT_SCHEMA_VERSION]) {
   const branch = schemaVersion === undefined ? 'legacy' : 'current-schema';
   test(`1654 (${branch}): the merge runs BRANCH-INDEPENDENTLY and carries its refusal`, () => {
     const migrated = migrateExportPayload(duplicateEssenceEnvelope(schemaVersion));
-    // THE PREMISE: the derivation above really did lift two world essences for this one system,
+    // The premise: the derivation above really did lift two world essences for this one system,
     // or there would be nothing for the merge to reason about.
     assert.equal(migrated.essenceScope.entities.length, 2, 'two world essences were derived');
 
     const refusals = migrated._worldScopeEntityReport.essenceMergeRefusals;
     assert.ok(Array.isArray(refusals), 'the refusal leg is present on BOTH branches');
     assert.equal(refusals.length, 1, 'the equivalent pair is seen');
-    // A ONE-SYSTEM CORPUS REFUSES EVERY GROUP, and the refusal is the payload. Both members hold a
+    // A one-system corpus refuses every group, and the refusal is the payload: both members hold a
     // membership record for the one system and both carry an `essenceDefinitions` row, so merging
     // them would make that array emit one id twice. Reported rather than silently done.
     assert.equal(refusals[0].reason, 'outputIdCollision');
@@ -2075,7 +2075,7 @@ for (const schemaVersion of [undefined, FABRICATE_EXPORT_SCHEMA_VERSION]) {
 
 test('1654: `migrate(migrate(x))` is deep-equal on the essence slice', () => {
   // The idempotence pin requirement 12 asks for, and it is not vacuous: the merge is applied
-  // rather than refused by THIS path, so a non-idempotent re-point would re-key a re-keyed id on
+  // rather than refused by this path, so a non-idempotent re-point would re-key a re-keyed id on
   // the second pass and the two slices would diverge.
   for (const schemaVersion of [undefined, FABRICATE_EXPORT_SCHEMA_VERSION]) {
     const once = migrateExportPayload(duplicateEssenceEnvelope(schemaVersion));
@@ -2094,7 +2094,7 @@ test('1654: a bundle with nothing to merge is untouched, and grows no key it did
   assert.deepEqual(migrated._worldScopeEntityReport.essenceMergeRefusals, []);
   assert.deepEqual(migrated.system.essenceDefinitions, [{ id: 'iron', name: 'Iron' }]);
   // The synthesized corpus defaults an absent gathering slice to `{}` and an absent recipe list to
-  // `[]`; an ungated write-back would ADD both keys to every bundle that lacked them, forever. The
+  // `[]`, so an ungated write-back would add both keys to every bundle that lacked them. The
   // envelope builder always supplies them, so the gate is exercised on a payload that does not.
   assert.deepEqual(migrated.gatheringConfig, { system: {}, shared: {} });
   const sparse = migrateExportPayload({

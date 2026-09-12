@@ -187,11 +187,11 @@ test('a PARTIAL remap withholds the clear AND the version advance', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The `1.34.0` ESSENCE-MERGE one-shot (issue 1654)
+// The `1.34.0` essence-merge one-shot (issue 1654)
 //
-// A SECOND decision record with a SECOND Number version, so a world that has consumed one may
-// still owe the other. Its gates mirror the `1.30.0` pair above exactly, and these assertions
-// exist because "mirrors it" is a claim a refactor can quietly falsify.
+// A second decision record with a second Number version, so a world that has consumed one may
+// still owe the other. Its gates mirror the `1.30.0` pair above, and "mirrors it" is a claim a
+// refactor can quietly falsify.
 // ---------------------------------------------------------------------------
 
 test('the essence one-shot has its OWN target, and its clear gate is never a lexicographic compare', () => {
@@ -231,11 +231,9 @@ test('the essence clear and its version advance are BOTH inside the same gate', 
 });
 
 test('the CLEAR empties the `systems` leg and WRITES THE TOMBSTONE BACK', () => {
-  // The setting is a two-leg container. `mintEssenceId` resolves a new id against the LIVE roster
-  // alone, so a clear that wrote `{}` hands a retired id straight back to the next essence named
-  // after a merged one — and the reference this pass deliberately left on that key stops
-  // contributing NOTHING and starts contributing the WRONG essence. The failure lands only on
-  // worlds that have FINISHED migrating, which is the worst signature there is.
+  // The setting is a two-leg container: `mintEssenceId` resolves a new id against the live roster
+  // alone, so a clear that wrote `{}` hands a retired id back and a reference this pass left behind
+  // starts contributing the wrong essence — on a world that has finished migrating.
   const body = bodyOf('runWorldEssenceMergeFlagRemap');
   const clearIndex = body.indexOf('SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, {');
   assert.ok(clearIndex > 0, 'the premise: the clear is there');
@@ -248,7 +246,7 @@ test('the CLEAR empties the `systems` leg and WRITES THE TOMBSTONE BACK', () => 
     'never a bare `{}`: that destroys the tombstone silently'
   );
   assert.match(body, /const stored = getSetting\(SETTING_KEYS\.WORLD_ESSENCE_MERGE_MAP\)/);
-  // A GUARDED MIRROR. `src/main.js` spells the two leg names as literals because a computed key
+  // A guarded mirror: `src/main.js` spells the two leg names as literals because a computed key
   // would make the clear unreadable, so the literals are pinned against the constants the pure
   // reader uses. A rename on one side alone fails here rather than at the next boot.
   assert.equal(WORLD_ESSENCE_MERGE_SYSTEMS_LEG, 'systems');

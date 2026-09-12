@@ -165,16 +165,12 @@ test('runContainersChanged: matches the doubly-nested crafting/salvage and singl
 });
 
 // ---------------------------------------------------------------------------
-// UPDATE-OPERATOR SPELLINGS (issue 1654)
+// Update-operator spellings (issue 1654)
 //
-// An update operator is part of the LAST path segment, so a write that uses one reaches
-// the change diff under a different key. The `1.34.0` essence-merge remap forced-replaces
-// each run container (`==<container>`) because it rewrites a map's KEY SET and a merge
-// write cannot remove a key, and `-=` has been reachable all along through
-// `deleteRemovedActiveRunFlags`. A probe for the bare spelling alone matches neither —
-// `runContainersChanged` answers `[]`, no manager drops its cache, and every other client
-// goes on serving runs it has already been told are stale. That is the module header's own
-// "matching the wrong depth means the hook silently never fires", one prefix over.
+// An update operator is part of the last path segment, so a write using one arrives under a
+// different key: the `1.34.0` remap force-replaces each run container (`==<container>`) and
+// `deleteRemovedActiveRunFlags` uses `-=`. A bare-spelling probe matches neither, so no
+// manager drops its cache and every client goes on serving runs it was told are stale.
 // ---------------------------------------------------------------------------
 
 /** The segment-walking probe `foundry.utils.hasProperty` implements at runtime. */
@@ -205,8 +201,8 @@ for (const [operator, why] of [
   ['-=', 'the deletion `deleteRemovedActiveRunFlags` has always been able to write'],
 ]) {
   test(`runContainersChanged matches a \`${operator}\` diff at BOTH flag depths (${why})`, () => {
-    // BOTH DEPTHS IN ONE TEST, because the asymmetry is the trap: crafting and salvage are
-    // DOUBLY nested and gathering is SINGLE-scope, so a fix that hard-coded one parent path
+    // Both depths in one test, because the asymmetry is the trap: crafting and salvage are
+    // doubly nested and gathering is single-scope, so a fix that hard-coded one parent path
     // would leave the other silently unmatched exactly as the bare spelling did.
     assert.deepEqual(
       runContainersChanged(
@@ -232,7 +228,7 @@ for (const [operator, why] of [
 
 test('the operator match is NOT a widening: an unrelated container still returns []', () => {
   // The risk in teaching a matcher a new spelling is that it starts matching everything.
-  // Each container is probed under its OWN last segment only.
+  // Each container is probed under its own last segment only.
   const unrelated = [
     'flags.fabricate.fabricate.==learnedRecipes',
     'flags.fabricate.fabricate.-=alchemyDeadEnds',
@@ -246,7 +242,7 @@ test('the operator match is NOT a widening: an unrelated container still returns
       `${updateKey} touches no Fabricate run container`
     );
   }
-  // The WRONG DEPTH stays wrong under an operator too: a single-scope crafting write is
+  // The wrong depth stays wrong under an operator too: a single-scope crafting write is
   // not a thing Fabricate does, and matching it would fire the hook on a flag nobody reads.
   assert.deepEqual(
     runContainersChanged(expandedDiff('flags.fabricate.==craftingRuns'), hasSegmentPath),
@@ -260,7 +256,7 @@ test('the operator match is NOT a widening: an unrelated container still returns
 });
 
 test('the prefix goes on the LAST segment only, never an interior one', () => {
-  // `flags.fabricate.==fabricate.craftingRuns` is a DIFFERENT write — it force-replaces the
+  // `flags.fabricate.==fabricate.craftingRuns` is a different write — it force-replaces the
   // whole `fabricate` scope object — and a matcher that prefixed interior segments would
   // claim it as a `craftingRuns` touch.
   assert.deepEqual(runContainerDiffPaths('flags.fabricate.fabricate.craftingRuns'), [

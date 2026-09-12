@@ -975,19 +975,16 @@ describe('the essence world-scope presentation leaf', () => {
   });
 });
 
-// ── (13) A RETIRED ESSENCE ID IS NEVER REISSUED (issue 1654) ──────────────────────────────────
+// ── (13) A retired essence id is never reissued (issue 1654) ──────────────────────────────────
 
 /**
- * `1.34.0` merges semantically equivalent world essences and RETIRES the losers' ids — the first
- * time an essence id has ever been re-keyed. That migration deliberately leaves some references
- * pointing at a retired id, and what justifies leaving them is that a key matching no definition
- * contributes nothing. Reissuing the id is the one event that makes that false: the stale key
- * then resolves to a DIFFERENT essence's quantity, silently and on documents the migration never
- * walked.
+ * `1.34.0` retires the losers' ids when it merges equivalent world essences, and the references it
+ * deliberately leaves pointing at a retired id are harmless only while that id matches no
+ * definition. Reissuing it makes a stale key resolve to a different essence's quantity.
  *
- * The risk is not theoretical arithmetic. The shell mints from a FIXED placeholder name, so the
- * shipped sequence is `new-essence`, `new-essence-2`, `new-essence-3` — dense, deterministic, and
- * reclaimed by the very next `+ New essence` press.
+ * Not theoretical: the shell mints from a fixed placeholder name, so the shipped sequence is
+ * `new-essence`, `new-essence-2`, `new-essence-3` — dense, deterministic, and reclaimed by the
+ * next `+ New essence` press.
  */
 describe('a retired essence id is never reissued', () => {
   it('treats a retired id as taken even though no live entity holds it', () => {
@@ -999,7 +996,7 @@ describe('a retired essence id is never reissued', () => {
   });
 
   it('and the same mint WITHOUT the retired leg reclaims it, which is what this guard changes', () => {
-    // NON-VACUITY for the pair above: the ids asserted refused are exactly the ids the shipped
+    // Non-vacuity for the pair above: the ids asserted refused are exactly the ids the shipped
     // two-argument minter hands back, so neither assertion can be passing on an unrelated slug.
     assert.equal(mintEssenceId('Ember Dust', []), 'ember-dust');
     assert.equal(mintEssenceId('New essence', [{ id: 'new-essence' }]), 'new-essence-2');
@@ -1011,7 +1008,7 @@ describe('a retired essence id is never reissued', () => {
   });
 
   it('takes either roster as a Set and writes to neither', () => {
-    // `worldEntityIdSet` hands a Set back AS GIVEN rather than copying it, so a minter that
+    // `worldEntityIdSet` hands a Set back as given rather than copying it, so a minter that
     // unioned the two would mutate the live roster a picker is still rendering.
     const live = new Set(['ash']);
     const retired = new Set(['ash-2']);
@@ -1032,7 +1029,7 @@ describe('a retired essence id is never reissued', () => {
       },
     });
     assert.deepEqual(worldScope.essence.retiredIds, ['cinder', 'soot']);
-    // NON-VACUITY: the leg carrying it is the real projection of the real corpus, not an empty
+    // Non-vacuity: the leg carrying it is the real projection of the real corpus, not an empty
     // state that would answer `[]` to anything asked of it.
     assert.deepEqual(
       worldScope.essence.entities.map((entity) => entity.id),
@@ -1042,9 +1039,9 @@ describe('a retired essence id is never reissued', () => {
   });
 
   it('reads every shape an unmerged or hand-edited world can hold as "no retired ids"', () => {
-    // A world that never merged has NO setting, a migration that found nothing to merge leaves
-    // `{}`, and a hand-edited setting may hold anything. None of those may throw on the publish
-    // path, and none may read as a retired id.
+    // A world that never merged has no setting, a migration that found nothing to merge leaves
+    // `{}`, and a hand-edited setting may hold anything. None may throw on the publish path, and
+    // none may read as a retired id.
     const shapes = [undefined, null, {}, { retired: null }, { retired: [] }, { retired: 'ash' }, 7];
     for (const essenceMergeMap of shapes) {
       const { worldScope } = buildWorldScopeState({ systems: ROSTER, essenceMergeMap });
@@ -1062,21 +1059,13 @@ describe('a retired essence id is never reissued', () => {
   });
 
   it('is WIRED — the guard is unreachable unless the shell mints against it', () => {
-    // MATCHED AS A LIVE STATEMENT, never as a substring. A bare `match` is satisfied by the call
-    // COMMENTED OUT, which is exactly the shape a bisect or a revert produces, so the pin would
-    // certify a shell that mints a hardcoded id and reclaims a retired one on the next press.
+    // Matched as a live statement, never as a substring: a bare `match` is satisfied by the call
+    // commented out, which is the shape a bisect or a revert produces, so the pin would certify a
+    // shell that mints a hardcoded id and reclaims a retired one on the next press.
     //
-    // ── AND HERE IS WHAT THIS STILL DOES NOT PROVE (issue 1654) ──────────────────────────────
-    // NOTHING IN THE REPO PRESSES `[data-world-essence-create]`. This pin and `SEAM 2` above read
-    // the shell's SOURCE; `essence-world-scope-screens-mounted.test.js` mounts the catalogue PAGE,
-    // which by design no longer carries the control, and defers the header button's evidence
-    // here. `manager-mounted.test.js` is the only suite that mounts `CraftingSystemManagerRoot`,
-    // and it is not this file — so a press-and-observe case belongs there, not in a second
-    // Root-mounting harness whose component allowlist would be a hand-copied duplicate of that
-    // one (and which, on the first omission, HANGS as `# cancelled` rather than failing).
-    // So the retired-id guard is proven WIRED and proven CORRECT (the `mintEssenceId` unit cases
-    // above), and is proven by nothing to fire on a real click. That gap is stated rather than
-    // implied: do not read the regex as coverage of the act.
+    // What it does not prove: nothing in the repo presses `[data-world-essence-create]`, and
+    // `manager-mounted.test.js` is the only suite that mounts `CraftingSystemManagerRoot`, so a
+    // press-and-observe case belongs there. Do not read this regex as coverage of the act.
     const [, args] =
       rootSource.match(/\n {4}const id = mintEssenceId\(([\s\S]*?)\n {4}\);/) ?? [];
     assert.ok(args, 'the shell mints the new world essence id from a LIVE statement');
@@ -1085,7 +1074,7 @@ describe('a retired essence id is never reissued', () => {
   });
 });
 
-// ── (14) THE SHARED-DEFINITION CALLOUT NAMES THE WORLD RECORD (issue 1654) ────────────────────
+// ── (14) The shared-definition callout names the world record (issue 1654) ────────────────────
 
 describe('the shared-definition callout names the record its pill claims', () => {
   const editorSource = readFileSync(
@@ -1095,11 +1084,9 @@ describe('the shared-definition callout names the record its pill claims', () =>
   const [calloutSource] = editorSource.match(/<SharedDefinitionCallout[\s\S]*?\/>/) ?? [];
 
   it("draws name and icon from the world entry rather than this system's projection", () => {
-    // The pill reads `World definition` and the sentence reads "Name, icon and colour are world
-    // vocabulary", both of which were true BY CONSTRUCTION while the `1.30.0` lift was 1:1. After
-    // `1.34.0` one world entity backs N in-system records whose `icon` is not in the equivalence
-    // key, so the in-system projection can caption `World definition` with a different glyph in
-    // every system that holds the essence.
+    // `World definition` and "Name, icon and colour are world vocabulary" were true by construction
+    // while the `1.30.0` lift was 1:1; after `1.34.0` one world entity backs N in-system records
+    // whose `icon` is outside the equivalence key, so the caption could carry a per-system glyph.
     assert.ok(calloutSource, 'the rules tab renders the callout');
     assert.match(calloutSource, /World definition/, 'under the world-definition pill');
     assert.match(calloutSource, /name=\{worldEntry\?\.entity\?\.name/);
@@ -1115,25 +1102,18 @@ describe('the shared-definition callout names the record its pill claims', () =>
 });
 
 /**
- * ── AND SO DOES THE HEADER A HAND ABOVE IT ────────────────────────────────────────────────────
- * The callout above is one of TWO medallions the rules route draws for one essence: the page
- * header's 44px `Medallion` + `<h1>` is the other, and the breadcrumb leaf takes the same name.
- * They are rendered by different files — the header lives in the shell, because `.manager-header`
- * is a sibling of `.manager-main` and the page cannot render into it — so nothing but this
- * section holds them to one answer. Sourcing them from different LAYERS is what requirement 13
- * calls a defect: after `1.34.0` the header would print `Iron` + `fa-hammer` from the re-keyed
- * in-system row while the callout ~100px below printed the survivor's `iron` + `fa-fire` under a
- * `World definition` pill, on a route that can edit neither.
+ * The rules route draws two medallions for one essence — this callout and the page header's
+ * `Medallion` + `<h1>`, whose name the breadcrumb repeats — rendered from different files, and
+ * requirement 13 makes sourcing them from different layers a defect. Only this section joins them.
  *
- * Read from the SOURCE because the subject is a `$derived` in the shell, and
- * `manager-mounted.test.js` is the only suite that mounts the shell. Each statement is matched
- * WHOLE, so a commented-out or partially reverted chain fails rather than matching as substring.
+ * Read from source because the subject is a `$derived` in the shell, and `manager-mounted.test.js`
+ * is the only suite that mounts the shell. Each statement is matched whole, so a commented-out or
+ * partially reverted chain fails rather than matching as a substring.
  */
 describe('the rules route header draws the same layer the callout below it does', () => {
   /**
    * One whole top-level `$derived` declaration from the shell, or `''`.
    *
-   * @param {string} name the declared binding name.
    * @returns {string} the statement text, closing paren included.
    */
   function shellDerived(name) {
@@ -1154,13 +1134,12 @@ describe('the rules route header draws the same layer the callout below it does'
   });
 
   it('still leads with the DRAFT on a create, because there is no world record to contradict', () => {
-    // `essenceRulesWorldEntry` is null for exactly two states — a CREATE draft and a world corpus
-    // that cannot answer — and in both the in-system record IS the record. So the fix is the
-    // ORDER of one chain rather than a branch, and this pins the half that must survive: remove
-    // the draft term and the CREATE heading prints an empty name while the GM types one.
+    // `essenceRulesWorldEntry` is null for exactly two states — a create draft and a world corpus
+    // that cannot answer — and in both the in-system record is the record, so the fix is the order
+    // of one chain rather than a branch. Remove the draft term and a create heading prints empty.
     assert.match(shellDerived('essenceEditName'), /essenceEditDraft\?\.name/);
     assert.match(shellDerived('essenceEditIcon'), /essenceEditDraft\?\.icon/);
-    // NON-VACUITY for the whole describe: the derivation this precedence is measured against is
+    // Non-vacuity for the whole describe: the derivation this precedence is measured against is
     // the one the header and the breadcrumb actually render.
     assert.match(rootSource, /<Medallion icon=\{essenceEditIcon\} tint=\{essenceEditTint\}/);
     assert.match(rootSource, /<h1 class="manager-title" title=\{essenceEditName\}>/);
@@ -1168,9 +1147,8 @@ describe('the rules route header draws the same layer the callout below it does'
 
   it('leaves the TINT reading the in-system projection, because M29 already put the world colour there', () => {
     // `adminStore` overlays the world `colorToken` onto the in-system row, so routing the tint
-    // through `essenceRulesWorldEntry` would swap one correct read for another and make the three
-    // chains look uniform at the cost of saying less. This is the callout's rule, stated once more
-    // at the second site that draws the same medallion.
+    // through `essenceRulesWorldEntry` would swap one correct read for another. The callout's rule,
+    // restated at the second site that draws the same medallion.
     const tint = shellDerived('essenceEditTint');
     assert.ok(tint, 'the tint is declared as a live `$derived` too');
     assert.ok(
@@ -1180,19 +1158,15 @@ describe('the rules route header draws the same layer the callout below it does'
   });
 });
 
-// ── (15) THE GATEWAY LINE THAT MAKES THE GUARD REACHABLE (issue 1654) ─────────────────────────
+// ── (15) The gateway line that makes the guard reachable (issue 1654) ─────────────────────────
 
 /**
- * ── WHY THIS DRIVES THE REAL STORE RATHER THAN THE LEAF ───────────────────────────────────────
- * Every assertion in section (13) calls `buildWorldScopeState` with an `essenceMergeMap` of its
- * own, so deleting the one argument `adminStore.js` supplies leaves the whole of this file green
- * — while the product publishes `retiredIds: []` on every world forever and `mintEssenceId`
- * reclaims a retired id on the next `+ New essence` press. That is the exact failure the World
- * Vocabulary's recipe-count line recorded against this same gateway call
- * (`tests/world-vocabulary-admin-store-composition.test.js`): a bound nothing guards is a bound
- * in name only.
+ * Driven through the real store rather than the leaf: every assertion in section (13) passes its
+ * own `essenceMergeMap`, so deleting the one argument `adminStore.js` supplies leaves this file
+ * green while the product publishes `retiredIds: []` on every world forever — the failure
+ * `tests/world-vocabulary-admin-store-composition.test.js` already records against this call.
  *
- * So the subject here is the PUBLISHED `viewState`, from the real `createAdminStore` over the
+ * The subject is therefore the published `viewState`, from the real `createAdminStore` over the
  * shared services double, with `getSetting` answering as a settings registry would.
  */
 describe('the gateway hands the merge map to the projection', () => {
@@ -1200,12 +1174,11 @@ describe('the gateway hands the merge map to the projection', () => {
    * The manager's published `worldScope`, through the real store.
    *
    * @param {(key: string) => unknown} getSetting the world settings registry, doubled.
-   * @returns {Promise<object>} the published `worldScope`.
    */
   async function publishedWorldScope(getSetting) {
     const store = createAdminStore(createServices(makeSystem(), [], [], { getSetting }));
     try {
-      // The publish is the tail of an ASYNC refresh, so a synchronous read sees the pre-publish
+      // The publish is the tail of an async refresh, so a synchronous read sees the pre-publish
       // shape. Selecting the fixture's system is what every adminStore suite drives it with.
       await store.selectSystem('sys1');
       return get(store.viewState).worldScope;
@@ -1233,18 +1206,16 @@ describe('the gateway hands the merge map to the projection', () => {
   });
 
   it('publishes no retired ids rather than THROWING when the setting is unregistered', async () => {
-    // THE SHAPE EVERY SERVICES DOUBLE THAT ANSWERS ONLY THE KEYS IT KNOWS PRODUCES. A real client
-    // registers this key unconditionally at init (`src/config/settings.js`, `BASE_DEFINITIONS`)
-    // and so answers the `{}` default — but Foundry's `game.settings.get` raises on an
-    // unregistered key rather than answering a default, so an unguarded read here would take the
-    // whole manager publish down wherever the key is absent.
+    // The shape a services double answering only the keys it knows produces. A real client
+    // registers this key at init (`BASE_DEFINITIONS`) and answers the `{}` default, but
+    // `game.settings.get` raises on an unregistered key, so an unguarded read takes the publish down.
     const worldScope = await publishedWorldScope((key) => {
       if (key === 'worldEssenceMergeMap') throw new Error('is not a registered game setting');
       return key === 'lastManagedCraftingSystem' ? 'sys1' : '';
     });
 
     assert.deepEqual(worldScope.essence.retiredIds, []);
-    // NON-VACUITY: a store that had died on the way would also answer nothing here, so the
+    // Non-vacuity: a store that had died on the way would also answer nothing here, so the
     // publish this read is taken from has to be a real one with its other legs intact.
     assert.equal(worldScope.essence.entityType, 'essence', 'the publish completed');
     assert.ok(worldScope.component, 'with every other world leg on it');

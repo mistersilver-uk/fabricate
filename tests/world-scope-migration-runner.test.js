@@ -131,19 +131,17 @@ function worldAt129(scenarioIndex = 0) {
 const equivalentEssenceCache = [];
 
 /**
- * A world at `1.29.0` whose two systems share a source ITEM and whose two essences share a NAME
- * under DIFFERENT ids — so `1.30.0` re-keys a component AND lifts TWO world essences, and `1.34.0`
+ * A world at `1.29.0` whose two systems share a source item and whose two essences share a name
+ * under different ids — so `1.30.0` re-keys a component and lifts two world essences, and `1.34.0`
  * then merges them.
  *
- * It exists because no `scenarioSpecs()` corpus writes BOTH decision records, and the requirement
- * that `worldEssenceMergeMap` is the SECOND leg is only observable on a pass that writes both.
- * Built through the SHARED raw-corpus factory rather than a second one; only the per-system
- * declaration differs.
+ * No `scenarioSpecs()` corpus writes both decision records, and `worldEssenceMergeMap` being the
+ * second leg is only observable on a pass that writes both. Built through the shared raw-corpus
+ * factory; only the per-system declaration differs.
  *
- * MEMOIZED AND DEEP-CLONED for the reason {@link worldAt129} is: `_normalizeSystem` mints an id
- * for a record that lacks one from a monotonic stub counter, so building the corpus twice would
- * produce two corpora differing by exactly those minted ids — and the tear arm compares a torn
- * re-run against an untorn baseline.
+ * Memoized and deep-cloned for the reason {@link worldAt129} is: `_normalizeSystem` mints a missing
+ * id from a monotonic stub counter, so building the corpus twice yields two corpora differing by
+ * those ids — and the tear arm compares a torn re-run against an untorn baseline.
  */
 function worldAt129WithEquivalentEssences() {
   if (equivalentEssenceCache.length === 0) {
@@ -179,7 +177,7 @@ function buildEquivalentEssenceCorpus() {
           id: 'sys-b',
           components: [{ id: 'comp-9', refs: ['Item.aaa'] }],
           // A `crypto.randomUUID()`-shaped id, which is what `adminStore.addEssence` mints and
-          // which is why `1.30.0`'s group-by-id left this world with TWO "Iron" world essences.
+          // which is why `1.30.0`'s group-by-id left this world with two "Iron" world essences.
           essences: [{ id: 'kTz9QpLm2xR4vB1a', name: 'Iron' }],
           tools: [],
         },
@@ -398,13 +396,9 @@ test('idempotence (d): a world already at 1.30.0 never re-enters the migration',
   initial.migrationVersion = '1.30.0';
   const { runner, writes } = makeRunner(initial);
   const summary = await runner.run();
-  // FOUR entries are pending, and NONE is this one: issue 1373's `1.31.0`, issue 1371's
-  // `1.32.0`, issue 1608's `1.33.0` and issue 1654's `1.34.0` sit above `1.30.0` on the ladder.
-  // What this test measures is that the world-scope LIFT does not re-enter, and the empty write
-  // list is what proves it — the `1.31.0` pass finds no tool membership record here to backfill,
-  // the `1.32.0` pass no component membership record to mark, the `1.33.0` pass no `bySubject`
-  // check whose subjects have picked anything, and the `1.34.0` pass no two world essences whose
-  // behaviour matches, so none changes anything and no leg is written.
+  // Four entries are pending and none is this one: `1.31.0`, `1.32.0`, `1.33.0` and `1.34.0` all
+  // sit above `1.30.0` on the ladder. What this measures is that the world-scope lift does not
+  // re-enter, and the empty write list proves it: no pass above it finds anything here to change.
   assert.equal(summary.ran, 4, 'only the four passes above it are pending');
   assert.deepEqual(
     writes,
@@ -602,7 +596,7 @@ test('the identity-flag remap does nothing at all without a re-key map', async (
   assert.equal(summary.remappedLeaves, 0);
 });
 // ---------------------------------------------------------------------------
-// 1.34.0 — the essence merge map is the SECOND leg, and tears like the first
+// 1.34.0 — the essence merge map is the second leg, and tears like the first
 // ---------------------------------------------------------------------------
 
 test('the merge map is the SECOND leg: after the re-key map, before recipes and every scope leg', async () => {
@@ -611,8 +605,8 @@ test('the merge map is the SECOND leg: after the re-key map, before recipes and 
   assert.equal(summary.aborted, false);
   assert.equal(summary.deferred, undefined);
 
-  // THE PREMISE, asserted rather than assumed: this corpus really does write BOTH decision
-  // records. Without it the ordering assertions below hold vacuously over a missing leg.
+  // The premise, asserted rather than assumed: this corpus really does write both decision
+  // records, or the ordering assertions below hold vacuously over a missing leg.
   assert.ok(writes.includes('worldScopeRekeyMap'), '1.30.0 really did re-key a component');
   assert.ok(writes.includes('worldEssenceMergeMap'), '1.34.0 really did merge two world essences');
 
@@ -626,7 +620,7 @@ test('the merge map is the SECOND leg: after the re-key map, before recipes and 
   }
 
   // And it really carries both legs: the per-system pairs the rewrite is driven by, and the
-  // TOMBSTONE that stops `mintEssenceId` handing the retired id straight back.
+  // tombstone that stops `mintEssenceId` handing the retired id straight back.
   const map = store.get('worldEssenceMergeMap');
   const [loserId] = Object.keys(map.retired);
   assert.ok(loserId, 'the retired leg names the essence the merge consumed');
@@ -656,7 +650,7 @@ test('tear recovery: the worldEssenceMergeMap leg (setting seam)', async () => {
   assert.equal(summary.deferred, true, 'the pass must DEFER, not throw');
   assert.equal(summary.deferredReason, 'writebackFailed');
   assert.equal(torn.store.get('migrationVersion'), '1.29.0');
-  // The leg is SECOND, so the re-key map landed and nothing after it did.
+  // The leg is second, so the re-key map landed and nothing after it did.
   for (const unwritten of ['worldEssenceMergeMap', 'recipes', 'essenceScope', 'craftingSystems']) {
     assert.deepEqual(
       torn.store.get(unwritten),

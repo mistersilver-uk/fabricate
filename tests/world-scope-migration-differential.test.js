@@ -1040,11 +1040,11 @@ test('idempotence (c) the refusal: an image that overlaps its key set REFUSES th
 // ---------------------------------------------------------------------------
 
 /**
- * The WORLD-WIDE loser-to-survivor lookup a produced `1.34.0` merge map carries.
+ * The world-wide loser-to-survivor lookup a produced `1.34.0` merge map carries.
  *
- * Read off the map the migration ACTUALLY wrote, never re-derived — the discipline
- * {@link canonicaliseProjection} states for the import map, for the same reason: a canonicaliser
- * that recomputed the mapping would agree with a WRONG merge by construction.
+ * Read off the map the migration actually wrote, never re-derived — the discipline
+ * {@link canonicaliseProjection} states for the import map: a canonicaliser that recomputed the
+ * mapping would agree with a wrong merge by construction.
  *
  * @param {object} mergeMapSetting The `fabricate.worldEssenceMergeMap` value.
  * @returns {Map<string, string>}
@@ -1060,14 +1060,12 @@ function essenceMergeIds(mergeMapSetting) {
 }
 
 /**
- * Fold every `essences` QUANTITY MAP a projection carries onto the survivor keys, SUMMING a
+ * Fold every `essences` quantity map a projection carries onto the survivor keys, summing a
  * collision because the survivor carries both merged contributions.
  *
- * `canonicaliseProjection` rewrites every id in VALUE position and every id a projection KEY
- * embeds, which is the whole of what an ENTITY re-key moves. An ESSENCE merge also moves ids in
- * KEY POSITION inside a `Record<essenceId, number>`, and the shared canonicaliser deliberately
- * does not reach those: a component or tool re-key never touches one, and a canonicaliser that
- * rewrote object keys generically would rewrite a salvage group id that happened to match.
+ * `canonicaliseProjection` rewrites ids in value position only, which is the whole of an entity
+ * re-key; an essence merge also moves ids in key position inside a `Record<essenceId, number>`, and
+ * a canonicaliser rewriting object keys generically would rewrite a matching salvage group id.
  *
  * @param {Record<string, object>} projection A `projectEntities` result.
  * @param {Map<string, string>} ids
@@ -1091,22 +1089,20 @@ function foldEssenceQuantities(projection, ids) {
 }
 
 test('the `1.30.0` -> `1.34.0` differential: per-system resolved behaviour is unchanged but for the merge', () => {
-  // THE SAME CRITERION ONE MIGRATION LATER, and the corpus is the one issue 1654 reports: two
-  // systems whose "Iron" arrived under UNRELATED ids, because `adminStore.addEssence` mints a
-  // `crypto.randomUUID()`. `1.30.0` groups essences by trimmed `id`, so it lifted TWO world
-  // essences and left the duplication behind; `1.34.0` is what repairs it.
+  // The same criterion one migration later, over the corpus issue 1654 reports: two systems whose
+  // "Iron" arrived under unrelated ids, because `adminStore.addEssence` mints a
+  // `crypto.randomUUID()` and `1.30.0` groups essences by trimmed `id`.
   //
-  // THE SOURCE ITEMS ARE DELIBERATELY NOT SHARED. `1.30.0` then merges no component and no tool,
-  // so everything this differential sees is attributable to the ESSENCE merge alone rather than
-  // to a component re-key baked into the BEFORE state.
+  // The source items are deliberately not shared, so `1.30.0` merges no component and no tool and
+  // everything this differential sees is attributable to the essence merge alone.
   const raw = buildRawCorpus({
     seed: 1654,
     systems: [
       {
         id: 'sys-a',
         components: [{ id: 'comp-1', refs: ['Item.aaa'] }],
-        // LOWERCASE, because `_normalizeEssenceDefinition` lowercases every id it emits: a
-        // mixed-case fixture arrives at `1.34.0` under a different id than it was authored with.
+        // `_normalizeEssenceDefinition` lowercases every id it emits, so a mixed-case fixture
+        // arrives at `1.34.0` under a different id than it was authored with.
         essences: [{ id: 'iron', name: 'Iron' }],
         tools: [{ id: 'tool-1', refs: ['Item.ccc'] }],
       },
@@ -1121,9 +1117,9 @@ test('the `1.30.0` -> `1.34.0` differential: per-system resolved behaviour is un
   const before = normalizeCorpus(CraftingSystemManager, raw);
   const lifted = migrateAndSave(before);
 
-  // `1.34.0` runs over `1.30.0`'s OUTPUT, back to back in one chain, exactly as `MigrationRunner`
-  // threads them. The BEFORE leg of the differential is the DURABLE state that output occupies —
-  // `lifted.saved`, past the real normalize-and-save seam — for the reason this whole file states.
+  // `1.34.0` runs over `1.30.0`'s output, back to back in one chain, exactly as `MigrationRunner`
+  // threads them. The before leg of the differential is the durable state that output occupies —
+  // `lifted.saved`, past the real normalize-and-save seam.
   const merged = mergeEquivalentWorldEssences({ ...lifted.migrated, worldEssenceMergeMap: {} });
   const report = merged._worldEssenceMergeReport;
   assert.equal(
@@ -1143,8 +1139,8 @@ test('the `1.30.0` -> `1.34.0` differential: per-system resolved behaviour is un
     toolScope: lifted.migrated.toolScope,
   });
 
-  // PROJECTION (a): every field a production reader consumes, per `(system, entity)` pair, read
-  // THROUGH the scope resolvers on both legs. Canonicalised through the map the merge actually
+  // Projection (a): every field a production reader consumes, per `(system, entity)` pair, read
+  // through the scope resolvers on both legs and canonicalised through the map the merge actually
   // wrote, so a successful re-key is invisible and a missed one is a difference.
   const ids = essenceMergeIds(merged.worldEssenceMergeMap);
   assert.equal(ids.size, 1, 'the premise: exactly one essence id was retired');
@@ -1161,20 +1157,20 @@ test('the `1.30.0` -> `1.34.0` differential: per-system resolved behaviour is un
     'every system resolves exactly what it resolved before, under the survivor id'
   );
 
-  // PROJECTION (b) IS THE GUARD HERE rather than the subject. It resolves COMPONENT and TOOL
-  // references, and an essence merge must move NONE of them: a pass that re-keyed a component id
+  // Projection (b) is the guard here rather than the subject: it resolves component and tool
+  // references, and an essence merge must move none of them — a pass that re-keyed a component id
   // while merging essences would be invisible to (a), whose reference leaves are scrubbed.
   //
-  // ITS VALUES ARE PROJECTED COMPONENT RECORDS, so they carry the very `essences` quantity map
-  // this merge re-keys; the same fold is applied here, and for the same reason. A site whose
-  // COMPONENT identity moved still shows every other field, so the fold cannot hide one.
+  // Its values are projected component records, so they carry the `essences` quantity map this
+  // merge re-keys; the same fold applies, and a site whose component identity moved still shows
+  // every other field, so the fold cannot hide one.
   assert.deepEqual(
     projectReferenceClosure(CraftingSystemManager, after, true),
     foldEssenceQuantities(projectReferenceClosure(CraftingSystemManager, lifted.saved, true), ids),
     'an essence merge moves no component or tool reference at all'
   );
 
-  // AND THE EXCEPTION THE REPORT NAMES, which is the whole of the "except" clause: exactly the
+  // And the exception the report names, which is the whole of the "except" clause: exactly the
   // world essence the report retires is gone from the roster, and nothing else is.
   const byCodePoint = (left, right) => (left < right ? -1 : Number(left > right));
   const rosterOf = (payload) =>
@@ -1192,11 +1188,9 @@ test('the `1.30.0` -> `1.34.0` differential: per-system resolved behaviour is un
 });
 
 test('the `1.34.0` merge leaves the `1.30.0` drift detector exactly as it found it', () => {
-  // 8a IS A DISCLOSURE, NOT A BUG, and the registry `label` says so in advance — but the CORPUS
-  // this differential runs over must not be the one that triggers it, or the assertion above
-  // would be reading a drift report as a behaviour change. The two systems author the SAME
-  // presentation here, so `reportWorldIdentityDrift` is empty on both legs and the differential's
-  // silence is attributable to the merge rather than to a drift the detector absorbed.
+  // Requirement 8a is a disclosure, not a bug, and the registry `label` says so — but this corpus
+  // must not trigger it, or the assertion above would read a drift report as a behaviour change.
+  // The two systems author the same presentation, so `reportWorldIdentityDrift` is empty on both.
   const raw = buildRawCorpus({
     seed: 1654,
     systems: [
@@ -1225,11 +1219,9 @@ test('the `1.34.0` merge leaves the `1.30.0` drift detector exactly as it found 
 });
 
 test('the `1.34.0` merge makes the drift detector report the disagreement it promises', () => {
-  // THE ZERO CASE ABOVE IS NOT THE CLAIM. Requirement 8a and the `1.34.0` registry `label` both
-  // promise a GM that the drift report will NAME the systems that disagree about presentation,
-  // and `icon` sits OUTSIDE the equivalence key — so two systems can merge on behaviour while
-  // disagreeing about how the essence looks. That NON-EMPTY branch is the whole disclosure, and
-  // until this arm existed only its zero point was pinned.
+  // The zero case above is not the claim: requirement 8a and the `1.34.0` registry `label` promise
+  // a GM that the drift report names the systems that disagree about presentation, and `icon` sits
+  // outside the equivalence key, so two systems can merge on behaviour and still disagree.
   const raw = buildRawCorpus({
     seed: 1654,
     systems: [

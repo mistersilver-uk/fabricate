@@ -365,17 +365,11 @@ test('the unsafe-systemId skips reach the SUMMARY, so the GM notice can name the
 // ---------------------------------------------------------------------------
 
 /**
- * The index of a LIVE `await <name>();` statement in `src/main.js`, or `-1`.
+ * The index of a live `await <name>();` statement in `src/main.js`, or `-1`.
  *
- * MATCHED AS A STATEMENT, NEVER AS A SUBSTRING, and that is the whole reason this exists.
- * `source.indexOf('await foo();')` is satisfied by the call COMMENTED OUT — which is exactly how
- * a bisect or a revert disables one — so an `indexOf` probe stays green against the mutation it
- * is there to catch. It was written for the essence arm at the bottom of this file and is hoisted
- * here because the two older probes above had the defect it was written for.
- *
- * @param {string} source The `src/main.js` text.
- * @param {string} name The function name.
- * @returns {number}
+ * Matched as a whole statement, never as a substring: `source.indexOf('await foo();')` is satisfied
+ * by the call commented out, which is exactly how a bisect or a revert disables one, so an
+ * `indexOf` probe stays green against the mutation it is there to catch.
  */
 function liveCallIndex(source, name) {
   return source.search(new RegExp(`\n +await ${name}\\(\\);`));
@@ -425,20 +419,16 @@ test('the clear and the version advance are BOTH inside the same gate', () => {
 });
 
 // ---------------------------------------------------------------------------
-// (c) THE `1.34.0` EQUIVALENT-ESSENCE MERGE ARM (issue 1654)
+// (c) the `1.34.0` equivalent-essence merge arm (issue 1654)
 //
-// Its hazard is the OPPOSITE of the re-key arm's. There the ids are leaf VALUES and a plain
-// merge write is correct because no key is ever removed; here the ids are object KEYS, so every
-// rewrite REMOVES one. `Document#update` merges inner objects recursively and performs no
-// deletions, so a merge write leaves the retired key in place beside the new one — and in a
-// CONSUMED `resolvedEssences` snapshot that makes a resumed run transfer essences nobody paid
-// for. Both halves of that are asserted below against a document that applies the documented
-// merge semantics, rather than against a write double that reports success.
+// Here the merged ids are object keys, so every rewrite removes one — and `Document#update` merges
+// inner objects recursively without deleting, leaving the retired key beside the new one. In a
+// consumed `resolvedEssences` snapshot that makes a resumed run transfer essences nobody paid for.
 // ---------------------------------------------------------------------------
 
-// THE PERSISTED SHAPE: a TWO-LEG container. The per-system pairs are nested under `systems`
-// rather than sitting beside `retired`, because a crafting system whose id is literally `retired`
-// would otherwise collide with the tombstone key and nothing validates a system id against that.
+// The persisted shape is a two-leg container: the per-system pairs nest under `systems` rather than
+// sitting beside `retired`, because a crafting system whose id is literally `retired` would collide
+// with the tombstone key and nothing validates a system id against that.
 const MERGE_MAP = Object.freeze({
   systems: {
     'sys-a': { essences: { 'fire-a': 'fire-b' } },
@@ -450,7 +440,7 @@ const MERGE_MAP = Object.freeze({
   },
 });
 
-/** A stored run container holding one active run with a CONSUMED essence snapshot. */
+/** A stored run container holding one active run with a consumed essence snapshot. */
 function craftingRunFlag(essences = { 'fire-a': 1, 'fire-b': 2 }, enabled = null) {
   const prepared = { resolvedEssences: { ...essences } };
   if (enabled) prepared.essenceEnabled = { ...enabled };
@@ -483,19 +473,15 @@ function mergeRecursiveWithoutDeletions(original, other) {
 
 /**
  * A document whose `update()` expands a dotted path and applies the merge semantics above,
- * honouring the `==` FORCED-REPLACEMENT prefix on the last segment.
+ * honouring the `==` forced-replacement prefix on the last segment.
  *
- * THIS IS THE EVIDENCE SURFACE, and it is deliberately not a spy. A write double that records
- * `[key, value]` pairs cannot tell a merge write from a replacement write — both "succeed" — so
- * it would report the corrupting write as a pass. This one stores the result and the assertions
- * read the STORED FLAGS back.
+ * Deliberately not a spy: a double recording `[key, value]` pairs cannot tell a merge write from a
+ * replacement write, since both succeed, so it would report the corrupting write as a pass. This
+ * one stores the result and the assertions read the stored flags back.
  *
- * `getFlag` answers a CLONE, so `flags` models PERSISTENCE and nothing else. Foundry's own
- * `getFlag` answers a live reference, and that difference is exactly what makes the merge hazard
- * insidious rather than obvious: a pass that rewrites the container in place leaves the
- * IN-MEMORY document looking repaired for the rest of the session, however the write landed, and
- * the retired key reappears on the next reload. Cloning the read removes that mask so the
- * assertions can only see what a reload would.
+ * `getFlag` answers a clone, so `flags` models persistence alone. Foundry's answers a live
+ * reference, and a pass that rewrites the container in place would leave the in-memory document
+ * looking repaired until the next reload; cloning the read removes that mask.
  */
 function makeMergeDocument(flags) {
   const document = {
@@ -537,7 +523,7 @@ function forcedReplacementWriters() {
   };
 }
 
-/** The PLAIN merge writers `setFabricateFlag` would have produced, for the hazard control. */
+/** The plain merge writers `setFabricateFlag` would have produced, for the hazard control. */
 function plainMergeWriters() {
   const replace = (document, path, value) => document.update({ [path]: value });
   return {
@@ -559,7 +545,7 @@ test('the pairs are read from the `systems` leg AND NOWHERE ELSE', () => {
     'sys-b': { 'shared-e': 'b-survivor' },
     'sys-c': { 'shared-e': 'c-survivor' },
   });
-  // EXACTLY ONE READER AND EXACTLY ONE LAYOUT. A reader that also accepted the FLAT layout would
+  // Exactly one reader and exactly one layout: a reader that also accepted the flat layout would
   // let the producing migration and this consumer disagree about where the pairs live while both
   // stayed green — the drift the nesting exists to make impossible.
   assert.deepEqual(
@@ -586,8 +572,8 @@ test('hasPendingWorldEssenceMerge is true only for unconsumed PAIRS, and does NO
   assert.equal(hasPendingWorldEssenceMerge({}), false);
   assert.equal(hasPendingWorldEssenceMerge(null), false);
   assert.equal(hasPendingWorldEssenceMerge(undefined), false, 'an absent setting is NOT pending');
-  // THE TOMBSTONE SURVIVES THE CLEAR, so the post-clear value must not read as pending — which is
-  // what would make the pass walk every actor on every boot for the life of the world. This is
+  // The tombstone survives the clear, so the post-clear value must not read as pending — that is
+  // what would make the pass walk every actor on every boot for the life of the world, and it is
   // exactly the value `runWorldEssenceMergeFlagRemap` writes when it clears.
   assert.equal(
     hasPendingWorldEssenceMerge({ systems: {}, retired: MERGE_MAP.retired }),
@@ -618,7 +604,7 @@ test('an id that is not a safe flag-key segment refuses its WHOLE group and is c
   );
   assert.deepEqual(read.unsafeEssenceIds, ['dotted.loser']);
   assert.equal(read.refusedGroups, 1);
-  // The map is derived from the RAW settings corpus, so a hand-edited id may be anything.
+  // The map is derived from the raw settings corpus, so a hand-edited id may be anything.
   assert.equal(
     readWorldEssenceMergeMap({ systems: { s: { essences: { a: 'sur.vivor' } } } }).refusedGroups,
     1
@@ -671,13 +657,12 @@ test('the walker finds the containers at ANY depth, in history as well as active
   assert.deepEqual(container.history[0].outcome.deep[0].resolvedEssences, { 'fire-b': 5 });
 });
 
-// --- THE WRITE -------------------------------------------------------------
+// --- the write -------------------------------------------------------------
 
 test('a PLAIN merge write LEAVES THE RETIRED KEY BEHIND — the hazard, proven, not assumed', async () => {
-  // THE NEGATIVE CONTROL FOR THE WHOLE DESIGN, on the two containers that are exposed to it.
-  // Written as a merge, the rebuilt `{fire-b: N}` is merged INTO the stored map and the retired
-  // key survives: the item then contributes a phantom unit of a retired essence on top of the
-  // survivor's, and a resumed run transfers essences nobody consumed.
+  // The negative control for the whole design, on the two containers exposed to it: written as a
+  // merge, the rebuilt `{fire-b: N}` merges into the stored map and the retired key survives, so
+  // the item contributes a phantom unit of a retired essence and a resumed run transfers it.
   const item = makeMergeDocument({
     fabricate: { fabricate: { essences: { 'fire-a': 1, 'fire-b': 2 } } },
   });
@@ -703,12 +688,9 @@ test('a PLAIN merge write LEAVES THE RETIRED KEY BEHIND — the hazard, proven, 
 });
 
 test('a container shielded by an intervening ARRAY is shielded INCIDENTALLY, not by design', async () => {
-  // WORTH PINNING BECAUSE IT LOOKS LIKE A COUNTER-EXAMPLE AND IS NOT. Foundry's recursive merge
-  // recurses into plain Objects only and replaces an ARRAY wholesale, and today's crafting run
-  // reaches `resolvedEssences` through `steps[]` — so a merge write happens to clear the retired
-  // key there. Nothing about that is a decision: `active` is already a plain map, `steps` could
-  // become one, and a run-level snapshot would be exposed the day it was added. The write idiom
-  // must not depend on the shape of a container it does not own.
+  // Looks like a counter-example and is not: the recursive merge recurses into plain objects only
+  // and replaces an array wholesale, so a merge write happens to clear the retired key under
+  // `steps[]`. The write idiom must not depend on the shape of a container it does not own.
   const actor = makeMergeDocument({
     fabricate: { fabricate: { craftingRuns: craftingRunFlag() } },
   });
@@ -819,9 +801,9 @@ test('a refused write is a LOCKED skip and a broken document is a SKIPPED ERROR'
 });
 
 test('a world with no pending merge never walks the actor corpus', async () => {
-  // THE REASON NO ORDINARY BOOT PAYS FOR A SECOND TRAVERSAL. Both `ready`-body passes are gated
-  // on their OWN pending map, so the only boot that walks twice is the one on which both
-  // migrations land — and on that boot both walks are doing real writes.
+  // No ordinary boot pays for a second traversal: both `ready`-body passes are gated on their own
+  // pending map, so the only boot that walks twice is the one on which both migrations land — and
+  // there both walks are doing real writes.
   const walked = [];
   const actors = {
     [Symbol.iterator]: function* () {
@@ -839,11 +821,11 @@ test('a world with no pending merge never walks the actor corpus', async () => {
   assert.equal(summary.scannedActors, 0);
 });
 
-// --- the COMPOSITION mutation ----------------------------------------------
+// --- the composition mutation ----------------------------------------------
 
 test('src/main.js runs the essence remap from its ready body, AFTER the 1.30.0 remap', () => {
   const source = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
-  // MATCHED AS A LIVE STATEMENT, never as a substring — see {@link liveCallIndex}.
+  // Matched as a live statement, never as a substring — see {@link liveCallIndex}.
   const rekeyIndex = liveCallIndex(source, 'runWorldScopeIdentityFlagRemap');
   const essenceIndex = liveCallIndex(source, 'runWorldEssenceMergeFlagRemap');
   const descriptionsIndex = source.indexOf('notifyUnresolvedItemDescriptions();');
@@ -859,8 +841,8 @@ test('src/main.js runs the essence remap from its ready body, AFTER the 1.30.0 r
 });
 
 test('the essence edge writes through the FORCED-REPLACEMENT path and never setFabricateFlag', () => {
-  // THE SINGLE HIGHEST-RISK LINE IN THE CHANGE. A `setFabricateFlag` write here is a merge write
-  // and silently corrupts a consumed run snapshot; both writes are indistinguishable at the seam,
+  // The highest-risk line in the change: a `setFabricateFlag` write here is a merge write and
+  // silently corrupts a consumed run snapshot, and both writes are indistinguishable at the seam,
   // so the edge is pinned on its source text as well as through the merge document above.
   const source = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
   const start = source.indexOf('async function applyWorldEssenceMergeFlagRemap(');
@@ -884,15 +866,13 @@ test('the essence edge writes through the FORCED-REPLACEMENT path and never setF
 });
 
 test('a `__proto__` key lands as an OWN property rather than reaching the prototype setter', () => {
-  // A PLAIN-OBJECT ACCUMULATOR LOSES IT SILENTLY. `next['__proto__'] = 1` on an object literal
-  // hits the inherited setter and stores NOTHING, so the entry vanishes from the rebuilt map with
-  // no error anywhere. The keys here come off a document's raw flags, which is exactly where a
-  // hand-edited or imported id can be any string at all. `rewriteEssenceQuantityMap` accumulates
-  // into a `Map` for this reason and this is the same rule at the sibling seam.
-  // BUILT THROUGH `JSON.parse`, never an object literal: `{__proto__: 2}` is the literal's
-  // prototype-setter SYNTAX and carries no own key at all, so a literal fixture could not state
-  // the input this guard is about. A flag read back off a document is parsed JSON, which is
-  // exactly how such a key arrives.
+  // A plain-object accumulator loses the key silently: `next['__proto__'] = 1` on an object literal
+  // hits the inherited setter and stores nothing, so the entry vanishes with no error anywhere.
+  // `rewriteEssenceQuantityMap` accumulates into a `Map` for this reason, and so does this seam.
+  //
+  // Built through `JSON.parse` rather than a literal, because `{__proto__: 2}` is the literal's
+  // prototype-setter syntax and carries no own key at all — a flag read back off a document is
+  // parsed JSON, which is how such a key actually arrives.
   const stored = JSON.parse('{"__proto__": 2, "fire-a": 1}');
   assert.ok(Object.hasOwn(stored, '__proto__'), 'the premise: the INPUT carries the hostile key');
 

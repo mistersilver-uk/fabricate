@@ -360,13 +360,12 @@ describe('subscribeActorRunFlagChange', () => {
   });
 
   // -------------------------------------------------------------------------
-  // UPDATE-OPERATOR SPELLINGS, AND THE MIRROR THAT MUST NOT DRIFT (issue 1654)
+  // Update-operator spellings, and the mirror that must not drift (issue 1654)
   //
-  // An update operator is part of the LAST path segment, so a write that uses one arrives
-  // under a different key: the 1.34.0 essence-merge remap force-replaces each run
-  // container, which reaches this diff as `flags.fabricate.fabricate.==craftingRuns`. The
-  // three bare-spelling probes this bridge used to carry matched none of the operator
-  // forms, so the Journal listing and the nav active-run badge silently never refreshed.
+  // An update operator is part of the last path segment, so a write using one arrives under
+  // a different key: the 1.34.0 remap force-replaces each run container, reaching this diff
+  // as `flags.fabricate.fabricate.==craftingRuns`. The bare-spelling probes matched no
+  // operator form, so the Journal listing and the nav active-run badge never refreshed.
   // -------------------------------------------------------------------------
 
   /** The expanded diff Foundry hands `updateActor` for one flattened update key. */
@@ -391,14 +390,13 @@ describe('subscribeActorRunFlagChange', () => {
   };
 
   it('THE DRIFT GUARD: its mirrored path list equals runFlagInvalidation own derivation', () => {
-    // This bridge cannot IMPORT the matcher: `foundryBridge.js` is declared in 102 mounted
-    // component test manifests, each enumerating its module closure by hand, and a manifest
-    // missing an entry HANGS the suite (`# cancelled`) rather than failing it. So the list is
-    // mirrored, exactly as `worldScopeRekeyPending.js` mirrors `SETTING_KEYS` for the same
-    // kind of reason — and, as there, the mirror is GUARDED rather than hand-maintained.
+    // `foundryBridge.js` cannot import the matcher: it is declared by hand in ~102 mounted
+    // component manifests, and a manifest missing an entry hangs the suite (`# cancelled`)
+    // rather than failing it. So the list is mirrored and guarded here, exactly as
+    // `worldScopeRekeyPending.js` mirrors `SETTING_KEYS`.
     //
     // A new run container, a new operator prefix, or a change to where the prefix sits fails
-    // HERE, with this note, instead of leaving the bridge one spelling behind again.
+    // here instead of leaving the bridge one spelling behind.
     const derived = RUN_CONTAINER_FLAG_PATHS.flatMap(({ flagPath }) =>
       runContainerDiffPaths(flagPath)
     );
@@ -412,8 +410,8 @@ describe('subscribeActorRunFlagChange', () => {
 
   for (const operator of ['==', '-=']) {
     it(`fires for a \`${operator}\`-keyed write at BOTH flag depths`, () => {
-      // BOTH DEPTHS, because the asymmetry is the trap the shared module's header names:
-      // crafting and salvage are DOUBLY nested, gathering is SINGLE-scope.
+      // Both depths, because the asymmetry is the trap the shared module's header names:
+      // crafting and salvage are doubly nested, gathering is single-scope.
       assert.ok(firesFor(`flags.fabricate.fabricate.${operator}craftingRuns`), 'crafting');
       assert.ok(firesFor(`flags.fabricate.fabricate.${operator}salvageRuns`), 'salvage');
       assert.ok(firesFor(`flags.fabricate.${operator}gatheringRuns`), 'gathering');
@@ -433,11 +431,10 @@ describe('subscribeActorRunFlagChange', () => {
   });
 
   it('refreshes NOTHING when Foundry own hasProperty is unavailable, deliberately', () => {
-    // A PINNED CHOICE, not an accident. The shared matcher falls back to its own POSIX-dotted
-    // probe when handed a non-function, so delegating without the `typeof` guard would switch
-    // this bridge from "refresh nothing without the engine's probe" to "refresh on a diff
-    // shape we guessed at". That may be an improvement; it is a behaviour change, and it is
-    // not the operator fix's business. Changing it deliberately means changing this test.
+    // A pinned choice: the shared matcher falls back to its own POSIX-dotted probe when handed
+    // a non-function, so delegating without the `typeof` guard would switch this bridge from
+    // "refresh nothing without the engine's probe" to "refresh on a guessed diff shape".
+    // Changing that deliberately means changing this test.
     delete globalThis.foundry;
     assert.ok(!firesFor('flags.fabricate.fabricate.craftingRuns'), 'not even the plain spelling');
     assert.ok(!firesFor('flags.fabricate.fabricate.==craftingRuns'));

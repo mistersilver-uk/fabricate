@@ -395,17 +395,9 @@ test('_cleanupCraftingPreferences WITHHOLDS its sweep while a re-key map is pend
 });
 
 // ---------------------------------------------------------------------------
-// THE NEGATIVE PIN: `1.34.0` adds NO startup prune withhold (issue 1654)
-//
-// The `1.30.0` re-key needed one because a startup pass destroys exactly the data its remap
-// exists to repair. The `1.34.0` ESSENCE merge needs none, and that is an assertion about the
-// startup composition rather than a preference: no pass gated by the `componentIdentityRemap`
-// kind reads an essence id, and no essence id set exists anywhere in the composition. A
-// fail-closed gate on a question no pass asks would suppress housekeeping FOREVER in exchange for
-// protecting nothing.
-//
-// It is pinned NEGATIVELY so a future pass that starts pruning against essence ids fails HERE,
-// with this note, rather than silently needing a withhold nobody adds.
+// A negative pin: `1.34.0` adds no startup prune withhold (issue 1654) because no pass gated on
+// `componentIdentityRemap` reads an essence id, and gating there would suppress housekeeping
+// while protecting nothing. Asserted negatively so a pass that later prunes essence ids fails here.
 // ---------------------------------------------------------------------------
 
 test('no startup pass declares an essence-derived entity kind', () => {
@@ -422,8 +414,8 @@ test('no startup pass declares an essence-derived entity kind', () => {
 });
 
 test('the two passes gated on componentIdentityRemap hold no essence reference at all', () => {
-  // THE EVIDENCE BEHIND THE ABSENCE. The declaration table could be honest and the passes still
-  // read an essence id through some other route, so the sources themselves are measured.
+  // The declaration table could be honest while a pass still reads an essence id by another
+  // route, so the sources themselves are measured.
   const sources = [
     ['src/systems/SalvageRunManager.js', 'salvage runs'],
     ['src/config/preferencesCleanup.js', 'stale preferences'],
