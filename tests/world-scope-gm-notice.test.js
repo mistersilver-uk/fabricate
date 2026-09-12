@@ -22,6 +22,10 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+  getHighestRegisteredMigrationVersion,
+  MigrationRunner,
+} from '../src/migration/MigrationRunner.js';
+import {
   buildWorldEssenceMergeNotice,
   buildWorldScopeEntityNotice,
   buildWorldScopeIdentityRemapNotice,
@@ -473,7 +477,7 @@ test('src/main.js dispatches the merge notice from the migration-summary handler
   // the migration ran — which is why its PRESENCE is asserted rather than inferred.
   const composeIndex = MAIN.indexOf('buildWorldEssenceMergeNotice(worldEssenceMergeReport');
   assert.ok(composeIndex > 0, 'the notice is composed from the transient report');
-  assert.match(MAIN, /const worldEssenceMergeReport = summary\?\._worldEssenceMergeReport \?\? null;/);
+  assert.match(MAIN, /const worldEssenceMergeReport = summary\?\.\w+ \?\? null;/);
   const block = MAIN.slice(composeIndex, composeIndex + 700);
   assert.match(
     block,
@@ -490,6 +494,29 @@ test('src/main.js dispatches the merge notice from the migration-summary handler
   );
   // The GM gate is the same one every sibling notice in this handler carries.
   assert.match(MAIN.slice(composeIndex - 200, composeIndex), /game\.user\?\.isGM/);
+});
+
+test('the summary key main.js reads for the merge report is a key the runner actually emits', async () => {
+  // THE GREP ABOVE CANNOT CLOSE THIS GAP, and shipping proved it: `main.js` read
+  // `summary._worldEssenceMergeReport` while `MigrationRunner.run()` returns
+  // `worldEssenceMergeReport` — the underscore field lives on `data` and is deleted before the
+  // summary is built. A source-text pin matched happily, and the notice was dead code on every
+  // world. So the load-bearing assertion is not the SHAPE of the read, it is that the identifier
+  // read exists on the object being read. Found by post-implementation review at issue 1654.
+  const read = MAIN.match(/const worldEssenceMergeReport = summary\?\.(\w+) \?\? null;/);
+  assert.ok(read, 'main.js reads the merge report off the migration summary');
+
+  const store = new Map([['migrationVersion', getHighestRegisteredMigrationVersion()]]);
+  const summary = await new MigrationRunner({
+    getSetting: (key) => store.get(key),
+    setSetting: async (key, value) => store.set(key, value),
+  }).run();
+
+  assert.ok(
+    Object.hasOwn(summary, read[1]),
+    `main.js reads summary.${read[1]}, which MigrationRunner.run() does not emit — the notice ` +
+      `would be dead code. Emitted keys: ${Object.keys(summary).join(', ')}`
+  );
 });
 
 test('every WorldEssenceMerge localization key the notice references exists in lang/en.json', () => {

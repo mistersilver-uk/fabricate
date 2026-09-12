@@ -1867,7 +1867,7 @@ class Fabricate {
     // what core logs beside a toast is the message it was HANDED, i.e. the capped one. The full
     // id-level dump is therefore logged HERE, at `console.info` rather than `console.debug`,
     // because `debug` maps to DevTools' VERBOSE level and Chromium's default filter excludes it.
-    const worldEssenceMergeReport = summary?._worldEssenceMergeReport ?? null;
+    const worldEssenceMergeReport = summary?.worldEssenceMergeReport ?? null;
     if (worldEssenceMergeReport && game.user?.isGM) {
       const essenceNotice = buildWorldEssenceMergeNotice(worldEssenceMergeReport, (key, data) =>
         data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
