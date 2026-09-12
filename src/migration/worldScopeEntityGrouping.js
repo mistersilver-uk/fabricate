@@ -27,9 +27,16 @@
  * it itself, because it runs on raw settings before any manager load.
  *
  * ESSENCES group by trimmed `id`. An essence has no source item; `sourceComponentId` is a
- * component reference, not identity. Ids are stable semantic slugs, so two systems' `fire` are
- * intended to be one essence. ESSENCE IDS ARE NEVER RE-KEYED, so no essence reference is
- * rewritten and the re-key map carries no essence leg.
+ * component reference, not identity. THIS PASS RE-KEYS NO ESSENCE ID, so no essence reference is
+ * rewritten here and the re-key map carries no essence leg.
+ *
+ * IT IS NOT TRUE THAT AN ESSENCE ID IS A STABLE SEMANTIC SLUG, and this module used to say it was
+ * (issue 1654). An essence id is MINTED PER SYSTEM, by `crypto.randomUUID()` in `adminStore
+ * .addEssence` or by the name-derived `mintEssenceId`, then lowercased and per-system-uniquified
+ * by `_normalizeEssenceDefinition` — so two systems' `fire` usually share no id at all and this
+ * grouping merges only the ids that LITERALLY COINCIDE. Behavioural equivalence across systems is
+ * resolved by the `1.34.0` pass (`mergeEquivalentWorldEssences.js`) instead, which re-keys on the
+ * canonicalised `(name, macro, effectSource)` triple and carries its own map.
  *
  * AN UNLINKED DEFINITION BECOMES ITS OWN WORLD ENTITY AND IS NEVER MERGED — not with another
  * unlinked definition of the same name, not with a linked one. Two unlinked "Ash Salt"s in two
@@ -85,9 +92,14 @@ export const ENTITY_TYPE_FIELDS = Object.freeze({
 });
 
 /**
- * The entity types whose ids this pass may RE-KEY. Essences are deliberately absent
- * (`#### D2`): they group by id, so their id never changes and no essence reference is
- * rewritten.
+ * The entity types whose ids THIS pass may RE-KEY. Essences are deliberately absent
+ * (`#### D2`): they group by id, so their id does not change here and no essence reference is
+ * rewritten by this pass.
+ *
+ * THIS LIST IS NOT A CLAIM THAT AN ESSENCE ID IS IMMUTABLE. The `1.34.0` equivalent-essence merge
+ * DOES re-key essence ids; it deliberately carries its OWN map in `fabricate.worldEssenceMergeMap`
+ * rather than joining this list, because widening it would newly refuse a `1.30.0` pair on a world
+ * holding a native duplicate essence id (issue 1654).
  *
  * @type {readonly string[]}
  */
@@ -488,9 +500,11 @@ function derive(systems, refusedPairs) {
     entities[entityType] = [];
 
     for (const group of groups) {
-      // Essence ids are NEVER re-keyed, so the group's shared id IS the world id and the
+      // THIS migration re-keys no essence id, so the group's shared id IS the world id and the
       // ladder is not consulted. Running the ladder would mint `fire-w2` for the second
       // system's `fire` and re-key an id this migration has undertaken never to re-key.
+      // (The `1.34.0` merge re-keys essence ids under its own map; that does not change what
+      // this pass promises here.)
       const worldId = entityType === 'essences' ? group[0].id : claimWorldId(group, claimed);
       claimed.add(worldId);
       const donor = group[0];

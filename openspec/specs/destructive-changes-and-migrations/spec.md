@@ -219,8 +219,8 @@ The action's stated purpose and its confirmation prompt must name description re
 ### Migration Registry
 
 - Migrations are registered in an ordered array (`MIGRATIONS`), each entry containing: `version` (semver string), `label` (human-readable description), and a `migrate(data)` function.
-- Each migration receives a twelve-key `{ recipes, systems, gatheringConfig, environments, gatheringParties, currencyConfig, travelConfig, characterLibraries, componentScope, essenceScope, toolScope, worldScopeRekeyMap }` data payload (built from the `RECIPES`, `CRAFTING_SYSTEMS`, `GATHERING_CONFIG`, `GATHERING_ENVIRONMENTS`, `GATHERING_PARTIES`, `CURRENCY_CONFIG`, `TRAVEL_CONFIG`, `CHARACTER_LIBRARIES`, `COMPONENT_SCOPE`, `ESSENCE_SCOPE`, `TOOL_SCOPE` and `WORLD_SCOPE_REKEY_MAP` settings) and returns the transformed payload **or a subset of its keys**.
-- The payload GROWS as world-scope settings are added, and every statement of its size below counts the settings the runner actually threads: `1.26.0` took it from five to six, `1.27.0` from six to seven, `1.28.0` from seven to eight, and `1.30.0` from eight to twelve.
+- Each migration receives a thirteen-key `{ recipes, systems, gatheringConfig, environments, gatheringParties, currencyConfig, travelConfig, characterLibraries, componentScope, essenceScope, toolScope, worldScopeRekeyMap, worldEssenceMergeMap }` data payload (built from the `RECIPES`, `CRAFTING_SYSTEMS`, `GATHERING_CONFIG`, `GATHERING_ENVIRONMENTS`, `GATHERING_PARTIES`, `CURRENCY_CONFIG`, `TRAVEL_CONFIG`, `CHARACTER_LIBRARIES`, `COMPONENT_SCOPE`, `ESSENCE_SCOPE`, `TOOL_SCOPE`, `WORLD_SCOPE_REKEY_MAP` and `WORLD_ESSENCE_MERGE_MAP` settings) and returns the transformed payload **or a subset of its keys**.
+- The payload GROWS as world-scope settings are added, and every statement of its size below counts the settings the runner actually threads: `1.26.0` took it from five to six, `1.27.0` from six to seven, `1.28.0` from seven to eight, `1.30.0` from eight to twelve, and `1.34.0` from twelve to thirteen.
   Threading a key is FOUR edits, not one — the raw read, the snapshot, the `data` literal and the change detection — and omitting any one of them is SILENT.
 - A migration may return a payload containing only the keys it mutates; the runner spread-merges the return over the accumulated payload so untouched keys pass through intact.
 This is what makes partial returns (e.g. the 0.1.0 migration returning only `{ recipes, systems }`, or a gathering migration returning only `{ gatheringConfig }`) safe.
@@ -850,6 +850,91 @@ It mutates no input, throws no `FatalMigrationError`, and skips a malformed envi
     The `enabled*Ids` entries themselves survive the downgrade; what is lost is their COMPOSITION, silently, because the old engine drops a picked record that no longer matches rather than reporting it.
 11. **The `label` string is the one string a GM ever reads about this migration**, so it states the new rule in both modes, says the fold is what stops a manual environment composing nothing after the upgrade, says the clear is what keeps the manual-to-automatic guarantee, and names the downgrade cost.
 
+### Equivalent World Essence Merge (`1.34.0`, `downgradeTo: '1.33.0'`, pure, non-mutating, idempotent)
+
+Issue 1654 gives the world ONE record per essence BEHAVIOUR, repairing the duplication `1.30.0` left behind when it grouped essences by an id that is not the semantic key it was assumed to be.
+The pass (`src/migration/mergeEquivalentWorldEssences.js`) merges world essences whose canonicalised `(name, macro, effectSource)` triples are equal, re-keys every reference to the ones it retires, and reports every group it merged, refused or declined.
+It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL object for any key it did not change.
+
+1. **WHY IT IS A FOURTH PASS RATHER THAN A WIDER `1.30.0`.**
+   § World-Scope Entity Migration requirement 1 grouped essences by trimmed `id` on the premise that an essence id is a stable semantic slug, and THAT PREMISE IS FALSE.
+   An essence id is MINTED PER SYSTEM by one of two routes — `crypto.randomUUID()` in `adminStore.addEssence`, or a name-derived slug from `mintEssenceId` (`src/ui/svelte/apps/manager/scoped/essenceScoped.js:488-506`) — and `_normalizeEssenceDefinition` then lowercases and per-system-uniquifies whatever it finds (`src/systems/CraftingSystemManager.js:1940-1946`).
+   So two systems' equivalent essences share no id at all on the commonest authoring route, each was lifted to its OWN world essence, and the duplication issue 1654 reports is exactly what `1.30.0` left behind.
+   `1.30.0`'s grouping, its id-claim ladder, its refusal fixed point and its donor election are NOT changed here, and a world that has already migrated needs the repair whether or not they ever were — so the repair is a SEPARATE pass, exactly as `1.31.0` and `1.32.0` are.
+2. **THE EQUIVALENCE KEY IS THE CANONICALISED TRIPLE `(name, macro, effectSource)`**, read from the world essence's identity snapshot and from the unanimous RESOLVED value requirement 4 establishes.
+   `name` is trimmed and CASE-FOLDED, matching the already case-insensitive same-name guard the authoring surface applies.
+   `macro` is trimmed, with `''` reading as `null`, because an empty string and an absent macro are the same statement.
+   `effectSource` is the three-field block `{sourceComponentId, sourceItemUuid, associatedSystemItemId}` in FIXED KEY ORDER with each value trimmed-or-`null`, so `{}`, an absent block and an all-`null` block compare EQUAL rather than three ways.
+   The key compares the effect-source REFERENCE and NEVER the resolved Item's Active Effects, which live on a document this pass cannot read.
+   **`enabled` IS DELIBERATELY NOT IN THE KEY.**
+   No world default carries it, `resolveEssence` (`src/systems/essenceScope.js`) answers it from the membership record alone, and every member keeps its own across a merge — so per-system resolved behaviour is unchanged by a merge BY CONSTRUCTION rather than by fixture choice.
+2a. **NAME ALONE IS NEVER THE KEY, AND YET FOR THE MODAL ESSENCE THE KEY IS THE NAME AND NOTHING ELSE — DELIBERATELY, AND THIS IS STATED RATHER THAN GLOSSED.**
+    A normalized essence with no property macro and no active-effect source canonicalises to `(name, null, all-null)`, and `_normalizeEssenceDefinition` always emits all four of those fields defaulted to `null` (`src/systems/CraftingSystemManager.js:1956-1959`), so that is the commonest essence there is and the commonest case this pass will meet.
+    It is the OPPOSITE of what § World-Scope Entity Migration requirement 2 does for two unlinked same-name definitions, and the ASYMMETRY IS THE POINT: that requirement governs components and tools, which HAVE a source item that COULD have proved identity and did not, whereas an essence has no source item at all (requirement 1 of that section) and carries no substance beyond this triple.
+    For an essence the triple is the WHOLE OF WHAT THE RECORD IS, not a guess about what it might refer to.
+    A canonical section must not be silently false about its own dominant case, which is why the modal case is named here instead of being left to be discovered.
+3. **`1.30.0`'S COMPONENT RE-KEY ORDERING IS LOAD-BEARING HERE.**
+   Its requirement 8 re-keys the component ids inside `effectSource` BEFORE the scope payloads are built, so two systems naming the same MERGED world component compare equal at this key.
+   Two essences whose AE-source components did NOT merge stay DISTINCT, on the same refusal-to-guess rule, subject to requirement 2a.
+   **AND THE REFUSED CASE CAN MERGE TOO MUCH**, which is why it is refused rather than trusted: `sourceComponentId` is SYSTEM-SCOPED, and for a `(system, 'components')` pair `1.30.0` REFUSED it was never re-keyed into world space at all — `partition` excludes a refused pair outright (`src/migration/worldScopeEntityGrouping.js:295-297`) — so two refused systems carrying a coincidentally equal raw id would merge on a guess.
+   A member whose `sourceComponentId` is NOT a WORLD component id therefore makes its group UNPROVABLE, and the group is REFUSED with reason `unresolvedEffectSourceComponent`.
+4. **CANDIDACY REQUIRES UNANIMITY OVER THE RESOLVED VALUE, AND IS NOT VACUOUS AT ZERO.**
+   Every live membership record of a world essence must resolve — through the shipped `resolveEssence`, never through its stored keys — to the SAME `(macro, effectSource)`.
+   A GM who cleared a switch resolves through the world default, so reading the stored key would compare a value nobody resolves; an ABSENT world default reads as NO OPINION rather than as an empty answer.
+   A world essence with ZERO live membership records is NOT a candidate, is left exactly as it is, and is reported as `orphaned`: unanimity over an empty list is VACUOUSLY TRUE, so the predicate tests the member count explicitly rather than inheriting the trivial answer.
+   One whose members disagree is reported as `declined`, with the section they disagreed on.
+5. **SURVIVOR ELECTION IS RE-DERIVED, NEVER READ OFF ARRAY ORDER.**
+   An id equal to the name-slug the world catalogue would mint for the group's case-folded name is PREFERRED FIRST, so a merge never retires a readable `iron` in favour of a `kTz9QpLm2xR4vB1a`.
+   Then OLDEST STORED CORPUS POSITION, under the same declared corpus-order exception § World-Scope Entity Migration requirement 3 takes and on the same three conditions § Migration Registry states.
+   `essenceScope.entities` array position is the FINAL tie-break ONLY, for a world essence with no surviving in-system member, because a persisted array survives GM edits, store writes and copy-import appends and is the weakest age fact of the three.
+6. **THE MAP IS PER SYSTEM, AND A GROUP IT CANNOT APPLY SAFELY IS REFUSED ENTIRELY.**
+   THREE invariants decide it, and the last two are POST-conditions rather than pre-conditions.
+   DISJOINTNESS of the map's image from its key set, or a single simultaneous lookup is not idempotent.
+   OUTPUT UNIQUENESS of the ids the `(system, 'essences')` pair emits, because disjointness alone does not forbid an output id colliding with an id in the same pair that was not re-keyed.
+   MEMBERSHIP-KEY UNIQUENESS over the REBUILT membership map, and this third one is not redundant: the first two are evaluated over the IN-SYSTEM definition array — `findRefusals` reads exactly that (`src/migration/worldScopeEntityGrouping.js:603-607`) — and cannot see a world essence holding a membership record for a system with no definition row.
+   An intra-system collision is reachable only through imported or hand-edited data, because the same-name guard lives in the authoring store and NOT in the normalizer.
+7. **EVERY REFERENCE THE RE-KEY INVALIDATES IS REWRITTEN, THROUGH THE ONE SHARED WALK** (`src/migration/worldScopeReferenceRewrite.js`), so this pass and the component walk beside it cannot drift.
+   LEAF-VALUE sites: `match.essenceId` at every recipe ingredient-group option and its `alternatives[]` recursion, the same two under `steps[]`, the flat `ingredients[]` alias, and tool `repairRequirements` options in BOTH the system slice and the gathering slice.
+   DEFINITION AND DERIVED sites: `systems[].essenceDefinitions[].id` and `systems[].essences[]`.
+   KEY-POSITION sites: `systems[].components[].essences`, `componentScope.defaults[].essences`, `componentScope.membership[].essences`, and the legacy `ingredientSets[].essences` at BOTH depths.
+   **THE COMPONENT KEY-POSITION REWRITE IS NOT OPTIONAL**: `_normalizeEssenceQuantities` prunes a key that is not in the Valid Id Basis (`src/systems/CraftingSystemManager.js:2734`), so a missed key is a SILENT DELETION on the next save rather than a dangling reference a reader could report.
+   Every other authored key on `essenceScope` is PRESERVED, on the same round-trip promise `readScopePayload` already keeps for the tool scope's fourth sibling.
+8. **A RE-POINTED INHERITING RECORD IS MADE FULLY OVERRIDING ON THE SECTION IT WAS INHERITING.**
+   Changing a membership record's `entityId` changes its WORLD PARENT, so a section it was inheriting would otherwise resolve to a different value — or to nothing at all — the moment the re-key lands.
+   This is § World-Scope Entity Migration requirement 6's "every section overridden" applied at the one moment the parent MOVES, and it is what keeps a merge behaviour-neutral for a record that authored nothing of its own.
+8a. **THE SURVIVOR'S WORLD IDENTITY WINS AND THE LOSER'S WORLD ENTITY ROW IS DELETED WITH ITS `name`, `icon`, `colorToken` AND `description`** — the four `WORLD_IDENTITY_FIELDS.essences` lifts, and a downgrade does not bring them back.
+    **THE IN-SYSTEM RECORDS KEEP THEIRS**, deliberately: while `## CraftingSystem` requirement 36 holds, the in-system copy is the source of truth every reader resolves through, so overwriting a re-keyed system's authored icon or description would destroy authored data this pass has NO BEHAVIOURAL EVIDENCE ABOUT — the triple it merged on says nothing about presentation.
+    The consequence is STATED rather than discovered: `reportWorldIdentityDrift` will report a divergence for every re-keyed record whose `name` case, `icon`, `colorToken` or `description` differs from the survivor's.
+    That disclosure is CORRECT — the systems really do disagree about presentation — so it is left to fire, and the `1.34.0` `label` says IN ADVANCE that it will.
+9. **THE ACTOR- AND ITEM-FLAG REMAP IS NOT A REGISTRY ENTRY**, on the same ground `1.30.0` requirement 13 states: `MigrationRunner` reads and writes settings payloads only and holds no Actor or Item handle.
+   The site list is a SECOND, INDEPENDENT one rather than an extension of that requirement's: `flags.fabricate.fabricate.craftingRuns` and `.salvageRuns` (`resolvedEssences` and `essenceEnabled`), `flags.fabricate.gatheringRuns` AT ITS SINGLE-SCOPE DEPTH, and the system-less item override at the DOUBLY-nested `flags.fabricate.fabricate.essences` under a whole-corpus unambiguity tie-break.
+   `alchemyDeadEnds` is EXCLUDED here because its signature keys hold COMPONENT ids only — a different reason from the one that excludes `learnedRecipes`, which stays excluded because recipe ids are never re-keyed.
+   On a key collision, quantity maps SUM and `essenceEnabled` takes the logical AND.
+   **AND THE REWRITTEN CONTAINER IS WRITTEN WITH A FORCED-REPLACEMENT UPDATE — the `==` key prefix Foundry reads as REPLACE-WHOLESALE, which is not the check-trigger comparison operator of the same spelling — AND NEVER WITH A PLAIN MERGE WRITE.**
+   `Document#update` merges inner objects recursively by default and performs NO DELETIONS, so a plain write of a rebuilt map leaves every retired key in place: exactly the case `remapWorldScopeIdentityFlags.js`'s own "No key is ever REMOVED by this pass" docblock (`src/migration/remapWorldScopeIdentityFlags.js:49-56`) explicitly excludes itself from.
+   A stale key in a CONSUMED `resolvedEssences` snapshot makes a resumed run transfer essences it never consumed, so this is DATA CORRUPTION rather than untidiness.
+   **THE PASS REACHES OWNED ACTOR ITEMS ONLY**: the same override on a world Item, a compendium Item or an unlinked synthetic token actor is never seen and is left stale PERMANENTLY, which the notice states rather than implies.
+10. **THE MAP IS ITS OWN SETTING, NOT A LEG ON `fabricate.worldScopeRekeyMap`**, and the three reasons are structural rather than stylistic.
+    `normalizeRekeyMap` drops any leg outside `REKEYABLE_ENTITY_TYPES`; widening that list would newly REFUSE a `1.30.0` pair on a world carrying a native duplicate essence id, which is a behaviour change to a shipped pass; and `mayClearWorldScopeRekeyMap` is read by two unrelated `1.30.0` source-Item stamp gates that have no business consulting an essence decision.
+    `fabricate.worldEssenceMergeMap` is therefore written as the SECOND writeback leg, immediately after `worldScopeRekeyMap` and before `recipes`, with its own containment, on the same order-independent-recovery-record rule § Migration Registry states.
+    **NO STARTUP PRUNE WITHHOLD IS ADDED.**
+    No pass gated by the `componentIdentityRemap` kind reads an essence id, and no essence id set exists anywhere in the startup composition, so a fail-closed gate would suppress housekeeping FOREVER in exchange for protecting nothing.
+11. **THE CLEAR OF THE PER-SYSTEM MAP AND THE VERSION ADVANCE SHARE ONE GATE AND ARE WITHHELD TOGETHER**, on `compareSemver(migrationVersion, '1.34.0') >= 0` and NEVER a bare JavaScript `>=` over a string setting, which is a LEXICOGRAPHIC compare — the trap `1.30.0` requirement 17 already names.
+    A second, independent withhold applies on a non-zero `skippedErrors`, because a partial remap must stay repairable on the next boot.
+    The `retired` leg of requirement 17 is OUTSIDE that clear and SURVIVES it.
+12. **`migrateExportPayload` APPLIES THIS PASS BRANCH-INDEPENDENTLY** to a synthesised ONE-SYSTEM corpus, ordered AFTER the `1.30.0` slice derivation whose component re-key requirement 3 depends on.
+    It is NOT a no-op there: the same-name guard is an AUTHORING-STORE guard rather than a normalizer guard, so an imported or hand-edited bundle can carry two equivalent same-name essences inside one system.
+13. **THE TRANSIENT REPORT** carries merged groups with their losers, survivors and systems; refusals with their reasons; declined candidates with the section they disagreed on; and orphans — through a `_worldEssenceMergeReport` field the runner captures and DELETES, so it is never persisted.
+14. **Mutated setting keys:** `worldEssenceMergeMap`, `recipes`, `essenceScope`, `componentScope`, `craftingSystems`, `gatheringConfig`.
+15. **THE DOWNGRADE IS LOSSLESS FOR DATA and is declared `downgradeLosesData: false`**, checked rather than copied.
+    The merge is a loss at MIGRATION time rather than one the downgrade causes; `1.33.0` reads every touched key with UNCHANGED normalizers; and the new setting survives as an orphaned `Setting` document that a re-upgrade finds intact, on the same terms `1.30.0` requirement 22 states for the three scope settings.
+    The `label` states the irreversibility caveat beside the Downgrade button anyway, because "no data is lost by downgrading" and "the merge can be undone" are different claims and only the first is true.
+16. **THE `label` STRING IS THE ONE STRING A GM EVER READS ABOUT THIS MIGRATION**, so it says which essences merged and from which systems, that the merge is IRREVERSIBLE, what a refusal means, and what the downgrade does and does not cost.
+17. **A RETIRED ESSENCE ID IS NEVER REISSUED.**
+    `fabricate.worldEssenceMergeMap` carries a `retired` leg — the loser id mapped to a snapshot of its `name`, `icon`, `colorToken`, `description` and member systems — and that leg is NEVER CLEARED.
+    The authoring surface mints a new world essence id by slugging a name and suffixing a collision against the LIVE roster alone (`mintEssenceId`), so without the tombstone it would hand a retired id straight back on the next essence named after a merged one.
+    Reissuing one turns requirement 9's deliberately-unremapped `flags.fabricate.fabricate.essences` key from a reference that contributes NOTHING into one that contributes the WRONG ESSENCE, which is the one outcome the decision to leave an ambiguous key alone was safe because of.
+
 ### Subject Modifier Mark Seed (`1.33.0`, `downgradeTo: '1.32.0'`, pure, clone-first, idempotent)
 
 Records the mark that keeps every existing subject check-modifier pick rolling, now that under `bySubject` an activity check's `defaultModifierIds` BOUNDS the subject's pick rather than merely defaulting it (`resolution-modes/spec.md`, issue 1608).
@@ -952,8 +1037,9 @@ The divergence is also REPORTED once per session to the active GM, as a disclosu
    The key is deliberately not a single canonical field, because two systems that registered the same Item by different routes carry different ones — so the pass unions over `{originItemUuid, registeredItemUuid, ...aliasItemUuids}` and their pre-#560 aliases.
    Union-find is permutation-invariant, so the entity PARTITION is set-equal under a shuffled corpus.
    A tool with no source references of its own resolves through its `componentId`, applying the same derivation the crafting-system normalizer applies on load; the migration must do it itself, because it runs on raw settings before any manager load.
-   An essence has no source item and its id is a stable semantic slug, so two systems' `fire` are intended to be one essence.
-   **ESSENCE IDS ARE NEVER RE-KEYED**, so no essence reference is rewritten and the re-key map carries no essence leg.
+   An essence has no source item, so there is no reference set to close over; its id is instead a PER-SYSTEM MINTED IDENTIFIER whose shape depends on the authoring route — a `crypto.randomUUID()` from the admin store, or a name-derived slug from `mintEssenceId`, either one lowercased and per-system-uniquified by `_normalizeEssenceDefinition`.
+   **THIS PASS THEREFORE GROUPS ONLY THE IDS THAT LITERALLY COINCIDE AND RE-KEYS NONE OF THEM**, so no essence reference is rewritten here and this pass's re-key map carries no essence leg.
+   Behavioural equivalence ACROSS systems — two systems' `fire`, which on the commonest authoring route were never going to share an id — is not decided here at all: § Equivalent World Essence Merge (`1.34.0`) resolves it, and its requirement 1 states why the stable-slug premise this requirement used to assert had to be retracted.
 2. **AN UNLINKED DEFINITION BECOMES ITS OWN WORLD ENTITY AND IS NEVER MERGED** — not with another unlinked definition of the same name, and not with a linked one.
    Two unlinked "Ash Salt"s in two systems are not provably the same thing, and merging on a name would be a silent irreversible content change made on a guess.
 3. **"OLDEST" IS STORED CORPUS POSITION, and this is a DECLARED exception** to § Migration Registry's rule that a migration MUST NOT depend on corpus order, taken under the three conditions that rule states.
@@ -1051,6 +1137,8 @@ The divergence is also REPORTED once per session to the active GM, as a disclosu
 14. **The complete actor-flag site list**, or the reason for exclusion:
     `roles[<systemId>].componentId` and `roles[<systemId>].toolId` on owned Items; the LEGACY FLAT SCALAR `flags.fabricate.fabricate.componentId`, remapped only when the old id is a key in exactly ONE system's component map across the whole corpus or in several that agree, and otherwise left untouched; `craftingRuns` and `salvageRuns` at their DOUBLY-nested depth and `gatheringRuns` at its SINGLE-scope depth, the two depths differing so a pass that assumes one silently misses the other; and `alchemyDeadEnds`, whose signature keys embed component ids SORTED LEXICALLY, so a re-key changes the sort order and the remap must PARSE, remap, RE-SORT and re-join rather than substitute.
     `learnedRecipes` is EXCLUDED, because it holds recipe ids and recipe ids are never re-keyed.
+    **THE ESSENCE MERGE ADDS A SECOND, INDEPENDENT SITE LIST** — § Equivalent World Essence Merge requirement 9 — rather than widening this one, because the two passes remap different key families and one of them reaches a site the other must not.
+    `alchemyDeadEnds` is EXCLUDED there for a DIFFERENT reason than `learnedRecipes` is excluded here: its signature keys hold COMPONENT ids only, so an essence re-key cannot reach them at all, whereas `learnedRecipes` is excluded on recipe ids never being re-keyed by any pass.
     Leaving the legacy scalar is behaviour-PRESERVING rather than lossy: a stale scalar makes tiers 1-2 miss and resolution falls through to the unchanged source-reference tier.
 15. **The dotted-`systemId` guard applies to every `roles.<systemId>` write.**
     A role leaf is written through a flattened `Document#update` key, which Foundry expands on every dot, so a dotted `systemId` nests one level deeper than any reader indexing `roles[systemId]`.

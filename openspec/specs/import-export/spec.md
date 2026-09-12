@@ -145,7 +145,9 @@ It MUST adopt ONLY the three scope keys from the result and MUST NOT adopt the r
 That discard is LOAD-BEARING rather than defensive: the shared function unions every legacy source-reference spelling into `aliasItemUuids` even for a singleton group and writes the merged identity back onto every in-system record, so adopting the returned systems would rewrite in-system identity through the import door — which the one-directional invariant above forbids.
 It MUST NOT hand back a value that ALIASES the shared function's result, because that function answers the ORIGINAL object for a key it did not change and a later in-place reference rewrite would otherwise reach the caller's payload.
 
-For a one-system corpus the re-key map MUST be EMPTY for every ACCEPTED `(system, entityType)` pair among the re-keyable types — components and tools; essences are never re-keyed and carry no map — and a pair whose map is non-empty MUST be REFUSED, so no imported bundle is ever re-keyed.
+For a one-system corpus the `1.30.0` re-key map MUST be EMPTY for every ACCEPTED `(system, entityType)` pair among the RE-KEYABLE types — components and tools — and a pair whose map is non-empty MUST be REFUSED, so no imported bundle has a component or tool id re-keyed.
+**The `1.34.0` ESSENCE MERGE MAP is NOT bound by that MUST**: for a one-system corpus it MAY be NON-EMPTY, and it is APPLIED rather than REFUSED.
+It is confined to the bundle and produces exactly the corpus the world pass produces for the same data, whereas a destination world already at `1.34.0` would never re-run the migration — so refusing here would leave the duplicate in the destination FOREVER (`destructive-changes-and-migrations/spec.md` § Equivalent World Essence Merge requirement 12).
 A REFUSED pair MUST yield an empty slice AND a REPORTED refusal, never a silently empty slice: an empty slice alone is indistinguishable from a system with no world members.
 
 A payload whose activity check sits on the `bySubject` rule with an AUTHORED EMPTY `defaultModifierIds` MUST have the world-side `1.33.0` transform applied to its one system, its recipes and its gathering slice, using the SAME function that migration applies (`applySubjectModifierMarks`), not a second implementation of it.
@@ -297,7 +299,8 @@ Import MUST additionally emit four WORLD-SCOPE ENTITY kinds, each carrying the s
 - `worldEntityCollision` — an incoming entity id equals a DESTINATION world entity's id while their source-reference sets prove they are different items.
   It RESOLVES, to the wrong thing, which is why it is reported and not repaired: keep mode must not regenerate anything.
   It applies in keep mode for all three entity types and in COPY mode for tools and essences, whose identifiers copy mode preserves verbatim; components in copy mode are protected by the match-or-mint rule below.
-  **The ESSENCE arm of this rule is VACUOUS in practice, and is stated rather than quietly relied on:** an essence id is a stable semantic slug that the world-scope grouping treats as the identity itself, so no world essence entity carries a source link at all and the disjointness test can never find the positive evidence it requires.
+  **The ESSENCE arm of this rule is VACUOUS in practice, and is stated rather than quietly relied on:** `WORLD_IDENTITY_FIELDS.essences` lifts `name` / `icon` / `colorToken` / `description` and NO SOURCE LINK, so no world essence entity carries one, `destination.refs.size` is 0 for every one of them, and the disjointness test can never find the positive evidence it requires.
+  The reason is that IDENTITY FIELD LIST and not any claim that an essence id is a stable semantic slug — it is not one, and `1.34.0` re-keys essence ids (`destructive-changes-and-migrations/spec.md` § Equivalent World Essence Merge requirement 1) — so the arm stays vacuous on a ground the merge does not disturb.
   The rule is still stated over all three types, so a world essence that ever acquired a source link is covered without an amendment; it is not a tested arm today.
   It is also the kind under which a copy-mode MULTI-MATCH reports each losing candidate, and under which a copy-mode CONTENTION — two incoming records wanting the same destination entity — reports the contested id against BOTH owners.
 - `worldEntityMissing` — a membership record or world default whose entity id names no entity in the MERGED roster.
@@ -352,7 +355,8 @@ The map MUST additionally rewrite every component reference INSIDE the three wor
 A MATCHED entity's roster record MUST be DROPPED from the incoming roster rather than added under its pre-import id, which would create a second world record for an item the destination already holds and would leave every membership record naming a world entity absent from the merged roster.
 Dropping rather than re-keying is stated deliberately: re-keying and relying on the merge's destination-wins collision rule is observationally equivalent under a CORRECT merge, and choosing it would make this rule's correctness depend on that one being right.
 
-Tool and essence identifiers are unaffected — copy mode never regenerated them — and an id collision on either is REPORTED rather than repaired.
+Tool and essence identifiers are unaffected by COPY-MODE REBINDING — copy mode never regenerated them — and an id collision on either is REPORTED rather than repaired.
+That is a statement about REBINDING alone: the `1.34.0` upcast may MERGE two equivalent essences inside the bundle BEFORE copy mode runs, and such a merge is REPORTED rather than silent.
 
 Copy-mode import MUST preserve task, event, character-modifier, recipe-item-definition, and salvage-group identifiers so environment-to-library linkages and routing survive.
 Character-prerequisite and modifier-library entry identifiers are preserved for a stronger reason since issue 1308: they are world scope, so a copy that minted fresh ones would fork the world's own rules rather than duplicate a per-system record.
