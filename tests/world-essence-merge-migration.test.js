@@ -517,11 +517,11 @@ test('the report carries exactly the four named legs', () => {
   )._worldEssenceMergeReport;
   assert.deepEqual(Object.keys(report), ['mergedGroups', 'refusals', 'declined', 'orphaned']);
   assert.deepEqual(report.mergedGroups, [
-    { survivorId: 'iron', loserIds: [MINTED], systemIds: ['sys-a', 'sys-b'] },
+    { survivorId: 'iron', name: 'Iron', loserIds: [MINTED], systemIds: ['sys-a', 'sys-b'] },
   ]);
   assert.deepEqual(report.orphaned, [{ essenceId: 'lonely', name: 'lonely' }]);
   assert.deepEqual(report.declined, [
-    { essenceId: 'mixed', sections: ['macro'], reason: 'sectionDisagreement' },
+    { essenceId: 'mixed', name: 'Mixed', sections: ['macro'], reason: 'sectionDisagreement' },
   ]);
 });
 

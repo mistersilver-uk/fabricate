@@ -681,7 +681,12 @@ test('the 1.34.0 report reaches the SUMMARY and is NEVER persisted', async () =>
   const report = summary.worldEssenceMergeReport;
   assert.ok(report, 'the report must reach the SUMMARY — a migration cannot report any other way');
   assert.deepEqual(report.mergedGroups, [
-    { survivorId: 'iron', loserIds: ['ktz9qplm2xr4vb1a'], systemIds: ['sys-a', 'sys-b'] },
+    {
+      survivorId: 'iron',
+      name: 'Iron',
+      loserIds: ['ktz9qplm2xr4vb1a'],
+      systemIds: ['sys-a', 'sys-b'],
+    },
   ]);
   assert.deepEqual(report.refusals, []);
   assert.deepEqual(report.declined, []);
