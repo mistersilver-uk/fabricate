@@ -350,12 +350,16 @@ const ESSENCE_MERGE_NOTICE_NAME_CAP = 5;
  * corner toast. An enumeration of them is a wall of hex a GM can do nothing with. The equivalence
  * key CASE-FOLDS the name, so every group has exactly one readable name by construction.
  *
- * THE RESOLUTION IS DEFENSIVE BECAUSE THE PRODUCER'S CONTRACT IS NOT YET FIXED.
- * `buildWorldEssenceEquivalence` emits `{survivorId, loserIds, systemIds}` for a merged group and
- * carries no `name` on it, while `retired` — keyed by loser id — does carry one. So the name is
- * read from the entry first (the field the report SHOULD grow), then from the tombstone of any
- * loser in the group, and only then does it fall back to the id, which is the one outcome this
- * clause exists to avoid and is therefore the last resort rather than the default.
+ * THE ENTRY'S OWN `name` IS THE CONTRACT AND IS ALWAYS PRESENT. `buildWorldEssenceEquivalence`
+ * carries an absence-preserving `name` on every `mergedGroups`, `refusals` and `declined` entry,
+ * and a survivor cannot lack one BY CONSTRUCTION: a nameless essence fails canonicalisation and
+ * is declined before it can ever become a candidate.
+ *
+ * THE REST OF THE CHAIN IS A GUARD, NOT A PATH. The report arrives through a TRANSIENT
+ * `_worldEssenceMergeReport` field that the runner captures and deletes, so it is never validated
+ * by a schema and a malformed one must still produce a readable sentence rather than the string
+ * `undefined` in a permanent toast. The tombstone lookup and the id fall-back cost nothing and
+ * are unreachable from correct data; they are deliberately NOT asserted as reachable.
  *
  * @param {object|null} entry A `mergedGroups`, `refusals` or `declined` entry.
  * @param {object|null} retired The `retired` tombstone map, when the report carries it.

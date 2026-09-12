@@ -413,10 +413,15 @@ test('the toast CAPS its enumeration and the console keeps every id', () => {
   assert.equal(describeWorldEssenceMerge(null), '');
 });
 
-test('a group with no name anywhere degrades to its id rather than to `undefined`', () => {
-  // THE LAST RESORT, and it is asserted so the fallback order is deliberate: the entry's own
-  // `name` first (the field the producer's report should grow), then the tombstone of any loser
-  // in the group, and only then the id.
+test('the entry name wins, and a MALFORMED report still degrades readably', () => {
+  // THE ENTRY'S OWN `name` IS THE CONTRACT: `buildWorldEssenceEquivalence` carries one on every
+  // merged, refused and declined entry, and a survivor cannot lack one by construction — a
+  // nameless essence fails canonicalisation and is declined before it can become a candidate.
+  //
+  // THE REST OF THE CHAIN IS A GUARD RATHER THAN A PATH, and this asserts it as one. The report
+  // arrives through a TRANSIENT field no schema validates, so a malformed one must still produce
+  // a readable sentence instead of the literal string `undefined` in a PERMANENT toast. It is
+  // deliberately not claimed to be reachable from correct data.
   const message = buildWorldEssenceMergeNotice(
     { mergedGroups: [{ survivorId: 'nameless', loserIds: ['gone'] }] },
     noLocalizer
@@ -430,8 +435,37 @@ test('a group with no name anywhere degrades to its id rather than to `undefined
     },
     noLocalizer
   );
-  assert.match(preferred, /From the entry/);
+  assert.match(preferred, /From the entry/, "the producer's own `name` is what the GM reads");
   assert.doesNotMatch(preferred, /From the tombstone/);
+});
+
+test('the shipped report shape — a `name` on every entry — needs no fallback at all', () => {
+  // THE CONTRACT, PINNED POSITIVELY. `buildWorldEssenceEquivalence` carries an absence-preserving
+  // `name` on each of the three entry types, so this is the shape the notice actually meets. A
+  // regression that dropped `name` from the producer would surface here as a wall of UUIDs.
+  const message = buildWorldEssenceMergeNotice(
+    {
+      mergedGroups: [{ survivorId: 'd3adb33f-1111', loserIds: ['c0ffee-2222'], name: 'Iron' }],
+      refusals: [
+        {
+          survivorId: 'feedface-3333',
+          loserIds: ['badc0de-4444'],
+          name: 'Ash',
+          reason: 'outputIdCollision',
+        },
+      ],
+      declined: [{ essenceId: 'deadbeef-5555', name: 'Water', sections: ['macro'] }],
+    },
+    noLocalizer
+  );
+  assert.match(message, /one shared essence: Iron\./);
+  assert.match(message, /Ash \(outputIdCollision\)/);
+  assert.match(message, /Water \(macro\)/);
+  assert.doesNotMatch(
+    message,
+    /[0-9a-f]{6,}-\d{4}/,
+    'not one id reaches the toast when the producer supplies every name'
+  );
 });
 
 test('src/main.js dispatches the merge notice from the migration-summary handler', () => {
