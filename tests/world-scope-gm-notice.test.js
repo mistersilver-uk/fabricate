@@ -602,6 +602,26 @@ test('src/main.js composes and posts the essence remap notice from the pass summ
   );
 });
 
+test('the Merged clause fallback and its lang/en.json string say the SAME thing', () => {
+  // EXISTENCE IS NOT AGREEMENT, and the gap between the two is where this drifted. The guards
+  // either side of this one assert only that a key EXISTS; both stayed green while the inline
+  // English fallback kept a sentence — "the systems that held them now draw the surviving
+  // essence's colour" — that requirement 8a had already made false, and that `lang/en.json` had
+  // already been corrected away from. The fallback fires whenever `game.i18n` cannot resolve the
+  // key, so the two are alternative renderings of one GM-facing claim about an IRREVERSIBLE
+  // change, and a claim that differs by channel is worse than one that is merely wrong.
+  const lang = JSON.parse(readFileSync(resolve(HERE, '..', 'lang', 'en.json'), 'utf8'));
+  const expected = lang.FABRICATE.Migration.WorldEssenceMerge.Merged;
+  const source = readFileSync(
+    resolve(HERE, '..', 'src', 'migration', 'worldScopeEntityNotice.js'),
+    'utf8'
+  );
+  const fallback = source.match(/`Fabricate found \$\{merged\.length\}([\s\S]*?)`/);
+  assert.ok(fallback, 'the premise: the module really does carry an inline Merged fallback');
+  const normalized = `Fabricate found {count}${fallback[1].replaceAll('${names}', '{names}')}`;
+  assert.equal(normalized, expected);
+});
+
 test('every WorldEssenceMerge key the REMAP notice references exists in lang/en.json', () => {
   const lang = JSON.parse(readFileSync(resolve(HERE, '..', 'lang', 'en.json'), 'utf8'));
   const source = readFileSync(

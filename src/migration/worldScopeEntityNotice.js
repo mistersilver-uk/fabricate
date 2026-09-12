@@ -460,7 +460,7 @@ export function buildWorldEssenceMergeNotice(report, localize) {
         localize,
         'FABRICATE.Migration.WorldEssenceMerge.Merged',
         { count: merged.length, names },
-        `Fabricate found ${merged.length} set(s) of essences that were the same essence in more than one system — same name, same macro and same active-effect source — and made each set one shared essence: ${names}. Every reference was updated. This cannot be undone: the other essences in each set are gone, along with their own icon, colour and description, and the systems that held them now draw the surviving essence's colour.`
+        `Fabricate found ${merged.length} set(s) of essences that were the same essence in more than one system — same name, same macro and same active-effect source — and made each set one shared essence: ${names}. Every reference was updated. This cannot be undone: the other essences in each set are gone, along with their own world icon, colour and description, and the systems that held them now resolve the surviving essence as the shared definition — but each system's own essence row keeps the name, icon and description it was authored with, so what you see inside a system may not change at all.`
       )
     );
   }
