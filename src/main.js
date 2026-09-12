@@ -130,6 +130,7 @@ import { MIGRATION_DEFERRAL_REASONS, MigrationRunner } from './migration/Migrati
 // module is a readability trap on a public surface: a reader of `applyWorldScope...` cannot
 // tell which is which, and the wrong one is the ungated one.
 import {
+  buildWorldEssenceMergeRemapNotice,
   forcedReplacementFlagPath,
   hasPendingWorldEssenceMerge,
   mayClearWorldEssenceMergeMap,
@@ -5669,11 +5670,16 @@ async function applyWorldScopeIdentityFlagRemap(rekeyMap) {
  * `fabricate.worldEssenceMergeMap`. The pure logic lives in `remapWorldScopeIdentityFlags.js`;
  * what is here is the Foundry edge and the gates.
  *
- * IT MIRRORS `runWorldScopeIdentityFlagRemap` DELIBERATELY AND COMPLETELY — the same DECISION/WORK
- * split, the same two withholds, the same `compareSemver` gate — because the two passes face the
- * same three hazards and a second, subtly different set of gates would be a set nobody could
- * reason about together. What it does NOT share is the decision record: `1.34.0` carries its own
- * map and its own Number version, so a world that has consumed one may still owe the other.
+ * IT MIRRORS `runWorldScopeIdentityFlagRemap` IN ITS GATES — the same DECISION/WORK split, the
+ * same two withholds, the same `compareSemver` gate — because the two passes face the same three
+ * hazards and a second, subtly different set of gates would be a set nobody could reason about
+ * together. It mirrors it in its GM CHANNEL too: both post a permanent warning built from the
+ * pass summary, because both can leave a documented, unrepaired remainder.
+ *
+ * IT DOES NOT MIRROR IT EVERYWHERE, and the two differences are named rather than left to be
+ * discovered. The decision record is separate — `1.34.0` carries its own map and its own Number
+ * version, so a world that has consumed one may still owe the other — and the WRITE is a forced
+ * replacement rather than a merge, because this half rewrites KEY SETS and the sibling does not.
  *
  * IT RUNS AFTER THE `1.30.0` REMAP, AND THE ORDER IS LOAD-BEARING. On a world migrating `1.30.0`
  * and `1.34.0` in one boot both passes read and rewrite the SAME run containers. This half writes
@@ -5748,13 +5754,32 @@ async function runWorldEssenceMergeFlagRemap() {
  * EVERY WRITE IS A FORCED REPLACEMENT (`forcedReplacementFlagPath`), never `setFabricateFlag`. An
  * essence id is an object KEY, so a re-key REMOVES one key and adds another — and `Document#update`
  * merges inner objects recursively and performs no deletions, so a plain merge write would leave
- * the retired key in place beside the new one. In a CONSUMED `resolvedEssences` snapshot that makes
- * a resumed run transfer essences it never consumed.
+ * the retired key in place beside the new one.
+ *
+ * THE WORKED INSTANCE IS THE ITEM OVERRIDE, NOT A RUN CONTAINER. `flags.fabricate.fabricate.
+ * essences` is a plain `{[essenceId]: quantity}` map directly under its container key, so writing
+ * `{'fire-b': 3}` over a stored `{'fire-a': 1, 'fire-b': 2}` persists `{'fire-a': 1, 'fire-b': 3}`
+ * and the retired key SURVIVES. A run container happens to be shielded today only because
+ * `resolvedEssences` sits under `steps`, an ARRAY Foundry's recursive merge replaces wholesale.
+ * THAT SHIELDING IS INCIDENTAL AND IS NOT RELIED ON: `active` one level up is already a plain map,
+ * `steps` could become one, and the change would turn a passing write into corruption with nothing
+ * to signal it — a stale key in a CONSUMED `resolvedEssences` snapshot makes a resumed run
+ * transfer essences it never consumed.
  *
  * @param {object} mergeMap The pending `fabricate.worldEssenceMergeMap`.
  */
 async function applyWorldEssenceMergeFlagRemap(mergeMap) {
-  const replace = (document, path, value) => document?.update?.({ [path]: value });
+  // AWAITED AND PROBED, rather than counted as landed on the strength of not throwing. A document
+  // with no `update` answers `undefined` and `Document#update` RESOLVES `undefined` on an empty
+  // diff, so the bare call cannot tell a write that landed from one that never happened — and the
+  // summary counts this returns are now read by a GM notice rather than by `console.debug` alone.
+  // A missing `update` is the one case that is unambiguously NOT a write, so it is the one this
+  // reports; an empty diff stays indistinguishable and is left counted, which overstates nothing
+  // a GM acts on because no withhold reads these counts.
+  const replace = async (document, path, value) => {
+    if (typeof document?.update !== 'function') return undefined;
+    return document.update({ [path]: value });
+  };
   const summary = await remapEssenceFlagsAcrossActors({
     actors: game.actors ?? [],
     mergeMap,
@@ -5769,6 +5794,14 @@ async function applyWorldEssenceMergeFlagRemap(mergeMap) {
       replace(document, forcedReplacementFlagPath(key, { bare: true }), value),
   });
   console.debug?.('Fabricate | world essence merge flag remap complete', summary);
+
+  // THE GM CHANNEL, and the sibling's exact shape. Without it the three legs below were returned
+  // and read by nothing: a refused group leaves the world merged in its SETTINGS and un-merged in
+  // its ACTOR FLAGS, which is the one outcome of this pass a GM has to act on.
+  const notice = buildWorldEssenceMergeRemapNotice(summary, (key, data) =>
+    data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
+  );
+  if (notice && game.user?.isGM) ui.notifications?.warn?.(notice, { permanent: true });
   return summary;
 }
 

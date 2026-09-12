@@ -65,6 +65,7 @@
 
 import { FABRICATE_FLAG_NAMESPACE, isSafeFlagKeySegment } from '../config/flags.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
+import { localizeWith } from '../utils/localizeWithFallback.js';
 
 import { compareSemver } from './MigrationRunner.js';
 
@@ -510,8 +511,22 @@ export async function remapWorldScopeIdentityFlags({
 // `Document#update` merges inner objects recursively (`recursive` defaults true) and
 // `foundry.utils.mergeObject` defaults `performDeletions` false, so writing `{'fire-b': 3}` over a
 // stored `{'fire-a': 1, 'fire-b': 2}` persists `{'fire-a': 1, 'fire-b': 3}` — the retired key
-// SURVIVES. In a CONSUMED `resolvedEssences` snapshot that makes the resumed run transfer 4 units
-// where 3 were paid for. That is data corruption, not untidiness.
+// SURVIVES.
+//
+// THE WORKED INSTANCE IS THE ITEM OVERRIDE AND NOT A RUN CONTAINER, and the difference is stated
+// because it is ACCIDENTAL rather than designed. `flags.fabricate.fabricate.essences` is a plain
+// `{[essenceId]: quantity}` map sitting DIRECTLY under its container key, so the surviving-key
+// case above is exactly what it persists. For `craftingRuns` the retired key happens to be
+// cleared today, because `resolvedEssences` lives at
+// `active[runId].steps[i].preparedConsumption.resolvedEssences` and `steps` is an ARRAY, which the
+// recursive merge REPLACES WHOLESALE rather than merging entry by entry — the same property the
+// module note above already relies on for `alchemyDeadEnds`.
+//
+// THAT SHIELDING IS INCIDENTAL AND IS NOT RELIED ON: `active` one level up is already a plain map,
+// `steps` could become one, and a single container-shape change would turn a passing write into
+// the corruption below with nothing to signal it. In a CONSUMED `resolvedEssences` snapshot that
+// makes the resumed run transfer 4 units where 3 were paid for. That is data corruption, not
+// untidiness.
 //
 // The write is therefore ONE ATOMIC UPDATE per container using Foundry's FORCED-REPLACEMENT key
 // prefix `==` on the LAST path segment (see {@link forcedReplacementFlagPath}). `{recursive:
@@ -991,4 +1006,75 @@ export async function remapWorldEssenceIdentityFlags({
     await applyEssenceRemapToActor(actor, context);
   }
   return summary;
+}
+
+/**
+ * The one-time notice describing what the `1.34.0` essence flag remap could NOT repair.
+ *
+ * THE SIBLING HAS ONE AND THIS HALF DID NOT, WHICH IS THE GAP THIS CLOSES.
+ * {@link remapWorldEssenceIdentityFlags} returns three legs nothing read — `unsafeEssenceIdSkips`,
+ * `refusedGroups` and `lockedSkips` — and the pass ended at `console.debug`, so the one state a
+ * GM has to know about was announced to nobody. That state is REACHABLE: the map is derived from
+ * the RAW settings corpus, so a hand-edited or imported essence id can fail
+ * `isSafeFlagKeySegment`, {@link partitionSafeEssencePairs} refuses its WHOLE group, and the world
+ * is then merged in its SETTINGS and un-merged in its ACTOR FLAGS. A consumed `resolvedEssences`
+ * snapshot keeps a retired key, which § Equivalent World Essence Merge requirement 9 calls data
+ * corruption rather than untidiness.
+ *
+ * IT LIVES HERE RATHER THAN BESIDE ITS SIBLING IN `worldScopeEntityNotice.js`, and the reason is
+ * cohesion rather than convenience: every fact it reports is a decision made in THIS module — the
+ * safe-segment guard, the whole-group refusal and the summary shape that carries them — so a
+ * builder next door would have to be kept in step with three things it cannot see.
+ *
+ * SILENT ON A CLEAN PASS, exactly as the sibling is. A notice that always fires is a notice nobody
+ * reads, and the merge's OWN migration-time notice already tells the GM what merged.
+ *
+ * `lockedSkips` is REPORTED BUT DOES NOT WITHHOLD, matching `remapCompletedCleanly`: a locked
+ * compendium is a standing condition a re-run cannot fix, while `skippedErrors` is transient and
+ * does withhold the map clear. The GM needs to be told which of the two they have.
+ *
+ * @param {object|null} summary The pass summary from {@link remapWorldEssenceIdentityFlags}.
+ * @param {(key: string, data?: object) => string|undefined} localize
+ * @returns {string} the message, or `''` when there is nothing to say.
+ */
+export function buildWorldEssenceMergeRemapNotice(summary, localize) {
+  const unsafe = Array.isArray(summary?.unsafeEssenceIdSkips) ? summary.unsafeEssenceIdSkips : [];
+  const refused = Number(summary?.refusedGroups) || 0;
+  const locked = Number(summary?.lockedSkips) || 0;
+  const failed = Number(summary?.skippedErrors) || 0;
+  if (unsafe.length === 0 && refused === 0 && locked === 0 && failed === 0) return '';
+
+  const clauses = [];
+  if (refused > 0) {
+    const named = unsafe.join(', ');
+    clauses.push(
+      localizeWith(
+        localize,
+        'FABRICATE.Migration.WorldEssenceMerge.UnsafeEssenceIds',
+        { count: refused, essences: named },
+        `${refused} merged essence set(s) contain an id Fabricate cannot use inside a flag path, so the merge landed in your world's settings but NOT on your characters' in-progress runs: ${named}. Those runs may still name an essence that no longer exists — finish or cancel them, and rename the offending essence before merging again.`
+      )
+    );
+  }
+  if (locked > 0) {
+    clauses.push(
+      localizeWith(
+        localize,
+        'FABRICATE.Migration.WorldEssenceMerge.RemapLockedSkips',
+        { count: locked },
+        `${locked} item(s) refused the update — usually because they live in a locked compendium — and may still name a merged-away essence.`
+      )
+    );
+  }
+  if (failed > 0) {
+    clauses.push(
+      localizeWith(
+        localize,
+        'FABRICATE.Migration.WorldEssenceMerge.RemapSkippedErrors',
+        { count: failed },
+        `${failed} document(s) could not be updated at all, so the repair is INCOMPLETE. Fabricate has kept its record of what to change and will retry on the next reload; you can also run it now from the console with game.fabricate.remapWorldEssenceIdentityFlags().`
+      )
+    );
+  }
+  return clauses.join(' ');
 }
