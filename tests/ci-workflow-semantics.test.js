@@ -98,6 +98,45 @@ test('CI semantically isolates edited metadata runs and fully gates ready_for_re
   assert.match(ready, /code/);
 });
 
+test('a red unit-tests job re-prints its failing tests at the END of the job log', () => {
+  const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
+
+  // WHY THIS IS PINNED. `node --test`'s TAP reporter writes each failure where it happens and emits
+  // roughly 119,000 lines, so on a red run every `not ok` line sits in the first ~96% of the log,
+  // past the reach of the log APIs, which serve a bounded tail. At issue 1654 that made a ONE-TEST
+  // failure cost two CI cycles to place, twice reporting counts with no name attached. The re-print
+  // is the only reason a red run is readable, and it is invisible on a green one — so nothing else
+  // would notice it being dropped.
+  assert.match(
+    workflow,
+    /npm test 2>&1 \| tee "\$RUNNER_TEMP\/unit-tests\.tap"/,
+    'the unit-tests run must tee its output, or the failure re-print below has nothing to read'
+  );
+  assert.match(
+    workflow,
+    /set -o pipefail/,
+    'without pipefail the step takes tee\u2019s exit status and a failing suite reports GREEN'
+  );
+  assert.match(
+    workflow,
+    /- name: Report failing tests\n\s+if: failure\(\)/,
+    'the failing-test re-print must exist and run only on failure'
+  );
+  assert.match(
+    workflow,
+    /grep -E '\^\[\[:space:\]\]\*not ok '/,
+    'the re-print must match INDENTED not-ok lines too, since a subtest failure is indented'
+  );
+
+  // RUNNER_TEMP, not the workspace: several suites scan the repository tree, so a stray file
+  // appearing there while the suite runs is a test input.
+  assert.equal(
+    /tee "?\$?\{?\{? ?runner\.temp|tee "\$RUNNER_TEMP/i.test(workflow),
+    true,
+    'the TAP must be written outside the checkout'
+  );
+});
+
 // ────────────────────────────────────────────────────────────────────────────────────────────────
 // The screenshot gate's sequencing contract (issue 1133).
 //
