@@ -31,26 +31,48 @@ const CORPUS_ROOT = 'tests';
 const SCANNED_EXTENSIONS = Object.freeze(['.js', '.mjs']);
 
 /**
- * Names exported anywhere under `tests/` as a `src/` path constant. A test that imports one and
- * reads through it would otherwise resolve nothing, and that shape recurs across the helpers.
+ * Names EXPORTED under `tests/` as a `src/` path constant, so a module that imports one and reads
+ * through it resolves. Only an `export`ed declaration qualifies, and the set is applied per file
+ * against what that file actually imports: matching bare names across the corpus would seed
+ * `result`, `entry` and `text`, each bound to something unrelated in hundreds of places.
  */
 function exportedPathConstants(corpus) {
   const names = new Set();
   for (const text of Object.values(corpus)) {
     for (const node of walkNodes(parseModule(text).ast)) {
-      if (node.type !== 'VariableDeclarator' || node.id?.type !== 'Identifier') continue;
-      const [literal] = literalStrings(node.init ?? {});
-      if (literal?.includes('src/')) names.add(node.id.name);
+      if (
+        node.type !== 'ExportNamedDeclaration' ||
+        node.declaration?.type !== 'VariableDeclaration'
+      )
+        continue;
+      for (const declarator of node.declaration.declarations) {
+        if (declarator.id?.type !== 'Identifier') continue;
+        const [literal] = literalStrings(declarator.init ?? {});
+        if (literal?.includes('src/')) names.add(declarator.id.name);
+      }
     }
   }
   return names;
+}
+
+/** The subset of `exported` that this module imports, which is all it may resolve through. */
+function importedPathNames(ast, exported) {
+  const imported = new Set();
+  for (const node of walkNodes(ast)) {
+    if (node.type !== 'ImportDeclaration') continue;
+    for (const specifier of node.specifiers) {
+      const name = specifier.local?.name;
+      if (name && exported.has(name)) imported.add(name);
+    }
+  }
+  return imported;
 }
 
 function buildLedger() {
   const corpus = collectSources(resolve(repoRoot, CORPUS_ROOT), {
     extensions: [...SCANNED_EXTENSIONS],
   });
-  const seedPaths = exportedPathConstants(corpus);
+  const exportedPaths = exportedPathConstants(corpus);
   const counted = [];
   for (const [file, text] of Object.entries(corpus)) {
     let parsed;
@@ -63,7 +85,7 @@ function buildLedger() {
     const sites = countPinSites(parsed.ast, {
       file,
       scopeManager: parsed.scopeManager,
-      seedPaths,
+      seedPaths: importedPathNames(parsed.ast, exportedPaths),
     });
     if (sites > 0) counted.push([file, sites]);
   }
