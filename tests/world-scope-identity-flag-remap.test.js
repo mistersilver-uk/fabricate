@@ -26,6 +26,7 @@ import {
   planItemIdentityFlagRemap,
   readWorldEssenceMergeMap,
   remapAlchemyDeadEnds,
+  remapEssenceKeyedMap,
   remapEssenceRunContainer,
   remapRunContainer,
   remapWorldEssenceIdentityFlags,
@@ -880,4 +881,32 @@ test('the essence edge writes through the FORCED-REPLACEMENT path and never setF
     /recursive: false/,
     'and that fix would destroy every other module’s flags'
   );
+});
+
+test('a `__proto__` key lands as an OWN property rather than reaching the prototype setter', () => {
+  // A PLAIN-OBJECT ACCUMULATOR LOSES IT SILENTLY. `next['__proto__'] = 1` on an object literal
+  // hits the inherited setter and stores NOTHING, so the entry vanishes from the rebuilt map with
+  // no error anywhere. The keys here come off a document's raw flags, which is exactly where a
+  // hand-edited or imported id can be any string at all. `rewriteEssenceQuantityMap` accumulates
+  // into a `Map` for this reason and this is the same rule at the sibling seam.
+  // BUILT THROUGH `JSON.parse`, never an object literal: `{__proto__: 2}` is the literal's
+  // prototype-setter SYNTAX and carries no own key at all, so a literal fixture could not state
+  // the input this guard is about. A flag read back off a document is parsed JSON, which is
+  // exactly how such a key arrives.
+  const stored = JSON.parse('{"__proto__": 2, "fire-a": 1}');
+  assert.ok(Object.hasOwn(stored, '__proto__'), 'the premise: the INPUT carries the hostile key');
+
+  const { value, changed } = remapEssenceKeyedMap(
+    stored,
+    (id) => (id === 'fire-a' ? 'fire-b' : id),
+    (left, right) => left + right
+  );
+  assert.equal(changed, true, 'the premise: the remap really did move a key');
+  assert.ok(Object.hasOwn(value, '__proto__'), 'the hostile key is an OWN property of the result');
+  assert.equal(
+    Object.getOwnPropertyDescriptor(value, '__proto__')?.value,
+    2,
+    'carrying its stored value rather than silently reassigning the rebuilt map prototype'
+  );
+  assert.deepEqual(Object.keys(value).sort(), ['__proto__', 'fire-b']);
 });

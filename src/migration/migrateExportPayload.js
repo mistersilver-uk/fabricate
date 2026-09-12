@@ -683,8 +683,14 @@ function mergeEquivalentBundleEssences(migrated) {
   }
   // STEP 4's helper, reused rather than respelled: the same array projection through a fresh deep
   // copy, so nothing the caller still holds can alias a slice a later in-place rewrite reaches.
+  //
+  // AND GATED ON PRESENCE, like the three assignments above it. The gate is INERT on the shipped
+  // path — {@link deriveWorldScopeEntitySlices} runs first and writes both keys unconditionally —
+  // but the comment above claimed the gate existed and the loop did not have it, which is the one
+  // way a reader learns the wrong rule from working code.
   for (const entityType of ['essences', 'components']) {
     const key = SCOPE_PAYLOAD_KEYS[entityType];
+    if (!(key in migrated)) continue;
     migrated[key] = scopeSliceToEnvelopeShape(
       isPlainObject(result?.[key]) ? result[key] : migrated[key]
     );

@@ -776,6 +776,13 @@ const ESSENCE_KEY_POSITION_CONTAINERS = new Map([
  *
  * Returns the ORIGINAL object when nothing changed, so an unchanged container is never rewritten.
  *
+ * THE ACCUMULATOR IS A `Map` AND THE RESULT COMES BACK THROUGH `Object.fromEntries`, which is its
+ * sibling `rewriteEssenceQuantityMap`'s rule for its stated reason: a key spelled `__proto__`
+ * assigned onto a plain object literal reaches the PROTOTYPE SETTER instead of landing as an own
+ * property, so the entry vanishes from the rebuilt map. The keys here come from the raw flag
+ * corpus on a document, which is the one place a hand-edited or imported id can be any string at
+ * all — the same reason `partitionSafeEssencePairs` guards the ids it is handed.
+ *
  * @param {unknown} map `{[essenceId]: value}`
  * @param {(value: unknown) => unknown} lookup
  * @param {(left: unknown, right: unknown) => unknown} combine
@@ -783,14 +790,14 @@ const ESSENCE_KEY_POSITION_CONTAINERS = new Map([
  */
 export function remapEssenceKeyedMap(map, lookup, combine) {
   if (!isPlainObject(map)) return { value: map, changed: false };
-  const next = {};
+  const next = new Map();
   let changed = false;
   for (const [essenceId, value] of Object.entries(map)) {
     const mapped = String(lookup(essenceId));
     if (mapped !== essenceId) changed = true;
-    next[mapped] = Object.hasOwn(next, mapped) ? combine(next[mapped], value) : value;
+    next.set(mapped, next.has(mapped) ? combine(next.get(mapped), value) : value);
   }
-  return { value: changed ? next : map, changed };
+  return { value: changed ? Object.fromEntries(next) : map, changed };
 }
 
 /**
