@@ -528,6 +528,17 @@ Reserve combined "tasks and events" / "task or event" wording for surfaces that 
 Use accurate domain terms when adding new strings.
 - Test files under `tests/components/` pin code shapes with `inspectorSource.includes(...)` / `listSource.includes(...)` string assertions.
 When renaming variables, refactoring markup, or removing i18n keys, grep these assertions and update them in lockstep — they fail at test time, not compile time.
+- **Comments state contracts, not history.**
+A comment survives only if it states an invariant, a non-obvious ordering or concurrency rule, a persisted-shape or public-API contract, or the test or spec line that pins one — in one to three lines.
+- Rejected alternatives, review rounds, and what the code used to do live in the issue and the pull request.
+A one-token `(issue 1234)` pointer back to that record is allowed; a paragraph retelling it is not.
+- No ALL-CAPS emphasis, no Markdown headings inside a docblock, and no `file.js:123` cites.
+Name the symbol or the test instead.
+- Use a JSDoc tag only when its description adds something the type and the parameter name do not.
+Nothing in this repository consumes JSDoc — no `jsdoc`, no `typedoc`, no `checkJs`, no JSDoc ESLint plugin — so a tag that restates the signature costs its lines and returns nothing.
+- Svelte component headers follow the template in [`.agents/component-header-template.md`](.agents/component-header-template.md).
+- These rules apply to every line a change touches and to every new file in full.
+A change does not rewrite comments in files it is not otherwise editing, unless condensing them is the change and its issue names it as such.
 
 ## FoundryVTT Notes
 
