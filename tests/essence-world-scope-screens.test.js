@@ -1062,8 +1062,24 @@ describe('a retired essence id is never reissued', () => {
   });
 
   it('is WIRED — the guard is unreachable unless the shell mints against it', () => {
-    const [, args] = rootSource.match(/mintEssenceId\(([\s\S]*?)\);/) ?? [];
-    assert.ok(args, 'the shell mints the new world essence id');
+    // MATCHED AS A LIVE STATEMENT, never as a substring. A bare `match` is satisfied by the call
+    // COMMENTED OUT, which is exactly the shape a bisect or a revert produces, so the pin would
+    // certify a shell that mints a hardcoded id and reclaims a retired one on the next press.
+    //
+    // ── AND HERE IS WHAT THIS STILL DOES NOT PROVE (issue 1654) ──────────────────────────────
+    // NOTHING IN THE REPO PRESSES `[data-world-essence-create]`. This pin and `SEAM 2` above read
+    // the shell's SOURCE; `essence-world-scope-screens-mounted.test.js` mounts the catalogue PAGE,
+    // which by design no longer carries the control, and defers the header button's evidence
+    // here. `manager-mounted.test.js` is the only suite that mounts `CraftingSystemManagerRoot`,
+    // and it is not this file — so a press-and-observe case belongs there, not in a second
+    // Root-mounting harness whose component allowlist would be a hand-copied duplicate of that
+    // one (and which, on the first omission, HANGS as `# cancelled` rather than failing).
+    // So the retired-id guard is proven WIRED and proven CORRECT (the `mintEssenceId` unit cases
+    // above), and is proven by nothing to fire on a real click. That gap is stated rather than
+    // implied: do not read the regex as coverage of the act.
+    const [, args] =
+      rootSource.match(/\n {4}const id = mintEssenceId\(([\s\S]*?)\n {4}\);/) ?? [];
+    assert.ok(args, 'the shell mints the new world essence id from a LIVE statement');
     assert.match(args, /worldScopeState\.essence\?\.entities/, 'against the live roster');
     assert.match(args, /worldScopeState\.essence\?\.retiredIds/, 'AND the retired ids');
   });
@@ -1095,6 +1111,72 @@ describe('the shared-definition callout names the record its pill claims', () =>
     // into the in-system projection, so re-routing it through `worldEntry` would swap one correct
     // read for another and make the expression look uniform at the cost of saying less.
     assert.match(calloutSource, /tint=\{normalizeEssenceColorToken\(essence\?\.colorToken\)/);
+  });
+});
+
+/**
+ * ── AND SO DOES THE HEADER A HAND ABOVE IT ────────────────────────────────────────────────────
+ * The callout above is one of TWO medallions the rules route draws for one essence: the page
+ * header's 44px `Medallion` + `<h1>` is the other, and the breadcrumb leaf takes the same name.
+ * They are rendered by different files — the header lives in the shell, because `.manager-header`
+ * is a sibling of `.manager-main` and the page cannot render into it — so nothing but this
+ * section holds them to one answer. Sourcing them from different LAYERS is what requirement 13
+ * calls a defect: after `1.34.0` the header would print `Iron` + `fa-hammer` from the re-keyed
+ * in-system row while the callout ~100px below printed the survivor's `iron` + `fa-fire` under a
+ * `World definition` pill, on a route that can edit neither.
+ *
+ * Read from the SOURCE because the subject is a `$derived` in the shell, and
+ * `manager-mounted.test.js` is the only suite that mounts the shell. Each statement is matched
+ * WHOLE, so a commented-out or partially reverted chain fails rather than matching as substring.
+ */
+describe('the rules route header draws the same layer the callout below it does', () => {
+  /**
+   * One whole top-level `$derived` declaration from the shell, or `''`.
+   *
+   * @param {string} name the declared binding name.
+   * @returns {string} the statement text, closing paren included.
+   */
+  function shellDerived(name) {
+    const pattern = new RegExp(`\\n {2}const ${name} = \\$derived\\(([\\s\\S]*?)\\n {2}\\);`);
+    return rootSource.match(pattern)?.[1] ?? '';
+  }
+
+  it('leads the name and the glyph with the WORLD record, not this system’s projection', () => {
+    for (const binding of ['essenceEditName', 'essenceEditIcon']) {
+      const body = shellDerived(binding);
+      assert.ok(body, `${binding} is declared as a live \`$derived\` in the shell`);
+      const world = body.indexOf('essenceRulesWorldEntry?.entity?.');
+      const draft = body.indexOf('essenceEditDraft?.');
+      assert.ok(world >= 0, `${binding} reads the world entry the callout reads`);
+      assert.ok(draft >= 0, `${binding} still carries its draft fallback`);
+      assert.ok(world < draft, `${binding} lets the WORLD record win, not the in-system copy`);
+    }
+  });
+
+  it('still leads with the DRAFT on a create, because there is no world record to contradict', () => {
+    // `essenceRulesWorldEntry` is null for exactly two states — a CREATE draft and a world corpus
+    // that cannot answer — and in both the in-system record IS the record. So the fix is the
+    // ORDER of one chain rather than a branch, and this pins the half that must survive: remove
+    // the draft term and the CREATE heading prints an empty name while the GM types one.
+    assert.match(shellDerived('essenceEditName'), /essenceEditDraft\?\.name/);
+    assert.match(shellDerived('essenceEditIcon'), /essenceEditDraft\?\.icon/);
+    // NON-VACUITY for the whole describe: the derivation this precedence is measured against is
+    // the one the header and the breadcrumb actually render.
+    assert.match(rootSource, /<Medallion icon=\{essenceEditIcon\} tint=\{essenceEditTint\}/);
+    assert.match(rootSource, /<h1 class="manager-title" title=\{essenceEditName\}>/);
+  });
+
+  it('leaves the TINT reading the in-system projection, because M29 already put the world colour there', () => {
+    // `adminStore` overlays the world `colorToken` onto the in-system row, so routing the tint
+    // through `essenceRulesWorldEntry` would swap one correct read for another and make the three
+    // chains look uniform at the cost of saying less. This is the callout's rule, stated once more
+    // at the second site that draws the same medallion.
+    const tint = shellDerived('essenceEditTint');
+    assert.ok(tint, 'the tint is declared as a live `$derived` too');
+    assert.ok(
+      !tint.includes('essenceRulesWorldEntry'),
+      'the tint takes no world read of its own; the projection already carries the world colour'
+    );
   });
 });
 
@@ -1151,10 +1233,11 @@ describe('the gateway hands the merge map to the projection', () => {
   });
 
   it('publishes no retired ids rather than THROWING when the setting is unregistered', async () => {
-    // THE ORDINARY CASE UNTIL `1.34.0` HAS RUN, and on every services double that answers only
-    // the keys it knows: Foundry's `game.settings.get` raises on an unregistered key rather than
-    // answering a default, so an unguarded read here would take the whole manager publish down
-    // on precisely the worlds that have nothing to report.
+    // THE SHAPE EVERY SERVICES DOUBLE THAT ANSWERS ONLY THE KEYS IT KNOWS PRODUCES. A real client
+    // registers this key unconditionally at init (`src/config/settings.js`, `BASE_DEFINITIONS`)
+    // and so answers the `{}` default — but Foundry's `game.settings.get` raises on an
+    // unregistered key rather than answering a default, so an unguarded read here would take the
+    // whole manager publish down wherever the key is absent.
     const worldScope = await publishedWorldScope((key) => {
       if (key === 'worldEssenceMergeMap') throw new Error('is not a registered game setting');
       return key === 'lastManagedCraftingSystem' ? 'sys1' : '';

@@ -5767,11 +5767,11 @@ export function createAdminStore(services) {
   /**
    * The raw `fabricate.worldEssenceMergeMap` world setting, or `null` when it cannot be read.
    *
-   * GUARDED, and the guard is load-bearing rather than ceremonial (issue 1654). The setting is
-   * registered by the `1.34.0` migration, so on every world that predates it — and on any
-   * services double that answers only the keys it knows — `game.settings.get` THROWS on an
-   * unregistered key rather than answering a default. An unguarded read here would take the
-   * whole manager publish down on exactly the worlds that have nothing to report.
+   * GUARDED, and the guard is load-bearing rather than ceremonial (issue 1654). The key IS
+   * registered unconditionally at init (`src/config/settings.js`, `BASE_DEFINITIONS`), so a
+   * real client answers the `{}` default rather than throwing — but `game.settings.get` THROWS
+   * on an unregistered key, and this store is driven by services doubles that answer only the
+   * keys they know. An unguarded read would take the whole manager publish down there.
    *
    * This is `_worldToolCorpus`'s rule, stated by `worldScopeProjection`'s own `readCorpus`: an
    * unreadable world input degrades to "nothing to say" and leaves the GM a working Manager.
