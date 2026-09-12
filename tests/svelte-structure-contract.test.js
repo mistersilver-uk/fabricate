@@ -1,0 +1,98 @@
+/**
+ * Proves every predicate `tests/helpers/svelteStructureContract.js` exports, and that its header
+ * still states the policy the helper exists to enforce (issue 1658). The helper lives outside the
+ * `npm test` glob, so without this file nothing runs its guarantees.
+ */
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { test } from 'node:test';
+
+import {
+  declaresAttribute,
+  importedModules,
+  importsModule,
+  parseComponent,
+  passesProp,
+  renderedComponents,
+  renderedElements,
+  rendersComponent,
+  rendersElement,
+} from './helpers/svelteStructureContract.js';
+import { walkElements } from './helpers/svelteTemplateScan.js';
+
+/** One fixture exercising every predicate: a nested block, a directive, and two imports. */
+const FIXTURE = [
+  '<script>',
+  "  import Chip from './Chip.svelte';",
+  "  import { tone } from '../stores/tone.js';",
+  '  let open = $state(false);',
+  '</script>',
+  '',
+  '<div class="wrap">',
+  '  <select bind:value={open}>',
+  '    <option value="a">a</option>',
+  '  </select>',
+  '  {#if open}',
+  '    <Chip label="one" tone={tone} />',
+  '  {/if}',
+  '  {#each [1, 2] as n}',
+  '    <Chip label={n} tone={tone} />',
+  '  {/each}',
+  '</div>',
+].join('\n');
+
+const ast = parseComponent(FIXTURE);
+
+test('renderedComponents lists every component, including inside if and each blocks', () => {
+  assert.deepStrictEqual(renderedComponents(ast), ['Chip', 'Chip']);
+});
+
+test('rendersComponent answers for a component nested in a block, and denies one absent', () => {
+  assert.equal(rendersComponent(ast, 'Chip'), true);
+  assert.equal(rendersComponent(ast, 'Callout'), false);
+});
+
+test('renderedElements lists raw elements lower-cased, and rendersElement answers for one', () => {
+  assert.deepStrictEqual(renderedElements(ast), ['div', 'select', 'option']);
+  assert.equal(rendersElement(ast, 'SELECT'), true);
+  assert.equal(rendersElement(ast, 'textarea'), false);
+});
+
+test('passesProp requires every occurrence to declare it, and is false when none is rendered', () => {
+  assert.equal(passesProp(ast, 'Chip', 'tone'), true);
+  assert.equal(passesProp(ast, 'Chip', 'disabled'), false);
+  assert.equal(passesProp(ast, 'Callout', 'tone'), false);
+});
+
+test('passesProp is false when only some occurrences declare the prop', () => {
+  const partial = parseComponent('<div><Chip tone="a" /><Chip /></div>');
+  assert.equal(passesProp(partial, 'Chip', 'tone'), false);
+});
+
+test('declaresAttribute sees a directive as well as a plain attribute', () => {
+  const select = parseComponent('<select bind:value={x} id="s"></select>');
+  let node;
+  walkElements(select.fragment, (candidate) => {
+    if (candidate.type === 'RegularElement' && candidate.name === 'select') node = candidate;
+  });
+  assert.ok(node, 'the fixture renders a select');
+  assert.equal(declaresAttribute(node, 'id'), true);
+  assert.equal(declaresAttribute(node, 'value'), true);
+  assert.equal(declaresAttribute(node, 'name'), false);
+});
+
+test('importedModules and importsModule read the instance script', () => {
+  assert.deepStrictEqual(importedModules(ast), ['./Chip.svelte', '../stores/tone.js']);
+  assert.equal(importsModule(ast, '../stores/tone.js'), true);
+  assert.equal(importsModule(ast, './Nothing.svelte'), false);
+});
+
+test('the helper header still states the policy that string includes is not to be added', () => {
+  const header = readFileSync(
+    resolve(import.meta.dirname, 'helpers/svelteStructureContract.js'),
+    'utf8'
+  ).slice(0, 1600);
+  assert.match(header, /Do not add a string `includes` on component source to a test\./);
+  assert.match(header, /MEASURED COVERAGE/);
+});
