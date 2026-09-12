@@ -21,6 +21,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 
+import { viteDepCacheDir } from './vite-dep-cache-dir.js';
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 /**
@@ -48,6 +50,9 @@ export async function withFabricateLifecycleReplay(run) {
   // lifecycle that never touch art. Nothing is edited mid-run, so the watcher buys nothing.
   const vite = await createServer({
     root: repoRoot,
+    // PER PROCESS, because the default is shared with every other test process. See
+    // `vite-dep-cache-dir.js` for the `ERR_OUTDATED_OPTIMIZED_DEP` failure that causes.
+    cacheDir: viteDepCacheDir(),
     server: { middlewareMode: true, hmr: false, watch: null },
     appType: 'custom',
   });
@@ -127,6 +132,7 @@ export async function captureCloseOrdering({
   // lifecycle that never touch art. Nothing is edited mid-run, so the watcher buys nothing.
   const vite = await createServer({
     root: repoRoot,
+    cacheDir: viteDepCacheDir(),
     server: { middlewareMode: true, watch: null },
     appType: 'custom',
   });
