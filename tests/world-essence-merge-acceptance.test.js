@@ -1,40 +1,22 @@
 /**
- * THE `1.34.0` EQUIVALENT WORLD ESSENCE MERGE — END-TO-END ACCEPTANCE (issue 1654).
+ * End-to-end acceptance for the `1.34.0` equivalent world essence merge (issue 1654).
  *
- * THE CRITERION NO UNIT SUITE CAN ANSWER: "every system's resolved behaviour is identical before
- * and after, except what the report names." The three unit suites beside this one each pin ONE
- * module against its own expected output, which encodes that module's beliefs —
- * `world-essence-equivalence.test.js` owns the DECISION, `world-essence-merge-migration.test.js`
- * owns the WRITE, `world-scope-reference-walk.test.js` owns the SITE LIST. Nothing there composes
- * them and reads the result through the seam production reads through. That is this file.
+ * The criterion no unit suite answers: every system's resolved behaviour is identical before and
+ * after, except what the report names. Each unit suite pins one module against its own expected
+ * output — `world-essence-equivalence.test.js` the decision,
+ * `world-essence-merge-migration.test.js` the write, `world-scope-reference-walk.test.js` the site
+ * list — and nothing there composes them.
  *
- * ## THE ORACLE IS THE PRODUCTION READ UNION, NOT THE MIGRATION'S OUTPUT
+ * The oracle is the production read union, not the migration's output. {@link readResolvedWorld}
+ * resolves every system's essences through `resolveEssenceScope`, the call
+ * `resolveScopedEntityRead` makes for `essenceDefinitions`, and collects essence-bearing sites
+ * through a walk independent of the shared rewrite's own site list, so deleting a site from that
+ * list cannot delete it from the oracle too. The before projection is canonicalised through the map
+ * the migration actually produced, so a successful re-key is invisible and a missed one is a
+ * difference; key-position collisions sum on both sides.
  *
- * {@link readResolvedWorld} resolves every system's essences through `resolveEssenceScope` — the
- * exact call `resolveScopedEntityRead` makes for `essenceDefinitions`, and therefore the exact
- * rows `CraftingEngine._runEssencePropertyMacros` reads a property macro off — and collects every
- * essence-bearing site in the corpus through an INDEPENDENT GENERIC WALK. The walk is deliberately
- * not the shared rewrite's own site list: if it were, deleting a site from that list would delete
- * it from this oracle too and the mutation would stay green.
- *
- * The BEFORE projection is then canonicalised through the map the migration ACTUALLY produced, so
- * a successful re-key is invisible and a missed one is a difference. Key-position collisions SUM
- * on both sides, because that is what the survivor carrying both contributions means.
- *
- * ## THE EIGHT SCENARIOS ARE DATA ROWS OVER ONE HELPER
- *
- * {@link runScenario} is the whole assertion body; every row below is a declaration of what the
- * report, the surviving roster, the membership map and the behaviour differential must be.
- * `tests/**` counts against the SonarCloud new-code duplication gate exactly as `src/` does, and
- * eight near-identical bodies is the commonest way that gate goes red.
- *
- * ## EVERY FIXTURE COMES FROM THE ONE SHARED BUILDER
- *
- * `buildEssenceMergeCorpus` builds the already-`1.30.0`-migrated world; `buildRawCorpus` builds
- * the pre-`1.30.0` one the chain arm needs. The shapes neither expresses — a recipe, a gathering
- * slice and an in-system component's essence quantity map — are ATTACHED to the corpus the
- * builder returns, exactly as `world-essence-merge-migration.test.js` attaches them, rather than
- * produced by a second factory.
+ * The eight scenarios are data rows over {@link runScenario}: `tests/**` counts against the
+ * SonarCloud new-code duplication gate, and eight near-identical bodies is how that gate goes red.
  */
 
 import assert from 'node:assert/strict';
@@ -58,16 +40,15 @@ installFoundryStubs();
 const { CraftingSystemManager } = await import('../src/systems/CraftingSystemManager.js');
 
 /**
- * Three `crypto.randomUUID()`-shaped ids, which is what `adminStore.addEssence` actually mints and
- * therefore the commonest thing this pass retires.
+ * Three `crypto.randomUUID()`-shaped ids, which is what `adminStore.addEssence` mints and therefore
+ * the commonest thing this pass retires.
  *
- * NONE OF THEM IS SLUG-SHAPED for any name used below, so `slugRank` cannot decide an election
- * between two of them and corpus position is left to answer — which is what scenario 8 measures.
+ * None is slug-shaped for any name used below, so `slugRank` cannot decide an election between two
+ * of them and corpus position has to answer — which is what scenario 8 measures.
  *
- * ALL LOWERCASE, and that is not cosmetic: `_normalizeEssenceDefinition` LOWERCASES every id it
- * emits, so a mixed-case fixture arrives at `1.34.0` under a different id the moment it passes
- * through `_normalizeSystem` — which {@link chainedThroughOneThirty} does, exactly as production
- * does. `crypto.randomUUID()` is lowercase anyway, so this is also the truer fixture.
+ * All lowercase, because `_normalizeEssenceDefinition` lowercases every id it emits: a mixed-case
+ * fixture would arrive at `1.34.0` under a different id once {@link chainedThroughOneThirty} passed
+ * it through `_normalizeSystem`, as production does.
  */
 const MINTED_B = 'ktz9qplm2xr4vb1a';
 const MINTED_C = 'w7yh2ndfs0jq6xe3';
@@ -94,7 +75,7 @@ function payloadOf(corpus, extra = {}) {
   return { recipes: [], gatheringConfig: { systems: {} }, ...corpus, ...extra };
 }
 
-/** The WORLD-WIDE loser-to-survivor lookup, unioned from the per-system legs of a produced map. */
+/** The world-wide loser-to-survivor lookup, unioned from the per-system legs of a produced map. */
 function unionOf(mergeMapSetting) {
   const union = {};
   for (const legs of Object.values(mergeMapSetting?.systems ?? {})) {
@@ -104,7 +85,7 @@ function unionOf(mergeMapSetting) {
 }
 
 // ---------------------------------------------------------------------------
-// THE ORACLE — the production read union, plus an independent site walk
+// The oracle — the production read union, plus an independent site walk
 // ---------------------------------------------------------------------------
 
 /** Whether a value is a `Record<essenceId, number>` quantity map rather than a section switch. */
@@ -118,18 +99,13 @@ function isQuantityMap(value) {
 }
 
 /**
- * Every essence-bearing site in a subtree, PATH-KEYED, through a generic walk.
+ * Every essence-bearing site in a subtree, path-keyed, through a generic walk.
  *
- * It visits every leaf named `essenceId` and every `essences` member — in its quantity-map form,
- * in the derived `systems[].essences[]` id-array form, and nowhere else. `inherit.essences` is a
- * BOOLEAN section switch whose key is a section NAME, so `isQuantityMap` declines it and the walk
- * descends past it; that is the same distinction `rewriteEssenceQuantityMap` makes, arrived at
+ * It visits every leaf named `essenceId` and every `essences` member in its quantity-map form and
+ * in the derived `systems[].essences[]` id-array form, and nowhere else: `inherit.essences` is a
+ * boolean section switch keyed by section name, so `isQuantityMap` declines it and the walk
+ * descends past it — the same distinction `rewriteEssenceQuantityMap` makes, arrived at
  * independently.
- *
- * @param {unknown} node
- * @param {string} path
- * @param {Record<string, unknown>} into
- * @returns {Record<string, unknown>}
  */
 function collectEssenceSites(node, path, into) {
   if (Array.isArray(node)) {
@@ -172,15 +148,14 @@ const UNION_FIELDS = Object.freeze([
 ]);
 
 /**
- * WHAT EVERY SYSTEM RESOLVES, and every site that names an essence.
+ * What every system resolves, and every site that names an essence.
  *
- * The essence rows come from `resolveEssenceScope` against the corpus a REAL store publishes, so
- * the three-layer resolution, requirement 36's in-system re-spread and `applyInheritedSections`
- * all run exactly as they do in production. A hand-rolled read of the membership record would be
- * blind to all three.
+ * The essence rows come from `resolveEssenceScope` against the corpus a real store publishes, so
+ * the three-layer resolution, requirement 36's in-system re-spread and `applyInheritedSections` all
+ * run as they do in production; a hand-rolled read of the membership record would be blind to all
+ * three.
  *
  * @param {object} corpus `{systems, recipes, gatheringConfig, essenceScope, componentScope}`
- * @returns {Record<string, unknown>}
  */
 function readResolvedWorld(corpus) {
   const manager = makeManagerWithScope(CraftingSystemManager, corpus);
@@ -194,8 +169,8 @@ function readResolvedWorld(corpus) {
     }
     collectEssenceSites(system.components, `${system.id}|components`, projection);
     collectEssenceSites(system.tools, `${system.id}|tools`, projection);
-    // The DERIVED roster is an id ARRAY rather than a member of an object, so it is recorded
-    // directly: the walk above only sees an `essences` key it descends ONTO.
+    // The derived roster is an id array rather than a member of an object, so it is recorded
+    // directly: the walk above only sees an `essences` key it descends onto.
     if (Array.isArray(system.essences)) projection[`${system.id}|roster`] = [...system.essences];
   }
   for (const recipe of corpus.recipes ?? []) {
@@ -210,16 +185,14 @@ function readResolvedWorld(corpus) {
 }
 
 /**
- * Rewrite every retired id a projection carries — in its KEY, in a leaf value, in an id array and
- * in QUANTITY-MAP KEY POSITION, where a collision SUMS.
+ * Rewrite every retired id a projection carries: in its key, in a leaf value, in an id array, and
+ * in quantity-map key position, where a collision sums.
  *
- * Applied to the BEFORE leg alone. The AFTER leg needs none: the map's image is disjoint from its
+ * Applied to the before leg alone. The after leg needs none — the map's image is disjoint from its
  * key set, which `world-essence-equivalence.test.js` pins outright, so canonicalising it would be
  * the identity.
  *
- * @param {Record<string, unknown>} projection
  * @param {{[loserId: string]: string}} remap
- * @returns {Record<string, unknown>}
  */
 function canonicaliseEssenceIds(projection, remap) {
   const mapId = (id) => (typeof id === 'string' && remap[id]) || id;
@@ -248,15 +221,12 @@ function canonicaliseEssenceIds(projection, remap) {
 }
 
 /**
- * The differences the merge made to what the world RESOLVES, as sorted `path` strings.
+ * The differences the merge made to what the world resolves, as sorted `path` strings.
  *
  * A site that vanished or appeared is reported too, under an explicit prefix, because an absence
  * compared against an absence is the one shape a naive deep-equal reads as agreement.
  *
- * @param {object} before The pre-merge corpus.
- * @param {object} after The post-merge corpus.
  * @param {{[loserId: string]: string}} remap
- * @returns {string[]}
  */
 function behaviourDifferences(before, after, remap) {
   const expected = canonicaliseEssenceIds(readResolvedWorld(before), remap);
@@ -305,7 +275,7 @@ function membershipIndex(essenceScope) {
 }
 
 // ---------------------------------------------------------------------------
-// THE ONE ASSERTION HELPER
+// The one assertion helper
 // ---------------------------------------------------------------------------
 
 /**
@@ -322,7 +292,7 @@ function runScenario(row) {
   const remap = unionOf(result.worldEssenceMergeMap);
   const where = row.name;
 
-  // 1. THE REPORT — what a GM is told, which is the whole of the exception clause.
+  // 1. The report — what a GM is told, which is the whole of the exception clause.
   assert.deepEqual(
     report.mergedGroups.map(({ survivorId, loserIds, systemIds }) => ({
       survivorId,
@@ -353,17 +323,17 @@ function runScenario(row) {
     `${where}: orphaned`
   );
 
-  // 2. THE SURVIVING WORLD ROSTER, in the stored array's own order minus the retired rows.
+  // 2. The surviving world roster, in the stored array's own order minus the retired rows.
   assert.deepEqual(
     result.essenceScope.entities.map((entity) => entity.id),
     row.entities,
     `${where}: surviving world essences`
   );
 
-  // 3. THE MEMBERSHIP MAP — one record per system on the survivor, none dropped.
+  // 3. The membership map — one record per system on the survivor, none dropped.
   assert.deepEqual(membershipIndex(result.essenceScope), row.members, `${where}: membership`);
 
-  // 4. REQUIREMENT 8, over every record this pass RE-POINTED: a section it was inheriting is now
+  // 4. Requirement 8, over every record this pass re-pointed: a section it was inheriting is now
   //    an explicit override, because its world parent moved and the loser's default is gone.
   for (const record of Object.values(result.essenceScope.membership)) {
     if (!(record.systemId in (result.worldEssenceMergeMap?.systems ?? {}))) continue;
@@ -375,15 +345,15 @@ function runScenario(row) {
     );
   }
 
-  // 5. A CORPUS WITH NOTHING TO MERGE ANSWERS THE CALLER'S OWN OBJECT, so the runner's
-  //    per-setting JSON comparison declines to write the leg at all.
+  // 5. A corpus with nothing to merge answers the caller's own object, so the runner's per-setting
+  //    JSON comparison declines to write the leg at all.
   if (row.untouched) {
     for (const key of PAYLOAD_KEYS) {
       assert.equal(result[key], data[key], `${where}: ${key} must answer the caller's OWN object`);
     }
   }
 
-  // 6. THE DIFFERENTIAL — the criterion the unit suites cannot state.
+  // 6. The differential — the criterion the unit suites cannot state.
   assert.deepEqual(
     behaviourDifferences(before, corpusOf(result), remap),
     row.behaviourDifferences ?? [],
@@ -399,15 +369,12 @@ function runScenario(row) {
 // ---------------------------------------------------------------------------
 
 /**
- * SCENARIO 5's corpus: three systems whose references all converge on ONE migrated world essence,
- * carrying every site class the shared walk covers.
+ * Scenario 5's payload-ready corpus: three systems whose references all converge on one migrated
+ * world essence, carrying every site class the shared walk covers.
  *
  * The three shapes `buildEssenceMergeCorpus` cannot express — a recipe, a gathering slice and an
- * in-system component's essence quantity map — are ATTACHED to what it returns. That is the same
- * decision `world-essence-merge-migration.test.js` records, taken for the same reason: a second
- * corpus factory is duplicated test code, and `tests/**` counts against the duplication gate.
- *
- * @returns {object} a payload-ready corpus.
+ * in-system component's essence quantity map — are attached to what it returns rather than built by
+ * a second factory that would duplicate it.
  */
 function convergingReferences() {
   const corpus = buildEssenceMergeCorpus({
@@ -417,17 +384,17 @@ function convergingReferences() {
       { id: 'sys-c', essences: [{ id: MINTED_C, name: 'Iron' }] },
     ],
   });
-  // KEY-POSITION FAMILY 1 — `systems[].components[].essences`, the sharpest of the four: a missed
-  // key here is a SILENT DELETION on the next save, not a dangling reference a reader can report.
+  // Key-position family 1 — `systems[].components[].essences`, the sharpest of the four: a missed
+  // key here is a silent deletion on the next save, not a dangling reference a reader can report.
   corpus.systems[1].components = [
     { id: 'comp-b', name: 'Ore', essences: { [MINTED_B]: 2, iron: 1 } },
   ];
   corpus.systems[2].components = [{ id: 'comp-c', name: 'Ore', essences: { [MINTED_C]: 4 } }];
-  // The DERIVED roster `_normalizeSystem` re-mints, which is READ long before the next save.
+  // The derived roster `_normalizeSystem` re-mints, which is read long before the next save.
   for (const system of corpus.systems) {
     system.essences = system.essenceDefinitions.map((definition) => definition.id);
   }
-  // LEAF SITES in the system slice, at the option AND at its `alternatives[]` recursion.
+  // Leaf sites in the system slice, at the option and at its `alternatives[]` recursion.
   corpus.systems[1].tools = [
     {
       id: 'tool-b',
@@ -446,7 +413,7 @@ function convergingReferences() {
       ],
     },
   ];
-  // KEY-POSITION FAMILIES 2 AND 3 — the two world-scope component maps.
+  // Key-position families 2 and 3 — the two world-scope component maps.
   corpus.componentScope.defaults['comp-b'] = { id: 'comp-b', essences: { [MINTED_B]: 3 } };
   corpus.componentScope.membership['comp-b|sys-b'].essences = { [MINTED_B]: 5, iron: 5 };
   corpus.componentScope.membership['comp-b|sys-b'].inherit = { essences: false };
@@ -459,7 +426,7 @@ function convergingReferences() {
         ingredientSets: [
           {
             id: 'is-1',
-            // KEY-POSITION FAMILY 4, DEPTH 1 — the legacy per-set quantity map.
+            // Key-position family 4, depth 1 — the legacy per-set quantity map.
             essences: { [MINTED_B]: 1, iron: 1 },
             ingredientGroups: [
               {
@@ -475,7 +442,7 @@ function convergingReferences() {
                 ],
               },
             ],
-            // The FLAT `ingredients[]` alias `IngredientSet.toJSON` stopped emitting.
+            // The flat `ingredients[]` alias `IngredientSet.toJSON` stopped emitting.
             ingredients: [{ quantity: 1, match: { type: 'essence', essenceId: MINTED_B } }],
           },
         ],
@@ -485,7 +452,7 @@ function convergingReferences() {
             ingredientSets: [
               {
                 id: 'sis-1',
-                // KEY-POSITION FAMILY 4, DEPTH 2 — the same map under a step.
+                // Key-position family 4, depth 2 — the same map under a step.
                 essences: { [MINTED_B]: 7 },
                 ingredientGroups: [
                   {
@@ -528,16 +495,14 @@ function convergingReferences() {
 }
 
 /**
- * SCENARIO 6's corpus: a world that has ALREADY been through `1.30.0`, produced by running the
+ * Scenario 6's payload-ready corpus: a world already through `1.30.0`, produced by running the
  * shipped `1.30.0` pass over a raw pre-migration corpus rather than by hand.
  *
- * Two systems' "Iron" arrive under UNRELATED ids — the `crypto.randomUUID()` authoring route — so
- * `1.30.0` groups them by trimmed `id`, lifts TWO world essences, and leaves behind exactly the
- * duplication issue 1654 reports. An essence-bearing gathering slice is attached because
- * `buildRawCorpus` authors none, and without one the `gatheringConfig` tear below would be
- * invisible: a leg with nothing in it to re-key cannot be observed as un-landed.
- *
- * @returns {object} a payload-ready corpus.
+ * Two systems' "Iron" arrive under unrelated ids — the `crypto.randomUUID()` authoring route — so
+ * `1.30.0` groups them by trimmed `id`, lifts two world essences, and leaves behind the duplication
+ * issue 1654 reports. A gathering slice is attached because `buildRawCorpus` authors none, and
+ * without one the `gatheringConfig` tear below is invisible: a leg with nothing in it to re-key
+ * cannot be observed as un-landed.
  */
 function chainedThroughOneThirty() {
   const raw = buildRawCorpus({
@@ -585,17 +550,16 @@ function chainedThroughOneThirty() {
 }
 
 /**
- * A TORN world: the writeback legs in `landed` carry the `1.34.0` values and every other leg still
+ * A torn world: the writeback legs in `landed` carry the `1.34.0` values and every other leg still
  * carries its pre-merge one.
  *
- * `worldEssenceMergeMap` is ALWAYS landed, because it is the SECOND leg — written immediately
- * after `worldScopeRekeyMap` and before `recipes` — which is precisely the ordering decision
- * requirement 10 takes so a tear anywhere downstream is recoverable.
+ * `worldEssenceMergeMap` is always landed because it is the second leg — written after
+ * `worldScopeRekeyMap` and before `recipes` — the ordering requirement 10 takes so that a tear
+ * anywhere downstream is recoverable.
  *
  * @param {object} baseline The pre-merge payload.
  * @param {object} untorn The complete `1.34.0` result.
  * @param {string[]} landed The legs that reached disk.
- * @returns {object}
  */
 function tornPayload(baseline, untorn, landed) {
   const payload = { ...baseline, worldEssenceMergeMap: untorn.worldEssenceMergeMap };
@@ -604,7 +568,7 @@ function tornPayload(baseline, untorn, landed) {
 }
 
 // ---------------------------------------------------------------------------
-// THE EIGHT SCENARIOS, AS DATA
+// The eight scenarios, as data
 // ---------------------------------------------------------------------------
 
 const SCENARIOS = [
@@ -637,8 +601,8 @@ const SCENARIOS = [
           { id: 'sys-b', essences: [{ id: MINTED_B, name: 'Iron', macro: 'Macro.smelt' }] },
         ],
       }),
-    // NOT `declined`. The two systems disagree ACROSS two world essences, which is two different
-    // keys and therefore no group at all; `declined` is reserved for a disagreement INSIDE one
+    // Not `declined`: the two systems disagree across two world essences, which is two different
+    // keys and therefore no group at all. `declined` is reserved for a disagreement inside one
     // world essence, where a candidate really was evaluated and really was rejected.
     entities: ['iron', MINTED_B],
     members: { iron: ['sys-a'], [MINTED_B]: ['sys-b'] },
@@ -803,9 +767,9 @@ const SCENARIOS = [
           {
             id: 'sys-a',
             essences: [{ id: 'iron', name: 'Iron', sourceComponentId: 'comp-x' }],
-            // `member: false` IS the refusal: `partition` excludes a refused `(system,
+            // `member: false` is the refusal: `partition` excludes a refused `(system,
             // 'components')` pair outright, so `1.30.0` wrote no membership record for it and the
-            // essence still carries a raw SYSTEM-LOCAL id.
+            // essence still carries a raw system-local id.
             components: [{ id: 'comp-x', member: false }],
           },
           {
@@ -869,8 +833,8 @@ const SCENARIOS = [
     corpus: () =>
       buildEssenceMergeCorpus({
         systems: [
-          // `sys-a` INHERITS its macro from W1's world default; `sys-b` overrides with the same
-          // value. Unanimity therefore has to read BOTH records, and the row below proves it does.
+          // `sys-a` inherits its macro from W1's world default; `sys-b` overrides with the same
+          // value. Unanimity therefore has to read both records, and the row below proves it does.
           {
             id: 'sys-a',
             essences: [
@@ -882,13 +846,12 @@ const SCENARIOS = [
         ],
         worldDefaults: { [MINTED_B]: { macro: 'Macro.forge' } },
       }),
-    // SLUG PREFERENCE is consulted FIRST, so the readable `iron` wins from the YOUNGEST system.
+    // Slug preference is consulted first, so the readable `iron` wins from the youngest system.
     merged: [{ survivorId: 'iron', loserIds: [MINTED_B], systemIds: ['sys-a', 'sys-b', 'sys-c'] }],
     entities: ['iron'],
     members: { iron: ['sys-a', 'sys-b', 'sys-c'] },
-    // NO DECLARED DIFFERENCE. `sys-a` was INHERITING its macro, so requirement 8 freezes it at
-    // BOTH scopes and the read union answers `Macro.forge` before and after. This row carried a
-    // declared allowance while the in-system half was missing; the dedicated arm below is why.
+    // No declared difference: `sys-a` was inheriting its macro, so requirement 8 freezes it at
+    // both scopes and the read union answers `Macro.forge` before and after.
     extra: ({ result }) => {
       assert.equal(
         result.essenceScope.membership['iron|sys-a'].macro,
@@ -902,8 +865,8 @@ const SCENARIOS = [
         undefined,
         "the loser's world default is deleted with its entity row"
       );
-      // AND THE IN-SYSTEM HALF, which is what makes the row carry no declared difference:
-      // `sys-a` alone was inheriting, so `sys-a` alone is written and reported.
+      // And the in-system half, which is what makes the row carry no declared difference: `sys-a`
+      // alone was inheriting, so `sys-a` alone is written and reported.
       assert.deepEqual(result._worldEssenceMergeReport.inSystemFreezes, [
         { systemId: 'sys-a', essenceId: 'iron', sections: ['macro'] },
       ]);
@@ -921,7 +884,7 @@ const SCENARIOS = [
       buildEssenceMergeCorpus({
         systems: [
           { id: 'sys-a', essences: [{ id: MINTED_B, name: 'Iron', macro: 'Macro.forge' }] },
-          // ONLY the SECOND record disagrees. A unanimity walk that read `members[0]` alone would
+          // Only the second record disagrees. A unanimity walk that read `members[0]` alone would
           // merge this and silently give `sys-b` `sys-a`'s macro.
           { id: 'sys-b', essences: [{ id: MINTED_B, name: 'Iron', macro: 'Macro.smelt' }] },
           { id: 'sys-c', essences: [{ id: 'iron', name: 'Iron', macro: 'Macro.forge' }] },
@@ -939,34 +902,29 @@ for (const row of SCENARIOS) {
 }
 
 // ---------------------------------------------------------------------------
-// SCENARIO 5's destructive regression, WITH ITS NEGATIVE CONTROL
+// Scenario 5's destructive regression, with its negative control
 // ---------------------------------------------------------------------------
 
 /**
- * THE COMPONENT KEY-POSITION REWRITE IS NOT OPTIONAL, and the naive assertion cannot say so.
+ * The component key-position rewrite is not optional, and a positive assertion cannot say so.
  *
  * `_normalizeEssenceQuantities` prunes a key only when `_scopeBasis().essenceIds` is a `Set`, and
- * `_scopeEntityBasis` answers `null` — PRUNE NOTHING — unless the store reports
- * `isSeeded('entities')` or the system's `essenceDefinitions` array is NON-EMPTY. So a round trip
- * through a bare manager over an emptied system keeps every key and the positive assertion below
- * passes with the prune DISARMED. Worse, the basis is a UNION: a run that missed the
- * `essenceDefinitions` re-key too would put the RETIRED id back in the basis and hide the loss.
+ * `_scopeEntityBasis` answers `null` — prune nothing — unless the store reports
+ * `isSeeded('entities')` or the system's `essenceDefinitions` array is non-empty. So a round trip
+ * through a bare manager over an emptied system keeps every key and the positive assertion passes
+ * with the prune disarmed; and because the basis is a union, a run that missed the
+ * `essenceDefinitions` re-key too would put the retired id back in the basis and hide the loss.
  *
- * Three steps, in this order:
- *
- *  (a) the basis is ARMED, and the retired id is genuinely OUTSIDE it;
- *  (b) the POSITIVE — every quantity survives under the SURVIVOR key, summed;
- *  (c) the NEGATIVE CONTROL — the same corpus with the component key-position rewrite WITHHELD
- *      loses exactly that quantity, silently and permanently, because the normalizer is an
- *      allowlist rebuild.
- *
- * @param {{result: object}} context
+ * Hence three steps, in this order: (a) the basis is armed and the retired id is genuinely outside
+ * it; (b) the positive — every quantity survives under the survivor key, summed; (c) the negative
+ * control — the same corpus with the component key-position rewrite withheld loses exactly that
+ * quantity, silently and permanently, because the normalizer is an allowlist rebuild.
  */
 function assertNoSilentQuantityDeletion({ result }) {
   const merged = corpusOf(result);
   const system = merged.systems[1];
 
-  // (a) ARMED. Through a manager wired to the REAL seeded store, never a bare one.
+  // (a) Armed, through a manager wired to the real seeded store rather than a bare one.
   const manager = makeManagerWithScope(CraftingSystemManager, merged);
   const basis = manager._scopeBasis(system).essenceIds;
   assert.ok(basis instanceof Set, 'the prune is ARMED: a null basis prunes NOTHING');
@@ -976,7 +934,7 @@ function assertNoSilentQuantityDeletion({ result }) {
     'and the RETIRED id is outside it, which is what makes a missed key a deletion'
   );
 
-  // (b) THE POSITIVE. `{[MINTED_B]: 2, iron: 1}` became `{iron: 3}` before the save, so the save
+  // (b) The positive. `{[MINTED_B]: 2, iron: 1}` became `{iron: 3}` before the save, so the save
   // keeps all three units.
   assert.deepEqual(
     manager._normalizeSystem(system).components[0].essences,
@@ -984,7 +942,7 @@ function assertNoSilentQuantityDeletion({ result }) {
     'every quantity survives the real normalize-and-save seam under the survivor key'
   );
 
-  // (c) THE NEGATIVE CONTROL. Only the component quantity map is rewound; the definition re-key,
+  // (c) The negative control. Only the component quantity map is rewound; the definition re-key,
   // the world roster and the merge map all stay landed, which is exactly the shape a deleted
   // `rewriteEssenceQuantityMap` leg produces.
   const withheld = copy(merged);
@@ -1000,31 +958,30 @@ function assertNoSilentQuantityDeletion({ result }) {
 }
 
 // ---------------------------------------------------------------------------
-// SCENARIO 6's tears, chosen for DIRECTION rather than for convenience
+// Scenario 6's tears, chosen for direction rather than for convenience
 // ---------------------------------------------------------------------------
 
 /**
- * THE WRITEBACK ORDER IS `worldScopeRekeyMap` -> `worldEssenceMergeMap` -> `recipes` -> ... ->
+ * The writeback order is `worldScopeRekeyMap` -> `worldEssenceMergeMap` -> `recipes` -> ... ->
  * `componentScope` -> `essenceScope` -> `toolScope` -> `craftingSystems` -> `gatheringConfig`.
  *
- * **"`essenceScope` landed, `craftingSystems` did not" is safe against the PRUNE hazard and is not
- * pinned here for that**: the legacy `essenceDefinitions` array still carries the loser id, so the
- * basis UNION still vouches for it and nothing is pruned. It is NOT safe against the FREEZE
- * hazard, which is a different defect at the same tear, and that one is pinned as an accepted
- * bound by its own test below. The three pinned here can all fail:
+ * The three tears pinned here can each fail:
  *
- *  (a) ONLY THE MERGE MAP LANDED — the highest-probability tear there is, because the map is the
- *      SECOND writeback leg and every other leg is downstream of it. It drives the whole pass
- *      through `reusingPersistedMap` against wholly UN-merged data, which is the one path on which
- *      the persisted map is the sole source of truth;
- *  (b) `componentScope` landed, `essenceScope` did NOT — the re-run must RECONCILE rather than
+ *  (a) only the merge map landed — the likeliest tear there is, because the map is the second
+ *      writeback leg and every other leg is downstream of it, so the pass runs through
+ *      `reusingPersistedMap` against wholly un-merged data, the one path on which the persisted map
+ *      is the sole source of truth;
+ *  (b) `componentScope` landed and `essenceScope` did not — the re-run must reconcile rather than
  *      double-apply the map to component maps that are already re-keyed;
- *  (c) `craftingSystems` landed, `gatheringConfig` did NOT — the re-run must rewrite the gathering
- *      slice from the PERSISTED map, because re-deriving one from already-re-keyed systems answers
- *      EMPTY. That is the exact failure `migrateWorldScopeEntities.js` records for `1.30.0` in its
- *      own "a torn run may already have re-keyed `craftingSystems`" note.
+ *  (c) `craftingSystems` landed and `gatheringConfig` did not — the re-run must rewrite the
+ *      gathering slice from the persisted map, because re-deriving one from already-re-keyed
+ *      systems answers empty, the failure `migrateWorldScopeEntities.js` records for `1.30.0` in
+ *      its "a torn run may already have re-keyed `craftingSystems`" note.
  *
- * @param {{before: object, result: object}} context
+ * "`essenceScope` landed, `craftingSystems` did not" is not among them: the basis union still
+ * vouches for the loser id through the legacy `essenceDefinitions` array, so the prune hazard
+ * cannot fire. It is not safe against the freeze hazard, pinned as an accepted bound by its own
+ * test.
  */
 function assertTearRecovery({ before, result }) {
   const RECOVERED = ['systems', 'recipes', 'gatheringConfig', 'essenceScope', 'componentScope'];
@@ -1043,8 +1000,8 @@ function assertTearRecovery({ before, result }) {
     }
   }
 
-  // THE PREMISE OF TEAR (b), which is what makes it a test of the persisted map rather than of
-  // the derivation: with the map WITHHELD there is nothing left in the corpus to re-derive from.
+  // The premise of tear (b), which is what makes it a test of the persisted map rather than of the
+  // derivation: with the map withheld there is nothing left in the corpus to re-derive from.
   const landedAll = ['recipes', 'componentScope', 'essenceScope', 'systems'];
   const mapless = { ...tornPayload(before, result, landedAll), worldEssenceMergeMap: {} };
   assert.deepEqual(
@@ -1069,20 +1026,18 @@ function assertTearRecovery({ before, result }) {
 }
 
 // ---------------------------------------------------------------------------
-// SCENARIO 6(i) — the CHAIN, and what deep-equality there actually proves
+// Scenario 6(i) — the chain, and what deep-equality there actually proves
 // ---------------------------------------------------------------------------
 
 test('acceptance 6: the `1.30.0`-then-`1.34.0` chain equals `1.34.0` alone on a persisted world', () => {
-  // WHAT THIS PROVES, stated rather than overclaimed: `1.34.0`'s answer is a function of the
-  // PERSISTED state alone. Arm B starts from a JSON round trip of `1.30.0`'s output — which is
-  // literally what the next boot reads back out of `game.settings` — and carries no object
-  // identity, no prototype and no non-JSON value from the pass that produced it. A `1.34.0` that
-  // had come to depend on any of those, or on a `worldScopeRekeyMap` still sitting in memory,
-  // would answer differently here.
+  // `1.34.0`'s answer is a function of the persisted state alone. Arm B starts from a JSON round
+  // trip of `1.30.0`'s output — what the next boot reads back out of `game.settings` — so it
+  // carries no object identity, no prototype, no non-JSON value and no in-memory
+  // `worldScopeRekeyMap` from the pass that produced it.
   const chained = chainedThroughOneThirty();
   const armA = mergeEquivalentWorldEssences(payloadOf(chained));
   const armB = mergeEquivalentWorldEssences(payloadOf(copy(chained)));
-  // THE PREMISE, because two arms that both merged NOTHING are deep-equal for no good reason.
+  // The premise, because two arms that both merged nothing are deep-equal for no good reason.
   assert.deepEqual(
     armA._worldEssenceMergeReport.mergedGroups.map((group) => group.loserIds),
     [[MINTED_B]],
@@ -1095,8 +1050,8 @@ test('acceptance 6: the `1.30.0`-then-`1.34.0` chain equals `1.34.0` alone on a 
   assert.deepEqual(armB.worldEssenceMergeMap, armA.worldEssenceMergeMap);
   assert.deepEqual(armB._worldEssenceMergeReport, armA._worldEssenceMergeReport);
 
-  // AND THE END-TO-END FACT both arms share, which is what stops this being a pure tautology: a
-  // RAW pre-`1.30.0` world reaches ONE world essence, and the younger system's DEFINITION row, its
+  // And the end-to-end fact both arms share, which is what stops this being a pure tautology: a
+  // raw pre-`1.30.0` world reaches one world essence, and the younger system's definition row, its
   // component quantity map and its gathering slice all name it.
   assert.deepEqual(
     armA.essenceScope.entities.map((entity) => entity.id),
@@ -1115,10 +1070,10 @@ test('acceptance 6: the `1.30.0`-then-`1.34.0` chain equals `1.34.0` alone on a 
 });
 
 // ---------------------------------------------------------------------------
-// DETERMINISM AND SURVIVOR ELECTION — set-equality is NOT sufficient
+// Determinism and survivor election — set-equality is not sufficient
 // ---------------------------------------------------------------------------
 
-/** A Fisher-Yates shuffle from the SEEDED generator, never `Math.random` (SonarCloud S2245). */
+/** A Fisher-Yates shuffle from the seeded generator, never `Math.random` (SonarCloud S2245). */
 function shuffled(list, random) {
   const copied = [...list];
   for (let index = copied.length - 1; index > 0; index -= 1) {
@@ -1139,11 +1094,11 @@ function survivorOf(corpus) {
 }
 
 test('election re-derives CORPUS POSITION even when the persisted array order contradicts it', () => {
-  // SET-EQUALITY IS NOT SUFFICIENT AND NEITHER IS A FRESHLY DERIVED CORPUS. A set-equal partition
-  // holds under EVERY election rule, including the `essenceScope.entities[0]` rule the design
-  // rejects — and `derive()` emits entities already sorted by corpus position, so on a freshly
-  // derived corpus array order and corpus order COINCIDE and swapping one rule for the other is
-  // invisible. This corpus stores the eventual LOSER at index 0 and the SURVIVOR LAST, so the two
+  // Set-equality is not sufficient, and neither is a freshly derived corpus: a set-equal partition
+  // holds under every election rule, including the `essenceScope.entities[0]` rule the design
+  // rejects, and `derive()` emits entities already sorted by corpus position, so on a freshly
+  // derived corpus array order and corpus order coincide and swapping one rule for the other is
+  // invisible. This corpus stores the eventual loser at index 0 and the survivor last, so the two
   // rules answer differently and only one of them can be right.
   const contradictory = buildEssenceMergeCorpus({
     systems: [
@@ -1165,9 +1120,9 @@ test('election re-derives CORPUS POSITION even when the persisted array order co
 });
 
 test('an independently shuffled corpus elects the IDENTICAL survivor, not merely a set-equal one', () => {
-  // Permutation invariance is only claimable where the CORPUS decides the election — here the
+  // Permutation invariance is only claimable where the corpus decides the election — here the
   // readable slug does, which is order-independent by construction. Where corpus position decides
-  // it, order dependence is the DECLARED exception the arm above pins instead.
+  // it, order dependence is the declared exception the arm above pins instead.
   const random = seededRandom(16_540_812);
   const build = () =>
     buildEssenceMergeCorpus({
@@ -1201,7 +1156,7 @@ test('an independently shuffled corpus elects the IDENTICAL survivor, not merely
 test('the READABLE SLUG is consulted FIRST, so a merge never retires `iron` for a minted id', () => {
   // Pinned separately because it precedes corpus position: without it the arm above would elect
   // `MINTED_B` from `sys-a` and still be permutation-invariant, which is why a shuffle test alone
-  // cannot state this. The three slug RANKS themselves — bare stem, `<stem>-<n>`, anything else —
+  // cannot state this. The three slug ranks themselves — bare stem, `<stem>-<n>`, anything else —
   // are pinned by `world-essence-equivalence.test.js`.
   const corpus = buildEssenceMergeCorpus({
     systems: [
@@ -1213,14 +1168,14 @@ test('the READABLE SLUG is consulted FIRST, so a merge never retires `iron` for 
 });
 
 // ---------------------------------------------------------------------------
-// IDEMPOTENCE ON BOTH RE-RUN PATHS
+// Idempotence on both re-run paths
 // ---------------------------------------------------------------------------
 
 test('idempotence (i): with the map PERSISTED, `migrate(migrate(x))` deep-equals `migrate(x)`', () => {
-  // THIS ARM IS A NO-OP BY DISJOINTNESS ALONE AND PROVES NOTHING ABOUT THE EQUIVALENCE KEY. The
+  // This arm is a no-op by disjointness alone and proves nothing about the equivalence key: the
   // persisted map's image is disjoint from its key set, so a second simultaneous lookup finds no
-  // key at all — whatever the canonicalisation does. It is pinned because it is the path a
-  // same-boot re-entry takes, not because it is the strong one; arm (ii) is the strong one.
+  // key at all, whatever the canonicalisation does. It is pinned because it is the path a same-boot
+  // re-entry takes, not because it is the strong one; arm (ii) is the strong one.
   const corpus = convergingReferences();
   const first = mergeEquivalentWorldEssences(payloadOf(corpus));
   const second = mergeEquivalentWorldEssences({ ...payloadOf(corpus), ...first });
@@ -1231,10 +1186,10 @@ test('idempotence (i): with the map PERSISTED, `migrate(migrate(x))` deep-equals
 });
 
 test('idempotence (ii): with the map ABSENT, the re-derivation over merged data is a FIXED POINT', () => {
-  // THE ONLY ARM THAT CAN CATCH A CANONICALISATION THAT IS NOT A FIXED POINT, and it is the state
+  // The only arm that can catch a canonicalisation that is not a fixed point, and it is the state
   // a world actually occupies once the one-shot clear has fired (requirement 11): the per-system
-  // legs are gone, the tombstone survives, and the next boot re-derives over ALREADY-MERGED data.
-  // A key that canonicalised differently the second time round would merge the survivor into
+  // legs are gone, the tombstone survives, and the next boot re-derives over already-merged data. A
+  // key that canonicalised differently the second time round would merge the survivor into
   // something else here, with no persisted map to make the no-op happen for it.
   const corpus = convergingReferences();
   const first = mergeEquivalentWorldEssences(payloadOf(corpus));
@@ -1270,25 +1225,22 @@ test('idempotence (ii): with the map ABSENT, the re-derivation over merged data 
 });
 
 // ---------------------------------------------------------------------------
-// REQUIREMENT 8 AT THE READ SEAM — the only place a GM can observe it
+// Requirement 8 at the read seam — the only place a GM can observe it
 // ---------------------------------------------------------------------------
 
 /**
- * One corpus per essence SECTION, in which `sys-b` INHERITS that section from the LOSER's world
+ * One corpus per essence section, in which `sys-b` inherits that section from the loser's world
  * default and `sys-a` overrides it with the same value, so the two are equivalent and merge.
  *
- * KEYED BY SECTION AND DRIVEN BY {@link ESSENCE_SECTIONS} BELOW, which is what makes this a guard
- * over the whole rule rather than over `macro`. The section names name NOTHING on the in-system
- * record — `macro` is spelled `propertyMacroUuid` and `effectSource` is a block over three fields
- * — so the write the migration makes is a PROJECTION, and a projection onto the wrong field name
- * is exactly the mistake a key-set comparison cannot see. Reading the answer back through the
- * real union catches it, because a value on a key no reader reads is a value the union does not
- * answer.
+ * Keyed by section and driven by {@link ESSENCE_SECTIONS} below, which makes this a guard over the
+ * whole rule rather than over `macro`. The section names name nothing on the in-system record —
+ * `macro` is spelled `propertyMacroUuid`, `effectSource` is a block over three fields — so the
+ * migration's write is a projection, and a projection onto the wrong field name is the mistake a
+ * key-set comparison cannot see; reading the answer back through the real union catches it.
  *
- * The `effectSource` block spells ALL THREE fields, matching what `rawEssence` puts on an
- * in-system row carrying a source: a partial block would compare unequal at the canonical key and
- * the group would never merge, which is a green test measuring nothing.
- */
+ * The `effectSource` block spells all three fields, matching what `rawEssence` puts on an in-system
+ * row carrying a source: a partial block compares unequal at the canonical key, the group never
+ * merges, and the test measures nothing.
 /** One projection of {@link UNION_FIELDS} off any essence-shaped record, absence reading as null. */
 const unionFieldsOf = (row) =>
   Object.fromEntries(UNION_FIELDS.map((field) => [field, row?.[field] ?? null]));
@@ -1341,29 +1293,21 @@ const INHERITED_SECTION_FIXTURES = Object.freeze({
 });
 
 test('requirement 8 freezes the MEMBERSHIP RECORD **and** the IN-SYSTEM ROW, so the READ UNION follows', () => {
-  // THIS ARM IS THE CORRECTION TO AN EARLIER ACCEPTANCE RECORD, and it is the reason this file
-  // reads through `resolveEssenceScope` rather than through `resolveEssence`.
+  // The membership freeze alone is behaviour-neutral at the scope layer — `resolveEssence` answers
+  // the frozen value — and inverts one layer further out, which is why this file reads through
+  // `resolveEssenceScope`. While `## CraftingSystem` requirement 36 holds, `unionScopedDefinitions`
+  // spreads the in-system record last and writes the world default onto the row only for a section
+  // the membership record still marks inheriting (`applyInheritedSections`'s `=== false` guard), so
+  // flipping the switch to `false` is the very act that stops the row taking the frozen value and a
+  // record that authored nothing of its own falls back to its own `propertyMacroUuid: null`.
   //
-  // At the SCOPE layer the membership freeze alone is exactly behaviour-neutral: `resolveEssence`
-  // answers the frozen value, which is the value the record resolved to before the re-key.
-  //
-  // THE PRODUCTION READ IS ONE LAYER FURTHER OUT, AND THERE THE FREEZE ALONE INVERTS. While
-  // `## CraftingSystem` requirement 36 holds, `unionScopedDefinitions` spreads the IN-SYSTEM
-  // record LAST and then writes the world default onto the row ONLY for a section the membership
-  // record still marks INHERITING (`applyInheritedSections`'s `=== false` guard). So flipping the
-  // switch to `false` is the very act that stops the row taking the frozen value, and a record
-  // that authored nothing of its own fell back to its own `propertyMacroUuid: null`.
-  //
-  // The pre-state is production-reachable: `worldScopeActions.setSectionInherited` flips the
-  // membership switch alone and never touches `essenceDefinitions[].propertyMacroUuid`, which is
-  // the documented opt-in. And the field is load-bearing:
-  // `CraftingEngine._runEssencePropertyMacros` reads `definition.propertyMacroUuid` off
-  // `resolvedEssencesFor`, which is this very union — so the essence's property macro silently
-  // stopped running for that system, and the same mechanism silently dropped Active Effect
-  // transfer for the three `effectSource` fields.
-  //
-  // The fix is the IN-SYSTEM half of the freeze, at the shipped field names. Both halves are
-  // asserted separately below, because they answer to different consumers.
+  // The pre-state is production-reachable — `worldScopeActions.setSectionInherited` flips the
+  // membership switch alone and never touches `essenceDefinitions[].propertyMacroUuid` — and the
+  // field is load-bearing: `CraftingEngine._runEssencePropertyMacros` reads
+  // `definition.propertyMacroUuid` off `resolvedEssencesFor`, which is this union, so the property
+  // macro silently stops running for that system and the same mechanism drops Active Effect
+  // transfer for the three `effectSource` fields. Both halves of the freeze are asserted separately
+  // below, because they answer to different consumers.
   for (const section of ESSENCE_SECTIONS) {
     const build = INHERITED_SECTION_FIXTURES[section];
     assert.ok(
@@ -1373,9 +1317,9 @@ test('requirement 8 freezes the MEMBERSHIP RECORD **and** the IN-SYSTEM ROW, so 
     const corpus = build();
     const frozen = copy(corpus.essenceScope.defaults[MINTED_B][section]);
     const before = readResolvedWorld(corpus);
-    // THE PREMISE, per section, and it is the sharp one: the union's answer for `sys-b` is NOT
-    // what that system's own in-system row carries. So the row is reading THROUGH the world
-    // default, and there is something for the re-key to break.
+    // The premise, per section, and the sharp one: the union's answer for `sys-b` is not what that
+    // system's own in-system row carries, so the row is reading through the world default and there
+    // is something for the re-key to break.
     const inSystemRow = corpus.systems[1].essenceDefinitions[0];
     assert.notDeepEqual(
       unionFieldsOf(inSystemRow),
@@ -1390,8 +1334,8 @@ test('requirement 8 freezes the MEMBERSHIP RECORD **and** the IN-SYSTEM ROW, so 
       `${section}: the premise — the two equivalent essences really did merge`
     );
 
-    // HALF ONE — the scope layer, which `resolveEssence` and the world catalogue's per-system
-    // rows answer from. Unchanged by this fix.
+    // Half one — the scope layer, which `resolveEssence` and the world catalogue's per-system rows
+    // answer from. Unchanged by this fix.
     const record = result.essenceScope.membership['iron|sys-b'];
     assert.equal(record.inherit[section], false, `${section}: the switch is FLIPPED`);
     assert.deepEqual(
@@ -1400,9 +1344,8 @@ test('requirement 8 freezes the MEMBERSHIP RECORD **and** the IN-SYSTEM ROW, so 
       `${section}: the frozen record carries the value it resolved to through the parent it LEFT`
     );
 
-    // HALF TWO — THE READ SEAM. This is the assertion the earlier record measured as a
-    // divergence; a fix that teaches the merge to write the in-system row turns it green while
-    // leaving half one exactly as it was.
+    // Half two — the read seam, which half one is structurally blind to: teaching the merge to
+    // write the in-system row turns this green while leaving half one exactly as it was.
     const after = readResolvedWorld(corpusOf(result));
     for (const field of UNION_FIELDS) {
       assert.deepEqual(
@@ -1412,7 +1355,7 @@ test('requirement 8 freezes the MEMBERSHIP RECORD **and** the IN-SYSTEM ROW, so 
       );
     }
 
-    // AND THE WRITE IS DISCLOSED. It is a write to a row the GM authored, so it is named rather
+    // And the write is disclosed. It is a write to a row the GM authored, so it is named rather
     // than made silently — and it names `sys-b` alone, never the already-overriding `sys-a`.
     assert.deepEqual(
       result._worldEssenceMergeReport.inSystemFreezes,
@@ -1427,8 +1370,8 @@ test('requirement 8 freezes the MEMBERSHIP RECORD **and** the IN-SYSTEM ROW, so 
 });
 
 test('an ALREADY-OVERRIDING record is untouched at BOTH scopes, which bounds the in-system write', () => {
-  // THE BOUND, and it is the whole of why writing an authored in-system row is admissible here:
-  // every record `1.30.0` wrote through `buildMembershipRecord` is fully OVERRIDING, so the only
+  // The bound, and it is the whole of why writing an authored in-system row is admissible here:
+  // every record `1.30.0` wrote through `buildMembershipRecord` is fully overriding, so the only
   // world exposed to either half of requirement 8 is one whose GM has since flipped a switch to
   // inheriting. A world that merely upgraded is byte-identical through the union.
   const overriding = buildEssenceMergeCorpus({
@@ -1453,13 +1396,12 @@ test('an ALREADY-OVERRIDING record is untouched at BOTH scopes, which bounds the
 });
 
 test('a section whose OLD world parent authored NOTHING leaves the in-system row alone', () => {
-  // THE OPPOSITE RULE, and it is right for the opposite reason. `applyInheritedSections` SKIPS an
-  // `undefined` world value, so a record inheriting a section its old parent never authored was
-  // ALREADY reading its own in-system field — before the re-key and after it. The membership
-  // record still takes the CANONICAL EMPTY, because an absent local section under `inherit: false`
-  // falls back to the SURVIVOR's value; the in-system row takes NOTHING, because writing that same
-  // canonical empty there would DESTROY the authored value and be the only behaviour change this
-  // pass made.
+  // The opposite rule, right for the opposite reason. `applyInheritedSections` skips an `undefined`
+  // world value, so a record inheriting a section its old parent never authored was already reading
+  // its own in-system field, before the re-key and after it. The membership record still takes the
+  // canonical empty, because an absent local section under `inherit: false` falls back to the
+  // survivor's value; the in-system row takes nothing, because writing that same canonical empty
+  // there would destroy the authored value and be the only behaviour change this pass made.
   const corpus = buildEssenceMergeCorpus({
     systems: [
       { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron' }] },
@@ -1471,7 +1413,7 @@ test('a section whose OLD world parent authored NOTHING leaves the in-system row
       },
     ],
   });
-  // THE PREMISE: the world decided nothing, and the SYSTEM authored a macro of its own.
+  // The premise: the world decided nothing, and the system authored a macro of its own.
   assert.deepEqual(corpus.essenceScope.defaults, {});
   corpus.systems[1].essenceDefinitions[0].propertyMacroUuid = 'Macro.own';
   const before = copy(payloadOf(corpus));
@@ -1497,7 +1439,7 @@ test('a section whose OLD world parent authored NOTHING leaves the in-system row
 });
 
 // ---------------------------------------------------------------------------
-// ANTI-VACUITY — the oracle has to actually see something
+// Anti-vacuity — the oracle has to actually see something
 // ---------------------------------------------------------------------------
 
 test('the differential oracle reads a NON-TRIVIAL number of sites, and every site class', () => {
@@ -1527,27 +1469,25 @@ test('the differential oracle reads a NON-TRIVIAL number of sites, and every sit
 });
 
 // ---------------------------------------------------------------------------
-// The ONE tear the persisted map cannot repair — stated as an ACCEPTED BOUND
+// The one tear the persisted map cannot repair — stated as an accepted bound
 // ---------------------------------------------------------------------------
 
 test('the FREEZE half of requirement 8 does not survive an `essenceScope`/`craftingSystems` tear', () => {
-  // THE DIRECTION THE PRUNE ARGUMENT IS SILENT ABOUT. `essenceScope` is written BEFORE
-  // `craftingSystems`, and requirement 8's freeze lands in BOTH: the membership record takes the
+  // The direction the prune argument is silent about. `essenceScope` is written before
+  // `craftingSystems`, and requirement 8's freeze lands in both: the membership record takes the
   // resolved value as an override, and the in-system row takes it on `propertyMacroUuid`. A tear
   // between those two writes lands the membership half alone.
   //
-  // ON THE RE-RUN NOTHING IS RE-POINTED — the landed record already names the SURVIVOR, which is
+  // On the re-run nothing is re-pointed — the landed record already names the survivor, which is
   // not a key of the map — so `freezeInheritedSections` never runs and the in-system half never
   // lands. The union then answers the in-system row's own `propertyMacroUuid: null`, because
-  // `applyInheritedSections` skips a section the record marks OVERRIDING, and the essence's
+  // `applyInheritedSections` skips a section the record marks overriding, and the essence's
   // property macro silently stops for that system.
   //
-  // IT IS ACCEPTED RATHER THAN REPAIRED, and the reason is that a repair arm cannot exist. The
-  // torn state — membership overriding with a value, in-system row carrying its own — is
-  // BYTE-INDISTINGUISHABLE from the state `worldScopeActions.setSectionInherited` produces on
-  // every world where a GM flipped a switch and left the row alone. An arm that wrote the
-  // membership value onto the row would destroy that GM's authored field on every re-run of every
-  // world that never tore, which is a strictly larger harm than the one it repairs.
+  // It is accepted rather than repaired because a repair arm cannot exist: the torn state is
+  // byte-indistinguishable from what `worldScopeActions.setSectionInherited` produces wherever a GM
+  // flipped a switch and left the row alone, so an arm that wrote the membership value onto the row
+  // would destroy that GM's authored field on every world that never tore.
   const corpus = buildEssenceMergeCorpus({
     systems: [
       { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron', macro: 'Macro.forge' }] },

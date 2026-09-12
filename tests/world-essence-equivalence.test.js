@@ -1,13 +1,13 @@
 /**
- * UNIT AND PROPERTY COVERAGE for the `1.34.0` world-essence equivalence core (issue 1654).
+ * Unit and property coverage for the `1.34.0` world-essence equivalence core (issue 1654).
  *
- * The canonical key and what it deliberately sees through, candidacy and THE ZERO POINT, the
+ * The canonical key and what it deliberately sees through, candidacy and the zero point, the
  * false-merge trap, the re-derived survivor election, the three refusal invariants, and the
  * tombstone leg.
  *
- * EVERY FIXTURE COMES FROM THE ONE SHARED BUILDER in `helpers/worldScopeCorpus.js`, and the
- * randomness is SEEDED (`seededRandom`) — `Math.random` is S2245 and fails the quality gate, and
- * a seeded generator is what makes a property failure reproducible from its seed.
+ * Every fixture comes from the one shared builder in `helpers/worldScopeCorpus.js`, and the
+ * randomness is seeded (`seededRandom`): `Math.random` is S2245 and fails the quality gate, and a
+ * seeded generator is what makes a property failure reproducible from its seed.
  */
 
 import assert from 'node:assert/strict';
@@ -89,7 +89,7 @@ test('the equivalence core is TOTAL on a malformed corpus and an adversarial sco
   });
   assert.deepEqual(result.mergeMap, {});
   assert.deepEqual(result.mergedGroups, []);
-  // An id-less world entity is DROPPED; the surviving `e1` carries no name, so its key cannot be
+  // An id-less world entity is dropped; the surviving `e1` carries no name, so its key cannot be
   // canonicalised and it is declined rather than merged on an empty name.
   assert.deepEqual(result.declined, [
     {
@@ -159,7 +159,7 @@ test('an ABSENT, an EMPTY and an ALL-NULL effectSource block all compare EQUAL',
             {
               id: 'e-c',
               name: 'Ash',
-              // REVERSED KEY ORDER, because key order is exactly the non-behavioural metadata
+              // Reversed key order, because key order is exactly the non-behavioural metadata
               // difference the canonical block exists to see through.
               effectSource: {
                 associatedSystemItemId: null,
@@ -222,7 +222,7 @@ test('`enabled` is NOT in the key: two essences differing only in it still merge
 });
 
 // ---------------------------------------------------------------------------
-// Candidacy and THE ZERO POINT (`#### D2`)
+// Candidacy and the zero point (`#### D2`)
 // ---------------------------------------------------------------------------
 
 test('THE ZERO POINT: a world essence with no live membership record never merges', () => {
@@ -239,7 +239,7 @@ test('THE ZERO POINT: a world essence with no live membership record never merge
   assert.deepEqual(orphaned.mergeMap, {});
   assert.deepEqual(orphaned.retired, {});
 
-  // THE MUTATION CONTROL. The only difference is the membership record, so the assertion above
+  // The mutation control: the only difference is the membership record, so the assertion above
   // pins the explicit member-count test rather than some other accident of the fixture.
   const merged = buildWorldEssenceEquivalence(buildEssenceMergeCorpus(spec(true)));
   assert.deepEqual(merged.orphaned, []);
@@ -275,7 +275,7 @@ test('candidacy compares the RESOLVED value, not the stored one', () => {
         { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron', macro: 'Macro.abc' }] },
         {
           id: 'sys-b',
-          // STORED `macro` is null and the switch is ON, so only the RESOLVED read can see the
+          // Stored `macro` is null and the switch is on, so only the resolved read can see the
           // world default this system actually runs.
           essences: [{ id: 'xj7', name: 'Iron', macro: null, inherit: { macro: true } }],
         },
@@ -334,7 +334,7 @@ test('a world essence whose members DISAGREE is declined with the section they d
 // ---------------------------------------------------------------------------
 
 test('equal sourceComponentIds from two REFUSED component pairs never merge', () => {
-  // Both systems carry `comp-1` on the world ROSTER but hold NO membership record for it, which is
+  // Both systems carry `comp-1` on the world roster but hold no membership record for it, which is
   // exactly the state a `(system, 'components')` pair `1.30.0` refused leaves behind: no lift, no
   // re-key, no membership, so the id on the essence is still a raw system-local string.
   const refused = buildWorldEssenceEquivalence(
@@ -366,7 +366,7 @@ test('equal sourceComponentIds from two REFUSED component pairs never merge', ()
   assert.deepEqual(refused.retired, {});
   assert.deepEqual(refused.mergedGroups, []);
 
-  // THE MUTATION CONTROL: the same corpus with both systems MEMBERS of the world component. The
+  // The mutation control: the same corpus with both systems members of the world component. The
   // id now means the same thing in both, so the merge is not a guess.
   const lifted = buildWorldEssenceEquivalence(
     buildEssenceMergeCorpus({
@@ -465,8 +465,8 @@ test('election RE-DERIVES corpus position and never reads `entities` array order
         { id: 'sys-a', essences: [{ id: 'aaa1', name: 'Iron' }] },
         { id: 'sys-b', essences: [{ id: 'bbb2', name: 'Iron' }] },
       ],
-      // The already-migrated world has the YOUNGER essence first, which is precisely what GM edits
-      // and copy-import appends do to a persisted array.
+      // The already-migrated world has the younger essence first, which is what GM edits and
+      // copy-import appends do to a persisted array.
       entityOrder: ['bbb2', 'aaa1'],
     })
   );
@@ -500,7 +500,7 @@ test('ARRAY POSITION decides only when no candidate has a surviving in-system me
 });
 
 test('the local slug stem agrees with `mintEssenceId` on an unclaimed roster', () => {
-  // The migration MUST NOT import the UI leaf that owns `mintEssenceId`, so the stem derivation is
+  // The migration must not import the UI leaf that owns `mintEssenceId`, so the stem derivation is
   // duplicated deliberately. This is the pin that keeps the duplicate faithful.
   const names = ['Iron', '  IRON  ', 'Fire & Ice', 'new essence', '***', '', '   ', '123', 'Élan'];
   for (const name of names) {
@@ -524,7 +524,7 @@ test('OUTPUT UNIQUENESS refuses a merge that would make one system emit a duplic
       {
         id: 'sys-a',
         essences: [
-          // A ROW in `sys-a` whose membership record lives in `sys-b`: the two invariants that
+          // A row in `sys-a` whose membership record lives in `sys-b`: the two invariants that
           // read `essenceDefinitions` see it, and the membership post-condition does not.
           { id: 'iron', name: 'Iron', member: false, inSystem },
           { id: 'kt9', name: 'Iron' },
@@ -547,14 +547,14 @@ test('OUTPUT UNIQUENESS refuses a merge that would make one system emit a duplic
   assert.deepEqual(refused.mergeMap, {});
   assert.deepEqual(refused.retired, {});
 
-  // THE MUTATION CONTROL: drop the colliding row and the same merge is safe.
+  // The mutation control: drop the colliding row and the same merge is safe.
   const allowed = buildWorldEssenceEquivalence(buildEssenceMergeCorpus(spec(false)));
   assert.deepEqual(allowed.refusals, []);
   assert.deepEqual(allowed.mergeMap, { 'sys-a': { essences: { kt9: 'iron' } } });
 });
 
 test('MEMBERSHIP-KEY UNIQUENESS catches what the other two invariants cannot see', () => {
-  // `kt9` holds a membership record for `sys-a` with NO in-system definition row, so the emitted-id
+  // `kt9` holds a membership record for `sys-a` with no in-system definition row, so the emitted-id
   // check has nothing to look at — `sys-a` emits `iron` exactly once either way — and only the
   // rebuilt-key post-condition can see that the merge would collide `iron|sys-a` and silently drop
   // `kt9`'s authored overrides for that system.
@@ -591,9 +591,9 @@ test('a NATIVE duplicate of a group member’s id refuses that group, as `1.30.0
       { id: 'sys-b', essences: [{ id: 'kt9', name: 'Iron' }] },
     ],
   });
-  // A hand-edited corpus carrying the SAME row id twice in one system. `1.30.0` refuses a pair
+  // A hand-edited corpus carrying the same row id twice in one system. `1.30.0` refuses a pair
   // holding one of these on its own ("such a system already has an unreachable definition and must
-  // not have a lift layered on top of it"), and the same reading applies to a merge INTO that id.
+  // not have a lift layered on top of it"), and the same reading applies to a merge into that id.
   const [first] = corpus.systems[0].essenceDefinitions;
   corpus.systems[0].essenceDefinitions.push({ ...first });
   const result = buildWorldEssenceEquivalence(corpus);
@@ -625,12 +625,12 @@ test('a NATIVE duplicate NO group touches refuses nothing', () => {
 });
 
 test('a system holding a ROW but no membership record still gets a leg', () => {
-  // PRESENCE, the case decided AGAINST narrowing the rule to membership records alone. `sys-c`
-  // holds an `essenceDefinitions` row under the loser id and no membership record, so it never
-  // voted on unanimity — and it is re-keyed anyway, because it holds the ENTITY rather than a
-  // reference to it. `unionScopedDefinitions` passes a row with no membership record through
-  // UNTOUCHED, so the re-key cannot change what that row resolves to; leaving it behind would
-  // leave a definition naming a world entity this pass deletes and tombstones.
+  // Presence, not voting: `sys-c` holds an `essenceDefinitions` row under the loser id and no
+  // membership record, so it never voted on unanimity — and it is re-keyed anyway, because it holds
+  // the entity rather than a reference to it. `unionScopedDefinitions` passes a row with no
+  // membership record through untouched, so the re-key cannot change what that row resolves to;
+  // leaving it behind would leave a definition naming a world entity this pass deletes and
+  // tombstones.
   const corpus = buildEssenceMergeCorpus({
     systems: [
       { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron' }] },
@@ -647,9 +647,9 @@ test('a system holding a ROW but no membership record still gets a leg', () => {
 });
 
 test('a system holding a row for the SURVIVOR too is REFUSED rather than re-keyed', () => {
-  // The bound on the case above, and the reason it is safe to keep the row leg: the one shape in
-  // which re-keying an unvoted row would make a definition unreachable is caught by requirement
-  // 6's output-uniqueness invariant, which is evaluated over exactly the row index that leg reads.
+  // The bound on the rule above, and the reason it is safe to keep the row leg: the one shape in
+  // which re-keying an unvoted row would make a definition unreachable is caught by requirement 6's
+  // output-uniqueness invariant, which is evaluated over exactly the row index that leg reads.
   const corpus = buildEssenceMergeCorpus({
     systems: [
       { id: 'sys-a', essences: [{ id: 'iron', name: 'Iron' }] },
@@ -685,11 +685,11 @@ test('the merge map is DISJOINT and a second application is a no-op, across ever
           `fixture ${seed}: ${systemId} maps onto a re-keyed id ${survivorId}`
         );
       }
-      // IDEMPOTENCE follows from disjointness, and is asserted directly against the APPLIED map
-      // rather than against the identity fallback. `map[survivorId] ?? survivorId === survivorId`
-      // reduces to a tautology once the loop above has proved no survivor is a key, so it proved
-      // nothing; what the migration actually relies on is that applying the map to its own OUTPUT
-      // changes nothing, and that is what `keyedRemapper` is asked here.
+      // Idempotence follows from disjointness, and is asserted against the applied map rather than
+      // against the identity fallback: `map[survivorId] ?? survivorId === survivorId` reduces to a
+      // tautology once the loop above has proved no survivor is a key. What the migration relies on
+      // is that applying the map to its own output changes nothing, which is what `keyedRemapper`
+      // is asked here.
       const remap = keyedRemapper(map);
       for (const [loserId, survivorId] of Object.entries(map)) {
         assert.equal(
@@ -700,9 +700,9 @@ test('the merge map is DISJOINT and a second application is a no-op, across ever
       }
     }
   }
-  // THE NON-VACUITY FLOOR, on the repository's own convention (`tests/helpers/scale/scaleProbes.js`):
-  // fixture 0 is an EMPTY corpus, so without this a `buildMergeMap` that returned `{}` would leave
-  // every assertion above unexecuted and the suite green.
+  // The non-vacuity floor, on the repository's own convention
+  // (`tests/helpers/scale/scaleProbes.js`): fixture 0 is an empty corpus, so without this a
+  // `buildMergeMap` that returned `{}` would leave every assertion above unexecuted and green.
   assert.ok(mapped > 0, 'the premise: at least one fixture actually produces a non-empty map');
 });
 
@@ -728,7 +728,7 @@ test('every report leg carries the STORED display name, not the canonical fold',
     { survivorId: 'iron-ore', name: stored, loserIds: ['kt9'], systemIds: ['sys-a', 'sys-b'] },
   ]);
 
-  // A REFUSAL names the same group a merge would have, so it carries the survivor's name too.
+  // A refusal names the same group a merge would have, so it carries the survivor's name too.
   const refused = buildWorldEssenceEquivalence(
     buildEssenceMergeCorpus({
       systems: [
@@ -747,7 +747,7 @@ test('every report leg carries the STORED display name, not the canonical fold',
     },
   ]);
 
-  // A DECLINED essence carries its OWN name — there is no survivor to borrow one from.
+  // A declined essence carries its own name — there is no survivor to borrow one from.
   const declined = buildWorldEssenceEquivalence(
     buildEssenceMergeCorpus({
       systems: [
@@ -778,7 +778,7 @@ test('an ABSENT name is never minted, and a stored null name is preserved', () =
   const result = buildWorldEssenceEquivalence({
     systems: [{ id: 'sys-a', essenceDefinitions: [] }],
     essenceScope: {
-      // `lonely` has no membership record, so it reaches the ORPHAN leg rather than the declined
+      // `lonely` has no membership record, so it reaches the orphan leg rather than the declined
       // one — the two absence-preserving legs an essence with no name can actually reach.
       entities: [{ id: 'nameless' }, { id: 'nulled', name: null }, { id: 'lonely' }],
       defaults: {},
@@ -786,7 +786,7 @@ test('an ABSENT name is never minted, and a stored null name is preserved', () =
     },
   });
 
-  // `deepEqual` here is the STRICT variant, so it already distinguishes a MISSING key from one
+  // `deepEqual` here is the strict variant, so it already distinguishes a missing key from one
   // holding `undefined`; the `in` assertions below say so out loud.
   assert.deepEqual(result.declined, [
     {
@@ -841,7 +841,7 @@ test('every retired id keeps the four identity fields and the systems it lived i
       systems: ['sys-b'],
     },
   });
-  // The SURVIVOR is never tombstoned: its id is still live.
+  // The survivor is never tombstoned: its id is still live.
   assert.ok(!('iron' in result.retired));
 });
 
@@ -857,14 +857,14 @@ test('the answer is BYTE-IDENTICAL on a re-run, across every fixture', () => {
     assert.equal(JSON.stringify(once), JSON.stringify(twice), `fixture ${seed} is not re-runnable`);
     merged += once.mergedGroups.length;
   }
-  // THE NON-VACUITY FLOOR. Determinism is trivially true of a derivation that decides nothing, so
+  // The non-vacuity floor: determinism is trivially true of a derivation that decides nothing, so
   // the property is worth asserting only over a set that reaches a real answer at least once.
   assert.ok(merged > 0, 'the premise: at least one fixture actually merges a group');
 });
 
 test('the PARTITION is permutation-invariant when the corpus decides every election', () => {
   // Every candidate here has an in-system row, so election never reaches the array-position
-  // tie-break and the WHOLE answer — not merely the partition — is invariant under a shuffle.
+  // tie-break and the whole answer — not merely the partition — is invariant under a shuffle.
   const corpus = buildEssenceMergeCorpus({
     systems: [
       {
@@ -906,8 +906,6 @@ test('the PARTITION is permutation-invariant when the corpus decides every elect
 /**
  * Every corpus the property assertions above run over, in one place so a new scenario joins them
  * all at once.
- *
- * @returns {Array<object>}
  */
 function everyMergeFixture() {
   return [
