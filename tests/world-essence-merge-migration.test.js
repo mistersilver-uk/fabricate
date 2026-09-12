@@ -609,6 +609,7 @@ test('the `retired` leg snapshots what the retired entity carried, and a re-run 
       icon: 'fas fa-fire',
       colorToken: 'rose',
       description: 'iron essence',
+      survivorId: 'iron',
       systems: ['sys-b'],
     },
   });

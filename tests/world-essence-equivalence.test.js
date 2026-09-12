@@ -775,6 +775,7 @@ test('every retired id keeps the four identity fields and the systems it lived i
       icon: 'fas fa-anvil',
       colorToken: 'amber',
       description: 'Refined iron',
+      survivorId: 'iron',
       systems: ['sys-b'],
     },
   });

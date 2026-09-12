@@ -975,7 +975,7 @@ function findGroupRefusals(mergeMap, groups, corpus) {
  * @returns {{
  *   mergeMap: {[systemId: string]: {essences: {[loserId: string]: string}}},
  *   retired: {[loserId: string]: {name?: unknown, icon?: unknown, colorToken?: unknown,
- *     description?: unknown, systems: string[]}},
+ *     description?: unknown, survivorId: string, systems: string[]}},
  *   mergedGroups: Array<{survivorId: string, name?: unknown, loserIds: string[],
  *     systemIds: string[]}>,
  *   refusals: Array<{survivorId: string, name?: unknown, loserIds: string[],
@@ -1060,6 +1060,12 @@ export function buildWorldEssenceEquivalence({ systems, essenceScope, componentS
       // retired entity CARRIED, and a field it never carried is not one a restore should mint.
       retired[loser.id] = {
         ...identityOf(loser.record, ESSENCES),
+        // WHAT ABSORBED IT, and it is recorded HERE because this is the last moment the pairing
+        // exists anywhere. The per-system legs that also carry `loserId -> survivorId` are CLEARED
+        // by the one-shot flag pass once it completes, and the losers are gone from the corpus by
+        // then, so after the first clean boot a world could otherwise answer "an essence called
+        // Iron was retired, from systems A and B" and never again answer "into which one".
+        survivorId: survivor.id,
         systems: presenceSystemsOf(loser, corpus),
       };
     }
