@@ -1,13 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
-import { runContainersChanged } from '../src/systems/runFlagInvalidation.js';
+import {
+  runContainerDiffPaths,
+  runContainersChanged,
+} from '../src/systems/runFlagInvalidation.js';
 import {
   FakeActor as SharedActor,
   setupRunManagerGlobals as setupGlobals,
 } from './helpers/run-manager-fakes.js';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 // Issue 739 (read side): the run managers cache an actor's runs in memory and never
 // learn about a write another client (or the primary-GM world-time resume) makes to the
@@ -154,4 +162,134 @@ test('runContainersChanged: matches the doubly-nested crafting/salvage and singl
   // A noisy HP-tick diff touches no run flag.
   const hpTick = { system: { attributes: { hp: { value: 3 } } } };
   assert.deepEqual(runContainersChanged(hpTick, has), []);
+});
+
+// ---------------------------------------------------------------------------
+// UPDATE-OPERATOR SPELLINGS (issue 1654)
+//
+// An update operator is part of the LAST path segment, so a write that uses one reaches
+// the change diff under a different key. The `1.34.0` essence-merge remap forced-replaces
+// each run container (`==<container>`) because it rewrites a map's KEY SET and a merge
+// write cannot remove a key, and `-=` has been reachable all along through
+// `deleteRemovedActiveRunFlags`. A probe for the bare spelling alone matches neither —
+// `runContainersChanged` answers `[]`, no manager drops its cache, and every other client
+// goes on serving runs it has already been told are stale. That is the module header's own
+// "matching the wrong depth means the hook silently never fires", one prefix over.
+// ---------------------------------------------------------------------------
+
+/** The segment-walking probe `foundry.utils.hasProperty` implements at runtime. */
+function hasSegmentPath(object, path) {
+  let node = object;
+  for (const segment of String(path).split('.')) {
+    if (node == null || typeof node !== 'object' || !(segment in node)) return false;
+    node = node[segment];
+  }
+  return true;
+}
+
+/** The expanded diff Foundry hands `updateActor` for one flattened update key. */
+function expandedDiff(updateKey) {
+  const segments = updateKey.split('.');
+  const diff = {};
+  let node = diff;
+  for (const segment of segments.slice(0, -1)) {
+    node[segment] = {};
+    node = node[segment];
+  }
+  node[segments.at(-1)] = { active: {}, history: [] };
+  return diff;
+}
+
+for (const [operator, why] of [
+  ['==', 'the forced replacement the 1.34.0 essence remap writes'],
+  ['-=', 'the deletion `deleteRemovedActiveRunFlags` has always been able to write'],
+]) {
+  test(`runContainersChanged matches a \`${operator}\` diff at BOTH flag depths (${why})`, () => {
+    // BOTH DEPTHS IN ONE TEST, because the asymmetry is the trap: crafting and salvage are
+    // DOUBLY nested and gathering is SINGLE-scope, so a fix that hard-coded one parent path
+    // would leave the other silently unmatched exactly as the bare spelling did.
+    assert.deepEqual(
+      runContainersChanged(
+        expandedDiff(`flags.fabricate.fabricate.${operator}craftingRuns`),
+        hasSegmentPath
+      ),
+      ['crafting']
+    );
+    assert.deepEqual(
+      runContainersChanged(
+        expandedDiff(`flags.fabricate.fabricate.${operator}salvageRuns`),
+        hasSegmentPath
+      ),
+      ['salvage']
+    );
+    assert.deepEqual(
+      runContainersChanged(expandedDiff(`flags.fabricate.${operator}gatheringRuns`), hasSegmentPath),
+      ['gathering'],
+      'the SINGLE-scope depth, derived from the descriptor rather than written out'
+    );
+  });
+}
+
+test('the operator match is NOT a widening: an unrelated container still returns []', () => {
+  // The risk in teaching a matcher a new spelling is that it starts matching everything.
+  // Each container is probed under its OWN last segment only.
+  const unrelated = [
+    'flags.fabricate.fabricate.==learnedRecipes',
+    'flags.fabricate.fabricate.-=alchemyDeadEnds',
+    'flags.fabricate.==someOtherModuleFlag',
+    'flags.other-module.==craftingRuns',
+  ];
+  for (const updateKey of unrelated) {
+    assert.deepEqual(
+      runContainersChanged(expandedDiff(updateKey), hasSegmentPath),
+      [],
+      `${updateKey} touches no Fabricate run container`
+    );
+  }
+  // The WRONG DEPTH stays wrong under an operator too: a single-scope crafting write is
+  // not a thing Fabricate does, and matching it would fire the hook on a flag nobody reads.
+  assert.deepEqual(
+    runContainersChanged(expandedDiff('flags.fabricate.==craftingRuns'), hasSegmentPath),
+    []
+  );
+  // A noisy HP tick is still the common case and must stay free.
+  assert.deepEqual(
+    runContainersChanged({ system: { attributes: { hp: { value: 3 } } } }, hasSegmentPath),
+    []
+  );
+});
+
+test('the prefix goes on the LAST segment only, never an interior one', () => {
+  // `flags.fabricate.==fabricate.craftingRuns` is a DIFFERENT write — it force-replaces the
+  // whole `fabricate` scope object — and a matcher that prefixed interior segments would
+  // claim it as a `craftingRuns` touch.
+  assert.deepEqual(runContainerDiffPaths('flags.fabricate.fabricate.craftingRuns'), [
+    'flags.fabricate.fabricate.craftingRuns',
+    'flags.fabricate.fabricate.-=craftingRuns',
+    'flags.fabricate.fabricate.==craftingRuns',
+  ]);
+  assert.deepEqual(runContainerDiffPaths('flags.fabricate.gatheringRuns'), [
+    'flags.fabricate.gatheringRuns',
+    'flags.fabricate.-=gatheringRuns',
+    'flags.fabricate.==gatheringRuns',
+  ]);
+  assert.deepEqual(runContainerDiffPaths('bare'), ['bare', '-=bare', '==bare'], 'no leading dot');
+  assert.deepEqual(runContainerDiffPaths(''), []);
+});
+
+test('the default probe matches the injected one, so both seams see the operator spellings', () => {
+  // The probe is injectable — `foundry.utils.hasProperty` at runtime, `hasByPath` by
+  // default — and a fix that worked under only one of them would pass every test in this
+  // file while failing in Foundry, or the reverse.
+  const diff = expandedDiff('flags.fabricate.fabricate.==craftingRuns');
+  assert.deepEqual(runContainersChanged(diff), ['crafting'], 'the hasByPath default');
+  assert.deepEqual(runContainersChanged(diff, hasSegmentPath), ['crafting'], 'and the injected one');
+  assert.deepEqual(runContainersChanged(diff, 'not a function'), ['crafting'], 'and the fallback');
+});
+
+test('src/main.js still routes the hook through the matcher it is filtered by', () => {
+  // The filter is load-bearing: `updateActor` fires on every HP tick. An unfiltered hook
+  // would be a performance defect, and a filter that never matches is this whole bug.
+  const source = readFileSync(resolve(HERE, '..', 'src', 'main.js'), 'utf8');
+  assert.match(source, /const changed = runContainersChanged\(changes, foundry\.utils\.hasProperty\);/);
 });
