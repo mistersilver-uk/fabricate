@@ -5769,17 +5769,20 @@ async function runWorldEssenceMergeFlagRemap() {
  * @param {object} mergeMap The pending `fabricate.worldEssenceMergeMap`.
  */
 async function applyWorldEssenceMergeFlagRemap(mergeMap) {
-  // AWAITED AND PROBED, rather than counted as landed on the strength of not throwing. A document
-  // with no `update` answers `undefined` and `Document#update` RESOLVES `undefined` on an empty
-  // diff, so the bare call cannot tell a write that landed from one that never happened — and the
-  // summary counts this returns are now read by a GM notice rather than by `console.debug` alone.
-  // A missing `update` is the one case that is unambiguously NOT a write, so it is the one this
-  // reports; an empty diff stays indistinguishable and is left counted, which overstates nothing
-  // a GM acts on because no withhold reads these counts.
-  const replace = async (document, path, value) => {
-    if (typeof document?.update !== 'function') return undefined;
-    return document.update({ [path]: value });
-  };
+  // THIS COUNTS A WRITE AS LANDED ON THE STRENGTH OF NOT THROWING, AND THAT IS A DECISION RATHER
+  // THAN AN OVERSIGHT. A document with no `update` answers `undefined`, and `Document#update`
+  // RESOLVES `undefined` on an empty diff, so neither case is distinguishable here from a write
+  // that landed — `remappedItemOverrides` and `remappedRunContainers` can therefore OVERSTATE.
+  //
+  // IT IS NOT TIGHTENED INTO A `skippedErrors`, which is the only bucket the caller's `catch`
+  // arms offer. `remapCompletedCleanly` reads that count and WITHHOLDS the merge-map clear on a
+  // non-zero one, so a single malformed document would strand the map on that world forever — a
+  // permanent harm traded for an accurate count.
+  //
+  // AND THE OVERSTATEMENT REACHES NOBODY. The GM notice reports the REFUSAL and SKIP legs alone
+  // (`unsafeEssenceIdSkips`, `refusedGroups`, `lockedSkips`, `skippedErrors`); the two "remapped"
+  // counts go to `console.debug` and to no gate.
+  const replace = (document, path, value) => document?.update?.({ [path]: value });
   const summary = await remapEssenceFlagsAcrossActors({
     actors: game.actors ?? [],
     mergeMap,
