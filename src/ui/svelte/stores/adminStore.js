@@ -215,6 +215,12 @@ const TASK_PROGRESSIVE_AWARD_MODES = new Set(['equal', 'partial', 'exceed']);
 const TASK_TIME_UNITS = ['minutes', 'hours', 'days', 'months', 'years'];
 const TASK_FAILURE_OUTCOME_MODES = new Set(['text', 'macro']);
 const GATHERING_CONFIG_SETTING = 'gatheringConfig';
+// The world setting the `1.34.0` equivalent-essence merge writes its merge map to (issue 1654),
+// spelled here as `GATHERING_CONFIG_SETTING` is rather than imported: `SETTING_KEYS` lives in
+// `src/config/settings.js`, which this file does not import, and the key is read through the
+// injected `services.getSetting` seam either way. `tests/essence-world-scope-screens.test.js`
+// drives the real store with a double keyed on this exact string, so the mirror is guarded.
+const WORLD_ESSENCE_MERGE_MAP_SETTING = 'worldEssenceMergeMap';
 const DEFAULT_GATHERING_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 const DEFAULT_GATHERING_VOCABULARIES = Object.freeze({
   biomes: [
@@ -5703,6 +5709,16 @@ export function createAdminStore(services) {
       // because the essence leg is handed THIS array rather than taking a second one. The
       // counting itself lives in `worldScopeProjection.js`, an open file.
       recipes: worldRecipes,
+      // Issue 1654: THE SECOND ADDED INPUT IN THIS GATEWAY FILE, and it is here for the reason
+      // `recipes` is. Nothing in `{stores, systems, usage}` can answer which essence ids
+      // `1.34.0` retired: the merge map is a world setting of its own, not part of any scope
+      // corpus, so the store legs cannot see it. Without it `mintEssenceId` resolves a new
+      // world essence's id against the LIVE roster alone and hands a retired id straight back —
+      // which silently re-points every reference the migration knowingly left on that key at
+      // the WRONG essence. The reading itself lives in `worldScopeProjection.js`, an open file;
+      // this supplies only the raw value, through the same `services.getSetting` seam the
+      // gathering config is read with.
+      essenceMergeMap: _worldEssenceMergeMap(),
       usage: {
         component: _worldComponentUsage(recipeCache),
         essence: _worldEssenceUsage(worldRecipes),
@@ -5746,6 +5762,30 @@ export function createAdminStore(services) {
       tool: services.getToolScopeStore?.() ?? null,
       vocabulary: services.getVocabularyScopeStore?.() ?? null,
     };
+  }
+
+  /**
+   * The raw `fabricate.worldEssenceMergeMap` world setting, or `null` when it cannot be read.
+   *
+   * GUARDED, and the guard is load-bearing rather than ceremonial (issue 1654). The setting is
+   * registered by the `1.34.0` migration, so on every world that predates it — and on any
+   * services double that answers only the keys it knows — `game.settings.get` THROWS on an
+   * unregistered key rather than answering a default. An unguarded read here would take the
+   * whole manager publish down on exactly the worlds that have nothing to report.
+   *
+   * This is `_worldToolCorpus`'s rule, stated by `worldScopeProjection`'s own `readCorpus`: an
+   * unreadable world input degrades to "nothing to say" and leaves the GM a working Manager.
+   * `retiredEssenceIds` reads `null`, `undefined`, `{}` and a malformed value alike as no
+   * retired ids, so the fail-soft answer is also the correct one.
+   *
+   * @returns {unknown} the raw setting value; `null` when absent or unreadable.
+   */
+  function _worldEssenceMergeMap() {
+    try {
+      return services.getSetting?.(WORLD_ESSENCE_MERGE_MAP_SETTING) ?? null;
+    } catch {
+      return null;
+    }
   }
 
   function _allSystems() {
