@@ -34,6 +34,8 @@ import {
   mayClearWorldEssenceMergeMap,
   mayClearWorldScopeRekeyMap,
   remapCompletedCleanly,
+  WORLD_ESSENCE_MERGE_RETIRED_LEG,
+  WORLD_ESSENCE_MERGE_SYSTEMS_LEG,
 } from '../src/migration/remapWorldScopeIdentityFlags.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -228,19 +230,31 @@ test('the essence clear and its version advance are BOTH inside the same gate', 
   );
 });
 
-test('the CLEAR keeps the retired tombstone, which is what stops a retired id being reissued', () => {
-  // `mintEssenceId` resolves a new id against the LIVE roster alone, so a cleared tombstone hands
-  // a retired id straight back to the next essence named after a merged one — and the reference
-  // this pass deliberately left on that key stops contributing NOTHING and starts contributing the
-  // WRONG essence.
+test('the CLEAR empties the `systems` leg and WRITES THE TOMBSTONE BACK', () => {
+  // The setting is a two-leg container. `mintEssenceId` resolves a new id against the LIVE roster
+  // alone, so a clear that wrote `{}` hands a retired id straight back to the next essence named
+  // after a merged one — and the reference this pass deliberately left on that key stops
+  // contributing NOTHING and starts contributing the WRONG essence. The failure lands only on
+  // worlds that have FINISHED migrating, which is the worst signature there is.
   const body = bodyOf('runWorldEssenceMergeFlagRemap');
-  const clear = body.slice(body.indexOf('SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, {'));
-  assert.match(
-    clear.slice(0, 80),
-    /SETTING_KEYS\.WORLD_ESSENCE_MERGE_MAP, \{ retired \}\)/,
-    'the clear writes the tombstone back, never `{}`'
+  const clearIndex = body.indexOf('SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, {');
+  assert.ok(clearIndex > 0, 'the premise: the clear is there');
+  const clear = body.slice(clearIndex, clearIndex + 160);
+  assert.match(clear, /systems: \{\},/, 'the TRANSIENT leg is emptied');
+  assert.match(clear, /retired: stored\.retired \?\? \{\},/, 'and the tombstone is written BACK');
+  assert.doesNotMatch(
+    clear.slice(0, 60),
+    /WORLD_ESSENCE_MERGE_MAP, \{\}\)/,
+    'never a bare `{}`: that destroys the tombstone silently'
   );
-  assert.match(body, /const \{ retired = \{\} \} = getSetting\(SETTING_KEYS\.WORLD_ESSENCE_MERGE_MAP\)/);
+  assert.match(body, /const stored = getSetting\(SETTING_KEYS\.WORLD_ESSENCE_MERGE_MAP\)/);
+  // A GUARDED MIRROR. `src/main.js` spells the two leg names as literals because a computed key
+  // would make the clear unreadable, so the literals are pinned against the constants the pure
+  // reader uses. A rename on one side alone fails here rather than at the next boot.
+  assert.equal(WORLD_ESSENCE_MERGE_SYSTEMS_LEG, 'systems');
+  assert.equal(WORLD_ESSENCE_MERGE_RETIRED_LEG, 'retired');
+  assert.ok(clear.includes(`${WORLD_ESSENCE_MERGE_SYSTEMS_LEG}: {},`));
+  assert.ok(clear.includes(`${WORLD_ESSENCE_MERGE_RETIRED_LEG}: stored.${WORLD_ESSENCE_MERGE_RETIRED_LEG}`));
 });
 
 test('the essence recovery action is ACTIVE-GM ONLY and SAYS SO when it declines', () => {

@@ -418,12 +418,15 @@ test('the clear and the version advance are BOTH inside the same gate', () => {
 // merge semantics, rather than against a write double that reports success.
 // ---------------------------------------------------------------------------
 
+// THE PERSISTED SHAPE: a TWO-LEG container. The per-system pairs are nested under `systems`
+// rather than sitting beside `retired`, because a crafting system whose id is literally `retired`
+// would otherwise collide with the tombstone key and nothing validates a system id against that.
 const MERGE_MAP = Object.freeze({
-  'sys-a': { essences: { 'fire-a': 'fire-b' } },
-  'sys-b': { essences: { 'shared-e': 'b-survivor' } },
-  'sys-c': { essences: { 'shared-e': 'c-survivor' } },
-  // NEVER A SYSTEM LEG. It is the tombstone that sits beside them in the same setting, and its
-  // values carry no `essences` key at all — which is what the shape test excludes it by.
+  systems: {
+    'sys-a': { essences: { 'fire-a': 'fire-b' } },
+    'sys-b': { essences: { 'shared-e': 'b-survivor' } },
+    'sys-c': { essences: { 'shared-e': 'c-survivor' } },
+  },
   retired: {
     'fire-a': { name: 'Fire', icon: 'icons/fire.webp', systems: ['sys-a'] },
   },
@@ -533,20 +536,31 @@ function runEssenceRemap(actors, writers, mergeMap = MERGE_MAP) {
 
 // --- the map reader --------------------------------------------------------
 
-test('the merge map reads by SHAPE, so the retired tombstone is never taken for a system leg', () => {
+test('the pairs are read from the `systems` leg AND NOWHERE ELSE', () => {
   assert.deepEqual(worldEssenceMergeLegs(MERGE_MAP), {
     'sys-a': { 'fire-a': 'fire-b' },
     'sys-b': { 'shared-e': 'b-survivor' },
     'sys-c': { 'shared-e': 'c-survivor' },
   });
-  // A leg whose values carry no `essences` key is not a system leg however it is named. The
-  // tombstone's own values are `{name, icon, colorToken, description, systems}`.
-  assert.deepEqual(worldEssenceMergeLegs({ retired: { x: { systems: ['s'] } } }), {});
-  assert.deepEqual(worldEssenceMergeLegs({ 'sys-a': { essences: { same: 'same' } } }), {}, 'a self-map re-keys nothing');
+  // EXACTLY ONE READER AND EXACTLY ONE LAYOUT. A reader that also accepted the FLAT layout would
+  // let the producing migration and this consumer disagree about where the pairs live while both
+  // stayed green — the drift the nesting exists to make impossible.
   assert.deepEqual(
-    worldEssenceMergeLegs({ systems: { 'sys-a': { essences: { a: 'b' } } }, retired: {} }),
-    { 'sys-a': { a: 'b' } },
-    'and a nested {systems: ...} layout reads the same, so this reader cannot make one irreversible'
+    worldEssenceMergeLegs({ 'sys-a': { essences: { 'fire-a': 'fire-b' } } }),
+    {},
+    'a flat layout holds no work, because the pairs are not where this reader looks'
+  );
+  assert.deepEqual(worldEssenceMergeLegs({ retired: { x: { systems: ['s'] } } }), {});
+  assert.deepEqual(
+    worldEssenceMergeLegs({ systems: { 'sys-a': { essences: { same: 'same' } } } }),
+    {},
+    'a self-map re-keys nothing'
+  );
+  assert.deepEqual(
+    worldEssenceMergeLegs({ systems: { retired: { essences: { a: 'b' } } } }),
+    { retired: { a: 'b' } },
+    'and a crafting system named `retired` is an ordinary system leg here, which is the whole ' +
+      'point of nesting them'
   );
 });
 
@@ -556,17 +570,25 @@ test('hasPendingWorldEssenceMerge is true only for unconsumed PAIRS, and does NO
   assert.equal(hasPendingWorldEssenceMerge(null), false);
   assert.equal(hasPendingWorldEssenceMerge(undefined), false, 'an absent setting is NOT pending');
   // THE TOMBSTONE SURVIVES THE CLEAR, so the post-clear value must not read as pending — which is
-  // what would make the pass walk every actor on every boot for the life of the world.
+  // what would make the pass walk every actor on every boot for the life of the world. This is
+  // exactly the value `runWorldEssenceMergeFlagRemap` writes when it clears.
+  assert.equal(
+    hasPendingWorldEssenceMerge({ systems: {}, retired: MERGE_MAP.retired }),
+    false,
+    'a map holding only a tombstone holds no WORK'
+  );
   assert.equal(hasPendingWorldEssenceMerge({ retired: MERGE_MAP.retired }), false);
 });
 
 test('an id that is not a safe flag-key segment refuses its WHOLE group and is counted', () => {
   const unsafeMap = {
-    'sys-a': {
-      essences: {
-        'dotted.loser': 'good-survivor',
-        'other-loser': 'good-survivor',
-        'clean-loser': 'clean-survivor',
+    systems: {
+      'sys-a': {
+        essences: {
+          'dotted.loser': 'good-survivor',
+          'other-loser': 'good-survivor',
+          'clean-loser': 'clean-survivor',
+        },
       },
     },
   };
@@ -580,7 +602,10 @@ test('an id that is not a safe flag-key segment refuses its WHOLE group and is c
   assert.deepEqual(read.unsafeEssenceIds, ['dotted.loser']);
   assert.equal(read.refusedGroups, 1);
   // The map is derived from the RAW settings corpus, so a hand-edited id may be anything.
-  assert.equal(readWorldEssenceMergeMap({ s: { essences: { a: 'sur.vivor' } } }).refusedGroups, 1);
+  assert.equal(
+    readWorldEssenceMergeMap({ systems: { s: { essences: { a: 'sur.vivor' } } } }).refusedGroups,
+    1
+  );
 });
 
 test('the item override is remapped ONLY when the whole corpus agrees, exactly as the legacy scalar is', () => {
@@ -778,7 +803,7 @@ test('a world with no pending merge never walks the actor corpus', async () => {
   };
   const summary = await remapWorldEssenceIdentityFlags({
     actors,
-    mergeMap: { retired: MERGE_MAP.retired },
+    mergeMap: { systems: {}, retired: MERGE_MAP.retired },
     readFlag,
     ...forcedReplacementWriters(),
   });

@@ -5721,11 +5721,17 @@ async function runWorldEssenceMergeFlagRemap() {
       );
       return;
     }
-    // THE PER-SYSTEM LEGS ONLY. `retired` is the never-cleared tombstone that keeps a retired
-    // essence id TAKEN for the life of the world, so clearing it would let `mintEssenceId` hand
-    // one straight back to the next essence named after a merged one.
-    const { retired = {} } = getSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP) ?? {};
-    await setSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, { retired });
+    // THE `systems` LEG ONLY, AND `retired` IS WRITTEN BACK RATHER THAN LEFT TO SURVIVE BY LUCK.
+    // The setting is a two-leg container: `systems` holds the transient per-system re-key pairs
+    // this pass consumes, and `retired` is the tombstone that keeps a retired essence id TAKEN for
+    // the life of the world. A clear that wrote `{}` would destroy the tombstone and let
+    // `mintEssenceId` hand a retired id straight back to the next essence named after a merged
+    // one — silently, and only on worlds that have FINISHED migrating.
+    const stored = getSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP) ?? {};
+    await setSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, {
+      systems: {},
+      retired: stored.retired ?? {},
+    });
     await setSetting(
       SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION,
       WORLD_ESSENCE_MERGE_FLAG_TARGET

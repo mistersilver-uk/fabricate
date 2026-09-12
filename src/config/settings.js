@@ -109,12 +109,16 @@ export const SETTING_KEYS = Object.freeze({
   WORLD_SCOPE_REKEY_MAP: 'worldScopeRekeyMap',
   // Issue 1654: the `1.34.0` equivalent-essence merge's DURABLE DECISION RECORD, written as the
   // SECOND writeback leg (immediately after `worldScopeRekeyMap`, before `recipes`) so a torn
-  // pass is recoverable whichever later legs landed. TWO LEGS WITH DIFFERENT LIFETIMES: the
-  // per-system `{essences: {loserId: survivorId}}` re-key map is TRANSIENT and is cleared by the
-  // one-shot `ready` pass that remaps owned Actor/Item durable flags, while `retired` — the
-  // tombstone recording what each retired id carried — is NEVER cleared, because `mintEssenceId`
-  // resolves a new id against the LIVE roster alone and would otherwise hand a retired id
-  // straight back to the next essence named after a merged one.
+  // pass is recoverable whichever later legs landed. A TWO-LEG CONTAINER,
+  // `{systems: {[systemId]: {essences: {loserId: survivorId}}}, retired: {[loserId]: {...}}}`,
+  // WITH DIFFERENT LIFETIMES PER LEG: `systems` is TRANSIENT and is cleared by the one-shot
+  // `ready` pass that remaps owned Actor/Item durable flags, while `retired` — the tombstone
+  // recording what each retired id carried — is NEVER cleared, because `mintEssenceId` resolves a
+  // new id against the LIVE roster alone and would otherwise hand a retired id straight back to
+  // the next essence named after a merged one.
+  // THE LEGS ARE NESTED RATHER THAN FLAT SIBLINGS because a crafting system whose id is literally
+  // `retired` would otherwise collide with the tombstone key, and nothing validates a system id
+  // against that on the way in.
   WORLD_ESSENCE_MERGE_MAP: 'worldEssenceMergeMap',
   GATHERING_ENVIRONMENTS: 'gatheringEnvironments',
   GATHERING_CONFIG: 'gatheringConfig',
