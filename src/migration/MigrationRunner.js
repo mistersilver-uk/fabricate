@@ -773,23 +773,17 @@ const MIGRATIONS = [
       'untouched for a re-upgrade, so going back costs you nothing further — it simply does not ' +
       'undo the merge',
     downgradeTo: '1.33.0',
-    // DELIBERATELY NOT MARKED `downgradeLosesData`, and CHECKED rather than copied from the
-    // `1.30.0` entry above (issue 1654, requirement 15). Three candidate losses were examined and
-    // each fails the test the registry applies. The retired world essences are a loss at
-    // MIGRATION time rather than one the downgrade causes — the same reading `1.30.0` takes of
-    // its merged identities. `1.33.0` reads `recipes`, `craftingSystems`, `gatheringConfig`,
-    // `essenceScope` and `componentScope` with UNCHANGED normalizers, so no key this pass wrote
-    // is dropped on read there. And `worldEssenceMergeMap` is a setting `1.33.0` neither reads
-    // nor writes, so it survives as an orphaned `Setting` document that a re-upgrade finds
-    // intact, exactly as `1.30.0` requirement 22 states for the three scope settings. The label
-    // still carries the irreversibility caveat beside the Downgrade button, because "no data is
-    // lost by downgrading" and "the merge can be undone" are DIFFERENT claims and only the first
-    // is true. `tests/world-essence-merge-migration.test.js` holds the declaration executable.
+    // Deliberately not marked `downgradeLosesData` (issue 1654, requirement 15): the retired world
+    // essences are a loss at migration time rather than one the downgrade causes, `1.33.0` reads
+    // every setting this pass touched with unchanged normalizers, and `worldEssenceMergeMap`
+    // survives there as an orphaned `Setting` a re-upgrade finds intact. The label still carries
+    // the irreversibility caveat, because "no data is lost by downgrading" and "the merge can be
+    // undone" are different claims. `tests/world-essence-merge-migration.test.js` pins this.
     downgradeLosesData: false,
-    // Reports the groups it merged, the groups it REFUSED with their reasons, the world essences
-    // whose members disagreed (`declined`) and the ones no system is a member of (`orphaned`),
-    // through the transient `_worldEssenceMergeReport` field — captured and deleted by the runner
-    // below for the GM notice.
+    // Reports four legs through the transient `_worldEssenceMergeReport` field — the groups it
+    // merged, the groups it refused with their reasons, the world essences whose members disagreed
+    // (`declined`) and the ones no system is a member of (`orphaned`) — captured and deleted by the
+    // runner below for the GM notice.
     migrate: (data) => mergeEquivalentWorldEssences(data),
   },
   // Future migrations added here in version order
@@ -1162,12 +1156,9 @@ export class MigrationRunner {
     }
     delete data._worldScopeEntityReport;
 
-    // 1.34.0 reports what the equivalent-world-essence merge did (issue 1654): the groups it
-    // merged with their survivors, losers and systems; the groups it REFUSED with the reason; the
-    // world essences whose members disagreed about a section; and the ones no system is a member
-    // of. Captured for the GM notice and stripped so the transient field is never persisted —
-    // the loop above spread-merges a migration's return into the DATA payload rather than into
-    // this summary, so a report can only travel this way.
+    // 1.34.0's four-leg merge report (issue 1654), captured for the GM notice and stripped so the
+    // transient field is never persisted: the loop above spread-merges a migration's return into the
+    // data payload rather than into this summary, so a report can only travel this way.
     let worldEssenceMergeReport = null;
     if (data._worldEssenceMergeReport && typeof data._worldEssenceMergeReport === 'object') {
       worldEssenceMergeReport = data._worldEssenceMergeReport;
@@ -1230,22 +1221,19 @@ export class MigrationRunner {
         return this._deferOnWriteFailure(error);
       }
     }
-    // `worldEssenceMergeMap` is the SECOND leg, immediately after the map above and still ahead of
-    // `recipes` (issue 1654, § Equivalent World Essence Merge requirement 10). It is the `1.34.0`
-    // pass's own DURABLE DECISION RECORD and is a SETTING OF ITS OWN rather than an essence leg on
-    // the `1.30.0` map, for three structural reasons that requirement states: `normalizeRekeyMap`
-    // drops any leg outside `REKEYABLE_ENTITY_TYPES`, widening that list would newly REFUSE a
-    // `1.30.0` pair on a world carrying a native duplicate essence id, and
-    // `mayClearWorldScopeRekeyMap` is read by two `1.30.0` source-Item stamp gates that have no
-    // business consulting an essence decision.
+    // `worldEssenceMergeMap` is the second leg, immediately after the map above and still ahead of
+    // `recipes` (issue 1654, § Equivalent World Essence Merge requirement 10). It is ordered here
+    // for the reason that map is: a tear at any later leg leaves a re-run able to finish the
+    // rewrite, and re-deriving the map from an already re-keyed `craftingSystems` would answer
+    // empty. It also carries the tombstone leg, so a tear that dropped it would let a later
+    // `+ New essence` reissue a retired essence id.
     //
-    // It is ordered here for the reason the map above is: a tear at ANY later leg leaves a re-run
-    // able to finish the rewrite whichever legs landed, and re-deriving the map from a
-    // `craftingSystems` that has already been re-keyed would answer EMPTY. It also carries the
-    // TOMBSTONE leg, which is what stops the authoring surface reissuing a retired essence id, so
-    // a tear that dropped it would let a later `+ New essence` hand one straight back.
+    // It is a setting of its own rather than an essence leg on the `1.30.0` map because
+    // `normalizeRekeyMap` drops any leg outside `REKEYABLE_ENTITY_TYPES`, widening that list would
+    // newly refuse a `1.30.0` pair on a world carrying a native duplicate essence id, and
+    // `mayClearWorldScopeRekeyMap` is read by two `1.30.0` source-Item stamp gates.
     //
-    // IT CARRIES ITS OWN CONTAINMENT for the reason the leg above does: this sits OUTSIDE both
+    // It carries its own containment for the reason the leg above does: this sits outside both
     // shipped try/catch blocks, so an escaping rejection would propagate out of `run()` past a
     // caller with no `catch`.
     if (worldEssenceMergeMapChanged) {

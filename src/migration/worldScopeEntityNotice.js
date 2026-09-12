@@ -327,39 +327,30 @@ export function buildWorldIdentityDriftNotice(driftEntries, localize) {
 }
 
 // ---------------------------------------------------------------------------
-// THE `1.34.0` EQUIVALENT-ESSENCE MERGE NOTICE (issue 1654)
+// The `1.34.0` equivalent-essence merge notice (issue 1654).
 // ---------------------------------------------------------------------------
 
 /**
- * How many essences the TOAST names before deferring to the console.
- *
- * The cap exists for the reason {@link IDENTITY_DRIFT_NOTICE_RECORD_CAP} states — `.notification`
- * has no `max-height`, no `overflow` and `pointer-events: all` — and the call site logs the full,
- * id-level enumeration at `console.info` through {@link describeWorldEssenceMerge}, which is the
- * only thing that makes "the rest is in the console" a true sentence.
+ * How many essences the toast names before deferring to the console, for the reason
+ * {@link IDENTITY_DRIFT_NOTICE_RECORD_CAP} states. The call site must log the full enumeration from
+ * {@link describeWorldEssenceMerge}, or "the rest is in the console" is not a true sentence.
  */
 const ESSENCE_MERGE_NOTICE_NAME_CAP = 5;
 
 /**
  * The readable name of one merged, refused or declined essence group.
  *
- * **IT IS A NAME AND NEVER AN ID PAIR, AND THAT IS NOT A STYLE CHOICE.** The `Renames` clause this
- * is otherwise modelled on prints `oldId → newId` because it was written when an essence id was
- * believed to be a readable slug. It is not: `adminStore.addEssence` mints one with
- * `crypto.randomUUID()`, so most ids `1.34.0` retires are 36-character UUIDs, and the channel is a
- * corner toast. An enumeration of them is a wall of hex a GM can do nothing with. The equivalence
- * key CASE-FOLDS the name, so every group has exactly one readable name by construction.
+ * A name and never an id pair, unlike the `Renames` clause this is modelled on: an essence id is
+ * minted with `crypto.randomUUID()`, so most ids `1.34.0` retires are UUIDs and the channel is a
+ * corner toast. The equivalence key case-folds the name, so every group has exactly one.
  *
- * THE ENTRY'S OWN `name` IS THE CONTRACT AND IS ALWAYS PRESENT. `buildWorldEssenceEquivalence`
- * carries an absence-preserving `name` on every `mergedGroups`, `refusals` and `declined` entry,
- * and a survivor cannot lack one BY CONSTRUCTION: a nameless essence fails canonicalisation and
- * is declined before it can ever become a candidate.
+ * The entry's own `name` is the contract and is always present: `buildWorldEssenceEquivalence`
+ * carries one on every `mergedGroups`, `refusals` and `declined` entry, and a nameless essence is
+ * declined before it can become a candidate.
  *
- * THE REST OF THE CHAIN IS A GUARD, NOT A PATH. The report arrives through a TRANSIENT
- * `_worldEssenceMergeReport` field that the runner captures and deletes, so it is never validated
- * by a schema and a malformed one must still produce a readable sentence rather than the string
- * `undefined` in a permanent toast. The tombstone lookup and the id fall-back cost nothing and
- * are unreachable from correct data; they are deliberately NOT asserted as reachable.
+ * The rest of the chain is a guard and not a path. The report arrives through a transient
+ * `_worldEssenceMergeReport` field no schema validates, so a malformed one must still produce a
+ * readable sentence rather than the string `undefined` in a permanent toast.
  *
  * @param {object|null} entry A `mergedGroups`, `refusals` or `declined` entry.
  * @param {object|null} retired The `retired` tombstone map, when the report carries it.
@@ -393,13 +384,11 @@ function describeCappedEssences(entries, describe, localize) {
 }
 
 /**
- * EVERY group, by id, uncapped - the detail the notice's own cap defers to the console.
+ * Every group, by id, uncapped - the detail the notice's own cap defers to the console.
  *
- * Separate from the notice for the reason {@link describeWorldIdentityDrift} is: what core logs
- * alongside a toast is the message it was HANDED, which is the CAPPED one, so a notice claiming
- * the rest is in the console is false unless Fabricate logs it itself. The call site logs this at
- * `console.info`, not `console.debug` — `debug` maps to DevTools' VERBOSE level, which Chromium's
- * default filter excludes.
+ * Separate from the notice for the reason {@link describeWorldIdentityDrift} is: core logs the
+ * message it was handed, which is the capped one. The call site logs this at `console.info` and not
+ * `console.debug`, which maps to DevTools' verbose level and is excluded by Chromium's default.
  *
  * @param {object|null} report The transient `_worldEssenceMergeReport`.
  * @returns {string} the full enumeration, or `''` when there is nothing to say.
@@ -418,12 +407,9 @@ export function describeWorldEssenceMerge(report) {
       (entry) => `declined ${entry?.essenceId} (${arrayOf(entry?.sections).join(', ')})`
     ),
     ...arrayOf(report?.orphaned).map((entry) => `orphaned ${entry?.essenceId}`),
-    // THE ONLY LEG THAT NAMES A CHANGE TO A GM-AUTHORED FIELD'S VALUE. Every other leg above
-    // reports an id being re-keyed or a group being left alone; a freeze writes a resolved value
-    // onto an in-system row that was INHERITING it, which is a change to what that system's
-    // essence does. Requirements 8 and 13 call it disclosed, and without this line nothing
-    // rendered it: the notice builder reads three legs, and `MigrationRunner` then deletes the
-    // field — so the one substantive edit this pass makes was the one thing a GM could not see.
+    // The only leg that names a change to a GM-authored field's value: a freeze writes a resolved
+    // value onto an in-system row that was inheriting it, which changes what that system's essence
+    // does. Requirements 8 and 13 of the spec section require it disclosed.
     ...arrayOf(report?.inSystemFreezes).map(
       (freeze) =>
         `froze ${arrayOf(freeze?.sections).join(', ')} on ${freeze?.essenceId} in ${freeze?.systemId}`
@@ -434,20 +420,16 @@ export function describeWorldEssenceMerge(report) {
 /**
  * The one-time notice describing what the `1.34.0` equivalent-essence merge did.
  *
- * SEVERITY IS CONSTANT-`warn` BY CONSTRUCTION, which is why this returns a bare string rather than
- * the `{message, severity}` pair its `1.30.0` sibling returns. Every case that produces a message
- * at all is one the GM has to act on or at least know about: a merge is IRREVERSIBLE, a refusal
- * will NOT be retried, and a declined pair is a disagreement only the GM can settle. There is no
- * informational case left to distinguish, so a derived severity would be a branch with one arm.
+ * Severity is constant-`warn` by construction, which is why this returns a bare string rather than
+ * the `{message, severity}` pair its `1.30.0` sibling returns: every case that produces a message is
+ * one the GM must act on or know about, so a derived severity would be a branch with one arm.
  *
- * SILENT WHEN NOTHING HAPPENED. `orphaned` alone produces NO message: a world essence with no live
- * membership record is left exactly as it is, nothing changed, and a notice that always fires is a
- * notice nobody reads.
+ * Silent when nothing happened. `orphaned` alone produces no message, because a world essence with
+ * no live membership record is left exactly as it is.
  *
- * IT DISCLOSES ITS OWN REACH. The item-override remap walks OWNED ACTOR ITEMS only, so the same
+ * It discloses its own reach: the item-override remap walks owned actor Items only, so the same
  * `flags.fabricate.essences` override on a world Item, a compendium Item or an unlinked synthetic
- * token actor is never seen and stays stale permanently. That is stated rather than implied,
- * because the GM is the only one who can find those documents.
+ * token actor stays stale permanently and only the GM can find those documents.
  *
  * @param {object|null} report The transient `_worldEssenceMergeReport`.
  * @param {(key: string, data?: object) => string|undefined} localize
@@ -505,7 +487,7 @@ export function buildWorldEssenceMergeNotice(report, localize) {
     );
   }
   if (merged.length > 0) {
-    // ONLY WHEN SOMETHING MERGED, because only a merge retires an id for a stale override to name.
+    // Only when something merged: only a merge retires an id for a stale override to name.
     clauses.push(
       localizeWith(
         localize,

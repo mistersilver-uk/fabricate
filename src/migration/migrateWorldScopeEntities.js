@@ -327,13 +327,12 @@ export function buildMembershipRecord(record, entityType, entityId, systemId) {
 }
 
 /**
- * The persisted scope payload for one entity type, normalized to the three sub-keys plus
- * whatever else was authored beside them, and fully CLONED.
+ * The persisted scope payload for one entity type, normalized to the three sub-keys plus whatever
+ * else was authored beside them, and fully cloned.
  *
- * EXPORTED so the `1.34.0` essence merge (`mergeEquivalentWorldEssences.js`) reads a scope payload
- * through the same reader this pass writes one through. A second copy would be a second decision
- * about which sub-keys are the contract and which are extras, and the extras half is exactly the
- * one a copy gets wrong — see the comment on the spread below.
+ * Exported so the `1.34.0` essence merge (`mergeEquivalentWorldEssences.js`) reads a scope payload
+ * through the same reader this pass writes one through; a second copy would be a second decision
+ * about which sub-keys are the contract and which are extras.
  *
  * @param {unknown} existing The persisted value.
  * @returns {{entities: Array<object>, defaults: object, membership: object}}
