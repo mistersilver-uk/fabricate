@@ -99,26 +99,15 @@ export const SETTING_KEYS = Object.freeze({
   // per-system `{ components: {oldId: newId}, tools: {...} }` re-key map, written as the FIRST
   // writeback leg so a torn pass is recoverable whichever later legs landed. It is TRANSIENT:
   // the one-shot `ready` pass that restamps owned-Item identity flags consumes it and clears
-  // it. It carries NO essence leg — `REKEYABLE_ENTITY_TYPES` is `['components', 'tools']` and
-  // `normalizeRekeyMap` drops anything else — and that is a property of THIS map rather than a
-  // claim that an essence id is immutable. The `1.34.0` equivalent-essence merge DOES re-key
-  // essence ids and carries its own map in `WORLD_ESSENCE_MERGE_MAP` below, because widening
-  // this one would newly REFUSE a `1.30.0` pair on a world holding a native duplicate essence
-  // id, and because `mayClearWorldScopeRekeyMap` is read by two `1.30.0` source-Item stamp
-  // gates that have no business consulting an essence decision (issue 1654).
+  // it. It carries no essence leg — `REKEYABLE_ENTITY_TYPES` is `['components', 'tools']` — and the
+  // `1.34.0` merge re-keys essence ids under `WORLD_ESSENCE_MERGE_MAP` below instead (issue 1654).
   WORLD_SCOPE_REKEY_MAP: 'worldScopeRekeyMap',
-  // Issue 1654: the `1.34.0` equivalent-essence merge's DURABLE DECISION RECORD, written as the
-  // SECOND writeback leg (immediately after `worldScopeRekeyMap`, before `recipes`) so a torn
-  // pass is recoverable whichever later legs landed. A TWO-LEG CONTAINER,
-  // `{systems: {[systemId]: {essences: {loserId: survivorId}}}, retired: {[loserId]: {...}}}`,
-  // WITH DIFFERENT LIFETIMES PER LEG: `systems` is TRANSIENT and is cleared by the one-shot
-  // `ready` pass that remaps owned Actor/Item durable flags, while `retired` — the tombstone
-  // recording what each retired id carried — is NEVER cleared, because `mintEssenceId` resolves a
-  // new id against the LIVE roster alone and would otherwise hand a retired id straight back to
-  // the next essence named after a merged one.
-  // THE LEGS ARE NESTED RATHER THAN FLAT SIBLINGS because a crafting system whose id is literally
-  // `retired` would otherwise collide with the tombstone key, and nothing validates a system id
-  // against that on the way in.
+  // Issue 1654: the `1.34.0` equivalent-essence merge's durable decision record, written as the
+  // second writeback leg (after `worldScopeRekeyMap`, before `recipes`) so a torn pass is
+  // recoverable. Shape `{systems: {[systemId]: {essences: {loserId: survivorId}}}, retired: {...}}`,
+  // one lifetime per leg: the one-shot `ready` remap clears the transient `systems`, while
+  // `retired` is never cleared, because `mintEssenceId` would otherwise reissue a retired id. The
+  // legs nest so a crafting system whose id is literally `retired` cannot collide with that key.
   WORLD_ESSENCE_MERGE_MAP: 'worldEssenceMergeMap',
   GATHERING_ENVIRONMENTS: 'gatheringEnvironments',
   GATHERING_CONFIG: 'gatheringConfig',
@@ -169,11 +158,9 @@ export const SETTING_KEYS = Object.freeze({
   // migration pass DEFERRED.
   WORLD_SCOPE_IDENTITY_FLAG_VERSION: 'worldScopeIdentityFlagVersion',
   // Issue 1654: version stamp for the one-shot active-GM pass that remaps the durable identity
-  // flags the `1.34.0` essence merge invalidates. A NUMBER for the reason its `1.30.0` sibling
-  // above is one, and a SEPARATE stamp rather than a re-bump of that one: the two passes consume
-  // two different decision records, and a world can have consumed one while the other is still
-  // pending. It gates whether the pass RUNS; whether the pass may DESTROY the merge map's
-  // per-system leg is gated separately on `migrationVersion`, through `compareSemver`.
+  // flags the `1.34.0` essence merge invalidates. Separate from its `1.30.0` sibling above, because
+  // a world can have consumed one decision record while still owing the other. It gates whether the
+  // pass runs; whether the pass may destroy the map's transient leg is gated on `migrationVersion`.
   WORLD_ESSENCE_MERGE_FLAG_VERSION: 'worldEssenceMergeFlagVersion',
   // Issue 1024: the ADDITIONAL actor types a GM designates as player characters.
   // `'character'` is unioned in by `resolvePlayerCharacterTypes` and is never stored
@@ -228,10 +215,8 @@ export const WORLD_SCOPE_IDENTITY_FLAG_TARGET = 1;
 
 // The target version for the one-shot essence-merge identity-flag remap (issue 1654). When the
 // stored `WORLD_ESSENCE_MERGE_FLAG_VERSION` is below this, the active GM runs the remap once on
-// `ready` and writes this value back — UNLESS it withheld the merge-map clear, in which case it
-// withholds this advance too, so the pass genuinely re-runs on a later boot rather than orphaning
-// the map's transient leg forever. Same rule as `WORLD_SCOPE_IDENTITY_FLAG_TARGET`, separately
-// stamped because the two passes consume two different decision records.
+// `ready` and writes this value back — unless it withheld the merge-map clear, in which case it
+// withholds this advance too, so the pass re-runs on a later boot rather than orphaning the map.
 export const WORLD_ESSENCE_MERGE_FLAG_TARGET = 1;
 
 const BASE_DEFINITIONS = Object.freeze({
@@ -313,12 +298,10 @@ const BASE_DEFINITIONS = Object.freeze({
     type: Object,
     default: {},
   },
-  // Issue 1654. PART-TRANSIENT: the one-shot `ready` pass that consumes the per-system re-key
-  // legs clears THOSE and leaves the `retired` tombstone in place forever. `scope: 'world'`
-  // because it is the decision record of a world-scope migration and every client must see the
-  // same one — the Manager's essence-id minter reads it on every client to keep a retired id
-  // taken. REGISTERED HERE rather than only written by the migration: `game.settings.get` THROWS
-  // on an unregistered key, so every reader would otherwise need a try/catch of its own.
+  // Issue 1654. Part-transient: the one-shot `ready` pass clears the per-system re-key legs and
+  // leaves the `retired` tombstone in place forever. `scope: 'world'` because the Manager's
+  // essence-id minter reads it on every client. Registered here because `game.settings.get` throws
+  // on an unregistered key.
   [SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP]: {
     name: 'World Essence Merge Map',
     scope: 'world',

@@ -3081,13 +3081,12 @@
     worldScopeState.essence?.available === true && essenceRulesWorldEntry !== null
   );
 
-  // IDENTITY FOLLOWS THE WORLD RECORD WHEREVER THERE IS ONE (issue 1654), for the reason the
-  // shared-definition callout below it does: `1.34.0` merges equivalent world essences and
-  // `icon` is not in the equivalence key, so one world entity now backs N in-system records
-  // whose icons may differ — and this route may not edit either. Two medallions on one screen
-  // drawing different glyphs for one essence is the contradiction requirement 13 names.
-  // `essenceRulesWorldEntry` is null for a CREATE draft and for an unreadable corpus, which is
-  // exactly where the draft must still lead: there the in-system record IS the record.
+  // Name and glyph follow the world record wherever there is one (issue 1654): `1.34.0` merges
+  // equivalent world essences and `icon` is not in the equivalence key, so one world entity can
+  // back N in-system records whose icons differ, and this route edits neither. Requirement 13
+  // forbids two medallions on one screen drawing different glyphs for one essence.
+  // `essenceRulesWorldEntry` is null for a create draft and for an unreadable corpus, which is
+  // where the draft must still lead: there the in-system record is the record.
   const essenceEditName = $derived(
     essenceRulesWorldEntry?.entity?.name ||
       essenceEditDraft?.name ||
@@ -3100,9 +3099,9 @@
       selectedEssenceStrict?.icon ||
       'fas fa-mortar-pestle'
   );
-  // THE TINT NEEDS NO WORLD READ OF ITS OWN (maintainer ruling M29): `adminStore`'s projection
+  // The tint needs no world read of its own (maintainer ruling M29): `adminStore`'s projection
   // already overlays the world colour onto the in-system row's `colorToken`, so the copy the
-  // draft buffers IS the world colour and reading the draft first keeps the CREATE state right.
+  // draft buffers is the world colour, and reading the draft first keeps the create state right.
   const essenceEditTint = $derived(
     essenceEditDraft?.colorToken ?? selectedEssenceStrict?.colorToken ?? ''
   );
@@ -3732,10 +3731,9 @@
 
   async function createWorldEssence() {
     const name = text('FABRICATE.Admin.Manager.Scoped.Essence.NewName', 'New essence');
-    // THE RETIRED LEG IS NOT OPTIONAL HERE (issue 1654). This mints from a FIXED placeholder
-    // name, so the id sequence is dense and every id `1.34.0` retired is reclaimable on the
-    // next press; reissuing one re-points the references that migration knowingly left behind
-    // at the wrong essence. See `mintEssenceId`.
+    // The retired leg is required here (issue 1654): this mints from a fixed placeholder name, so
+    // the id sequence is dense and every id `1.34.0` retired is otherwise reclaimable on the next
+    // press. See `mintEssenceId`.
     const id = mintEssenceId(
       name,
       worldScopeState.essence?.entities ?? [],

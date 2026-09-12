@@ -824,28 +824,15 @@ function readCorpus(store) {
 }
 
 /**
- * The ids the `1.34.0` equivalent-essence merge RETIRED, from the persisted merge map.
+ * The ids the `1.34.0` equivalent-essence merge retired, read as a key set from the persisted
+ * `{retired: {<retiredId>: {...}}}` leg of the `fabricate.worldEssenceMergeMap` world setting
+ * (§ Equivalent World Essence Merge in
+ * `openspec/specs/destructive-changes-and-migrations/spec.md`). Only the keys are published: a
+ * screen must not draw an essence that no longer exists.
  *
- * ── A TOMBSTONE LIST, READ AS A KEY SET AND NOTHING MORE ────────────────────────────────────
- * `1.34.0` merges semantically equivalent world essences and retires the losers' ids (§
- * Equivalent World Essence Merge in `openspec/specs/destructive-changes-and-migrations/spec.md`),
- * persisting `{retired: {<retiredId>: {name, icon, colorToken, description, systems}}}` at the
- * `fabricate.worldEssenceMergeMap` world setting. Only the KEY SET is published here: the
- * snapshots behind those keys are the migration's own record of what it consumed, and a
- * projection that carried them would invite a screen to draw an essence that no longer exists.
- *
- * WHY THE PROJECTION CARRIES IT AT ALL. `mintEssenceId` resolves a new world essence's id
- * against the LIVE roster alone, so a retired id is free for reissue — and because the shell
- * mints from a fixed placeholder name the shipped sequence (`new-essence`, `new-essence-2`, …)
- * is dense, which makes reissue the ORDINARY case rather than the unlucky one. Reissuing one
- * silently re-points every reference `1.34.0` knowingly left on a retired key at the WRONG
- * essence. Publishing the set here lets the shell mint from state it already holds, instead of
- * a page reaching into a world setting.
- *
- * DEFENSIVE ON EVERY LEG, by {@link readCorpus}'s rule. A world that never merged has no
- * setting at all, a world whose migration found nothing to merge has `{}`, and a hand-edited
- * setting may hold anything; none of those may read as more than "no retired ids", and none of
- * them may throw on the publish path.
+ * The projection carries the set so the shell can mint an essence id from state it already holds;
+ * `mintEssenceId` resolves against the live roster alone. Defensive on every leg by
+ * {@link readCorpus}'s rule — an absent, empty or hand-edited setting reads as no retired ids.
  *
  * @param {unknown} mergeMap the raw `fabricate.worldEssenceMergeMap` value.
  * @returns {string[]} the retired ids in the map's own key order; `[]` when there are none.
@@ -883,11 +870,9 @@ function retiredEssenceIds(mergeMap) {
  * @param {Record<string, Record<string, object>>} [options.usage] Per-entity-type reference
  *   counts, keyed by entity type then entity id.
  * @param {unknown} [options.essenceMergeMap] The raw `fabricate.worldEssenceMergeMap` world
- *   setting (issue 1654). The FIFTH input, and it arrives for the reason the recipes argument
- *   did: nothing in `{stores, systems, recipes, usage}` can answer which essence ids `1.34.0`
- *   retired, because the merge map is a setting of its own rather than part of any scope
- *   corpus. Absent — every world that has not merged, and every caller that has not wired it —
- *   answers no retired ids. See {@link retiredEssenceIds}.
+ *   setting (issue 1654). Nothing else in this argument can answer which essence ids `1.34.0`
+ *   retired, because the merge map is a setting of its own rather than part of a scope corpus.
+ *   Absent answers no retired ids. See {@link retiredEssenceIds}.
  * @returns {{worldScope: object}}
  */
 export function buildWorldScopeState({
@@ -931,12 +916,9 @@ export function buildWorldScopeState({
     categories: worldScope.vocabulary.componentCategories.map((entry) => entry.name),
     tags: worldScope.vocabulary.componentTags.map((entry) => entry.name),
   };
-  // AND THE ESSENCE LEG CARRIES THE `1.34.0` TOMBSTONES (issue 1654), for the same reason the
-  // component leg carries the vocabulary's names: the shell hands an essence screen only this
-  // leg, so an id-minting guard that needed the merge map would otherwise have to reach past
-  // the projection into a world setting. Attached unconditionally, so `retiredIds` is a plain
-  // array on every publish — including an UNAVAILABLE corpus — and no reader has to tell an
-  // absent leg from an empty one.
+  // The essence leg carries the `1.34.0` tombstones (issue 1654) because the shell hands an
+  // essence screen only this leg. Attached unconditionally — including for an unavailable corpus
+  // — so `retiredIds` is a plain array on every publish and no reader tells absent from empty.
   worldScope.essence.retiredIds = retiredEssenceIds(essenceMergeMap);
   return { worldScope };
 }

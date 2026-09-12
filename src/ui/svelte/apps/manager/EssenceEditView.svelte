@@ -679,20 +679,14 @@
           {#if rulesMode}
             <!-- WHAT THIS SCREEN DOES NOT OWN, STATED FIRST, with the one route to it.
 
-               IT NAMES THE WORLD RECORD, NOT THIS SYSTEM'S PROJECTION OF IT (issue 1654). The
-               pill says `World definition` and the sentence says the name and icon are world
-               vocabulary, and both were true BY CONSTRUCTION while the `1.30.0` lift was 1:1 —
-               one world entity per in-system record, so the two agreed. `1.34.0` merges
-               equivalent world essences, and `icon` and `description` are not in its
-               equivalence key: one world entity now backs N in-system records whose icons may
-               differ outright, so system A's rules screen would caption `World definition` with
-               `fa-hammer`, system B with `fa-fire`, and the world entry with the survivor's.
-               `colorToken` is the one field the world overlay already carries into the
-               in-system projection (maintainer ruling M29), so `tint` keeps reading it.
-
-               The in-system fallbacks are unreachable from here — this renders inside the
-               `scopedKnown` guard, which is false whenever `worldEntry` is null — and are kept
-               only so the expression states its own answer rather than assuming the guard. -->
+               The callout names the world record, not this system's projection of it (issue
+               1654): `1.34.0` merges equivalent world essences and neither `icon` nor
+               `description` is in its equivalence key, so one world entity can back N in-system
+               records whose icons differ, and a pill reading `World definition` must not caption
+               a per-system glyph. `colorToken` is the one field the world overlay already carries
+               into the in-system projection (maintainer ruling M29), so `tint` keeps reading it.
+               The in-system fallbacks are unreachable from inside the `scopedKnown` guard and are
+               kept only so the expression states its own answer. -->
             <SharedDefinitionCallout
               name={worldEntry?.entity?.name ?? essence?.name ?? ''}
               icon={normalizeEssenceIcon(

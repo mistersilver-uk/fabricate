@@ -436,21 +436,11 @@ export function isWorldAddressableEffectSource(value, worldEntityIds = []) {
 }
 
 /**
- * The id SET behind a roster handed as an array of records OR as an already-built Set.
- *
- * ── ONE COERCION, NAMED ONCE, BECAUSE THIS FILE IS LINT-BLIND AND SONAR-VISIBLE ─────────────
- * Both readers below take "the world roster, in whatever form the call site already holds it",
- * and each had transcribed the same map/filter to get an id set out of it. `mintEssenceId`'s
- * retired leg would have been a THIRD copy. `npm run lint` does not read this file's directory
- * tree at all while SonarCloud's duplication gate indexes it, so a copy here is invisible
- * locally and fails the gate on the PR.
- *
- * A Set is returned AS GIVEN rather than copied: no caller writes to the result, and copying a
- * roster on every keystroke of a picker filter is a cost with no reader. Callers must therefore
- * treat it as the caller's own.
- *
- * A BARE STRING entry is taken as an id, so a caller holding ids rather than records — the
- * retired leg is exactly that — needs no wrapper of its own.
+ * The id set behind a roster given as entity records, as bare id strings, or as an already-built
+ * Set. A Set is returned as given rather than copied, so callers must treat the result as the
+ * caller's own and never write to it. Shared by the two readers below and by
+ * {@link mintEssenceId}'s retired leg, because a third transcription of this coercion would fail
+ * SonarCloud's new-code duplication gate.
  *
  * @param {Array<{id?: string}|string>|Set<string>|unknown} source
  * @returns {Set<string>} the caller's own Set when it handed one.
@@ -496,30 +486,16 @@ export function worldAddressableEffectSources(candidates, worldEntities = []) {
  * `foundry.utils.randomID()` is unavailable to a pure leaf and `Math.random()` is a SonarCloud
  * VULNERABILITY (S2245) that fails the quality gate outright. A slug is neither, and it is also
  * the better answer here: an essence id is the reference every membership record and every
- * component quantity addresses, and a GM reading a component's stored essence map gets `iron`
- * rather than `kTz9QpLm2xR4vB1a`.
+ * component quantity addresses, so a stored essence map reads `iron`, not `kTz9QpLm2xR4vB1a`.
  *
- * ── AN ESSENCE ID IS NOT PERMANENT, AND THAT IS THE WHOLE OF WHY `retired` IS AN ARGUMENT ───
- * The `1.34.0` migration merges semantically equivalent WORLD essences and RETIRES the losers'
- * ids — the first time an essence id has ever been re-keyed (§ Equivalent World Essence Merge
- * in `openspec/specs/destructive-changes-and-migrations/spec.md`). That migration deliberately
- * LEAVES some references pointing at a retired id: an ambiguous item override it cannot prove
- * an image for, and every document its one-shot never walks — a compendium item, an actor
- * imported next week. What justifies leaving them is that a key matching no definition
- * contributes nothing.
- *
- * REISSUING a retired id destroys exactly that justification. The stale key stops contributing
- * nothing and starts contributing the WRONG essence's quantity, through the precedence override
- * in `src/utils/essenceResolver.js`. Nor is reissue a remote risk: the only caller mints from a
- * FIXED placeholder name, so the shipped sequence is `new-essence`, `new-essence-2`,
- * `new-essence-3` — dense, deterministic and fully reclaimable, and retiring `new-essence-2`
- * would hand it straight back to the next `+ New essence` press. `retired` is the tombstone leg
- * of `fabricate.worldEssenceMergeMap`, which is never cleared, so a retired id stays TAKEN for
- * the life of the world even though no live entity holds it.
- *
- * The two rosters are read through ONE PREDICATE rather than merged into a third Set, because
- * {@link worldEntityIdSet} may hand back the caller's own Set and a union written into it would
- * mutate a roster its owner is still rendering.
+ * An essence id is not permanent: the `1.34.0` migration merges equivalent world essences and
+ * retires the losers' ids (§ Equivalent World Essence Merge in
+ * `openspec/specs/destructive-changes-and-migrations/spec.md`). `retired` is that merge's
+ * never-cleared tombstone leg, so a retired id stays taken for the life of the world even though
+ * no live entity holds it — reissuing one would re-point the references the migration knowingly
+ * left on that key at the wrong essence, through `src/utils/essenceResolver.js`'s precedence
+ * override. Both rosters feed one predicate rather than a merged third Set, because
+ * {@link worldEntityIdSet} may hand back the caller's own Set.
  *
  * COLLISIONS ARE RESOLVED BY SUFFIX rather than refused, because `createEntity` refuses a
  * duplicate id and reports nothing: a GM who names a second essence "Ash" would get a button
@@ -527,9 +503,8 @@ export function worldAddressableEffectSources(candidates, worldEntities = []) {
  * so the caller's own name validation stays the only thing that can reject a create.
  *
  * @param {string} name
- * @param {Array<{id?: string}>|Set<string>} [existing] the LIVE world roster.
- * @param {Array<string>|Set<string>} [retired] the retired ids — taken, but held by nothing.
- *   Defaults to none, so a caller on a world that never merged behaves exactly as before.
+ * @param {Array<{id?: string}>|Set<string>} [existing] the live world roster.
+ * @param {Array<string>|Set<string>} [retired] the retired ids — taken, held by nothing.
  * @returns {string}
  */
 export function mintEssenceId(name, existing = [], retired = []) {

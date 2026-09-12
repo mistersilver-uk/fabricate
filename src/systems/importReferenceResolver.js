@@ -52,10 +52,9 @@ export const REFERENCE_KINDS = Object.freeze({
   WORLD_ENTITY_MISSING: 'worldEntityMissing',
   WORLD_DEFAULT_DECLINED: 'worldDefaultDeclined',
   WORLD_TOOL_BREAKAGE_DROPPED: 'worldToolBreakageDropped',
-  // KIND 5. The `1.34.0` essence-merge upcast REFUSES a group it cannot prove safe, and a
-  // refused group changes no slice — so without a kind carrying it, the refusal was computed
-  // into the transient upcast report and then read by nobody. `import-export` requires it
-  // REPORTED rather than silent, and this is the channel that makes that true.
+  // Kind 5: a `1.34.0` essence-merge upcast refusal changes no slice, so without a kind carrying
+  // it the refusal reaches no report. `import-export` requires it reported rather than silent
+  // (issue 1654).
   WORLD_ESSENCE_MERGE_REFUSED: 'worldEssenceMergeRefused',
 });
 
@@ -183,11 +182,10 @@ function reportEntry(kind, ownerType, owner, referenceValue) {
  *
  * **THE ESSENCE ARM IS VACUOUS IN PRACTICE, AND SAYING SO IS THE POINT.** The DESTINATION side is
  * what makes it so: `WORLD_IDENTITY_FIELDS.essences` lifts only `name` / `icon` / `colorToken` /
- * `description` and NO SOURCE LINK, so no world essence entity the migration or an export ever
+ * `description` and no source link, so no world essence entity the migration or an export ever
  * produced carries one and `destination.refs.size` is 0 for every one of them. The reason is that
- * IDENTITY FIELD LIST, not any claim that an essence id is a stable semantic slug — it is not one,
- * and `1.34.0` re-keys essence ids (issue 1654) — so the arm stays vacuous on a ground the merge
- * does not disturb. The INCOMING side
+ * identity field list, not any claim that an essence id is stable — `1.34.0` re-keys essence ids
+ * (issue 1654) — so the arm stays vacuous on ground the merge does not disturb. The INCOMING side
  * is not empty - an essence definition's own `sourceItemUuid` is a THIRD, unrelated field family
  * that `sourceReferencesOf` happens to read - so it is the destination half alone that
  * short-circuits the positive-evidence guard. The loop still covers all three entity types
@@ -573,9 +571,9 @@ function dropMatchedWorldEntities(prepared, matched, idMap) {
  * branch is a deliberate no-op (`category` holds no component reference) and its tools branch
  * deliberately WITHHOLDS `componentId`, because neither record class carries one.
  *
- * Only the COMPONENT scope's own identifiers move HERE: this copy-mode remap re-keys no essence
- * or tool id. (The `1.34.0` equivalent-essence merge re-keys essence ids under its own map, in the
- * export upcast that runs BEFORE copy mode — see issue 1654; nothing in this function changes.)
+ * Only the component scope's own identifiers move here: this copy-mode remap re-keys no essence or
+ * tool id. The `1.34.0` equivalent-essence merge re-keys essence ids under its own map, in the
+ * export upcast that runs before copy mode (issue 1654).
  *
  * @param {object} prepared
  * @param {{remapComponent: Function}} remappers

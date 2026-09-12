@@ -343,12 +343,10 @@ export function prepareForImport(rawData, mode = 'keep', options = null) {
     });
   }
 
-  // KIND 5. The `1.34.0` upcast refuses a group it cannot prove safe, and a refused group changes
-  // NO SLICE — so a refusal is indistinguishable from a bundle with nothing to merge unless it is
-  // carried here. `migrateExportPayload` computed `essenceMergeRefusals` into the transient report
-  // and nothing read it, which left `import-export`'s "REPORTED rather than silent" requirement
-  // false in the shipped build. The owner is the REFUSED GROUP's survivor, which is the id a GM can
-  // actually find in the Essence Catalogue; the losers ride the reference value.
+  // Kind 5: a `1.34.0` upcast refusal changes no slice, so it is indistinguishable from a bundle
+  // with nothing to merge unless it is carried here — `import-export` requires it reported rather
+  // than silent. The owner is the refused group's survivor, the id a GM can find in the Essence
+  // Catalogue; the losers ride the reference value.
   for (const refusal of Array.isArray(upcastReport?.essenceMergeRefusals)
     ? upcastReport.essenceMergeRefusals
     : []) {

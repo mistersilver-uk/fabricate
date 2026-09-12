@@ -1855,19 +1855,10 @@ class Fabricate {
       }
     }
 
-    // 1.34.0 (issue 1654): the equivalent-essence merge. The composition lives in
-    // `buildWorldEssenceMergeNotice` for the reason its 1.30.0 sibling above does; what is here
-    // is the GM gate, the localizer and the channel.
-    //
-    // ALWAYS PERMANENT AND ALWAYS A WARNING, because every case that produces a message at all is
-    // one the GM must act on or at least know about: the merge is IRREVERSIBLE, a refusal will NOT
-    // be retried, and a declined pair is a disagreement only the GM can settle.
-    //
-    // THE TOAST NAMES THE ESSENCES AND THE CONSOLE CARRIES THE IDS. Most ids 1.34.0 retires are
-    // `crypto.randomUUID()` values, so an id enumeration in a corner toast is a wall of hex — and
-    // what core logs beside a toast is the message it was HANDED, i.e. the capped one. The full
-    // id-level dump is therefore logged HERE, at `console.info` rather than `console.debug`,
-    // because `debug` maps to DevTools' VERBOSE level and Chromium's default filter excludes it.
+    // 1.34.0 (issue 1654): the equivalent-essence merge notice, read off the runner summary's
+    // `worldEssenceMergeReport` key. Always a permanent warning, because every case that produces
+    // a message is one the GM must act on: the merge is irreversible and a refusal is not retried.
+    // The id-level detail goes to `console.info`; Chromium's default filter hides `console.debug`.
     const worldEssenceMergeReport = summary?.worldEssenceMergeReport ?? null;
     if (worldEssenceMergeReport && game.user?.isGM) {
       const essenceNotice = buildWorldEssenceMergeNotice(worldEssenceMergeReport, (key, data) =>
@@ -2001,24 +1992,19 @@ class Fabricate {
   /**
    * Re-run the `1.34.0` equivalent-essence merge's durable-flag repair (issue 1654).
    *
-   * A GM-FACING RECOVERY ACTION, not a test hook, and reachable in exactly the two states its
-   * `1.30.0` sibling {@link remapWorldScopeIdentityFlags} is reachable in: a TORN MIGRATION
-   * leaves the merge map pending and the boot pass declines to consume a decision record the
-   * next boot may still need, and a PARTIAL REMAP withholds the clear too, because a transient
-   * rejection is a failure a re-run can genuinely fix. A LOCKED-PACK skip is deliberately not one
-   * of them - it is a standing condition a re-run cannot improve.
+   * A GM-facing recovery action for the two states its `1.30.0` sibling
+   * {@link remapWorldScopeIdentityFlags} also serves: a torn migration leaves the merge map
+   * pending, and a partial remap withholds the clear. A locked-pack skip is not one of them.
    *
-   * **ACTIVE-GM ONLY**, and the warning is NOT optional. `game.fabricate` is bound on every
-   * client and the pass walks the UNFILTERED actor collection, so a player invoking it would have
-   * every write it does not own rejected by the server. A silent `return null` on a player client
-   * would leave a GM's "run it from the console" instruction looking like it had worked.
+   * Active-GM only, and it warns rather than returning silently, because a player's writes across
+   * the unfiltered actor collection would all be rejected by the server and a silent `null` would
+   * read as success.
    *
-   * IDEMPOTENT. It performs the remap ONLY; it does not clear the map or advance the one-shot
-   * version, so the ordinary boot-time gating still decides when the decision record may be
-   * destroyed - and the never-cleared `retired` tombstone is untouched either way.
+   * Idempotent: it remaps only, neither clearing the map nor advancing the one-shot version, so
+   * boot-time gating still decides when the decision record may be destroyed.
    *
-   * @returns {Promise<object|null>} the pass summary; `null` when this client is not the active
-   *   GM, or when no essence merge is pending.
+   * @returns {Promise<object|null>} the pass summary; `null` on a non-active-GM client, or when no
+   *   essence merge is pending.
    */
   async remapWorldEssenceIdentityFlags() {
     if (game.users?.activeGM?.id !== game.user?.id) {
@@ -5159,12 +5145,9 @@ Hooks.once('ready', async () => {
   // restamp, which never reaches this population because its planner returns early for any item
   // already carrying a durable identity flag.
   await runWorldScopeIdentityFlagRemap();
-  // Issue 1654: remap the durable essence references the 1.34.0 equivalent-essence merge
-  // invalidated. MUST run AFTER the 1.30.0 remap above: on a world migrating both in one boot the
-  // two passes read and rewrite the SAME run containers, and this one writes with a FORCED
-  // REPLACEMENT — so a container snapshot taken before the component/tool repair landed would
-  // replace that repair away. It walks the actor corpus only while its own map is pending, so no
-  // ordinary boot pays for a second traversal.
+  // Issue 1654: remap the durable essence references the 1.34.0 merge invalidated. Must run after
+  // the 1.30.0 remap above: both passes rewrite the same run containers, and this one writes a
+  // forced replacement, so a snapshot taken before the component/tool repair landed would undo it.
   await runWorldEssenceMergeFlagRemap();
 
   // Issue 800: GM-only cue for a world whose stored descriptions predate write-time
@@ -5665,31 +5648,16 @@ async function applyWorldScopeIdentityFlagRemap(rekeyMap) {
 }
 
 /**
- * Issue 1654 — one-shot, active-GM-gated pass that remaps every durable ESSENCE reference the
+ * Issue 1654 — one-shot, active-GM-gated pass that remaps every durable essence reference the
  * `1.34.0` equivalent-essence merge invalidated, driven by the persisted
  * `fabricate.worldEssenceMergeMap`. The pure logic lives in `remapWorldScopeIdentityFlags.js`;
  * what is here is the Foundry edge and the gates.
  *
- * IT MIRRORS `runWorldScopeIdentityFlagRemap` IN ITS GATES — the same DECISION/WORK split, the
- * same two withholds, the same `compareSemver` gate — because the two passes face the same three
- * hazards and a second, subtly different set of gates would be a set nobody could reason about
- * together. It mirrors it in its GM CHANNEL too: both post a permanent warning built from the
- * pass summary, because both can leave a documented, unrepaired remainder.
- *
- * IT DOES NOT MIRROR IT EVERYWHERE, and the two differences are named rather than left to be
- * discovered. The decision record is separate — `1.34.0` carries its own map and its own Number
- * version, so a world that has consumed one may still owe the other — and the WRITE is a forced
- * replacement rather than a merge, because this half rewrites KEY SETS and the sibling does not.
- *
- * IT RUNS AFTER THE `1.30.0` REMAP, AND THE ORDER IS LOAD-BEARING. On a world migrating `1.30.0`
- * and `1.34.0` in one boot both passes read and rewrite the SAME run containers. This half writes
- * with a FORCED REPLACEMENT, so a snapshot taken before the component/tool repair landed would
- * replace that repair away. Reading after it cannot.
- *
- * NO SECOND CORPUS WALK IS ADDED TO AN ORDINARY BOOT. Each pass walks only while its OWN map is
- * pending, so a world with no merge to apply returns before touching `game.actors`. The one boot
- * that walks twice is the boot on which both migrations land, and on that boot both walks are
- * doing real writes.
+ * It mirrors `runWorldScopeIdentityFlagRemap`'s gates and GM channel: the same decision/work
+ * split, the same two withholds, the same `compareSemver` gate. It differs in carrying its own
+ * decision record, so a world that has consumed one may still owe the other, and in writing a
+ * forced replacement rather than a merge, because this half rewrites key sets. Its ordering
+ * against that sibling is stated at the `ready`-body call site.
  */
 async function runWorldEssenceMergeFlagRemap() {
   try {
@@ -5701,38 +5669,35 @@ async function runWorldEssenceMergeFlagRemap() {
     ) {
       return;
     }
-    // THE RUN GATE, and the reason a world with nothing to remap still falls through to the
-    // version advance below rather than returning here: it must stop re-checking on every boot.
-    // That advance is itself gated on migration completion, so a world whose migration deferred
-    // BEFORE writing the map re-runs on a later boot rather than short-circuiting.
+    // The run gate. A world with nothing to remap still falls through to the version advance
+    // below rather than returning here, so it stops re-checking every boot; that advance is itself
+    // gated on migration completion, so a migration that deferred before writing the map re-runs.
     const mergeMap = getSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP) ?? {};
     let summary = null;
     if (hasPendingWorldEssenceMerge(mergeMap)) {
       summary = await applyWorldEssenceMergeFlagRemap(mergeMap);
     }
 
-    // THE CLEAR, and the version advance, share ONE gate. The predicate lives in the pure module,
-    // on `compareSemver`, so no reader can re-derive it as a bare JS `>=` on a STRING setting.
+    // The clear and the version advance share one gate. The predicate lives in the pure module, on
+    // `compareSemver`, so no reader re-derives it as a bare JS `>=` on a string setting.
     if (!mayClearWorldEssenceMergeMap(getSetting(SETTING_KEYS.MIGRATION_VERSION))) {
       console.warn(
         'Fabricate | world essence merge map RETAINED: the 1.34.0 migration has not completed on this world yet, so the decision record it may still need is not destroyed. This pass will run again after a successful migration pass.'
       );
       return;
     }
-    // THE SECOND WITHHOLD, and it is a different question from the first. The gate above asks
-    // whether the PRODUCING migration completed; this asks whether THIS pass did.
+    // The second withhold asks a different question from the first: the gate above asks whether
+    // the producing migration completed, this whether this pass did.
     if (!remapCompletedCleanly(summary)) {
       console.warn(
         `Fabricate | world essence merge map RETAINED: ${summary.skippedErrors} document(s) could not be updated, so the repair is incomplete and its decision record is not destroyed. Fix the cause and reload, or run game.fabricate.remapWorldEssenceIdentityFlags().`
       );
       return;
     }
-    // THE `systems` LEG ONLY, AND `retired` IS WRITTEN BACK RATHER THAN LEFT TO SURVIVE BY LUCK.
-    // The setting is a two-leg container: `systems` holds the transient per-system re-key pairs
-    // this pass consumes, and `retired` is the tombstone that keeps a retired essence id TAKEN for
-    // the life of the world. A clear that wrote `{}` would destroy the tombstone and let
-    // `mintEssenceId` hand a retired id straight back to the next essence named after a merged
-    // one — silently, and only on worlds that have FINISHED migrating.
+    // The `systems` leg only, with `retired` written back explicitly. `systems` holds the
+    // transient per-system re-key pairs this pass consumes; `retired` is the tombstone that keeps
+    // a retired essence id taken for the life of the world, so a clear that wrote `{}` would let
+    // `mintEssenceId` reissue a retired id.
     const stored = getSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP) ?? {};
     await setSetting(SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP, {
       systems: {},
@@ -5749,39 +5714,22 @@ async function runWorldEssenceMergeFlagRemap() {
 
 /**
  * Apply the essence remap itself. Split out of the gating above so the two are separately
- * readable: everything here is WORK, everything there is a DECISION.
+ * readable: everything here is work, everything there is a decision.
  *
- * EVERY WRITE IS A FORCED REPLACEMENT (`forcedReplacementFlagPath`), never `setFabricateFlag`. An
- * essence id is an object KEY, so a re-key REMOVES one key and adds another — and `Document#update`
- * merges inner objects recursively and performs no deletions, so a plain merge write would leave
- * the retired key in place beside the new one.
- *
- * THE WORKED INSTANCE IS THE ITEM OVERRIDE, NOT A RUN CONTAINER. `flags.fabricate.fabricate.
- * essences` is a plain `{[essenceId]: quantity}` map directly under its container key, so writing
- * `{'fire-b': 3}` over a stored `{'fire-a': 1, 'fire-b': 2}` persists `{'fire-a': 1, 'fire-b': 3}`
- * and the retired key SURVIVES. A run container happens to be shielded today only because
- * `resolvedEssences` sits under `steps`, an ARRAY Foundry's recursive merge replaces wholesale.
- * THAT SHIELDING IS INCIDENTAL AND IS NOT RELIED ON: `active` one level up is already a plain map,
- * `steps` could become one, and the change would turn a passing write into corruption with nothing
- * to signal it — a stale key in a CONSUMED `resolvedEssences` snapshot makes a resumed run
- * transfer essences it never consumed.
+ * Every write is a forced replacement (`forcedReplacementFlagPath`), never `setFabricateFlag`: an
+ * essence id is an object key, and `Document#update` merges inner objects recursively and performs
+ * no deletions, so a plain merge write would leave the retired key beside the new one. The case
+ * that needs it is the item override, where `flags.fabricate.fabricate.essences` is a plain
+ * `{[essenceId]: quantity}` map. A run container is shielded only incidentally, by
+ * `resolvedEssences` sitting under the `steps` array, and that shielding is not relied on.
  *
  * @param {object} mergeMap The pending `fabricate.worldEssenceMergeMap`.
  */
 async function applyWorldEssenceMergeFlagRemap(mergeMap) {
-  // THIS COUNTS A WRITE AS LANDED ON THE STRENGTH OF NOT THROWING, AND THAT IS A DECISION RATHER
-  // THAN AN OVERSIGHT. A document with no `update` answers `undefined`, and `Document#update`
-  // RESOLVES `undefined` on an empty diff, so neither case is distinguishable here from a write
-  // that landed — `remappedItemOverrides` and `remappedRunContainers` can therefore OVERSTATE.
-  //
-  // IT IS NOT TIGHTENED INTO A `skippedErrors`, which is the only bucket the caller's `catch`
-  // arms offer. `remapCompletedCleanly` reads that count and WITHHOLDS the merge-map clear on a
-  // non-zero one, so a single malformed document would strand the map on that world forever — a
-  // permanent harm traded for an accurate count.
-  //
-  // AND THE OVERSTATEMENT REACHES NOBODY. The GM notice reports the REFUSAL and SKIP legs alone
-  // (`unsafeEssenceIdSkips`, `refusedGroups`, `lockedSkips`, `skippedErrors`); the two "remapped"
-  // counts go to `console.debug` and to no gate.
+  // A write counts as landed on the strength of not throwing, so `remappedItemOverrides` and
+  // `remappedRunContainers` can overstate; deliberately, because the only tighter bucket is
+  // `skippedErrors`, which `remapCompletedCleanly` reads to withhold the merge-map clear. The
+  // overstatement reaches no gate and no GM notice.
   const replace = (document, path, value) => document?.update?.({ [path]: value });
   const summary = await remapEssenceFlagsAcrossActors({
     actors: game.actors ?? [],
@@ -5798,9 +5746,8 @@ async function applyWorldEssenceMergeFlagRemap(mergeMap) {
   });
   console.debug?.('Fabricate | world essence merge flag remap complete', summary);
 
-  // THE GM CHANNEL, and the sibling's exact shape. Without it the three legs below were returned
-  // and read by nothing: a refused group leaves the world merged in its SETTINGS and un-merged in
-  // its ACTOR FLAGS, which is the one outcome of this pass a GM has to act on.
+  // The GM channel: a refused group leaves the world merged in its settings and un-merged in its
+  // actor flags, which is the one outcome of this pass a GM must act on.
   const notice = buildWorldEssenceMergeRemapNotice(summary, (key, data) =>
     data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
   );
