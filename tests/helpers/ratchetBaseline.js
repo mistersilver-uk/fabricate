@@ -200,3 +200,41 @@ export function assertRatchet({
       `\n\n${guidance}`
   );
 }
+
+/**
+ * The spine both exact-count ledger gates share (issues 1657, 1658): read a pinned `key -> count`
+ * map, compare a freshly built one against it in BOTH directions, and describe the drift so a
+ * reader can act on it. Hand-rolling a second copy is what SonarCloud's duplication detector
+ * counts, and its detector normalizes string literals, so differing key names would not hide it.
+ *
+ * @param {object} actual Freshly derived `key -> count`.
+ * @param {object} expected The pinned ledger.
+ * @param {{subject: string, regenerate: string, roseHint: string, fellHint: string}} wording
+ * @returns {string|undefined} A message, or undefined when the two agree.
+ */
+export function describeLedgerDrift(actual, expected, wording) {
+  const added = Object.keys(actual)
+    .filter((key) => !(key in expected))
+    .sort(byCodePoint);
+  const removed = Object.keys(expected)
+    .filter((key) => !(key in actual))
+    .sort(byCodePoint);
+  if (added.length > 0 || removed.length > 0) {
+    return (
+      `the set of ${wording.subject} changed — added: [${added.join(', ')}], ` +
+      `removed: [${removed.join(', ')}]. These gates scan the working tree, not the git index, so ` +
+      'a stray untracked file under a scanned root is the likely cause before a real change ' +
+      `(\`git status\` will show it). Re-derive with ${wording.regenerate}.`
+    );
+  }
+  const changed = Object.keys(expected)
+    .filter((key) => actual[key] !== expected[key])
+    .sort(byCodePoint)
+    .map((key) => `${key}: pinned ${expected[key]} -> actual ${actual[key]}`);
+  if (changed.length === 0) return undefined;
+  return (
+    `${wording.subject} drifted: ${changed.join('; ')}. This gate fails in both directions: a ` +
+    `count that ROSE ${wording.roseHint}, and a count that FELL ${wording.fellHint}. ` +
+    `Re-derive with ${wording.regenerate}.`
+  );
+}

@@ -9,7 +9,7 @@ import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { test } from 'node:test';
 
-import { byCodePoint } from './helpers/ratchetBaseline.js';
+import { byCodePoint, describeLedgerDrift } from './helpers/ratchetBaseline.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 
 // `readFileSync` + `JSON.parse`, not `import ... with { type: 'json' }`: this repo's ESLint
@@ -239,41 +239,6 @@ function rollUpByRoot(ledger) {
 }
 
 /**
- * `collectWorkingTreeSources` walks the working tree, not the git index, so a stray untracked
- * file under a scanned root counts here before it is ever committed — the likely cause of a
- * structural mismatch below, named ahead of a real regression.
- */
-function describeStructuralDrift(actual, expected) {
-  const added = Object.keys(actual)
-    .filter((key) => !(key in expected))
-    .sort(byCodePoint);
-  const removed = Object.keys(expected)
-    .filter((key) => !(key in actual))
-    .sort(byCodePoint);
-  if (added.length === 0 && removed.length === 0) return undefined;
-  return (
-    `directory set changed — added: [${added.join(', ')}], removed: [${removed.join(', ')}]. ` +
-    'A stray untracked file under src/, tests/, scripts/, or styles/ is the likely cause before a ' +
-    'real regression, because this corpus is the working tree, not the git index (`git status` ' +
-    `will show it). If the change is real, re-derive with ${REGENERATE}.`
-  );
-}
-
-function describeValueDrift(actual, expected) {
-  const changed = Object.keys(expected)
-    .filter((key) => key in actual && actual[key] !== expected[key])
-    .sort(byCodePoint)
-    .map((key) => `${key}: pinned ${expected[key]} -> actual ${actual[key]}`);
-  if (changed.length === 0) return undefined;
-  return (
-    `comment-line counts drifted on existing directories: ${changed.join('; ')}. This gate fails ` +
-    'in both directions: a count that ROSE needs justification or a revert, and a count that FELL ' +
-    'needs the ledger lowered to bank the win. One key down and another up by the same amount is ' +
-    `a file moved between two existing directories, not a regression. Re-derive with ${REGENERATE}.`
-  );
-}
-
-/**
  * Every symlink under `root` whose target is a directory, repo-relative. Scoped to these four
  * roots only — `sourceScan.js`'s own symlink-safety note verifies `src`, `styles`, and `lang`,
  * not `tests` or `scripts`, so this gate proves its own two new roots directly.
@@ -308,8 +273,22 @@ test('the comment-line ledger matches the pinned baseline exactly, per directory
     writeFileSync(LEDGER_PATH, `${JSON.stringify(actual, null, 2)}\n`);
     return;
   }
-  const message = describeStructuralDrift(actual, LEDGER) ?? describeValueDrift(actual, LEDGER);
-  assert.deepStrictEqual(actual, LEDGER, message);
+  // The corpus is the working tree, not the git index, so a stray untracked file under a scanned
+  // root counts here before it is ever committed.
+  assert.deepStrictEqual(
+    actual,
+    LEDGER,
+    describeLedgerDrift(actual, LEDGER, {
+      subject: 'comment-line counts per directory',
+      regenerate: REGENERATE,
+      roseHint:
+        'needs justification or a revert, and a stray untracked file under a scanned root is the ' +
+        'likely cause before a real regression',
+      fellHint:
+        'needs the ledger lowered to bank the win; one key down and another up by the same ' +
+        'amount is a file moved between directories, not a regression',
+    })
+  );
 });
 
 /** Prints the four numbers epic 1656's definition of done reads; it cannot fail alone. */

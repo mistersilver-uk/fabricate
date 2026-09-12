@@ -7,14 +7,14 @@
  * string or regex literal, and a token in a comment, count zero.
  */
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { test } from 'node:test';
 
-import { byCodePoint } from './helpers/ratchetBaseline.js';
-import { parseModule } from './helpers/moduleAst.js';
+import { literalStrings, parseModule, walkNodes } from './helpers/moduleAst.js';
+import { byCodePoint, describeLedgerDrift } from './helpers/ratchetBaseline.js';
 import { countPinSites } from './helpers/sourcePinSites.js';
-import { repoRoot } from './helpers/sourceScan.js';
+import { collectSources, repoRoot } from './helpers/sourceScan.js';
 
 const LEDGER_PATH = resolve(import.meta.dirname, 'source-pin-ledger.json');
 const LEDGER = JSON.parse(readFileSync(LEDGER_PATH, 'utf8'));
@@ -30,30 +30,41 @@ const REGENERATE =
 const CORPUS_ROOT = 'tests';
 const SCANNED_EXTENSIONS = Object.freeze(['.js', '.mjs']);
 
-/** Recorded debt tables whose entries are strings about pins, not pins. */
-const EXCLUDED = Object.freeze([
-  'tests/components/design-system-known-debt.js',
-  'tests/components/selector-repetition-baseline.js',
-  'tests/components/spacing-known-literals.js',
-]);
-
-function collect(dir, found = []) {
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const full = join(dir, entry.name);
-    if (entry.isSymbolicLink()) continue;
-    if (entry.isDirectory()) collect(full, found);
-    else if (SCANNED_EXTENSIONS.some((extension) => entry.name.endsWith(extension))) found.push(full);
+/**
+ * Names exported anywhere under `tests/` as a `src/` path constant. A test that imports one and
+ * reads through it would otherwise resolve nothing, and that shape recurs across the helpers.
+ */
+function exportedPathConstants(corpus) {
+  const names = new Set();
+  for (const text of Object.values(corpus)) {
+    for (const node of walkNodes(parseModule(text).ast)) {
+      if (node.type !== 'VariableDeclarator' || node.id?.type !== 'Identifier') continue;
+      const [literal] = literalStrings(node.init ?? {});
+      if (literal?.includes('src/')) names.add(node.id.name);
+    }
   }
-  return found;
+  return names;
 }
 
 function buildLedger() {
+  const corpus = collectSources(resolve(repoRoot, CORPUS_ROOT), {
+    extensions: [...SCANNED_EXTENSIONS],
+  });
+  const seedPaths = exportedPathConstants(corpus);
   const counted = [];
-  for (const full of collect(resolve(repoRoot, CORPUS_ROOT))) {
-    const file = relative(repoRoot, full).replaceAll('\\', '/');
-    if (EXCLUDED.includes(file)) continue;
-    const { ast } = parseModule(readFileSync(full, 'utf8'));
-    const sites = countPinSites(ast);
+  for (const [file, text] of Object.entries(corpus)) {
+    let parsed;
+    try {
+      parsed = parseModule(text);
+    } catch (error) {
+      // `parseModule` names its probe path, never the real one, so attribute it here.
+      throw new Error(`${file} failed to parse: ${error.message}`, { cause: error });
+    }
+    const sites = countPinSites(parsed.ast, {
+      file,
+      scopeManager: parsed.scopeManager,
+      seedPaths,
+    });
     if (sites > 0) counted.push([file, sites]);
   }
   return Object.fromEntries(counted.sort(([left], [right]) => byCodePoint(left, right)));
@@ -65,50 +76,34 @@ function currentLedger() {
   return cached;
 }
 
-function describeDrift(actual, expected) {
-  const added = Object.keys(actual)
-    .filter((key) => !(key in expected))
-    .sort(byCodePoint);
-  const removed = Object.keys(expected)
-    .filter((key) => !(key in actual))
-    .sort(byCodePoint);
-  if (added.length > 0 || removed.length > 0) {
-    return (
-      `the set of pinning files changed — added: [${added.join(', ')}], ` +
-      `removed: [${removed.join(', ')}]. A file that newly pins source text needs a reason; one ` +
-      `that stopped has paid the debt down and should bank it. Re-derive with ${REGENERATE}.`
-    );
-  }
-  const changed = Object.keys(expected)
-    .filter((key) => actual[key] !== expected[key])
-    .sort(byCodePoint)
-    .map((key) => `${key}: pinned ${expected[key]} -> actual ${actual[key]}`);
-  if (changed.length === 0) return undefined;
-  return (
-    `source-pin counts drifted: ${changed.join('; ')}. This gate fails in both directions: a ` +
-    'count that ROSE means a new pin on how the code is written rather than what it does, and a ' +
-    `count that FELL needs the ledger lowered to bank the conversion. Re-derive with ${REGENERATE}.`
-  );
-}
-
 test('the source-pin ledger matches the pinned baseline exactly, per test file', () => {
   const actual = currentLedger();
   if (process.env.UPDATE_SOURCE_PIN_LEDGER) {
     writeFileSync(LEDGER_PATH, `${JSON.stringify(actual, null, 2)}\n`);
     return;
   }
-  assert.deepStrictEqual(actual, LEDGER, describeDrift(actual, LEDGER));
+  assert.deepStrictEqual(
+    actual,
+    LEDGER,
+    describeLedgerDrift(actual, LEDGER, {
+      subject: 'source-pin counts',
+      // The corpus is the working tree, so a stray untracked file trips the set before a real change.
+      regenerate: REGENERATE,
+      roseHint: 'means a new pin on how the code is written rather than what it does',
+      fellHint: 'needs the ledger lowered to bank the conversion',
+    })
+  );
 });
 
 test('a pattern spelled as a literal is not a pin site, so this gate does not count itself', () => {
   const probe = [
-    "const SHAPE = /Source\\.includes\\(/;",
+    String.raw`const SHAPE = /Source\.includes\(/;`,
     "const ALSO = '.includes(';",
     '// readFileSync of src/ in a comment is not a call',
     'export { SHAPE, ALSO };',
   ].join('\n');
-  const { ast } = parseModule(probe);
-  assert.equal(countPinSites(ast), 0);
+  const { ast, scopeManager } = parseModule(probe);
+  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 0);
 });
 
 test('a read through a path binding counts, which a same-line rule would miss', () => {
@@ -118,9 +113,41 @@ test('a read through a path binding counts, which a same-line rule would miss', 
     "const rootSource = readFileSync(rootPath, 'utf8');",
     "export const ok = rootSource.includes('class=');",
   ].join('\n');
-  const { ast } = parseModule(probe);
+  const { ast, scopeManager } = parseModule(probe);
   // One read plus one `includes` on what it read.
-  assert.equal(countPinSites(ast), 2);
+  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 2);
+});
+
+test('a read through a local wrapper counts, and its binding is a source not a path', () => {
+  const probe = [
+    "import { readFileSync } from 'node:fs';",
+    "import { resolve } from 'node:path';",
+    'function read(relPath) {',
+    "  return readFileSync(resolve(import.meta.dirname, relPath), 'utf8');",
+    '}',
+    "const rootSource = read('../../src/ui/svelte/apps/FabricateAppRoot.svelte');",
+    "export const ok = rootSource.includes('<JournalView');",
+  ].join('\n');
+  const { ast, scopeManager } = parseModule(probe);
+  // One read through the wrapper plus one `includes` on what it read.
+  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 2);
+});
+
+test('two bindings of one name in different scopes are not conflated', () => {
+  const probe = [
+    "import { readFileSync } from 'node:fs';",
+    'export function pin() {',
+    "  const source = readFileSync('src/a.js', 'utf8');",
+    "  return source.includes('x');",
+    '}',
+    'export function unrelated(rows) {',
+    "  const source = rows.join(',');",
+    "  return source.includes('y');",
+    '}',
+  ].join('\n');
+  const { ast, scopeManager } = parseModule(probe);
+  // The read and the pin on it; the unrelated join is not source text.
+  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 2);
 });
 
 test('text derived from a source binding is still a source', () => {
@@ -128,18 +155,40 @@ test('text derived from a source binding is still a source', () => {
     "import { readFileSync } from 'node:fs';",
     "const a = readFileSync('src/one.js', 'utf8');",
     "const b = readFileSync('src/two.js', 'utf8');",
-    "const joined = [a, b].join('\\n');",
+    String.raw`const joined = [a, b].join('\n');`,
     "export const ok = joined.includes('export');",
   ].join('\n');
-  const { ast } = parseModule(probe);
-  assert.equal(countPinSites(ast), 3);
+  const { ast, scopeManager } = parseModule(probe);
+  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 3);
+});
+
+test('a source held in a property or indexed out of a map is still a pin', () => {
+  const probe = [
+    "import { readFileSync } from 'node:fs';",
+    "const byFile = { a: readFileSync('src/a.js', 'utf8') };",
+    "export const one = byFile['a'].includes('export');",
+  ].join('\n');
+  const { ast, scopeManager } = parseModule(probe);
+  // One read, plus the indexed match on what it read.
+  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 2);
+});
+
+test('a helper matching a handed parameter against a literal pins only under tests/helpers', () => {
+  const probe = [
+    'export function pins(source) {',
+    "  return source.includes('export const');",
+    '}',
+  ].join('\n');
+  const { ast, scopeManager } = parseModule(probe);
+  assert.equal(countPinSites(ast, { file: 'tests/helpers/thing.js', scopeManager }), 1);
+  // The same shape in a behavioural test is ordinary membership, not a source pin.
+  assert.equal(countPinSites(ast, { file: 'tests/thing.test.js', scopeManager }), 0);
 });
 
 test('an includes on text that never came from src/ is not a pin', () => {
-  const probe = [
-    "const dataSource = 'a,b,c';",
-    "export const ok = dataSource.includes('b');",
-  ].join('\n');
-  const { ast } = parseModule(probe);
-  assert.equal(countPinSites(ast), 0);
+  const probe = ["const dataSource = 'a,b,c';", "export const ok = dataSource.includes('b');"].join(
+    '\n'
+  );
+  const { ast, scopeManager } = parseModule(probe);
+  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 0);
 });

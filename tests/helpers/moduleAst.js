@@ -20,8 +20,12 @@ import { parseForESLint } from 'svelte-eslint-parser';
  */
 const PROBE_FILE_PATH = 'probe.svelte.js';
 
-/** Keys that make the tree cyclic or carry no child nodes, so a walk must not follow them. */
-const SKIPPED_KEYS = new Set(['parent', 'loc', 'range']);
+/**
+ * Keys that make the tree cyclic or carry no child nodes, so a walk must not follow them.
+ * `tokens` and `comments` hang off the Program: walking them costs a full second pass over the
+ * file and is what makes "a token in a docblock is not a node" literally true of this walk.
+ */
+const SKIPPED_KEYS = new Set(['parent', 'loc', 'range', 'tokens', 'comments']);
 
 /**
  * @param {string} source

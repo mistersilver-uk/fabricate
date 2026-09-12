@@ -55,8 +55,10 @@ test('a closing script tag in a string parses, which the rejected wrapper could 
   assert.equal(ast.body[0].type, 'ExportNamedDeclaration');
 });
 
-test('walkNodes visits every node once and terminates on a cyclic tree', () => {
+test('walkNodes visits every node once and terminates on a genuine cycle', () => {
   const { ast } = parseModule('const a = { b: 1 };');
+  // A real back-reference, so the `seen` guard is exercised rather than assumed.
+  ast.body[0].cycle = ast;
   const seen = [...walkNodes(ast)];
   assert.ok(seen.length > 3);
   assert.equal(new Set(seen).size, seen.length);

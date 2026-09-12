@@ -9,6 +9,7 @@ import { resolve } from 'node:path';
 import { test } from 'node:test';
 
 import {
+  carriesSpread,
   declaresAttribute,
   importedModules,
   importsModule,
@@ -20,6 +21,26 @@ import {
   rendersElement,
 } from './helpers/svelteStructureContract.js';
 import { walkElements } from './helpers/svelteTemplateScan.js';
+
+/** A second fixture for the shapes the first deliberately does not carry. */
+const EDGE_FIXTURE = [
+  '<script module>',
+  "  export const KIND = 'x';",
+  '</script>',
+  '<script>',
+  "  import { helper } from './helper.js';",
+  "  export * from './reexported.js';",
+  "  const lazy = () => import('./dynamic.js');",
+  '</script>',
+  '',
+  '<svelte:element this="label" class="wrap">',
+  '  <Chip {...rest} />',
+  '  <Chip class:tone={true} />',
+  '  <Chip tone="a" />',
+  '</svelte:element>',
+].join('\n');
+
+const edge = parseComponent(EDGE_FIXTURE);
 
 /** One fixture exercising every predicate: a nested block, a directive, and two imports. */
 const FIXTURE = [
@@ -94,5 +115,41 @@ test('the helper header still states the policy that string includes is not to b
     'utf8'
   ).slice(0, 1600);
   assert.match(header, /Do not add a string `includes` on component source to a test\./);
-  assert.match(header, /MEASURED COVERAGE/);
+  // Pin the residue sentence, not a heading word: a heading can stay while the claim under it
+  // rots, which is how a coverage figure nobody re-derived survived plan review.
+  assert.match(header, /exact JS expression text/);
+  assert.match(header, /loop variable rather than a literal/);
+});
+
+test('a svelte:element with a literal tag is a rendered element', () => {
+  assert.equal(rendersElement(edge, 'label'), true);
+});
+
+test('a class: directive is not a prop, so passesProp does not accept it', () => {
+  const classOnly = parseComponent('<div><Chip class:tone={true} /></div>');
+  assert.equal(passesProp(classOnly, 'Chip', 'tone'), false);
+});
+
+test('a bind: directive does count as passing the prop', () => {
+  const bound = parseComponent('<div><Chip bind:tone={x} /></div>');
+  assert.equal(passesProp(bound, 'Chip', 'tone'), true);
+});
+
+test('a spread makes the prop undecidable, reported as false and distinguishable', () => {
+  const spread = parseComponent('<div><Chip {...rest} /></div>');
+  assert.equal(passesProp(spread, 'Chip', 'tone'), false);
+  const [occurrence] = [];
+  let node;
+  walkElements(spread.fragment, (candidate) => {
+    if (candidate.type === 'Component') node = candidate;
+  });
+  assert.equal(occurrence, undefined);
+  assert.equal(carriesSpread(node), true);
+});
+
+test('importedModules sees the module script, a re-export and a dynamic import', () => {
+  const found = importedModules(edge);
+  assert.ok(found.includes('./helper.js'), 'static import');
+  assert.ok(found.includes('./reexported.js'), 're-export');
+  assert.ok(found.includes('./dynamic.js'), 'dynamic import');
 });
