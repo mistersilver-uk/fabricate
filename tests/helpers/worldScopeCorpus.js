@@ -16,6 +16,8 @@
  * production never produces.
  */
 
+import { ESSENCE_EFFECT_SOURCE_FIELDS } from '../../src/migration/worldScopeEntityGrouping.js';
+import { membershipKey } from '../../src/systems/scopedDefinitions.js';
 import { createScopedDefinitionStore } from '../../src/systems/scopedDefinitionStore.js';
 import {
   normalizeComponentMemberships,
@@ -726,6 +728,157 @@ export function malformedCorpus() {
     ],
     recipes: [null, { craftingSystemId: 'sys-a' }, 7],
     gatheringConfig: { systems: { 'sys-a': null, 'sys-b': 'nope' } },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The POST-migration merge corpus (issue 1654)
+// ---------------------------------------------------------------------------
+
+/**
+ * The `effectSource` block a membership record or world default carries, read off a raw essence
+ * row through the SHARED field list rather than a second spelling of the three names.
+ *
+ * @param {object} row A raw essence definition.
+ * @returns {Record<string, unknown>}
+ */
+function effectSourceBlockOf(row) {
+  const block = {};
+  for (const field of ESSENCE_EFFECT_SOURCE_FIELDS) {
+    if (row[field] !== undefined) block[field] = row[field];
+  }
+  return block;
+}
+
+/**
+ * Build an ALREADY-MIGRATED world: a `craftingSystems` corpus PLUS the essence and component scope
+ * payloads `1.30.0` would have left behind, in the STORED map shape.
+ *
+ * The `1.30.0` builders above produce a PRE-migration world, which is the wrong starting state for
+ * anything that reasons about world essences — there are none yet. This is the same declarative
+ * idea one migration later: it is still the ONE shared factory, it reuses {@link rawEssence} for
+ * the in-system rows so the row shape cannot drift from the older fixtures, and it defaults every
+ * membership record to FULLY OVERRIDING, which is exactly the state `buildMembershipRecord` leaves
+ * every pair in.
+ *
+ * Per-essence declaration fields, all optional but `id`:
+ *
+ * | field                            | default            | models                                   |
+ * |----------------------------------|--------------------|------------------------------------------|
+ * | `name` / `icon` / `colorToken` / `description` | derived | the world entity's identity, FIRST declaration wins |
+ * | `macro`                          | `null`             | the membership record's `macro` override |
+ * | `sourceComponentId`              | `null`             | the row's three effect-source fields      |
+ * | `effectSource`                   | derived from the row | an explicit block, for key-order and absence cases |
+ * | `inherit`                        | both `false`       | the two section switches                  |
+ * | `enabled`                        | `true`             | the membership record's flag              |
+ * | `member`                         | `true`             | whether a membership record exists at all |
+ * | `inSystem`                       | `true`             | whether an `essenceDefinitions` row exists |
+ * | `omitSections`                   | `[]`               | sections the membership record OMITS      |
+ *
+ * @param {object} [spec]
+ * @param {Array<object>} [spec.systems] `[{id, name, essences: [...], components: [{id, member}]}]`
+ * @param {object} [spec.worldDefaults] `{[essenceId]: {macro?, effectSource?}}`
+ * @param {string[]|null} [spec.entityOrder] An explicit `essenceScope.entities` order.
+ * @returns {{systems: Array<object>, essenceScope: object, componentScope: object}}
+ */
+export function buildEssenceMergeCorpus({
+  systems: specs = [],
+  worldDefaults = {},
+  entityOrder = null,
+} = {}) {
+  const systems = [];
+  const entitiesById = new Map();
+  const membership = {};
+  const componentEntities = new Map();
+  const componentMembership = {};
+
+  for (const spec of specs) {
+    const systemId = spec.id;
+    const essenceDefinitions = [];
+    for (const essence of spec.essences ?? []) {
+      const name = essence.name ?? essence.id;
+      const row = {
+        ...rawEssence({
+          id: essence.id,
+          name,
+          sourceComponentId: essence.sourceComponentId ?? null,
+          macro: essence.macro ?? null,
+        }),
+        ...(essence.icon === undefined ? {} : { icon: essence.icon }),
+        ...(essence.colorToken === undefined ? {} : { colorToken: essence.colorToken }),
+        ...(essence.description === undefined ? {} : { description: essence.description }),
+        enabled: essence.enabled !== false,
+      };
+      // FIRST DECLARATION WINS the world identity, mirroring the donor rule `1.30.0` lifted under.
+      if (!entitiesById.has(essence.id)) {
+        entitiesById.set(essence.id, {
+          id: essence.id,
+          name: row.name,
+          icon: row.icon,
+          colorToken: row.colorToken,
+          description: row.description,
+        });
+      }
+      if (essence.inSystem !== false) essenceDefinitions.push(row);
+      if (essence.member === false) continue;
+      const omitted = essence.omitSections ?? [];
+      const record = {
+        entityId: essence.id,
+        systemId,
+        inherit: {
+          effectSource: essence.inherit?.effectSource === true,
+          macro: essence.inherit?.macro === true,
+        },
+        enabled: essence.enabled !== false,
+      };
+      if (!omitted.includes('effectSource')) {
+        record.effectSource = essence.effectSource ?? effectSourceBlockOf(row);
+      }
+      if (!omitted.includes('macro')) record.macro = essence.macro ?? null;
+      membership[membershipKey(essence.id, systemId)] = record;
+    }
+
+    for (const component of spec.components ?? []) {
+      if (!componentEntities.has(component.id)) {
+        componentEntities.set(component.id, {
+          id: component.id,
+          name: `Component ${component.id}`,
+        });
+      }
+      if (component.member === false) continue;
+      componentMembership[membershipKey(component.id, systemId)] = {
+        entityId: component.id,
+        systemId,
+        inherit: {},
+      };
+    }
+
+    systems.push({
+      id: systemId,
+      name: spec.name ?? `System ${systemId}`,
+      enabled: true,
+      components: [],
+      essenceDefinitions,
+      tools: [],
+    });
+  }
+
+  const orderedIds = entityOrder ?? [...entitiesById.keys()];
+  const defaults = {};
+  for (const [id, sections] of Object.entries(worldDefaults)) defaults[id] = { id, ...sections };
+
+  return {
+    systems,
+    essenceScope: {
+      entities: orderedIds.map((id) => entitiesById.get(id)).filter(Boolean),
+      defaults,
+      membership,
+    },
+    componentScope: {
+      entities: [...componentEntities.values()],
+      defaults: {},
+      membership: componentMembership,
+    },
   };
 }
 
