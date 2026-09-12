@@ -521,7 +521,16 @@ export async function remapWorldScopeIdentityFlags({
 // actor has no `craftingRuns` at all, and a crash between the two awaits loses every in-flight
 // run.
 //
-// ## NO STARTUP PRUNE WITHHOLD IS ADDED
+// ## The setting is a TWO-LEG container
+//
+// `fabricate.worldEssenceMergeMap` is
+// `{systems: {[systemId]: {essences: {[loserId]: survivorId}}}, retired: {[loserId]: {...}}}`.
+// The legs are NESTED rather than flat siblings because a crafting system whose id is literally
+// `retired` would otherwise collide with the tombstone key, and nothing validates a system id
+// against that on the way in. `systems` is TRANSIENT and this pass's boot-time gating clears it;
+// `retired` is NEVER cleared.
+//
+// ## No startup prune withhold is added
 //
 // `hasPendingWorldEssenceMerge` lives HERE and not in `src/systems/worldScopeRekeyPending.js`.
 // That module is import-free because `startupPassComposition.js` consumes it; this predicate has
@@ -540,8 +549,18 @@ export async function remapWorldScopeIdentityFlags({
 export const WORLD_ESSENCE_MERGE_MIGRATION_VERSION = '1.34.0';
 
 /**
- * The NEVER-CLEARED tombstone leg of `fabricate.worldEssenceMergeMap`, which sits beside the
- * per-system re-key legs in the same setting and is therefore not one of them.
+ * The TRANSIENT leg of `fabricate.worldEssenceMergeMap`: the per-system re-key pairs this pass
+ * consumes and the boot-time gating then clears.
+ *
+ * @type {string}
+ */
+export const WORLD_ESSENCE_MERGE_SYSTEMS_LEG = 'systems';
+
+/**
+ * The NEVER-CLEARED tombstone leg of `fabricate.worldEssenceMergeMap`, recording what each retired
+ * id carried. It survives the clear of {@link WORLD_ESSENCE_MERGE_SYSTEMS_LEG}, because
+ * `mintEssenceId` resolves a new essence id against the LIVE roster alone and would otherwise hand
+ * a retired id straight back to the next essence named after a merged one.
  *
  * @type {string}
  */
@@ -569,27 +588,29 @@ export function mayClearWorldEssenceMergeMap(migrationVersion) {
 }
 
 /**
- * The per-system re-key legs of the raw merge map, READ BY SHAPE RATHER THAN BY NAME.
+ * The per-system re-key legs of the merge map, read from its `systems` leg AND NOWHERE ELSE.
  *
- * THE SHAPE TEST IS WHAT KEEPS THE TOMBSTONE OUT. `retired` is a sibling of the system legs in
- * the same setting, and its values are `{name?, icon?, colorToken?, description?, systems: []}` —
- * no `essences` key at all — so requiring a plain-object `essences` leg excludes it structurally
- * rather than by matching one reserved name that a future rename could drift from. The reserved
- * name is skipped too, so a world whose migration wrote an empty `retired: {}` needs no shape
- * luck. A nested `{systems: {...}}` layout is accepted as well, so this reader cannot be the
- * reason a layout choice made by the producing migration becomes irreversible.
+ * THE TWO LEGS ARE NESTED RATHER THAN FLAT, AND THAT IS A CORRECTNESS DECISION. Were the
+ * per-system legs top-level siblings of `retired`, a crafting system whose id is literally
+ * `retired` would collide with the tombstone key — and nothing validates a system id against that
+ * on the way in. `systems` and `retired` therefore occupy disjoint namespaces by construction.
+ *
+ * THERE IS EXACTLY ONE READER AND EXACTLY ONE LAYOUT. This deliberately does NOT fall back to a
+ * flat layout: a tolerant reader would let the producing migration and this consumer disagree
+ * about where the pairs live while both stayed green, which is the drift the nesting exists to
+ * make impossible. A map with no `systems` leg holds no work, whatever else it holds.
  *
  * Self-mapping and empty pairs are dropped, so a map that re-keys nothing reads as no legs.
  *
- * @param {unknown} mergeMap The raw `fabricate.worldEssenceMergeMap` value.
+ * @param {unknown} mergeMap The raw `fabricate.worldEssenceMergeMap` value,
+ *   `{systems: {[systemId]: {essences: {[loserId]: survivorId}}}, retired: {...}}`.
  * @returns {{[systemId: string]: {[loserId: string]: string}}}
  */
 export function worldEssenceMergeLegs(mergeMap) {
-  if (!isPlainObject(mergeMap)) return {};
-  const source = isPlainObject(mergeMap.systems) ? mergeMap.systems : mergeMap;
+  const systems = isPlainObject(mergeMap) ? mergeMap[WORLD_ESSENCE_MERGE_SYSTEMS_LEG] : null;
+  if (!isPlainObject(systems)) return {};
   const legs = {};
-  for (const [systemId, leg] of Object.entries(source)) {
-    if (systemId === WORLD_ESSENCE_MERGE_RETIRED_LEG) continue;
+  for (const [systemId, leg] of Object.entries(systems)) {
     if (!isPlainObject(leg) || !isPlainObject(leg.essences)) continue;
     const pairs = {};
     for (const [loserId, survivorId] of Object.entries(leg.essences)) {
