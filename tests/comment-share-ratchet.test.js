@@ -80,6 +80,10 @@ function advanceInsideQuote(line, index, state, syntax) {
  * is a non-event rather than a ratchet trip. One function, called with a different `syntax` per
  * extension and svelte region, so no per-type copy exists for the duplication gate.
  *
+ * A `'` or `"` string held open only by a trailing backslash line-continuation is not tracked:
+ * state resets at the next line's entry rather than swallowing the file. No file in this corpus
+ * uses that construct.
+ *
  * @param {string} line
  * @param {{inBlock: boolean, quote: string|null}} state
  * @param {{blockOpen: string, blockClose: string, lineComment: string|null, quotes: boolean}} syntax
