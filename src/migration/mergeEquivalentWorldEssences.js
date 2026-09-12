@@ -28,7 +28,7 @@
  * same ones:
  *
  * - The REWRITE half runs UNCONDITIONALLY over `craftingSystems`, `recipes`, `gatheringConfig`
- *   and the two scope payloads, driven by the merge map alone. It is idempotent by construction:
+ *   and the THREE scope payloads, driven by the merge map alone. It is idempotent by construction:
  *   each system's map has an image disjoint from its key set — an invariant
  *   {@link buildWorldEssenceEquivalence} REFUSES a group rather than break — and every site does
  *   a single simultaneous lookup, so an already-rewritten id is not a key.
@@ -121,6 +121,7 @@ import {
   rewriteMembershipReferences,
   rewriteRecipeReferences,
   rewriteSystemReferences,
+  rewriteToolReferences,
 } from './worldScopeReferenceRewrite.js';
 
 /** The `craftingSystem` array essences are stored under, read from the ONE list that names it. */
@@ -451,6 +452,7 @@ export function mergeEquivalentWorldEssences(data) {
   const gatheringConfig = clone(isPlainObject(data.gatheringConfig) ? data.gatheringConfig : {});
   const essenceScope = readScopePayload(data.essenceScope);
   const componentScope = readScopePayload(data.componentScope);
+  const toolScope = readScopePayload(data.toolScope);
 
   const persisted = normalizeEssenceMergeMap(data.worldEssenceMergeMap);
   const reusingPersistedMap = mapHasEntries(persisted.systems);
@@ -502,11 +504,38 @@ export function mergeEquivalentWorldEssences(data) {
       if (!isPlainObject(record) || trimmedString(record.systemId) !== systemId) continue;
       rewriteMembershipReferences(record, 'components', remappers);
     }
+    // A TOOL membership record's `repairRequirements` is an `IngredientGroup[]` whose options may
+    // be ESSENCE-TYPED (`{type: 'essence', essenceId, amount}`), and `1.30.0` populates the
+    // position itself: `buildMembershipRecord` clones the in-system array onto every tool
+    // membership record it writes. `resolveTool` answers `repairRequirements` from the MEMBERSHIP
+    // RECORD ALONE — it is not a resolver section and never falls back to the world default — so
+    // a missed essence id here is not merely a second copy of the in-system one going stale: it
+    // is the ONLY copy the repair check reads, disagreeing with an in-system copy this pass HAS
+    // re-keyed.
+    for (const record of Object.values(toolScope.membership)) {
+      if (!isPlainObject(record) || trimmedString(record.systemId) !== systemId) continue;
+      rewriteMembershipReferences(record, 'tools', remappers);
+    }
   }
 
   // The WORLD-SCOPE key positions, which belong to no system and take the unioned lookup.
   for (const record of Object.values(componentScope.defaults)) {
     rewriteEssenceQuantityMap(record, { remapEssence: globalRemapper });
+  }
+  // A WORLD TOOL DEFAULT carries the donor's whole `repairRequirements` group array
+  // (`worldScopeDefaults.electWorldDefault`, CONSTRAINT 4), and that constraint's guard checks
+  // COMPONENT ids only — an essence-typed option passes through it untouched, carrying a world
+  // essence id by construction. The record belongs to NO system, so it takes the unioned lookup
+  // exactly as a world component default's essence map does.
+  //
+  // IT IS THE SHARPEST OF THE THREE TOOL POSITIONS. `seedToolRepairRequirements`
+  // (`src/systems/toolScope.js`) copies this array into every membership record minted when a
+  // tool is added to a system, and CONSTRAINT 4 names the consequence in advance: it is "a SEED,
+  // copied once and never re-read, so a dangling group is baked silently into a future system's
+  // repair recipe". A retired id left standing here is therefore not a stale reference that
+  // decays — it is one that PROPAGATES, into systems that do not exist yet.
+  for (const record of Object.values(toolScope.defaults)) {
+    rewriteToolReferences(record, { remapEssence: globalRemapper });
   }
 
   // -------------------------------------------------------------------------
@@ -586,6 +615,7 @@ export function mergeEquivalentWorldEssences(data) {
     gatheringConfig: unchanged(gatheringConfig, data.gatheringConfig),
     essenceScope: unchangedScope(essenceScope, data.essenceScope),
     componentScope: unchangedScope(componentScope, data.componentScope),
+    toolScope: unchangedScope(toolScope, data.toolScope),
     worldEssenceMergeMap:
       JSON.stringify(mergeMapSetting) === JSON.stringify(persisted)
         ? data.worldEssenceMergeMap

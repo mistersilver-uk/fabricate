@@ -148,6 +148,30 @@ test('every reference class the shared walk covers moves, and colliding quantiti
     inherit: { essences: false },
     essences: { [MINTED]: 5, iron: 5 },
   };
+  // THE FOURTH SHAPE THE BUILDER DOES NOT BUILD, and the one no derived fixture can hold: the
+  // TOOL SCOPE. `1.30.0` writes both halves itself — `buildMembershipRecord` clones the in-system
+  // array onto the membership record, and the world-default election lifts the donor's whole
+  // group array past a CONSTRAINT 4 that inspects COMPONENT ids only.
+  corpus.toolScope = {
+    entities: [{ id: 'tool-9', name: 'Hammer' }],
+    defaults: {
+      'tool-9': {
+        id: 'tool-9',
+        repairRequirements: [
+          { id: 'ig-3', options: [{ quantity: 1, match: { type: 'essence', essenceId: MINTED } }] },
+        ],
+      },
+    },
+    membership: {
+      'tool-9|sys-b': {
+        entityId: 'tool-9',
+        systemId: 'sys-b',
+        repairRequirements: [
+          { id: 'ig-4', options: [{ quantity: 1, match: { type: 'essence', essenceId: MINTED } }] },
+        ],
+      },
+    },
+  };
   const recipes = [
     {
       id: 'recipe-b',
@@ -202,6 +226,36 @@ test('every reference class the shared walk covers moves, and colliding quantiti
     result.gatheringConfig.systems['sys-b'].tools[0].repairRequirements[0].options[0].match
       .essenceId,
     'iron'
+  );
+  // LEAF POSITION AT TOOL SCOPE, both halves. The MEMBERSHIP half is the only copy `resolveTool`
+  // reads, so leaving it would make the repair check disagree with the in-system copy asserted
+  // above; the DEFAULTS half is the SEED `seedToolRepairRequirements` copies into every future
+  // membership record, so leaving it would bake the retired id into systems that do not exist yet.
+  assert.equal(
+    result.toolScope.membership['tool-9|sys-b'].repairRequirements[0].options[0].match.essenceId,
+    'iron'
+  );
+  assert.equal(
+    result.toolScope.defaults['tool-9'].repairRequirements[0].options[0].match.essenceId,
+    'iron'
+  );
+});
+
+test("a tool scope with nothing to re-key answers the CALLER'S OWN object", () => {
+  // The identity contract the runner's per-setting JSON comparison rests on, at the key this
+  // pass newly touches: a world with no merge must not have its tool scope rewritten, and an
+  // ABSENT tool scope must not be SEEDED with an empty payload. Seeding one would hand
+  // `_scopeEntityBasis` a KNOWN, EMPTY basis, which is a licence to prune every tool reference.
+  const corpus = buildEssenceMergeCorpus({
+    systems: [{ id: 'sys-a', essences: [{ id: 'iron', name: 'Iron' }] }],
+  });
+  const toolScope = { entities: [], defaults: {}, membership: {}, toolBreakage: { enabled: true } };
+  const merged = mergeEquivalentWorldEssences(payloadOf(corpus, { toolScope }));
+  assert.equal(merged.toolScope, toolScope, 'the ORIGINAL object, not a re-serialized equal one');
+  assert.equal(
+    mergeEquivalentWorldEssences(payloadOf(corpus)).toolScope,
+    undefined,
+    'an absent tool scope stays absent rather than being seeded with an empty payload'
   );
 });
 
