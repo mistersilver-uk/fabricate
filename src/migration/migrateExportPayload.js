@@ -630,12 +630,12 @@ function deriveWorldScopeEntitySlices(migrated) {
  * one does not. Both refusals are correct — merging them would make one definition unreachable or
  * drop a system's authored overrides — so a one-system bundle's merge map is always EMPTY today.
  *
- * **This contradicts § Equivalent World Essence Merge requirement 12's "It is NOT a no-op there",
- * and the code is what is true.** The pass is an OBSERVER on this path: it reports the refusal,
- * which is a real and GM-useful fact about a bundle carrying duplicate essences, and changes no
- * slice. The call stays for two reasons — the refusal report IS the payload here, and the day the
- * decision core can safely merge an intra-system pair this path must merge it rather than have to
- * be found.
+ * § Equivalent World Essence Merge requirement 12 and `import-export/spec.md` now BOTH say this;
+ * they used to claim the opposite, and the correction went to the spec because the code was what
+ * was true. The pass is an OBSERVER on this path: it reports the refusal, which is a real and
+ * GM-useful fact about a bundle carrying duplicate essences, and changes no slice. The call stays
+ * for two reasons — the refusal report IS the payload here, and the day the decision core can
+ * safely merge an intra-system pair this path must merge it rather than have to be found.
  *
  * @param {object} migrated The working payload, mutated in place.
  * @private

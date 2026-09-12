@@ -146,8 +146,11 @@ That discard is LOAD-BEARING rather than defensive: the shared function unions e
 It MUST NOT hand back a value that ALIASES the shared function's result, because that function answers the ORIGINAL object for a key it did not change and a later in-place reference rewrite would otherwise reach the caller's payload.
 
 For a one-system corpus the `1.30.0` re-key map MUST be EMPTY for every ACCEPTED `(system, entityType)` pair among the RE-KEYABLE types — components and tools — and a pair whose map is non-empty MUST be REFUSED, so no imported bundle has a component or tool id re-keyed.
-**The `1.34.0` ESSENCE MERGE MAP is NOT bound by that MUST**: for a one-system corpus it MAY be NON-EMPTY, and it is APPLIED rather than REFUSED.
+**The `1.34.0` ESSENCE MERGE MAP is NOT bound by that MUST**: whatever it says MUST be APPLIED rather than REFUSED.
 It is confined to the bundle and produces exactly the corpus the world pass produces for the same data, whereas a destination world already at `1.34.0` would never re-run the migration — so refusing here would leave the duplicate in the destination FOREVER (`destructive-changes-and-migrations/spec.md` § Equivalent World Essence Merge requirement 12).
+**As shipped that map is always EMPTY for a one-system corpus, and this rule is stated for the day it is not.**
+Every candidate in a one-system corpus is a member of that one system by construction, so every group of two or more is an intra-system duplicate and requirement 6 refuses exactly those.
+The pass is therefore an OBSERVER on this path: it MUST report the refusal, and it changes no slice.
 A REFUSED pair MUST yield an empty slice AND a REPORTED refusal, never a silently empty slice: an empty slice alone is indistinguishable from a system with no world members.
 
 A payload whose activity check sits on the `bySubject` rule with an AUTHORED EMPTY `defaultModifierIds` MUST have the world-side `1.33.0` transform applied to its one system, its recipes and its gathering slice, using the SAME function that migration applies (`applySubjectModifierMarks`), not a second implementation of it.
