@@ -52,6 +52,11 @@ export const REFERENCE_KINDS = Object.freeze({
   WORLD_ENTITY_MISSING: 'worldEntityMissing',
   WORLD_DEFAULT_DECLINED: 'worldDefaultDeclined',
   WORLD_TOOL_BREAKAGE_DROPPED: 'worldToolBreakageDropped',
+  // KIND 5. The `1.34.0` essence-merge upcast REFUSES a group it cannot prove safe, and a
+  // refused group changes no slice — so without a kind carrying it, the refusal was computed
+  // into the transient upcast report and then read by nobody. `import-export` requires it
+  // REPORTED rather than silent, and this is the channel that makes that true.
+  WORLD_ESSENCE_MERGE_REFUSED: 'worldEssenceMergeRefused',
 });
 
 /** The world-scope entity types, and the settings key + in-system array each is carried under. */

@@ -1587,6 +1587,7 @@
           "worldEntityMissing": "Missing world entities",
           "worldDefaultDeclined": "Declined world defaults",
           "worldToolBreakageDropped": "Dropped world tool breakage authority",
+          "worldEssenceMergeRefused": "Refused equivalent essence merge",
           "unknown": "Other references"
         },
         "OwnerType": {

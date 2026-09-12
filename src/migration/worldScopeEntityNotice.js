@@ -418,6 +418,16 @@ export function describeWorldEssenceMerge(report) {
       (entry) => `declined ${entry?.essenceId} (${arrayOf(entry?.sections).join(', ')})`
     ),
     ...arrayOf(report?.orphaned).map((entry) => `orphaned ${entry?.essenceId}`),
+    // THE ONLY LEG THAT NAMES A CHANGE TO A GM-AUTHORED FIELD'S VALUE. Every other leg above
+    // reports an id being re-keyed or a group being left alone; a freeze writes a resolved value
+    // onto an in-system row that was INHERITING it, which is a change to what that system's
+    // essence does. Requirements 8 and 13 call it disclosed, and without this line nothing
+    // rendered it: the notice builder reads three legs, and `MigrationRunner` then deletes the
+    // field — so the one substantive edit this pass makes was the one thing a GM could not see.
+    ...arrayOf(report?.inSystemFreezes).map(
+      (freeze) =>
+        `froze ${arrayOf(freeze?.sections).join(', ')} on ${freeze?.essenceId} in ${freeze?.systemId}`
+    ),
   ].join('; ');
 }
 
