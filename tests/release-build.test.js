@@ -362,8 +362,14 @@ function assertBundleConsoleLine(bundle, literal, level, what) {
   // actual guarded by `tests/item-directory-manager-launch.test.js` therefore produce reports of
   // much the same size. The message below carries the diagnosis instead. A local choice for a
   // whole-bundle actual, not a rule about `assert.match`.
+  // ESCAPED, because the minifier's chosen name is not a regex-safe token. Rolldown allocates
+  // `$`-prefixed identifiers once a bundle grows past a certain size, and `$` interpolated raw
+  // into this pattern reads as an END ANCHOR — so `console.warn($b` could never match and the
+  // assertion failed against a bundle whose console level was exactly right. Found at issue 1654,
+  // where a migration grew `main.js` enough to shift the allocation onto that shape.
+  const boundName = escapeForRegExp(bound[1]);
   assert.ok(
-    new RegExp(`console\\.${level}\\(\\s*${bound[1]}\\b`).test(bundle),
+    new RegExp(`console\\.${level}\\(\\s*${boundName}\\b`).test(bundle),
     `${what}: must be written at console.${level} in the built bundle`
   );
 }
