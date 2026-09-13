@@ -9,6 +9,9 @@
  *
  * An enclosing function's count is not reduced by a nested one: subtracting would hide a long
  * function that happens to contain a longer-lived helper.
+ *
+ * A class static block is deliberately out of scope: it is not a function, and none in `src/`
+ * approaches the threshold.
  */
 import { parse } from 'svelte/compiler';
 
@@ -36,10 +39,29 @@ function declaredName(node, owners) {
     return owner.key?.name ?? owner.key?.value;
   }
   if (owner.type === 'MethodDefinition') return owner.key?.name ?? owner.key?.value;
+  if (owner.type === 'CallExpression') return callTarget(owner);
   return undefined;
 }
 
-/** Map each function node to the declaration that names it, which the AST does not record. */
+/** `Hooks.once`, `describe`, `array.map` — the call a callback was handed to. */
+function callTarget(call) {
+  const { callee } = call;
+  if (callee?.type === 'Identifier') return callee.name;
+  if (callee?.type === 'MemberExpression' && callee.property?.type === 'Identifier') {
+    const object = callee.object?.type === 'Identifier' ? `${callee.object.name}.` : '';
+    return `${object}${callee.property.name}`;
+  }
+  return undefined;
+}
+
+/**
+ * Map each function node to the declaration that names it, which the AST does not record.
+ *
+ * A callback is owned by the call it is passed to, so a `Hooks.once('ready', …)` body is keyed by
+ * that call rather than by its position among every anonymous function in the file. A purely
+ * positional key renumbers when an unrelated callback is added above it, which reads in the ledger
+ * as debt moving when nothing did.
+ */
 function functionOwners(ast) {
   const owners = new Map();
   for (const node of walkNodes(ast)) {
@@ -52,6 +74,13 @@ function functionOwners(ast) {
     for (const [type, value] of candidates) {
       if (node.type === type && value && FUNCTION_TYPES.includes(value.type))
         owners.set(value, node);
+    }
+    if (node.type === 'CallExpression') {
+      for (const argument of node.arguments) {
+        if (FUNCTION_TYPES.includes(argument.type) && !owners.has(argument)) {
+          owners.set(argument, node);
+        }
+      }
     }
   }
   return owners;
@@ -93,13 +122,12 @@ const lineOf = (text, index) => text.slice(0, index).split('\n').length;
  * share a key, and a ledger keyed by name silently keeps only the last — a dropped entry that
  * reads as a shrinking debt.
  */
-function measureProgram(ast, text, offset = 0) {
+function measureProgram(ast, text, offset = 0, seen = new Map()) {
   const functions = [...walkNodes(ast)]
     .filter((node) => FUNCTION_TYPES.includes(node.type))
     .sort((left, right) => left.start - right.start);
   const owners = functionOwners(ast);
   const byNode = enclosingFunctions(functions);
-  const seen = new Map();
   return functions.map((node) => {
     const base = qualify(node, owners, byNode);
     const ordinal = (seen.get(base) ?? 0) + 1;
@@ -129,12 +157,23 @@ export function measureModuleFunctions(text) {
 export function measureComponentFunctions(text) {
   const ast = parse(text, { modern: true });
   const measured = [];
+  // ONE `seen` map across every block: `<script module>`, `<script>` and the markup share one
+  // keyspace in the ledger, so an ordinal that restarts per block cannot stop a collision.
+  const seen = new Map();
   for (const block of [ast.instance, ast.module]) {
-    if (block?.content) measured.push(...measureProgram(block.content, text));
+    if (block?.content) measured.push(...measureProgram(block.content, text, 0, seen));
   }
-  if (ast.fragment) measured.push(...measureProgram(ast.fragment, text));
+  if (ast.fragment) measured.push(...measureProgram(ast.fragment, text, 0, seen));
   return measured;
 }
 
-/** Physical lines, comments and blanks included, matching the figures the issue quotes. */
-export const physicalLines = (text) => text.split('\n').length;
+/**
+ * Physical lines, comments and blanks included, matching the measure the issue's figures use.
+ *
+ * A file's terminating newline does not add a line of its own. Counting it made every one of the
+ * 741 corpus files read one line long and turned the exclusive thresholds into inclusive ones.
+ */
+export function physicalLines(text) {
+  const parts = String(text).split('\n');
+  return parts.length > 1 && parts.at(-1) === '' ? parts.length - 1 : parts.length;
+}
