@@ -89,7 +89,7 @@ const ESLINT_SCRIPTS_GLOB = /files:\s*\[\s*'scripts\/\*\*\/\*\.\{([^}]+)}'/;
  * against it, so adding `.sh` there is not an option: it would immediately fail that mirror test,
  * and ESLint cannot parse shell anyway. Prettier has no shell parser either. So a `.sh` file under
  * `scripts/` is invisible to every gate this repository runs — not linted, not formatted, not in
- * `KNOWN_UNGATED_SCRIPTS`, and not visible to the ratchet, which stays green with nothing
+ * `eslint-debt.txt`, and not visible to the ratchet, which stays green with nothing
  * acknowledged.
  *
  * That was demonstrated rather than assumed: a syntax error introduced into
@@ -286,7 +286,7 @@ test('every shell script under scripts/ PARSES, so a syntax error cannot wait fo
 });
 
 test('the bash parse check can actually fail', () => {
-  // Guarding the guard, in the style of parseGatedScriptPaths' own fixtures above. A `bash -n` that
+  // Guarding the guard, in the style every anti-vacuity check here follows. A `bash -n` that
   // silently exits 0 on everything — a wrong path, a bash that ignores its argument — would report
   // success forever, which is the failure mode this file was written to attack.
   const directory = mkdtempSync(path.join(os.tmpdir(), 'shell-ratchet-'));

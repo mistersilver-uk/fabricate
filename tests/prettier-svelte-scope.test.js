@@ -60,6 +60,24 @@
  * lane gates actually produce (2-3 other full `npm test` runs in flight at once) — well past the
  * previous 60000ms cap, which is exactly what turned a slow-but-healthy run into a `# cancelled 1`
  * that read as a flake. Narrowing this back down "to tidy it" reintroduces that.
+ *
+ * THOSE NUMBERS GREW WITH ISSUE #1660. `format:check` is `prettier --check .` now, so the real
+ * argv this executes covers the repository rather than about eighty paths: ~24s run alone, against
+ * the ~7.5s above. That is a deliberate cost and it is worth naming beside its neighbour, because
+ * the same change moved a 23-second ESLint check OUT of `npm test` on the grounds that CPU-bound
+ * seconds here starve the browser-backed suites. The two are not in conflict, but they are close
+ * enough that the difference should be stated rather than left to be rediscovered: this test was
+ * ALREADY executing a real Prettier run, so #1660 added ~16s to an existing cost, while
+ * `lint:debt` would have added ~272s of entirely new work. If this ever needs to come down, the
+ * lever is running it in a CI job of its own — not narrowing the argv, which is the one thing
+ * that would make it stop testing what it exists to test.
+ *
+ * ONE MORE THING THE GLOB TOOK AWAY. Dropping `prettier-plugin-svelte` from `.prettierrc.json`
+ * used to make `format:check` exit 2 with "No parser could be inferred", because the script named
+ * `src/**\/*.svelte` and Prettier refuses a file it was handed and cannot parse. Under
+ * `prettier --check .` it exits 0 — directory expansion just skips such a file. Measured, not
+ * assumed. So the `resolves a Svelte parser` and `registers prettier-plugin-svelte` assertions
+ * below are no longer belt-and-braces over a loud CLI failure; they ARE the gate.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';

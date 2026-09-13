@@ -576,7 +576,7 @@ function neutraliseCallerBand(page) {
     const RUNG_RULE = '.fabricate-picker-popover.fabricate-select-popover-inline';
     let band = null;
     for (const sheet of document.styleSheets) {
-      let rules = [];
+      let rules;
       try {
         rules = [...sheet.cssRules];
       } catch {

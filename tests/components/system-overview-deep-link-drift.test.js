@@ -57,7 +57,7 @@ describe('System overview deep-link drift guard', () => {
 
   it('maps every deep-linkable kind to a real CraftingSystemManagerRoot view token', () => {
     // Parse the root's OVERVIEW_DEEP_LINKS table: kind -> { view: '<token>', ... }.
-    const tableMatch = rootSource.match(/const OVERVIEW_DEEP_LINKS = \{([\s\S]*?)\n  \};/);
+    const tableMatch = rootSource.match(/const OVERVIEW_DEEP_LINKS = \{([\s\S]*?)\n {2}\};/);
     assert.ok(tableMatch, 'OVERVIEW_DEEP_LINKS table found in the root component');
     const table = tableMatch[1];
 
@@ -127,7 +127,7 @@ describe('System overview deep-link drift guard', () => {
 
     // The root's environment/task/event deep-links must select by environmentId,
     // not by the record/entity id (which selectEnvironment cannot resolve).
-    const tableMatch = rootSource.match(/const OVERVIEW_DEEP_LINKS = \{([\s\S]*?)\n  \};/);
+    const tableMatch = rootSource.match(/const OVERVIEW_DEEP_LINKS = \{([\s\S]*?)\n {2}\};/);
     assert.ok(tableMatch, 'OVERVIEW_DEEP_LINKS table found in the root component');
     const table = tableMatch[1];
     const targetIds = new Map(

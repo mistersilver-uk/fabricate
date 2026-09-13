@@ -1915,7 +1915,7 @@ const CHECK_TRIGGERS_SRC = readFileSync(
 );
 
 test('the Phase D0 tier-step walk drives hooks the trigger component still emits', () => {
-  // `scripts/foundry-test-run.mjs` is entry #4 in `KNOWN_UNGATED_SCRIPTS`, so neither
+  // `scripts/foundry-test-run.mjs` is carried as debt in `eslint-debt.txt`, so neither
   // `npm run lint` nor `npm run format:check` reads it and this file is the walk's only
   // gate. Issue 975 deleted the `[data-check-nat-stepping]` card the walk used to
   // round-trip and replaced it with a trigger-authoring walk over the tier-step row, so

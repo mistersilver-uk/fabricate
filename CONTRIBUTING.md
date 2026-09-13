@@ -526,7 +526,7 @@ When you bring a file to green, delete its entry and lower the pinned count in t
 
 A **second** gated script, `npm run lint:svelte`, covers every `*.svelte` file under `src/` and runs as its own step of the same required `lint` job.
 It is separate because components need the Svelte parser and their own rule set, not because they are optional.
-Note what this does and does not mean for `src/ui/**`: that directory holds both halves, and only the `.svelte` half is gated — the plain `.js` under it still is not.
+Note what this means for `src/ui/**`: that directory holds both halves and `npm run lint` now covers both, so the 394 plain `.js` files there that are clean are gated outright; only the 60 listed in `eslint-debt.txt` carry any exclusion, and only for the rules they fail.
 
 `lint:svelte` runs with `--max-warnings=0`, so the two WARN-level rules in `svelte.configs.recommended` (`svelte/no-at-debug-tags`, `svelte/no-inspect`) fail the build rather than printing and exiting 0 — a `{@debug}` tag or an `$inspect()` call left in a component is a CI failure.
 A finding has three legitimate dispositions: fix the code, tune the rule in `eslint.config.js`, or suppress it.
@@ -543,8 +543,11 @@ The fence there protects the directive's line anchor and nothing else — `{' '}
 
 ESLint and the Svelte compiler are the static analysis a `.svelte` file gets.
 Prettier now formats components as well — `prettier-plugin-svelte` is registered in `.prettierrc.json`, and `format:check` covers `src/**/*.svelte`.
-Prettier 3 does not auto-load plugins, so the devDependency alone leaves `.svelte` with no parser and dropping the config entry fails loudly — the glob names the components, so `format:check` exits 2 with "No parser could be inferred".
-The silent way back is the other one, and the one `tests/prettier-svelte-scope.test.js` guards: re-ignoring `*.svelte` makes `format:check` match zero files, report success and exit 0.
+Prettier 3 does not auto-load plugins, so the devDependency alone leaves `.svelte` with no parser.
+That used to fail loudly: the script named `src/**/*.svelte` explicitly, so `format:check` exited 2 with "No parser could be inferred".
+It does not any more, and the change is worth knowing — measured on this branch, removing `plugins` from `.prettierrc.json` leaves `prettier --check .` exiting **0**, because directory expansion simply skips a file it can infer no parser for.
+So both ways back are silent now, and `tests/prettier-svelte-scope.test.js` is the only thing that catches either: re-ignoring `*.svelte`, and dropping the plugin.
+Its `resolves a Svelte parser for a real component` and `registers prettier-plugin-svelte in the resolved config` assertions are what stand in for the exit code the glob used to give you.
 
 Svelte compiler warnings fail the build as of issue 924, which found seven of them passing unnoticed.
 Five were real accessibility defects; one was a `css_unused_selector` that was not dead code at all but a focus ring the compiler was emitting COMMENTED OUT, so the ring had never applied in a shipped build; the seventh was a `state_referenced_locally` in `GatheringEnvironmentList.svelte`, a deliberate one-time seed now said so with `untrack()` rather than suppressed.

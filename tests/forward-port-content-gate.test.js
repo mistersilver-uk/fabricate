@@ -755,7 +755,7 @@ test('A7: a line neither line contains is refused, and choosing a side is not', 
     assert.match(output, /present in neither origin\/main's nor origin\/release's version/);
     assert.match(
       output,
-      /::error::  a resolution neither side wrote/,
+      /::error:: {2}a resolution neither side wrote/,
       'the invented line is named'
     );
     assert.match(output, /this path cannot complete it/, 'the residual cost is named');

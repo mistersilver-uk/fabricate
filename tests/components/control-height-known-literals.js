@@ -42,7 +42,7 @@
  *
  * ── THE ROWS ARE STRINGS ────────────────────────────────────────────────────────────────
  * One `'file | property | value | count | raw => resolved [; raw => resolved]'` per line,
- * following `tests/scripts-known-ungated.js`. Thirty-eight uniform object literals would be
+ * following the acknowledged-debt baselines this repository already keeps. Thirty-eight uniform object literals would be
  * thirty-eight identical token runs, and SonarCloud's duplication detector reads `tests/**`
  * with `sonar.cpd.exclusions` inert — a change earlier in this programme failed that gate at
  * 23% for exactly this shape. Two tokens a line cannot collide with anything.

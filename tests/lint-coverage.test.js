@@ -38,7 +38,7 @@
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -92,7 +92,7 @@ const DEBT_COUNTS = {
 };
 
 /** The rules `tests/**` does not pass yet. Pinned for the same reason as the counts above. */
-const TESTS_DEBT_RULE_COUNT = 89;
+const TESTS_DEBT_RULE_COUNT = 82;
 
 /** The marker that opens the formatting-debt section of `.prettierignore`. */
 const PRETTIER_DEBT_MARKER = '# --- FORMATTING DEBT BASELINE';
@@ -104,8 +104,8 @@ const PRETTIER_DEBT_COUNT = 101;
 /** Whether an ESLint rule entry is switched on. */
 const armed = (entry) => Array.isArray(entry) && entry[0] !== 0 && entry[0] !== 'off';
 
-/** The `.prettierignore` lines below the debt marker, comments and blanks dropped. */
-function prettierDebtEntries() {
+/** `.prettierignore`, split at the debt marker into its permanent half and its debt half. */
+function prettierIgnoreSections() {
   const text = readFileSync(path.join(REPOSITORY_ROOT, '.prettierignore'), 'utf8');
   const marker = text.indexOf(PRETTIER_DEBT_MARKER);
   assert.notEqual(
@@ -114,23 +114,68 @@ function prettierDebtEntries() {
     `.prettierignore no longer carries the ${PRETTIER_DEBT_MARKER} marker, so the debt section ` +
       'cannot be told apart from the permanent exclusions and this ratchet checks nothing.'
   );
-  return text
-    .slice(marker)
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !line.startsWith('#'));
+  const patterns = (block) =>
+    block
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && !line.startsWith('#'));
+  return { permanent: patterns(text.slice(0, marker)), debt: patterns(text.slice(marker)) };
 }
 
-test('the frozen legacy argv still selects exactly the files it selected', () => {
+test('every file the frozen legacy argv named is still where it named it', () => {
   assert.equal(LEGACY_GATE_FILES.length, LEGACY_GATE_FILE_COUNT);
+
+  // A SUBSET CHECK, NOT AN EQUALITY ONE, and the asymmetry is the whole point.
+  //
+  // The frozen argv's first token is an open directory glob —
+  // `src/{models,utils,…}/**/*.js` — so expanding it against the working tree grows every time
+  // anyone adds a module under one of those directories, and this repository adds a migration per
+  // schema change. Pinned by equality, a perfectly ordinary new file would red this test with a
+  // message about deletion, and the only way to green it would be to APPEND to a fixture whose own
+  // header forbids exactly that. The fixture would then drift from "what the old gate reached"
+  // towards "what the new gate reaches", which is the tautology it exists to avoid.
+  //
+  // So growth is ignored and DISAPPEARANCE is caught: every path the old gate named must still be
+  // a path that argv would select today. A legacy file that is deleted or moved out of those
+  // directories fails here and has to be de-listed deliberately, in the commit that moves it.
+  // Silent shrinkage is separately impossible because LEGACY_GATE_FILE_COUNT is pinned exactly.
+  const selectable = new Set(deriveLegacyGateFiles(LEGACY_LINT_ARGV));
+  const gone = LEGACY_GATE_FILES.filter((file) => !selectable.has(file));
   assert.deepEqual(
-    deriveLegacyGateFiles(LEGACY_LINT_ARGV),
-    LEGACY_GATE_FILES,
-    'the frozen `lint` argv no longer expands to the committed file list. A file it named has ' +
-      'been deleted or renamed; remove its fixture entry in the same commit, and lower ' +
-      'LEGACY_GATE_FILE_COUNT. Do NOT re-derive the fixture from the current configuration — ' +
-      'that would assert only that the new gate covers what the new gate covers.'
+    gone,
+    [],
+    'the frozen `lint` argv no longer selects these files. Each was deleted, renamed, or moved ' +
+      'out of the directories that argv named — remove its entry from tests/legacy-lint-gate.txt ' +
+      'and lower LEGACY_GATE_FILE_COUNT, in the same commit that moved the file. Do NOT re-derive ' +
+      'the fixture from the current configuration: that would assert only that the new gate ' +
+      'covers what the new gate covers.'
   );
+
+  // And the expansion must be alive. An expander that returned nothing would make the subset
+  // check above pass for every possible fixture.
+  assert.ok(
+    selectable.size >= LEGACY_GATE_FILE_COUNT,
+    `the frozen argv expanded to ${selectable.size} file(s), fewer than the ${LEGACY_GATE_FILE_COUNT} ` +
+      'it selected when it was frozen. It cannot have shrunk below the committed list without ' +
+      'the check above firing, so the expander itself has stopped working.'
+  );
+});
+
+// Named sentinels from each group the old gate covered, so an emptied or truncated fixture cannot
+// pass the assertions above by describing a smaller gate than the one that existed.
+test('the frozen fixture still describes the whole of the old gate', () => {
+  for (const sentinel of [
+    'src/systems/CraftingEngine.js',
+    'src/toolBreakageRuntime.js',
+    'src/migration/MigrationRunner.js',
+    'scripts/lib/semver.js',
+    'scripts/visual-parity/extract.mjs',
+  ]) {
+    assert.ok(
+      LEGACY_GATE_FILES.includes(sentinel),
+      `${sentinel} was covered by the old enumerated gate and is missing from the fixture`
+    );
+  }
 });
 
 test('the frozen-argv expander refuses a pattern it does not understand', () => {
@@ -166,6 +211,49 @@ test('the ignored-path check can actually fail', async () => {
     overrideConfig: [{ ignores: ['src/**'] }, {}],
   });
   assert.equal(await eslint.isPathIgnored(LEGACY_GATE_FILES.find((f) => f.startsWith('src/'))), true);
+});
+
+test('the config still SELECTS .svelte, which is not selected by default', async () => {
+  // `isPathIgnored` answers "is this path excluded", which is NOT the question `eslint .` asks.
+  // Directory expansion visits a file only when ESLint SELECTS its extension; a file it does not
+  // select is not ignored, it is simply never visited — and `calculateConfigForFile` still reports
+  // `no-undef` armed on it from the universal `js.configs.recommended` block, so every other
+  // assertion in this file stays green while the corpus quietly shrinks.
+  //
+  // MEASURED, because the obvious version of this test is wrong in both directions. A fixture
+  // directory holding `a.js`, `b.mjs`, `c.ts` and `d.svelte`, linted through `lintFiles(['.'])`:
+  //
+  //   - `.js`, `.mjs` and `.cjs` are selected with NO `files` pattern naming them. They are
+  //     ESLint's defaults, so stripping `.mjs` from every glob in this config changes nothing —
+  //     an earlier version of this test asserted otherwise and passed under exactly that mutation.
+  //   - `.ts` is never selected, and `.svelte` is selected ONLY while some block's `files` pattern
+  //     names it. Remove block 8's `files: ['**/*.svelte']` and 329 components leave `npm run
+  //     lint` in silence.
+  //
+  // So `.svelte` is the extension worth a guard, and it is the one this asserts. Reading the
+  // patterns as strings would not do it either: block 6b lists `scripts/foundry-version-assert.mjs`
+  // literally, so a substring test for an extension is satisfied by one named file while the
+  // extension as a whole is unreachable. ESLint is asked instead, and asked with a DIRECTORY —
+  // an explicit file path is linted whatever its extension, so a per-file probe answers a
+  // different question and always passes.
+  const componentDirectory = 'src/ui/svelte/apps/gathering';
+  const results = await new ESLint().lintFiles([componentDirectory]);
+  const components = results.filter((result) => result.filePath.endsWith('.svelte'));
+  assert.ok(
+    components.length > 0,
+    `expanding ${componentDirectory}/ the way \`eslint .\` does yielded no .svelte file, so no ` +
+      '`files` pattern selects that extension any more. Components are not ignored — they are ' +
+      'never visited, which no ignore or armed-rule check here can see.'
+  );
+
+  // And the probe directory must still hold components, or the assertion above is measuring an
+  // empty tree rather than the config.
+  assert.ok(
+    readdirSync(path.join(REPOSITORY_ROOT, componentDirectory)).some((entry) =>
+      entry.endsWith('.svelte')
+    ),
+    `${componentDirectory}/ holds no components any more; point this probe at a directory that does`
+  );
 });
 
 test('no-undef is armed on every file the legacy gate covered', async () => {
@@ -257,10 +345,20 @@ test('every baselined file and rule is real', async () => {
 
   // A misspelled rule name disables nothing and is invisible: ESLint does not complain about an
   // unknown rule set to `off`. So the names are checked against the rules ESLint actually knows.
-  const known = new Set((await new ESLint().calculateConfigForFile('src/main.js')) && []);
+  //
+  // SEEDED FROM A FILE WITH NO DEBT ENTRY. A file that has one carries its own disables in the
+  // resolved config, so a typo inside that entry would be "known" because it is in the config —
+  // the check would certify exactly the entries it is meant to police.
+  const known = new Set();
   const { builtinRules } = await import('eslint/use-at-your-own-risk');
   for (const name of builtinRules.keys()) known.add(name);
-  const config = await new ESLint().calculateConfigForFile('src/main.js');
+  const clean = 'src/systems/CraftingEngine.js';
+  assert.equal(
+    Object.values(ESLINT_DEBT).some((group) => clean in group),
+    false,
+    `${clean} now carries a debt entry, so seeding from it would let a typo certify itself`
+  );
+  const config = await new ESLint().calculateConfigForFile(clean);
   for (const name of Object.keys(config.rules)) known.add(name);
   const unknown = [
     ...new Set([...Object.values(ESLINT_DEBT).flatMap((g) => Object.values(g).flat()), ...ESLINT_TESTS_DEBT]),
@@ -291,7 +389,7 @@ test('every file the legacy format gate covered is still formatted', async () =>
 });
 
 test('the formatting-debt section only shrinks', async () => {
-  const entries = prettierDebtEntries();
+  const entries = prettierIgnoreSections().debt;
   assert.equal(
     entries.length,
     PRETTIER_DEBT_COUNT,
@@ -325,6 +423,37 @@ test('the formatting-debt section only shrinks', async () => {
     'these files are already Prettier-clean, so their .prettierignore entries do nothing but ' +
       'keep them out of the gate. Remove them and lower PRETTIER_DEBT_COUNT in the same commit.'
   );
+});
+
+test('the permanent Prettier exclusions are pinned, so a new one is a visible edit', () => {
+  // The debt section below the marker is counted, staleness-checked and pinned. Everything ABOVE
+  // the marker was not, and that half is the easier hiding place precisely because it reads as
+  // settled policy rather than as debt: appending `src/ui/svelte/stores/` there takes 60-odd files
+  // out of `format:check` with no number moving anywhere.
+  //
+  // The superset assertion does not catch it either. Its population is what the OLD enumerated
+  // `format:check` reached, so any path that gate never named — a `.js` file under `src/ui/`, a
+  // new `scripts/*.mjs`, anything under `tests/` — can be excluded here and stay invisible.
+  //
+  // So this half is pinned by equality, exactly as the ESLint global `ignores` are. Adding an
+  // exclusion is then an edit to this list, which a reviewer sees and has to accept.
+  assert.deepEqual(prettierIgnoreSections().permanent, [
+    'dist/',
+    'node_modules/',
+    'coverage/',
+    'docs/_site/',
+    'docs/vendor/',
+    'docs/.jekyll-cache/',
+    'package-lock.json',
+    '**/*.min.js',
+    '**/*.min.css',
+    '*.md',
+    '.github/',
+    'openspec/',
+    'docs/',
+    'benchmarks/baselines/',
+    'styles/fabricate.css',
+  ]);
 });
 
 test('ESLint ignores every tree git ignores', async () => {
@@ -372,7 +501,12 @@ test('the global ignores are pinned, so a new exclusion is a visible edit', asyn
   // hand-maintained allowlist this change removed: somewhere to put a file so that nothing looks
   // at it. Pinning the list means parking a real source tree there costs an edit to this test.
   const { default: config } = await import('../eslint.config.js');
-  const globalIgnores = config.filter((block) => block.ignores && Object.keys(block).length === 1);
+  // `block.ignores && Object.keys(block).length === 1` would miss `{ name, ignores }`, which
+  // ESLint also treats as a global ignore — so a named block could park a whole tree outside the
+  // gate while the pin below still saw exactly one ignores block and passed.
+  const globalIgnores = config.filter(
+    (block) => block.ignores && !block.files && !block.rules && !block.languageOptions
+  );
   assert.equal(globalIgnores.length, 1, 'there should be exactly one global-ignores block');
   assert.deepEqual(globalIgnores[0].ignores, [
     'dist/',
@@ -392,6 +526,55 @@ test('the global ignores are pinned, so a new exclusion is a visible edit', asyn
     '**/*.min.js',
     'package-lock.json',
   ]);
+});
+
+test('tests/helpers/ still holds no suite, which seventeen files reason from', () => {
+  // THE OLD GLOB EXCLUDED `tests/helpers/` BY CONSTRUCTION. `npm test` named the top-level
+  // `tests/*.test.js` plus a fixed set of subdirectories, and `helpers` was not among them. That
+  // is not incidental — it is stated as a structural fact in about seventeen places, and three
+  // suites (`tests/ratchet-baseline.test.js`, `tests/source-scan.test.js`,
+  // `tests/style-block-scan.test.js`) exist BECAUSE of it: a helper cannot test itself there, so
+  // its coverage lives in a sibling file.
+  //
+  // `tests/**/*.test.js` matches `tests/helpers/*.test.js`, so the guarantee those files rely on
+  // stopped being enforced by the glob. Nothing under `tests/helpers/` is named `*.test.js`
+  // today, so behaviour is unchanged — but the invariant has to be asserted somewhere now, or it
+  // is only a convention that seventeen comments describe as a rule.
+  //
+  // It matters beyond tidiness: helpers do real work at import (`tests/helpers/langBackedI18n.js`
+  // reads `lang/en.json`), so a helper collected as a suite would run that work under the test
+  // runner's concurrency rather than under the suite that meant to use it.
+  const suites = readdirSync(path.join(REPOSITORY_ROOT, 'tests/helpers'), { recursive: true })
+    .map((entry) => String(entry).split(String.fromCodePoint(92)).join('/'))
+    .filter((entry) => entry.endsWith('.test.js'));
+  assert.deepEqual(
+    suites,
+    [],
+    'a suite under tests/helpers/ is collected by `npm test` now that the glob is recursive, and ' +
+      'about seventeen files state that it cannot be. Name it `*.test.js` under tests/ proper, ' +
+      'or drop the `.test` from the filename.'
+  );
+});
+
+test('the staleness ratchet is actually wired into CI', () => {
+  // `npm run lint:debt` is the ONLY thing that enforces "the baseline only shrinks" — this file
+  // deliberately holds the cheap half and not that one. So an unasserted CI step is the weakest
+  // link in the whole design: four lines of YAML could retire the ratchet with every test here
+  // green, and nothing would say so until someone noticed the baseline had not moved in months.
+  //
+  // `tests/svelte-warning-scope.test.js` already treats "CI stops running it" as one of the ways
+  // its own gate goes quiet, and parses the workflow to rule it out. Same shape here.
+  const workflow = readFileSync(path.join(REPOSITORY_ROOT, '.github/workflows/ci.yml'), 'utf8');
+  assert.match(
+    workflow,
+    /^\s*lint-debt:$/mu,
+    'ci.yml no longer defines the `lint-debt` job, so nothing checks the baseline for stale entries'
+  );
+  assert.match(
+    workflow,
+    /run: npm run lint:debt$/mu,
+    'ci.yml no longer invokes `npm run lint:debt`, so the baseline can grow stale unnoticed'
+  );
 });
 
 test('the npm scripts are globs, and short enough to read', () => {

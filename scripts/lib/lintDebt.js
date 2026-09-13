@@ -22,5 +22,17 @@ export function debtFiles() {
 /** This repository's config with the debt blocks removed, and nothing else changed. */
 export function configWithoutDebt() {
   const debt = new Set(DEBT_BLOCKS);
-  return config.filter((block) => !debt.has(block));
+  const without = config.filter((block) => !debt.has(block));
+  // The subtraction is by reference, which is exact — but only while `eslint.config.js` spreads
+  // the same objects. A later `...DEBT_BLOCKS.map((block) => ({ ...block }))` would make this a
+  // no-op, and the resulting failure is `lint:debt` announcing that every baseline entry reports
+  // nothing any more: true, misdirecting, and it sends the author to delete the baseline.
+  if (config.length - without.length !== DEBT_BLOCKS.length) {
+    throw new Error(
+      `removed ${config.length - without.length} of ${DEBT_BLOCKS.length} debt blocks from the ` +
+        'config. They are subtracted by object identity, so eslint.config.js must spread ' +
+        'DEBT_BLOCKS itself rather than a copy of it.'
+    );
+  }
+  return without;
 }

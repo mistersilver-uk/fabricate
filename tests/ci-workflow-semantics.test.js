@@ -87,6 +87,7 @@ test('CI semantically isolates edited metadata runs and fully gates ready_for_re
     'check-screenshots',
     'lint',
     'lint-commits',
+    'lint-debt',
     'unit-tests',
     'validate-bindings',
   ]);

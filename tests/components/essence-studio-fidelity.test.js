@@ -655,7 +655,10 @@ describe('essence studio prototype fidelity (issue 1036)', () => {
     // cannot be reached rather than a capability.
     for (const prop of ['showEffectiveKicker', 'showIdentity', 'showLiveNote']) {
       assert.ok(
-        !new RegExp(`${prop}\s*=`).test(previewSource),
+        // `\\s`, not `\s`: this is a TEMPLATE LITERAL, so a single backslash is a string escape
+        // that yields a bare `s` — the pattern was `showIdentitys*=` and matched nothing for four
+        // months, which is the shape of an assertion that passes for the wrong reason (issue #1660).
+        !new RegExp(`${prop}\\s*=`).test(previewSource),
         `${prop} is declared with no call site that passes it`
       );
     }

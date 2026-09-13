@@ -348,7 +348,7 @@ test('every crafting-system export fixture in tests/fixtures survives the differ
   const { fileURLToPath } = await import('node:url');
   const here = dirname(fileURLToPath(import.meta.url));
   const fixtureRoot = resolve(here, 'fixtures');
-  let names = [];
+  let names;
   try {
     names = readdirSync(fixtureRoot).filter((name) => name.endsWith('.json'));
   } catch {

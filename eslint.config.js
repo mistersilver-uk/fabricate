@@ -449,7 +449,7 @@ export default [
   //    ratchet and then fail `no-undef` on `require`, having missed this block's
   //    Node globals.
   {
-    files: ['scripts/**/*.{js,mjs,cjs}', '*.config.js', 'eslint.config.js'],
+    files: ['scripts/**/*.{js,mjs,cjs}', '*.config.js', 'eslint.config.js', 'eslint.debt.js'],
     languageOptions: {
       globals: { ...globals.node },
     },
@@ -540,10 +540,19 @@ export default [
     },
   },
 
-  // 8. Svelte components (Svelte 5 runes). This block IS gated: `npm run
-  //    lint:svelte` runs it over every `.svelte` file under `src/` as its own
-  //    step of the required `lint` CI job, so a new finding here fails the
-  //    build. It runs with `--max-warnings=0`, which matters because
+  // 8. Svelte components (Svelte 5 runes). This block IS gated, twice over as of
+  //    issue #1660: `npm run lint` is `eslint .`, and `**/*.svelte` below is what
+  //    makes ESLint SELECT that extension at all during directory expansion — a
+  //    `.js`/`.mjs`/`.cjs` file is selected by default, a `.svelte` one only
+  //    because some block names it here. Remove this `files` pattern and 329
+  //    components leave the gate in silence, which is why
+  //    `tests/lint-coverage.test.js` probes a real component directory for it.
+  //
+  //    `npm run lint:svelte` runs the same rules over `src/**/*.svelte` as its own
+  //    step of the required `lint` CI job. It is a strict subset of `lint` now and
+  //    therefore duplicated work; it is kept because it is the focused command to
+  //    run while working on a component, and because its findings are attributable
+  //    to one step rather than to a repository-wide sweep. It runs with `--max-warnings=0`, which matters because
   //    `svelte.configs.recommended` ships two WARN-level rules
   //    (`svelte/no-at-debug-tags`, `svelte/no-inspect`) — without the flag a
   //    stray `{@debug}` tag or a leftover `$inspect()` would report and the job
