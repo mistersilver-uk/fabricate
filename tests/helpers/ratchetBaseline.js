@@ -37,6 +37,7 @@
  * This file is deliberately NOT named `*.test.js`: `tests/helpers/` is outside the `npm test`
  * glob. Its guarantees are proved from inside the glob by `tests/ratchet-baseline.test.js`.
  */
+import { readFileSync, writeFileSync } from 'node:fs';
 
 /**
  * Tally observed keys.
@@ -199,4 +200,106 @@ export function assertRatchet({
       ) +
       `\n\n${guidance}`
   );
+}
+
+/**
+ * The spine both exact-count ledger gates share (issues 1657, 1658): read a pinned `key -> count`
+ * map, compare a freshly built one against it in BOTH directions, and describe the drift so a
+ * reader can act on it. Hand-rolling a second copy is what SonarCloud's duplication detector
+ * counts, and its detector normalizes string literals, so differing key names would not hide it.
+ *
+ * @param {object} actual Freshly derived `key -> count`.
+ * @param {object} expected The pinned ledger.
+ * @param {{subject: string, regenerate: string, structuralHint: string, roseHint: string,
+ *   fellHint: string}} wording `structuralHint` speaks to a key appearing or vanishing, which is
+ *   a different event from a count moving and needs each gate's own guidance.
+ * @returns {string|undefined} A message, or undefined when the two agree.
+ */
+export function describeLedgerDrift(actual, expected, wording) {
+  const added = Object.keys(actual)
+    .filter((key) => !(key in expected))
+    .sort(byCodePoint);
+  const removed = Object.keys(expected)
+    .filter((key) => !(key in actual))
+    .sort(byCodePoint);
+  if (added.length > 0 || removed.length > 0) {
+    return (
+      `the set of ${wording.subject} changed — added: [${added.join(', ')}], ` +
+      `removed: [${removed.join(', ')}]. ${wording.structuralHint} These gates scan the working ` +
+      'tree, not the git index, so a stray untracked file under a scanned root is the other ' +
+      `likely cause (\`git status\` will show it). Re-derive with ${wording.regenerate}.`
+    );
+  }
+  const changed = Object.keys(expected)
+    .filter((key) => actual[key] !== expected[key])
+    .sort(byCodePoint)
+    .map((key) => `${key}: pinned ${expected[key]} -> actual ${actual[key]}`);
+  if (changed.length === 0) return undefined;
+  return (
+    `${wording.subject} drifted: ${changed.join('; ')}. This gate fails in both directions: a ` +
+    `count that ROSE ${wording.roseHint}, and a count that FELL ${wording.fellHint}. ` +
+    `Re-derive with ${wording.regenerate}.`
+  );
+}
+
+/**
+ * One exact-count ledger gate (issues 1657, 1658). Two gates of this shape now exist and a third
+ * is planned, so the scaffolding lives here rather than being re-authored per gate: SonarCloud
+ * counts `tests/**` duplication at full weight and normalizes string literals, so differing key
+ * names and prose would not hide a second copy.
+ *
+ * The ledger is a TAB-SEPARATED TABLE, not JSON. Normalized for duplication detection, every row
+ * of a `{"path": count}` object is the same token sequence, so a ledger of a few hundred entries
+ * reads as heavily duplicated against any other ledger and against itself — measured at 6.9% of
+ * new code against a 3% gate. `sonar.cpd.exclusions` is inert under Automatic Analysis, so the
+ * fix is the format: a data table is data, and a text table is not parsed as source at all.
+ *
+ * The caller supplies only what differs: where the ledger lives, which environment variable
+ * re-derives it, how to build a fresh one, and the wording of its drift message.
+ *
+ * @param {{ledgerPath: string, regenerateEnv: string, build: () => object,
+ *   wording: object}} options
+ */
+/** Read a tab-separated ledger back into a `key -> count` map. */
+export function parseLedger(text) {
+  const entries = [];
+  for (const line of String(text).split('\n')) {
+    if (line.trim() === '') continue;
+    const separator = line.lastIndexOf('\t');
+    entries.push([line.slice(0, separator), Number(line.slice(separator + 1))]);
+  }
+  return Object.fromEntries(entries);
+}
+
+/** Write a `key -> count` map as a tab-separated ledger, ordered so a diff reads cleanly. */
+export function formatLedger(ledger) {
+  return `${Object.entries(ledger)
+    .sort(([left], [right]) => byCodePoint(left, right))
+    .map(([key, count]) => `${key}\t${count}`)
+    .join('\n')}\n`;
+}
+
+export function ledgerGate({ ledgerPath, regenerateEnv, build, wording }) {
+  let cached;
+  const current = () => {
+    cached ??= build();
+    return cached;
+  };
+  return {
+    current,
+    /** The pinned ledger as committed. */
+    pinned: () => parseLedger(readFileSync(ledgerPath, 'utf8')),
+    /** True when this run rewrote the ledger instead of asserting against it. */
+    regenerated: () => Boolean(process.env[regenerateEnv]),
+    /** Assert the fresh ledger against the pinned one, or rewrite it when regenerating. */
+    check(assert) {
+      const actual = current();
+      if (process.env[regenerateEnv]) {
+        writeFileSync(ledgerPath, formatLedger(actual));
+        return;
+      }
+      const expected = parseLedger(readFileSync(ledgerPath, 'utf8'));
+      assert.deepStrictEqual(actual, expected, describeLedgerDrift(actual, expected, wording));
+    },
+  };
 }

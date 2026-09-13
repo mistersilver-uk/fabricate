@@ -1,21 +1,20 @@
 /**
  * Ratchets the comment-line share per directory (issue 1657), so Phase 1 sweeps of this epic
- * can each lower `tests/comment-share-ledger.json` without a later sweep silently re-growing it.
+ * can each lower `tests/comment-share-ledger.txt` without a later sweep silently re-growing it.
  * Root roll-ups are derived here and printed on mismatch; the ledger itself pins directories only.
  * This file is itself in the `tests` bucket it pins, so editing these comments moves that number.
  */
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { test } from 'node:test';
 
-import { byCodePoint } from './helpers/ratchetBaseline.js';
+import { byCodePoint, ledgerGate } from './helpers/ratchetBaseline.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 
 // `readFileSync` + `JSON.parse`, not `import ... with { type: 'json' }`: this repo's ESLint
 // parser rejects the import-attribute syntax, as `scripts/lib/designSystemPrimitives.js` notes.
-const LEDGER_PATH = resolve(import.meta.dirname, 'comment-share-ledger.json');
-const LEDGER = JSON.parse(readFileSync(LEDGER_PATH, 'utf8'));
+const LEDGER_PATH = resolve(import.meta.dirname, 'comment-share-ledger.txt');
 
 /** The command that re-derives the ledger, named in every drift message so it is actionable. */
 const REGENERATE =
@@ -223,11 +222,6 @@ function buildLedger(corpus) {
 }
 
 /** One corpus walk per run: three assertions read it, and the tree is ~550 files. */
-let cachedLedger;
-function currentLedger() {
-  cachedLedger ??= buildLedger(collectWorkingTreeSources(SCAN_ROOTS, SCAN_EXTENSIONS));
-  return cachedLedger;
-}
 
 function rollUpByRoot(ledger) {
   const rollup = {};
@@ -236,41 +230,6 @@ function rollUpByRoot(ledger) {
     rollup[root] = (rollup[root] ?? 0) + count;
   }
   return rollup;
-}
-
-/**
- * `collectWorkingTreeSources` walks the working tree, not the git index, so a stray untracked
- * file under a scanned root counts here before it is ever committed — the likely cause of a
- * structural mismatch below, named ahead of a real regression.
- */
-function describeStructuralDrift(actual, expected) {
-  const added = Object.keys(actual)
-    .filter((key) => !(key in expected))
-    .sort(byCodePoint);
-  const removed = Object.keys(expected)
-    .filter((key) => !(key in actual))
-    .sort(byCodePoint);
-  if (added.length === 0 && removed.length === 0) return undefined;
-  return (
-    `directory set changed — added: [${added.join(', ')}], removed: [${removed.join(', ')}]. ` +
-    'A stray untracked file under src/, tests/, scripts/, or styles/ is the likely cause before a ' +
-    'real regression, because this corpus is the working tree, not the git index (`git status` ' +
-    `will show it). If the change is real, re-derive with ${REGENERATE}.`
-  );
-}
-
-function describeValueDrift(actual, expected) {
-  const changed = Object.keys(expected)
-    .filter((key) => key in actual && actual[key] !== expected[key])
-    .sort(byCodePoint)
-    .map((key) => `${key}: pinned ${expected[key]} -> actual ${actual[key]}`);
-  if (changed.length === 0) return undefined;
-  return (
-    `comment-line counts drifted on existing directories: ${changed.join('; ')}. This gate fails ` +
-    'in both directions: a count that ROSE needs justification or a revert, and a count that FELL ' +
-    'needs the ledger lowered to bank the win. One key down and another up by the same amount is ' +
-    `a file moved between two existing directories, not a regression. Re-derive with ${REGENERATE}.`
-  );
 }
 
 /**
@@ -302,22 +261,31 @@ function findSymlinkedDirectories(root) {
   return found;
 }
 
+const gate = ledgerGate({
+  ledgerPath: LEDGER_PATH,
+  regenerateEnv: 'UPDATE_COMMENT_SHARE_LEDGER',
+  build: () => buildLedger(collectWorkingTreeSources(SCAN_ROOTS, SCAN_EXTENSIONS)),
+  wording: {
+    subject: 'comment-line counts per directory',
+    regenerate: REGENERATE,
+    structuralHint: 'A directory appears or vanishes as its files are created, renamed or emptied.',
+    roseHint: 'needs justification or a revert',
+    fellHint:
+      'needs the ledger lowered to bank the win; one key down and another up by the same amount ' +
+      'is a file moved between directories, not a regression',
+  },
+});
+
 test('the comment-line ledger matches the pinned baseline exactly, per directory', () => {
-  const actual = currentLedger();
-  if (process.env.UPDATE_COMMENT_SHARE_LEDGER) {
-    writeFileSync(LEDGER_PATH, `${JSON.stringify(actual, null, 2)}\n`);
-    return;
-  }
-  const message = describeStructuralDrift(actual, LEDGER) ?? describeValueDrift(actual, LEDGER);
-  assert.deepStrictEqual(actual, LEDGER, message);
+  gate.check(assert);
 });
 
 /** Prints the four numbers epic 1656's definition of done reads; it cannot fail alone. */
 test('the ledger reports as the root-level roll-up epic 1656 tracks', (t) => {
-  // The regeneration run rewrote the file the pinned copy above was read from, so this comparison
-  // is against a stale constant and means nothing until the next run.
-  if (process.env.UPDATE_COMMENT_SHARE_LEDGER) return t.skip('ledger regenerated this run');
-  assert.deepStrictEqual(rollUpByRoot(currentLedger()), rollUpByRoot(LEDGER));
+  // A regeneration run has just rewritten the file, so comparing against it proves nothing until
+  // the next run.
+  if (gate.regenerated()) return t.skip('ledger regenerated this run');
+  assert.deepStrictEqual(rollUpByRoot(gate.current()), rollUpByRoot(gate.pinned()));
 });
 
 test('none of the four scanned roots contains a symlinked directory', () => {
