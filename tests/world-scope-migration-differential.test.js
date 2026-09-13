@@ -23,6 +23,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { mergeEquivalentWorldEssences } from '../src/migration/mergeEquivalentWorldEssences.js';
 import { migrateWorldScopeEntities } from '../src/migration/migrateWorldScopeEntities.js';
 import { SCOPE_PAYLOAD_KEYS } from '../src/migration/migrateWorldScopeEntities.js';
 import {
@@ -36,6 +37,8 @@ import { resolveScopedDefinition } from '../src/systems/scopedDefinitions.js';
 import { TOOL_SCOPE } from '../src/systems/toolScope.js';
 import { reportWorldIdentityDrift } from '../src/systems/worldIdentityDrift.js';
 import {
+  buildRawCorpus,
+  canonicaliseProjection,
   installFoundryStubs,
   malformedCorpus,
   normalizeCorpus,
@@ -492,7 +495,11 @@ test('an essence whose ONLY source spelling is `sourceItemUuid` survives the re-
 
   const manager = new CraftingSystemManager({ getRecipes: () => [] });
   const essence = manager._normalizeSystem(migratedYounger).essenceDefinitions[0];
-  assert.equal(essence.sourceComponentId, 'comp-1', 'the effect source still RESOLVES after hydrate');
+  assert.equal(
+    essence.sourceComponentId,
+    'comp-1',
+    'the effect source still RESOLVES after hydrate'
+  );
   assert.equal(essence.associatedSystemItemId, 'comp-1', 'and the transitional alias follows it');
   assert.equal(
     essence.sourceItemUuid,
@@ -1025,5 +1032,240 @@ test('idempotence (c) the refusal: an image that overlaps its key set REFUSES th
       { id: 'comp-2', name: 'B2' },
     ],
     'a refused pair is byte-identical to its input: no re-key AND no identity write-back'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// The `1.30.0` -> `1.34.0` corpus differential (issue 1654)
+// ---------------------------------------------------------------------------
+
+/**
+ * The world-wide loser-to-survivor lookup a produced `1.34.0` merge map carries.
+ *
+ * Read off the map the migration actually wrote, never re-derived — the discipline
+ * {@link canonicaliseProjection} states for the import map: a canonicaliser that recomputed the
+ * mapping would agree with a wrong merge by construction.
+ *
+ * @param {object} mergeMapSetting The `fabricate.worldEssenceMergeMap` value.
+ * @returns {Map<string, string>}
+ */
+function essenceMergeIds(mergeMapSetting) {
+  const ids = new Map();
+  for (const legs of Object.values(mergeMapSetting?.systems ?? {})) {
+    for (const [loserId, survivorId] of Object.entries(legs.essences ?? {})) {
+      ids.set(loserId, survivorId);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Fold every `essences` quantity map a projection carries onto the survivor keys, summing a
+ * collision because the survivor carries both merged contributions.
+ *
+ * `canonicaliseProjection` rewrites ids in value position only, which is the whole of an entity
+ * re-key; an essence merge also moves ids in key position inside a `Record<essenceId, number>`, and
+ * a canonicaliser rewriting object keys generically would rewrite a matching salvage group id.
+ *
+ * @param {Record<string, object>} projection A `projectEntities` result.
+ * @param {Map<string, string>} ids
+ * @returns {Record<string, object>}
+ */
+function foldEssenceQuantities(projection, ids) {
+  const folded = {};
+  for (const [key, record] of Object.entries(projection)) {
+    if (!record?.essences || typeof record.essences !== 'object') {
+      folded[key] = record;
+      continue;
+    }
+    const essences = {};
+    for (const [essenceId, quantity] of Object.entries(record.essences)) {
+      const target = ids.get(essenceId) ?? essenceId;
+      essences[target] = (essences[target] ?? 0) + quantity;
+    }
+    folded[key] = { ...record, essences };
+  }
+  return folded;
+}
+
+test('the `1.30.0` -> `1.34.0` differential: per-system resolved behaviour is unchanged but for the merge', () => {
+  // The same criterion one migration later, over the corpus issue 1654 reports: two systems whose
+  // "Iron" arrived under unrelated ids, because `adminStore.addEssence` mints a
+  // `crypto.randomUUID()` and `1.30.0` groups essences by trimmed `id`.
+  //
+  // The source items are deliberately not shared, so `1.30.0` merges no component and no tool and
+  // everything this differential sees is attributable to the essence merge alone.
+  const raw = buildRawCorpus({
+    seed: 1654,
+    systems: [
+      {
+        id: 'sys-a',
+        components: [{ id: 'comp-1', refs: ['Item.aaa'] }],
+        // `_normalizeEssenceDefinition` lowercases every id it emits, so a mixed-case fixture
+        // arrives at `1.34.0` under a different id than it was authored with.
+        essences: [{ id: 'iron', name: 'Iron' }],
+        tools: [{ id: 'tool-1', refs: ['Item.ccc'] }],
+      },
+      {
+        id: 'sys-b',
+        components: [{ id: 'comp-9', refs: ['Item.bbb'] }],
+        essences: [{ id: 'ktz9qplm2xr4vb1a', name: 'Iron' }],
+        tools: [{ id: 'tool-9', refs: ['Item.ddd'] }],
+      },
+    ],
+  });
+  const before = normalizeCorpus(CraftingSystemManager, raw);
+  const lifted = migrateAndSave(before);
+
+  // `1.34.0` runs over `1.30.0`'s output, back to back in one chain, exactly as `MigrationRunner`
+  // threads them. The before leg of the differential is the durable state that output occupies —
+  // `lifted.saved`, past the real normalize-and-save seam.
+  const merged = mergeEquivalentWorldEssences({ ...lifted.migrated, worldEssenceMergeMap: {} });
+  const report = merged._worldEssenceMergeReport;
+  assert.equal(
+    report.mergedGroups.length,
+    1,
+    'the premise: `1.30.0` really did leave two world essences behind for one behaviour'
+  );
+  assert.deepEqual(report.refusals, []);
+  assert.deepEqual(report.declined, []);
+
+  const after = saveRoundTrip(CraftingSystemManager, {
+    recipes: merged.recipes,
+    systems: merged.systems,
+    gatheringConfig: merged.gatheringConfig,
+    componentScope: merged.componentScope,
+    essenceScope: merged.essenceScope,
+    toolScope: lifted.migrated.toolScope,
+  });
+
+  // Projection (a): every field a production reader consumes, per `(system, entity)` pair, read
+  // through the scope resolvers on both legs and canonicalised through the map the merge actually
+  // wrote, so a successful re-key is invisible and a missed one is a difference.
+  const ids = essenceMergeIds(merged.worldEssenceMergeMap);
+  assert.equal(ids.size, 1, 'the premise: exactly one essence id was retired');
+  const beforeEntities = foldEssenceQuantities(
+    canonicaliseProjection(projectEntities(CraftingSystemManager, lifted.saved, true), {
+      ids,
+      systemIds: new Map(),
+    }),
+    ids
+  );
+  assert.deepEqual(
+    projectEntities(CraftingSystemManager, after, true),
+    beforeEntities,
+    'every system resolves exactly what it resolved before, under the survivor id'
+  );
+
+  // Projection (b) is the guard here rather than the subject: it resolves component and tool
+  // references, and an essence merge must move none of them — a pass that re-keyed a component id
+  // while merging essences would be invisible to (a), whose reference leaves are scrubbed.
+  //
+  // Its values are projected component records, so they carry the `essences` quantity map this
+  // merge re-keys; the same fold applies, and a site whose component identity moved still shows
+  // every other field, so the fold cannot hide one.
+  assert.deepEqual(
+    projectReferenceClosure(CraftingSystemManager, after, true),
+    foldEssenceQuantities(projectReferenceClosure(CraftingSystemManager, lifted.saved, true), ids),
+    'an essence merge moves no component or tool reference at all'
+  );
+
+  // And the exception the report names, which is the whole of the "except" clause: exactly the
+  // world essence the report retires is gone from the roster, and nothing else is.
+  const byCodePoint = (left, right) => (left < right ? -1 : Number(left > right));
+  const rosterOf = (payload) =>
+    (payload.entities ?? []).map((entity) => entity.id).sort(byCodePoint);
+  assert.deepEqual(
+    rosterOf(merged.essenceScope),
+    rosterOf(lifted.migrated.essenceScope).filter((id) => !ids.has(id)),
+    'the world roster loses exactly the ids the report names, and keeps every other'
+  );
+  assert.deepEqual(
+    report.mergedGroups.map((group) => [group.survivorId, group.loserIds]),
+    [['iron', [...ids.keys()]]],
+    'and the surviving id is the one every re-keyed reference now names'
+  );
+});
+
+test('the `1.34.0` merge leaves the `1.30.0` drift detector exactly as it found it', () => {
+  // Requirement 8a is a disclosure, not a bug, and the registry `label` says so — but this corpus
+  // must not trigger it, or the assertion above would read a drift report as a behaviour change.
+  // The two systems author the same presentation, so `reportWorldIdentityDrift` is empty on both.
+  const raw = buildRawCorpus({
+    seed: 1654,
+    systems: [
+      { id: 'sys-a', components: [], essences: [{ id: 'iron', name: 'Iron' }], tools: [] },
+      {
+        id: 'sys-b',
+        components: [],
+        essences: [{ id: 'w7yh2ndfs0jq6xe3', name: 'Iron' }],
+        tools: [],
+      },
+    ],
+  });
+  const lifted = migrateAndSave(normalizeCorpus(CraftingSystemManager, raw));
+  const merged = mergeEquivalentWorldEssences({ ...lifted.migrated, worldEssenceMergeMap: {} });
+  const scopeCorpus = {
+    components: merged.componentScope,
+    essences: merged.essenceScope,
+    tools: lifted.migrated.toolScope,
+  };
+  assert.equal(merged._worldEssenceMergeReport.mergedGroups.length, 1, 'the premise: it merged');
+  assert.deepEqual(
+    reportWorldIdentityDrift(merged.systems, scopeCorpus),
+    [],
+    'two systems that agree about presentation still agree after the merge'
+  );
+});
+
+test('the `1.34.0` merge makes the drift detector report the disagreement it promises', () => {
+  // The zero case above is not the claim: requirement 8a and the `1.34.0` registry `label` promise
+  // a GM that the drift report names the systems that disagree about presentation, and `icon` sits
+  // outside the equivalence key, so two systems can merge on behaviour and still disagree.
+  const raw = buildRawCorpus({
+    seed: 1654,
+    systems: [
+      { id: 'sys-a', components: [], essences: [{ id: 'iron', name: 'Iron' }], tools: [] },
+      {
+        id: 'sys-b',
+        components: [],
+        essences: [{ id: 'w7yh2ndfs0jq6xe3', name: 'Iron' }],
+        tools: [],
+      },
+    ],
+  });
+  // The one field the builder does not parameterise, set on the corpus it returns rather than
+  // through a second factory — the same rule the merge fixtures follow for a recipe or a tool.
+  raw.systems[0].essenceDefinitions[0].icon = 'fas fa-fire';
+  raw.systems[1].essenceDefinitions[0].icon = 'fas fa-flask';
+
+  const lifted = migrateAndSave(normalizeCorpus(CraftingSystemManager, raw));
+  const beforeCorpus = {
+    components: lifted.migrated.componentScope,
+    essences: lifted.migrated.essenceScope,
+    tools: lifted.migrated.toolScope,
+  };
+  assert.deepEqual(
+    reportWorldIdentityDrift(lifted.migrated.systems, beforeCorpus),
+    [],
+    'the premise: before the merge each system agrees with its OWN world entity'
+  );
+
+  const merged = mergeEquivalentWorldEssences({ ...lifted.migrated, worldEssenceMergeMap: {} });
+  const drift = reportWorldIdentityDrift(merged.systems, {
+    components: merged.componentScope,
+    essences: merged.essenceScope,
+    tools: lifted.migrated.toolScope,
+  });
+  assert.equal(merged._worldEssenceMergeReport.mergedGroups.length, 1, 'the premise: it merged');
+  assert.deepEqual(
+    drift.map((entry) => [entry.systemId, entry.entityType, entry.entityId, entry.field]),
+    [['sys-b', 'essences', 'iron', 'icon']],
+    'exactly the re-keyed system, on exactly the field outside the equivalence key'
+  );
+  assert.deepEqual(
+    [drift[0].systemValue, drift[0].worldValue],
+    ['fas fa-flask', 'fas fa-fire'],
+    'and it reports BOTH values, because the in-system copy is what every reader resolves through'
   );
 });

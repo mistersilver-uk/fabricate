@@ -510,6 +510,48 @@ It does not reach unlinked token copies that were never saved as world actors, o
 
 ---
 
+## An Item Stopped Contributing an Essence After Updating
+
+**Symptom:** After updating Fabricate, one particular item no longer counts towards an essence requirement, while other copies of the same component still do.
+You may also have seen a standing notice saying Fabricate merged sets of essences that were the same essence in more than one crafting system.
+
+**What to expect:** Fabricate now keeps one shared record per essence instead of one per crafting system, and on first load after updating it consolidated the duplicates and rewrote every reference to the records it retired.
+See [Upgrading from a version before 1.34.0]({% link essences/index.md %}#upgrading-from-a-version-before-1340).
+An ordinary component is fine, because its essence values were rewritten along with everything else.
+The exception is an **individual item carrying its own essence values**, set on that item rather than on the component, which Fabricate could only rewrite on items your characters were carrying at the time.
+Essence values on that item that still name a retired essence count for nothing, so the item contributes less than it did, or nothing at all.
+Nothing resolves to the wrong essence, because a retired essence is never reused.
+
+**Likely causes:**
+
+- The item is a **world item** in the Items directory, or lives in a **compendium**, or belongs to a **token copy that was never saved as a world actor**.
+None of those are reached.
+- The item lives in a **locked compendium** and refused the update.
+Fabricate counts how many items refused, in the notice.
+A refusal like this is not retried, because unlocking the pack later is not something Fabricate goes back to check.
+- The repair could not finish at all, which Fabricate says plainly.
+It keeps its record of what to change and retries on the next reload.
+- The essence is part of a set Fabricate **refused** to merge, in which case nothing changed for it and the cause is elsewhere.
+
+**Step-by-step checks:**
+
+1. Read the standing notice Fabricate posted on load.
+It names the sets it merged, the sets it refused and why, and counts the items that refused the update.
+It names up to five essences at a time and then says how many more there were, and it tells you where the rest of the list is.
+2. Open the item and set its essence values again, choosing the essence that survived the merge.
+Re-saving it is what replaces the retired reference.
+3. Unlock the compendium first if the item lives in one, so that setting its values again can save.
+4. If the notice said the repair was incomplete, reload your world once the cause is fixed.
+Fabricate runs the repair again on its own.
+5. Check in-progress crafting runs.
+Where Fabricate could not record a merge against a character's in-progress runs, it says so and names the essences involved.
+Finishing or cancelling those runs clears it.
+
+**See also:** [Essences]({% link essences/index.md %}#one-shared-essence-per-behaviour) covers what the shared record holds and what each crafting system keeps for itself.
+[Protecting Your Worlds]({% link technical/protecting-your-worlds.md %}#reversible-data-migrations) covers how Fabricate runs and aborts an upgrade pass.
+
+---
+
 ## Crafting App Fails to Open
 
 **Symptom:** Clicking **Craft Item** from the Items sidebar does nothing, or the Crafting App opens briefly then closes.

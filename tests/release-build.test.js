@@ -362,8 +362,11 @@ function assertBundleConsoleLine(bundle, literal, level, what) {
   // actual guarded by `tests/item-directory-manager-launch.test.js` therefore produce reports of
   // much the same size. The message below carries the diagnosis instead. A local choice for a
   // whole-bundle actual, not a rule about `assert.match`.
+  // Escaped: Rolldown allocates `$`-prefixed identifiers in a large bundle, and a raw `$` in this
+  // pattern reads as an end anchor, so the assertion can fail against a correct bundle (issue 1654).
+  const boundName = escapeForRegExp(bound[1]);
   assert.ok(
-    new RegExp(`console\\.${level}\\(\\s*${bound[1]}\\b`).test(bundle),
+    new RegExp(`console\\.${level}\\(\\s*${boundName}\\b`).test(bundle),
     `${what}: must be written at console.${level} in the built bundle`
   );
 }

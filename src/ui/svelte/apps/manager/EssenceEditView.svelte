@@ -677,10 +677,21 @@
       {:else}
         <div class="manager-essence-rules-stack">
           {#if rulesMode}
-            <!-- WHAT THIS SCREEN DOES NOT OWN, STATED FIRST, with the one route to it. -->
+            <!-- WHAT THIS SCREEN DOES NOT OWN, STATED FIRST, with the one route to it.
+
+               The callout names the world record, not this system's projection of it (issue
+               1654): `1.34.0` merges equivalent world essences and neither `icon` nor
+               `description` is in its equivalence key, so one world entity can back N in-system
+               records whose icons differ, and a pill reading `World definition` must not caption
+               a per-system glyph. `colorToken` is the one field the world overlay already carries
+               into the in-system projection (maintainer ruling M29), so `tint` keeps reading it.
+               The in-system fallbacks are unreachable from inside the `scopedKnown` guard and are
+               kept only so the expression states its own answer. -->
             <SharedDefinitionCallout
-              name={essence?.name ?? ''}
-              icon={normalizeEssenceIcon(essence?.icon || DEFAULT_ESSENCE_ICON)}
+              name={worldEntry?.entity?.name ?? essence?.name ?? ''}
+              icon={normalizeEssenceIcon(
+                worldEntry?.entity?.icon || essence?.icon || DEFAULT_ESSENCE_ICON
+              )}
               tint={normalizeEssenceColorToken(essence?.colorToken) || ''}
               pillLabel={text(
                 'FABRICATE.Admin.Manager.Scoped.Essence.WorldDefinitionPill',

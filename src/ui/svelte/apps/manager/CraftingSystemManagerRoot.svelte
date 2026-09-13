@@ -3081,15 +3081,27 @@
     worldScopeState.essence?.available === true && essenceRulesWorldEntry !== null
   );
 
-  // NAME, GLYPH AND COLOUR FOLLOW THE DRAFT and fall back to the persisted card. They are not
-  // editable on this route any more, so the draft can only carry what the record already holds —
-  // but reading the draft first keeps this heading correct for the CREATE state too, where the
-  // Identity tab is live and a heading pinned to the record would print an empty name while the
-  // GM typed one.
-  const essenceEditName = $derived(essenceEditDraft?.name || selectedEssenceStrict?.name || '');
-  const essenceEditIcon = $derived(
-    essenceEditDraft?.icon || selectedEssenceStrict?.icon || 'fas fa-mortar-pestle'
+  // Name and glyph follow the world record wherever there is one (issue 1654): `1.34.0` merges
+  // equivalent world essences and `icon` is not in the equivalence key, so one world entity can
+  // back N in-system records whose icons differ, and this route edits neither. Requirement 13
+  // forbids two medallions on one screen drawing different glyphs for one essence.
+  // `essenceRulesWorldEntry` is null for a create draft and for an unreadable corpus, which is
+  // where the draft must still lead: there the in-system record is the record.
+  const essenceEditName = $derived(
+    essenceRulesWorldEntry?.entity?.name ||
+      essenceEditDraft?.name ||
+      selectedEssenceStrict?.name ||
+      ''
   );
+  const essenceEditIcon = $derived(
+    essenceRulesWorldEntry?.entity?.icon ||
+      essenceEditDraft?.icon ||
+      selectedEssenceStrict?.icon ||
+      'fas fa-mortar-pestle'
+  );
+  // The tint needs no world read of its own (maintainer ruling M29): `adminStore`'s projection
+  // already overlays the world colour onto the in-system row's `colorToken`, so the copy the
+  // draft buffers is the world colour, and reading the draft first keeps the create state right.
   const essenceEditTint = $derived(
     essenceEditDraft?.colorToken ?? selectedEssenceStrict?.colorToken ?? ''
   );
@@ -3719,7 +3731,14 @@
 
   async function createWorldEssence() {
     const name = text('FABRICATE.Admin.Manager.Scoped.Essence.NewName', 'New essence');
-    const id = mintEssenceId(name, worldScopeState.essence?.entities ?? []);
+    // The retired leg is required here (issue 1654): this mints from a fixed placeholder name, so
+    // the id sequence is dense and every id `1.34.0` retired is otherwise reclaimable on the next
+    // press. See `mintEssenceId`.
+    const id = mintEssenceId(
+      name,
+      worldScopeState.essence?.entities ?? [],
+      worldScopeState.essence?.retiredIds ?? []
+    );
     const created = await store?.worldScope?.essence?.createEntity?.({
       id,
       name,

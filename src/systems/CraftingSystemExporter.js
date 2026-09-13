@@ -343,6 +343,25 @@ export function prepareForImport(rawData, mode = 'keep', options = null) {
     });
   }
 
+  // Kind 5: a `1.34.0` upcast refusal changes no slice, so it is indistinguishable from a bundle
+  // with nothing to merge unless it is carried here — `import-export` requires it reported rather
+  // than silent. The owner is the refused group's survivor, the id a GM can find in the Essence
+  // Catalogue; the losers ride the reference value.
+  for (const refusal of Array.isArray(upcastReport?.essenceMergeRefusals)
+    ? upcastReport.essenceMergeRefusals
+    : []) {
+    worldScopeReferences.push({
+      kind: REFERENCE_KINDS.WORLD_ESSENCE_MERGE_REFUSED,
+      ownerType: 'essence',
+      ownerId: String(refusal?.survivorId ?? ''),
+      // `name`, not `survivorName`: the refusal spreads `displayNameOf(group[0].record)`, which
+      // emits a bare `name` key and OMITS it entirely when the record has none.
+      ownerName: String(refusal?.name ?? refusal?.survivorId ?? ''),
+      referenceValue: `${(Array.isArray(refusal?.loserIds) ? refusal.loserIds : []).join(', ')} (${refusal?.reason ?? 'unknown'})`,
+      disposition: 'reported',
+    });
+  }
+
   const prepared = {
     system,
     recipes,

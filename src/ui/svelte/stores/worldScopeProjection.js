@@ -824,6 +824,26 @@ function readCorpus(store) {
 }
 
 /**
+ * The ids the `1.34.0` equivalent-essence merge retired, read as a key set from the persisted
+ * `{retired: {<retiredId>: {...}}}` leg of the `fabricate.worldEssenceMergeMap` world setting
+ * (§ Equivalent World Essence Merge in
+ * `openspec/specs/destructive-changes-and-migrations/spec.md`). Only the keys are published: a
+ * screen must not draw an essence that no longer exists.
+ *
+ * The projection carries the set so the shell can mint an essence id from state it already holds;
+ * `mintEssenceId` resolves against the live roster alone. Defensive on every leg by
+ * {@link readCorpus}'s rule — an absent, empty or hand-edited setting reads as no retired ids.
+ *
+ * @param {unknown} mergeMap the raw `fabricate.worldEssenceMergeMap` value.
+ * @returns {string[]} the retired ids in the map's own key order; `[]` when there are none.
+ */
+function retiredEssenceIds(mergeMap) {
+  const retired = mergeMap?.retired;
+  if (!retired || typeof retired !== 'object' || Array.isArray(retired)) return [];
+  return Object.keys(retired).filter((id) => id !== '');
+}
+
+/**
  * Project all three entity types from their three stores.
  *
  * Answers the top-level `worldScope` key `adminStore` publishes, ALWAYS as a new object, so a
@@ -849,9 +869,19 @@ function readCorpus(store) {
  *   supplies it from `_allRecipes()`, which it already invokes on every publish.
  * @param {Record<string, Record<string, object>>} [options.usage] Per-entity-type reference
  *   counts, keyed by entity type then entity id.
+ * @param {unknown} [options.essenceMergeMap] The raw `fabricate.worldEssenceMergeMap` world
+ *   setting (issue 1654). Nothing else in this argument can answer which essence ids `1.34.0`
+ *   retired, because the merge map is a setting of its own rather than part of a scope corpus.
+ *   Absent answers no retired ids. See {@link retiredEssenceIds}.
  * @returns {{worldScope: object}}
  */
-export function buildWorldScopeState({ stores = {}, systems = [], recipes = [], usage = {} } = {}) {
+export function buildWorldScopeState({
+  stores = {},
+  systems = [],
+  recipes = [],
+  usage = {},
+  essenceMergeMap = null,
+} = {}) {
   const worldScope = {};
   for (const entityType of WORLD_SCOPE_ENTITY_TYPES) {
     worldScope[entityType] = projectWorldScopeEntity({
@@ -886,5 +916,9 @@ export function buildWorldScopeState({ stores = {}, systems = [], recipes = [], 
     categories: worldScope.vocabulary.componentCategories.map((entry) => entry.name),
     tags: worldScope.vocabulary.componentTags.map((entry) => entry.name),
   };
+  // The essence leg carries the `1.34.0` tombstones (issue 1654) because the shell hands an
+  // essence screen only this leg. Attached unconditionally — including for an unavailable corpus
+  // — so `retiredIds` is a plain array on every publish and no reader tells absent from empty.
+  worldScope.essence.retiredIds = retiredEssenceIds(essenceMergeMap);
   return { worldScope };
 }

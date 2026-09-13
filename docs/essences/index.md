@@ -76,6 +76,56 @@ A brand-new essence is the one exception: it has no shared definition yet, so it
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
+## One shared essence per behaviour
+
+Open the Crafting System Manager and choose **Essence Catalogue** in the World section of the rail.
+It holds one record per essence.
+Two crafting systems that both use Fire point at that one record, so its name, icon, colour and description are authored once in the catalogue rather than once per system.
+What each system keeps for itself is what the essence does on craft there: its enabled switch, its active effect source, and its macro on craft.
+
+Fabricate treats two systems as meaning the same essence on three things only.
+The name, the macro on craft, and the active effect source.
+The name is compared without regard to case, so Iron and iron are the same name.
+A colour, an icon and a description are presentation, so they never decide whether two essences are the same.
+
+{: .note }
+> Fabricate does not join essences together as you author them.
+> Creating a Fire essence in a second system gives that system its own essence, and nothing merges it with the first.
+> The one time Fabricate consolidates essences for you is the upgrade below.
+
+### Upgrading from a version before 1.34.0
+
+Until this version the catalogue held a separate record for every system's copy of the same essence.
+Three systems with Iron gave you three Iron records.
+On first load after upgrading, Fabricate makes each set of matching essences one shared essence, rewrites every reference to the records it retires, and posts a standing notice describing what it did.
+
+Six things are worth knowing.
+
+- **The merge cannot be undone.**
+Each retired record is deleted along with the icon, colour and description it held in the catalogue, and rolling Fabricate back does not bring those back.
+Rolling back is otherwise lossless, so going back costs you nothing further.
+It simply does not undo the merge.
+- **No system changes behaviour.**
+Wherever a system was following the world record it is leaving, Fabricate writes that system's current active effect source and macro on craft down as its own, so the essence goes on doing exactly what it did.
+Each system also keeps the name, icon and description it gave its own copy, so what you see inside a system may not change at all.
+Where two component essence values land on the same essence, they are added together rather than one replacing the other.
+- **Fabricate refuses rather than guesses.**
+Where a merge cannot be proved safe, the whole set is left exactly as it was and named in the notice.
+Two cases reach this: two matching essences inside one crafting system, and an active effect source Fabricate cannot prove names the same component in both systems.
+Nothing changes for those essences, and the refusal is not retried on a later load.
+To merge a refused set yourself, delete the duplicate essence from the offending system's Essences screen.
+- **Essences your systems disagree about are left alone.**
+Where the systems using one record disagree about its macro on craft or its active effect source, Fabricate cannot tell whether they are one essence or several.
+It changes nothing and names them for you to review in the Essence Catalogue.
+- **Fabricate may start telling you its shared world record is out of date.**
+Because each system keeps the name, icon, colour and description it authored, those can now differ from the merged record's, and Fabricate says so once per session.
+That notice says in the same breath that each crafting system's own copy is what everything reads, so nothing is wrong and nothing has been changed.
+It covers names, images, descriptions and source links only, never behaviour.
+- **An individual item that carries its own essence values may not have been updated.**
+Fabricate reaches the items your characters are carrying.
+It does not reach a world item, an item in a compendium, or a token copy that was never saved as a world actor.
+See [An item stopped contributing an essence after updating]({% link help/troubleshooting.md %}#an-item-stopped-contributing-an-essence-after-updating).
+
 ## Assigning Essences to Components
 
 In the **Items** tab of the GM admin, each component can have essences assigned with quantities:

@@ -99,8 +99,16 @@ export const SETTING_KEYS = Object.freeze({
   // per-system `{ components: {oldId: newId}, tools: {...} }` re-key map, written as the FIRST
   // writeback leg so a torn pass is recoverable whichever later legs landed. It is TRANSIENT:
   // the one-shot `ready` pass that restamps owned-Item identity flags consumes it and clears
-  // it. There is no essence leg, because essences group by id and their ids are never re-keyed.
+  // it. It carries no essence leg — `REKEYABLE_ENTITY_TYPES` is `['components', 'tools']` — and the
+  // `1.34.0` merge re-keys essence ids under `WORLD_ESSENCE_MERGE_MAP` below instead (issue 1654).
   WORLD_SCOPE_REKEY_MAP: 'worldScopeRekeyMap',
+  // Issue 1654: the `1.34.0` equivalent-essence merge's durable decision record, written as the
+  // second writeback leg (after `worldScopeRekeyMap`, before `recipes`) so a torn pass is
+  // recoverable. Shape `{systems: {[systemId]: {essences: {loserId: survivorId}}}, retired: {...}}`,
+  // one lifetime per leg: the one-shot `ready` remap clears the transient `systems`, while
+  // `retired` is never cleared, because `mintEssenceId` would otherwise reissue a retired id. The
+  // legs nest so a crafting system whose id is literally `retired` cannot collide with that key.
+  WORLD_ESSENCE_MERGE_MAP: 'worldEssenceMergeMap',
   GATHERING_ENVIRONMENTS: 'gatheringEnvironments',
   GATHERING_CONFIG: 'gatheringConfig',
   GATHERING_PARTIES: 'gatheringParties',
@@ -149,6 +157,11 @@ export const SETTING_KEYS = Object.freeze({
   // separately on `migrationVersion`, because a `ready`-body one-shot runs even when the
   // migration pass DEFERRED.
   WORLD_SCOPE_IDENTITY_FLAG_VERSION: 'worldScopeIdentityFlagVersion',
+  // Issue 1654: version stamp for the one-shot active-GM pass that remaps the durable identity
+  // flags the `1.34.0` essence merge invalidates. Separate from its `1.30.0` sibling above, because
+  // a world can have consumed one decision record while still owing the other. It gates whether the
+  // pass runs; whether the pass may destroy the map's transient leg is gated on `migrationVersion`.
+  WORLD_ESSENCE_MERGE_FLAG_VERSION: 'worldEssenceMergeFlagVersion',
   // Issue 1024: the ADDITIONAL actor types a GM designates as player characters.
   // `'character'` is unioned in by `resolvePlayerCharacterTypes` and is never stored
   // here, so an existing dnd5e/pf2e world is unaffected by the default `[]`. Edited
@@ -199,6 +212,12 @@ export const OWNED_ITEM_COMPONENT_STAMP_TARGET = 1;
 // withheld the re-key map clear, in which case it withholds this advance too, so the pass genuinely
 // re-runs on a later boot rather than orphaning the map forever.
 export const WORLD_SCOPE_IDENTITY_FLAG_TARGET = 1;
+
+// The target version for the one-shot essence-merge identity-flag remap (issue 1654). When the
+// stored `WORLD_ESSENCE_MERGE_FLAG_VERSION` is below this, the active GM runs the remap once on
+// `ready` and writes this value back — unless it withheld the merge-map clear, in which case it
+// withholds this advance too, so the pass re-runs on a later boot rather than orphaning the map.
+export const WORLD_ESSENCE_MERGE_FLAG_TARGET = 1;
 
 const BASE_DEFINITIONS = Object.freeze({
   [SETTING_KEYS.RECIPES]: {
@@ -274,6 +293,17 @@ const BASE_DEFINITIONS = Object.freeze({
   // decision record of a world-scope migration and every client must see the same one.
   [SETTING_KEYS.WORLD_SCOPE_REKEY_MAP]: {
     name: 'World Scope Re-key Map',
+    scope: 'world',
+    config: false,
+    type: Object,
+    default: {},
+  },
+  // Issue 1654. Part-transient: the one-shot `ready` pass clears the per-system re-key legs and
+  // leaves the `retired` tombstone in place forever. `scope: 'world'` because the Manager's
+  // essence-id minter reads it on every client. Registered here because `game.settings.get` throws
+  // on an unregistered key.
+  [SETTING_KEYS.WORLD_ESSENCE_MERGE_MAP]: {
+    name: 'World Essence Merge Map',
     scope: 'world',
     config: false,
     type: Object,
@@ -460,6 +490,13 @@ const BASE_DEFINITIONS = Object.freeze({
   },
   [SETTING_KEYS.WORLD_SCOPE_IDENTITY_FLAG_VERSION]: {
     name: 'World Scope Identity Flag Version',
+    scope: 'world',
+    config: false,
+    type: Number,
+    default: 0,
+  },
+  [SETTING_KEYS.WORLD_ESSENCE_MERGE_FLAG_VERSION]: {
+    name: 'World Essence Merge Flag Version',
     scope: 'world',
     config: false,
     type: Number,
