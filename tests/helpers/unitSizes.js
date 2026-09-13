@@ -117,8 +117,14 @@ export function measureModuleFunctions(text) {
 }
 
 /**
- * Every function in a component's script blocks. The markup carries no function declarations of
- * its own, and a component's FILE size is measured over the whole file rather than here.
+ * Every function in a component: both script blocks AND the markup.
+ *
+ * The markup is included because an inline handler is still a function this epic would want to see
+ * grow. There are 1,381 of them across the corpus and none is oversized today, so including them
+ * moves no pinned number — but Phase 5 moves logic out of the root component, which is exactly
+ * when a large inline handler could appear, and a script-only scan would not see it.
+ *
+ * A component's FILE size is measured over the whole file rather than here.
  */
 export function measureComponentFunctions(text) {
   const ast = parse(text, { modern: true });
@@ -126,6 +132,7 @@ export function measureComponentFunctions(text) {
   for (const block of [ast.instance, ast.module]) {
     if (block?.content) measured.push(...measureProgram(block.content, text));
   }
+  if (ast.fragment) measured.push(...measureProgram(ast.fragment, text));
   return measured;
 }
 

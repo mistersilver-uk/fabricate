@@ -161,3 +161,17 @@ test('a component reports its script functions, and its file size is the whole f
   );
   assert.equal(physicalLines(source), 7);
 });
+
+test('an inline handler in the markup is measured, not only the script blocks', () => {
+  const source = [
+    '<script>',
+    '  let n = 0;',
+    '</script>',
+    '<button onclick={() => {',
+    '  n += 1;',
+    '}}>go</button>',
+  ].join('\n');
+  const measured = measureComponentFunctions(source);
+  assert.equal(measured.length, 1, 'the markup arrow is measured');
+  assert.equal(measured[0].lines, 3);
+});
