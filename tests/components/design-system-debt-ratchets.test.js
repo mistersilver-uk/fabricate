@@ -1870,7 +1870,7 @@ const PUBLISHED_REPETITION_FIGURES = Object.freeze([
   // over. The patterns match across the `//` line break the comment wraps at.
   [
     'every (at-context, selector) key',
-    /Unfiltered the sheet holds ([\d,]+) `\(at-context, selector\)`\n  \/\/ keys under this very keying/,
+    /Unfiltered the sheet holds ([\d,]+) `\(at-context, selector\)`\n {2}\/\/ keys under this very keying/,
   ],
   [
     'keys appearing exactly once',

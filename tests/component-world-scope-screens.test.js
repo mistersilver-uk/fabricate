@@ -518,7 +518,7 @@ describe('the deep link into a system’s Component Rules is a capability, not j
 
   it('it selects the system FIRST and commits the route only if that succeeded', () => {
     const handler =
-      /function openSystemComponentRules\(entityId, systemId\) \{([\s\S]*?)\n  \}/.exec(body);
+      /function openSystemComponentRules\(entityId, systemId\) \{([\s\S]*?)\n {2}\}/.exec(body);
     assert.ok(handler, 'the gateway declares the handler');
     assert.match(
       handler[1],

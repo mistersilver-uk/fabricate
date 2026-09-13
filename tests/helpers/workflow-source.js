@@ -7,9 +7,11 @@
  * `tests/**` duplication counts against the new-code gate — so re-inlining them would fail the
  * quality gate on otherwise correct code. They live here once and both test files import them.
  *
- * This file is deliberately NOT a test file and is NOT collected: `npm test`'s glob lists the
- * top-level `tests/*.test.js` plus a fixed set of subdirectories, and `tests/helpers/` is not among
- * them.
+ * This file is deliberately NOT a test file and is NOT collected: `npm test`'s glob is
+ * `tests/**\/*.test.js`, which this filename does not match. Before issue #1660 the glob named a
+ * fixed set of subdirectories and excluded `tests/helpers/` outright; it is recursive now, so the
+ * exclusion rests on the filename alone and `tests/lint-coverage.test.js` asserts that no suite
+ * appears under `tests/helpers/`.
  *
  * This is a pragmatic, indentation-driven reader, not a YAML parser. It exists so an assertion can
  * be made against workflow STRUCTURE (a step's `if:`, its `env:` map, its shell body) rather than

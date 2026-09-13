@@ -201,7 +201,8 @@ describe('issue 1076 bound — identity resolution is independent of library siz
     // Non-vacuity for the guard above: the same probe must still register a real scan.
     const counters = createOperationCounters();
     const components = countingCandidates(library(16), counters, 'componentCandidates');
-    components.find((entry) => entry.id === 'c-15');
+    // The RESULT is deliberately unused — the scan is what moves the counter asserted below.
+    const _scanned = components.find((entry) => entry.id === 'c-15');
     assert.equal(counters.get('componentCandidates'), 16);
   });
 

@@ -329,7 +329,7 @@ describe('consumePooledCurrency', () => {
     const party = [new PooledActorFake('Idrin', { gp: 9 })];
 
     for (const amount of [2.5, 0, -1, true, null, '']) {
-      // eslint-disable-next-line no-await-in-loop
+      // Sequential on purpose: each refusal must leave the pool untouched for the next.
       const refused = await consume(party, pooledSeams(), { amount });
       assert.equal(
         refused.outcome,

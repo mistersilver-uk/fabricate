@@ -18,7 +18,6 @@ export async function insertTerminalRuns(count, insertOne) {
   const ids = [];
   for (let i = 0; i < count; i += 1) {
     // Sequential on purpose: each insert mutates the same actor flag container.
-    // eslint-disable-next-line no-await-in-loop
     ids.push(await insertOne(i));
   }
   return ids;

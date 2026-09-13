@@ -5,9 +5,13 @@
  * the import. Every gate stayed green, and three independent blind spots line up on that one file
  * to make that possible:
  *
- *  1. **CI's `lint` glob excludes it.** The script covers
+ *  1. **CI's `lint` glob excluded it.** The script covered
  *     `src/{models,utils,integrations,config,migration,canvas,systems}/**\/*.js` plus
- *     `src/toolBreakageRuntime.js`. `lint:all` is not run in CI.
+ *     `src/toolBreakageRuntime.js`, and `lint:all` was not run in CI. FIXED by issue #1660: `lint`
+ *     is `eslint .` now, so every file in this population is gated for real. This file stays
+ *     because blind spots 2 and 3 are untouched, and because the way this coverage would be lost
+ *     AGAIN is a scoped `no-undef` disable — which the assertions below are built to catch and a
+ *     file-count check is not.
  *  2. **No test imports it.** All 28 suites naming `src/main.js` read it with `readFileSync` for
  *     source-text assertions, because it statically imports CSS and cannot load under
  *     `node --test`. A source-text gate can pin a dispatch's POSITION and can never pin that its
@@ -61,41 +65,35 @@
  */
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import { ESLint } from 'eslint';
 
+import { LEGACY_GATE_FILES } from './helpers/legacyLintGate.js';
+import { byCodePoint } from './helpers/ratchetBaseline.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 
 /** Repo-relative POSIX path, built without a backslash literal. */
 const posix = (file) => file.split(String.fromCharCode(92)).join('/');
 
-/** The directories CI's `lint` script already covers, parsed from the script itself. */
-function coveredPrefixes() {
-  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  const script = pkg.scripts.lint;
-  const braced = /src\/\{([a-z,]+)\}\/\*\*\/\*\.js/.exec(script);
-  assert.ok(braced, 'the `lint` script no longer carries the braced src/{...} glob this parses');
-  return braced[1].split(',').map((dir) => `src/${dir}/`);
-}
-
-/** The named single files CI's `lint` script covers outside that glob. */
-function coveredFiles() {
-  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-  return new Set(
-    [...pkg.scripts.lint.matchAll(/(?<![\w/])(src\/[\w.-]+\.js)\b/g)].map(([, file]) => file)
-  );
-}
-
-/** Every `.js` under `src/` that CI's lint glob does NOT reach. */
+/**
+ * Every `.js` under `src/` that the PRE-GLOB lint gate did not reach.
+ *
+ * This used to be derived by parsing the braced `src/{models,…}` glob back out of the `lint`
+ * script. That script is `eslint .` since issue #1660, so there is nothing left to parse — and the
+ * population is taken from `tests/helpers/legacyLintGate.js`, which freezes the old command and
+ * the 360 files it selected.
+ *
+ * The population is deliberately UNCHANGED by that switch. These are the files whose blindness
+ * cost this repository a shipped `ReferenceError`, and they are the files a scoped `no-undef`
+ * disable would most plausibly be reached for next; a probe aimed at them keeps its point after
+ * the gate widened, and re-deriving it from the new gate would empty it to nothing.
+ */
 function unlintedSources() {
-  const prefixes = coveredPrefixes();
-  const files = coveredFiles();
+  const legacy = new Set(LEGACY_GATE_FILES);
   return Object.keys(collectSources(repoRoot + '/src', { extensions: ['.js'] }))
-    .filter((file) => !prefixes.some((prefix) => file.startsWith(prefix)))
-    .filter((file) => !files.has(file))
-    .sort();
+    .filter((file) => !legacy.has(file))
+    .sort(byCodePoint);
 }
 
 /** Every `no-undef` report over `files`, using the REPOSITORY'S OWN config so the Foundry and

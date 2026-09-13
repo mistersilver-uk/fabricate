@@ -55,7 +55,8 @@ function parseObjectLiteralAfter(source, marker, where) {
   const literal = source.slice(start, end + 1);
   // The literal is plain data in both classes today. If that ever stops being true the
   // evaluation throws here rather than producing a half-right object.
-  // eslint-disable-next-line no-new-func -- evaluating a data-only literal lifted from our own source is the point; the alternative is an AST dependency for two objects
+  // Evaluating a data-only literal lifted from our own source is the point here; the
+  // alternative is an AST dependency for two objects.
   return new Function(`return (${literal});`)();
 }
 

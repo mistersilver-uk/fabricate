@@ -137,7 +137,7 @@ const NAVIGATION_TIMEOUT_MS = 150_000;
  * specifier before any rule filtering, and it crashes outright on Vite's exports map ("node with
  * invalid interface loaded as resolver") — an `eslint-disable` comment does not help, because the
  * crash happens before rules run. Keeping the specifier opaque is what keeps this file inside the
- * `npm run lint` gate instead of parked in KNOWN_UNGATED_SCRIPTS. Vite is only needed when a
+ * `npm run lint` gate, which since issue #1660 it is. Vite is only needed when a
  * capture actually runs, so the lazy load is honest on its own terms too.
  */
 const VITE_SPECIFIER = 'vite';

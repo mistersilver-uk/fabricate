@@ -271,7 +271,7 @@ describe('checkPreview: it posts nothing and prompts for nothing', () => {
 describe('checkPreview: it NEVER executes a DC macro', () => {
   it('SPY CHECK — a real DC macro path resolves the uuid and runs the command', async () => {
     let resolved = 0;
-    let ran = 0;
+    let ran;
     globalThis.fromUuid = async (uuid) => {
       resolved += 1;
       assert.equal(uuid, 'Macro.dc-macro');

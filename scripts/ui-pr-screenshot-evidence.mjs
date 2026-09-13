@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 // The refusal diagnostic lives beside `evaluateSmokeOutcome` in the lib, NOT here (issue
 // #1019). Two reasons, both structural: the producer and this consumer then share one
 // `formatFailedStep`, so the gate quotes a failing step exactly as the harness's own throw
-// does; and this file is in `KNOWN_UNGATED_SCRIPTS`, outside both the `lint` and the
+// does; and this file's remaining findings are carried in `eslint-debt.txt`, so it is inside the
 // `format:check` globs, while `scripts/lib/foundrySmokeSignal.js` is inside both.
 import { explainSmokeSummaryRefusal } from './lib/foundrySmokeSignal.js';
 // The `check` gate's composed decision — await the capture run for this head, then match what it

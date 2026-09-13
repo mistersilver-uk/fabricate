@@ -26,7 +26,7 @@
  * `<=` ceiling loosens by one slot every time debt is paid: remove an entry, and the list sits one
  * under the ceiling with nothing requiring the ceiling to follow it. The next author can then
  * append instead of fixing and still pass. `tests/scripts-lint-gate-coverage.test.js` records the
- * same reasoning for `ACKNOWLEDGED_UNGATED_COUNT`, and this file follows it.
+ * same reasoning for the `scripts/` debt baseline (now `ESLINT_DEBT.scripts`), and this file follows it.
  *
  * WHAT IS DELIBERATELY NOT ASSERTED
  * ----------------------------------

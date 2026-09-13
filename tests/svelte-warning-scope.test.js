@@ -43,6 +43,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // The same walker the sweep uses, so "every component" means one thing here too.
+import { ESLint } from 'eslint';
+// Deep entry point: `npm test` runs Node with `--conditions=browser`, and Prettier's export map
+// answers that condition with `standalone.mjs` — a bundle with no filesystem access, so no
+// `getFileInfo`. `prettier/index.mjs` is the Node build.
+import { getFileInfo } from 'prettier/index.mjs';
+
+import { ESLINT_DEBT } from '../eslint.debt.js';
 import { listSvelteComponents } from '../scripts/lib/svelteComponentFiles.js';
 import {
   BUILD_COMPILER_OPTIONS,
@@ -210,18 +217,30 @@ describe('the gate is wired into CI and into npm', () => {
     assert.equal(packageJson.scripts?.[sweepNpmScript], `node ${sweepScript}`);
   });
 
-  // #935's ratchet already fails `npm test` on an ungated `scripts/` file. This states the
-  // requirement in the place someone adding to THIS gate will be reading, with its reason.
-  it('gates its own new scripts/ files through lint, format and format:check', () => {
-    for (const script of ['lint', 'format', 'format:check']) {
-      const command = packageJson.scripts?.[script];
-      for (const file of [sweepScript, 'scripts/lib/svelteCompilerWarnings.js']) {
-        assert.ok(
-          command.includes(file),
-          `the ${script} script must cover ${file} — an ungated script under scripts/ is how a` +
-            ' new BUG and VULNERABILITY reached SonarCloud in issue 933'
-        );
-      }
+  // `lint` and `format:check` are globs over the repository since issue #1660, so these two
+  // files are covered by default rather than by being named. What can still take them back out
+  // is an exclusion — an ESLint `ignores` entry, a `.prettierignore` line, or a slide into
+  // `eslint.debt.js` — and an exclusion is exactly as silent as the omission that let a new BUG
+  // and VULNERABILITY reach SonarCloud in issue 933. So the requirement is stated here, where
+  // someone adding to THIS gate is reading, against the thing that can actually change.
+  it('keeps its own scripts/ files inside the lint and format gates', async () => {
+    const eslint = new ESLint();
+    const baselined = new Set(Object.keys(ESLINT_DEBT.scripts));
+    for (const file of [sweepScript, 'scripts/lib/svelteCompilerWarnings.js']) {
+      assert.equal(
+        await eslint.isPathIgnored(file),
+        false,
+        `${file} is excluded from \`npm run lint\` entirely`
+      );
+      assert.equal(
+        baselined.has(file),
+        false,
+        `${file} has been recorded as lint debt in eslint.debt.js rather than kept clean`
+      );
+      const info = await getFileInfo(path.join(repoRoot, file), {
+        ignorePath: [path.join(repoRoot, '.gitignore'), path.join(repoRoot, '.prettierignore')],
+      });
+      assert.equal(info.ignored, false, `${file} is excluded from \`npm run format:check\``);
     }
   });
 });

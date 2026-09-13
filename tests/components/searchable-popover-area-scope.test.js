@@ -2353,7 +2353,7 @@ function elementsWithAncestry(text) {
       const open = stack.map((entry) => entry.name).lastIndexOf(name);
       if (open !== -1) stack.length = open;
     } else {
-      const classes = (attributes.match(/class="([^"]*)"/) ?? [, ''])[1].split(/\s+/).filter(Boolean);
+      const classes = (attributes.match(/class="([^"]*)"/) ?? ['', ''])[1].split(/\s+/).filter(Boolean);
       out.push({ name, classes, ancestry: [...stack.flatMap((entry) => entry.classes), ...classes] });
       if (!selfClosing && !VOID_ELEMENTS.has(name)) stack.push({ name, classes });
     }

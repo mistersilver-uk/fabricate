@@ -432,7 +432,6 @@ function fakeRecipe(ingredientSet) {
     ingredientSets: [ingredientSet],
     resultGroups: [],
     toolIds: [],
-    toolIds: [],
     outcomeRouting: null,
     steps: [],
     transferEffects: false,
