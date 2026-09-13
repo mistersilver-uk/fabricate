@@ -459,6 +459,25 @@ export default [
     },
   },
 
+  // 6a. The repo-root Foundry entry shim, whose unresolved import is the point of the file.
+  //
+  //     `main.js` dynamically imports `./dist/main.js` inside a try/catch whose catch says "Run
+  //     `npm run build`". The target is BUILD OUTPUT: absent in a fresh checkout, absent on the
+  //     `lint` CI runner, present on any machine that has built. `import-x/no-unresolved` resolves
+  //     against the filesystem, so leaving it armed here makes the gate's verdict depend on
+  //     whether the person running it happens to have a `dist/` — green locally, red in CI, for
+  //     the same commit. That is exactly how this surfaced: the glob gate passed on a built tree
+  //     and failed on the runner (issue #1660).
+  //
+  //     Scoped to this one file and this one rule, not baselined in `eslint-debt.txt`: a debt
+  //     entry is something to pay off, and there is nothing here to fix. `main.js` is the only
+  //     file in the repository that imports build output — asserted by nothing, because the rule
+  //     stays armed everywhere else and would report the next one.
+  {
+    files: ['main.js'],
+    rules: { 'import-x/no-unresolved': 'off' },
+  },
+
   // 6b. Harness scripts that ship code INTO a browser page.
   //
   //     A Playwright `page.evaluate(fn)` serialises `fn` and runs it inside Foundry's page, so the
