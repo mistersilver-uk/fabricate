@@ -281,6 +281,8 @@ test('the comment-line ledger matches the pinned baseline exactly, per directory
     describeLedgerDrift(actual, LEDGER, {
       subject: 'comment-line counts per directory',
       regenerate: REGENERATE,
+      structuralHint:
+        'A directory appears or vanishes as its files are created, renamed or emptied.',
       roseHint:
         'needs justification or a revert, and a stray untracked file under a scanned root is the ' +
         'likely cause before a real regression',

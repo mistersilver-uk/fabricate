@@ -209,7 +209,9 @@ export function assertRatchet({
  *
  * @param {object} actual Freshly derived `key -> count`.
  * @param {object} expected The pinned ledger.
- * @param {{subject: string, regenerate: string, roseHint: string, fellHint: string}} wording
+ * @param {{subject: string, regenerate: string, structuralHint: string, roseHint: string,
+ *   fellHint: string}} wording `structuralHint` speaks to a key appearing or vanishing, which is
+ *   a different event from a count moving and needs each gate's own guidance.
  * @returns {string|undefined} A message, or undefined when the two agree.
  */
 export function describeLedgerDrift(actual, expected, wording) {
@@ -222,9 +224,9 @@ export function describeLedgerDrift(actual, expected, wording) {
   if (added.length > 0 || removed.length > 0) {
     return (
       `the set of ${wording.subject} changed — added: [${added.join(', ')}], ` +
-      `removed: [${removed.join(', ')}]. These gates scan the working tree, not the git index, so ` +
-      'a stray untracked file under a scanned root is the likely cause before a real change ' +
-      `(\`git status\` will show it). Re-derive with ${wording.regenerate}.`
+      `removed: [${removed.join(', ')}]. ${wording.structuralHint} These gates scan the working ` +
+      'tree, not the git index, so a stray untracked file under a scanned root is the other ' +
+      `likely cause (\`git status\` will show it). Re-derive with ${wording.regenerate}.`
     );
   }
   const changed = Object.keys(expected)

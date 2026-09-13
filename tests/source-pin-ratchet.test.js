@@ -111,6 +111,8 @@ test('the source-pin ledger matches the pinned baseline exactly, per test file',
       subject: 'source-pin counts',
       // The corpus is the working tree, so a stray untracked file trips the set before a real change.
       regenerate: REGENERATE,
+      structuralHint:
+        'A file that newly pins source text needs a reason; one that stopped has paid the debt down and should bank it.',
       roseHint: 'means a new pin on how the code is written rather than what it does',
       fellHint: 'needs the ledger lowered to bank the conversion',
     })
@@ -205,6 +207,19 @@ test('a helper matching a handed parameter against a literal pins only under tes
   assert.equal(countPinSites(ast, { file: 'tests/helpers/thing.js', scopeManager }), 1);
   // The same shape in a behavioural test is ordinary membership, not a source pin.
   assert.equal(countPinSites(ast, { file: 'tests/thing.test.js', scopeManager }), 0);
+});
+
+test('a regex test and an assert.match on source are pins, like includes', () => {
+  const probe = [
+    "import { readFileSync } from 'node:fs';",
+    "import assert from 'node:assert/strict';",
+    "const src = readFileSync('src/a.svelte', 'utf8');",
+    'export const one = /premium/i.test(src);',
+    'assert.match(src, /export/);',
+  ].join('\n');
+  const { ast, scopeManager } = parseModule(probe);
+  // The read, the regex test on what it read, and the assert.match on the same text.
+  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 3);
 });
 
 test('an includes on text that never came from src/ is not a pin', () => {

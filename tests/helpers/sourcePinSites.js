@@ -19,6 +19,9 @@
  * supplies the names this module imports that are known `src/` path constants, because a helper
  * exporting one is a recurring shape and the read through it would otherwise count nothing.
  *
+ * The matchers counted are `includes`, `assert.match` and a regex `test`, which are the three
+ * ways this suite asserts the shape of source text.
+ *
  * MEASURED RESIDUE, deliberately uncounted: text a helper returns that its caller matches inline.
  */
 import { calledName, identifierNames, literalStrings, walkNodes } from './moduleAst.js';
@@ -221,7 +224,9 @@ export function countPinSites(ast, { file = '', scopeManager, seedPaths = new Se
       sites += 1;
       continue;
     }
-    if (called === 'match' && receiverText === 'assert') {
+    // `assert.match(source, /x/)` and `/x/.test(source)` assert the shape of source text exactly
+    // as `includes` does; the subject is the argument rather than the receiver.
+    if ((called === 'match' && receiverText === 'assert') || called === 'test') {
       const subject = node.arguments[0];
       if (subject?.type === 'Identifier' && sources.has(keyFor(subject))) sites += 1;
       continue;
