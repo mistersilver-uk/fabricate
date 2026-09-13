@@ -34,10 +34,10 @@ const SCANNED_EXTENSIONS = Object.freeze(['.js', '.mjs']);
  * against what that file actually imports: matching bare names across the corpus would seed
  * `result`, `entry` and `text`, each bound to something unrelated in hundreds of places.
  */
-function exportedPathConstants(corpus) {
+function exportedPathConstants(parsed) {
   const names = new Set();
-  for (const text of Object.values(corpus)) {
-    for (const node of walkNodes(parseModule(text).ast)) {
+  for (const { ast } of parsed.values()) {
+    for (const node of walkNodes(ast)) {
       if (
         node.type !== 'ExportNamedDeclaration' ||
         node.declaration?.type !== 'VariableDeclaration'
@@ -70,20 +70,24 @@ function buildLedger() {
   const corpus = collectSources(resolve(repoRoot, CORPUS_ROOT), {
     extensions: [...SCANNED_EXTENSIONS],
   });
-  const exportedPaths = exportedPathConstants(corpus);
-  const counted = [];
+  // Parsed once, not once per pass: the seed scan and the count both need an AST, and parsing a
+  // thousand modules twice inside `npm test` starves the browser-backed suites running beside it.
+  const parsed = new Map();
   for (const [file, text] of Object.entries(corpus)) {
-    let parsed;
     try {
-      parsed = parseModule(text);
+      parsed.set(file, parseModule(text));
     } catch (error) {
       // `parseModule` names its probe path, never the real one, so attribute it here.
       throw new Error(`${file} failed to parse: ${error.message}`, { cause: error });
     }
-    const sites = countPinSites(parsed.ast, {
+  }
+  const exportedPaths = exportedPathConstants(parsed);
+  const counted = [];
+  for (const [file, { ast, scopeManager }] of parsed) {
+    const sites = countPinSites(ast, {
       file,
-      scopeManager: parsed.scopeManager,
-      seedPaths: importedPathNames(parsed.ast, exportedPaths),
+      scopeManager,
+      seedPaths: importedPathNames(ast, exportedPaths),
     });
     if (sites > 0) counted.push([file, sites]);
   }
@@ -109,113 +113,121 @@ test('the source-pin ledger matches the pinned baseline exactly, per test file',
   gate.check(assert);
 });
 
-test('a pattern spelled as a literal is not a pin site, so this gate does not count itself', () => {
-  const probe = [
-    String.raw`const SHAPE = /Source\.includes\(/;`,
-    "const ALSO = '.includes(';",
-    '// readFileSync of src/ in a comment is not a call',
-    'export { SHAPE, ALSO };',
-  ].join('\n');
-  const { ast, scopeManager } = parseModule(probe);
-  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 0);
-});
+/**
+ * The counter's behaviour, as a table. One case per shape rather than six near-identical test
+ * bodies: the bodies differed only in their literals, which a duplication detector normalizes
+ * away, and the table reads as the specification it is.
+ */
+const PROBES = Object.freeze([
+  {
+    name: 'a pattern spelled as a literal is not a pin site, so the gate does not count itself',
+    file: 'tests/x.test.js',
+    sites: 0,
+    source: [
+      String.raw`const SHAPE = /Source\.includes\(/;`,
+      "const ALSO = '.includes(';",
+      '// readFileSync of src/ in a comment is not a call',
+      'export { SHAPE, ALSO };',
+    ],
+  },
+  {
+    name: 'a read through a path binding counts, which a same-line rule would miss',
+    file: 'tests/x.test.js',
+    sites: 2,
+    source: [
+      "import { readFileSync } from 'node:fs';",
+      "const rootPath = new URL('../src/ui/Thing.svelte', import.meta.url);",
+      "const rootSource = readFileSync(rootPath, 'utf8');",
+      "export const ok = rootSource.includes('class=');",
+    ],
+  },
+  {
+    name: 'a read through a local wrapper counts, and its binding is a source not a path',
+    file: 'tests/x.test.js',
+    sites: 2,
+    source: [
+      "import { readFileSync } from 'node:fs';",
+      "import { resolve } from 'node:path';",
+      'function read(relPath) {',
+      "  return readFileSync(resolve(import.meta.dirname, relPath), 'utf8');",
+      '}',
+      "const rootSource = read('../../src/ui/svelte/apps/FabricateAppRoot.svelte');",
+      "export const ok = rootSource.includes('<JournalView');",
+    ],
+  },
+  {
+    name: 'two bindings of one name in different scopes are not conflated',
+    file: 'tests/x.test.js',
+    sites: 2,
+    source: [
+      "import { readFileSync } from 'node:fs';",
+      'export function pin() {',
+      "  const source = readFileSync('src/a.js', 'utf8');",
+      "  return source.includes('x');",
+      '}',
+      'export function unrelated(rows) {',
+      "  const source = rows.join(',');",
+      "  return source.includes('y');",
+      '}',
+    ],
+  },
+  {
+    name: 'text derived from a source binding is still a source',
+    file: 'tests/x.test.js',
+    sites: 3,
+    source: [
+      "import { readFileSync } from 'node:fs';",
+      "const a = readFileSync('src/one.js', 'utf8');",
+      "const b = readFileSync('src/two.js', 'utf8');",
+      String.raw`const joined = [a, b].join('\n');`,
+      "export const ok = joined.includes('export');",
+    ],
+  },
+  {
+    name: 'a source held in a property or indexed out of a map is still a pin',
+    file: 'tests/x.test.js',
+    sites: 2,
+    source: [
+      "import { readFileSync } from 'node:fs';",
+      "const byFile = { a: readFileSync('src/a.js', 'utf8') };",
+      "export const one = byFile['a'].includes('export');",
+    ],
+  },
+  {
+    name: 'a regex test and an assert.match on source are pins, like includes',
+    file: 'tests/x.test.js',
+    sites: 3,
+    source: [
+      "import { readFileSync } from 'node:fs';",
+      "import assert from 'node:assert/strict';",
+      "const src = readFileSync('src/a.svelte', 'utf8');",
+      'export const one = /premium/i.test(src);',
+      'assert.match(src, /export/);',
+    ],
+  },
+  {
+    name: 'an includes on text that never came from src/ is not a pin',
+    file: 'tests/x.test.js',
+    sites: 0,
+    source: ["const dataSource = 'a,b,c';", "export const ok = dataSource.includes('b');"],
+  },
+  {
+    name: 'a helper matching a handed parameter against a literal pins under tests/helpers',
+    file: 'tests/helpers/thing.js',
+    sites: 1,
+    source: ['export function pins(source) {', "  return source.includes('export const');", '}'],
+  },
+  {
+    name: 'the same shape in a behavioural test is membership, not a source pin',
+    file: 'tests/thing.test.js',
+    sites: 0,
+    source: ['export function pins(source) {', "  return source.includes('export const');", '}'],
+  },
+]);
 
-test('a read through a path binding counts, which a same-line rule would miss', () => {
-  const probe = [
-    "import { readFileSync } from 'node:fs';",
-    "const rootPath = new URL('../src/ui/Thing.svelte', import.meta.url);",
-    "const rootSource = readFileSync(rootPath, 'utf8');",
-    "export const ok = rootSource.includes('class=');",
-  ].join('\n');
-  const { ast, scopeManager } = parseModule(probe);
-  // One read plus one `includes` on what it read.
-  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 2);
-});
-
-test('a read through a local wrapper counts, and its binding is a source not a path', () => {
-  const probe = [
-    "import { readFileSync } from 'node:fs';",
-    "import { resolve } from 'node:path';",
-    'function read(relPath) {',
-    "  return readFileSync(resolve(import.meta.dirname, relPath), 'utf8');",
-    '}',
-    "const rootSource = read('../../src/ui/svelte/apps/FabricateAppRoot.svelte');",
-    "export const ok = rootSource.includes('<JournalView');",
-  ].join('\n');
-  const { ast, scopeManager } = parseModule(probe);
-  // One read through the wrapper plus one `includes` on what it read.
-  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 2);
-});
-
-test('two bindings of one name in different scopes are not conflated', () => {
-  const probe = [
-    "import { readFileSync } from 'node:fs';",
-    'export function pin() {',
-    "  const source = readFileSync('src/a.js', 'utf8');",
-    "  return source.includes('x');",
-    '}',
-    'export function unrelated(rows) {',
-    "  const source = rows.join(',');",
-    "  return source.includes('y');",
-    '}',
-  ].join('\n');
-  const { ast, scopeManager } = parseModule(probe);
-  // The read and the pin on it; the unrelated join is not source text.
-  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 2);
-});
-
-test('text derived from a source binding is still a source', () => {
-  const probe = [
-    "import { readFileSync } from 'node:fs';",
-    "const a = readFileSync('src/one.js', 'utf8');",
-    "const b = readFileSync('src/two.js', 'utf8');",
-    String.raw`const joined = [a, b].join('\n');`,
-    "export const ok = joined.includes('export');",
-  ].join('\n');
-  const { ast, scopeManager } = parseModule(probe);
-  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 3);
-});
-
-test('a source held in a property or indexed out of a map is still a pin', () => {
-  const probe = [
-    "import { readFileSync } from 'node:fs';",
-    "const byFile = { a: readFileSync('src/a.js', 'utf8') };",
-    "export const one = byFile['a'].includes('export');",
-  ].join('\n');
-  const { ast, scopeManager } = parseModule(probe);
-  // One read, plus the indexed match on what it read.
-  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 2);
-});
-
-test('a helper matching a handed parameter against a literal pins only under tests/helpers', () => {
-  const probe = [
-    'export function pins(source) {',
-    "  return source.includes('export const');",
-    '}',
-  ].join('\n');
-  const { ast, scopeManager } = parseModule(probe);
-  assert.equal(countPinSites(ast, { file: 'tests/helpers/thing.js', scopeManager }), 1);
-  // The same shape in a behavioural test is ordinary membership, not a source pin.
-  assert.equal(countPinSites(ast, { file: 'tests/thing.test.js', scopeManager }), 0);
-});
-
-test('a regex test and an assert.match on source are pins, like includes', () => {
-  const probe = [
-    "import { readFileSync } from 'node:fs';",
-    "import assert from 'node:assert/strict';",
-    "const src = readFileSync('src/a.svelte', 'utf8');",
-    'export const one = /premium/i.test(src);',
-    'assert.match(src, /export/);',
-  ].join('\n');
-  const { ast, scopeManager } = parseModule(probe);
-  // The read, the regex test on what it read, and the assert.match on the same text.
-  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 3);
-});
-
-test('an includes on text that never came from src/ is not a pin', () => {
-  const probe = ["const dataSource = 'a,b,c';", "export const ok = dataSource.includes('b');"].join(
-    '\n'
-  );
-  const { ast, scopeManager } = parseModule(probe);
-  assert.equal(countPinSites(ast, { file: 'tests/x.test.js', scopeManager }), 0);
-});
+for (const probe of PROBES) {
+  test(probe.name, () => {
+    const { ast, scopeManager } = parseModule(probe.source.join('\n'));
+    assert.equal(countPinSites(ast, { file: probe.file, scopeManager }), probe.sites);
+  });
+}
