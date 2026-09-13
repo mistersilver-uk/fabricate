@@ -5,17 +5,16 @@
  * This file is itself in the `tests` bucket it pins, so editing these comments moves that number.
  */
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { test } from 'node:test';
 
-import { byCodePoint, describeLedgerDrift } from './helpers/ratchetBaseline.js';
+import { byCodePoint, ledgerGate } from './helpers/ratchetBaseline.js';
 import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 
 // `readFileSync` + `JSON.parse`, not `import ... with { type: 'json' }`: this repo's ESLint
 // parser rejects the import-attribute syntax, as `scripts/lib/designSystemPrimitives.js` notes.
 const LEDGER_PATH = resolve(import.meta.dirname, 'comment-share-ledger.json');
-const LEDGER = JSON.parse(readFileSync(LEDGER_PATH, 'utf8'));
 
 /** The command that re-derives the ledger, named in every drift message so it is actionable. */
 const REGENERATE =
@@ -223,11 +222,6 @@ function buildLedger(corpus) {
 }
 
 /** One corpus walk per run: three assertions read it, and the tree is ~550 files. */
-let cachedLedger;
-function currentLedger() {
-  cachedLedger ??= buildLedger(collectWorkingTreeSources(SCAN_ROOTS, SCAN_EXTENSIONS));
-  return cachedLedger;
-}
 
 function rollUpByRoot(ledger) {
   const rollup = {};
@@ -267,38 +261,31 @@ function findSymlinkedDirectories(root) {
   return found;
 }
 
+const gate = ledgerGate({
+  ledgerPath: LEDGER_PATH,
+  regenerateEnv: 'UPDATE_COMMENT_SHARE_LEDGER',
+  build: () => buildLedger(collectWorkingTreeSources(SCAN_ROOTS, SCAN_EXTENSIONS)),
+  wording: {
+    subject: 'comment-line counts per directory',
+    regenerate: REGENERATE,
+    structuralHint: 'A directory appears or vanishes as its files are created, renamed or emptied.',
+    roseHint: 'needs justification or a revert',
+    fellHint:
+      'needs the ledger lowered to bank the win; one key down and another up by the same amount ' +
+      'is a file moved between directories, not a regression',
+  },
+});
+
 test('the comment-line ledger matches the pinned baseline exactly, per directory', () => {
-  const actual = currentLedger();
-  if (process.env.UPDATE_COMMENT_SHARE_LEDGER) {
-    writeFileSync(LEDGER_PATH, `${JSON.stringify(actual, null, 2)}\n`);
-    return;
-  }
-  // The corpus is the working tree, not the git index, so a stray untracked file under a scanned
-  // root counts here before it is ever committed.
-  assert.deepStrictEqual(
-    actual,
-    LEDGER,
-    describeLedgerDrift(actual, LEDGER, {
-      subject: 'comment-line counts per directory',
-      regenerate: REGENERATE,
-      structuralHint:
-        'A directory appears or vanishes as its files are created, renamed or emptied.',
-      roseHint:
-        'needs justification or a revert, and a stray untracked file under a scanned root is the ' +
-        'likely cause before a real regression',
-      fellHint:
-        'needs the ledger lowered to bank the win; one key down and another up by the same ' +
-        'amount is a file moved between directories, not a regression',
-    })
-  );
+  gate.check(assert);
 });
 
 /** Prints the four numbers epic 1656's definition of done reads; it cannot fail alone. */
 test('the ledger reports as the root-level roll-up epic 1656 tracks', (t) => {
-  // The regeneration run rewrote the file the pinned copy above was read from, so this comparison
-  // is against a stale constant and means nothing until the next run.
-  if (process.env.UPDATE_COMMENT_SHARE_LEDGER) return t.skip('ledger regenerated this run');
-  assert.deepStrictEqual(rollUpByRoot(currentLedger()), rollUpByRoot(LEDGER));
+  // A regeneration run has just rewritten the file, so comparing against it proves nothing until
+  // the next run.
+  if (gate.regenerated()) return t.skip('ledger regenerated this run');
+  assert.deepStrictEqual(rollUpByRoot(gate.current()), rollUpByRoot(gate.pinned()));
 });
 
 test('none of the four scanned roots contains a symlinked directory', () => {

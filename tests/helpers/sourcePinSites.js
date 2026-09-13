@@ -7,20 +7,15 @@
  * `CallExpression`, and a token in a docblock is not a node, so this file and the ratchet's own
  * file count their true call sites even though both spell the tokens they hunt.
  *
- * Bindings resolve through the SCOPE MANAGER, not by name. Two functions in one file may both
- * bind `source`, one from a read of `src/` and one from joining rows; matching on the name alone
- * attributes the second to the first.
+ * The matchers counted are `includes`, `assert.match` and a regex `test`, which are the three ways
+ * this suite asserts the shape of source text.
  *
- * READS ARE RESOLVED THROUGH LOCAL WRAPPERS. The commonest shape here is a one-line `read()` that
- * calls `readFileSync`, so a closed set of reader names both misses those pins and mis-files the
- * binding as a path — measured at 303 sites across 19 files before this resolved them.
+ * Bindings resolve through the SCOPE MANAGER, not by name: two functions in one file may both bind
+ * `source`, one from a read of `src/` and one from joining rows.
  *
- * A PATH CONSTANT IMPORTED FROM ANOTHER MODULE is resolved too, through `seedPaths`: the caller
- * supplies the names this module imports that are known `src/` path constants, because a helper
- * exporting one is a recurring shape and the read through it would otherwise count nothing.
- *
- * The matchers counted are `includes`, `assert.match` and a regex `test`, which are the three
- * ways this suite asserts the shape of source text.
+ * READS RESOLVE THROUGH LOCAL WRAPPERS, because the commonest shape here is a one-line `read()`
+ * that calls `readFileSync`. A closed set of reader names both missed those pins and mis-filed the
+ * binding as a path — measured at 303 sites across 19 files.
  *
  * MEASURED RESIDUE, deliberately uncounted: text a helper returns that its caller matches inline.
  */
@@ -46,110 +41,124 @@ const FUNCTION_TYPES = Object.freeze([
 const spellsSrcPath = (node) =>
   literalStrings(node).some((text) => text.includes('src/') || SRC_ROOTS.includes(text));
 
+const isReader = (node, readers) =>
+  node?.type === 'CallExpression' && readers.has(calledName(node));
+
+/** The name a function is bound to, whether declared or assigned to a `const`. */
+function boundFunctionName(node, assignedNames) {
+  return node.id?.name ?? assignedNames.get(node);
+}
+
+/** Names bound to a function expression, which the AST does not record on the function itself. */
+function functionAssignments(ast) {
+  const assigned = new Map();
+  for (const node of walkNodes(ast)) {
+    if (node.type !== 'VariableDeclarator' || node.id?.type !== 'Identifier') continue;
+    if (node.init && FUNCTION_TYPES.includes(node.init.type)) assigned.set(node.init, node.id.name);
+  }
+  return assigned;
+}
+
+const callsAReader = (node, readers) =>
+  [...walkNodes(node)].some((inner) => isReader(inner, readers));
+
 /**
  * Names this module can read a file through: the base readers plus any local function whose body
- * calls one. `function read(p) { return readFileSync(p, 'utf8'); }` is a reader.
+ * calls one, resolved to a fixpoint so a wrapper around a wrapper still counts.
  */
 function readerNames(ast) {
+  const assigned = functionAssignments(ast);
   const names = new Set(BASE_READERS);
-  for (let pass = 0; pass < 3; pass += 1) {
+  let grew = true;
+  while (grew) {
+    grew = false;
     for (const node of walkNodes(ast)) {
       if (!FUNCTION_TYPES.includes(node.type)) continue;
-      const bound =
-        node.id?.name ??
-        (node.parent?.type === 'VariableDeclarator' && node.parent.id?.type === 'Identifier'
-          ? node.parent.id.name
-          : undefined);
-      if (!bound || names.has(bound)) continue;
-      for (const inner of walkNodes(node.body)) {
-        if (inner.type === 'CallExpression' && names.has(calledName(inner))) {
-          names.add(bound);
-          break;
-        }
-      }
+      const bound = boundFunctionName(node, assigned);
+      if (!bound || names.has(bound) || !callsAReader(node.body, names)) continue;
+      names.add(bound);
+      grew = true;
     }
   }
   return names;
 }
 
-/** Bind a function expression to the declarator name it is assigned to, which the AST omits. */
-function namedFunctionBindings(ast) {
-  const named = new Map();
-  for (const node of walkNodes(ast)) {
-    if (node.type !== 'VariableDeclarator' || node.id?.type !== 'Identifier') continue;
-    if (node.init && FUNCTION_TYPES.includes(node.init.type)) named.set(node.init, node.id.name);
-  }
-  return named;
-}
-
-const isReader = (node, readers) =>
-  node?.type === 'CallExpression' && readers.has(calledName(node));
-
-/**
- * Two sets resolved together to a fixpoint: a PATH binding spells a `src/` path without reading
- * it, and a SOURCE binding holds text a reader returned. A binding whose initialiser CALLS a
- * reader is a source even when it also spells the path, which is the case a path-first rule
- * mis-files.
- */
-function resolveBindings(ast, scopeManager, readers, seedPaths = new Set()) {
-  const declarations = [];
-  for (const node of walkNodes(ast)) {
-    if (node.type === 'VariableDeclarator' && node.id?.type === 'Identifier' && node.init) {
-      declarations.push(node);
-    }
-  }
-  // Resolve every reference to the variable it actually binds, so two `source` declarations in
-  // different functions stay apart. `variableFor` maps both a declarator's own id node and every
-  // later reference to one variable object, which is what the sets below hold.
-  const variableFor = new Map();
+/** Map every declaration and reference to the variable it binds, so names cannot be conflated. */
+function variableIndex(scopeManager) {
+  const index = new Map();
   for (const scope of scopeManager?.scopes ?? []) {
     for (const variable of scope.variables) {
       for (const definition of variable.defs) {
-        if (definition.name) variableFor.set(definition.name, variable);
+        if (definition.name) index.set(definition.name, variable);
       }
-      for (const reference of variable.references) variableFor.set(reference.identifier, variable);
+      for (const reference of variable.references) index.set(reference.identifier, variable);
     }
   }
-  const keyFor = (node) => variableFor.get(node) ?? node?.name;
+  return index;
+}
+
+/** Whether any identifier in a subtree resolves to a key already in `known`. */
+function referencesKnown(node, known, keyFor, seedPaths) {
+  for (const inner of walkNodes(node)) {
+    if (inner.type !== 'Identifier') continue;
+    if (known.has(keyFor(inner))) return true;
+    if (seedPaths.has(inner.name) && known.has(inner.name)) return true;
+  }
+  return false;
+}
+
+/**
+ * Whether a read call names a `src/` path directly or through a path binding.
+ *
+ * `seedPaths` is honoured while RESOLVING a binding but not when scoring the read itself: a seeded
+ * name is a claim about another module, and letting it score a call site directly counted reads of
+ * `lang/` and `scripts/` as source. The two call sites pass `seedPaths` accordingly.
+ */
+const readsSrc = (call, paths, keyFor, seedPaths) =>
+  spellsSrcPath(call) ||
+  call.arguments.some((argument) => referencesKnown(argument, paths, keyFor, seedPaths));
+
+/**
+ * Classify one declaration: a PATH binding spells a `src/` path without reading it, and a SOURCE
+ * binding holds text a reader returned. A binding whose initialiser CALLS a reader is a source
+ * even when it also spells the path, which is the case a path-first rule mis-files.
+ */
+function classifyDeclaration(declaration, context) {
+  const { readers, paths, sources, keyFor, seedPaths } = context;
+  const reads = [...walkNodes(declaration.init)].filter((node) => isReader(node, readers));
+  // The two are computed independently rather than as an either/or: a binding that spells a path
+  // and is later found to derive from a source is both, and collapsing them moves real counts.
+  const path = reads.length === 0 && spellsSrcPath(declaration.init);
+  const source =
+    reads.some((read) => readsSrc(read, paths, keyFor, seedPaths)) ||
+    (reads.length > 0 && spellsSrcPath(declaration.init)) ||
+    referencesKnown(declaration.init, sources, keyFor, seedPaths);
+  return { path, source };
+}
+
+function resolveBindings(ast, scopeManager, readers, seedPaths) {
+  const index = variableIndex(scopeManager);
+  const keyFor = (node) => index.get(node) ?? node?.name;
+  const declarations = [...walkNodes(ast)].filter(
+    (node) => node.type === 'VariableDeclarator' && node.id?.type === 'Identifier' && node.init
+  );
   const paths = new Set(seedPaths);
   const sources = new Set();
-  // A seeded name is matched by text as well as by variable, because an imported binding's
-  // declaration lives in the module it came from.
-  const referencedKeys = (node) => {
-    const keys = new Set();
-    for (const inner of walkNodes(node)) {
-      if (inner.type !== 'Identifier') continue;
-      keys.add(keyFor(inner));
-      if (seedPaths.has(inner.name)) keys.add(inner.name);
-    }
-    return keys;
-  };
-  // Monotone over a finite set of declarator names, so this terminates on its own.
+  const context = { readers, paths, sources, keyFor, seedPaths };
+  // Monotone over a finite set of declarations, so this terminates on its own; a fixed pass bound
+  // would only turn a long binding chain into a silent under-count.
   let grew = true;
   while (grew) {
     grew = false;
     for (const declaration of declarations) {
       const key = keyFor(declaration.id);
-      const reads = [...walkNodes(declaration.init)].filter((node) => isReader(node, readers));
-      if (!paths.has(key) && reads.length === 0 && spellsSrcPath(declaration.init)) {
+      if (paths.has(key) && sources.has(key)) continue;
+      const { path, source } = classifyDeclaration(declaration, context);
+      if (path && !paths.has(key)) {
         paths.add(key);
         grew = true;
       }
-      if (sources.has(key)) continue;
-      let isSource = reads.some(
-        (read) =>
-          spellsSrcPath(read) ||
-          read.arguments.some((argument) =>
-            [...referencedKeys(argument)].some((referenced) => paths.has(referenced))
-          )
-      );
-      if (!isSource && reads.length > 0 && spellsSrcPath(declaration.init)) isSource = true;
-      if (!isSource) {
-        isSource = [...referencedKeys(declaration.init)].some((referenced) =>
-          sources.has(referenced)
-        );
-      }
-      if (isSource) {
+      if (source && !sources.has(key)) {
         sources.add(key);
         grew = true;
       }
@@ -158,10 +167,7 @@ function resolveBindings(ast, scopeManager, readers, seedPaths = new Set()) {
   return { paths, sources, keyFor };
 }
 
-/**
- * The identifier a call's receiver is ultimately reached through, so `holder.source.includes(...)`
- * and `byFile[path].includes(...)` resolve to `holder` and `byFile` rather than to nothing.
- */
+/** The identifier a call's receiver is reached through, so `byFile[path]` resolves to `byFile`. */
 function receiverNode(node) {
   let object = node.callee?.type === 'MemberExpression' ? node.callee.object : undefined;
   while (object?.type === 'MemberExpression') object = object.object;
@@ -188,60 +194,43 @@ function parameterNames(ast) {
   return names;
 }
 
+/** Whether this call asserts the shape of source text, and so is one pin site. */
+function isPinSite(node, context) {
+  const { readers, paths, sources, keyFor, parameters } = context;
+  if (isReader(node, readers)) return readsSrc(node, paths, keyFor, new Set());
+  const called = calledName(node);
+  const receiver = receiverNode(node);
+  // `assert.match(source, /x/)` and `/x/.test(source)` take the text as an argument, not a receiver.
+  if ((called === 'match' && receiver?.name === 'assert') || called === 'test') {
+    const [subject] = node.arguments;
+    return subject?.type === 'Identifier' && sources.has(keyFor(subject));
+  }
+  if (called !== 'includes' || receiver === undefined) return false;
+  // A resolved source binding is pin enough whatever the needle: a pin whose argument is a loop
+  // variable is still a pin, and requiring a literal would let one be hidden by hoisting it.
+  if (sources.has(keyFor(receiver))) return true;
+  // A parameter is reached without resolving to a read, so it needs a literal needle to stay clear
+  // of ordinary membership checks, and only counts where scanning handed-in source is the job.
+  return matchesLiteral(node) && parameters.has(receiver.name);
+}
+
 /**
  * @param {object} ast A module AST from `parseModule`.
- * @param {{file?: string}} options The repo-relative path, which decides whether a parameter the
- *   module was handed counts as source it is pinning.
+ * @param {{file?: string, scopeManager?: object, seedPaths?: Set<string>}} options `file` decides
+ *   whether a parameter the module was handed counts as source it is pinning; `seedPaths` names the
+ *   `src/` path constants this module imports.
  * @returns {number}
  */
 export function countPinSites(ast, { file = '', scopeManager, seedPaths = new Set() } = {}) {
-  const named = namedFunctionBindings(ast);
-  for (const [node, name] of named)
-    node.parent = { type: 'VariableDeclarator', id: { type: 'Identifier', name } };
   const readers = readerNames(ast);
   const { paths, sources, keyFor } = resolveBindings(ast, scopeManager, readers, seedPaths);
-  // A helper handed source text pins it through a parameter, never through a binding it read.
-  // Counted everywhere, that shape sweeps up ordinary array membership in behavioural tests:
-  // 425 sites across 94 files, against 11 under `tests/helpers/`.
-  const scansHandedSource = file.startsWith('tests/helpers/');
-  const parameters = scansHandedSource ? parameterNames(ast) : new Set();
+  // Counted everywhere, the parameter shape sweeps up ordinary array membership in behavioural
+  // tests: 425 sites across 94 files, against 11 under `tests/helpers/`.
+  const parameters = file.startsWith('tests/helpers/') ? parameterNames(ast) : new Set();
+  const context = { readers, paths, sources, keyFor, seedPaths, parameters };
   let sites = 0;
   for (const node of walkNodes(ast)) {
-    if (node.type !== 'CallExpression') continue;
-    const called = calledName(node);
-    const receiverIdentifier = receiverNode(node);
-    const receiver = receiverIdentifier ? keyFor(receiverIdentifier) : undefined;
-    const receiverText = receiverIdentifier?.name;
-    if (
-      isReader(node, readers) &&
-      (spellsSrcPath(node) ||
-        node.arguments.some((argument) =>
-          [...walkNodes(argument)].some(
-            (inner) => inner.type === 'Identifier' && paths.has(keyFor(inner))
-          )
-        ))
-    ) {
-      sites += 1;
-      continue;
-    }
-    // `assert.match(source, /x/)` and `/x/.test(source)` assert the shape of source text exactly
-    // as `includes` does; the subject is the argument rather than the receiver.
-    if ((called === 'match' && receiverText === 'assert') || called === 'test') {
-      const subject = node.arguments[0];
-      if (subject?.type === 'Identifier' && sources.has(keyFor(subject))) sites += 1;
-      continue;
-    }
-    if (called !== 'includes') continue;
-    // A resolved source binding is pin enough whatever the needle: a pin whose argument is a loop
-    // variable is still a pin, and requiring a literal would let one be hidden by hoisting it.
-    if (receiver !== undefined && sources.has(receiver)) {
-      sites += 1;
-      continue;
-    }
-    // The widened shapes below are reached without resolving the text to a read, so they require a
-    // literal needle to stay clear of ordinary membership checks.
-    if (!matchesLiteral(node)) continue;
-    if (scansHandedSource && receiverText !== undefined && parameters.has(receiverText)) sites += 1;
+    if (node.type === 'CallExpression' && isPinSite(node, context)) sites += 1;
   }
   return sites;
 }

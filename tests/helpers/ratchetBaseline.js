@@ -37,6 +37,7 @@
  * This file is deliberately NOT named `*.test.js`: `tests/helpers/` is outside the `npm test`
  * glob. Its guarantees are proved from inside the glob by `tests/ratchet-baseline.test.js`.
  */
+import { readFileSync, writeFileSync } from 'node:fs';
 
 /**
  * Tally observed keys.
@@ -239,4 +240,41 @@ export function describeLedgerDrift(actual, expected, wording) {
     `count that ROSE ${wording.roseHint}, and a count that FELL ${wording.fellHint}. ` +
     `Re-derive with ${wording.regenerate}.`
   );
+}
+
+/**
+ * One exact-count ledger gate (issues 1657, 1658). Two gates of this shape now exist and a third
+ * is planned, so the scaffolding lives here rather than being re-authored per gate: SonarCloud
+ * counts `tests/**` duplication at full weight and normalizes string literals, so differing key
+ * names and prose would not hide a second copy.
+ *
+ * The caller supplies only what differs: where the ledger lives, which environment variable
+ * re-derives it, how to build a fresh one, and the wording of its drift message.
+ *
+ * @param {{ledgerPath: string, regenerateEnv: string, build: () => object,
+ *   wording: object}} options
+ */
+export function ledgerGate({ ledgerPath, regenerateEnv, build, wording }) {
+  let cached;
+  const current = () => {
+    cached ??= build();
+    return cached;
+  };
+  return {
+    current,
+    /** The pinned ledger as committed. */
+    pinned: () => JSON.parse(readFileSync(ledgerPath, 'utf8')),
+    /** True when this run rewrote the ledger instead of asserting against it. */
+    regenerated: () => Boolean(process.env[regenerateEnv]),
+    /** Assert the fresh ledger against the pinned one, or rewrite it when regenerating. */
+    check(assert) {
+      const actual = current();
+      if (process.env[regenerateEnv]) {
+        writeFileSync(ledgerPath, `${JSON.stringify(actual, null, 2)}\n`);
+        return;
+      }
+      const expected = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+      assert.deepStrictEqual(actual, expected, describeLedgerDrift(actual, expected, wording));
+    },
+  };
 }

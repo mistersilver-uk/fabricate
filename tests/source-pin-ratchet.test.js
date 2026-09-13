@@ -7,17 +7,15 @@
  * string or regex literal, and a token in a comment, count zero.
  */
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 
 import { literalStrings, parseModule, walkNodes } from './helpers/moduleAst.js';
-import { byCodePoint, describeLedgerDrift } from './helpers/ratchetBaseline.js';
+import { byCodePoint, ledgerGate } from './helpers/ratchetBaseline.js';
 import { countPinSites } from './helpers/sourcePinSites.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 
 const LEDGER_PATH = resolve(import.meta.dirname, 'source-pin-ledger.json');
-const LEDGER = JSON.parse(readFileSync(LEDGER_PATH, 'utf8'));
 
 const REGENERATE =
   'UPDATE_SOURCE_PIN_LEDGER=1 node --conditions=browser --test ' +
@@ -92,31 +90,23 @@ function buildLedger() {
   return Object.fromEntries(counted.sort(([left], [right]) => byCodePoint(left, right)));
 }
 
-let cached;
-function currentLedger() {
-  cached ??= buildLedger();
-  return cached;
-}
+const gate = ledgerGate({
+  ledgerPath: LEDGER_PATH,
+  regenerateEnv: 'UPDATE_SOURCE_PIN_LEDGER',
+  build: buildLedger,
+  wording: {
+    subject: 'source-pin counts',
+    regenerate: REGENERATE,
+    structuralHint:
+      'A file that newly pins source text needs a reason; one that stopped has paid the debt ' +
+      'down and should bank it.',
+    roseHint: 'means a new pin on how the code is written rather than what it does',
+    fellHint: 'needs the ledger lowered to bank the conversion',
+  },
+});
 
 test('the source-pin ledger matches the pinned baseline exactly, per test file', () => {
-  const actual = currentLedger();
-  if (process.env.UPDATE_SOURCE_PIN_LEDGER) {
-    writeFileSync(LEDGER_PATH, `${JSON.stringify(actual, null, 2)}\n`);
-    return;
-  }
-  assert.deepStrictEqual(
-    actual,
-    LEDGER,
-    describeLedgerDrift(actual, LEDGER, {
-      subject: 'source-pin counts',
-      // The corpus is the working tree, so a stray untracked file trips the set before a real change.
-      regenerate: REGENERATE,
-      structuralHint:
-        'A file that newly pins source text needs a reason; one that stopped has paid the debt down and should bank it.',
-      roseHint: 'means a new pin on how the code is written rather than what it does',
-      fellHint: 'needs the ledger lowered to bank the conversion',
-    })
-  );
+  gate.check(assert);
 });
 
 test('a pattern spelled as a literal is not a pin site, so this gate does not count itself', () => {
