@@ -493,7 +493,7 @@ export function buildWorldEssenceMergeNotice(report, localize) {
         localize,
         'FABRICATE.Migration.WorldEssenceMerge.ItemOverrideScope',
         undefined,
-        'Fabricate could only update the per-item essence overrides on items your characters are carrying, so a world item, a compendium item or an unlinked token actor may still name a merged-away essence. Nothing resolves to the wrong essence — a retired id is never reused — but those items contribute no essence at all until you open and re-save them.'
+        'Fabricate could only update the per-item essence overrides on items your characters are carrying, so a world item, a compendium item or an unlinked token actor may still name a merged-away essence. Nothing resolves to the wrong essence — a retired id is never reused — but a merged-away id counts for nothing, so those items contribute less essence than they did, or none at all. Fabricate has no screen for these overrides, so whatever set them — a GM, a macro or another module — has to set them again.'
       )
     );
   }
