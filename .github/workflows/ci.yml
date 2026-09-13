@@ -79,8 +79,37 @@ jobs:
           echo "::error::playwright install failed twice; see issue 1264"
           exit 1
 
+      # TEE'd to RUNNER_TEMP rather than the workspace: several suites scan the repository tree, and
+      # a stray file appearing there mid-run is a test input. `pipefail` keeps the step's status the
+      # runner's rather than `tee`'s, which always succeeds.
       - name: Run unit tests
-        run: npm test
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee "$RUNNER_TEMP/unit-tests.tap"
+
+      # THE FAILING TEST NAMES, RE-PRINTED LAST. The TAP reporter writes each failure where it
+      # happens and emits ~119,000 lines in total, so on a red run every `not ok` line sits in the
+      # first ~96% of the log — past the reach of the log APIs, which serve a bounded tail. At issue
+      # 1654 that made a one-test failure cost two CI cycles to place. Re-printing the failures at
+      # the END of the job is what makes a red run readable without downloading the artifact.
+      - name: Report failing tests
+        if: failure()
+        run: |
+          echo "::group::Failing tests"
+          grep -E '^[[:space:]]*not ok ' "$RUNNER_TEMP/unit-tests.tap" || echo 'no "not ok" line: the suite failed before reporting, or died outside a test'
+          echo "::endgroup::"
+          echo "::group::Failure detail"
+          grep -E -A 25 '^[[:space:]]*not ok ' "$RUNNER_TEMP/unit-tests.tap" | head -500 || true
+          echo "::endgroup::"
+
+      # The full TAP, for a failure the re-print above truncates.
+      - name: Upload unit test output
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: unit-tests-tap
+          path: ${{ runner.temp }}/unit-tests.tap
+          retention-days: 7
 
       - name: Build module
         run: npm run build

@@ -37,6 +37,14 @@
  *      missed site bearing a NEW name, and two of `#### D9`'s three historical gaps bore none —
  *      `onBreak.replacementTarget.componentId` reuses `componentId` and essence `sourceItemUuid`
  *      reuses `sourceItemUuid`, so both would sit in neither list, go untouched, and pass.
+ *
+ * The essence leg (issue 1654) is diffed on its own: one pass with `remapComponent` + `remapTool`
+ * live against `WORLD_SCOPE_REFERENCE_SITES`, one with `remapEssence` live against
+ * `WORLD_SCOPE_ESSENCE_REFERENCE_SITES`, so neither list weakens into a subset comparison.
+ *
+ * An essence id is the first id class this walk rewrites in key position, so a third closure diffs
+ * each object's own key list and reports a moved one as a key-position site spelled `…essences{}`.
+ * A leaf of a re-keyed map is attributed there rather than double-counted as a vanished leaf.
  */
 
 import assert from 'node:assert/strict';
@@ -44,10 +52,14 @@ import test from 'node:test';
 import { Recipe } from '../src/models/Recipe.js';
 import {
   keyedRemapper,
+  rewriteEssenceQuantityMap,
   rewriteGatheringSliceReferences,
+  rewriteMembershipReferences,
   rewriteRecipeReferences,
   rewriteSystemReferences,
   WORLD_SCOPE_DEFENSIVE_SITES,
+  WORLD_SCOPE_ESSENCE_DEFENSIVE_SITES,
+  WORLD_SCOPE_ESSENCE_REFERENCE_SITES,
   WORLD_SCOPE_REFERENCE_SITES,
 } from '../src/migration/worldScopeReferenceRewrite.js';
 import { installFoundryStubs } from './helpers/worldScopeCorpus.js';
@@ -58,6 +70,30 @@ const { createAdminStore } = await import('../src/ui/svelte/stores/adminStore.js
 
 const MARKER = 'MARKER-ID';
 const REWRITTEN = 'REWRITTEN-ID';
+
+/**
+ * The corpus's authored essence id, and the two ids the essence leg maps it to.
+ *
+ * `markEveryStringLeaf` replaces string leaves only, so after marking the sole surviving `fire`
+ * occurrences are object keys of an `essences` quantity map — which is what makes the key-position
+ * leg derivable. `MARKER` and `fire` map to distinct targets so a diff tells the rewrites apart.
+ */
+const ESSENCE_KEY = 'fire';
+const ESSENCE_VALUE_REWRITTEN = 'REWRITTEN-ESSENCE-VALUE';
+const ESSENCE_KEY_REWRITTEN = 'REWRITTEN-ESSENCE-KEY';
+
+/**
+ * One essence-typed ingredient option, with an essence-typed alternative.
+ *
+ * Shared by the system and recipe producers because `matchTypes.js`'s `essenceHandler` normalizes
+ * all three positions to the same `{ type: 'essence', essenceId, amount }`, and `tests/**` counts
+ * against the duplication gate exactly as `src/` does.
+ */
+const essenceOption = () => ({
+  quantity: 1,
+  match: { type: 'essence', essenceId: ESSENCE_KEY, amount: 3 },
+  alternatives: [{ quantity: 1, match: { type: 'essence', essenceId: ESSENCE_KEY, amount: 2 } }],
+});
 
 // ---------------------------------------------------------------------------
 // Deriving the maximally-populated corpus from the three REAL producers
@@ -71,7 +107,7 @@ function producedSystem() {
     features: { salvage: true, essences: true, gathering: true },
     essenceDefinitions: [
       {
-        id: 'fire',
+        id: ESSENCE_KEY,
         name: 'Fire',
         icon: 'fas fa-fire',
         colorToken: 'rose',
@@ -94,7 +130,7 @@ function producedSystem() {
         aliasItemUuids: ['Item.bbb'],
         category: 'reagent',
         tags: ['alchemical'],
-        essences: { fire: 2 },
+        essences: { [ESSENCE_KEY]: 2 },
         difficulty: 3,
         complications: [{ id: 'cx-1', label: 'Cracks' }],
         salvage: {
@@ -136,6 +172,7 @@ function producedSystem() {
                   { quantity: 1, match: { type: 'component', componentId: 'comp-1' } },
                 ],
               },
+              essenceOption(),
             ],
           },
         ],
@@ -149,6 +186,10 @@ function producedRecipe() {
     id: 'is-1',
     name: 'Set',
     toolIds: ['tool-1'],
+    // `IngredientSet.toJSON` omits an empty per-set quantity map, which would make
+    // `recipes[].ingredientSets[].essences{}` unproducible and demote the site to the defensive
+    // list; it is populated so the derivation genuinely covers it.
+    essences: { [ESSENCE_KEY]: 1 },
     ingredientGroups: [
       {
         id: 'ig-1',
@@ -159,6 +200,7 @@ function producedRecipe() {
             match: { type: 'component', componentId: 'comp-1' },
             alternatives: [{ quantity: 1, match: { type: 'component', componentId: 'comp-1' } }],
           },
+          essenceOption(),
         ],
       },
     ],
@@ -255,6 +297,46 @@ function leafPaths(value, path = '', collected = new Map()) {
   return collected;
 }
 
+/**
+ * Every plain object in a value, as `path -> its own key names`, with array indices collapsed.
+ *
+ * The key-position counterpart of {@link leafPaths}, and the only view here that can see an essence
+ * id re-keyed in key position. Keys accumulate per collapsed path, because two array entries share
+ * one path, and the question asked is whether that position's key vocabulary moved, not entry 3's.
+ */
+function keySetPaths(value, path = '', collected = new Map()) {
+  if (Array.isArray(value)) {
+    for (const entry of value) keySetPaths(entry, `${path}[]`, collected);
+    return collected;
+  }
+  if (value === null || typeof value !== 'object') return collected;
+  const keys = collected.get(path) ?? new Set();
+  for (const key of Object.keys(value)) keys.add(key);
+  collected.set(path, keys);
+  for (const [key, entry] of Object.entries(value)) {
+    keySetPaths(entry, path ? `${path}.${key}` : key, collected);
+  }
+  return collected;
+}
+
+/** The paths of every object whose own key set the walk moved. */
+function reKeyedPaths(beforeRoot, afterRoot) {
+  const beforeKeys = keySetPaths(beforeRoot);
+  const afterKeys = keySetPaths(afterRoot);
+  const moved = new Set();
+  for (const [path, keys] of beforeKeys) {
+    const after = [...(afterKeys.get(path) ?? [])].sort().join('|');
+    if ([...keys].sort().join('|') !== after) moved.add(path);
+  }
+  return moved;
+}
+
+/** The object path a leaf path hangs off, or `''` for a leaf on the root. */
+function parentPath(path) {
+  const cut = path.lastIndexOf('.');
+  return cut === -1 ? '' : path.slice(0, cut);
+}
+
 function buildMarkedCorpus() {
   return {
     systems: [markEveryStringLeaf(system)],
@@ -263,42 +345,61 @@ function buildMarkedCorpus() {
   };
 }
 
-/** Run the shared walk with `MARKER -> REWRITTEN` on both legs and diff the leaf paths. */
-function touchedPaths() {
+function markedCorpusRoots(corpus) {
+  return [
+    ['systems[]', corpus.systems[0]],
+    ['recipes[]', corpus.recipes[0]],
+    ['gatheringConfig.systems.*', corpus.gatheringConfig.systems['sys-1']],
+  ];
+}
+
+/**
+ * Run the shared walk over the marked corpus with one leg's remappers live and diff it.
+ *
+ * One derivation for all three legs, driven by the remappers it is handed, so neither the
+ * component-and-tool list nor the essence list can acquire the weaker derivation.
+ */
+function diffMarkedCorpus(remappers) {
   const before = buildMarkedCorpus();
   const after = buildMarkedCorpus();
-  const remappers = {
-    remapComponent: keyedRemapper({ [MARKER]: REWRITTEN }),
-    remapTool: keyedRemapper({ [MARKER]: REWRITTEN }),
-  };
   rewriteSystemReferences(after.systems[0], remappers);
   rewriteRecipeReferences(after.recipes[0], remappers);
   rewriteGatheringSliceReferences(after.gatheringConfig.systems['sys-1'], remappers);
 
-  const roots = [
-    ['systems[]', before.systems[0], after.systems[0]],
-    ['recipes[]', before.recipes[0], after.recipes[0]],
-    [
-      'gatheringConfig.systems.*',
-      before.gatheringConfig.systems['sys-1'],
-      after.gatheringConfig.systems['sys-1'],
-    ],
-  ];
+  const beforeRoots = markedCorpusRoots(before);
+  const afterRoots = markedCorpusRoots(after);
   const touched = new Set();
+  const keyMaps = new Set();
   const allLeaves = new Map();
-  for (const [prefix, beforeRoot, afterRoot] of roots) {
+  for (const [index, [prefix, beforeRoot]] of beforeRoots.entries()) {
+    const afterRoot = afterRoots[index][1];
+    const full = (path) => `${prefix}.${path}`.replace('.[]', '[]');
+    const moved = reKeyedPaths(beforeRoot, afterRoot);
+    for (const path of moved) keyMaps.add(`${full(path)}{}`);
     const beforeLeaves = leafPaths(beforeRoot);
     const afterLeaves = leafPaths(afterRoot);
     for (const [path, value] of beforeLeaves) {
-      const full = `${prefix}.${path}`.replace('.[]', '[]');
-      allLeaves.set(full, value);
-      if (afterLeaves.get(path) !== value) touched.add(full);
+      allLeaves.set(full(path), value);
+      // A leaf of a re-keyed map is already reported as its container's key-position site;
+      // counting it again as a vanished leaf would double-report the one rewrite.
+      if (moved.has(parentPath(path))) continue;
+      if (afterLeaves.get(path) !== value) touched.add(full(path));
     }
   }
-  return { touched, allLeaves };
+  return { touched, keyMaps, allLeaves };
 }
 
-const { touched, allLeaves } = touchedPaths();
+const componentAndToolLeg = diffMarkedCorpus({
+  remapComponent: keyedRemapper({ [MARKER]: REWRITTEN }),
+  remapTool: keyedRemapper({ [MARKER]: REWRITTEN }),
+});
+const essenceLeg = diffMarkedCorpus({
+  remapEssence: keyedRemapper({
+    [MARKER]: ESSENCE_VALUE_REWRITTEN,
+    [ESSENCE_KEY]: ESSENCE_KEY_REWRITTEN,
+  }),
+});
+const { touched, allLeaves } = componentAndToolLeg;
 
 // ---------------------------------------------------------------------------
 
@@ -309,6 +410,10 @@ test('the derived corpus is genuinely maximal — the premise every assertion be
   assert.ok(touched.size > 0, 'the walk must have rewritten something');
   const roots = new Set([...allLeaves.keys()].map((path) => path.split(/[.[]/)[0]));
   assert.deepEqual([...roots].sort(), ['gatheringConfig', 'recipes', 'systems']);
+  // The essence leg has the same anti-vacuity premise, and one more: a corpus carrying no essence
+  // option and no populated quantity map would make both essence closures pass by reading zero.
+  assert.ok(essenceLeg.touched.size > 0, 'the essence leg must have rewritten a leaf value');
+  assert.ok(essenceLeg.keyMaps.size > 0, 'the essence leg must have re-keyed a quantity map');
 });
 
 test('the touched set is SET-EQUAL to the enumerated site list, in BOTH directions', () => {
@@ -321,12 +426,50 @@ test('the touched set is SET-EQUAL to the enumerated site list, in BOTH directio
   );
 });
 
+test('the ESSENCE leg is SET-EQUAL to its own enumerated site list, in BOTH directions', () => {
+  // The leg is derived with `remapComponent` and `remapTool` at `identity`, so this set is the
+  // essence sites alone: a component site that leaked into the essence remapper, or an essence
+  // site the walk lists and does not rewrite, fails here rather than hiding inside a merged list.
+  const actual = [...essenceLeg.touched, ...essenceLeg.keyMaps].sort();
+  assert.deepEqual(
+    actual,
+    [...WORLD_SCOPE_ESSENCE_REFERENCE_SITES].sort(),
+    'an essence site the walk rewrites but does not list, or lists but does not rewrite, is a mirror that has rotted'
+  );
+});
+
+test('the COMPONENT-AND-TOOL leg re-keys NOTHING — key-position rewriting is the essence leg alone', () => {
+  // The negative half of the key-set closure. Every id class except essences is rewritten in leaf
+  // position only, so a component or tool remapper that moved an object key would be rewriting a
+  // position no list names and no reader expects.
+  assert.deepEqual([...componentAndToolLeg.keyMaps].sort(), []);
+});
+
 /**
- * The leaf KEY NAMES a reference site can bear, derived FROM the site list rather than restated.
+ * The leaf key names a reference site can bear, derived from the site lists rather than restated.
+ *
+ * Key-position sites are excluded: a `…essences{}` entry names a container, so folding it in would
+ * put `essences` here and make the path closure below demand that `systems[].features.essences` —
+ * a boolean feature flag sharing the word — be an enumerated reference site.
  */
+const leafKeyName = (path) => path.replace(/\[\]$/, '').split('.').pop().replace(/\[\]$/, '');
+
 const SITE_KEY_NAMES = new Set(
-  WORLD_SCOPE_REFERENCE_SITES.map((site) => site.replace(/\[\]$/, '').split('.').pop())
+  [...WORLD_SCOPE_REFERENCE_SITES, ...WORLD_SCOPE_ESSENCE_REFERENCE_SITES]
+    .filter((site) => !site.endsWith('{}'))
+    .map((site) => leafKeyName(site))
 );
+
+/**
+ * Every enumerated position across all four lists — the two leaf closures and the defensive
+ * completeness walk all ask the same question of it, so it is built once.
+ */
+const ENUMERATED_SITES = new Set([
+  ...WORLD_SCOPE_REFERENCE_SITES,
+  ...WORLD_SCOPE_DEFENSIVE_SITES,
+  ...WORLD_SCOPE_ESSENCE_REFERENCE_SITES,
+  ...WORLD_SCOPE_ESSENCE_DEFENSIVE_SITES,
+]);
 
 /**
  * Every leaf key name in the derived corpus that is NOT a reference site.
@@ -337,9 +480,10 @@ const SITE_KEY_NAMES = new Set(
  * `macroUuid`, `linkedSceneUuid`), authored behaviour and configuration (`mode`, `formula`,
  * `dc`, `enabled`, `salvageResolutionMode`, …), vocabulary tokens (`biomes`, `dangerTags`,
  * `category`, `tags`), and structural containers (`match`, `outcomes`, `salvage`, `alchemy`).
- * `fire` is an ESSENCE ID appearing as an object key in a component's `essences` quantity map —
- * a key position, never a reference — and essence ids are the one class this migration never
- * re-keys.
+ *
+ * Two names no longer fit that one reason and have moved to
+ * {@link ESSENCE_LEG_NON_SITE_KEY_NAMES}: both rested on essence ids never being re-keyed, which
+ * `1.34.0` retired (issue 1654).
  *
  * THE LIST IS THE MIRROR AND THE CLOSURE IS ITS GUARD. It is TOTAL against the derived corpus in
  * both directions, so a NEW leaf key emitted by any of the three producers is on neither list and
@@ -351,6 +495,7 @@ const NON_SITE_KEY_NAMES = new Set([
   'alchemy',
   'aliasItemUuids',
   'allowPlayerResultReorder',
+  'amount',
   'author',
   'awardMode',
   'biomeModifierAggregation',
@@ -391,7 +536,6 @@ const NON_SITE_KEY_NAMES = new Set([
   'enableMultiStepRecipes',
   'enableTags',
   'enabled',
-  'essences',
   'eventLimit',
   'eventModifier',
   'eventPolicy',
@@ -400,7 +544,6 @@ const NON_SITE_KEY_NAMES = new Set([
   'expr',
   'expression',
   'failureResultPolicy',
-  'fire',
   'formula',
   'gateMode',
   'gathering',
@@ -459,14 +602,27 @@ const NON_SITE_KEY_NAMES = new Set([
   'visibilityMode',
 ]);
 
+/**
+ * The two leaf key names issue 1654 moved out of {@link NON_SITE_KEY_NAMES}.
+ *
+ * Both rested there on "essence ids are the one class this migration never re-keys", and `1.34.0`
+ * re-keys one for the first time, so that rationale would now read as a guarantee this test does
+ * not make. Each is still a non-site for a reason that survives the change:
+ *
+ * - `essences` — every leaf of this name is a boolean (`features.essences`, the system's feature
+ *   switch), and `SITE_KEY_NAMES` holds leaf field names, so admitting it would demand that a
+ *   feature flag be a reference site. Its container is guarded as `…essences{}` by the key closure.
+ * - `fire` — an essence id in key position, re-keyed by the essence leg under
+ *   `systems[].components[].essences{}` and the two ingredient-set maps. It stays a non-site key
+ *   name because the closures classify the name of a field holding an id, not the id itself.
+ */
+const ESSENCE_LEG_NON_SITE_KEY_NAMES = new Set(['essences', ESSENCE_KEY]);
+
 test('the KEY-NAME closure: every leaf key in the derived corpus is a site key or a listed non-site', () => {
-  const keyNames = new Set(
-    [...allLeaves.keys()].map((path) =>
-      path.replace(/\[\]$/, '').split('.').pop().replace(/\[\]$/, '')
-    )
-  );
+  const keyNames = new Set([...allLeaves.keys()].map((path) => leafKeyName(path)));
+  const nonSites = new Set([...NON_SITE_KEY_NAMES, ...ESSENCE_LEG_NON_SITE_KEY_NAMES]);
   const unclassified = [...keyNames].filter(
-    (key) => !SITE_KEY_NAMES.has(key) && !NON_SITE_KEY_NAMES.has(key)
+    (key) => !SITE_KEY_NAMES.has(key) && !nonSites.has(key)
   );
   assert.deepEqual(
     unclassified.sort(),
@@ -474,7 +630,7 @@ test('the KEY-NAME closure: every leaf key in the derived corpus is a site key o
     'a NEW leaf key emitted by any of the three producers is on neither list and fails HERE, ' +
       'whatever it is called — which is what an anchored seven-name regex could never do'
   );
-  const unused = [...NON_SITE_KEY_NAMES].filter((key) => !keyNames.has(key));
+  const unused = [...nonSites].filter((key) => !keyNames.has(key));
   assert.deepEqual(
     unused.sort(),
     [],
@@ -483,10 +639,9 @@ test('the KEY-NAME closure: every leaf key in the derived corpus is a site key o
 });
 
 test('the PATH closure: every leaf whose key name is a SITE key name is itself an enumerated site', () => {
-  const enumerated = new Set([...WORLD_SCOPE_REFERENCE_SITES, ...WORLD_SCOPE_DEFENSIVE_SITES]);
   const unlisted = [...allLeaves.keys()].filter((path) => {
-    const key = path.replace(/\[\]$/, '').split('.').pop().replace(/\[\]$/, '');
-    return SITE_KEY_NAMES.has(key) && !enumerated.has(path);
+    const key = leafKeyName(path);
+    return SITE_KEY_NAMES.has(key) && !ENUMERATED_SITES.has(path);
   });
   assert.deepEqual(
     unlisted.sort(),
@@ -515,19 +670,21 @@ test('the DEFENSIVE list is COMPLETE: every unproducible leaf the walk touches i
   // and every leaf the walk rewrites must be either an enumerated site or a listed defensive
   // one. An earlier form of the list named `catalysts[]` as a bare array path and omitted every
   // `systemItemId` alias, so the invariant it stated was false.
+  // `essenceId` sits alongside the component spellings in one match rather than in a second
+  // essence-typed corpus: the walk is key-driven and never reads `match.type`, so a single
+  // over-populated match reaches every alias at once and a `type` field cannot mask a site.
+  const match = () => ({
+    type: 'component',
+    componentId: MARKER,
+    systemItemId: MARKER,
+    essenceId: MARKER,
+  });
   const ingredient = () => ({
     quantity: 1,
     componentId: MARKER,
     systemItemId: MARKER,
-    match: { type: 'component', componentId: MARKER, systemItemId: MARKER },
-    alternatives: [
-      {
-        quantity: 1,
-        componentId: MARKER,
-        systemItemId: MARKER,
-        match: { type: 'component', componentId: MARKER, systemItemId: MARKER },
-      },
-    ],
+    match: match(),
+    alternatives: [{ quantity: 1, componentId: MARKER, systemItemId: MARKER, match: match() }],
   });
   const set = () => ({
     id: MARKER,
@@ -611,12 +768,12 @@ test('the DEFENSIVE list is COMPLETE: every unproducible leaf the walk touches i
   const remappers = {
     remapComponent: keyedRemapper({ [MARKER]: REWRITTEN }),
     remapTool: keyedRemapper({ [MARKER]: REWRITTEN }),
+    remapEssence: keyedRemapper({ [MARKER]: ESSENCE_VALUE_REWRITTEN }),
   };
   rewriteSystemReferences(after.system, remappers);
   rewriteRecipeReferences(after.recipe, remappers);
   rewriteGatheringSliceReferences(after.slice, remappers);
 
-  const enumerated = new Set([...WORLD_SCOPE_REFERENCE_SITES, ...WORLD_SCOPE_DEFENSIVE_SITES]);
   const unlisted = [];
   for (const [prefix, beforeRoot, afterRoot] of [
     ['systems[]', before.system, after.system],
@@ -628,7 +785,7 @@ test('the DEFENSIVE list is COMPLETE: every unproducible leaf the walk touches i
     for (const [path, value] of beforeLeaves) {
       if (afterLeaves.get(path) === value) continue;
       const full = `${prefix}.${path}`.replace('.[]', '[]');
-      if (!enumerated.has(full)) unlisted.push(full);
+      if (!ENUMERATED_SITES.has(full)) unlisted.push(full);
     }
   }
   assert.deepEqual(
@@ -652,4 +809,150 @@ test('every DEFENSIVE site is genuinely unproducible — the list cannot hide a 
     'a defensive site the producers actually emit belongs in WORLD_SCOPE_REFERENCE_SITES'
   );
   assert.ok(WORLD_SCOPE_DEFENSIVE_SITES.length > 0, 'the exemption list is not vacuous');
+});
+
+test('every ESSENCE defensive site is genuinely unproducible, leaf and key position alike', () => {
+  // Same guard for the key-position half, which needs its own lookup: a `…essences{}` entry is not
+  // a leaf path, so `allLeaves` can never contain it. It is checked against the container paths the
+  // producers emit rather than resting on a stale "the fixture cannot reach it" claim.
+  const producedLeaves = new Set(allLeaves.keys());
+  const producedContainers = new Set([...allLeaves.keys()].map((path) => `${parentPath(path)}{}`));
+  const producible = WORLD_SCOPE_ESSENCE_DEFENSIVE_SITES.filter((site) =>
+    site.endsWith('{}') ? producedContainers.has(site) : producedLeaves.has(site)
+  );
+  assert.deepEqual(
+    producible,
+    [],
+    'an essence defensive site the producers actually emit belongs in WORLD_SCOPE_ESSENCE_REFERENCE_SITES'
+  );
+  assert.ok(WORLD_SCOPE_ESSENCE_DEFENSIVE_SITES.length > 0, 'the exemption list is not vacuous');
+});
+
+// ---------------------------------------------------------------------------
+// The essence leg's behaviour, where the derived fixture cannot reach (issue 1654)
+// ---------------------------------------------------------------------------
+
+/** `{ essences }` carriers for the two world-scope rows the derived corpus has no producer for. */
+const scopeRows = () => ({
+  worldDefault: { id: 'comp-1', category: 'reagent', essences: { fire: 2, flame: 3 } },
+  membership: {
+    entityId: 'comp-1',
+    systemId: 'sys-1',
+    inherit: { category: false, essences: false },
+    essences: { fire: 2, flame: 3 },
+  },
+});
+
+const MERGE_FLAME_INTO_FIRE = { flame: 'fire' };
+
+test('an ESSENCE remapper defaults to identity, so every pre-1654 caller is byte-identical', () => {
+  // The premise the whole leg rests on: `rebindCopyComponentIds` and the `1.30.0` pass hand the
+  // walk two remappers and no third, and must keep seeing essence ids they never asked to move.
+  const before = buildMarkedCorpus();
+  const after = buildMarkedCorpus();
+  rewriteSystemReferences(after.systems[0], {
+    remapComponent: keyedRemapper({ [MARKER]: REWRITTEN }),
+    remapTool: keyedRemapper({ [MARKER]: REWRITTEN }),
+  });
+  rewriteRecipeReferences(after.recipes[0], { remapComponent: keyedRemapper({}) });
+  assert.deepEqual(
+    after.systems[0].components[0].essences,
+    before.systems[0].components[0].essences
+  );
+  assert.equal(
+    after.recipes[0].ingredientSets[0].ingredientGroups[0].options[1].match.essenceId,
+    MARKER,
+    'an essence leaf must be untouched when no essence remapper is supplied'
+  );
+});
+
+test('a KEY COLLISION SUMS, because the survivor carries both merged contributions', () => {
+  const component = { id: 'comp-1', essences: { fire: 2, flame: 3, water: 1 } };
+  rewriteEssenceQuantityMap(component, { remapEssence: keyedRemapper(MERGE_FLAME_INTO_FIRE) });
+  assert.deepEqual(
+    component.essences,
+    { fire: 5, water: 1 },
+    'last-writer-wins here would silently delete a quantity a GM authored'
+  );
+  assert.deepEqual(
+    Object.keys(component.essences),
+    ['fire', 'water'],
+    'a merged key keeps the position of its FIRST contributor'
+  );
+});
+
+test('the essence re-key is IDEMPOTENT on a map whose image is disjoint from its keys', () => {
+  const rewrite = (set) =>
+    rewriteRecipeReferences(
+      { ingredientSets: [set] },
+      { remapEssence: keyedRemapper(MERGE_FLAME_INTO_FIRE) }
+    );
+  const set = { id: 'is-1', essences: { fire: 2, flame: 3 } };
+  rewrite(set);
+  const once = JSON.stringify(set.essences);
+  rewrite(set);
+  assert.equal(
+    JSON.stringify(set.essences),
+    once,
+    'a second pass must not re-sum: `fire` is not a key of the map, so one simultaneous lookup leaves it alone'
+  );
+  assert.deepEqual(set.essences, { fire: 5 });
+});
+
+test('the essence leg is TOTAL: malformed carriers answer, and never throw', () => {
+  const remappers = { remapEssence: keyedRemapper(MERGE_FLAME_INTO_FIRE) };
+  for (const container of [null, undefined, 'flame', 42, []]) {
+    assert.doesNotThrow(() => rewriteEssenceQuantityMap(container, remappers));
+  }
+  // A non-object `essences` is left exactly as found rather than coerced or dropped: a migration
+  // that rewrites a malformed value into a plausible one has destroyed the evidence.
+  for (const essences of [null, 'flame', 7, ['flame']]) {
+    const carrier = { essences };
+    rewriteEssenceQuantityMap(carrier, remappers);
+    assert.deepEqual(carrier.essences, essences);
+  }
+  const missing = { id: 'comp-1' };
+  rewriteEssenceQuantityMap(missing, remappers);
+  assert.deepEqual(missing, { id: 'comp-1' }, 'an absent map must not be invented');
+  assert.doesNotThrow(() => rewriteRecipeReferences({ ingredientSets: [null, 7] }, remappers));
+  assert.doesNotThrow(() => rewriteMembershipReferences(null, 'components', remappers));
+});
+
+test('a non-finite quantity cannot abort the pass or propagate as NaN', () => {
+  const carrier = { essences: { fire: 'lots', flame: 3, ash: 'some', soot: 'more' } };
+  rewriteEssenceQuantityMap(carrier, {
+    remapEssence: keyedRemapper({ flame: 'fire', soot: 'ash' }),
+  });
+  assert.deepEqual(
+    carrier.essences,
+    { fire: 3, ash: 'more' },
+    'a numeric side wins the merge, and two non-numeric sides resolve to the later contribution'
+  );
+});
+
+test('the WORLD-SCOPE rows re-key, and `inherit.essences` — a section NAME — does not', () => {
+  // The two `componentScope` sites no producer in the derived corpus emits, and the highest-stakes
+  // pair: `_normalizeEssenceQuantities` prunes a key outside the Valid Id Basis, so a merged-away
+  // id left standing in `defaults.*.essences{}` or `membership.*.essences{}` dies on the next save.
+  const remappers = { remapEssence: keyedRemapper(MERGE_FLAME_INTO_FIRE) };
+  const { worldDefault, membership } = scopeRows();
+  rewriteEssenceQuantityMap(worldDefault, remappers);
+  rewriteMembershipReferences(membership, 'components', remappers);
+  assert.deepEqual(worldDefault.essences, { fire: 5 });
+  assert.deepEqual(membership.essences, { fire: 5 });
+  assert.deepEqual(
+    membership.inherit,
+    { category: false, essences: false },
+    '`inherit.essences` is a boolean section switch keyed by a section NAME, never by an essence id'
+  );
+});
+
+test('an essence id spelled `__proto__` lands as an OWN key and not as a prototype', () => {
+  const carrier = { essences: { fire: 2 } };
+  rewriteEssenceQuantityMap(carrier, { remapEssence: keyedRemapper({ fire: '__proto__' }) });
+  assert.ok(
+    Object.prototype.hasOwnProperty.call(carrier.essences, '__proto__'),
+    'assigning through a plain object literal would reassign the prototype and lose the entry'
+  );
+  assert.equal(Object.getPrototypeOf(carrier.essences), Object.prototype);
 });

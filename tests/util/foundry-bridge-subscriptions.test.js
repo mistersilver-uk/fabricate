@@ -4,10 +4,15 @@ import assert from 'node:assert/strict';
 import { CRAFTING_DATA_CHANGED_HOOK as PRODUCER_HOOK } from '../../src/systems/craftingDataChange.js';
 import { INVALIDATION_DOMAIN_NAMES } from '../../src/systems/invalidationDomains.js';
 import {
+  RUN_CONTAINER_FLAG_PATHS,
+  runContainerDiffPaths,
+} from '../../src/systems/runFlagInvalidation.js';
+import {
   subscribeInventoryChange,
   subscribeCraftingDataChange,
   subscribeActorRunFlagChange,
   CRAFTING_DATA_CHANGED_HOOK,
+  RUN_FLAG_DIFF_PATHS,
   readCraftingDataFallbackCount,
   resetCraftingDataFallbackCount,
 } from '../../src/ui/svelte/util/foundryBridge.js';
@@ -352,5 +357,86 @@ describe('subscribeActorRunFlagChange', () => {
   it('no-ops when Hooks is absent', () => {
     delete globalThis.Hooks;
     assert.doesNotThrow(() => subscribeActorRunFlagChange(() => {})());
+  });
+
+  // -------------------------------------------------------------------------
+  // Update-operator spellings, and the mirror that must not drift (issue 1654)
+  //
+  // An update operator is part of the last path segment, so a write using one arrives under
+  // a different key: the 1.34.0 remap force-replaces each run container, reaching this diff
+  // as `flags.fabricate.fabricate.==craftingRuns`. The bare-spelling probes matched no
+  // operator form, so the Journal listing and the nav active-run badge never refreshed.
+  // -------------------------------------------------------------------------
+
+  /** The expanded diff Foundry hands `updateActor` for one flattened update key. */
+  const diffFor = (updateKey) => {
+    const segments = updateKey.split('.');
+    const diff = {};
+    let node = diff;
+    for (const segment of segments.slice(0, -1)) {
+      node[segment] = {};
+      node = node[segment];
+    }
+    node[segments.at(-1)] = { active: {}, history: [] };
+    return diff;
+  };
+
+  const firesFor = (updateKey) => {
+    let calls = 0;
+    const unsubscribe = subscribeActorRunFlagChange(() => (calls += 1));
+    hooks.fire('updateActor', { id: 'a' }, diffFor(updateKey));
+    unsubscribe();
+    return calls === 1;
+  };
+
+  it('THE DRIFT GUARD: its mirrored path list equals runFlagInvalidation own derivation', () => {
+    // `foundryBridge.js` cannot import the matcher: it is declared by hand in ~102 mounted
+    // component manifests, and a manifest missing an entry hangs the suite (`# cancelled`)
+    // rather than failing it. So the list is mirrored and guarded here, exactly as
+    // `worldScopeRekeyPending.js` mirrors `SETTING_KEYS`.
+    //
+    // A new run container, a new operator prefix, or a change to where the prefix sits fails
+    // here instead of leaving the bridge one spelling behind.
+    const derived = RUN_CONTAINER_FLAG_PATHS.flatMap(({ flagPath }) =>
+      runContainerDiffPaths(flagPath)
+    );
+    assert.ok(derived.length >= 9, `the premise: the shared module derives paths (${derived.length})`);
+    assert.deepEqual(
+      [...RUN_FLAG_DIFF_PATHS].sort(),
+      [...derived].sort(),
+      'foundryBridge RUN_FLAG_DIFF_PATHS has drifted from runFlagInvalidation; mirror it'
+    );
+  });
+
+  for (const operator of ['==', '-=']) {
+    it(`fires for a \`${operator}\`-keyed write at BOTH flag depths`, () => {
+      // Both depths, because the asymmetry is the trap the shared module's header names:
+      // crafting and salvage are doubly nested, gathering is single-scope.
+      assert.ok(firesFor(`flags.fabricate.fabricate.${operator}craftingRuns`), 'crafting');
+      assert.ok(firesFor(`flags.fabricate.fabricate.${operator}salvageRuns`), 'salvage');
+      assert.ok(firesFor(`flags.fabricate.${operator}gatheringRuns`), 'gathering');
+    });
+  }
+
+  it('is NOT widened: an operator on an unrelated flag still does not fire', () => {
+    // The risk in teaching a matcher a new spelling is that it starts matching everything.
+    for (const updateKey of [
+      'flags.fabricate.fabricate.==learnedRecipes',
+      'flags.fabricate.fabricate.-=alchemyDeadEnds',
+      'flags.other-module.==craftingRuns',
+      'flags.fabricate.==craftingRuns',
+    ]) {
+      assert.ok(!firesFor(updateKey), `${updateKey} touches no run container`);
+    }
+  });
+
+  it('refreshes NOTHING when Foundry own hasProperty is unavailable, deliberately', () => {
+    // A pinned choice: the shared matcher falls back to its own POSIX-dotted probe when handed
+    // a non-function, so delegating without the `typeof` guard would switch this bridge from
+    // "refresh nothing without the engine's probe" to "refresh on a guessed diff shape".
+    // Changing that deliberately means changing this test.
+    delete globalThis.foundry;
+    assert.ok(!firesFor('flags.fabricate.fabricate.craftingRuns'), 'not even the plain spelling');
+    assert.ok(!firesFor('flags.fabricate.fabricate.==craftingRuns'));
   });
 });

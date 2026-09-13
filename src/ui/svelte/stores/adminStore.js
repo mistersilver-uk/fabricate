@@ -215,6 +215,11 @@ const TASK_PROGRESSIVE_AWARD_MODES = new Set(['equal', 'partial', 'exceed']);
 const TASK_TIME_UNITS = ['minutes', 'hours', 'days', 'months', 'years'];
 const TASK_FAILURE_OUTCOME_MODES = new Set(['text', 'macro']);
 const GATHERING_CONFIG_SETTING = 'gatheringConfig';
+// The world setting the `1.34.0` equivalent-essence merge writes its map to (issue 1654), spelled
+// out as `GATHERING_CONFIG_SETTING` is because this file does not import `src/config/settings.js`.
+// `tests/essence-world-scope-screens.test.js` drives the real store with a double keyed on this
+// exact string, so the mirror is guarded.
+const WORLD_ESSENCE_MERGE_MAP_SETTING = 'worldEssenceMergeMap';
 const DEFAULT_GATHERING_CONDITIONS = Object.freeze({ weather: 'clear', timeOfDay: 'day' });
 const DEFAULT_GATHERING_VOCABULARIES = Object.freeze({
   biomes: [
@@ -5703,6 +5708,12 @@ export function createAdminStore(services) {
       // because the essence leg is handed THIS array rather than taking a second one. The
       // counting itself lives in `worldScopeProjection.js`, an open file.
       recipes: worldRecipes,
+      // Issue 1654: nothing in `{stores, systems, usage}` can answer which essence ids `1.34.0`
+      // retired, because the merge map is a world setting of its own rather than part of a scope
+      // corpus. Without it `mintEssenceId` resolves a new essence's id against the live roster
+      // alone and reissues a retired one. The reading lives in `worldScopeProjection.js`; this
+      // supplies the raw value through the same `services.getSetting` seam as the gathering config.
+      essenceMergeMap: _worldEssenceMergeMap(),
       usage: {
         component: _worldComponentUsage(recipeCache),
         essence: _worldEssenceUsage(worldRecipes),
@@ -5746,6 +5757,24 @@ export function createAdminStore(services) {
       tool: services.getToolScopeStore?.() ?? null,
       vocabulary: services.getVocabularyScopeStore?.() ?? null,
     };
+  }
+
+  /**
+   * The raw `fabricate.worldEssenceMergeMap` world setting, or `null` when it cannot be read.
+   *
+   * The guard is load-bearing (issue 1654): `game.settings.get` throws on an unregistered key, and
+   * this store is driven by services doubles that answer only the keys they know, so an unguarded
+   * read would take the whole manager publish down there. Degrading to `null` is also correct,
+   * because `retiredEssenceIds` reads `null`, `{}` and a malformed value alike as no retired ids.
+   *
+   * @returns {unknown} the raw setting value; `null` when absent or unreadable.
+   */
+  function _worldEssenceMergeMap() {
+    try {
+      return services.getSetting?.(WORLD_ESSENCE_MERGE_MAP_SETTING) ?? null;
+    } catch {
+      return null;
+    }
   }
 
   function _allSystems() {

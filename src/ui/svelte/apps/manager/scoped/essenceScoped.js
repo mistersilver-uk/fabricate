@@ -436,6 +436,26 @@ export function isWorldAddressableEffectSource(value, worldEntityIds = []) {
 }
 
 /**
+ * The id set behind a roster given as entity records, as bare id strings, or as an already-built
+ * Set. A Set is returned as given rather than copied, so callers must treat the result as the
+ * caller's own and never write to it. Shared by the two readers below and by
+ * {@link mintEssenceId}'s retired leg, because a third transcription of this coercion would fail
+ * SonarCloud's new-code duplication gate.
+ *
+ * @param {Array<{id?: string}|string>|Set<string>|unknown} source
+ * @returns {Set<string>} the caller's own Set when it handed one.
+ */
+function worldEntityIdSet(source) {
+  if (source instanceof Set) return source;
+  const ids = new Set();
+  for (const entry of Array.isArray(source) ? source : []) {
+    const id = typeof entry === 'string' ? entry : entry?.id;
+    if (typeof id === 'string' && id !== '') ids.add(id);
+  }
+  return ids;
+}
+
+/**
  * The referents a WORLD-DEFAULTS `effectSource` picker may offer.
  *
  * ── THE ENFORCEMENT POINT IS THIS FUNCTION, AND NOTHING BELOW IT ────────────────────────────
@@ -453,14 +473,7 @@ export function isWorldAddressableEffectSource(value, worldEntityIds = []) {
  * @returns {Array<object>} a new array; the input is not mutated.
  */
 export function worldAddressableEffectSources(candidates, worldEntities = []) {
-  const ids =
-    worldEntities instanceof Set
-      ? worldEntities
-      : new Set(
-          (Array.isArray(worldEntities) ? worldEntities : [])
-            .map((entity) => (typeof entity?.id === 'string' ? entity.id : ''))
-            .filter(Boolean)
-        );
+  const ids = worldEntityIdSet(worldEntities);
   return (Array.isArray(candidates) ? candidates : []).filter((candidate) =>
     isWorldAddressableEffectSource(candidate?.id, ids)
   );
@@ -472,9 +485,17 @@ export function worldAddressableEffectSources(candidates, worldEntities = []) {
  * ── DERIVED FROM THE NAME, NOT MINTED AT RANDOM, AND THE REASON IS NOT AESTHETIC ────────────
  * `foundry.utils.randomID()` is unavailable to a pure leaf and `Math.random()` is a SonarCloud
  * VULNERABILITY (S2245) that fails the quality gate outright. A slug is neither, and it is also
- * the better answer here: an essence id is a durable reference every membership record and every
- * component quantity addresses, `## EssenceDefinition` never re-keys one, and a GM reading a
- * component's stored essence map gets `iron` rather than `kTz9QpLm2xR4vB1a`.
+ * the better answer here: an essence id is the reference every membership record and every
+ * component quantity addresses, so a stored essence map reads `iron`, not `kTz9QpLm2xR4vB1a`.
+ *
+ * An essence id is not permanent: the `1.34.0` migration merges equivalent world essences and
+ * retires the losers' ids (§ Equivalent World Essence Merge in
+ * `openspec/specs/destructive-changes-and-migrations/spec.md`). `retired` is that merge's
+ * never-cleared tombstone leg, so a retired id stays taken for the life of the world even though
+ * no live entity holds it — reissuing one would re-point the references the migration knowingly
+ * left on that key at the wrong essence, through `src/utils/essenceResolver.js`'s precedence
+ * override. Both rosters feed one predicate rather than a merged third Set, because
+ * {@link worldEntityIdSet} may hand back the caller's own Set.
  *
  * COLLISIONS ARE RESOLVED BY SUFFIX rather than refused, because `createEntity` refuses a
  * duplicate id and reports nothing: a GM who names a second essence "Ash" would get a button
@@ -482,27 +503,23 @@ export function worldAddressableEffectSources(candidates, worldEntities = []) {
  * so the caller's own name validation stays the only thing that can reject a create.
  *
  * @param {string} name
- * @param {Array<{id?: string}>|Set<string>} existing the world roster.
+ * @param {Array<{id?: string}>|Set<string>} [existing] the live world roster.
+ * @param {Array<string>|Set<string>} [retired] the retired ids — taken, held by nothing.
  * @returns {string}
  */
-export function mintEssenceId(name, existing = []) {
-  const taken =
-    existing instanceof Set
-      ? existing
-      : new Set(
-          (Array.isArray(existing) ? existing : [])
-            .map((entity) => (typeof entity?.id === 'string' ? entity.id : ''))
-            .filter(Boolean)
-        );
+export function mintEssenceId(name, existing = [], retired = []) {
+  const live = worldEntityIdSet(existing);
+  const tombstoned = worldEntityIdSet(retired);
+  const isTaken = (candidate) => live.has(candidate) || tombstoned.has(candidate);
   const stem =
     String(name ?? '')
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '') || 'essence';
-  if (!taken.has(stem)) return stem;
+  if (!isTaken(stem)) return stem;
   let suffix = 2;
-  while (taken.has(`${stem}-${suffix}`)) suffix += 1;
+  while (isTaken(`${stem}-${suffix}`)) suffix += 1;
   return `${stem}-${suffix}`;
 }
 

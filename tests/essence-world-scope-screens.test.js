@@ -22,6 +22,10 @@ import { dirname, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { get } from 'svelte/store';
+
+import { createAdminStore } from '../src/ui/svelte/stores/adminStore.js';
+import { createServices, makeSystem } from './helpers/adminStoreServices.js';
 import { declaredPropNames } from './helpers/sveltePropsDeclaration.js';
 import {
   ESSENCE_SYSTEM_STATES,
@@ -38,7 +42,10 @@ import {
 import { WORLD_IDENTITY_FIELDS } from '../src/migration/worldScopeEntityGrouping.js';
 import { membershipKey } from '../src/systems/scopedDefinitions.js';
 import { createWorldScopeActions } from '../src/ui/svelte/stores/worldScopeActions.js';
-import { projectWorldScopeEntity } from '../src/ui/svelte/stores/worldScopeProjection.js';
+import {
+  buildWorldScopeState,
+  projectWorldScopeEntity,
+} from '../src/ui/svelte/stores/worldScopeProjection.js';
 import {
   ESSENCE_VALIDATION_CHECKS,
   essenceEditorValidation,
@@ -965,5 +972,252 @@ describe('the essence world-scope presentation leaf', () => {
       'ember-dust-3'
     );
     assert.equal(mintEssenceId('  ***  ', []), 'essence');
+  });
+});
+
+// ── (13) A retired essence id is never reissued (issue 1654) ──────────────────────────────────
+
+/**
+ * `1.34.0` retires the losers' ids when it merges equivalent world essences, and the references it
+ * deliberately leaves pointing at a retired id are harmless only while that id matches no
+ * definition. Reissuing it makes a stale key resolve to a different essence's quantity.
+ *
+ * Not theoretical: the shell mints from a fixed placeholder name, so the shipped sequence is
+ * `new-essence`, `new-essence-2`, `new-essence-3` — dense, deterministic, and reclaimed by the
+ * next `+ New essence` press.
+ */
+describe('a retired essence id is never reissued', () => {
+  it('treats a retired id as taken even though no live entity holds it', () => {
+    assert.equal(mintEssenceId('Ember Dust', [], ['ember-dust']), 'ember-dust-2');
+    assert.equal(
+      mintEssenceId('New essence', [{ id: 'new-essence' }], ['new-essence-2']),
+      'new-essence-3'
+    );
+  });
+
+  it('and the same mint WITHOUT the retired leg reclaims it, which is what this guard changes', () => {
+    // Non-vacuity for the pair above: the ids asserted refused are exactly the ids the shipped
+    // two-argument minter hands back, so neither assertion can be passing on an unrelated slug.
+    assert.equal(mintEssenceId('Ember Dust', []), 'ember-dust');
+    assert.equal(mintEssenceId('New essence', [{ id: 'new-essence' }]), 'new-essence-2');
+  });
+
+  it('defaults to none, so a world that never merged mints exactly as it did before', () => {
+    assert.equal(mintEssenceId('Ember Dust', [{ id: 'ember-dust' }]), 'ember-dust-2');
+    assert.equal(mintEssenceId('Ember Dust', [{ id: 'ember-dust' }], []), 'ember-dust-2');
+  });
+
+  it('takes either roster as a Set and writes to neither', () => {
+    // `worldEntityIdSet` hands a Set back as given rather than copying it, so a minter that
+    // unioned the two would mutate the live roster a picker is still rendering.
+    const live = new Set(['ash']);
+    const retired = new Set(['ash-2']);
+    assert.equal(mintEssenceId('Ash', live, retired), 'ash-3');
+    assert.deepEqual([...live], ['ash']);
+    assert.deepEqual([...retired], ['ash-2']);
+  });
+
+  it('publishes the retired KEY SET on the essence leg the shell already holds', () => {
+    const { worldScope } = buildWorldScopeState({
+      stores: { essence: { corpus: () => corpusOf({}) } },
+      systems: ROSTER,
+      essenceMergeMap: {
+        retired: {
+          cinder: { name: 'Cinder', icon: 'fas fa-fire', colorToken: '', description: '' },
+          soot: { name: 'Soot', icon: 'fas fa-cloud', colorToken: '', description: '' },
+        },
+      },
+    });
+    assert.deepEqual(worldScope.essence.retiredIds, ['cinder', 'soot']);
+    // Non-vacuity: the leg carrying it is the real projection of the real corpus, not an empty
+    // state that would answer `[]` to anything asked of it.
+    assert.deepEqual(
+      worldScope.essence.entities.map((entity) => entity.id),
+      ['ash', 'brine'],
+      'and the live roster beside it is the corpus this publish actually read'
+    );
+  });
+
+  it('reads every shape an unmerged or hand-edited world can hold as "no retired ids"', () => {
+    // A world that never merged has no setting, a migration that found nothing to merge leaves
+    // `{}`, and a hand-edited setting may hold anything. None may throw on the publish path, and
+    // none may read as a retired id.
+    const shapes = [undefined, null, {}, { retired: null }, { retired: [] }, { retired: 'ash' }, 7];
+    for (const essenceMergeMap of shapes) {
+      const { worldScope } = buildWorldScopeState({ systems: ROSTER, essenceMergeMap });
+      assert.deepEqual(
+        worldScope.essence.retiredIds,
+        [],
+        `${JSON.stringify(essenceMergeMap) ?? 'undefined'} reads as no retired ids`
+      );
+    }
+    assert.deepEqual(
+      buildWorldScopeState().worldScope.essence.retiredIds,
+      [],
+      'as does a publish that was handed no merge map at all'
+    );
+  });
+
+  it('is WIRED — the guard is unreachable unless the shell mints against it', () => {
+    // Matched as a live statement, never as a substring: a bare `match` is satisfied by the call
+    // commented out, which is the shape a bisect or a revert produces, so the pin would certify a
+    // shell that mints a hardcoded id and reclaims a retired one on the next press.
+    //
+    // What it does not prove: nothing in the repo presses `[data-world-essence-create]`, and
+    // `manager-mounted.test.js` is the only suite that mounts `CraftingSystemManagerRoot`, so a
+    // press-and-observe case belongs there. Do not read this regex as coverage of the act.
+    const [, args] =
+      rootSource.match(/\n {4}const id = mintEssenceId\(([\s\S]*?)\n {4}\);/) ?? [];
+    assert.ok(args, 'the shell mints the new world essence id from a LIVE statement');
+    assert.match(args, /worldScopeState\.essence\?\.entities/, 'against the live roster');
+    assert.match(args, /worldScopeState\.essence\?\.retiredIds/, 'AND the retired ids');
+  });
+});
+
+// ── (14) The shared-definition callout names the world record (issue 1654) ────────────────────
+
+describe('the shared-definition callout names the record its pill claims', () => {
+  const editorSource = readFileSync(
+    resolve(repoRoot, 'src/ui/svelte/apps/manager/EssenceEditView.svelte'),
+    'utf8'
+  );
+  const [calloutSource] = editorSource.match(/<SharedDefinitionCallout[\s\S]*?\/>/) ?? [];
+
+  it("draws name and icon from the world entry rather than this system's projection", () => {
+    // `World definition` and "Name, icon and colour are world vocabulary" were true by construction
+    // while the `1.30.0` lift was 1:1; after `1.34.0` one world entity backs N in-system records
+    // whose `icon` is outside the equivalence key, so the caption could carry a per-system glyph.
+    assert.ok(calloutSource, 'the rules tab renders the callout');
+    assert.match(calloutSource, /World definition/, 'under the world-definition pill');
+    assert.match(calloutSource, /name=\{worldEntry\?\.entity\?\.name/);
+    assert.match(calloutSource, /icon=\{normalizeEssenceIcon\(\s*worldEntry\?\.entity\?\.icon/);
+  });
+
+  it('and keeps the in-system colorToken as the tint, because THAT one is the world value', () => {
+    // Maintainer ruling M29: `colorToken` is the single identity field the world overlay carries
+    // into the in-system projection, so re-routing it through `worldEntry` would swap one correct
+    // read for another and make the expression look uniform at the cost of saying less.
+    assert.match(calloutSource, /tint=\{normalizeEssenceColorToken\(essence\?\.colorToken\)/);
+  });
+});
+
+/**
+ * The rules route draws two medallions for one essence — this callout and the page header's
+ * `Medallion` + `<h1>`, whose name the breadcrumb repeats — rendered from different files, and
+ * requirement 13 makes sourcing them from different layers a defect. Only this section joins them.
+ *
+ * Read from source because the subject is a `$derived` in the shell, and `manager-mounted.test.js`
+ * is the only suite that mounts the shell. Each statement is matched whole, so a commented-out or
+ * partially reverted chain fails rather than matching as a substring.
+ */
+describe('the rules route header draws the same layer the callout below it does', () => {
+  /**
+   * One whole top-level `$derived` declaration from the shell, or `''`.
+   *
+   * @returns {string} the statement text, closing paren included.
+   */
+  function shellDerived(name) {
+    const pattern = new RegExp(`\\n {2}const ${name} = \\$derived\\(([\\s\\S]*?)\\n {2}\\);`);
+    return rootSource.match(pattern)?.[1] ?? '';
+  }
+
+  it('leads the name and the glyph with the WORLD record, not this system’s projection', () => {
+    for (const binding of ['essenceEditName', 'essenceEditIcon']) {
+      const body = shellDerived(binding);
+      assert.ok(body, `${binding} is declared as a live \`$derived\` in the shell`);
+      const world = body.indexOf('essenceRulesWorldEntry?.entity?.');
+      const draft = body.indexOf('essenceEditDraft?.');
+      assert.ok(world >= 0, `${binding} reads the world entry the callout reads`);
+      assert.ok(draft >= 0, `${binding} still carries its draft fallback`);
+      assert.ok(world < draft, `${binding} lets the WORLD record win, not the in-system copy`);
+    }
+  });
+
+  it('still leads with the DRAFT on a create, because there is no world record to contradict', () => {
+    // `essenceRulesWorldEntry` is null for exactly two states — a create draft and a world corpus
+    // that cannot answer — and in both the in-system record is the record, so the fix is the order
+    // of one chain rather than a branch. Remove the draft term and a create heading prints empty.
+    assert.match(shellDerived('essenceEditName'), /essenceEditDraft\?\.name/);
+    assert.match(shellDerived('essenceEditIcon'), /essenceEditDraft\?\.icon/);
+    // Non-vacuity for the whole describe: the derivation this precedence is measured against is
+    // the one the header and the breadcrumb actually render.
+    assert.match(rootSource, /<Medallion icon=\{essenceEditIcon\} tint=\{essenceEditTint\}/);
+    assert.match(rootSource, /<h1 class="manager-title" title=\{essenceEditName\}>/);
+  });
+
+  it('leaves the TINT reading the in-system projection, because M29 already put the world colour there', () => {
+    // `adminStore` overlays the world `colorToken` onto the in-system row, so routing the tint
+    // through `essenceRulesWorldEntry` would swap one correct read for another. The callout's rule,
+    // restated at the second site that draws the same medallion.
+    const tint = shellDerived('essenceEditTint');
+    assert.ok(tint, 'the tint is declared as a live `$derived` too');
+    assert.ok(
+      !tint.includes('essenceRulesWorldEntry'),
+      'the tint takes no world read of its own; the projection already carries the world colour'
+    );
+  });
+});
+
+// ── (15) The gateway line that makes the guard reachable (issue 1654) ─────────────────────────
+
+/**
+ * Driven through the real store rather than the leaf: every assertion in section (13) passes its
+ * own `essenceMergeMap`, so deleting the one argument `adminStore.js` supplies leaves this file
+ * green while the product publishes `retiredIds: []` on every world forever — the failure
+ * `tests/world-vocabulary-admin-store-composition.test.js` already records against this call.
+ *
+ * The subject is therefore the published `viewState`, from the real `createAdminStore` over the
+ * shared services double, with `getSetting` answering as a settings registry would.
+ */
+describe('the gateway hands the merge map to the projection', () => {
+  /**
+   * The manager's published `worldScope`, through the real store.
+   *
+   * @param {(key: string) => unknown} getSetting the world settings registry, doubled.
+   */
+  async function publishedWorldScope(getSetting) {
+    const store = createAdminStore(createServices(makeSystem(), [], [], { getSetting }));
+    try {
+      // The publish is the tail of an async refresh, so a synchronous read sees the pre-publish
+      // shape. Selecting the fixture's system is what every adminStore suite drives it with.
+      await store.selectSystem('sys1');
+      return get(store.viewState).worldScope;
+    } finally {
+      store.destroy?.();
+    }
+  }
+
+  it('reads the setting and publishes its key set on the essence leg', async () => {
+    const reads = [];
+    const worldScope = await publishedWorldScope((key) => {
+      reads.push(key);
+      if (key === 'worldEssenceMergeMap') {
+        return { retired: { cinder: { name: 'Cinder' }, soot: { name: 'Soot' } } };
+      }
+      return key === 'lastManagedCraftingSystem' ? 'sys1' : '';
+    });
+
+    assert.ok(reads.includes('worldEssenceMergeMap'), 'the gateway reads the merge-map setting');
+    assert.deepEqual(
+      worldScope.essence.retiredIds,
+      ['cinder', 'soot'],
+      'and the value reaches the published essence leg the shell mints against'
+    );
+  });
+
+  it('publishes no retired ids rather than THROWING when the setting is unregistered', async () => {
+    // The shape a services double answering only the keys it knows produces. A real client
+    // registers this key at init (`BASE_DEFINITIONS`) and answers the `{}` default, but
+    // `game.settings.get` raises on an unregistered key, so an unguarded read takes the publish down.
+    const worldScope = await publishedWorldScope((key) => {
+      if (key === 'worldEssenceMergeMap') throw new Error('is not a registered game setting');
+      return key === 'lastManagedCraftingSystem' ? 'sys1' : '';
+    });
+
+    assert.deepEqual(worldScope.essence.retiredIds, []);
+    // Non-vacuity: a store that had died on the way would also answer nothing here, so the
+    // publish this read is taken from has to be a real one with its other legs intact.
+    assert.equal(worldScope.essence.entityType, 'essence', 'the publish completed');
+    assert.ok(worldScope.component, 'with every other world leg on it');
   });
 });

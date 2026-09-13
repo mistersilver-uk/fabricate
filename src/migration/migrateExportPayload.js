@@ -22,6 +22,7 @@ import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../systems/authoringExport.js';
 import { membershipKey } from '../systems/scopedDefinitions.js';
 import { subKeyEntries } from '../systems/scopedDefinitionStore.js';
 
+import { mergeEquivalentWorldEssences } from './mergeEquivalentWorldEssences.js';
 import {
   buildWorldCharacterLibraries,
   stripSystemCharacterLibraries,
@@ -589,6 +590,94 @@ function deriveWorldScopeEntitySlices(migrated) {
   };
 }
 
+/**
+ * Schema 6, field level: merge the bundle's equivalent world essences (issue 1654), through the
+ * shipped `1.34.0` world-side pass itself rather than a second implementation of it.
+ *
+ * `destructive-changes-and-migrations` § Equivalent World Essence Merge requirement 12 requires it
+ * branch-independently and ordered after {@link deriveWorldScopeEntitySlices}: the equivalence key
+ * compares essence `effectSource` blocks, and on this path the world essences it reasons about do
+ * not exist until that derivation has synthesized them.
+ *
+ * Unlike a `1.30.0` re-key map, which `import-export/spec.md` requires to be empty for every
+ * accepted `(system, entityType)` pair, whatever this map says is applied: a destination world
+ * already at `1.34.0` never re-runs the migration, so refusing here would leave the duplicate in
+ * the destination forever. That is why the re-keyed `system`, `recipes` and gathering slice are
+ * adopted back rather than discarded the way the `1.30.0` result's are.
+ *
+ * On a one-system corpus this changes nothing today, and the reason is structural: every candidate
+ * is a member of the one system, so every group is an intra-system duplicate and requirement 6
+ * refuses exactly those. The pass is an observer here — the refusal report is the payload — and the
+ * call stays so the day an intra-system pair can be merged safely, this path merges it.
+ *
+ * @param {object} migrated The working payload, mutated in place.
+ * @private
+ */
+function mergeEquivalentBundleEssences(migrated) {
+  const system = migrated?.system;
+  if (!isPlainObject(system)) return;
+
+  const systemId = trimmedString(system.id);
+  const gatheringSlice = isPlainObject(migrated.gatheringConfig?.system)
+    ? migrated.gatheringConfig.system
+    : {};
+
+  // The same map/array conversion the derivation above performs, and for the same reason: the
+  // shared pass reads `defaults` and `membership` as maps only and silently ignores an array, so
+  // passing the envelope's own shape in would hide every membership record from the re-point.
+  const result = mergeEquivalentWorldEssences({
+    systems: [system],
+    recipes: Array.isArray(migrated.recipes) ? migrated.recipes : [],
+    gatheringConfig: systemId ? { systems: { [systemId]: gatheringSlice } } : { systems: {} },
+    [SCOPE_PAYLOAD_KEYS.essences]: scopeSliceToPersistedShape(
+      migrated[SCOPE_PAYLOAD_KEYS.essences]
+    ),
+    [SCOPE_PAYLOAD_KEYS.components]: scopeSliceToPersistedShape(
+      migrated[SCOPE_PAYLOAD_KEYS.components]
+    ),
+  });
+
+  // Adopted, not discarded: the shared pass answers the original object for a key it did not
+  // change, so on the refusing path each assignment writes back the object it was handed.
+  //
+  // Each assignment is gated on the key having been present. The corpus handed to the pass is
+  // synthesized — an absent `recipes` becomes `[]`, an absent gathering slice `{}` — so an ungated
+  // write-back would add a key the bundle never carried, which is a shape change, not a merge.
+  const mergedSystem = Array.isArray(result?.systems) ? result.systems[0] : null;
+  if (isPlainObject(mergedSystem)) migrated.system = mergedSystem;
+  if (Array.isArray(migrated.recipes) && Array.isArray(result?.recipes)) {
+    migrated.recipes = result.recipes;
+  }
+  const mergedSlice = result?.gatheringConfig?.systems?.[systemId];
+  if (isPlainObject(migrated.gatheringConfig?.system) && isPlainObject(mergedSlice)) {
+    migrated.gatheringConfig.system = mergedSlice;
+  }
+  // Step 4's helper, reused rather than respelled: the same array projection through a fresh deep
+  // copy, so nothing the caller still holds can alias a slice a later in-place rewrite reaches.
+  // Gated on presence like the three assignments above, though inert on the shipped path, where
+  // {@link deriveWorldScopeEntitySlices} runs first and writes both keys unconditionally.
+  for (const entityType of ['essences', 'components']) {
+    const key = SCOPE_PAYLOAD_KEYS[entityType];
+    if (!(key in migrated)) continue;
+    migrated[key] = scopeSliceToEnvelopeShape(
+      isPlainObject(result?.[key]) ? result[key] : migrated[key]
+    );
+  }
+
+  // The refusal is carried rather than dropped, on the derivation's own rule: a refused group that
+  // produced no change is indistinguishable from a bundle with nothing to merge unless it is
+  // reported. It joins the report the derivation above wrote rather than opening a second key.
+  const report = isPlainObject(migrated[WORLD_SCOPE_UPCAST_REPORT_KEY])
+    ? migrated[WORLD_SCOPE_UPCAST_REPORT_KEY]
+    : {};
+  report.essenceMergeRefusals = cloneJson(
+    Array.isArray(result?._worldEssenceMergeReport?.refusals)
+      ? result._worldEssenceMergeReport.refusals
+      : []
+  );
+  migrated[WORLD_SCOPE_UPCAST_REPORT_KEY] = report;
+}
+
 function seedFailureResultPolicy(migrated) {
   const system = migrated?.system;
   if (!system || typeof system !== 'object' || Array.isArray(system)) return;
@@ -661,6 +750,7 @@ export function migrateExportPayload(payload) {
     liftCharacterLibrariesToWorldScope(current);
     foldManualCompositionForces(current, { clearAutomaticForces: false });
     deriveWorldScopeEntitySlices(current);
+    mergeEquivalentBundleEssences(current);
     return current;
   }
 
@@ -702,6 +792,7 @@ export function migrateExportPayload(payload) {
   seedSubjectModifierMarks(migrated);
   foldManualCompositionForces(migrated, { clearAutomaticForces: true });
   deriveWorldScopeEntitySlices(migrated);
+  mergeEquivalentBundleEssences(migrated);
 
   return migrated;
 }

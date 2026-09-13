@@ -112,7 +112,8 @@ World:
 - `fabricate.componentScope`, `fabricate.essenceScope` and `fabricate.toolScope` for the world-scope entity definitions — each `{ entities, defaults, membership }`, with the WORLD tool-breakage authority carried by `fabricate.toolScope` alone (see `## Scoped Entity Definitions` in `data-models`).
   THREE keys rather than one, because `isSeeded()` cannot be honest per entity type on a shared key: a store writes the whole object, so one entity type's first write persists the others as empty and turns an UNKNOWN Valid Id Basis into a real, empty, prunable one.
   THE `1.30.0` WORLD-SCOPE MIGRATION WRITES THEM, plus one fully-overriding membership record per original definition.
-  COMPONENTS AND TOOLS get one world entity per resolved SOURCE ITEM, with every other member re-keyed onto it; ESSENCES group by trimmed `id` instead, and essence ids are NEVER re-keyed.
+  COMPONENTS AND TOOLS get one world entity per resolved SOURCE ITEM, with every other member re-keyed onto it; AT `1.30.0` ESSENCES group by trimmed `id` instead, and that pass re-keys none of them.
+  THE `1.34.0` EQUIVALENT WORLD ESSENCE MERGE DOES: it merges world essences whose canonicalised `(name, macro, effectSource)` triples are equal, re-keys every reference to the ones it retires, carries its own map in `fabricate.worldEssenceMergeMap`, and tombstones every retired id so none is ever reissued.
   It ELECTS each world default from the OLDEST contributing system, and it does NOT shed a crafting system's own `components`, `essenceDefinitions` and `tools`, which stay LIVE AND AUTHORITATIVE for every key they still decide while `## CraftingSystem` requirement 36 in `data-models` holds — every key, that is, except a SECTION the system's membership record marks INHERITING, which issue 1372 makes resolve to its world default.
   THE THREE SCOPES ARE NOW READ THROUGH ONE SHARED SEAM: every non-UI consumer of a system's components, essence definitions or tools enters through the read union rather than touching the array.
   READING IS NOT AUTHORITY — the in-system arrays still decide every field, every row and the row ORDER, re-derived from them at read time — so a world that has authored no world entity reads exactly as the previous release did.
@@ -129,6 +130,8 @@ World:
 - `fabricate.worldScopeIdentityFlagVersion` (one-shot flag-stamp version, for the `1.30.0` durable-identity remap)
 - `fabricate.worldScopeRekeyMap` — TRANSIENT.
   The `1.30.0` migration's durable decision record, `{ [systemId]: { components: {oldId: newId}, tools: {...} } }`, written as the FIRST leg of its writeback and CLEARED by the one-shot pass that consumes it, once that migration has completed
+- `fabricate.worldEssenceMergeMap` — PART-transient, and a SEPARATE setting rather than an essence leg on the map above (see `destructive-changes-and-migrations/spec.md` § Equivalent World Essence Merge requirement 10).
+  The `1.34.0` merge's decision record, written as the SECOND leg of its writeback: the per-system old-to-new essence id pairs are CLEARED by the one-shot pass that consumes them, once that migration has completed, while the `retired` TOMBSTONE leg is NEVER cleared, because the authoring surface would otherwise mint a retired id again
 
 Client (per client/device):
 

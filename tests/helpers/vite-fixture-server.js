@@ -24,6 +24,8 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
+import { viteDepCacheDir } from './vite-dep-cache-dir.js';
+
 const repoRoot = resolve(import.meta.dirname, '../..');
 
 /**
@@ -75,6 +77,9 @@ export function createViteFixtureServer({ styleMountPrefix, extraPlugins = [] })
         // proxy on `serve`, which these fixtures neither need nor should depend on.
         configFile: false,
         root: repoRoot,
+        // Per process: the default is shared with every other test process. See
+        // `vite-dep-cache-dir.js` for the `ERR_OUTDATED_OPTIMIZED_DEP` failure that causes.
+        cacheDir: viteDepCacheDir(),
         // NO FILE WATCHER, for the reason `tests/view-lab/vite.config.js` records at length: the
         // root is the whole repository, chokidar costs an inotify handle per file, and a developer
         // with harvested Foundry chrome or sibling lane worktrees exhausts the user-session limit

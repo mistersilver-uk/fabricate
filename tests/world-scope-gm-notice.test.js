@@ -22,8 +22,15 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+  getHighestRegisteredMigrationVersion,
+  MigrationRunner,
+} from '../src/migration/MigrationRunner.js';
+import { buildWorldEssenceMergeRemapNotice } from '../src/migration/remapWorldScopeIdentityFlags.js';
+import {
+  buildWorldEssenceMergeNotice,
   buildWorldScopeEntityNotice,
   buildWorldScopeIdentityRemapNotice,
+  describeWorldEssenceMerge,
 } from '../src/migration/worldScopeEntityNotice.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -247,6 +254,57 @@ test('each half of the remap notice appears independently of the other', () => {
 });
 
 // ---------------------------------------------------------------------------
+// The `1.34.0` remap notice — the essence half's GM channel
+// ---------------------------------------------------------------------------
+
+test('the essence remap notice names the refused groups, the offending ids and both skip counts', () => {
+  // `partitionSafeEssencePairs` refuses a whole group whose survivor or any loser is not a safe
+  // flag-path segment, which leaves the world merged in its settings and un-merged in its actor
+  // flags — a reachable state the GM is told about rather than left to find.
+  const message = buildWorldEssenceMergeRemapNotice(
+    {
+      unsafeEssenceIdSkips: ['fire.dotted', 'ash id'],
+      refusedGroups: 1,
+      lockedSkips: 4,
+      skippedErrors: 2,
+    },
+    noLocalizer
+  );
+  assert.match(message, /1 merged essence set\(s\)/);
+  assert.ok(message.includes('fire.dotted') && message.includes('ash id'));
+  assert.match(message, /4 item\(s\) refused the update/);
+  assert.match(message, /2 document\(s\) could not be updated at all/);
+  assert.match(message, /INCOMPLETE/, 'a transient failure withholds the clear and says so');
+});
+
+test('the essence remap notice is SILENT on a clean pass and TOTAL on junk', () => {
+  for (const summary of [
+    { unsafeEssenceIdSkips: [], refusedGroups: 0, lockedSkips: 0, skippedErrors: 0 },
+    {},
+    null,
+    undefined,
+    { unsafeEssenceIdSkips: 'nonsense', refusedGroups: 'nonsense', lockedSkips: 'nonsense' },
+  ]) {
+    assert.equal(buildWorldEssenceMergeRemapNotice(summary, noLocalizer), '');
+  }
+});
+
+test('each clause of the essence remap notice appears independently of the others', () => {
+  const clauseOf = (summary) => buildWorldEssenceMergeRemapNotice(summary, noLocalizer);
+  const refusedOnly = clauseOf({ unsafeEssenceIdSkips: ['fire.dotted'], refusedGroups: 1 });
+  assert.match(refusedOnly, /merged essence set\(s\)/);
+  assert.doesNotMatch(refusedOnly, /refused the update|could not be updated/);
+
+  const lockedOnly = clauseOf({ lockedSkips: 1 });
+  assert.match(lockedOnly, /1 item\(s\) refused the update/);
+  assert.doesNotMatch(lockedOnly, /merged essence set|could not be updated/);
+
+  const failedOnly = clauseOf({ skippedErrors: 1 });
+  assert.match(failedOnly, /1 document\(s\) could not be updated at all/);
+  assert.doesNotMatch(failedOnly, /merged essence set|refused the update/);
+});
+
+// ---------------------------------------------------------------------------
 // The two DISPATCH legs in src/main.js
 // ---------------------------------------------------------------------------
 
@@ -300,4 +358,320 @@ test('every localization key the two notices reference exists in lang/en.json', 
     const value = key.split('.').reduce((node, segment) => node?.[segment], lang);
     assert.equal(typeof value, 'string', `${key} must exist in lang/en.json`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// The `1.34.0` equivalent-essence merge notice (issue 1654)
+//
+// `adminStore.addEssence` mints an essence id with `crypto.randomUUID()`, so these assertions hold
+// the notice to readable names: no id enumeration, and no `oldId → newId` arrow of the kind the
+// `Renames` clause prints.
+// ---------------------------------------------------------------------------
+
+/** A merge report with one of everything, in the shape `buildWorldEssenceEquivalence` emits. */
+function mergeReport(overrides = {}) {
+  return {
+    mergedGroups: [
+      { survivorId: 'iron', loserIds: ['b1c2d3e4-f5a6'], systemIds: ['sys-a', 'sys-b'] },
+    ],
+    refusals: [
+      {
+        survivorId: 'ash',
+        loserIds: ['99887766-5544'],
+        systemIds: ['sys-c'],
+        reason: 'outputIdCollision',
+      },
+    ],
+    declined: [{ essenceId: 'water', sections: ['macro'], reason: 'memberDisagreement' }],
+    orphaned: [{ essenceId: 'ghost', name: 'Ghost' }],
+    retired: {
+      'b1c2d3e4-f5a6': { name: 'Iron', icon: 'icons/iron.webp', systems: ['sys-b'] },
+      '99887766-5544': { name: 'Ash', systems: ['sys-c'] },
+    },
+    ...overrides,
+  };
+}
+
+test('the merge notice names every group BY NAME and never enumerates a retired id', () => {
+  const message = buildWorldEssenceMergeNotice(mergeReport(), noLocalizer);
+  assert.match(message, /one shared essence: Iron\./, 'the tombstone carries the readable name');
+  assert.match(message, /Ash \(outputIdCollision\)/);
+  assert.match(message, /water \(macro\)/);
+  // The equivalence key case-folds the name, so a readable name always exists and a raw UUID
+  // never reaches the toast as the only thing a GM gets.
+  assert.doesNotMatch(message, /b1c2d3e4-f5a6|99887766-5544/, 'no id pair reaches the toast');
+  assert.doesNotMatch(
+    message,
+    /→/,
+    "and no `oldId → newId` arrow, which is the Renames clause's shape"
+  );
+});
+
+test('the notice is SILENT when nothing merged, was refused or was declined', () => {
+  assert.equal(buildWorldEssenceMergeNotice(null, noLocalizer), '');
+  assert.equal(buildWorldEssenceMergeNotice({}, noLocalizer), '');
+  assert.equal(
+    buildWorldEssenceMergeNotice({ mergedGroups: [], refusals: [], declined: [] }, noLocalizer),
+    ''
+  );
+  assert.equal(
+    buildWorldEssenceMergeNotice({ orphaned: [{ essenceId: 'ghost' }] }, noLocalizer),
+    '',
+    'an ORPHAN changed nothing: a world essence with no live member is left exactly as it is'
+  );
+});
+
+test('each clause appears independently of the others', () => {
+  const only = (key, value) =>
+    buildWorldEssenceMergeNotice(
+      { ...mergeReport(), mergedGroups: [], refusals: [], declined: [], [key]: value },
+      noLocalizer
+    );
+  const mergedOnly = only('mergedGroups', mergeReport().mergedGroups);
+  assert.match(mergedOnly, /1 set\(s\) of essences/);
+  assert.doesNotMatch(mergedOnly, /could not be merged safely/);
+  const refusedOnly = only('refusals', mergeReport().refusals);
+  assert.match(refusedOnly, /1 set\(s\) could not be merged safely/);
+  assert.match(refusedOnly, /will not be retried/);
+  assert.doesNotMatch(refusedOnly, /one shared essence/);
+  const declinedOnly = only('declined', mergeReport().declined);
+  assert.match(declinedOnly, /1 essence\(s\) were left alone/);
+  assert.doesNotMatch(declinedOnly, /could not be merged safely/);
+});
+
+test('the notice DISCLOSES that the item-override remap reaches owned actor items only', () => {
+  // A world Item, a compendium Item and an unlinked synthetic token actor are never walked, so
+  // their `flags.fabricate.essences` override stays stale permanently; only the GM can find those
+  // documents, so the notice states the scope rather than implying it.
+  const merged = buildWorldEssenceMergeNotice(mergeReport(), noLocalizer);
+  assert.match(merged, /world item, a compendium item or an unlinked token actor/);
+  assert.match(
+    merged,
+    /retired id is never reused/,
+    'and why that is safe rather than merely known'
+  );
+  // Only a merge retires an id, so a refusal-only pass has no stale override to disclose.
+  const refusedOnly = buildWorldEssenceMergeNotice(
+    { ...mergeReport(), mergedGroups: [] },
+    noLocalizer
+  );
+  assert.doesNotMatch(refusedOnly, /compendium item/);
+});
+
+test('the toast CAPS its enumeration and the console keeps every id', () => {
+  const many = Array.from({ length: 8 }, (unused, index) => ({
+    survivorId: `survivor-${index}`,
+    loserIds: [`loser-${index}`],
+    systemIds: ['sys-a'],
+    name: `Essence ${index}`,
+  }));
+  const message = buildWorldEssenceMergeNotice({ mergedGroups: many }, noLocalizer);
+  assert.match(message, /Essence 4/);
+  assert.doesNotMatch(message, /Essence 5/, 'capped at the first 5');
+  assert.match(message, /and 3 more/);
+  assert.match(message, /8 set\(s\)/, 'while the COUNT in the sentence stays exact');
+
+  const detail = describeWorldEssenceMerge(mergeReport());
+  assert.match(detail, /merged b1c2d3e4-f5a6 into iron across sys-a, sys-b/);
+  assert.match(detail, /refused 99887766-5544 -> ash \(outputIdCollision\)/);
+  assert.match(detail, /declined water \(macro\)/);
+  assert.match(detail, /orphaned ghost/);
+  assert.equal(describeWorldEssenceMerge(null), '');
+});
+
+test('the entry name wins, and a MALFORMED report still degrades readably', () => {
+  // `buildWorldEssenceEquivalence` carries a `name` on every merged, refused and declined entry,
+  // so the rest of the chain is a guard, not a path: the report arrives on a transient field no
+  // schema validates, and a malformed one must still read as a sentence, not `undefined`.
+  const message = buildWorldEssenceMergeNotice(
+    { mergedGroups: [{ survivorId: 'nameless', loserIds: ['gone'] }] },
+    noLocalizer
+  );
+  assert.match(message, /one shared essence: nameless\./);
+  assert.doesNotMatch(message, /undefined/);
+  const preferred = buildWorldEssenceMergeNotice(
+    {
+      mergedGroups: [{ survivorId: 'iron', loserIds: ['x'], name: 'From the entry' }],
+      retired: { x: { name: 'From the tombstone' } },
+    },
+    noLocalizer
+  );
+  assert.match(preferred, /From the entry/, "the producer's own `name` is what the GM reads");
+  assert.doesNotMatch(preferred, /From the tombstone/);
+});
+
+test('the shipped report shape — a `name` on every entry — needs no fallback at all', () => {
+  // `buildWorldEssenceEquivalence` carries an absence-preserving `name` on each of the three entry
+  // types, so a regression that dropped it from the producer surfaces here as a wall of UUIDs.
+  const message = buildWorldEssenceMergeNotice(
+    {
+      mergedGroups: [{ survivorId: 'd3adb33f-1111', loserIds: ['c0ffee-2222'], name: 'Iron' }],
+      refusals: [
+        {
+          survivorId: 'feedface-3333',
+          loserIds: ['badc0de-4444'],
+          name: 'Ash',
+          reason: 'outputIdCollision',
+        },
+      ],
+      declined: [{ essenceId: 'deadbeef-5555', name: 'Water', sections: ['macro'] }],
+    },
+    noLocalizer
+  );
+  assert.match(message, /one shared essence: Iron\./);
+  assert.match(message, /Ash \(outputIdCollision\)/);
+  assert.match(message, /Water \(macro\)/);
+  assert.doesNotMatch(
+    message,
+    /[0-9a-f]{6,}-\d{4}/,
+    'not one id reaches the toast when the producer supplies every name'
+  );
+});
+
+test('src/main.js dispatches the merge notice from the migration-summary handler', () => {
+  // An omitted dispatch fails silently: the consumer is guarded on a report that is `null` unless
+  // the migration ran, so its presence is asserted rather than inferred.
+  const composeIndex = MAIN.indexOf('buildWorldEssenceMergeNotice(worldEssenceMergeReport');
+  assert.ok(composeIndex > 0, 'the notice is composed from the transient report');
+  assert.match(MAIN, /const worldEssenceMergeReport = summary\?\.\w+ \?\? null;/);
+  const block = MAIN.slice(composeIndex, composeIndex + 700);
+  assert.match(
+    block,
+    /ui\.notifications\?\.warn\?\.\(essenceNotice, \{ permanent: true \}\)/,
+    'ALWAYS permanent and ALWAYS a warning: an irreversible merge, an un-retried refusal and an ' +
+      'unsettled disagreement are all things the GM must see'
+  );
+  assert.doesNotMatch(block, /notifications\?\.info\?\.\(essenceNotice/);
+  assert.match(
+    block,
+    /console\.info\('Fabricate \| 1\.34\.0 equivalent essence merge:', detail\)/,
+    "`console.debug` maps to DevTools' VERBOSE level, which Chromium's default filter excludes, " +
+      'so the capped toast would point at a dump nobody can see'
+  );
+  // The GM gate is the same one every sibling notice in this handler carries.
+  assert.match(MAIN.slice(composeIndex - 200, composeIndex), /game\.user\?\.isGM/);
+});
+
+test('the summary key main.js reads for the merge report is a key the runner actually emits', async () => {
+  // A source-text pin cannot close this gap (issue 1654): `main.js` shipped reading the underscore
+  // field while `MigrationRunner.run()` emits `worldEssenceMergeReport`, so the grep matched while
+  // the notice was dead code. The claim here is that the identifier read exists on the object read.
+  const read = MAIN.match(/const worldEssenceMergeReport = summary\?\.(\w+) \?\? null;/);
+  assert.ok(read, 'main.js reads the merge report off the migration summary');
+
+  const store = new Map([['migrationVersion', getHighestRegisteredMigrationVersion()]]);
+  const summary = await new MigrationRunner({
+    getSetting: (key) => store.get(key),
+    setSetting: async (key, value) => store.set(key, value),
+  }).run();
+
+  assert.ok(
+    Object.hasOwn(summary, read[1]),
+    `main.js reads summary.${read[1]}, which MigrationRunner.run() does not emit — the notice ` +
+      `would be dead code. Emitted keys: ${Object.keys(summary).join(', ')}`
+  );
+});
+
+test('src/main.js composes and posts the essence remap notice from the pass summary', () => {
+  // An omitted dispatch fails silently: the notice would never appear and every assertion above
+  // it would stay green.
+  const composeIndex = MAIN.indexOf('buildWorldEssenceMergeRemapNotice(summary,');
+  assert.ok(composeIndex > 0, 'the essence remap notice is composed from the pass summary');
+  const block = MAIN.slice(composeIndex, composeIndex + 400);
+  assert.match(
+    block,
+    /if \(notice && game\.user\?\.isGM\) ui\.notifications\?\.warn\?\.\(notice, \{ permanent: true \}\);/,
+    'GM-only and PERMANENT, exactly as the 1.30.0 sibling posts its own'
+  );
+  assert.doesNotMatch(
+    MAIN,
+    /MIRRORS `runWorldScopeIdentityFlagRemap` DELIBERATELY AND COMPLETELY/,
+    'the mirror is partial and the docblock must not overstate it'
+  );
+});
+
+test('the Merged clause fallback and its lang/en.json string say the SAME thing', () => {
+  // Existence is not agreement: the key-exists guards either side stayed green while the inline
+  // English fallback kept a sentence `lang/en.json` had already been corrected away from. The
+  // fallback fires whenever `game.i18n` cannot resolve the key, so the two renderings must match.
+  const lang = JSON.parse(readFileSync(resolve(HERE, '..', 'lang', 'en.json'), 'utf8'));
+  const expected = lang.FABRICATE.Migration.WorldEssenceMerge.Merged;
+  const source = readFileSync(
+    resolve(HERE, '..', 'src', 'migration', 'worldScopeEntityNotice.js'),
+    'utf8'
+  );
+  const fallback = source.match(/`Fabricate found \$\{merged\.length\}([\s\S]*?)`/);
+  assert.ok(fallback, 'the premise: the module really does carry an inline Merged fallback');
+  const normalized = `Fabricate found {count}${fallback[1].replaceAll('${names}', '{names}')}`;
+  assert.equal(normalized, expected);
+});
+
+test('every WorldEssenceMerge key the REMAP notice references exists in lang/en.json', () => {
+  const lang = JSON.parse(readFileSync(resolve(HERE, '..', 'lang', 'en.json'), 'utf8'));
+  const source = readFileSync(
+    resolve(HERE, '..', 'src', 'migration', 'remapWorldScopeIdentityFlags.js'),
+    'utf8'
+  );
+  const keys = [...source.matchAll(/'(FABRICATE\.Migration\.WorldEssenceMerge\.[A-Za-z]+)'/g)].map(
+    (match) => match[1]
+  );
+  assert.equal(
+    keys.length,
+    3,
+    `the premise: the module really does reference keys (${keys.length})`
+  );
+  for (const key of new Set(keys)) {
+    const value = key.split('.').reduce((node, segment) => node?.[segment], lang);
+    assert.equal(typeof value, 'string', `${key} must exist in lang/en.json`);
+  }
+});
+
+test('every WorldEssenceMerge localization key the notice references exists in lang/en.json', () => {
+  const lang = JSON.parse(readFileSync(resolve(HERE, '..', 'lang', 'en.json'), 'utf8'));
+  const source = readFileSync(
+    resolve(HERE, '..', 'src', 'migration', 'worldScopeEntityNotice.js'),
+    'utf8'
+  );
+  const keys = [...source.matchAll(/'(FABRICATE\.Migration\.WorldEssenceMerge\.[A-Za-z]+)'/g)].map(
+    (match) => match[1]
+  );
+  assert.equal(
+    keys.length,
+    5,
+    `the premise: the module really does reference keys (${keys.length})`
+  );
+  for (const key of new Set(keys)) {
+    const value = key.split('.').reduce((node, segment) => node?.[segment], lang);
+    assert.equal(typeof value, 'string', `${key} must exist in lang/en.json`);
+  }
+});
+
+test('the shipped English strings carry the same substitutions the fallbacks do', () => {
+  // `localizeWith` refuses a missing key but never an incomplete one, so a localized string that
+  // drops a placeholder renders worse than the fallback, with nothing else to catch it.
+  const lang = JSON.parse(readFileSync(resolve(HERE, '..', 'lang', 'en.json'), 'utf8'));
+  const block = lang.FABRICATE.Migration.WorldEssenceMerge;
+  for (const [key, placeholders] of [
+    ['Merged', ['{count}', '{names}']],
+    ['Refusals', ['{count}', '{refusals}']],
+    ['Declined', ['{count}', '{essences}']],
+    ['Overflow', ['{count}']],
+    ['UnsafeEssenceIds', ['{count}', '{essences}']],
+    ['RemapLockedSkips', ['{count}']],
+    ['RemapSkippedErrors', ['{count}']],
+  ]) {
+    for (const placeholder of placeholders) {
+      assert.ok(block[key].includes(placeholder), `${key} must interpolate ${placeholder}`);
+    }
+  }
+  assert.doesNotMatch(block.ItemOverrideScope, /\{/, 'the scope disclosure interpolates nothing');
+  assert.match(block.Merged, /cannot be undone/, 'the merge is IRREVERSIBLE and says so');
+  assert.match(block.Refusals, /will not be retried/);
+  // Requirement 8a: the loser's world identity is deleted and its in-system rows keep theirs, so
+  // the string must not tell a GM the icon is gone.
+  assert.match(
+    block.Merged,
+    /own essence row keeps the name, icon and description it was authored with/,
+    'the notice must scope the identity loss to the WORLD record'
+  );
 });
