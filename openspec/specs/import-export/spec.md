@@ -297,7 +297,7 @@ A component **complication**'s `macroUuid` (issue 1286) is an external macro ref
 It is collected by a dedicated walk rather than by the flat one-level-deep collector, for a REPORTING reason as much as a structural one: the flat collector cannot reach a nested list, and a flattened form would take the owner id and name from the complication, so the report would name a record the GM cannot open instead of the component they have to go and fix.
 Left uncollected, the uuid is never remapped and the complication runs the WRONG macro in the importing world.
 
-Import MUST additionally emit four WORLD-SCOPE ENTITY kinds, each carrying the shipped `reported` disposition; the disposition vocabulary is UNCHANGED.
+Import MUST additionally emit five WORLD-SCOPE ENTITY kinds, each carrying the shipped `reported` disposition; the disposition vocabulary is UNCHANGED.
 
 - `worldEntityCollision` — an incoming entity id equals a DESTINATION world entity's id while their source-reference sets prove they are different items.
   It RESOLVES, to the wrong thing, which is why it is reported and not repaired: keep mode must not regenerate anything.
@@ -311,8 +311,11 @@ Import MUST additionally emit four WORLD-SCOPE ENTITY kinds, each carrying the s
 - `worldDefaultDeclined` — a world-default SECTION the destination re-check refused.
 - `worldToolBreakageDropped` — an incoming `toolScope.toolBreakage` authority dropped by the payload upcast.
   It is a SEPARATE kind because the authority is not a world default: it is `toolScope`'s fourth sub-key, world scope rather than entity scope, and folding it into `worldDefaultDeclined` would make the kind name assert a falsehood about what it reports.
+- `worldEssenceMergeRefused` — an equivalence group the `1.34.0` upcast REFUSED to merge inside the incoming bundle.
+  It is reported because a refused group changes no slice, so without a kind carrying it a bundle holding duplicate essences is indistinguishable from one with nothing to merge.
+  Its owner is the refused group's SURVIVOR, which is the id a GM can find in the Essence Catalogue; the losers and the refusal reason ride the reference value.
 
-The first three MUST reuse the existing entity-specific `ownerType` values `component`, `tool` and `essence`.
+All but `worldToolBreakageDropped` MUST reuse the existing entity-specific `ownerType` values `component`, `tool` and `essence`.
 A WORLD-SCOPE entry — one whose subject is a SETTING rather than a record, which `worldToolBreakageDropped` alone is — MUST use the existing `unknown` ownerType and name the SETTING as its owner, rather than introducing a scope-level ownerType.
 A generic `worldEntity` or `worldScope` ownerType is the unsearchable generic the domain naming rules reject, and in a report already grouped by kind it would lose the entity type as well.
 
