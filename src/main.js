@@ -5786,7 +5786,7 @@ Hooks.once('ready', async () => {
 
   addModuleButtonsToItemsDirectory();
   Hooks.on('fabricate.craftingSystemsChanged', () => addModuleButtonsToItemsDirectory());
-  Hooks.on('renderItemDirectory', () => addModuleButtonsToItemsDirectory());
+  Hooks.on('renderItemDirectory', (app) => addModuleButtonsToItemsDirectory(app));
   Hooks.on('updateItem', (item, changes) => {
     void fabricate.craftingSystemManager?.refreshComponentMetadataForUpdatedItem(item, changes);
   });
@@ -6515,12 +6515,11 @@ function neutralizeInheritedInteractableLink(document) {
 
 /**
  * Add the Craft button to Items Directory header
- * Since sidebar is already rendered at module init, we inject directly
+ * Inject when an element exists; ready can precede the sidebar's first render.
+ * The renderItemDirectory hook retries for each rendered sidebar or popout instance.
  */
-function addModuleButtonsToItemsDirectory() {
-  const itemsDir = ui.items;
+function addModuleButtonsToItemsDirectory(itemsDir = ui.items) {
   if (!itemsDir?.element) {
-    console.error('Fabricate | Items directory not found or not rendered');
     return;
   }
 
