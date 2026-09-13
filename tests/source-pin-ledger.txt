@@ -111,7 +111,7 @@ tests/crafting-modifier-config.test.js	3
 tests/crafting-nav.test.js	7
 tests/currency-balance-macro.test.js	4
 tests/essence-bulk-delete-copy.test.js	2
-tests/essence-world-scope-screens.test.js	31
+tests/essence-world-scope-screens.test.js	34
 tests/export-system-gathering-bundle.test.js	15
 tests/fabricate-api-surface.test.js	56
 tests/fabricate-facade-alchemy-owner-gate.test.js	9
@@ -157,6 +157,7 @@ tests/progressive-stage-complications.test.js	2
 tests/quantity-literal-gate.test.js	6
 tests/recipe-set-delete-cascade.test.js	5
 tests/recipe-visibility-service.test.js	5
+tests/run-manager-cache-invalidation.test.js	2
 tests/scoped-definition-read-and-basis.test.js	12
 tests/scoped-definitions.test.js	2
 tests/scoped-entity-list-model.test.js	8
@@ -180,9 +181,9 @@ tests/view-lab-cases.test.js	16
 tests/world-scope-consumer-sweep.test.js	24
 tests/world-scope-entities-import-export.test.js	11
 tests/world-scope-flag-stamp-version-gate.test.js	4
-tests/world-scope-gm-notice.test.js	7
+tests/world-scope-gm-notice.test.js	14
 tests/world-scope-identity-drift.test.js	3
-tests/world-scope-identity-flag-remap.test.js	3
+tests/world-scope-identity-flag-remap.test.js	8
 tests/world-scope-reader-ledger.test.js	1
 tests/world-scope-tool-breakage-authority.test.js	3
 tests/world-vocabulary-gateway-bounds.test.js	2
