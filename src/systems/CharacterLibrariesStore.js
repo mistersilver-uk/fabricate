@@ -3,6 +3,7 @@ import {
   setSetting as defaultSetSetting,
   SETTING_KEYS,
 } from '../config/settings.js';
+import { cloneJson } from '../utils/scalars.js';
 
 import { normalizeCharacterPrerequisiteList } from './characterPrerequisites.js';
 import { normalizeModifierLibrary } from './modifierLibrary.js';
@@ -205,8 +206,4 @@ function _carriedLibraryKeys(raw) {
     characterPrerequisites: Object.prototype.hasOwnProperty.call(source, 'characterPrerequisites'),
     modifiers: Object.prototype.hasOwnProperty.call(source, 'modifiers'),
   };
-}
-
-function cloneJson(value) {
-  return value == null ? value : JSON.parse(JSON.stringify(value));
 }

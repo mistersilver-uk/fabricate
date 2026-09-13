@@ -21,6 +21,7 @@
 import { FABRICATE_EXPORT_SCHEMA_VERSION } from '../systems/authoringExport.js';
 import { membershipKey } from '../systems/scopedDefinitions.js';
 import { subKeyEntries } from '../systems/scopedDefinitionStore.js';
+import { cloneJson, isPlainObject } from '../utils/scalars.js';
 
 import { mergeEquivalentWorldEssences } from './mergeEquivalentWorldEssences.js';
 import {
@@ -369,16 +370,8 @@ const SCOPE_ENTITY_TYPES = Object.freeze(['components', 'essences', 'tools']);
  */
 export const WORLD_SCOPE_UPCAST_REPORT_KEY = '_worldScopeEntityReport';
 
-function isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
 function trimmedString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
-
-function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
 /**

@@ -3,6 +3,7 @@ import {
   setSetting as defaultSetSetting,
   SETTING_KEYS,
 } from '../config/settings.js';
+import { cloneJson } from '../utils/scalars.js';
 
 import {
   environmentComposesRecord,
@@ -615,10 +616,6 @@ function normalizeBlindSelection(data = null) {
   const weights = data.weights && typeof data.weights === 'object' ? cloneJson(data.weights) : {};
   if (Object.keys(weights).length === 0) return null;
   return { weights };
-}
-
-function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
 function replaceAt(array, index, value) {

@@ -62,6 +62,7 @@ const harness = createMountedComponentHarness({
     'src/systems/toolScope.js',
     'src/systems/scopedDefinitions.js',
     'src/systems/scopedDefinitionStore.js',
+    'src/utils/scalars.js',
     'src/migration/worldScopeEntityGrouping.js',
     'src/systems/invalidationDomains.js',
     'src/systems/itemStackQuantity.js',

@@ -108,6 +108,7 @@
  */
 
 import { normalizeComponentEssenceMap } from '../systems/componentScope.js';
+import { cloneJson, isPlainObject } from '../utils/scalars.js';
 
 import { ESSENCE_EFFECT_SOURCE_FIELDS } from './worldScopeEntityGrouping.js';
 
@@ -162,16 +163,8 @@ export function sectionIsAuthoredBy(record, entityType, section) {
   return true;
 }
 
-function isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
 function arrayOf(value) {
   return Array.isArray(value) ? value : [];
-}
-
-function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
 function trimmedString(value) {

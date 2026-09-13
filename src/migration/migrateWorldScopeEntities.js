@@ -70,6 +70,8 @@
  * transient report for the acceptance suite and for the editors of PRs 6a-c.
  */
 
+import { cloneJson, isPlainObject } from '../utils/scalars.js';
+
 import { markComponentEssenceInheritance } from './migrateComponentEssenceSections.js';
 import { electWorldDefault } from './worldScopeDefaults.js';
 import {
@@ -109,16 +111,8 @@ const OVERRIDING_INHERIT = Object.freeze({
 
 const ENTITY_TYPES = Object.freeze(['components', 'essences', 'tools']);
 
-function isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
 function arrayOf(value) {
   return Array.isArray(value) ? value : [];
-}
-
-function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
 function trimmedString(value) {

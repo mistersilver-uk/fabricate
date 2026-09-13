@@ -59,6 +59,7 @@
  */
 
 import { COMPLICATION_ACTIVITIES } from '../utils/componentComplications.js';
+import { trimString } from '../utils/scalars.js';
 
 import { createDepletionRateLimiter } from './gatheringNodeSocket.js';
 
@@ -124,10 +125,6 @@ export const COMPLICATION_DELIVERY_MAX_ENTRIES = 250;
 
 /** Delivery keys the de-duplication set retains before evicting the oldest. */
 export const COMPLICATION_DEDUPE_LIMIT = 512;
-
-function trimString(value) {
-  return typeof value === 'string' ? value.trim() : '';
-}
 
 /**
  * Normalize one addressed complication, or `null` when it addresses nothing.

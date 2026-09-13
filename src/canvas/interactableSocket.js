@@ -22,6 +22,8 @@
  * (`behavior.update`, `game.socket.emit`).
  */
 
+import { trimString } from '../utils/scalars.js';
+
 import { mayApplyNonGmBehaviorUpdate } from './regions/interactableRegionFlags.js';
 
 export const INTERACTABLE_SOCKET = 'module.fabricate';
@@ -41,10 +43,6 @@ export const INTERACTABLE_VISUAL_DELETE = 'interactableVisualDelete';
 // ---------------------------------------------------------------------------
 // Region-first model: behaviour-update + linked-visual + activation routing.
 // ---------------------------------------------------------------------------
-
-function trimString(value) {
-  return typeof value === 'string' ? value.trim() : '';
-}
 
 function plainObjectOrNull(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;

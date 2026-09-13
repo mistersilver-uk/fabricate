@@ -47,13 +47,13 @@ src/ui/svelte/apps/manager/world	352
 src/ui/svelte/components	6826
 src/ui/svelte/stores	7008
 src/ui/svelte/util	3353
-src/utils	7473
+src/utils	7541
 styles	7502
-tests	39601
+tests	39650
 tests/actions	155
 tests/canvas	622
 tests/canvas/regions	292
-tests/components	36183
+tests/components	36186
 tests/fixtures	72
 tests/fixtures/chip	44
 tests/fixtures/manager-select	51

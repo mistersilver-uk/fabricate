@@ -1,3 +1,5 @@
+import { cloneJson } from '../utils/scalars.js';
+
 import { reconcileAgainstDocument, runContainerBaseline } from './runContainerCoherence.js';
 
 const FLAG_NAMESPACE = 'fabricate';
@@ -654,10 +656,6 @@ function numberOrDefault(...values) {
 function positiveNumberOrDefault(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : fallback;
-}
-
-function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
 function cloneContainer(container) {

@@ -77,6 +77,8 @@
  * by the number of `(system, entityType)` pairs, so the loop terminates.
  */
 
+import { isPlainObject } from '../utils/scalars.js';
+
 const ENTITY_TYPES = Object.freeze(['components', 'essences', 'tools']);
 
 /**
@@ -183,10 +185,6 @@ const IDENTITY_FIELDS = Object.freeze({
  * @type {Readonly<Record<string, readonly string[]>>}
  */
 export const WORLD_IDENTITY_FIELDS = IDENTITY_FIELDS;
-
-function isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function arrayOf(value) {
   return Array.isArray(value) ? value : [];

@@ -90,6 +90,7 @@ import {
   WORLD_DEFAULT_SECTIONS,
 } from '../migration/worldScopeDefaults.js';
 import { ESSENCE_EFFECT_SOURCE_FIELDS } from '../migration/worldScopeEntityGrouping.js';
+import { isPlainObject } from '../utils/scalars.js';
 
 import { membershipKey } from './scopedDefinitions.js';
 import { subKeyEntries } from './scopedDefinitionStore.js';
@@ -105,10 +106,6 @@ import { subKeyEntries } from './scopedDefinitionStore.js';
  * @type {string}
  */
 export const INCOMING_SYSTEM_TOKEN = '__fabricate.incoming__';
-
-function isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function trimmedId(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;

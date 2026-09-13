@@ -62,6 +62,7 @@ export const COMPONENT_SCOPE_LEAF_MODULES = Object.freeze([
   'src/utils/recipeCategories.js',
   'src/systems/scopedDefinitions.js',
   'src/systems/scopedDefinitionStore.js',
+  'src/utils/scalars.js',
   'src/systems/componentScope.js',
   'src/systems/essenceScope.js',
   'src/systems/toolScope.js',

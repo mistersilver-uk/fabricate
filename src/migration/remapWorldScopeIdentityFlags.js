@@ -65,6 +65,7 @@
 import { FABRICATE_FLAG_NAMESPACE, isSafeFlagKeySegment } from '../config/flags.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
 import { localizeWith } from '../utils/localizeWithFallback.js';
+import { isPlainObject } from '../utils/scalars.js';
 
 import { compareSemver } from './MigrationRunner.js';
 
@@ -141,10 +142,6 @@ const COMPONENT_LEAF_KEYS = Object.freeze(['componentId', 'systemItemId']);
 
 /** Leaf keys inside a run record that name a tool. */
 const TOOL_LEAF_KEYS = Object.freeze(['toolId']);
-
-function isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function arrayOf(value) {
   return Array.isArray(value) ? value : [];
