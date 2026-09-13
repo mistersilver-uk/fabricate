@@ -1542,15 +1542,19 @@ test('the completion script builds the merge itself, pushes nothing, and makes n
   const body = scriptStatements(COMPLETE_MERGE_SCRIPT).join('\n');
 
   // The runbook quotes these two phrases verbatim to tell an operator how to read the job log, and
-  // nothing else guards that mirror: reword either message and CONTRIBUTING.md silently starts
+  // nothing else guards that mirror: reword either message and the runbook silently starts
   // describing output the job no longer produces, on a path that runs once every few years.
-  const runbook = read('CONTRIBUTING.md');
+  //
+  // The runbook is `.github/workflows/README.md` since issue #1661 moved the CI narrative out of
+  // `CONTRIBUTING.md` to sit beside the YAML. The assertion follows the prose rather than the
+  // filename — a mirror pinned to a file the text has left is a mirror of nothing.
+  const runbook = read('.github/workflows/README.md');
   for (const quoted of [
     "the forward-port's merge of origin/release into main CONFLICTED",
     'left no conflicting paths behind',
   ]) {
     assert.ok(body.includes(quoted), `the completion script must still print ${JSON.stringify(quoted)}`);
-    assert.ok(runbook.includes(quoted), `CONTRIBUTING.md must still quote ${JSON.stringify(quoted)}`);
+    assert.ok(runbook.includes(quoted), `the CI runbook must still quote ${JSON.stringify(quoted)}`);
   }
 
   // BOTH PARENTS, IN THAT ORDER, and the tree taken wholesale. The order records `origin/main` as

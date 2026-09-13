@@ -362,6 +362,12 @@ function harnessDocList(io) {
     'AGENTS.md',
     'CLAUDE.md',
     'CONTRIBUTING.md',
+    // The two narratives CONTRIBUTING.md used to carry, moved beside the code they describe
+    // (issue #1661). They are listed here for the same reason CONTRIBUTING.md is: between them
+    // they cite 33 repository paths, and moving prose out of a checked document into an unchecked
+    // one is how those citations start rotting silently.
+    'scripts/README.md',
+    '.github/workflows/README.md',
     'openspec/README.md',
     `${SKILLS_ROOT}/README.md`,
     ...io.skillDirs().flatMap((d) => {
