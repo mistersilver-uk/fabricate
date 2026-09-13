@@ -115,6 +115,7 @@ tests/essence-world-scope-screens.test.js	34
 tests/export-system-gathering-bundle.test.js	15
 tests/fabricate-api-surface.test.js	56
 tests/fabricate-facade-alchemy-owner-gate.test.js	9
+tests/file-size-ledger.test.js	1
 tests/foundry-manager-rail-hooks.test.js	1
 tests/foundry-perf-profile.test.js	1
 tests/gathering-bootstrap-api.test.js	36
