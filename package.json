@@ -18,6 +18,7 @@
     "lint:svelte:warnings": "node scripts/check-svelte-warnings.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "format:tables": "node scripts/reflow-markdown-tables.mjs",
     "lint:css": "stylelint \"styles/**/*.{css,scss}\" --max-warnings=0",
     "lint:css:fix": "npm run lint:css -- --fix",
     "lint:md": "markdownlint-cli2",

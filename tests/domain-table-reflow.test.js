@@ -54,21 +54,27 @@ const DOMAIN = readFileSync(path.join(REPOSITORY_ROOT, 'DOMAIN.md'), 'utf8');
  */
 const MAXIMUM_BYTES = 420 * 1024;
 
+/** The file's real size on disk. `String#length` counts UTF-16 units, and 165 lines here are
+ * not ASCII — em dashes, arrows, ellipses — so the two disagree by a few KB. */
+const DOMAIN_BYTES = Buffer.byteLength(DOMAIN, 'utf8');
+
 /** Table rows in the file, so the assertions below cannot be measuring an empty set. */
 const TABLE_ROWS = DOMAIN.split('\n').filter((line) => isTableRow(line));
 
 test('DOMAIN.md is the corpus these assertions think it is', () => {
   // A guard over a file that stopped having tables — or stopped being read — reports success
   // forever. Both inputs are floored.
-  assert.ok(
-    TABLE_ROWS.length > 200,
-    `expected DOMAIN.md to hold a real table corpus, found ${TABLE_ROWS.length} rows`
-  );
-  // 216 rows, not the 313 a `startsWith('|')` count reports: the other 107 are an ASCII tree
-  // (`|- World settings`) inside a fenced block, which opens with a pipe and does not close with
-  // one. `isTableRow` requires both, which is what keeps the transform off that diagram — and
-  // this floor is set from the real number rather than from the looser count, because a floor
-  // above the corpus fails forever and a floor derived from the wrong count hides the difference.
+  // 216 rows across four tables, and the number is worth stating exactly because two looser
+  // counts are close enough to be mistaken for it. `line.startsWith('|')` answers 313 and
+  // `/^\s*\|/` answers 323; the difference is 107 lines of an ASCII tree of the world-settings
+  // layout (`|- World settings`), ten of them indented. `isTableRow` excludes every one of them
+  // because they do not CLOSE with a pipe — the fence they sit in plays no part in it, and
+  // `reflowTables` skips fenced content separately.
+  //
+  // A floor above the real corpus fails forever, and the obvious fix for that is to lower it
+  // until it passes — at which point it measures nothing. So this is derived, with enough slack
+  // to survive an edit but not a deleted table.
+  assert.equal(TABLE_ROWS.length, 216, 'the DOMAIN.md table corpus changed size');
   assert.ok(DOMAIN.length > 100_000, 'DOMAIN.md is far smaller than any version of this document');
 });
 
@@ -77,9 +83,9 @@ test('DOMAIN.md carries no column padding', () => {
   assert.deepEqual(
     padded.map(({ number }) => number),
     [],
-    'these DOMAIN.md table rows are padded to column width again. Re-emit them with one space ' +
-      'per cell — `MD060` is off, so `npm run lint:md` will not tell you, and an editor that ' +
-      'aligns tables on save will do it without asking:\n' +
+    'these DOMAIN.md table rows are padded to column width again. Run `npm run format:tables` ' +
+      'to re-emit them — `MD060` is off, so `npm run lint:md` will not tell you, and an editor ' +
+      'that aligns tables on save will do it without asking:\n' +
       padded.map(({ number, line }) => `  ${number}: ${line.slice(0, 80)}…`).join('\n')
   );
 });
@@ -92,8 +98,8 @@ test('DOMAIN.md is a fixed point of the transform, byte for byte', () => {
 
 test('DOMAIN.md stays under its size ceiling', () => {
   assert.ok(
-    DOMAIN.length <= MAXIMUM_BYTES,
-    `DOMAIN.md is ${Math.round(DOMAIN.length / 1024)} KB, over the ${MAXIMUM_BYTES / 1024} KB ` +
+    DOMAIN_BYTES <= MAXIMUM_BYTES,
+    `DOMAIN.md is ${Math.round(DOMAIN_BYTES / 1024)} KB, over the ${MAXIMUM_BYTES / 1024} KB ` +
       'ceiling. If the document has genuinely grown, raise the ceiling deliberately; if a table ' +
       'was re-padded, the assertion above will say so too.'
   );
@@ -135,9 +141,26 @@ test('the reflow is falsifiable in every direction it claims', () => {
   assert.equal(isDelimiterRow(splitRow('| :--- | ---: |')), true);
 
   // 4. Non-table text is untouched, including a line that merely contains a pipe.
-  const prose = 'A sentence with a | pipe in it.\n\n```\n| not | a | table |\n```\n';
-  assert.equal(reflowTables(prose), prose);
+  assert.equal(reflowTables('A sentence with a | pipe in it.\n'), 'A sentence with a | pipe in it.\n');
   assert.equal(isTableRow('A sentence with a | pipe in it.'), false);
+
+  // 4b. A FENCE IS VERBATIM. The fixture is deliberately a PADDED table: an already-canonical one
+  //     would survive by coincidence rather than by fence handling, and an earlier draft of this
+  //     test used exactly that and proved nothing. `DOMAIN.md` documents its own conventions, so a
+  //     fenced before/after example of padding is content the gate must not rewrite — and without
+  //     this the fixed-point assertion above would REQUIRE rewriting it.
+  const fenced = '```markdown\n| col |   col |\n| --- | ------ |\n```\n';
+  assert.equal(reflowTables(fenced), fenced);
+  assert.deepEqual(paddedRows(fenced), []);
+  assert.equal(isTableRow('| col |   col |'), true, 'the fixture must be a row the transform WOULD rewrite');
+
+  // 4c. `||` carries no cell, so re-emitting it as `|  |` would be a change, not a normalisation.
+  assert.equal(reflowTables('||\n'), '||\n');
+  assert.deepEqual(paddedRows('||\n'), []);
+
+  // 4d. CRLF is a line ending, not padding. Without `/\r?\n/` every row of a CRLF checkout reads
+  //     as re-padded — a red gate with a message describing the wrong problem entirely.
+  assert.equal(paddedRows('| a   | b |\r\n| --- | --- |\r\n').length, 1);
 
   // 5. A cell's own content is never trimmed away, only its padding.
   assert.deepEqual(splitRow('|   `a b`   |   c   |'), ['`a b`', 'c']);

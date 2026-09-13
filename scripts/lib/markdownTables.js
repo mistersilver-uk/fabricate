@@ -59,6 +59,18 @@ export function splitRow(line) {
   return cells;
 }
 
+/**
+ * Whether `line` carries any cell content at all.
+ *
+ * `||` does not: `splitRow` reads it as one empty cell, and re-emitting it as `|  |` would be a
+ * change rather than a normalisation — `paddedRows` would then report a row carrying no padding as
+ * padded. No such row exists in this repository; the guard is here so the first one does not
+ * produce a confusing message.
+ */
+function hasContent(line) {
+  return splitRow(line).some((cell) => cell.length > 0);
+}
+
 /** Whether every cell of `row` is a `---`, `:---`, `---:` or `:---:` delimiter. */
 export function isDelimiterRow(cells) {
   return cells.length > 0 && cells.every((cell) => /^:?-+:?$/u.test(cell));
@@ -72,10 +84,20 @@ export function isDelimiterRow(cells) {
  * Everything that is not a table row is returned byte-for-byte.
  */
 export function reflowTables(text) {
+  let inFence = false;
   return String(text)
-    .split('\n')
+    .split(/\r?\n/u)
     .map((line) => {
-      if (!isTableRow(line)) return line;
+      // A FENCE IS VERBATIM, and that is not a nicety. `DOMAIN.md` documents its own conventions;
+      // a fenced `| col |   col |` showing what padding looks like, or pasted tool output, is
+      // content — and rewriting it would be a silent mutation inside the one construct whose
+      // whole contract is that its bytes are left alone. Worse, `paddedRows` feeds a fixed-point
+      // gate, so without this the gate would REQUIRE that mutation.
+      if (/^\s*(?:```|~~~)/u.test(line)) {
+        inFence = !inFence;
+        return line;
+      }
+      if (inFence || !isTableRow(line) || !hasContent(line)) return line;
       const indent = line.slice(0, line.length - line.trimStart().length);
       const cells = splitRow(line);
       const emitted = isDelimiterRow(cells)
@@ -88,10 +110,17 @@ export function reflowTables(text) {
     .join('\n');
 }
 
-/** Table rows in `text` that still carry column padding, as `{ line, number }`. */
+/**
+ * Lines of `text` the transform would change, as `{ line, number }`.
+ *
+ * Reflowed as ONE document rather than line by line, so the fence state in `reflowTables` applies.
+ * A per-line `reflowTables(line)` would report a fenced example table as padded, which is the same
+ * defect from the other side.
+ */
 export function paddedRows(text) {
-  return String(text)
-    .split('\n')
+  const before = String(text).split(/\r?\n/u);
+  const after = reflowTables(text).split('\n');
+  return before
     .map((line, index) => ({ line, number: index + 1 }))
-    .filter(({ line }) => isTableRow(line) && reflowTables(line) !== line);
+    .filter(({ line, number }) => line !== after[number - 1]);
 }
