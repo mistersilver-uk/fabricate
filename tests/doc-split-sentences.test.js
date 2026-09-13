@@ -30,7 +30,12 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { missingSentences, multiset, sentencesOf } from '../scripts/lib/docSentences.js';
+import {
+  missingSentences,
+  multiset,
+  sentencesOf,
+  withoutLinkTargets,
+} from '../scripts/lib/docSentences.js';
 
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = 'tests/fixtures/doc-split';
@@ -58,6 +63,8 @@ const DESTINATIONS = [
   // they describe.
   'scripts/README.md',
   '.github/workflows/README.md',
+  // Phase 4: the FoundryVTT notes and architecture pointers, moved whole.
+  '.agents/docs/foundry-and-architecture.md',
 ];
 
 /**
@@ -75,6 +82,26 @@ const DEDUPLICATED = [];
 
 /** Pinned exactly, not as a ceiling: a ceiling banks a free slot on every entry that is retired. */
 const DEDUPLICATED_COUNT = 0;
+
+/**
+ * Sentences a move forced to change, where the only change is a link TARGET.
+ *
+ * When a heading moves to another file, the in-file `(#anchor)` links pointing at it have to
+ * become `(path/to.md#anchor)`. That is a changed sentence and the subset assertion reports it,
+ * which is correct — so the allowance is made here, and made narrowly: the test asserts that
+ * stripping link targets from both makes them the same string. A retarget is admissible; a
+ * reworded rule wearing a retarget's clothes is not.
+ */
+const RETARGETED = [
+  {
+    before: 'See [Manager confirm-discard guard](#manager-confirm-discard-guard).',
+    after:
+      'See [Manager confirm-discard guard](.agents/docs/foundry-and-architecture.md#manager-confirm-discard-guard).',
+  },
+];
+
+/** Pinned for the same reason as DEDUPLICATED_COUNT. */
+const RETARGETED_COUNT = 1;
 
 /** Every sentence of the post-split set, as one multiset. */
 function survivingSentences() {
@@ -107,7 +134,10 @@ test('the frozen fixtures are the documents they claim to be', () => {
 test('every sentence of the pre-split documents still exists somewhere', () => {
   const before = multiset(SOURCES.flatMap(({ fixture }) => sentencesOf(readFileSync(path.join(REPOSITORY_ROOT, fixture), 'utf8'))));
   const after = survivingSentences();
-  const allowed = new Set(DEDUPLICATED.map(({ sentence }) => sentence));
+  const allowed = new Set([
+    ...DEDUPLICATED.map(({ sentence }) => sentence),
+    ...RETARGETED.map(({ before }) => before),
+  ]);
   const lost = missingSentences(before, after).filter(({ sentence }) => !allowed.has(sentence));
 
   assert.deepEqual(
@@ -138,6 +168,38 @@ test('every deduplication claim names a place that really carries the sentence',
     assert.ok(
       text.includes(sentence),
       `DEDUPLICATED says this sentence survives in ${survivesIn}, and it does not:\n  ${sentence}`
+    );
+  }
+});
+
+test('every retarget claim really is a retarget and nothing more', () => {
+  assert.equal(
+    RETARGETED.length,
+    RETARGETED_COUNT,
+    'the retarget allowlist changed size. Each entry excuses one sentence from the subset ' +
+      'assertion, so growing it needs its own justification in review.'
+  );
+
+  const surviving = survivingSentences();
+  for (const { before, after } of RETARGETED) {
+    // 1. The replacement must actually be somewhere, or the sentence is simply gone.
+    assert.ok(
+      (surviving.get(after) ?? 0) > 0,
+      `RETARGETED claims this replaced a sentence and it is in no destination:\n  ${after}`
+    );
+    // 2. THE ONLY DIFFERENCE MAY BE THE LINK TARGET. Without this the allowlist is a hole big
+    //    enough to rewrite a rule through, which is the exact loophole this whole file exists to
+    //    close on the deduplication side.
+    assert.equal(
+      withoutLinkTargets(after),
+      withoutLinkTargets(before),
+      'a RETARGETED entry changed more than a link target, so it is a rewrite, not a retarget'
+    );
+    // 3. And it must not be stale: an entry whose `before` still exists excuses nothing.
+    assert.equal(
+      surviving.get(before) ?? 0,
+      0,
+      `RETARGETED still lists this sentence, which is present after all — remove the entry:\n  ${before}`
     );
   }
 });

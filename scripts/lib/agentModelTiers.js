@@ -80,6 +80,7 @@ export const HIGH_RISK_PATHS = [
   'AGENTS.md',
   'CLAUDE.md',
   '.agents/skills/**',
+  '.agents/docs/**',
   '.claude/agents/**',
   '.codex/agents/**',
 ];

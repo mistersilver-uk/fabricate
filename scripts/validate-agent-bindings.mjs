@@ -368,6 +368,7 @@ function harnessDocList(io) {
     // one is how those citations start rotting silently.
     'scripts/README.md',
     '.github/workflows/README.md',
+    '.agents/docs/foundry-and-architecture.md',
     'openspec/README.md',
     `${SKILLS_ROOT}/README.md`,
     ...io.skillDirs().flatMap((d) => {
