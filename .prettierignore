@@ -14,3 +14,146 @@ package-lock.json
 # Minified / generated assets
 **/*.min.js
 **/*.min.css
+
+# --- Formats this repository deliberately does not hand to Prettier ---------------------------
+#
+# `npm run format:check` is `prettier --check .` as of issue #1660. It was an allowlist of
+# eighty-one hand-written paths, so a new file was unformatted until somebody remembered it. The
+# exclusions below are the whole of what Prettier does not see, and each one states why.
+#
+# Markdown: markdownlint-cli2 gates it (`npm run lint:md`, a required CI step), and the two
+# disagree by design — `markdownlint-sentences-per-line` splits prose one sentence per line while
+# Prettier's `proseWrap` default is `preserve`. Two formatters over one corpus is a standing
+# conflict, so markdown has exactly one owner and it is not Prettier.
+*.md
+
+# Workflow YAML is read as SOURCE TEXT by `tests/ci-workflow-semantics.test.js` and
+# `tests/helpers/workflow-source.js`, and `pr-screenshots.yml` carries a step name asserted from
+# two other places. Reformatting is measurable risk for no gain.
+.github/
+
+# The canonical spec source of truth (AGENTS.md). Reformatting it churns the exact diff that
+# post-implementation and docs reviewers reconcile against each issue's change delta.
+openspec/
+
+# Jekyll owns the docs site; its build output and vendored assets are already excluded above.
+docs/
+
+# Machine-written and rewritten by `npm run benchmark:performance`. Formatting it here would be
+# undone by the next run, so the two would disagree forever.
+benchmarks/baselines/
+
+# The compiled stylesheet. Its source of truth is the component `<style>` blocks and the design
+# tokens; stylelint gates those.
+styles/fabricate.css
+
+# --- FORMATTING DEBT BASELINE (only shrinks; pinned by tests/lint-coverage.test.js) -----------
+#
+# Everything below was unformatted when the glob landed, and is excluded ONLY until someone runs
+# Prettier over it. These entries are debt, not policy: `tests/lint-coverage.test.js` fails if one
+# names a file that is already formatted or no longer exists, and pins the count exactly so the
+# list cannot quietly grow instead of shrinking. Do not add to it — format the file instead.
+#
+# `tests/` is one entry rather than 691 because the old script never covered that tree at all; a
+# six-hundred-line enumeration of it would inform nobody. Every other entry is a single file.
+tests/
+.agents/skills/fabricate-competitive-analyst/agents/openai.yaml
+.agents/skills/fabricate-docs-writer/agents/openai.yaml
+.agents/skills/fabricate-domain-expert/agents/openai.yaml
+.agents/skills/fabricate-implementer/agents/openai.yaml
+.agents/skills/fabricate-orchestrator/agents/openai.yaml
+.agents/skills/fabricate-quality-engineer/agents/openai.yaml
+.agents/skills/fabricate-reviewer/agents/openai.yaml
+.agents/skills/fabricate-ux-designer/agents/openai.yaml
+.agents/skills/javascript-structural-design/agents/openai.yaml
+.agents/skills/review-implementing/agents/openai.yaml
+.markdownlint-cli2.jsonc
+.mcp.json
+commitlint.config.js
+docker-compose.foundry.yml
+examples/macros/01-list-recipes.js
+examples/macros/02-available-recipes.js
+examples/macros/03-get-item-uuids.js
+examples/macros/04-create-simple-recipe.js
+examples/macros/05-craft-item.js
+examples/macros/06-tag-items.js
+examples/macros/07-export-recipes.js
+examples/macros/08-import-recipes.js
+lang/en.json
+module.json
+scripts/foundry-setup-data.mjs
+scripts/foundry-test-down.mjs
+scripts/foundry-test-run.mjs
+scripts/foundry-test-up.mjs
+scripts/foundry-test.mjs
+scripts/foundry/create-mythwright-dnd5e.js
+scripts/latest-module-versions.mjs
+scripts/lib/designSystemPrimitives.json
+scripts/lib/zip.js
+scripts/release.js
+scripts/setup-dev-module.mjs
+scripts/ui-pr-screenshot-evidence.mjs
+scripts/validate-agent-bindings.mjs
+scripts/verify-manager-chunk-split.mjs
+src/gatheringBootstrapAdapters.js
+src/gatheringImageDefaults.js
+src/gatheringResultCreation.js
+src/gatheringToolRuntime.js
+src/main.js
+src/ui/InteractableBrowserApp.svelte.js
+src/ui/InteractableConfigApp.svelte.js
+src/ui/InteractablesManagerApp.svelte.js
+src/ui/InteractionPromptApp.svelte.js
+src/ui/SvelteCraftingSystemManagerApp.svelte.js
+src/ui/SvelteFabricateApp.svelte.js
+src/ui/appFactory.js
+src/ui/compendiumDirectoryContext.js
+src/ui/foundryCompat.js
+src/ui/interactableConfigView.js
+src/ui/interactableSceneControl.js
+src/ui/itemsDirectoryButtons.js
+src/ui/managerExtensions.js
+src/ui/recipeAvailability.js
+src/ui/recipeIngredientGroups.js
+src/ui/svelte/SvelteApplicationMixin.svelte.js
+src/ui/svelte/SvelteApplicationMixinCore.js
+src/ui/svelte/actions/dismissOnOutsideClick.js
+src/ui/svelte/actions/dragDrop.js
+src/ui/svelte/actions/dragSource.js
+src/ui/svelte/actions/portal.js
+src/ui/svelte/apps/gathering/gatheringBlockedReasons.js
+src/ui/svelte/apps/gathering/scopedSelection.js
+src/ui/svelte/apps/gathering/selectionDefault.js
+src/ui/svelte/apps/manager/checks/checkTriggerSummary.js
+src/ui/svelte/apps/manager/environment/environmentReadiness.js
+src/ui/svelte/apps/manager/essences/essenceStudio.js
+src/ui/svelte/apps/manager/recipe/recipeReadiness.js
+src/ui/svelte/apps/manager/scoped/componentScoped.js
+src/ui/svelte/apps/manager/scoped/scopedEntryDraft.js
+src/ui/svelte/stores/actorBarStore.svelte.js
+src/ui/svelte/stores/adminComponentRowProjection.js
+src/ui/svelte/stores/adminRecipeRowProjection.js
+src/ui/svelte/stores/adminStore.js
+src/ui/svelte/stores/alchemyStore.svelte.js
+src/ui/svelte/stores/craftingStore.svelte.js
+src/ui/svelte/stores/journalStore.svelte.js
+src/ui/svelte/util/alchemyTabAvailability.js
+src/ui/svelte/util/autoFillResolver.js
+src/ui/svelte/util/componentEditor.js
+src/ui/svelte/util/dropUtils.js
+src/ui/svelte/util/essenceIcons.js
+src/ui/svelte/util/formatDuration.js
+src/ui/svelte/util/foundryIconVocabulary.js
+src/ui/svelte/util/gatheringConditionIcons.js
+src/ui/svelte/util/gatheringFormat.js
+src/ui/svelte/util/iconPickerPopover.js
+src/ui/svelte/util/managerColorTokens.js
+src/ui/svelte/util/recipeDuration.js
+src/ui/svelte/util/recipeGraphBuilder.js
+src/ui/svelte/util/recipeImageIcons.js
+src/ui/svelte/util/recipeItemAccessBadge.js
+src/ui/svelte/util/requirementSlots.js
+src/ui/svelte/util/sceneImages.js
+src/ui/svelte/util/sceneRegions.js
+src/ui/svelte/util/shoppingListAggregator.js
+src/ui/theme.js

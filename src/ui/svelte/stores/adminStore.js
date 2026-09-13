@@ -5686,7 +5686,8 @@ export function createAdminStore(services) {
     // ONE RECIPE COHORT READ PER SYSTEM, SHARED BY BOTH LEGS THAT WALK IT. See `_recipeCohort`:
     // the per-refresh recipe fetch is a bounded budget, and a second consumer reading it again
     // scales that budget by the crafting-system count.
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a per-call cache, never state
+    // A per-call cache, never state: it lives and dies inside one `buildWorldScopeState()` call,
+    // so it is a plain Map rather than anything reactive.
     const recipeCache = new Map();
     // AND ONE WORLD-WIDE READ, SHARED THE SAME WAY (issue 1371, round 8). `_allRecipes()` is
     // `getRecipes({})` — a copy of the whole library, and the one read on this path that is NOT

@@ -140,6 +140,16 @@ jobs:
       - name: Lint (ESLint)
         run: npm run lint
 
+      # The other half of the glob gate (issue #1660). `npm run lint` passes on the files
+      # `eslint.debt.js` carries by construction — their failing rules are switched off per
+      # file — so this runs the same config with the baseline lifted and fails on an entry
+      # that reports nothing any more. Without it the baseline never shrinks. It lives here
+      # rather than in `npm test` because it has to lint the largest files in the tree, and
+      # twenty-three CPU-bound seconds in the unit-test job starve the browser-backed suites
+      # sharing its runner.
+      - name: Check the lint debt baseline is not stale
+        run: npm run lint:debt
+
       - name: Lint Svelte components (ESLint)
         run: npm run lint:svelte
 

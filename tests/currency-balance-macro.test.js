@@ -142,7 +142,7 @@ describe('MacroCoinSpender.readCoins', () => {
 
     for (const [why, options] of cases) {
       const { spender } = balanceSpender(250, options);
-      // eslint-disable-next-line no-await-in-loop
+      // Sequential on purpose: each case reads the balance the previous one left behind.
       const result = await spender.readCoins({ name: 'Idrin' }, {});
 
       assert.equal(result.valid, false, `${why}: must not report a balance`);
