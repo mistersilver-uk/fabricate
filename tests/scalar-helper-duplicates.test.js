@@ -34,20 +34,28 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { parseModule, walkNodes } from './helpers/moduleAst.js';
+import { parseComponent } from './helpers/svelteStructureContract.js';
 import { byCodePoint } from './helpers/ratchetBaseline.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 
 const CANONICAL = 'src/utils/scalars.js';
 
 /** The names `src/utils/scalars.js` owns. Declaring one of these anywhere else is the failure. */
-const CONSOLIDATED = [
-  'cloneJson',
-  'isPlainObject',
-  'normalizeConditionId',
-  'normalizeTag',
-  'normalizeTagList',
-  'trimString',
-];
+const CONSOLIDATED = {
+  cloneJson: [CANONICAL],
+  isPlainObject: [CANONICAL],
+  normalizeConditionId: [CANONICAL],
+  normalizeTagList: [CANONICAL],
+  trimString: [CANONICAL],
+  // `TagsCategoriesView.svelte` keeps its own `normalizeTag`, and the exception is recorded
+  // rather than merged because it DIVERGES: it spells the guard `String(value || '')` where
+  // `scalars.js` spells it `String(value ?? '')`, so `0` normalises to `''` there and `'0'` here,
+  // and likewise `false` and `NaN`. It reaches a child as a `normalize` prop rather than being
+  // called locally, so proving those inputs cannot arrive means tracing the child — the same
+  // proof the five names in DIVERGENT are waiting on. Until someone does it, this is a seventh
+  // spelling that is written down instead of assumed away.
+  normalizeTag: [CANONICAL, 'src/ui/svelte/apps/manager/TagsCategoriesView.svelte'],
+};
 
 /**
  * Names still declared per file, with the number of declarations, because their copies disagree.
@@ -76,8 +84,15 @@ const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), 
 function declarationsOf(names) {
   const wanted = new Set(names);
   const found = new Map();
-  for (const file of Object.keys(collectSources(`${repoRoot}/src`, { extensions: ['.js'] }))) {
-    const ast = parseModule(readFileSync(path.join(REPOSITORY_ROOT, file), 'utf8'));
+  // `.svelte` INCLUDED, and that is the whole difference between this gate and a comfortable one.
+  // `sourceScan.js` says of its own default that "`.svelte` is load-bearing — real call sites live
+  // there", and `AGENTS.md` records issue 1050, where reasoning that Svelte is invisible to
+  // SonarCloud shipped a duplication failure with 93 of its 98 duplicated lines in a single
+  // `.svelte` file. A first version of this gate scanned `.js` only and was blind to a live,
+  // divergent seventh `normalizeTag`.
+  for (const file of Object.keys(collectSources(`${repoRoot}/src`))) {
+    const source = readFileSync(path.join(REPOSITORY_ROOT, file), 'utf8');
+    const ast = file.endsWith('.svelte') ? parseComponent(source) : parseModule(source);
     for (const node of walkNodes(ast)) {
       let name = null;
       if (node.type === 'FunctionDeclaration' && node.id?.name) name = node.id.name;
@@ -104,25 +119,34 @@ test('the scan sees a real corpus', () => {
   assert.ok(files.includes(CANONICAL), `${CANONICAL} must be in the scanned corpus`);
 });
 
-test('each consolidated helper is declared once, in scalars.js', () => {
-  const declarations = declarationsOf(CONSOLIDATED);
+test('each consolidated helper is declared only where it is allowed to be', () => {
+  const declarations = declarationsOf(Object.keys(CONSOLIDATED));
   const offenders = [];
-  for (const name of CONSOLIDATED) {
+  const stale = [];
+  for (const [name, allowed] of Object.entries(CONSOLIDATED)) {
     const sites = (declarations.get(name) ?? []).sort(byCodePoint);
-    const outside = sites.filter((site) => !site.startsWith(`${CANONICAL}:`));
-    if (outside.length > 0) offenders.push(`${name}: ${outside.join(', ')}`);
+    const files = new Set(sites.map((site) => site.slice(0, site.lastIndexOf(':'))));
+    for (const site of sites) {
+      if (!allowed.some((file) => site.startsWith(`${file}:`))) offenders.push(`${name}: ${site}`);
+    }
     assert.ok(
-      sites.some((site) => site.startsWith(`${CANONICAL}:`)),
-      `${name} is not declared in ${CANONICAL} at all, so this gate is guarding a name nothing owns`
+      files.has(CANONICAL),
+      `${name} is not declared in ${CANONICAL} at all, so this gate guards a name nothing owns`
     );
+    // A recorded exception that no longer declares the helper is stale, and a stale exception is
+    // a licence nobody is using that the next author can reach for.
+    for (const file of allowed) {
+      if (!files.has(file)) stale.push(`${name}: ${file}`);
+    }
   }
   assert.deepEqual(
     offenders,
     [],
-    `these helpers are declared outside ${CANONICAL}. Import them from there instead — the copies ` +
-      'were compared body-for-body before they were merged, so a new local one is a divergence ' +
-      'nobody has checked.'
+    `these helpers are declared somewhere CONSOLIDATED does not allow. Import them from ` +
+      `${CANONICAL} instead — the copies were compared body-for-body before they were merged, so ` +
+      'a new local one is a divergence nobody has checked.'
   );
+  assert.deepEqual(stale, [], 'these CONSOLIDATED exceptions name a file that no longer declares the helper');
 });
 
 test('the divergent helpers have not quietly multiplied', () => {
@@ -142,7 +166,7 @@ test('the divergent helpers have not quietly multiplied', () => {
 test('no divergent name is also owned by scalars.js', () => {
   // The two lists must not overlap, or a name could be "consolidated" and "divergent" at once and
   // the two assertions above would contradict each other without either failing.
-  const overlap = CONSOLIDATED.filter((name) => name in DIVERGENT);
+  const overlap = Object.keys(CONSOLIDATED).filter((name) => name in DIVERGENT);
   assert.deepEqual(overlap, []);
 
   const canonical = parseModule(readFileSync(path.join(REPOSITORY_ROOT, CANONICAL), 'utf8'));
@@ -152,7 +176,7 @@ test('no divergent name is also owned by scalars.js', () => {
   }
   assert.deepEqual(
     [...exported].sort(byCodePoint),
-    [...CONSOLIDATED].sort(byCodePoint),
+    Object.keys(CONSOLIDATED).sort(byCodePoint),
     `${CANONICAL} declares a different set of helpers than this gate enforces`
   );
   assert.deepEqual(
