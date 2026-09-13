@@ -1,4 +1,4 @@
-<!-- Svelte 5 runes mode -->
+<!-- Run actions use caller-owned eligibility and a deliberate two-step cancellation. -->
 <script>
   import SegmentedControl from '../apps/manager/SegmentedControl.svelte';
   import IconButton from './IconButton.svelte';

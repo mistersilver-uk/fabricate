@@ -13657,12 +13657,8 @@ async function main() {
           await assertNoScreenshotOverlays(page);
           await screenshot(page, 'fabricate-journal');
 
-          // Journal craft-detail capture (issue #752 — evidence for #748, and
-          // future #738): select a CRAFTING history run so the run-detail
-          // historical account is visible. The Phase E "Brew Healing
-          // Potion" craft guarantees at least one terminal crafting run. Full
-          // profile only (the rc journal frame is untouched); this runs after the
-          // fabricate-journal capture so it never disturbs that frame's selection.
+          // Phase E guarantees a terminal craft; capture its historical account after the
+          // general Journal frame so selecting it cannot disturb that frame's selection.
           if (RUN_SCREENSHOT_PHASES) {
             const historyRows = appShell.locator('.journal-history-row [data-history-run-id]');
             const historyCount = await historyRows.count();
@@ -13671,7 +13667,7 @@ async function main() {
               await historyRows.nth(i).scrollIntoViewIfNeeded().catch(() => {});
               await historyRows.nth(i).click().catch(() => {});
               const selectedCraftingRun = await appShell
-                .locator('[data-journal-detail][data-run-key*="\\\"crafting\\\""]')
+                .locator(String.raw`[data-journal-detail][data-run-key*="\"crafting\""]`)
                 .first()
                 .waitFor({ state: 'visible', timeout: 5_000 })
                 .then(() => true)
@@ -13684,8 +13680,7 @@ async function main() {
             if (!craftingRunSelected) {
               throw new Error('Journal history had no crafting run to show its historical account.');
             }
-            // The shared local/CI/release walk requires the new historical account,
-            // rather than silently accepting a missing retired StepDetails target.
+            // Every profile reaching this capture requires the selected run's historical account.
             await appShell.locator('[data-journal-detail] [data-journal-history-detail]')
               .first().waitFor({ state: 'visible', timeout: 5_000 });
             await assertNoScreenshotOverlays(page);

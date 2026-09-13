@@ -34,7 +34,7 @@ function checkText(check, localize) {
     formula: check.formula,
     total,
     value: total,
-    ...(finite(check.dc) ? { dc: check.dc } : {}),
+    ...(finite(check.dc) && { dc: check.dc }),
   });
 }
 
@@ -101,7 +101,7 @@ function closedKey(run, stages, results) {
   if (run?.redacted) return 'ClosedRedacted';
   if (run?.status === 'cancelled') {
     if (run?.lifecycleContract === 'legacy') return 'ClosedLegacyCancelled';
-    return stages.length ? 'ClosedCancelled' : 'ClosedCancelledBefore';
+    return stages.length > 0 ? 'ClosedCancelled' : 'ClosedCancelledBefore';
   }
   if (run?.status === 'failed') {
     if (results.some((entry) => finite(entry.quantity) && Number(entry.quantity) > 0))
@@ -155,17 +155,18 @@ function historySummary(run, stages, localize) {
 
 function usableHistoricalScale(run) {
   const drops = list(run?.gatheringYield?.entries);
-  if (run?.gatheringYield?.mode !== 'd100' || !finite(run.gatheringYield.roll) || !drops.length)
+  if (
+    run?.gatheringYield?.mode !== 'd100' ||
+    !finite(run.gatheringYield.roll) ||
+    drops.length === 0
+  )
     return false;
   return drops.every((entry) => typeof entry.cleared === 'boolean' && finite(entry.chance));
 }
 
 function attributedScaleAwards(run, results) {
   const drops = list(run?.gatheringYield?.entries);
-  if (
-    !drops.every((entry) => finite(entry.qty)) ||
-    !results.every((entry) => finite(entry.quantity))
-  )
+  if (drops.some((entry) => !finite(entry.qty)) || results.some((entry) => !finite(entry.quantity)))
     return false;
   return (
     drops.reduce((sum, entry) => sum + Number(entry.qty), 0) ===

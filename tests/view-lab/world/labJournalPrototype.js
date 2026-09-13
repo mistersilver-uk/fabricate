@@ -1,9 +1,7 @@
 /**
- * Static Journal-only authoring corpus transcribed from the original standalone's
- * runs/history data (SHA-256 453d147b1d1d27652aee4ac69764d77aaddf66e53f7ae9272513e0a1fd3d954c).
- * No prototype file, decoded script or image is a runtime/CI dependency.
- * Names, stage/slot/award cardinality and stock are reference facts; core raster art
- * replaces the prototype's glyph art. These are authoring models, never UI projections.
+ * Journal authoring matches prototype SHA-256 453d147b1d1d27652aee4ac69764d77aaddf66e53f7ae9272513e0a1fd3d954c.
+ * Names, cardinalities and stock are reference facts with core raster art, never UI projections.
+ * Local and CI runs require no prototype file, decoded script or image.
  */
 const fixed = (id, quantity = 1) => ({ id, quantity });
 const choice = (...options) => ({ options });

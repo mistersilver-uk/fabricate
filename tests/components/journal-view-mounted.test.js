@@ -1,5 +1,6 @@
 import { after, afterEach, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import {
@@ -11,9 +12,9 @@ import {
 } from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
-import english from '../../lang/en.json' with { type: 'json' };
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+const english = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
 const harness = createMountedComponentHarness({
   repoRoot,

@@ -5608,7 +5608,6 @@ export function createAdminStore(services) {
    * from. So the component a task requires is one join away, and reading `task.toolIds` as
    * component ids would key every reference by a Tool id no component carries.
    *
-   * ── HOW GATHERING PRODUCTION SELECTS ITS ACTIVE SOURCE ─────────────────────────────────────
    * Legacy/`d100` tasks produce from `dropRows`; straight, progressive, and routed tasks produce
    * from `resultGroups`. Both shapes stay persisted for lossless mode changes, while reporting
    * follows only the task's active mode.

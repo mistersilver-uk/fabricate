@@ -1,4 +1,4 @@
-<!-- Svelte 5 runes mode -->
+<!-- Material choices share caller-owned stock; choosing an option does not consume it. -->
 <script>
   import Medallion from './Medallion.svelte';
 

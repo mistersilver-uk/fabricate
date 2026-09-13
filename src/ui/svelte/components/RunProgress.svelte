@@ -1,4 +1,4 @@
-<!-- Svelte 5 runes mode -->
+<!-- Run progress presents caller-supplied stage and time state without advancing execution. -->
 <script>
   import FillBar from './FillBar.svelte';
 

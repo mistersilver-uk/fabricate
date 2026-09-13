@@ -1,4 +1,4 @@
-<!-- Svelte 5 runes mode -->
+<!-- One physical carrier allocation supplies all essence requirements; history is read-only. -->
 <script>
   import { SvelteMap } from 'svelte/reactivity';
   import FillBar from './FillBar.svelte';

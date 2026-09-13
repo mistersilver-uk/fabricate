@@ -2,11 +2,8 @@ import { CraftingLifecycleExecutionError } from './CraftingLifecycleExecutor.js'
 import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
 
 /**
- * Persists and executes the recipe-less effects of an alchemy no-match.
- *
- * A fizzle has no active recipe run, so it is planned directly into history before
- * its dead-end and optional consumption effects begin. Applied receipts may resume as
- * a prefix; an applying effect is always recovery-required and is never invoked again.
+ * Recipe-less alchemy fizzles are planned into history before dead-end or consumption effects.
+ * Applied receipts may resume as a prefix; an applying effect requires recovery, never replay.
  */
 export class CraftingFizzleExecutor {
   constructor({ runManager, consumeExecutionGrant }) {

@@ -1,4 +1,4 @@
-<!-- Svelte 5 runes mode -->
+<!-- Stage-relative inputs and outputs retain their actual, current or preview meaning. -->
 <script>
   import Chip from './Chip.svelte';
   import Kicker from './Kicker.svelte';

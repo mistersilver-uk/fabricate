@@ -1,4 +1,4 @@
-<!-- Svelte 5 runes mode -->
+<!-- Material-choice tiles retain the library's 56px image and overlaid quantity pip. -->
 <script>
   import Medallion from './Medallion.svelte';
 

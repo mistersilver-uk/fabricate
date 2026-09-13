@@ -39,13 +39,9 @@ export function getCommittedExecutionOutcome(journal, requestId) {
 }
 
 /**
- * Build the next evidence state without performing effects or persistence.
- * `plan` supplies `{operationId, requestId, baseRunRevision, intent, effects}`.
- * `effectApplying` names `effectId`, and `effectApplied` also supplies the actual `receipt`.
- * `commit` may carry `outcome` and requires every effect applied.
- * `reconstructAfterReload` marks an interrupted applying effect recovery-required.
- * `recoveryRequired` explicitly stops an unsettled operation. Neither permits uncertain replay.
- * Reconstruction belongs to exclusive authority recovery, never an observing-client refresh.
+ * Transitions produce evidence only; commit requires every effect applied, with an optional outcome.
+ * Interrupted applying effects require recovery, never replay or observing-client reconstruction.
+ * Plans supply operation/request/revision/intent/effects; applying names an ID and applied adds a receipt.
  * @param {object|null} journal Null only when creating the first plan.
  * @param {object} [transition]
  * @returns {object} A new journal, not an atomic transaction or rollback instruction.

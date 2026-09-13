@@ -1,4 +1,4 @@
-<!-- Svelte 5 runes mode -->
+<!-- Authored outcome bands preview possible yields, never confirmed historical awards. -->
 <script>
   import Chip from './Chip.svelte';
   import ListRow from './ListRow.svelte';

@@ -72,17 +72,9 @@ function createSecureRandomId(webCrypto) {
 }
 
 /**
- * Durable run-command arbitration with injected persistence and identity collaborators.
- * The local queue orders this realm only. Cross-realm exclusion requires `createClaim` to
- * arbitrate a fixed embedded-page ID under the one private ledger.
- * `setup` is an explicit active-GM operation whose caller must establish a single GM session.
- * Missing or multiple ledgers refuse commands. Claims never expire automatically.
- * `run(request, handler)` retains uncertain claims and durably deduplicates settled requests.
- * `reconcile({claimId, disposition})` reconstructs matching evidence, records `reconciled` or
- * `abandoned`, and releases only the matching claim. It never retries or compensates effects.
- * Ordinary availability refresh does not reconstruct execution journals.
- *
- * @param {object} deps
+ * Cross-realm exclusion requires exclusive fixed-page creation under exactly one private ledger.
+ * Setup requires one GM session; settled requests deduplicate and uncertain claims never expire.
+ * Exclusive recovery reconstructs; reconciliation records disposition before releasing a matching claim.
  * @param {Function} deps.currentUser `() => User|null` for this executing realm.
  * @param {Function} deps.activeGM `() => User|null` for the elected GM.
  * @param {Function} deps.listLedgers `async () => ledger[]`.

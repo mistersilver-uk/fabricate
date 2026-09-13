@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
@@ -8,7 +9,6 @@ import { ResolutionModeService } from '../../src/systems/ResolutionModeService.j
 import { RecipeVisibilityService } from '../../src/systems/RecipeVisibilityService.js';
 import { IngredientSet } from '../../src/models/IngredientSet.js';
 import { Recipe } from '../../src/models/Recipe.js';
-import english from '../../lang/en.json' with { type: 'json' };
 import { getCaseById, VIEW_LAB_CASES } from '../../scripts/lib/viewLabCases.js';
 import { buildLabActors } from '../view-lab/world/labActors.js';
 import {
@@ -35,6 +35,7 @@ import {
 } from '../view-lab/world/labRunStates.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
+const english = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
 const component = (name) => `src/ui/svelte/components/${name}.svelte`;
 const harness = createMountedComponentHarness({
   repoRoot,

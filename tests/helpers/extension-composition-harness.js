@@ -1,16 +1,7 @@
 /**
- * The two boots the companion-extension composition suites run under.
- *
- * Both the Manager seam's composition suite and the player seam's need the same two things:
- * a real Vite server that can evaluate the production entry module, and an ApplicationV2
- * close-ordering fixture that records what happened in what order. Hand-inlining the pair a
- * second time is the exact near-identical block SonarCloud's new-code duplication gate counts
- * against `tests/**` just as it does against `src/`, so they live here once (issue 1198).
- *
- * The boots share an isolated middleware server, but retain distinct Foundry hosts.
- * `withFabricateLifecycleReplay` supplies a `/lang/en.json` fetch shim and a `CONFIG` stub
- * because it evaluates `src/main.js` inside `buildLabWorld`, which fetches during boot.
- * `captureCloseOrdering` evaluates one application against hand-stubbed globals instead.
+ * Both composition boots use one isolated middleware-server factory with distinct Foundry hosts.
+ * Lifecycle replay supplies `/lang/en.json` and `CONFIG` for the real entry module's boot.
+ * Close-ordering capture evaluates one application against hand-stubbed globals.
  */
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';

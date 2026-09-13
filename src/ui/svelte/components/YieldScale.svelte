@@ -1,4 +1,4 @@
-<!-- Svelte 5 runes mode -->
+<!-- Yield rows honor recorded cleared/missed evidence when supplied, including high-roll d100. -->
 <script>
   import Chip from './Chip.svelte';
   import ListRow from './ListRow.svelte';

@@ -1,4 +1,4 @@
-<!-- Svelte 5 runes mode -->
+<!-- Browsing a stage changes the viewed stage, never the executable stage. -->
 <script>
   import IconButton from './IconButton.svelte';
   import ManagerButton from './ManagerButton.svelte';

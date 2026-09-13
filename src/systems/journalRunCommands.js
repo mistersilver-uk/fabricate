@@ -529,19 +529,9 @@ function serializedOperationResult(result, { secret = false, runId = '' } = {}) 
 }
 
 /**
- * Browser-realm command client plus elected-GM command handler.
- * Commands carry `{actorUuid, runType, runId, expectedRevision, action, payload}`.
- * Start uses an empty run ID and revision zero. Alchemy dispatches as native `crafting`.
- * Existing-run requests are resolved again under the claim, including sender/source ownership,
- * revision and any `payload.expectedStage`. Client totals and awards are never authoritative.
- * `handleSocketMessage(payload, senderId)` requires the server-attested second callback argument.
- * Replies use transport recipients plus user/session/request/run/revision correlation.
- * Player checks prepare an expiring one-use token, prompt locally, then resolve on the GM.
- * Cancelling releases the token without stage execution. Secret prompt redaction and fresh
- * post-commit roll entitlement belong to the operation adapters. Chat failure permits no replay.
- * Terminal dismissal awaits a per-user, per-world setting write, preserving actor history.
- *
- * @param {object} deps
+ * Server-attested commands revalidate identity, ownership, revision and expected stage under a claim.
+ * Player checks use one-use tokens, local prompts and GM resolution; adapters own disclosure.
+ * Replies correlate recipients/user/session/request/run/revision; dismissal preserves actor history.
  * @param {object} deps.authority Private-ledger authority from `createJournalRunAuthority`.
  * @param {object} [deps.operations] Registry keyed by native run type.
  * @param {Function} deps.currentUser Current realm's User supplier.

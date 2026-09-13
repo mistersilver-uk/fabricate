@@ -10,12 +10,8 @@ export class CraftingLifecycleExecutionError extends Error {
 }
 
 /**
- * Executes one versioned crafting stage as a durable, forward-only operation.
- *
- * The caller supplies crafting-specific effect seams. This collaborator owns their
- * ordering around the persisted journal and never retries an effect after invocation
- * starts. It deliberately provides no rollback abstraction: a lost acknowledgement is
- * recovery-required evidence, not permission to replay or compensate automatically.
+ * Orders caller-supplied crafting effects around the persisted versioned-stage journal.
+ * Invocation forbids retry: a lost acknowledgement requires recovery, never replay or rollback.
  */
 export class CraftingLifecycleExecutor {
   constructor({ runManager, consumeExecutionGrant }) {

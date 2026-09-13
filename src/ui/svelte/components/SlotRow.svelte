@@ -1,4 +1,4 @@
-<!-- Svelte 5 runes mode -->
+<!-- A requirement row composes fixed or selectable material evidence supplied by its caller. -->
 <script>
   import ChoiceOptionList from './ChoiceOptionList.svelte';
   import SlotTile from './SlotTile.svelte';

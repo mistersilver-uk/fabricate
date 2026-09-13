@@ -6,7 +6,7 @@ import { Window } from 'happy-dom';
 
 import { findItemsDirectoryActionsContainer, syncGatheringDirectoryButton } from '../src/ui/itemsDirectoryButtons.js';
 import { openDeferredApp } from '../src/utils/deferredEntryNotice.js';
-import { moduleFunctionSource } from './helpers/boundedSource.js';
+import { parseModule, walkNodes } from './helpers/moduleAst.js';
 
 function setupDirectory() {
   const window = new Window();
@@ -100,10 +100,19 @@ function directoryHarness(t, { isGM = true, resolveActions = findItemsDirectoryA
   t.after(() => window.happyDOM.close());
   const document = window.document;
   const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  const { ast } = parseModule(source);
   const declarations = ['addModuleButtonsToItemsDirectory', 'hasGatheringEnabledSystems', 'createHeaderButton']
-    .map(name => moduleFunctionSource(source, name)).join('\n');
-  const registrations = source.match(/^  Hooks\.on\('(?:renderItemDirectory|fabricate\.craftingSystemsChanged)',[^\n]+$/gm);
-  assert.equal(registrations?.length, 2, 'locate both real directory synchronization registrations');
+    .map(name => {
+      const declaration = ast.body.find(node => node.type === 'FunctionDeclaration' && node.id.name === name);
+      assert.ok(declaration, `locate ${name}`);
+      return source.slice(...declaration.range);
+    }).join('\n');
+  const registrations = [...walkNodes(ast)]
+    .filter(node => node.type === 'CallExpression' && node.callee.type === 'MemberExpression' &&
+      !node.callee.computed && node.callee.object.name === 'Hooks' && node.callee.property.name === 'on' &&
+      ['renderItemDirectory', 'fabricate.craftingSystemsChanged'].includes(node.arguments[0]?.value))
+    .map(node => `${source.slice(...node.range)};`);
+  assert.equal(registrations.length, 2, 'locate both real directory synchronization registrations');
   const hooks = new Map();
   const errors = [];
   const opened = [];

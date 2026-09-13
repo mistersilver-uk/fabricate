@@ -1,4 +1,4 @@
-<!-- Svelte 5 runes mode -->
+<!-- World time composes Chip's clock presentation with direct icon, label and value children. -->
 <script>
   import Chip from './Chip.svelte';
 

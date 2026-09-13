@@ -159,11 +159,9 @@ export function makeSucceededRun(overrides = {}) {
 }
 
 /**
- * Execute the real versioned engine, serialize actor flags, reload a fresh manager,
- * and project the result. No proposed historical fields are supplied by this fixture.
- * Item documents, the currency settlement adapter and authority are test doubles;
- * consumption, essence capture, stage finalization, persistence and projection are real.
- * Dynamic imports keep the existing lightweight mounted fixtures lightweight.
+ * Historical evidence comes from real execution, serialized actor flags and a fresh manager.
+ * Only Item documents, currency settlement and authority are doubled; no evidence is injected.
+ * Dynamic imports keep the other mounted fixtures independent of the execution graph.
  */
 export async function createPersistedCraftingHistory({
   failLast = false, cancelAfter = null, armNext = false, opaque = false,

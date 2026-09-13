@@ -4,20 +4,9 @@ const KIND_FILTERS = new Set(['all', 'crafting', 'alchemy', 'gathering', 'salvag
 const ACTIVE_STATUS_FILTERS = new Set(['all', 'ready', 'waiting', 'paused']);
 
 /**
- * Reactive state for the player Journal. Foundry reads and writes remain behind
- * the injected service boundary so this module can be compiled and exercised as
- * an ordinary Svelte store.
  * Active and Finished have independent pages and sorts, with shared search/kind filtering.
  * Status counts use the kind cohort before search, status filtering or paging.
  * Native run keys retain selected detail off-page or filtered out until removal/dismissal.
- * Viewed-stage state is transient and never overwrites the executable stage.
- * Versioned actions send revision/stage-scoped commands, while legacy crafting uses its old seam.
- * Successful terminal dismissal awaits user-scoped persistence before refreshing the listing.
- * Setup eligibility is active-GM plus missing-ledger state. Its service owns prerequisite confirmation.
- *
- * @param {object} deps
- * @param {object} deps.services
- * @returns {object}
  */
 export function createJournalStore({ services } = {}) {
   let listing = $state(null);
@@ -44,7 +33,7 @@ export function createJournalStore({ services } = {}) {
   let commandRetry = null;
   let worldTimeTick = $state(0);
   let loadedOnce = $state(false);
-  let viewedStageByRunKey = $state({});
+  const viewedStageByRunKey = $state({});
   let loadGeneration = 0;
 
   function worldTime() {
@@ -128,7 +117,7 @@ export function createJournalStore({ services } = {}) {
       listing = next ?? null;
       if (
         commandResult &&
-        ![...(listing?.history ?? [])].some((run) => runKey(run, listing) === commandResult.runKey)
+        [...(listing?.history ?? [])].every((run) => runKey(run, listing) !== commandResult.runKey)
       )
         commandResult = null;
       error = !next;
@@ -225,6 +214,7 @@ export function createJournalStore({ services } = {}) {
     historyPage = 0;
   }
 
+  // Browsing is transient and never overwrites the executable stage.
   function viewStage(run, index) {
     if (!run) return;
     viewedStageByRunKey[runKey(run, listing)] = normalizeStageIndex(run, index);
@@ -235,13 +225,15 @@ export function createJournalStore({ services } = {}) {
     viewStage(run, stageAnchor(run));
   }
 
-  async function execute(run, payload = { interactive: true }) {
+  // Versioned actions send revision/stage-scoped commands; legacy crafting retains its own seam.
+  async function execute(run, payload) {
     if (run?.lifecycleContract === 'legacy' || !run?.lifecycleContract) {
       return advanceLegacy(run);
     }
-    return runCommand(run, 'execute', payload);
+    return runCommand(run, 'execute', payload === undefined ? { interactive: true } : payload);
   }
 
+  // The service confirms the single-GM-session prerequisite before provisioning a missing ledger.
   function canSetupAuthority(run) {
     return (
       services?.isActiveGM?.() === true &&
@@ -422,6 +414,7 @@ export function createJournalStore({ services } = {}) {
     }
   }
 
+  // Refresh only after the user-scoped dismissal write settles; actor history remains intact.
   async function dismiss(run) {
     if (!run?.id || busyRunKey || run?.actions?.dismiss !== true) return;
     busyRunId = run.id;
