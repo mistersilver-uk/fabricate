@@ -1,6 +1,6 @@
 /**
  * Ratchets the source-text pin sites per test file (issue 1658), so the conversions in #1691 and
- * #1697 each lower `tests/source-pin-ledger.json` and nothing silently re-grows it.
+ * #1697 each lower `tests/source-pin-ledger.txt` and nothing silently re-grows it.
  *
  * This file spells the tokens the gate hunts, in prose and in fixtures. That is safe by
  * construction rather than by exclusion: sites are AST call nodes, so a pattern written as a
@@ -15,7 +15,7 @@ import { byCodePoint, ledgerGate } from './helpers/ratchetBaseline.js';
 import { countPinSites } from './helpers/sourcePinSites.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 
-const LEDGER_PATH = resolve(import.meta.dirname, 'source-pin-ledger.json');
+const LEDGER_PATH = resolve(import.meta.dirname, 'source-pin-ledger.txt');
 
 const REGENERATE =
   'UPDATE_SOURCE_PIN_LEDGER=1 node --conditions=browser --test ' +

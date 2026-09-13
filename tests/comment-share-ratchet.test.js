@@ -1,6 +1,6 @@
 /**
  * Ratchets the comment-line share per directory (issue 1657), so Phase 1 sweeps of this epic
- * can each lower `tests/comment-share-ledger.json` without a later sweep silently re-growing it.
+ * can each lower `tests/comment-share-ledger.txt` without a later sweep silently re-growing it.
  * Root roll-ups are derived here and printed on mismatch; the ledger itself pins directories only.
  * This file is itself in the `tests` bucket it pins, so editing these comments moves that number.
  */
@@ -14,7 +14,7 @@ import { collectWorkingTreeSources, repoRoot } from './helpers/sourceScan.js';
 
 // `readFileSync` + `JSON.parse`, not `import ... with { type: 'json' }`: this repo's ESLint
 // parser rejects the import-attribute syntax, as `scripts/lib/designSystemPrimitives.js` notes.
-const LEDGER_PATH = resolve(import.meta.dirname, 'comment-share-ledger.json');
+const LEDGER_PATH = resolve(import.meta.dirname, 'comment-share-ledger.txt');
 
 /** The command that re-derives the ledger, named in every drift message so it is actionable. */
 const REGENERATE =
