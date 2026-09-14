@@ -292,15 +292,15 @@ describe('world Tools Catalogue (issue 1373)', () => {
     );
   });
 
-  it('selects NEITHER option when the world has authored nothing', async () => {
+  it('selects the shipped TOOL-SPECIFIC fallback when the world has authored nothing', async () => {
     const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
     assert.deepEqual(
       [...target.querySelectorAll('[data-world-tool-break-segment].is-selected')].map(
         (segment) => segment.dataset.worldToolBreakSegment
       ),
-      [],
-      'an unauthored world value is not the same as an authored toolSpecific, and drawing one ' +
-        'as current is how a GM mints a value they never chose'
+      ['toolSpecific'],
+      'an unauthored world resolves every system to toolSpecific, so the control lights it ' +
+        'rather than drawing a mode with neither segment selected'
     );
   });
 
@@ -432,9 +432,16 @@ describe('world Tools Catalogue (issue 1373)', () => {
           toggle.getAttribute('aria-label'),
           `${enabled ? 'Disable' : 'Enable'} Smith Hammer for every crafting system`
         );
+        // The catalogue opens with its first row inspected, so "without selecting" is asserted as
+        // the switch leaving the inspected row exactly where it was.
+        const inspectedBefore = [...target.querySelectorAll('[aria-current="true"]')].length;
         toggle.click();
         await harness.setProps({});
-        assert.ok(Boolean(target.querySelector('[data-scoped-list-inspector-state="resting"]')));
+        assert.equal(
+          [...target.querySelectorAll('[aria-current="true"]')].length,
+          inspectedBefore,
+          'the switch changed which row is inspected'
+        );
         assert.equal(target.querySelector('[data-scoped-list-select="hammer"]').checked, false);
       }
       assert.deepEqual(calls, [['hammer', true], ['hammer', false]]);
@@ -496,11 +503,44 @@ describe('world Tools Catalogue (issue 1373)', () => {
     });
   });
 
+  it('opens with the FIRST shown Tool inspected rather than a resting panel', async () => {
+    // Maintainer defect report: the catalogue opened on `Select a Tool` beside a full list, where
+    // the world Component catalogue opens inspected. It opts into the shell's `autoSelectFirst`.
+    const selected = [];
+    const target = await harness.mount({
+      scope: scopeFor(),
+      systems: SYSTEMS,
+      actions: {},
+      onSelect: (id) => selected.push(id),
+    });
+    await harness.setProps({});
+    assert.ok(
+      !target.querySelector('[data-scoped-list-inspector-state="resting"]'),
+      'the inspector is still resting beside a list that has rows'
+    );
+    const current = target.querySelector('[data-scoped-list-row="hammer"][aria-current="true"]');
+    assert.ok(Boolean(current), 'the first row by name (Smith Hammer) is not the inspected one');
+    assert.match(
+      target.querySelector('[data-scoped-list-inspector]').textContent,
+      /Smith Hammer/,
+      'the inspector does not describe the auto-selected Tool'
+    );
+  });
+
   it('states the TOOL verb at rest, not the page subtitle a second time', async () => {
     // FINDING 2a. The resting inspector read `Nothing selected` over the catalogue's own
     // SUBTITLE - the sentence the header prints a few pixels above it - so on an empty catalogue
     // the one column that could have said what the panel is for repeated the header instead.
-    const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
+    // An EMPTY corpus, because a catalogue with rows now opens with its first one inspected.
+    const target = await harness.mount({
+      scope: projectWorldScopeEntity({
+        entityType: 'tool',
+        corpus: { entities: [], defaults: [], membership: [] },
+        systems: SYSTEMS,
+      }),
+      systems: SYSTEMS,
+      actions: {},
+    });
     const resting = target.querySelector('[data-scoped-list-inspector-state="resting"]');
     assert.ok(Boolean(resting), 'nothing is selected, so the resting panel must render');
     assert.match(resting.textContent, /Select a Tool/);
@@ -533,9 +573,14 @@ describe('world Tools Catalogue (issue 1373)', () => {
     // had silently stopped counting.
     it('swaps the inspector to the bulk panel, and the two counts agree', async () => {
       const target = await harness.mount({ scope: scopeFor(), systems: SYSTEMS, actions: {} });
+      await harness.setProps({});
       assert.ok(
-        Boolean(target.querySelector('[data-scoped-list-inspector-state="resting"]')),
-        'the panel is not at rest before the tick, so the swap below proves nothing'
+        !target.querySelector('[data-world-tool-bulk-panel]'),
+        'the bulk panel is already on screen before the tick, so the swap below proves nothing'
+      );
+      assert.ok(
+        Boolean(target.querySelector('[data-scoped-tool-open-entry]')),
+        'the identity panel is not on screen before the tick, so the swap below proves nothing'
       );
       tick(target, 'hammer');
       tick(target, 'orphan');
@@ -548,8 +593,8 @@ describe('world Tools Catalogue (issue 1373)', () => {
         'the panel rendered outside the inspector column it is meant to replace'
       );
       assert.ok(
-        !target.querySelector('[data-scoped-list-inspector-state="resting"]'),
-        'the resting panel is still on screen beside the bulk one'
+        !target.querySelector('[data-scoped-tool-open-entry]'),
+        'the identity panel is still on screen beside the bulk one'
       );
       assert.match(target.querySelector('[data-world-tool-bulk-count]').textContent, /2 Tools/);
       assert.match(
