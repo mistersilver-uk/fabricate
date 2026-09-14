@@ -70,14 +70,16 @@ import {
 import { createFoundryJournalRunAuthority } from './systems/journalRunAuthority.js';
 import {
   JOURNAL_RUN_SOCKET_KIND,
+  authorityUnavailableAvailability,
+  authorityUnavailableRefusal,
   createGatheringJournalRunOperations,
   createJournalExecutionReconstructor,
   createJournalRunCommandService,
+  createManagerMutation,
   executePublicCraft,
   installCraftingJournalRunAuthority,
   installGatheringJournalRunAuthority,
 } from './systems/journalRunCommands.js';
-import { applyGuardedRunMutation } from './systems/runLifecycleState.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
@@ -364,21 +366,8 @@ function createCraftingJournalOperations(fabricate, getService) {
       })?.some?.((candidate) => candidate?.recipe?.id === recipe.id)
     );
   };
-  const managerMutation = async (args, operation, mutate) => {
-    const trusted = consumeJournalGrant(getService(), args.executionGrant, {
-      operation,
-      actor: args.actor,
-      runId: args.runId,
-      expectedRevision: args.expectedRevision,
-      requestId: args.requestId,
-    });
-    if (!trusted) return { success: false, reason: 'execution-grant-invalid' };
-    const outcome = await applyGuardedRunMutation(mutate);
-    if (outcome.refused) {
-      return { success: false, reason: 'lifecycle-refused', message: outcome.refused.message };
-    }
-    return outcome.run ? { success: true, run: outcome.run } : { success: false, reason: 'run-not-found' };
-  };
+  const managerMutation = createManagerMutation((grant, context) =>
+    consumeJournalGrant(getService(), grant, context));
   return {
     getRun: ({ actor, runId }) => {
       fabricate.craftingRunManager?.invalidateCache?.(actor?.id);
@@ -4809,7 +4798,7 @@ class Fabricate {
   executeJournalRunCommand(command) {
     this._requireReady();
     return this.journalRunCommands?.executeJournalRunCommand(command)
-      ?? Promise.resolve({ success: false, reason: 'authority-unavailable' });
+      ?? Promise.resolve(authorityUnavailableRefusal());
   }
 
   /**
@@ -4821,7 +4810,7 @@ class Fabricate {
   dismissJournalRun(options) {
     this._requireReady();
     return this.journalRunCommands?.dismissJournalRun(options)
-      ?? Promise.resolve({ success: false, reason: 'authority-unavailable' });
+      ?? Promise.resolve(authorityUnavailableRefusal());
   }
 
   /**
@@ -4839,7 +4828,7 @@ class Fabricate {
    */
   getJournalRunAuthorityAvailability() {
     return this.journalRunCommands?.getJournalRunAuthorityAvailability()
-      ?? { available: false, reason: 'authority-unavailable' };
+      ?? authorityUnavailableAvailability();
   }
 
   /**
@@ -4851,7 +4840,7 @@ class Fabricate {
    */
   setupJournalRunAuthority() {
     return this.journalRunCommands?.setupJournalRunAuthority()
-      ?? Promise.resolve({ success: false, reason: 'authority-unavailable' });
+      ?? Promise.resolve(authorityUnavailableRefusal());
   }
 
   /**
@@ -4882,7 +4871,7 @@ class Fabricate {
    */
   reconcileJournalRunAuthority(options) {
     return this.journalRunCommands?.reconcileJournalRunAuthority(options)
-      ?? Promise.resolve({ success: false, reason: 'authority-unavailable' });
+      ?? Promise.resolve(authorityUnavailableRefusal());
   }
 
   /**
@@ -5854,7 +5843,13 @@ Hooks.once('ready', async () => {
         // destroyed inventory.
         applyItemStackQuantityPathSetting({ notify: true });
       }
-      if (key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.JOURNAL_RUN_DISMISSALS}`) {
+      // Dismissals are `scope: 'user'`, so `updateSetting` delivers EVERY user's document to
+      // every client; only this user's own hiding changes what this client shows. `Setting#user`
+      // is an id (`idOnly: true` on V14.365); the `.id` read costs nothing and stays honest.
+      if (
+        key === `${FABRICATE_SETTINGS_NAMESPACE}.${SETTING_KEYS.JOURNAL_RUN_DISMISSALS}`
+        && (setting?.user?.id ?? setting?.user) === game.user?.id
+      ) {
         Hooks.callAll('fabricate.journalDismissalsChanged');
       }
       // Cross-client refresh: `craftingSystemsChanged` / `recipesChanged` are local

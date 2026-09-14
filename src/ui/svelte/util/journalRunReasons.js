@@ -17,6 +17,8 @@
  */
 export const JOURNAL_RUN_REASON_KEYS = Object.freeze({
   // ── Availability and ledger provisioning ──────────────────────────────────
+  // Minted by the EDGES through `authorityUnavailableRefusal`, so the drift guard can see it.
+  'authority-unavailable': 'FABRICATE.App.Journal.Actions.AuthorityUnavailable',
   'active-gm-missing': 'FABRICATE.App.Journal.Actions.AuthorityUnavailable',
   'active-gm-required': 'FABRICATE.App.Journal.Actions.ActiveGmRequired',
   'ledger-missing': 'FABRICATE.App.Journal.Actions.LedgerMissing',
@@ -51,6 +53,11 @@ export const JOURNAL_RUN_REASON_KEYS = Object.freeze({
   // ── Authorization ─────────────────────────────────────────────────────────
   'owner-required': 'FABRICATE.App.Journal.Actions.NeedsOwner',
   'source-owner-required': 'FABRICATE.App.Journal.Reason.SourceOwnerRequired',
+  // ── Minted by the crafting operations in `src/main.js`, outside the drift guard's glob ────
+  'source-actor-not-found': 'FABRICATE.App.Journal.Reason.SourceActorNotFound',
+  'alchemy-system-not-found': 'FABRICATE.App.Journal.Reason.AlchemySystemNotFound',
+  'alchemy-submission-invalid': 'FABRICATE.App.Journal.Reason.AlchemySubmissionInvalid',
+  'ingredient-set-not-found': 'FABRICATE.App.Journal.Reason.IngredientSetNotFound',
   // ── Run state ─────────────────────────────────────────────────────────────
   'active-run': 'FABRICATE.App.Journal.Reason.ActiveRun',
   'actor-not-found': 'FABRICATE.App.Journal.Reason.ActorNotFound',

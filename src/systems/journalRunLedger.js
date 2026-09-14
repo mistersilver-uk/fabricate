@@ -29,6 +29,33 @@ function compareCandidates(left, right) {
   return left.id < right.id ? -1 : 1;
 }
 
+/**
+ * Merge the broadcast-fed view with the authoritative server read.
+ *
+ * A read that did not ANSWER — it rejected, or the adapter could not perform it — is reported as
+ * `null` rather than collapsed to `[]`, because `[]` is indistinguishable from "the server says
+ * none exist" and would authorise a second ledger. Only an ABSENT `listLedgerRecords` means there
+ * is no authoritative read to wait for.
+ *
+ * @returns {Promise<Array<{id: string, createdTime: number}>|null>} `null` when unanswered.
+ */
+async function mergedLedgerRecords(live, listLedgerRecords) {
+  let authoritative = [];
+  if (typeof listLedgerRecords === 'function') {
+    try {
+      authoritative = await listLedgerRecords();
+    } catch {
+      return null;
+    }
+    if (!Array.isArray(authoritative)) return null;
+  }
+  const merged = new Map(live.map((ledger) => [ledger.id, ledgerRecord(ledger)]));
+  for (const record of authoritative) {
+    if (record?.id) merged.set(record.id, { id: record.id, createdTime: record.createdTime ?? 0 });
+  }
+  return [...merged.values()];
+}
+
 function unsettled() {
   return { success: false, reason: 'ledger-unsettled' };
 }
@@ -92,21 +119,6 @@ export function createJournalRunLedgerProvisioner({
 }) {
   const liveLedgers = async () => ((await listLedgers()) ?? []).filter((entry) => entry?.id);
 
-  async function records(live) {
-    let authoritative;
-    try {
-      authoritative = (await listLedgerRecords?.()) ?? [];
-    } catch {
-      authoritative = [];
-    }
-    const merged = new Map(live.map((ledger) => [ledger.id, ledgerRecord(ledger)]));
-    for (const record of authoritative) {
-      if (record?.id)
-        merged.set(record.id, { id: record.id, createdTime: record.createdTime ?? 0 });
-    }
-    return [...merged.values()];
-  }
-
   async function provision() {
     if (canCreateLedger() !== true) return { success: false, reason: 'ledger-create-denied' };
     try {
@@ -137,7 +149,9 @@ export function createJournalRunLedgerProvisioner({
   async function resolve() {
     const live = await liveLedgers();
     const byId = new Map(live.map((ledger) => [ledger.id, ledger]));
-    const observed = await records(live);
+    const observed = await mergedLedgerRecords(live, listLedgerRecords);
+    // A read that did not answer authorises nothing, least of all a create.
+    if (observed === null) return unsettled();
     if (observed.length === 0) return provision();
     if (observed.length === 1) {
       const ledger = byId.get(observed[0].id);
@@ -171,7 +185,9 @@ export function createJournalRunLedgerProvisioner({
       if (outcome.success) return { ...outcome, provisioned };
       if (outcome.reason !== 'ledger-unsettled') return { ...outcome, provisioned };
     }
-    return { success: false, reason: 'ledger-ambiguous', provisioned };
+    // Exhausting the passes proves only that this client never settled — nothing here has
+    // established that two ledgers exist, which is what `ledger-ambiguous` asserts.
+    return { ...unsettled(), provisioned };
   }
 
   return { ensureSingleLedger };

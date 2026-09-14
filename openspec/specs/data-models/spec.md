@@ -3056,12 +3056,22 @@ The active GM MUST rank candidates with a deterministic total order every sessio
 `_stats.createdTime` is a server wall clock and MUST NOT be read as "first created"; it is a shared value the order converges on.
 Only a pristine non-winner may be deleted, and two or more ledgers holding durable evidence MUST remain `ledger-ambiguous` for a person to resolve.
 Because the client world collection is broadcast-fed, arbitration MUST resolve candidates through an authoritative server read, issued GM-side only because that read is not permission-filtered, ranking its detached documents and acting by ID against the live collection.
+A read that did not ANSWER — it rejected, or the client could not issue it — MUST yield an unsettled result and MUST NOT be collapsed to "the server reports none", because that answer is what authorises a create and two sessions reading through the same failure would each provision their own ledger.
+Exhausting the retry passes without settling MUST also report unsettled rather than ambiguous, which asserts a second ledger nothing has observed.
 A ledger deleted by a racing session mid-operation MUST be treated as replaced rather than failed: claim creation, receipt writes and prepare-token persistence MUST retry against the surviving ledger after relisting.
+Because the claim page lives inside the ledger it was created on, a retry that lands on a replacement has lost the lock, so the command MUST re-acquire its claim there.
+A command MUST NOT run on holding no claim on the ledger it is writing to: a re-acquisition that fails before the handler MUST refuse, and one that fails after it MUST settle as recovery-required.
 Explicit setup remains available as an idempotent ensure that returns the existing ledger rather than refusing it.
 
 The ledger holds durable request outcomes and one-use prepare tokens; an embedded JournalEntryPage with a fixed ID and `keepId` arbitrates the global execution claim.
 `keepId` is load-bearing: without it the server discards the fixed ID silently, and the cross-browser lock stops existing rather than failing.
-Its claim MUST NOT expire automatically, because an interrupted operation may already have produced irreversible effects.
+A claim MUST NOT expire on age alone, because an interrupted operation may already have produced irreversible effects.
+Its standing is judged from the REQUEST it guards, read from the ledger's own durable request state, within a bounded live window derived from the command timeout a caller itself waits before treating a reply as unknown.
+Inside that window the claim is live and `claim-held` is the correct, honest refusal.
+Past it the active GM MUST release a claim whose request is `settled`, `abandoned` or `reconciled`, or whose request was never recorded at all, because the operation it guarded provably finished or never began and the claim only leaked; that release is automatic, requires no console call, and MUST happen during boot recovery so a world already holding a leaked claim heals itself.
+Every other case MUST retain the claim and MUST keep requiring `reconcileJournalRunAuthority` — an uncertain effect, an unreadable acquisition stamp, an unknown status, and in particular a still-`processing` request whose holding session can no longer be running it, whose effect may be half applied.
+Only the elected GM releases; another realm judges the same claim for its own availability and writes nothing.
+An automatic release MUST be confined to the provably-leaked case, because releasing a claim that should have been kept is a data-integrity failure and is worse than the block it removes.
 This arbitration and the execution journal are not a transaction across Foundry document writes, macros and publications, and MUST NOT be described as atomic execution or automatic rollback.
 
 Boot reconstruction MAY scan orphaned execution journals only under an exclusively acquired claim when no prior claim exists.

@@ -757,7 +757,8 @@
           "Unknown": "You haven't learned this recipe yet.",
           "Exhausted": "This recipe's source has no uses left.",
           "Discovery": "Discover this recipe to reveal its details.",
-          "MissingMaterials": "You're missing some required materials."
+          "MissingMaterials": "You're missing some required materials.",
+          "AuthorityRefused": "Starting a craft will be refused until this clears."
         },
         "Browser": {
           "Title": "Recipes",
@@ -1050,6 +1051,9 @@
           "OutcomeNotRecorded": "Outcome not recorded",
           "NotApplicable": "Not applicable",
           "UnattributedAwards": "The check outcomes are recorded, but the awarded quantities cannot be assigned to individual rows. Actual awards are listed once below.",
+          "UnattributedSome": "Some of this run’s awards could not be matched to a row on the scale above. Those items are listed separately below; the rest are already shown against their rows.",
+          "UnattributedBroughtBack": "Awards with no matching row",
+          "ScalePerRow": "How each find landed",
           "MissedRoll": "Missed the roll",
           "SettlementTitle": "Settling results",
           "SettlementPending": "This run is still settling. Only confirmed awards are shown; its remaining effects have not finished yet.",
@@ -1261,6 +1265,10 @@
           "RollCancelled": "The roll was cancelled, so nothing changed.",
           "RollUnavailable": "The roll could not be resolved. Start the run change again.",
           "SourceOwnerRequired": "You must own every character supplying materials for this run (or ask your GM).",
+          "SourceActorNotFound": "The character supplying this run’s materials could not be found. Reopen Fabricate and choose the character again.",
+          "AlchemySystemNotFound": "That alchemy system is no longer available. Reopen Fabricate and choose it again.",
+          "AlchemySubmissionInvalid": "Those alchemy ingredients are not a submission this recipe accepts. Choose the ingredients again.",
+          "IngredientSetNotFound": "That set of ingredients is no longer part of this recipe. Refresh the Journal and choose again.",
           "StaleRun": "This run changed somewhere else. Refresh the Journal and try again.",
           "StaleStage": "This run has already moved past that stage. Refresh the Journal and try again.",
           "UnknownSender": "The run request could not be matched to a player. Reload Foundry and try again.",

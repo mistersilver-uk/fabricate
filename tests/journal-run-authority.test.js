@@ -3,10 +3,12 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import {
+  JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS,
   JOURNAL_RUN_CLAIM_PAGE_ID,
   createFoundryJournalRunAuthority,
   createJournalRunAuthority,
 } from '../src/systems/journalRunAuthority.js';
+import { JOURNAL_RUN_COMMAND_TIMEOUT_MS } from '../src/systems/journalRunCommands.js';
 
 /**
  * Models the V13.351/V14.365 server rules the arbitration rests on: `keepId` is what preserves a
@@ -22,6 +24,8 @@ function foundryAuthorityFixture(crypto) {
     const pages = new Map();
     return {
       id: 'ledger',
+      _id: 'ledger',
+      _stats: { createdTime: 5000 },
       pages,
       getFlag: (scope, key) =>
         scope === 'fabricate' && key === 'journalRunAuthorityState'
@@ -45,9 +49,12 @@ function foundryAuthorityFixture(crypto) {
         pages.set(page.id, page);
         return [page];
       },
+      // Core resolves the DELETED DOCUMENTS, not their ids. A looser double answering ids kept
+      // the adapter's `item === page.id` fallback alive and hid the fall-open branch beside it.
       deleteEmbeddedDocuments: async (_type, ids) => {
+        const removed = ids.map((id) => pages.get(id)).filter(Boolean);
         for (const id of ids) pages.delete(id);
-        return ids;
+        return removed;
       },
     };
   };
@@ -63,9 +70,14 @@ function foundryAuthorityFixture(crypto) {
       return entry;
     },
   };
+  // The authoritative server read the provisioner requires. `CONFIG.DatabaseBackend.get` is
+  // public on V13.351 and V14.365, and an adapter that CANNOT perform it now reports unsettled
+  // rather than "no ledger exists" — so a fixture without it would model a dead runtime.
+  const CONFIG = { DatabaseBackend: { get: async () => [...journal] } };
   const authority = createFoundryJournalRunAuthority({
     game,
     JournalEntry,
+    CONFIG,
     crypto,
     reconstructExecutions: async () => ({ success: true, reconstructed: 0 }),
   });
@@ -106,6 +118,10 @@ function sharedAuthorityWorld() {
       getCurrentUser = () => ({ id: userId, isGM: userId === 'gm' }),
       getActiveGM = () => ({ id: 'gm', active: true, isGM: true }),
       canCreateLedger = () => true,
+      // The authoritative server read. `null` / a rejection models an adapter that could not
+      // perform it, which must never be read as "the server says no ledger exists".
+      listLedgerRecords = async () =>
+        [...server.values()].map((entry) => ({ id: entry.id, createdTime: entry.createdTime })),
       beforeCreate = null,
       beforeClaim = null,
       beforeWrite = null,
@@ -115,8 +131,7 @@ function sharedAuthorityWorld() {
       currentUser: getCurrentUser,
       activeGM: getActiveGM,
       listLedgers: async () => [...server.values()],
-      listLedgerRecords: async () =>
-        [...server.values()].map((entry) => ({ id: entry.id, createdTime: entry.createdTime })),
+      listLedgerRecords,
       canCreateLedger,
       createLedger: async (source) => {
         await beforeCreate?.();
@@ -382,6 +397,38 @@ describe('journal run authority ledger', () => {
     assert.deepEqual(await gm.bootstrapRecovery(), { success: false, reason: 'ledger-ambiguous' });
     assert.equal(world.ledgers().length, 2, 'neither used ledger is deleted');
     assert.deepEqual(gm.availability(), { available: false, reason: 'ledger-ambiguous' });
+  });
+
+  // A READ THAT DID NOT ANSWER AUTHORISES NOTHING. The rejection used to collapse to `[]`,
+  // which `resolve()` cannot tell from "the server says none exist" — so two GMs booting while
+  // that read rejected each provisioned their own ledger, and the fixed-`_id` embedded claim
+  // cannot exclude them because they claim on different parents.
+  it('never provisions from an authoritative read that failed to answer', async () => {
+    for (const [label, listLedgerRecords] of [
+      ['a rejection', async () => { throw new Error('socket closed'); }],
+      ['an adapter that cannot perform it', async () => null],
+    ]) {
+      const world = sharedAuthorityWorld();
+      const gm = world.realm('gm', { listLedgerRecords });
+      const boot = await gm.bootstrapRecovery();
+      assert.equal(boot.success, false, label);
+      assert.equal(boot.reason, 'ledger-unsettled', `${label} is unsettled, not ambiguous`);
+      assert.equal(world.ledgers().length, 0, `${label} created no ledger`);
+      assert.equal(
+        world.log.filter(([kind]) => kind === 'create').length,
+        0,
+        `${label} reached no create at all`
+      );
+    }
+  });
+
+  it('still provisions when the authoritative read answers an empty world', async () => {
+    // The control for the pair above: an ANSWER of "none" is what authorises the create, so the
+    // refusal cannot be a blanket one.
+    const world = sharedAuthorityWorld();
+    const gm = world.realm('gm', { listLedgerRecords: async () => [] });
+    assert.deepEqual(await gm.bootstrapRecovery(), { success: true });
+    assert.equal(world.ledgers().length, 1);
   });
 
   it('retries the claim and the receipt write after a racing session deletes the ledger', async () => {
@@ -714,6 +761,8 @@ describe('journal run authority ledger', () => {
       id: JOURNAL_RUN_CLAIM_PAGE_ID,
       claimId: 'live-claim',
       requestId: 'live-operation',
+      // The stamp a real claim always carries; the reaper ages it to tell live from leaked.
+      acquiredAt: 1000,
     };
 
     assert.equal((await authority.refreshAvailability()).reason, 'claim-held');
@@ -735,6 +784,210 @@ describe('journal run authority ledger', () => {
     assert.equal(reconstructions, 0);
     assert.equal(handlerCalls, 0);
     assert.equal(world.ledger.claim.claimId, 'live-claim');
+  });
+
+  // --------------------------------------------------------------------------------------
+  // The claim reaper. `ledgerResult` used to answer `claim-held` for ANY claim with no
+  // liveness test of any kind, so one leaked claim blocked every user on every surface
+  // permanently until a GM ran a console API — which is how an ordinary recipe came to show
+  // a claim-held callout. The line is drawn at the REQUEST the claim guards, never at age
+  // alone, and every ambiguous case stays retained.
+  // --------------------------------------------------------------------------------------
+
+  it('derives the claim live window from the command timeout it has to outlast', () => {
+    assert.ok(
+      JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS >= JOURNAL_RUN_COMMAND_TIMEOUT_MS * 4,
+      'the window must comfortably outlast the longest a client waits for its own reply, or a '
+        + 'slow command is judged dead while it is still running'
+    );
+  });
+
+  it('reaps a leaked claim and retains an uncertain one, at any age', async () => {
+    const world = sharedAuthorityWorld();
+    const authority = world.realm();
+    await authority.setup();
+    const plant = (claimId, requestId, request, acquiredAt = 1000) => {
+      world.ledger.state.requests[requestId] = request;
+      world.ledger.claim = { id: JOURNAL_RUN_CLAIM_PAGE_ID, claimId, requestId, acquiredAt };
+      world.setNow(acquiredAt + JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS + 1);
+    };
+
+    // DIRECTION ONE — the request this claim guarded is SETTLED, so releasing it is provably
+    // safe: the very next thing its owner does is release it, and that evidently never ran.
+    plant('leaked', 'settled-request', { kind: 'command', status: 'settled', response: {} });
+    assert.deepEqual(
+      await authority.refreshAvailability(),
+      { available: true, reason: null },
+      'a leaked claim self-heals with no console call at all'
+    );
+    assert.ok(!world.ledger.claim, 'and the claim page is gone');
+    assert.deepEqual(
+      await authority.run(
+        { requestId: 'after-reap', senderId: 'player', sessionId: 'one' },
+        async () => ({ success: true })
+      ),
+      { success: true },
+      'the world is usable again'
+    );
+
+    // DIRECTION TWO — the mutation control for the same code path. An uncertain effect is
+    // exactly what the recovery design exists for, so its claim is NEVER reaped, however old.
+    plant('kept', 'uncertain-request', { kind: 'command', status: 'recoveryRequired' }, 9000);
+    world.setNow(9000 + JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS * 1000);
+    assert.deepEqual(await authority.refreshAvailability(), {
+      available: false,
+      reason: 'recovery-required',
+    });
+    assert.equal(world.ledger.claim?.claimId, 'kept', 'the uncertain claim is still held');
+    let handlerCalls = 0;
+    assert.equal(
+      (
+        await authority.run(
+          { requestId: 'must-not-run', senderId: 'player', sessionId: 'one' },
+          async () => (++handlerCalls, { success: true })
+        )
+      ).reason,
+      'recovery-required'
+    );
+    assert.equal(handlerCalls, 0);
+    assert.equal(
+      (await authority.reconcile({ claimId: 'kept', disposition: 'reconciled' })).success,
+      true,
+      'only reconcileJournalRunAuthority clears it, exactly as before'
+    );
+  });
+
+  it('keeps a dead session half-applied command retained rather than releasing it', async () => {
+    const world = sharedAuthorityWorld();
+    const authority = world.realm();
+    await authority.setup();
+    // `processing` and old: the holding session cannot still be running it, but the effect may
+    // have half applied, so this is NOT provably safe and takes the conservative path.
+    world.ledger.state.requests['abandoned-command'] = { kind: 'command', status: 'processing' };
+    world.ledger.claim = {
+      id: JOURNAL_RUN_CLAIM_PAGE_ID,
+      claimId: 'orphan',
+      requestId: 'abandoned-command',
+      acquiredAt: 1000,
+    };
+    world.setNow(1000 + JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS + 1);
+    assert.deepEqual(await authority.refreshAvailability(), {
+      available: false,
+      reason: 'recovery-required',
+    });
+    assert.equal(world.ledger.claim?.claimId, 'orphan');
+  });
+
+  it('reports a claim inside its live window as held, and never touches it', async () => {
+    const world = sharedAuthorityWorld();
+    const authority = world.realm();
+    await authority.setup();
+    // The bound's own mutation control: the SAME leaked fixture one millisecond earlier is a
+    // real concurrent command, and `claim-held` is the honest answer for it.
+    world.ledger.state.requests['settled-request'] = { kind: 'command', status: 'settled' };
+    world.ledger.claim = {
+      id: JOURNAL_RUN_CLAIM_PAGE_ID,
+      claimId: 'fresh',
+      requestId: 'settled-request',
+      acquiredAt: 1000,
+    };
+    world.setNow(1000 + JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS);
+    assert.deepEqual(await authority.refreshAvailability(), {
+      available: false,
+      reason: 'claim-held',
+    });
+    assert.equal(world.ledger.claim?.claimId, 'fresh');
+  });
+
+  it('lets a player realm read past a leaked claim without writing to the ledger', async () => {
+    const world = sharedAuthorityWorld();
+    await world.realm().setup();
+    world.ledger.state.requests['settled-request'] = { kind: 'command', status: 'settled' };
+    world.ledger.claim = {
+      id: JOURNAL_RUN_CLAIM_PAGE_ID,
+      claimId: 'leaked',
+      requestId: 'settled-request',
+      acquiredAt: 1000,
+    };
+    world.setNow(1000 + JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS + 1);
+    const player = world.realm('player');
+    assert.deepEqual(await player.refreshAvailability(), { available: true, reason: null });
+    assert.equal(
+      world.ledger.claim?.claimId,
+      'leaked',
+      'the player judged the claim but only the elected GM may release it'
+    );
+  });
+
+  // --------------------------------------------------------------------------------------
+  // A ledger swap mid-command. `writeLedgerState` retries onto the ledger that replaced a
+  // deleted one, and the claim page lives INSIDE the ledger it was created on — so the
+  // command used to run to completion holding no lock on the ledger it was writing to.
+  // --------------------------------------------------------------------------------------
+
+  it('re-claims on the replacement ledger when a racing deletion swaps it mid-command', async () => {
+    const world = sharedAuthorityWorld();
+    const gm = world.realm();
+    await gm.setup();
+    const doomed = world.ledger;
+    let swapped = 0;
+    let armed = false;
+    const swapOnFirstWrite = (entry) => {
+      if (!armed || swapped > 0 || entry.id !== doomed.id) return;
+      swapped += 1;
+      world.addLedger();
+      world.removeLedger(doomed.id);
+    };
+    const swapping = world.realm('gm', { beforeWrite: swapOnFirstWrite });
+    // Arm AFTER this realm's own boot write, so the swap lands on the command's write.
+    assert.equal((await swapping.bootstrapRecovery()).success, true);
+    armed = true;
+    let heldDuringHandler = null;
+    const result = await swapping.run(
+      { requestId: 'swapped-command', senderId: 'player', sessionId: 'one' },
+      async () => {
+        heldDuringHandler = world.ledger.claim?.claimId ?? null;
+        return { success: true };
+      }
+    );
+    assert.equal(swapped, 1, 'the racing deletion actually happened');
+    assert.deepEqual(result, { success: true });
+    assert.ok(heldDuringHandler, 'the command held a claim on the ledger it was writing to');
+    assert.ok(!world.ledger.claim, 'and released it on that same replacement');
+  });
+
+  it('refuses rather than executing unlocked when the replacement is already claimed', async () => {
+    const world = sharedAuthorityWorld();
+    const gm = world.realm();
+    await gm.setup();
+    const doomed = world.ledger;
+    let swapped = 0;
+    let armed = false;
+    const swapOnFirstWrite = (entry) => {
+      if (!armed || swapped > 0 || entry.id !== doomed.id) return;
+      swapped += 1;
+      const replacement = world.addLedger();
+      // The other session got there first, so this command CANNOT re-acquire.
+      replacement.claim = {
+        id: JOURNAL_RUN_CLAIM_PAGE_ID,
+        claimId: 'other-session',
+        requestId: 'other-request',
+        acquiredAt: 1000,
+      };
+      world.removeLedger(doomed.id);
+    };
+    const swapping = world.realm('gm', { beforeWrite: swapOnFirstWrite });
+    assert.equal((await swapping.bootstrapRecovery()).success, true);
+    armed = true;
+    let handlerCalls = 0;
+    const result = await swapping.run(
+      { requestId: 'unlocked-command', senderId: 'player', sessionId: 'one' },
+      async () => (++handlerCalls, { success: true })
+    );
+    assert.equal(swapped, 1);
+    assert.equal(handlerCalls, 0, 'the handler never ran against a ledger this command lost');
+    assert.equal(result.reason, 'claim-held');
+    assert.equal(world.ledger.claim?.claimId, 'other-session', 'the other session keeps its lock');
   });
 
   it('reconstructs the retained operation before reconciliation releases its claim', async () => {

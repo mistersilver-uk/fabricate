@@ -14,6 +14,7 @@ import { notifyWarn, localize, confirmDialog } from './svelte/util/foundryBridge
 // import beyond what it itself guards), reused rather than re-authored so the
 // bulk salvage/destroy progress toast cannot drift from the compendium import's.
 import { createDefaultProgressReporter } from '../systems/CompendiumImporter.js';
+import { authorityUnavailableAvailability } from '../systems/journalRunCommands.js';
 import { playerExtensions } from './playerExtensions.js';
 import {
   buildRouteKey,
@@ -407,7 +408,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
         game?.fabricate?.getDismissedJournalRunKeys?.(opts) ?? new Set(),
       getJournalRunAuthorityAvailability: () =>
         game?.fabricate?.getJournalRunAuthorityAvailability?.()
-        ?? { available: false, reason: 'authority-unavailable' },
+        ?? authorityUnavailableAvailability(),
       advanceCraftingRun: (opts = {}) => game?.fabricate?.advanceCraftingRun?.(opts) ?? null,
       cancelCraftingRun: (opts = {}) => game?.fabricate?.cancelCraftingRun?.(opts) ?? null,
       getWorldTime: () => game?.fabricate?.getWorldTime?.() ?? 0,

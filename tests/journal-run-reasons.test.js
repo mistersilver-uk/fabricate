@@ -25,11 +25,22 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 // DISCOVERED, not listed. This guard was first written against two named files, and the
 // ledger-arbitration module that landed later carried four more reason literals that it
 // therefore could not see — `ledger-create-denied` and `ledger-create-failed` would have
-// reached a player as the generic fallback with nothing red. A `journalRun*.js` glob cannot
-// be blind to the next such module; the floor below keeps the glob itself from silently
-// matching nothing.
+// reached a player as the generic fallback with nothing red.
+//
+// CORRECTION: this comment used to claim a `journalRun*.js` glob "cannot be blind to the next
+// such module". That was wrong, and `authority-unavailable` proved it — minted at five sites in
+// `src/main.js` and one in `src/ui/SvelteFabricateApp.svelte.js`, neither of which this glob
+// will ever match, and unmapped for as long as it existed. The glob covers the AUTHORITY
+// MODULES, not every minting site; a reason minted at an edge is invisible here, so the edges
+// now mint through `authorityUnavailableRefusal`/`authorityUnavailableAvailability` in
+// `journalRunCommands.js` and the vocabulary has one home this scan can reach. The floor below
+// keeps the glob itself from silently matching nothing.
 const AUTHORITY_SOURCE_DIR = 'src/systems';
 const AUTHORITY_SOURCE_PATTERN = /^journalRun[A-Za-z]*\.js$/;
+
+// The EDGES that also mint a refusal a player reads. Named explicitly, because no glob over the
+// authority modules reaches them and every reason minted here was unmapped until issue 1648.
+const EDGE_SOURCES = ['src/main.js', 'src/ui/SvelteFabricateApp.svelte.js'];
 
 function authoritySources() {
   const names = readdirSync(join(ROOT, AUTHORITY_SOURCE_DIR))
@@ -40,7 +51,7 @@ function authoritySources() {
     `expected at least the three journalRun* authority modules, found ${names.length}: ` +
       'a glob that stops matching makes every assertion below vacuous'
   );
-  return names.map((name) => `${AUTHORITY_SOURCE_DIR}/${name}`);
+  return [...names.map((name) => `${AUTHORITY_SOURCE_DIR}/${name}`), ...EDGE_SOURCES];
 }
 
 // A line that mentions `reason`, `unavailable(` or `failure(` carries a refusal code;
@@ -83,6 +94,7 @@ describe('journal run reason vocabulary', () => {
     assert.ok(reasons.has('ledger-missing'), 'the reported defect\u2019s own reason is derived');
     assert.ok(reasons.has('command-timeout'));
     assert.ok(reasons.has('source-owner-required'));
+    assert.ok(reasons.has('authority-unavailable'), 'the edge refusal is derived too');
   });
 
   it('maps every reason the authority can return', () => {

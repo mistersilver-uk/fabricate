@@ -8,6 +8,37 @@ const NON_MUTATING_GRANTS = new Set(['describeCheck', 'prepareAlchemyStart']);
 /** Fixed embedded-page ID used for arbitration, distinct from the claim's random `claimId`. */
 export const JOURNAL_RUN_CLAIM_PAGE_ID = 'FabRunAuthority1';
 
+/**
+ * How long a claim may be held before the command it guards is judged no longer running.
+ *
+ * A claim covers exactly ONE command, and the only declared bound on a command's life is the
+ * requesting client's own `JOURNAL_RUN_COMMAND_TIMEOUT_MS` (15s, `journalRunCommands.js`), past
+ * which nobody is waiting for the reply any more. Four times that is the floor: wide enough that
+ * a slow command is never misjudged, short enough that the honest `claim-held` a player can see
+ * lasts milliseconds. `tests/journal-run-authority.test.js` pins it against that timeout.
+ */
+export const JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS = 60_000;
+
+/** Statuses whose request is finished, so the claim guarding it can only have leaked. */
+const FINISHED_REQUEST_STATUSES = new Set(['settled', 'abandoned', 'reconciled']);
+
+/**
+ * Judge a claim from the REQUEST it guards, never from age alone: `leaked` only once it has
+ * outlived the live window AND its request provably finished (or was never recorded, so no
+ * handler ever ran). Every ambiguous case — an uncertain effect, an unreadable stamp, an unknown
+ * status — is `retained` and still requires `reconcileJournalRunAuthority`, because releasing a
+ * claim that should have been kept is a data-integrity bug.
+ * @returns {'live'|'leaked'|'retained'}
+ */
+function claimStanding(claim, state, nowMs) {
+  const acquiredAt = Number(claim?.acquiredAt);
+  if (!Number.isFinite(acquiredAt)) return 'retained';
+  if (nowMs - acquiredAt <= JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS) return 'live';
+  const request = state.requests[claim.requestId];
+  if (!request || FINISHED_REQUEST_STATUSES.has(request.status)) return 'leaked';
+  return 'retained';
+}
+
 function emptyState() {
   return { version: AUTHORITY_VERSION, requests: {}, prepareTokens: {}, reconciliations: [] };
 }
@@ -84,9 +115,43 @@ function createSecureRandomId(webCrypto) {
 }
 
 /**
+ * The ledger ONE command holds its claim on, and the only thing allowed to move it.
+ * The claim page lives INSIDE its ledger, so a racing deletion takes the lock with it while
+ * `writeLedgerState` silently retries onto the replacement. `persist` re-claims there rather than
+ * letting the command finish holding no lock on the ledger it is writing to; a re-claim that
+ * loses the race sets `lockLost`, which the caller turns into a refusal or into recovery.
+ * @returns {{ledger: object, held: boolean, lockLost: boolean, persist: Function}}
+ */
+function claimedLedgerWriter({ ledger, claimId, requestId, writeLedgerState, claimOn }) {
+  let current = ledger;
+  let held = true;
+  let lost = false;
+  return {
+    get ledger() {
+      return current;
+    },
+    get held() {
+      return held;
+    },
+    get lockLost() {
+      return lost;
+    },
+    async persist(state) {
+      const next = await writeLedgerState(current, state);
+      if (next === current) return;
+      current = next;
+      held = (await claimOn(next, claimId, requestId)) !== null;
+      if (!held) lost = true;
+    },
+  };
+}
+
+/**
  * Cross-realm exclusion requires exclusive fixed-page creation under exactly one private ledger.
  * The elected GM provisions and arbitrates that ledger; settled requests deduplicate, a pre-write
- * refusal releases its claim, and a claim left by an uncertain effect never expires.
+ * refusal releases its claim, and a claim left by an uncertain effect never expires — while one
+ * whose guarded request provably finished is reaped once it outlives
+ * {@link JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS}.
  * Exclusive recovery reconstructs; reconciliation records disposition before releasing a matching claim.
  * @param {Function} deps.currentUser `() => User|null` for this executing realm.
  * @param {Function} deps.activeGM `() => User|null` for the elected GM.
@@ -98,7 +163,7 @@ function createSecureRandomId(webCrypto) {
  * @param {Function} deps.readState `async (ledger) => state`.
  * @param {Function} deps.writeState `async (ledger, state) => void`.
  * @param {Function} deps.createClaim `async (ledger, source) => claim|null` with exclusive creation.
- * @param {Function} deps.readClaim `async (ledger) => {claimId, requestId}|null`.
+ * @param {Function} deps.readClaim `async (ledger) => {claimId, requestId, acquiredAt}|null`.
  * @param {Function} deps.deleteClaim `async (ledger, claimId) => boolean`, matching the exact claim.
  * @param {Function} deps.reconstructExecutions `async ({operationId, orphaned}) => {success}`.
  * @param {Function} deps.randomId Secure nonempty ID supplier.
@@ -160,15 +225,28 @@ export function createJournalRunAuthority({
     }
   }
 
+  /**
+   * Resolve this world's one ledger, reaping a claim that provably guards nothing. ANY claim used
+   * to answer `claim-held`, which blocked every user on every surface permanently; that reason is
+   * now reported only while a command may still be running, and only the elected GM ever writes.
+   */
   async function ledgerResult() {
     const gm = activeGM?.();
     if (!gm?.id) return unavailable('active-gm-missing');
     const ledgers = (await listLedgers()) ?? [];
     if (ledgers.length === 0) return unavailable('ledger-missing');
     if (ledgers.length !== 1) return unavailable('ledger-ambiguous');
-    const claim = await readClaim(ledgers[0]);
-    if (claim) return unavailable('claim-held', { ledger: ledgers[0], claim });
-    return { success: true, ledger: ledgers[0] };
+    const ledger = ledgers[0];
+    const claim = await readClaim(ledger);
+    if (!claim) return { success: true, ledger };
+    const standing = claimStanding(claim, normalizedState(await readState(ledger)), now());
+    if (standing === 'live') return unavailable('claim-held', { ledger, claim });
+    if (standing === 'retained') return unavailable('recovery-required', { ledger, claim });
+    // A non-GM realm cannot write, and does not need to: the claim guards nothing, and the
+    // elected GM that actually executes the command reaps it on its own acquire.
+    if (!activeGmMatches(currentUser?.(), gm)) return { success: true, ledger };
+    const released = await deleteClaim(ledger, claim.claimId);
+    return released ? { success: true, ledger } : unavailable('claim-held', { ledger, claim });
   }
 
   async function refreshAvailability() {
@@ -330,35 +408,35 @@ export function createJournalRunAuthority({
     return queue(performBootstrapRecovery);
   }
 
+  /**
+   * Create the exclusive claim page on one ledger, answering `null` for every refusal.
+   * `acquiredAt` is what {@link claimStanding} ages, so every create stamps it.
+   */
+  async function claimOn(ledger, claimId, requestId) {
+    try {
+      // `keepId` is what makes the server's duplicate embedded-`_id` rejection reachable; without
+      // it the fixed id is discarded and the cross-browser lock degrades to a silent no-op.
+      const source = { _id: JOURNAL_RUN_CLAIM_PAGE_ID, claimId, requestId, acquiredAt: now() };
+      return (await createClaim(ledger, source)) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   async function acquire(request) {
     if (!activeGmMatches(currentUser?.(), activeGM?.())) return unavailable('active-gm-required');
     const ledgerCheck = await ledgerResult();
     if (!ledgerCheck.success) return ledgerCheck;
     const claimId = nextRandomId();
     if (!claimId) return unavailable('secure-random-unavailable');
-    // `keepId` is what makes the server's duplicate embedded-`_id` rejection reachable; without
-    // it the fixed id is discarded and the cross-browser lock degrades to a silent no-op.
-    const source = {
-      _id: JOURNAL_RUN_CLAIM_PAGE_ID,
-      claimId,
-      requestId: request.requestId,
-      acquiredAt: now(),
-    };
-    const claimOn = async (ledger) => {
-      try {
-        return (await createClaim(ledger, source)) ?? null;
-      } catch {
-        return null;
-      }
-    };
     let ledger = ledgerCheck.ledger;
-    let claim = await claimOn(ledger);
+    let claim = await claimOn(ledger, claimId, request.requestId);
     if (!claim) {
       // A racing session may have deleted this ledger mid-acquire: relist and retry once.
       const replacement = await replacementLedger(ledger);
       if (!replacement) return unavailable('claim-held');
       ledger = replacement;
-      claim = await claimOn(ledger);
+      claim = await claimOn(ledger, claimId, request.requestId);
       if (!claim) return unavailable('claim-held');
     }
     return { success: true, ledger, claimId };
@@ -425,11 +503,14 @@ export function createJournalRunAuthority({
         return unavailable(acquired.reason);
       }
       const { claimId } = acquired;
-      const claimLedger = acquired.ledger;
-      let ledger = claimLedger;
-      // The claim page lives inside its ledger, so a racing deletion released it with the ledger.
-      const releaseClaim = async () =>
-        ledger === claimLedger ? deleteClaim(ledger, claimId) : true;
+      const writer = claimedLedgerWriter({
+        ledger: acquired.ledger,
+        claimId,
+        requestId: request.requestId,
+        writeLedgerState,
+        claimOn,
+      });
+      const releaseClaim = async () => (writer.held ? deleteClaim(writer.ledger, claimId) : true);
       if (!activeGmMatches(currentUser?.(), activeGM?.())) {
         recoveryReady = false;
         const released = await releaseClaim();
@@ -438,7 +519,7 @@ export function createJournalRunAuthority({
           : { available: false, reason: 'claim-release-failed' };
         return unavailable(released ? 'active-gm-required' : 'claim-release-failed');
       }
-      const state = normalizedState(await readState(ledger));
+      const state = normalizedState(await readState(writer.ledger));
       const prior = state.requests[request.requestId];
       if (prior && (prior.senderId !== request.senderId || prior.sessionId !== request.sessionId)) {
         if (!(await releaseClaim())) {
@@ -468,10 +549,14 @@ export function createJournalRunAuthority({
         sessionId: request.sessionId,
         startedAt: now(),
       };
-      ledger = await writeLedgerState(ledger, state);
-      const persist = async () => {
-        ledger = await writeLedgerState(ledger, state);
-      };
+      const persist = () => writer.persist(state);
+      await persist();
+      if (writer.lockLost) {
+        // The swap happened before the handler ran, so nothing has been applied and refusing is
+        // clean. Proceeding would execute against a ledger another session can claim.
+        cachedAvailability = { available: false, reason: 'claim-held' };
+        return unavailable('claim-held');
+      }
       const helpers = tokenHelpers({ state, request, persist });
       let response;
       try {
@@ -499,7 +584,9 @@ export function createJournalRunAuthority({
         response = unavailable('response-not-serializable', { recoveryRequired: true });
         durableResponse = structuredClone(response);
       }
-      const mustRecover = recoveryRequired || response.recoveryRequired === true;
+      // A lost lock is genuinely uncertain: the handler ran on to completion against a ledger
+      // this command no longer held, so its effect is exactly what reconciliation is for.
+      const mustRecover = recoveryRequired || response.recoveryRequired === true || writer.lockLost;
       state.requests[request.requestId] = {
         ...state.requests[request.requestId],
         status: mustRecover ? 'recoveryRequired' : 'settled',
@@ -507,7 +594,7 @@ export function createJournalRunAuthority({
         response: durableResponse,
         claimId: mustRecover ? claimId : null,
       };
-      ledger = await writeLedgerState(ledger, state);
+      await persist();
       if (mustRecover) {
         cachedAvailability = { available: false, reason: 'recovery-required' };
         return response;
@@ -610,6 +697,8 @@ export function createFoundryJournalRunAuthority({
   // session's ledger. This `get` round-trips to the server, but is NOT permission-filtered for
   // world documents, so it stays behind the GM check. Its documents are detached `fromSource`
   // copies: rank on them, then act by id against `game.journal`.
+  // `null` means the authoritative read could not be performed, which the provisioner treats as
+  // unsettled — never as "no ledger exists", which would authorise a duplicate.
   const listLedgerRecords = async () => {
     if (game?.user?.isGM !== true || typeof CONFIG?.DatabaseBackend?.get !== 'function') {
       return null;
@@ -673,15 +762,18 @@ export function createFoundryJournalRunAuthority({
         id: page.id,
         claimId: page.getFlag?.('fabricate', 'journalRunClaimId') ?? null,
         requestId: page.getFlag?.('fabricate', 'journalRunRequestId') ?? null,
+        // The stamp {@link claimStanding} ages; without it every claim reads as unjudgeable.
+        acquiredAt: page.getFlag?.('fabricate', 'journalRunClaimedAt') ?? null,
       };
     },
+    // `deleteEmbeddedDocuments` resolves the DELETED DOCUMENTS, so document identity is the
+    // whole answer. It used to fall open to `true` for any non-array, which only a test double
+    // produces and which reports a claim as released when nothing was.
     deleteClaim: async (entry, claimId) => {
       const page = entry?.pages?.get?.(JOURNAL_RUN_CLAIM_PAGE_ID) ?? null;
       if (!page || page.getFlag?.('fabricate', 'journalRunClaimId') !== claimId) return false;
       const deleted = await entry.deleteEmbeddedDocuments('JournalEntryPage', [page.id]);
-      return Array.isArray(deleted)
-        ? deleted.some((item) => item === page.id || item?.id === page.id)
-        : true;
+      return Array.isArray(deleted) && deleted.some((document) => document?.id === page.id);
     },
     reconstructExecutions,
     randomId,

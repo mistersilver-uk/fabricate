@@ -6,7 +6,12 @@ export const JOURNAL_RUN_SOCKET_KIND = Object.freeze({
   REPLY: 'fabricate.journalRun.reply',
 });
 
-const COMMAND_TIMEOUT_MS = 15_000;
+/**
+ * How long a caller waits for its authority reply before treating the outcome as unknown.
+ * Exported because `JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS` is derived from it and
+ * `tests/journal-run-authority.test.js` pins the two together.
+ */
+export const JOURNAL_RUN_COMMAND_TIMEOUT_MS = 15_000;
 const DISMISSAL_LIMIT = 500;
 const MUTATING_ACTIONS = new Set([
   'start',
@@ -99,6 +104,47 @@ function terminalRun(run) {
 
 function operationUnavailable() {
   return failure('unsupported-operation');
+}
+
+/**
+ * The refusal every Fabricate edge answers when the journal-run command service is absent.
+ * It lives HERE so the reason-drift guard can see it: minted at an edge instead, the literal sat
+ * outside every source that guard scanned and reached a player unworded.
+ * @returns {{success: false, reason: string}}
+ */
+export function authorityUnavailableRefusal() {
+  return failure('authority-unavailable');
+}
+
+/**
+ * The same absence in the shape `getJournalRunAuthorityAvailability` answers.
+ * @returns {{available: false, reason: string}}
+ */
+export function authorityUnavailableAvailability() {
+  return { available: false, reason: 'authority-unavailable' };
+}
+
+/**
+ * Build the one grant-consuming mutation path the Journal's manager operations share.
+ * `mutate` is the caller's own manager call, so the crafting and gathering facades keep their
+ * different run managers while the grant check, guarded apply and refusal wording live once.
+ * @param {Function} consumeGrant `(grant, context) => trustedContext|null`.
+ * @returns {Function} `async (args, operation, mutate) => result`.
+ */
+export function createManagerMutation(consumeGrant) {
+  return async (args, operation, mutate) => {
+    const trusted = consumeGrant(args.executionGrant, {
+      operation,
+      actor: args.actor,
+      runId: args.runId,
+      expectedRevision: args.expectedRevision,
+      requestId: args.requestId,
+    });
+    if (!trusted) return failure('execution-grant-invalid');
+    const outcome = await applyGuardedRunMutation(mutate);
+    if (outcome.refused) return failure('lifecycle-refused', { message: outcome.refused.message });
+    return outcome.run ? { success: true, run: outcome.run } : failure('run-not-found');
+  };
 }
 
 function actorUuidList(actors, fallbackUuids = []) {
@@ -399,23 +445,16 @@ export function createGatheringJournalRunOperations({
   getUser,
 } = {}) {
   const currentEngine = () => getEngine?.() ?? engine ?? null;
+  const mutateUnderGrant = createManagerMutation(
+    (grant, context) => getService?.()?.consumeExecutionGrant?.(grant, context) ?? null
+  );
   const managerMutation = async (args, operation, method, values = []) => {
     if (typeof runManager?.[method] !== 'function') return operationUnavailable();
-    const trusted = getService?.()?.consumeExecutionGrant?.(args.executionGrant, {
-      operation,
-      actor: args.actor,
-      runId: args.runId,
-      expectedRevision: args.expectedRevision,
-      requestId: args.requestId,
-    });
-    if (!trusted) return failure('execution-grant-invalid');
-    const outcome = await applyGuardedRunMutation(() =>
+    return mutateUnderGrant(args, operation, () =>
       runManager[method](args.actor, args.runId, ...values, {
         expectedRevision: args.expectedRevision,
       })
     );
-    if (outcome.refused) return failure('lifecycle-refused', { message: outcome.refused.message });
-    return outcome.run ? { success: true, run: outcome.run } : failure('run-not-found');
   };
   return {
     getRun: ({ actor, runId }) => {
@@ -563,7 +602,7 @@ export function createJournalRunCommandService({
   resolveUuid,
   emit,
   randomId,
-  timeoutMs = COMMAND_TIMEOUT_MS,
+  timeoutMs = JOURNAL_RUN_COMMAND_TIMEOUT_MS,
   promptCheck = null,
   postRollHandoff = null,
   getDismissals = () => ({}),

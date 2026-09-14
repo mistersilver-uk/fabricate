@@ -8,13 +8,13 @@ import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 import { resolvedComponentsFor } from '../src/systems/scopedEntityReads.js';
-import { applyGuardedRunMutation } from '../src/systems/runLifecycleState.js';
 import { createJournalRunAuthority } from '../src/systems/journalRunAuthority.js';
 import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 
 import {
   JOURNAL_RUN_SOCKET_KIND,
   createJournalExecutionReconstructor,
+  createManagerMutation,
   createGatheringJournalRunOperations,
   journalRunDismissalKey,
   createJournalRunCommandService,
@@ -92,8 +92,8 @@ describe('journal run command protocol', () => {
     const end = source.indexOf('function createJournalCommandsForFabricate(', start);
     assert.ok(start >= 0 && end > start, 'the production operation factory must be present');
     return compileFunction(`${source.slice(start, end)}\nreturn createCraftingJournalOperations;`,
-      ['resolveAlchemySubmissions', 'resolvedComponentsFor', 'applyGuardedRunMutation'])(
-        resolveAlchemySubmissions, resolvedComponentsFor, applyGuardedRunMutation);
+      ['resolveAlchemySubmissions', 'resolvedComponentsFor', 'createManagerMutation'])(
+        resolveAlchemySubmissions, resolvedComponentsFor, createManagerMutation);
   }
 
   for (const kind of ['crafting', 'matched-alchemy', 'fizzle']) {
@@ -1418,8 +1418,8 @@ describe('journal run pause lifecycle at the real command boundary', () => {
     return compileFunction(`${source.slice(start, end)}\nreturn createCraftingJournalOperations;`, [
       'resolveAlchemySubmissions',
       'resolvedComponentsFor',
-      'applyGuardedRunMutation',
-    ])(resolveAlchemySubmissions, resolvedComponentsFor, applyGuardedRunMutation);
+      'createManagerMutation',
+    ])(resolveAlchemySubmissions, resolvedComponentsFor, createManagerMutation);
   }
 
   // A merging flag write, like Foundry's: `setFlag` never removes a key deleted from a nested
