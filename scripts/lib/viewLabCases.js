@@ -13679,6 +13679,27 @@ export const VIEW_LAB_CASES = Object.freeze([
     kinds: ['player', 'crafting'],
     sourceMatches: [CRAFTING_SHARED, /^src\/ui\/svelte\/stores\/craftingStore/],
   }),
+  // The Crafting header withholds "Ready to craft" and leads the blocking callout with the
+  // authority's own reason. `ledger-missing` is unreachable now that the ledger is provisioned
+  // automatically, but `active-gm-missing`, `recovery-required` and `claim-held` all still
+  // happen, and before this the header said Ready and then failed. The lab reaches the state by
+  // withholding the ledger, which `labWorld.js` keys on `journalCaseState` for ANY tab.
+  playerCase({
+    id: 'player-crafting-authority-blocked',
+    label: 'Player app — Crafting blocked by the run authority',
+    smokeLabels: [],
+    reaches: 'beyond',
+    query: { tab: 'crafting', journalCaseState: 'authority-unavailable' },
+    steps: [],
+    position: { width: 1100, height: 760 },
+    expectTab: 'crafting',
+    expectSelector: '[data-recipe-authority-blocked]',
+    kinds: ['player', 'crafting'],
+    sourceMatches: [
+      CRAFTING_SHARED,
+      /^src\/ui\/svelte\/apps\/crafting\/RecipeDetailHeader\.svelte$/,
+    ],
+  }),
   playerCase({
     id: 'player-crafting-category-filter-list',
     label: 'Player app — Crafting category filter list',

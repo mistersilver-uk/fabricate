@@ -2552,10 +2552,15 @@ test('every crafting case claims exactly the resolution-mode body it renders', (
   // 32 as of issue 1511. `player-crafting-category-filter-list` opens the browser's converted
   // category filter and stops there, so like the sources picker it renders no recipe detail and is
   // correct to claim no mode body.
+  //
+  // 33 as of issue 1648. `player-crafting-authority-blocked` photographs the header withholding
+  // "Ready to craft" while the run authority refuses, and names `RecipeDetailHeader.svelte`. Like
+  // `player-crafting-simple` it selects no recipe through a step, so by this scan's own rule it
+  // renders no mode body and correctly claims none.
   assert.equal(
     examined.length,
-    32,
-    `expected the 32 crafting-path cases to be examined, saw ${examined.length}`
+    33,
+    `expected the 33 crafting-path cases to be examined, saw ${examined.length}`
   );
   assert.ok(
     examined.filter((id) =>
