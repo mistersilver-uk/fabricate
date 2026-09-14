@@ -2,6 +2,7 @@ import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
 import { authoredFailureOutcome } from '../utils/gatheringFailureOutcome.js';
 import { normalizeConditionId, normalizeTag, normalizeTagList } from '../utils/scalars.js';
 
+import { chatModeOption } from './bulkChatVisibility.js';
 import { resolveModifierLibrary } from './characterLibraries.js';
 import {
   conditionSettingsToCurrent,
@@ -543,9 +544,10 @@ export class GatheringRichStateService {
     // Interactive/animate-only; a chat failure is logged and swallowed, never thrown.
     if (itemRoll.attemptRollMessage) {
       try {
+        // `rollMode` is deprecated on V14; the shim picks key and vocabulary together.
         await itemRoll.attemptRollMessage.toMessage(
           { speaker, flavor },
-          { rollMode, create: true }
+          { ...chatModeOption(rollMode), create: true }
         );
       } catch (error) {
         console.error('Fabricate | Failed to post d100 roll to chat:', error);

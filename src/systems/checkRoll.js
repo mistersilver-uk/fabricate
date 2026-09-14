@@ -15,7 +15,7 @@ import {
   stripRetiredModifierPlaceholder,
 } from '../utils/craftingCheckExpression.js';
 
-import { V14_CHAT_MODE_BY_LEGACY_ROLL_MODE } from './bulkChatVisibility.js';
+import { chatModeOption } from './bulkChatVisibility.js';
 import { appendResolvedCheckModifier } from './checkModifierResolver.js';
 import {
   appendCheckModifierRollTerms,
@@ -746,34 +746,6 @@ export async function postCheckRollHandoff(handoff, { Roll = globalThis.Roll } =
     console.error('Fabricate | Failed to post authoritative check roll to chat:', error);
     return { success: false, reason: 'chat-post-failed' };
   }
-}
-
-/**
- * The chat option that carries a roll's visibility on the RUNNING Foundry, key and token
- * chosen TOGETHER.
- *
- * V13 and V14 have disjoint vocabularies and crossing them fails two different ways: a legacy
- * token handed to V14's `applyMode` THROWS, and a V14 token handed to V13 silently posts
- * public. `Roll#toMessage` translates only the legacy `rollMode` key (it maps it internally),
- * so a value passed as `messageMode` reaches `applyMode` UNTRANSLATED — which is why
- * switching the key without switching the vocabulary is a new defect rather than a fix.
- *
- * The probe is `typeof ChatMessage.applyMode === 'function'`: a static, which a subclassed
- * `CONFIG.ChatMessage.documentClass` inherits and therefore cannot fool. It is deliberately a
- * `ChatMessage` static deciding a `Roll` option, because `toMessage({rollMode})` is deprecated
- * on V14 in favour of `messageMode` and the translation table is core's own.
- *
- * @param {string} rollMode A legacy token (`publicroll`/`gmroll`/`blindroll`/`selfroll`). A
- *   token with no entry in the table passes through unchanged, matching
- *   {@link module:src/systems/bulkChatVisibility.applyBulkChatVisibility}.
- * @returns {{rollMode: string}|{messageMode: string}} One option, spread into `toMessage`'s
- *   options bag.
- */
-function chatModeOption(rollMode) {
-  if (typeof globalThis.ChatMessage?.applyMode === 'function') {
-    return { messageMode: V14_CHAT_MODE_BY_LEGACY_ROLL_MODE[rollMode] || rollMode };
-  }
-  return { rollMode };
 }
 
 /**

@@ -1549,9 +1549,7 @@ export class CraftingEngine {
         kind: 'consumeIngredients',
         planned: prepared.plan.items,
         apply: async () => {
-          state.consumedItems = await this._consumeIngredients(prepared.craftSelection.plan, {
-            requireConfirmation: true,
-          });
+          state.consumedItems = await this._consumeIngredients(prepared.craftSelection.plan);
           return this._versionedConsumptionReceipt(
             state,
             prepared.executionRecipe,
@@ -1569,7 +1567,6 @@ export class CraftingEngine {
             await this._consumeAlchemyExtraItems(state.consumedItems, componentSourceActors, {
               isAlchemyAttempt: true,
               alchemySubmittedItems,
-              requireConfirmation: true,
             });
             return this._versionedConsumptionReceipt(
               state,
@@ -5266,16 +5263,16 @@ export class CraftingEngine {
    * in {@link craft} (via {@link _resolveCraftSelection}) and passed in, so this never
    * recomputes the match against possibly-mutated items.
    * @private
+   * Every consumption requires document acknowledgement; there is no unconfirmed mode.
    * @param {Array<{item: Item, quantity: number, ingredient: object}>} consumptionPlan
-   * @param {{requireConfirmation?: boolean}} [options] Versioned effects require document acknowledgement.
    */
-  async _consumeIngredients(consumptionPlan = [], { requireConfirmation = true } = {}) {
+  async _consumeIngredients(consumptionPlan = []) {
     const consumedItems = [];
     try {
       for (const { item, quantity, ingredient } of consumptionPlan) {
         const captured = mapConsumedIngredientRef({ item, quantity });
         const snapshot = snapshotVersionedItem(item);
-        const actual = await this._consumeItemQuantity(item, quantity, requireConfirmation);
+        const actual = await this._consumeItemQuantity(item, quantity);
         const consumed = {
           item,
           quantity: actual,
@@ -5289,6 +5286,10 @@ export class CraftingEngine {
         if (actual !== quantity) throw unconfirmedHistoryError('Partial consumption');
       }
     } catch (error) {
+      // A path-guard refusal reached no database at all. With nothing consumed yet that is a
+      // DEFINITE failure, not the uncertain effect reconciliation exists for; once an earlier
+      // item has already been decremented the partial effect is real and stays uncertain.
+      if (error?.code === 'STACK_QUANTITY_PATH_REFUSED' && consumedItems.length === 0) throw error;
       const failure = unconfirmedHistoryError(
         'Consumption requires reconciliation',
         [...consumedItems.map(mapConsumedIngredientRef), ...(error.receipts ?? [])],
@@ -5301,7 +5302,7 @@ export class CraftingEngine {
   }
 
   /** Only the acknowledged source decrement establishes consumption. */
-  async _consumeItemQuantity(item, quantity, _requireConfirmation) {
+  async _consumeItemQuantity(item, quantity) {
     const path = itemStackQuantityPath();
     const before = sourceItemQuantity(item, { path });
     const captured = mapConsumedIngredientRef({ item, quantity });
@@ -5313,7 +5314,7 @@ export class CraftingEngine {
     const whole = readStackQuantity(item?._source ?? item, path);
     const result = await (quantity >= before
       ? item.delete()
-      : updateStackQuantity(item, before - quantity, path));
+      : updateStackQuantity(item, before - quantity, path, { throwOnRefusal: true }));
     requireDocumentAcknowledgment(item, result);
     if (quantity >= before) return whole;
     const after = sourceItemQuantity(item, { path, absentDefault: null });

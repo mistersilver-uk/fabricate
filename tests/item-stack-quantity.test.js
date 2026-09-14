@@ -41,6 +41,8 @@ import {
   stackQuantityUpdate,
   updateStackQuantity,
 } from '../src/systems/itemStackQuantity.js';
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import { writeItemAward } from '../src/systems/runHistoryEvidence.js';
 
 /** Capture `console.warn` for the duration of one test. */
 function captureWarnings(t) {
@@ -252,7 +254,7 @@ const SITE_MAPPING = [
     file: 'src/systems/runHistoryEvidence.js',
     accessor: 'updateStackQuantity',
     sites: 1,
-    anchors: [/updateStackQuantity\(existing, before \+ quantity, path\)/],
+    anchors: [/updateStackQuantity\(existing, before \+ quantity, path, {/],
   },
   {
     site: 'runHistoryEvidence.sourceItemQuantity presence before caller default',
@@ -317,7 +319,7 @@ const SITE_MAPPING = [
     accessor: 'updateStackQuantity',
     sites: 1,
     deleteSites: 1,
-    anchors: [/updateStackQuantity\(item, before - quantity, path\)/],
+    anchors: [/updateStackQuantity\(item, before - quantity, path, {/],
   },
   {
     site: 'RunJournalBuilder candidate held quantity (#1648)',
@@ -1424,5 +1426,96 @@ describe('the pooled reduction and its inverse, pinned FUNCTION BY FUNCTION', ()
         `${name} writes ${other}, which is the OTHER half of the pair`
       );
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A GUARD REFUSAL IS NOT A LOST ACKNOWLEDGEMENT (#1648 A4).
+//
+// The object-valued-path guard answers `null` WITHOUT calling `update`, and the two
+// acknowledgement sites read that exactly as they read a document that did not acknowledge —
+// so a write that never reached the database demanded GM reconciliation. `throwOnRefusal`
+// separates them; the two directions are asserted together so neither can drift into the other.
+// ---------------------------------------------------------------------------
+
+describe('a refused write is distinguishable from an unacknowledged one', () => {
+  // The divergence is modelled EXPLICITLY, and it is what makes the guard reachable from an
+  // acknowledgement site at all: the quantity is read from `_source` (a number, so the site
+  // proceeds) while the guard reads the PREPARED document, where derived data or an Active
+  // Effect has put an object. A fixture aliasing the two could never reach the refusal, and the
+  // test would pass while asserting nothing.
+  function divergentItem() {
+    return {
+      name: 'Iron Ingot',
+      system: { quantity: { value: 20 } },
+      _source: { system: { quantity: 20 } },
+      update: async () => {
+        throw new Error('update must never be reached on a refusal');
+      },
+    };
+  }
+
+  it('throws its own definite error rather than answering the acknowledgement null', async (t) => {
+    captureWarnings(t);
+    t.after(resetItemStackQuantityPath);
+    configureItemStackQuantityPath('system.quantity');
+    await assert.rejects(
+      () => updateStackQuantity(divergentItem(), 19, undefined, { throwOnRefusal: true }),
+      (error) => error.code === 'STACK_QUANTITY_PATH_REFUSED' && error.path === 'system.quantity'
+    );
+  });
+
+  it('keeps answering null for a caller whose null does not mean uncertainty', async (t) => {
+    captureWarnings(t);
+    t.after(resetItemStackQuantityPath);
+    configureItemStackQuantityPath('system.quantity');
+    // The companion-award stack branch publishes `awardFailed` as RETRY-SAFE from this `null`,
+    // which is already the right reading of a write that never happened.
+    assert.equal(await updateStackQuantity(divergentItem(), 19), null);
+  });
+
+  it('reports a refused consumption as definite rather than as needing reconciliation', async (t) => {
+    captureWarnings(t);
+    t.after(resetItemStackQuantityPath);
+    configureItemStackQuantityPath('system.quantity');
+    const engine = new CraftingEngine({ getRecipe: () => null }, null);
+    await assert.rejects(
+      () => engine._consumeIngredients([{ item: divergentItem(), quantity: 1, ingredient: null }]),
+      (error) => {
+        assert.equal(error.code, 'STACK_QUANTITY_PATH_REFUSED', 'a definite failure');
+        return true;
+      }
+    );
+  });
+
+  it('reports a refused award as definite rather than as needing reconciliation', async (t) => {
+    captureWarnings(t);
+    t.after(resetItemStackQuantityPath);
+    configureItemStackQuantityPath('system.quantity');
+    await assert.rejects(
+      () => writeItemAward({ existing: divergentItem(), quantity: 1 }),
+      (error) => {
+        assert.equal(error.code, 'STACK_QUANTITY_PATH_REFUSED', 'a definite failure');
+        return true;
+      }
+    );
+  });
+
+  it('still reports an unacknowledged decrement as uncertain', async (t) => {
+    // THE OTHER DIRECTION, on the same code path: a healthy path whose `update` resolves
+    // nothing is a real lost acknowledgement and must keep demanding reconciliation.
+    t.after(resetItemStackQuantityPath);
+    configureItemStackQuantityPath('system.qtd');
+    const engine = new CraftingEngine({ getRecipe: () => null }, null);
+    const item = {
+      name: 'Iron Ingot',
+      system: { qtd: 20 },
+      _source: { system: { qtd: 20 } },
+      update: async () => undefined,
+    };
+    await assert.rejects(
+      () => engine._consumeIngredients([{ item, quantity: 1, ingredient: null }]),
+      (error) => error.code === 'HISTORY_EFFECT_UNCERTAIN'
+    );
   });
 });

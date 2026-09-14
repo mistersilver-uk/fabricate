@@ -1,3 +1,5 @@
+import { isSafeFlagKeySegment } from '../config/flags.js';
+
 import {
   hasStackQuantity,
   itemStackQuantityPath,
@@ -101,9 +103,11 @@ export async function writeItemAward({
   if (existing) {
     const before = sourceItemQuantity(existing, { path, absentDefault });
     if (before === null) throw unconfirmedHistoryError('Unknown source stack quantity');
+    // `throwOnRefusal` keeps the two `null`s apart: the path guard answers `null` WITHOUT
+    // calling `update`, which acknowledgement cannot tell from a document that did not answer.
     requireDocumentAcknowledgment(
       existing,
-      await updateStackQuantity(existing, before + quantity, path)
+      await updateStackQuantity(existing, before + quantity, path, { throwOnRefusal: true })
     );
     const after = sourceItemQuantity(existing, { path, absentDefault: null });
     if (after === null || after < before) throw unconfirmedHistoryError('Unknown awarded delta');
@@ -151,8 +155,12 @@ export function createItemReceiptCollector() {
       return receipt;
     },
     snapshot: () => receipts.map((receipt) => ({ ...receipt })),
+    // A path-guard refusal reached no database at all, so with nothing recorded it is a DEFINITE
+    // failure rather than the uncertain effect reconciliation exists for.
     failure: (error) =>
-      unconfirmedHistoryError('Item effects require reconciliation', receipts, error),
+      error?.code === 'STACK_QUANTITY_PATH_REFUSED' && receipts.length === 0
+        ? error
+        : unconfirmedHistoryError('Item effects require reconciliation', receipts, error),
   };
 }
 
@@ -191,6 +199,10 @@ export async function writeAcknowledgedRunContainer(actor, namespace, key, curre
   if (sameHistoryValue(current, next)) return;
   const payload = structuredClone(next);
   for (const id of Object.keys(current?.active ?? {})) {
+    // A dotted or otherwise unsafe id cannot be addressed by a deletion key at all: the update
+    // re-splits it on every dot and the `-=` lands on another node. Mirrors the same guard on
+    // `GatheringStaminaService._deleteRetiredStaminaKeys`.
+    if (!isSafeFlagKeySegment(id)) continue;
     if (!Object.hasOwn(payload.active, id)) payload.active[`-=${id}`] = null;
   }
   requireDocumentAcknowledgment(actor, await actor.setFlag(namespace, key, payload));
