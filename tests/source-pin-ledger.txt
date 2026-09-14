@@ -114,7 +114,7 @@ tests/currency-balance-macro.test.js	4
 tests/essence-bulk-delete-copy.test.js	2
 tests/essence-world-scope-screens.test.js	34
 tests/export-system-gathering-bundle.test.js	15
-tests/fabricate-api-surface.test.js	70
+tests/fabricate-api-surface.test.js	71
 tests/fabricate-facade-alchemy-owner-gate.test.js	9
 tests/file-size-ledger.test.js	1
 tests/foundry-manager-rail-hooks.test.js	1
@@ -144,7 +144,7 @@ tests/item-directory-manager-launch.test.js	1
 tests/item-stack-quantity.test.js	19
 tests/items-directory-gathering-button.test.js	1
 tests/journal-run-authority.test.js	1
-tests/journal-run-commands.test.js	1
+tests/journal-run-commands.test.js	2
 tests/kicker-source-contract.test.js	3
 tests/library-search-scope-source-contract.test.js	1
 tests/macro-executor.test.js	8

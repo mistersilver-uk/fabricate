@@ -332,7 +332,11 @@ describe('SvelteFabricateApp shell window', () => {
         onConfirm = () => {};
         world.shim.setViewer('gm');
         const result = await services.setupJournalRunAuthority();
-        assert.equal(result.reason, 'ledger-already-exists', 'the actual API refusal is returned unchanged');
+        // Setup is an idempotent ensure since the ledger is auto-provisioned: an existing ledger
+        // is a success carrying its id, not the `ledger-already-exists` refusal it used to be.
+        assert.equal(result.success, true, 'the actual API result is returned unchanged');
+        assert.equal(typeof result.ledgerId, 'string');
+        assert.ok(result.ledgerId, 'the ensure names the ledger it settled on');
         assert.equal(apiCalls, 1);
         assert.equal(globalThis.game.journal.contents.filter((entry) => entry.flags?.fabricate?.journalRunAuthorityLedger).length, 1);
         assert.equal(globalThis.game.journal.contents.includes(ledger), true, 'setup does not replace the existing ledger');
