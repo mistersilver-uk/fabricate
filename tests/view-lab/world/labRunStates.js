@@ -33,6 +33,7 @@ import {
 import { blindWaitingTaskId } from '../../../src/systems/gatheringEngineInternals.js';
 
 import { CRACKED_ALEMBIC_STAGE_IDS, ICON_BASE, LAB_SYSTEM_IDS } from './labContent.js';
+import { LAB_HISTORY_DATA_STATES, historyDataRunSets } from './labHistoryEvidence.js';
 import {
   JOURNAL_PROTOTYPE_RECIPES,
   JOURNAL_PROTOTYPE_BINDINGS,
@@ -120,6 +121,7 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
       'history-settling',
       'history-compact-grid',
       'history-compact-tools',
+      ...LAB_HISTORY_DATA_STATES,
     ].map((state) => [state, `lab-v1-${state}`])
   ),
 });
@@ -666,6 +668,21 @@ function journalCaseFactories(context) {
     narrow: () => wideContainers(context, multi()),
     loading: readyAlias('lab-v1-ready-single'),
     'error-retry': readyAlias('lab-v1-ready-single'),
+    // Persisted history-data witnesses live in their own module; each state seeds one selected
+    // record, plus the earlier record a recovery genuinely reads. The open account keeps both
+    // Journal panes populated so the witness is photographed in a whole window.
+    ...Object.fromEntries(
+      Object.entries(historyDataRunSets({ ...context, now: NOW, hour: HOUR })).map(
+        ([state, build]) => [
+          state,
+          () =>
+            emptyRunContainers({
+              craftingActive: [ready(`lab-v1-${state}-open`)],
+              ...build(),
+            }),
+        ]
+      )
+    ),
   };
 }
 

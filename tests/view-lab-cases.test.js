@@ -950,6 +950,96 @@ test('compact Journal captures add full, short, empty, restored and tool witness
   }
 });
 
+// The evidence each history-data state exists to photograph, keyed by its own witness. Pinned
+// here rather than derived from the registry: the registry is what these strings guard, so
+// reading them back out of it would assert nothing about what the frame shows.
+const HISTORY_DATA_EVIDENCE = [
+  // The saved world's two independent rolls, and the global cut that must NOT be synthesised.
+  ['legacy-row-rolls', [/legacy-iron-ore-roll-12"\]\.is-cleared/, /legacy-copper-ore-roll-94"\]\.is-cleared/, /:not\(:has\(\[data-yield-cut\]\)\)/]],
+  ['shared-roll-control', [/:has\(\[data-yield-cut\]\)/, /shared-ruby:2"\]\.is-missed/]],
+  ['recovered-materials', [/title="Steel Billet"/, /title="Coal"/, /consumed"\] i\.fa-box/, /produced"\] \[title="Steel Ingot"\]/]],
+  ['unknown-material-resolution', [/data-yield-shared-roll/, /data-history-unattributed\] \+ \[data-history-items="produced"/, /:not\(:has\(\[data-yield-entry="unknown-ruby"\]\.is-cleared\)\)/]],
+  ['settled-zero', [/data-journal-verdict="failed"/, /barren-iron-ore"\]\.is-missed/, /:not\(:has\(\[data-yield-entry\]\.is-cleared\)\)/]],
+  ['uncertain-awards', [/data-effect-phase="applied"\] \[data-list-row\]/, /data-effect-phase="applying"\] \[data-list-row\]/, /data-journal-recovery-evidence\] ~ \[data-journal-history-detail\] \[data-journal-guidance\]/]],
+  ['fizzle', [/data-history-summary="none"/, /title="Quicksilver"/, /img\.fab-medallion-img/]],
+  ['salvage', [/data-history-items="produced"\] \+ \[data-journal-fact\]/, /produced"\] \[data-list-row\] ~ \[data-list-row\]/, /:not\(:has\(\[data-history-items="consumed"\]\)\)/]],
+];
+
+test('the history-data witnesses name their defining evidence on the selected record', () => {
+  const cases = VIEW_LAB_CASES.filter((entry) =>
+    entry.id.startsWith('fabricate-journal-history-data-')
+  );
+  assert.equal(cases.length, 16);
+  for (const width of [1240, 1024]) {
+    for (const [state, evidence] of HISTORY_DATA_EVIDENCE) {
+      const capture = getCaseById(`fabricate-journal-history-data-${state}-${width}`);
+      assert.deepEqual(capture.position, { width, height: 880 });
+      assert.equal(capture.expectTab, 'journal');
+      assert.equal(capture.reaches, 'beyond');
+      assert.equal(capture.query.journalCaseState, `history-data-${state}`);
+      // The walk selects its OWN record: a witness reached by whatever row happened to be first
+      // would photograph a different account's evidence under this case's name.
+      assert.deepEqual(capture.steps, [
+        { selector: `[data-history-run-id="lab-v1-history-data-${state}"]` },
+      ]);
+      for (const pattern of evidence) assert.match(capture.expectSelector, pattern, capture.id);
+      assert.ok(
+        capture.expectSelector.startsWith('[data-journal-detail]'),
+        `${capture.id} asserts against the open record, not the list`
+      );
+      assert.ok(
+        !capture.expectSelector.includes('data-journal-case-state'),
+        `${capture.id} checks product output`
+      );
+    }
+  }
+  // Only the alchemy attempt record is GM evidence; the other seven are the player's own.
+  assert.deepEqual(
+    cases.filter((entry) => entry.query.viewer === 'gm').map((entry) => entry.id),
+    ['fabricate-journal-history-data-fizzle-1240', 'fabricate-journal-history-data-fizzle-1024']
+  );
+  // The two families this one sits beside are unchanged by it.
+  assert.equal(
+    VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-lifecycle-')).length,
+    68
+  );
+  assert.equal(
+    VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-')).length,
+    10
+  );
+});
+
+test('no expectSelector nests one :has() inside another', () => {
+  // `:has()` may not appear inside a relative selector of another `:has()`. A browser REJECTS the
+  // whole selector, and the capture driver evaluates `expectSelector` before it photographs, so
+  // one such selector fails the job whole and publishes nothing — including every unrelated frame.
+  const nests = (selector) => {
+    const stack = [];
+    let open = 0;
+    for (let index = 0; index < selector.length; index += 1) {
+      if (selector.startsWith(':has(', index)) {
+        if (open > 0) return true;
+        open += 1;
+        stack.push('has');
+        index += 4;
+      } else if (selector[index] === '(') stack.push('other');
+      else if (selector[index] === ')' && stack.pop() === 'has') open -= 1;
+    }
+    return false;
+  };
+  // The scan is proved to fail before it is trusted: the first is the shape it must reject.
+  assert.equal(nests('a:has(b:has(c))'), true);
+  assert.equal(nests('a:has(b):not(:has(c)) :has(d)'), false);
+
+  const nested = VIEW_LAB_CASES.filter(
+    (viewCase) => typeof viewCase.expectSelector === 'string' && nests(viewCase.expectSelector)
+  );
+  assert.deepEqual(
+    nested.map((viewCase) => viewCase.id),
+    []
+  );
+});
+
 test('all Journal lifecycle captures assert defining product state rather than a populated shell', () => {
   const cases = VIEW_LAB_CASES.filter((entry) =>
     entry.id.startsWith('fabricate-journal-lifecycle-')

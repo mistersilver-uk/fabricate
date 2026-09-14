@@ -29,12 +29,14 @@ import {
   createLabJournalCaseController,
   installLabRunStates,
 } from './view-lab/world/labRunStates.js';
+import { LAB_HISTORY_DATA_STATES } from './view-lab/world/labHistoryEvidence.js';
 import { Recipe } from '../src/models/Recipe.js';
 import { RecipeVisibilityService } from '../src/systems/RecipeVisibilityService.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
 import { GatheringRunManager } from '../src/systems/GatheringRunManager.js';
 import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
+import { itemReceipt, nativeHistoryRecord } from '../src/systems/runHistoryEvidence.js';
 import { ResolutionModeService } from '../src/systems/ResolutionModeService.js';
 import { installFoundryShim } from './view-lab/foundry/installFoundryShim.js';
 import { installUpdateSemantics, makeGetFlag } from './view-lab/world/labFlags.js';
@@ -408,6 +410,199 @@ test('compact history witnesses have real short last pages, five long-name mater
       assert.equal(run.steps[0].usedTools[0].itemUuid, run.steps[1].usedTools[0].itemUuid);
       assert.equal(run.steps[1].usedTools[0].broken, true);
     }
+  }
+});
+
+test('every persisted history-data record is already in the shape its manager writes', () => {
+  const receipts = (record) => [
+    ...(record.consumedIngredients ?? []),
+    ...(record.consumedComponents ?? []),
+    ...(record.createdResults ?? []),
+    ...(record.steps ?? []).flatMap((step) => [
+      ...(step.consumedIngredients ?? []),
+      ...(step.createdResults ?? []),
+      ...(step.preparedConsumption?.consumedSummary ?? []),
+    ]),
+  ];
+  for (const state of LAB_HISTORY_DATA_STATES) {
+    const { containers } = journalFixture(state);
+    const records = Object.values(containers).flatMap((container) => container.history);
+    assert.ok(records.length > 0, `${state} persists a terminal record`);
+    for (const record of records) {
+      // `nativeHistoryRecord` is the normalizer the managers persist through, so a record that is
+      // not already its own normal form carries a field no writer produces. This is what stops a
+      // proposed field being inserted into a fixture after the fact and photographed as evidence.
+      assert.deepEqual(nativeHistoryRecord(record), record, `${state}/${record.id}`);
+      const rows = receipts(record);
+      assert.ok(rows.length > 0 || record.createdResults?.length === 0, `${state} has receipts`);
+      for (const row of rows) {
+        assert.deepEqual(itemReceipt(row), row, `${state}/${record.id} receipt ${row.itemUuid}`);
+      }
+    }
+  }
+});
+
+test('the mining witness keeps its independent rolls and recovers its receipts, not its rows', () => {
+  const state = 'history-data-legacy-row-rolls';
+  const { containers } = journalFixture(state);
+  const saved = containers.gatheringRuns.history[0];
+  // The saved record has NO root roll, and its evaluated rows carry quantities of their own.
+  assert.ok(!('roll' in saved.checkResult) && !('value' in saved.checkResult));
+  assert.deepEqual(
+    saved.checkResult.itemRows.map((row) => [row.roll, row.quantity]),
+    [
+      [12, 3],
+      [94, 5],
+    ]
+  );
+  const run = journalProjection(state).history.find((entry) => entry.id === `lab-v1-${state}`);
+  assert.equal(run.gatheringYield.rollModel, 'perRow');
+  assert.equal(run.gatheringYield.roll, null, 'no cut may be synthesised from independent rolls');
+  assert.deepEqual(
+    run.gatheringYield.entries.map((entry) => [entry.id, entry.name, entry.rawRoll, entry.qty]),
+    [
+      ['legacy-iron-ore-roll-12', 'Iron Ore', 12, 2],
+      ['legacy-copper-ore-roll-94', 'Copper Ore', 94, 1],
+    ]
+  );
+  assert.deepEqual(run.gatheringYield.unattributedAwardIndexes, []);
+});
+
+test('each history-data state projects the evidence that defines it, through a fresh manager', () => {
+  const projected = (state, viewer) =>
+    journalProjection(state, viewer).history.find((entry) => entry.id === `lab-v1-${state}`);
+
+  const shared = projected('history-data-shared-roll-control');
+  assert.equal(shared.gatheringYield.rollModel, 'shared');
+  assert.equal(shared.gatheringYield.roll, 40);
+  assert.deepEqual(
+    shared.gatheringYield.entries.map((entry) => [entry.rawRoll, entry.effectiveRoll, entry.cleared, entry.qty]),
+    [
+      [40, 55, true, 2],
+      [40, 55, true, 2],
+      [40, 55, false, 0],
+    ]
+  );
+
+  const recovered = projected('history-data-recovered-materials');
+  assert.deepEqual(
+    recovered.steps[0].consumedIngredients.map((entry) => [entry.name, entry.quantity]),
+    [
+      ['Steel Billet', 2],
+      ['Coal', 2],
+      [null, 3],
+    ]
+  );
+  const savedRows = journalFixture('history-data-recovered-materials')
+    .containers.craftingRuns.history[0].steps[0].consumedIngredients;
+  assert.deepEqual(
+    savedRows.map((row) => row.name),
+    [null, null, null],
+    'recovery is a projection, never a rewrite of the saved rows'
+  );
+
+  const unknown = projected('history-data-unknown-material-resolution');
+  assert.deepEqual(
+    unknown.gatheringYield.entries.map((entry) => [entry.cleared, entry.qty, entry.threshold]),
+    [
+      [true, 3, 31],
+      [true, null, 51],
+      [null, null, null],
+    ]
+  );
+  assert.deepEqual(unknown.gatheringYield.unattributedAwardIndexes, [1]);
+
+  const settled = projected('history-data-settled-zero');
+  assert.equal(settled.status, 'failed');
+  assert.deepEqual(settled.createdResults, []);
+  assert.equal(settled.createdResultsRecorded, true, 'an applied empty receipt establishes zero');
+  assert.ok(settled.gatheringYield.entries.every((entry) => entry.qty === 0 && !entry.cleared));
+
+  const uncertain = projected('history-data-uncertain-awards');
+  assert.equal(uncertain.recoveryEvidence.required, true);
+  assert.equal(uncertain.recoveryEvidence.uncertainEffectIndex, 1);
+  assert.deepEqual(
+    uncertain.recoveryEvidence.effects.map((effect) => effect.phase),
+    ['applied', 'applying', 'planned']
+  );
+  assert.deepEqual(
+    uncertain.recoveryEvidence.effects[1].receipt.items.map((item) => [item.name, item.quantity]),
+    [['Iron Ingot', 1]],
+    'the confirmed prefix belongs to the uncertain effect'
+  );
+
+  const salvaged = projected('history-data-salvage');
+  assert.equal(salvaged.historySettlement.consumption, 'notApplicable');
+  assert.deepEqual(salvaged.consumedIngredients, []);
+  assert.deepEqual(
+    salvaged.createdResults.map((entry) => [entry.name, entry.quantity]),
+    [
+      ['Iron Ore', 1],
+      ['Iron Ore', 2],
+    ]
+  );
+});
+
+test('a missing gathering results receipt cannot establish a confirmed zero', () => {
+  // The control for the settled-zero witness: strip the one applied effect the repaired writer
+  // records and the same record becomes an unproven blank, not a confirmed empty award.
+  const fixture = journalFixture('history-data-settled-zero');
+  const saved = fixture.containers.gatheringRuns.history[0];
+  assert.equal(saved.executionJournal.effects.length, 1);
+  saved.executionJournal.effects = [];
+  const run = journalProjection('history-data-settled-zero', undefined, fixture).history.find(
+    (entry) => entry.id === 'lab-v1-history-data-settled-zero'
+  );
+  // The projected award list is empty either way; only `createdResultsRecorded` separates a
+  // confirmed empty award from a record that simply never proved what it produced.
+  assert.deepEqual(run.createdResults, []);
+  assert.equal(run.createdResultsRecorded, false);
+});
+
+test('native salvage keeps its duplicate source linkage across a manager reload', () => {
+  const fixture = journalFixture('history-data-salvage');
+  installLabRunStates(fixture.actor, fixture.containers);
+  const [reloaded] = new SalvageRunManager().getRunHistory(fixture.actor);
+  assert.equal(reloaded.id, 'lab-v1-history-data-salvage');
+  assert.deepEqual(
+    reloaded.createdResults.map((entry) => entry.resultRowId),
+    ['salvage-scrap-row:0', 'salvage-scrap-row:0'],
+    'two receipts from one evaluated row stay two receipts'
+  );
+  assert.equal(
+    new Set(reloaded.createdResults.map((entry) => entry.itemUuid)).size,
+    2,
+    'each receipt keeps its own physical destination'
+  );
+  assert.equal(reloaded.historySettlement.consumption, 'notApplicable');
+});
+
+test('an alchemy attempt record stays GM evidence and discloses no recipe', () => {
+  const player = journalProjection('history-data-fizzle');
+  assert.deepEqual(
+    player.history.map((entry) => entry.id),
+    [],
+    'a player is not entitled to the attempt record at all'
+  );
+  const [fizzle] = journalProjection('history-data-fizzle', {
+    id: 'user-lab-gm',
+    isGM: true,
+  }).history;
+  assert.equal(fizzle.isFizzle, true);
+  assert.equal(fizzle.recipeId, null);
+  assert.deepEqual(fizzle.resolutionSnapshot, { kind: 'none', mode: 'alchemy' });
+  assert.deepEqual(fizzle.createdResults, []);
+  assert.deepEqual(
+    fizzle.consumedIngredients.map((entry) => [entry.name, entry.quantity, Boolean(entry.img)]),
+    [
+      ['Quicksilver', 1, true],
+      ['Yellow Sulphur', 2, true],
+    ]
+  );
+  const disclosed = JSON.stringify(fizzle);
+  for (const recipe of content.recipes.filter((entry) => entry.id.startsWith('al-r-'))) {
+    assert.ok(!disclosed.includes(recipe.name), `${recipe.name} must not reach the attempt record`);
+    assert.ok(!disclosed.includes(recipe.id), `${recipe.id} must not reach the attempt record`);
   }
 });
 

@@ -33,6 +33,7 @@ import {
   buildLabRunStates,
   createLabJournalCaseController,
 } from '../view-lab/world/labRunStates.js';
+import { LAB_HISTORY_DATA_STATES } from '../view-lab/world/labHistoryEvidence.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const english = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
@@ -466,6 +467,204 @@ function assertLockedStage(target) {
   );
 }
 
+const historyLabel = (key, data = {}) =>
+  globalThis.game.i18n.format(`FABRICATE.App.Journal.History.${key}`, data);
+const quantityLabel = (n) => globalThis.game.i18n.format('FABRICATE.App.Journal.Quantity', { n });
+const guidanceOf = (target) => target.querySelector('[data-journal-guidance]').textContent;
+const textsOf = (root, selector) =>
+  [...root.querySelectorAll(selector)].map((node) => node.textContent);
+const namesOf = (root) => textsOf(root, '.fabricate-list-row-name');
+const quantitiesOf = (root) => textsOf(root, '.fabricate-list-row-quantity');
+const section = (target, kind) => target.querySelector(`[data-history-items="${kind}"]`);
+const yieldRows = (target) => [...target.querySelectorAll('[data-yield-entry]')];
+
+/**
+ * What each history-data frame must prove, asserted on the rendered DOM of the selected record.
+ * The registry selector names the same evidence structurally; these read the values it cannot.
+ */
+const HISTORY_DATA_WITNESS = {
+  'history-data-legacy-row-rolls'(target) {
+    const rows = yieldRows(target);
+    assert.deepEqual(
+      rows.map((row) => row.getAttribute('data-yield-entry')),
+      ['legacy-iron-ore-roll-12', 'legacy-copper-ore-roll-94']
+    );
+    assert.deepEqual(namesOf(target.querySelector('[data-yield-scale]')), [
+      'Iron Ore',
+      'Copper Ore',
+    ]);
+    // The receipts, not the evaluated rows: those record 3 and 5 and can establish nothing.
+    assert.deepEqual(quantitiesOf(target.querySelector('[data-yield-scale]')), [
+      quantityLabel(2),
+      quantityLabel(1),
+    ]);
+    for (const excluded of [3, 5]) {
+      assert.ok(
+        !target.querySelector('[data-yield-scale]').textContent.includes(quantityLabel(excluded)),
+        `an evaluated row quantity of ${excluded} is not an award`
+      );
+    }
+    assert.equal(target.querySelectorAll('[data-yield-cut], [data-yield-shared-roll]').length, 0);
+    assert.ok(guidanceOf(target).includes(historyLabel('ClosedSuccess')));
+  },
+  'history-data-shared-roll-control'(target) {
+    const cut = target.querySelector('[data-yield-cut]');
+    assert.ok(cut.textContent.includes(historyLabel('RolledValue', { roll: 40 })));
+    assert.ok(cut.textContent.includes(historyLabel('Cut')));
+    const rows = yieldRows(target);
+    assert.ok(
+      rows.every((row) =>
+        row.textContent.includes(historyLabel('EffectiveRollValue', { roll: 55 }))
+      ),
+      'a raw roll differs from the effective roll the rows were read against'
+    );
+    assert.ok(!rows[0].textContent.includes(historyLabel('RolledValue', { roll: 40 })));
+    assert.deepEqual(
+      rows.map((row) => row.className.includes('is-cleared')),
+      [true, true, false]
+    );
+  },
+  'history-data-recovered-materials'(target) {
+    const consumed = section(target, 'consumed');
+    assert.deepEqual(namesOf(consumed), ['Steel Billet', 'Coal', historyLabel('UnknownMaterial')]);
+    assert.deepEqual(quantitiesOf(consumed), [
+      quantityLabel(2),
+      quantityLabel(2),
+      quantityLabel(3),
+    ]);
+    const rows = [...consumed.querySelectorAll('[data-list-row]')];
+    assert.equal(rows.length, 3, 'exactly the three rows the record consumed');
+    assert.ok(rows[0].querySelector('img'), 'a recovered identity carries its captured art');
+    assert.ok(rows[1].querySelector('img'));
+    assert.ok(!rows[2].querySelector('img'), 'an unknown row illustrates nothing');
+    assert.ok(rows[2].querySelector('i.fa-box'), 'and draws the fallback glyph instead');
+    // The captured name won over the live component name, which the same frame also shows.
+    assert.deepEqual(namesOf(section(target, 'produced')), ['Steel Ingot']);
+  },
+  'history-data-unknown-material-resolution'(target) {
+    const rows = yieldRows(target);
+    assert.ok(
+      target
+        .querySelector('[data-yield-shared-roll]')
+        .textContent.includes(historyLabel('RolledValue', { roll: 55 }))
+    );
+    assert.equal(
+      target.querySelectorAll('[data-yield-cut]').length,
+      0,
+      'a row with no recorded outcome leaves the roll unable to cut'
+    );
+    assert.deepEqual(quantitiesOf(target.querySelector('[data-yield-scale]')), [
+      quantityLabel(3),
+      historyLabel('NotRecorded'),
+      historyLabel('NotRecorded'),
+    ]);
+    assert.deepEqual(
+      rows.map((row) => [row.className.includes('is-cleared'), row.className.includes('is-missed')]),
+      [
+        [true, false],
+        [true, false],
+        [false, false],
+      ],
+      'a known outcome, a known outcome with an unknown amount, and a neutral unknown'
+    );
+    assert.ok(rows[1].textContent.includes(historyLabel('CheckCleared')));
+    for (const key of ['ThresholdNotRecorded', 'OutcomeNotRecorded']) {
+      assert.ok(rows[2].textContent.includes(historyLabel(key)), key);
+    }
+    const unattributed = target.querySelector('[data-history-unattributed]');
+    assert.ok(unattributed.textContent.includes(historyLabel('UnattributedAwards')));
+    assert.equal(
+      unattributed.nextElementSibling,
+      section(target, 'produced'),
+      'the unresolved awards are listed immediately under the note that explains them'
+    );
+    assert.deepEqual(namesOf(section(target, 'produced')), ['Cave Ruby']);
+  },
+  'history-data-settled-zero'(target) {
+    assert.equal(target.querySelector('[data-journal-verdict]').dataset.journalVerdict, 'failed');
+    assert.ok(
+      target.querySelector('[data-yield-cut]').textContent.includes(historyLabel('TopCut'))
+    );
+    assert.deepEqual(
+      quantitiesOf(target.querySelector('[data-yield-scale]')),
+      Array.from({ length: 3 }, () => quantityLabel(0)),
+      'a confirmed empty award states zero rather than omitting a quantity'
+    );
+    assert.ok(guidanceOf(target).includes(historyLabel('ClosedFailedEmpty')));
+    assert.ok(!guidanceOf(target).includes(historyLabel('ClosedMissing')));
+    assert.ok(!section(target, 'produced'), 'a confirmed zero lists no award');
+    assert.equal(
+      target.querySelectorAll('[data-yield-entry].is-cleared').length,
+      0,
+      'no row cleared the roll'
+    );
+  },
+  'history-data-uncertain-awards'(target) {
+    const evidence = target.querySelector('[data-journal-recovery-evidence]');
+    assert.equal(
+      target.querySelector('[data-journal-recovery]').dataset.journalRecovery,
+      'true'
+    );
+    const phases = [...evidence.querySelectorAll('[data-effect-phase]')];
+    assert.deepEqual(namesOf(phases[0]), ['Iron Ore']);
+    assert.deepEqual(
+      phases.map((node) => node.dataset.effectPhase),
+      ['applied', 'applying', 'planned']
+    );
+    assert.deepEqual(namesOf(phases[1]), ['Iron Ingot']);
+    assert.deepEqual(quantitiesOf(phases[1]), [quantityLabel(1)]);
+    const history = target.querySelector('[data-journal-history-detail]');
+    const order = [...evidence.parentElement.children];
+    assert.ok(
+      order.indexOf(evidence) < order.indexOf(history) && order.includes(history),
+      'the confirmed prefix and its uncertain remainder come before the closed-run guidance'
+    );
+    const guidance = history.querySelector('[data-journal-guidance]');
+    assert.ok(guidance.textContent.includes(historyLabel('ClosedRecovery')));
+    assert.ok(!guidance.textContent.includes(historyLabel('ClosedSuccess')));
+    assert.equal(
+      target.querySelectorAll('[data-history-items]').length,
+      0,
+      'an unreconciled record shows its receipts, not an ordinary award list'
+    );
+  },
+  'history-data-fizzle'(target, { protectedText }) {
+    const detail = target.querySelector('[data-journal-detail]');
+    assert.ok(
+      detail.textContent.includes(
+        globalThis.game.i18n.localize('FABRICATE.App.Journal.Fizzle.Title')
+      )
+    );
+    assert.ok(target.querySelector('[data-history-summary="none"]'));
+    assert.deepEqual(namesOf(section(target, 'consumed')), ['Quicksilver', 'Yellow Sulphur']);
+    assert.deepEqual(quantitiesOf(section(target, 'consumed')), [
+      quantityLabel(1),
+      quantityLabel(2),
+    ]);
+    assert.equal(target.querySelector('[data-journal-verdict]').dataset.journalVerdict, 'failed');
+    assert.equal(section(target, 'consumed').querySelectorAll('img.fab-medallion-img').length, 2);
+    assert.ok(protectedText.length > 0, 'the protected roster is not empty');
+    for (const disclosure of protectedText) {
+      assert.ok(!detail.textContent.includes(disclosure), `${disclosure} is not disclosed`);
+    }
+    assert.ok(!section(target, 'produced'), 'a fizzle banks nothing');
+    assert.ok(guidanceOf(target).includes(historyLabel('ClosedFailedEmpty')));
+  },
+  'history-data-salvage'(target) {
+    const produced = section(target, 'produced');
+    assert.deepEqual(namesOf(produced), ['Iron Ore', 'Iron Ore']);
+    assert.deepEqual(quantitiesOf(produced), [quantityLabel(1), quantityLabel(2)]);
+    const fact = produced.nextElementSibling;
+    assert.equal(fact.dataset.journalFact, '');
+    assert.ok(fact.textContent.includes(historyLabel('NotApplicable')));
+    assert.ok(fact.textContent.includes(historyLabel('MaterialsUsed')));
+    assert.equal(produced.querySelectorAll('[data-list-row]').length, 2);
+    assert.ok(!section(target, 'consumed'), 'nothing was spent, so nothing is listed as spent');
+    assert.equal(target.querySelector('[data-journal-verdict]').dataset.journalVerdict, 'failed');
+    assert.ok(guidanceOf(target).includes(historyLabel('ClosedFailureAwards')));
+  },
+};
+
 function assertCaseWitness(target, capture) {
   assert.ok(
     target.querySelector(capture.expectSelector) ?? document.querySelector(capture.expectSelector),
@@ -473,6 +672,16 @@ function assertCaseWitness(target, capture) {
   );
   const history = target.querySelector('[data-journal-history-detail]');
   if (!history) return;
+  // A row id that names its recorded roll is a hand-maintained mirror of the record; the capture
+  // selector reads the id and only this reads the number, so drift between them fails here.
+  for (const row of history.querySelectorAll('[data-yield-entry]')) {
+    const recorded = /-roll-(\d+)$/.exec(row.getAttribute('data-yield-entry'));
+    if (!recorded) continue;
+    assert.ok(
+      row.textContent.includes(historyLabel('RolledValue', { roll: recorded[1] })),
+      `${row.getAttribute('data-yield-entry')} must show the roll its id names`
+    );
+  }
   assert.ok(
     history.querySelectorAll('[data-history-summary]').length <= 1,
     'one final summary at most'
@@ -920,8 +1129,11 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(tracks.length, 0, 'terminal history has no active progress');
   });
 
-  for (const capture of VIEW_LAB_CASES.filter((entry) =>
-    entry.id.startsWith('fabricate-journal-lifecycle-') || entry.id.startsWith('fabricate-journal-history-batch-')
+  for (const capture of VIEW_LAB_CASES.filter(
+    (entry) =>
+      entry.id.startsWith('fabricate-journal-lifecycle-') ||
+      entry.id.startsWith('fabricate-journal-history-batch-') ||
+      entry.id.startsWith('fabricate-journal-history-data-')
   )) {
     const suffix = capture.id.replace('fabricate-journal-lifecycle-', '');
     it(`TP5 ${suffix}: operates its case walk against populated authoring/receipt data`, async () => {
@@ -999,6 +1211,15 @@ describe('Journal versioned lifecycle (mounted)', () => {
         }
       }
       assertCaseWitness(mounted.target, capture);
+      if (HISTORY_DATA_WITNESS[state]) {
+        HISTORY_DATA_WITNESS[state](mounted.target, {
+          // An alchemy attempt names no recipe: the whole roster is protected text, derived from
+          // the world rather than listed, so a renamed recipe cannot quietly leave the check.
+          protectedText: content.recipes
+            .filter((entry) => entry.craftingSystemId === LAB_SYSTEM_IDS.ALCHEMY)
+            .flatMap((entry) => [entry.id, entry.name]),
+        });
+      }
       if (state === 'material-shortage') {
         const requirements = mounted.store.selectedRun.currentStep.selectionAvailability.requirements;
         for (const requirement of requirements) {
@@ -1033,11 +1254,31 @@ describe('Journal versioned lifecycle (mounted)', () => {
         );
       }
       if (suffix === 'history-checked-choice') proveTerminalWitness(mounted.target, capture);
-      if (state === 'history-redacted')
-        assert.doesNotMatch(
-          mounted.target.querySelector('[data-journal-detail]').textContent,
-          /Copper Ingot|jp-deleted-recipe/
+      if (state === 'history-redacted') {
+        // Withheld: the protected set is derived from the record itself, so a fixture that stops
+        // carrying names or art cannot leave this passing on an empty comparison.
+        const record = mounted.containers.craftingRuns.history.find(
+          (entry) => entry.id === selectedId
         );
+        const rows = record.steps.flatMap((step) => [
+          ...(step.consumedIngredients ?? []),
+          ...(step.createdResults ?? []),
+        ]);
+        assert.ok(rows.length > 0, 'the withheld record actually carries protected rows');
+        const detail = mounted.target.querySelector('[data-journal-detail]');
+        const art = [...detail.querySelectorAll('img')].map((node) => node.getAttribute('src'));
+        for (const row of rows) {
+          assert.ok(!detail.textContent.includes(row.name), `${row.name} stays withheld`);
+          assert.ok(!art.includes(row.img), `${row.name} art stays withheld`);
+        }
+        assert.ok(!detail.textContent.includes(record.recipeId), 'the recipe id stays withheld');
+        assert.ok(
+          detail.textContent.includes(
+            globalThis.game.i18n.localize('FABRICATE.App.Journal.Redacted.Title')
+          ),
+          'the title is the protected one, not the record’s own'
+        );
+      }
       if (state === 'history-missing-material')
         assert.match(
           mounted.target.querySelector('[data-history-items="consumed"]').textContent,
@@ -1083,9 +1324,13 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(typeof buildLabRunStates, 'function');
     for (const [state, runId] of Object.entries(LAB_JOURNAL_CASE_STATE_RUN_IDS)) {
       if (!runId || ['legacy', 'redacted-owner'].includes(state)) continue;
-      const fixtureContent = Object.hasOwn(JOURNAL_PROTOTYPE_BINDINGS, state)
-        ? buildLabContent({ journalCaseState: state })
-        : null;
+      // The history-data states need the seeded world for the same reason the prototype states
+      // do: their records name a real mining task and real recipes, and a substitute would
+      // resolve a different account's evidence under this state's name.
+      const fixtureContent =
+        Object.hasOwn(JOURNAL_PROTOTYPE_BINDINGS, state) || LAB_HISTORY_DATA_STATES.includes(state)
+          ? buildLabContent({ journalCaseState: state })
+          : null;
       const containers = buildLabRunStates({
         actor: ACTOR,
         userId: 'user-1',
