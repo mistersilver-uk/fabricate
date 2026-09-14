@@ -91,6 +91,8 @@ PR-scoped screenshots are collected under `tmp/pr-screenshots/<number>/` (local 
 Benign fixture-world `404 (Not Found)` asset misses populate `consoleErrors` and flip `passed` to false with zero failed steps; a known-benign console or `pageerror` line can be admitted per run via `--allowed-console-error-patterns` (appended to the in-source defaults, never replacing them), but a failing `steps[]` entry is never waivable and throws first.
 Distinguish that benign case (screenshots still valid, no regression) from a real failing step before flagging a defect or rejecting screenshot evidence.
 - If confidence is low, file a clarification or investigation issue instead of overstating the defect.
+- Run the bloat checklist in `.agents/skills/fabricate-reviewer/SKILL.md` over the diff and report defects at `low` unless a shape also hides a behaviour risk.
+A test-file header that argues its design instead of stating its contract, or a new `Source.includes(` pin where an AST read would do, is a maintainability finding in its own right.
 - If `gh` is unavailable, provide ready-to-file issue drafts.
 
 ## Severity guide
@@ -132,3 +134,4 @@ Otherwise provide:
 - local commit handoff for any owned workflow or documentation changes
 - high-severity findings first
 - reviewed areas that were not flagged
+- the one-line `concision:` field defined in `.agents/skills/fabricate-reviewer/SKILL.md`

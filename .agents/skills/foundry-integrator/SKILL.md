@@ -115,3 +115,4 @@ Then list:
 - `module.json` compatibility-metadata issues, if any.
 - recommended `.agents/docs/foundry-and-architecture.md` captures for durable Foundry knowledge.
 - open questions and risks where verification was incomplete.
+- the one-line `concision:` field defined in `.agents/skills/fabricate-reviewer/SKILL.md`, run over the diff you reviewed; a Foundry quirk earns the invariant comment that states it, not the history of how it was found.

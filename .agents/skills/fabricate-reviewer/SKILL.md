@@ -108,6 +108,8 @@ PR-scoped screenshots should not be committed as repository assets.
 - Foundry UI CSS avoids unscoped generic state classes such as `.disabled`, `.active`, and `.selected` where global styles could interfere.
 - Image UI tests or smoke screenshots prove linked-image priority, or the remaining screenshot gap is explicitly called out.
 - Smoke screenshot data uses Foundry VTT core or dnd5e non-SVG raster paths when previews need imagery; invented SVG preview art should be treated as a finding.
+- **Bloat is a finding, not a style note.** Return `NEEDS_CHANGES` for a comment that narrates history or argues a rejected alternative, for ALL-CAPS emphasis, for a header longer than its template, for a unit past the size gate, for a new `Source.includes(` pin, and for a helper redeclared beside a shared one.
+"Observed failure mode: bloat" in `AGENTS.md` names each shape with the ledger that measures it, and a diff that raises `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, or `tests/source-pin-ledger.txt` is going the wrong way even while its gate stays green.
 
 ## Foundry API checks
 
@@ -125,4 +127,5 @@ When reviewing Foundry-facing code, verify:
 
 - first line: status token only, or the non-verdict `ESCALATE_TIER: <reason>` when the assignment exceeds the assigned model tier
 - then severity-ordered findings with `file:line` references
+- one line `concision: pass` when the bloat checklist found nothing, or `concision: <shapes found>` naming them, so the driver can see it was checked
 - if no findings, say so explicitly and list residual risks or testing gaps

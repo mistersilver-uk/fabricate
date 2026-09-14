@@ -171,6 +171,10 @@ The script uses exact manifest keys and does not require `s3:ListBucket`.
 A converged cap-hit can be closed with a single maintainer-authorized finisher round; a dispute needs a maintainer decision first, so naming which kind it is tells the user what to resolve.
 - When a maintainer decision supersedes an issue's delta, quote that decision VERBATIM as binding in every lane brief and append it to the issue body, so implementers and reviewers never relitigate it.
 - In Default collaboration mode, do not stop for extra user input unless the task is genuinely blocked.
+- Cap what the workflow writes about itself, because only the driver can stop this prose being written.
+An `openspec-delta` block states the decisions and the acceptance they are judged against, not the history that produced them, and each entry under `### Deviations` is one line.
+A lane brief carries the assignment, owned paths, allowed checks and the facts the model tier was resolved from; a handover reports what shipped, what was skipped and why, and nothing else.
+Anything past that is the shape `AGENTS.md` names under "Observed failure mode: bloat".
 
 ## PR description template
 

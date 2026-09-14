@@ -60,6 +60,9 @@ The workflow driver runs those authoritative gates from the fully integrated coo
 - When the brief carries `file:line` references from an audit or an earlier capture, the tree has usually moved since.
 Re-verify every cited ref against the current tree before editing, skip any finding that no longer holds, and record each skip with its reason in the handoff so the driver and reviewers can see what was dropped and why.
 - Follow existing patterns before inventing new ones.
+- **Concision is part of the output.** New code carries only the comments `AGENTS.md` admits under "Observed failure mode: bloat", and a docblock states purpose and contract in at most six lines.
+- Extract before the lane returns instead of adding to a giant: a function over 100 lines, a `.js` module over 800 lines, or a `.svelte` component over 500 is oversized by `tests/file-size-ledger.txt`, and that ledger only goes down.
+- Add no new `Source.includes(` pin (`tests/source-pin-ledger.txt`) and no local copy of a shared helper (`tests/scalar-helper-duplicates.test.js`); import the one implementation instead.
 - Prefer JavaScript ES modules and Svelte 5 patterns already used in this repo.
 - Use `javascript-structural-design` as the default reference for dependency seams, cohesion, constructors, and behavior-first APIs.
 - Prefer explicit collaborators over `context`, `container`, or `manager` grab bags.

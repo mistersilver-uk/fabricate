@@ -80,6 +80,7 @@ Check:
 - empty states, loading states, and error states — each rendered through its shared primitive, not hand-rolled per screen
 - duplicate implementations of one meaning: a second component, a copied markup block, or a per-screen style override that re-derives a shipped primitive is a finding, and the fix is a prop or variant on the primitive rather than the copy
 - Svelte 5 rune usage and avoidable side effects
+- the bloat checklist in `.agents/skills/fabricate-reviewer/SKILL.md`, which for a component means its header against `.agents/component-header-template.md`, narrative or ALL-CAPS comments, and a `.svelte` file past 500 lines (`tests/file-size-ledger.txt`); a copied markup block is already covered by the one-implementation rule below
 - localization readiness for longer strings
 - screenshot artifacts for first visible state, clipping, spacing, alignment, image/content scale, scroll containment, and visible controls
 - rendered geometry in resizable Foundry windows, including CSS that overflows, compresses, or clips despite looking plausible in source
@@ -156,3 +157,4 @@ Then provide:
 - concrete design changes
 - local commit handoff for any owned spec, design, or workflow changes
 - backlog issues drafted for the workflow driver
+- the one-line `concision:` field defined in `.agents/skills/fabricate-reviewer/SKILL.md`
