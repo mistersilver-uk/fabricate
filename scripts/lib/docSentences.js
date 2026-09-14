@@ -64,6 +64,22 @@ export function sentencesOf(markdown) {
 }
 
 /**
+ * A sentence with every Markdown link TARGET removed, its text kept.
+ *
+ * A move can force a link to be retargeted — an in-file `(#anchor)` becomes `(path/to.md#anchor)`
+ * once the anchor's heading lives in another file — and that is a changed sentence, so the subset
+ * assertion reports it, correctly. This is what lets such a change be allowed NARROWLY: an entry
+ * in the retarget allowlist must reduce to the same string as the sentence it replaces, so the
+ * allowance covers the target and nothing else. A reworded rule cannot be smuggled through it.
+ *
+ * @param {string} sentence
+ * @returns {string}
+ */
+export function withoutLinkTargets(sentence) {
+  return String(sentence).replaceAll(/\]\([^)]*\)/gu, ']()');
+}
+
+/**
  * A multiset of sentences: sentence -> how many times it appears.
  *
  * A MULTISET AND NOT A SET, because a set hides the failure this exists to catch. If a rule

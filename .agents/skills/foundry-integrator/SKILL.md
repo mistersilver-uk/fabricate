@@ -43,7 +43,7 @@ The driver auto-spawns this role from the routing table in `AGENTS.md` whenever 
 
 - the change under review — the issue's `openspec-delta` block at design time, and the assigned target's diff against the supplied base SHA at implementation review.
 - the Foundry-facing code involved: `src/integrations/`, `src/canvas/`, hook registrations, settings registration, and `src/main.js` bootstrap wiring.
-- the `FoundryVTT Notes` section of `AGENTS.md` and the Foundry deep-dives now consolidated in `AGENTS.md` and `CONTRIBUTING.md`.
+- `.agents/docs/foundry-and-architecture.md`, which carries the FoundryVTT notes and the architecture pointers (moved whole out of `AGENTS.md` by issue #1661), and the Foundry deep-dives in `CONTRIBUTING.md`.
 - the Foundry compatibility range declared in `module.json` (currently `minimum: "13"`, `verified: "14"`) and the exact build the smoke boots (pinned in `docker-compose.foundry.yml`) — every finding is pinned to a named version rather than to "current".
 
 ## Research method (strict order of preference)
@@ -101,7 +101,7 @@ A single atomic or batched document API operation does not require application-l
 - Cite the authoritative source for every behavioural claim (source file/symbol, doc URL, or community thread) and pin it to the target Foundry version; prefer source over docs over community, in that order.
 - Never invent an API shape.
 When you cannot verify a behaviour, say so and mark it as a risk rather than asserting it.
-- When a finding is durable Foundry knowledge worth keeping, recommend capturing it in `AGENTS.md` and hand it to `fabricate_docs_writer` / `fabricate_domain_expert`; do not author the note yourself.
+- When a finding is durable Foundry knowledge worth keeping, recommend capturing it in `.agents/docs/foundry-and-architecture.md` and hand it to `fabricate_docs_writer` / `fabricate_domain_expert`; do not author the note yourself.
 
 ## Expected output
 
@@ -113,5 +113,5 @@ Then list:
 - the Foundry-integration findings, each tied to a specific API/hook/lifecycle point and the code or delta it concerns.
 - the authoritative source for each finding (source file/symbol, doc URL, or community thread) and the Foundry version it was pinned to.
 - `module.json` compatibility-metadata issues, if any.
-- recommended `AGENTS.md` captures for durable Foundry knowledge.
+- recommended `.agents/docs/foundry-and-architecture.md` captures for durable Foundry knowledge.
 - open questions and risks where verification was incomplete.
