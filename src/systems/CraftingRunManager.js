@@ -1,5 +1,6 @@
 import { cloneJson } from '../utils/scalars.js';
 
+import { stringOrNull } from './gatheringEngineInternals.js';
 import { RunContainerManagerBase } from './runContainerStore.js';
 import {
   observeExecutionJournal,
@@ -1093,9 +1094,4 @@ function findRunLocation(container, runId) {
   if (container.active?.[id]) return { run: container.active[id], terminal: false };
   const run = (container.history || []).find((entry) => entry?.id === id);
   return run ? { run, terminal: true } : null;
-}
-
-function stringOrNull(value) {
-  const normalized = String(value ?? '').trim();
-  return normalized || null;
 }
