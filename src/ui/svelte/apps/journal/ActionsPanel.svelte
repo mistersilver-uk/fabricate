@@ -45,6 +45,10 @@
   function reasonFor(code, ready) {
     const message = journalRunReasonMessage(code, localize);
     if (message) return message;
+    // A code we cannot word is still a REFUSAL, so it must not fall through to the time-gate
+    // hint: that told a player to wait for world time while the authority was the thing missing.
+    // The positional fallbacks below apply only when the builder gave no code at all.
+    if (code) return localize('FABRICATE.App.Journal.Actions.Unavailable');
     if (!ready) return localize('FABRICATE.App.Journal.Actions.WaitingHint');
     return localize('FABRICATE.App.Journal.Actions.Unavailable');
   }

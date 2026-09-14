@@ -57,11 +57,26 @@
   // (`CraftingEngine._routeVersionedCraft`, reached because `main.js` always sends
   // `lifecycleVersion: 1`), so an authority refusal blocks this recipe whatever its own browse
   // status says. It therefore drops the status chip — "Ready to craft" is a lie while the craft
-  // would be refused — and leads the blocking callout, which is where the recipe's own reasons
-  // already read. The already-localized sentence arrives as a prop: `journalRunReasonMessage` is
-  // the ONE reason vocabulary and this header is not a second one.
+  // would be refused. The already-localized sentence arrives as a prop:
+  // `journalRunReasonMessage` is the ONE reason vocabulary and this header is not a second one.
+  //
+  // IT DOES NOT LEAD. It used to, and a transient authority state then outranked the recipe's
+  // own blocker: a player saw a claim-held sentence as the headline with "You're missing some
+  // required materials" demoted to the sub-line. The recipe's blocker is the one the player can
+  // ACT on, so it is the title and the authority's note is the detail; with no blocking reason
+  // of its own the refusal is the only cause there is and becomes the title itself.
+  //
+  // The refusal also STATES ITS CONSEQUENCE. The craft button below stays enabled on a craftable
+  // recipe on purpose — availability is a cache, and a stale `false` disabling the only CTA
+  // would leave a player with no way back — so the callout has to say what the click will do
+  // instead of leaving an accent-filled button contradicting it.
   const refusal = $derived(String(authorityRefusal ?? '').trim());
-  const calloutReasons = $derived(refusal ? [refusal, ...blockingReasons] : blockingReasons);
+  const refusalLine = $derived(
+    refusal ? `${refusal} ${localize('FABRICATE.App.Crafting.Blocking.AuthorityRefused')}` : ''
+  );
+  const calloutReasons = $derived(
+    refusalLine ? [...blockingReasons, refusalLine] : blockingReasons
+  );
 </script>
 
 <header class="crafting-detail-header" data-recipe-header>

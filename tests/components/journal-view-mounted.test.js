@@ -541,6 +541,11 @@ describe('JournalView mounted behavior', () => {
       0,
       'no recorded roll, so nothing cuts the scale and no shared roll is shown'
     );
+    assert.equal(
+      target.querySelector('[data-yield-scale] .fab-yield-kicker').textContent,
+      `${HISTORY}ScalePerRow`,
+      'and the heading does not assert "where THE roll landed" over a record with no roll at all'
+    );
   });
 
   it('states a legacy row roll once and never paints a recorded row with the no-roll odds tone', async () => {
@@ -557,6 +562,12 @@ describe('JournalView mounted behavior', () => {
     assert.equal(run.gatheringYield.rollModel, 'perRow');
     assert.equal(run.gatheringYield.roll, null, 'the record has no root roll to share');
     const target = await mountHistory(run);
+    // #1648 A8: two INDEPENDENT rolls, so the scale heading may not re-assert in words the
+    // single shared cut the per-row ruling already removed from the pixels.
+    assert.equal(
+      target.querySelector('[data-yield-scale] .fab-yield-kicker').textContent,
+      `${HISTORY}ScalePerRow`
+    );
     const rows = [...target.querySelectorAll('[data-yield-entry]')];
     assert.deepEqual(
       rows.map((row) => row.getAttribute('data-yield-entry')),

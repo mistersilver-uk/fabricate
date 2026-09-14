@@ -20,6 +20,13 @@
   const single = $derived(account.stages[0]);
   const recovery = $derived(run?.recoveryEvidence?.required === true);
   const text = (key, data) => localize(`FABRICATE.App.Journal.History.${key}`, data);
+  // The scale heading may not assert ONE roll over a per-row record: `shared` evidence has a
+  // single cut to describe, while `perRow`/`unknown` records carry an independent roll per row.
+  const scaleHeadingKey = $derived(
+    run?.gatheringYield?.rollModel === 'shared' || run?.gatheringYield?.rollModel == null
+      ? 'Scale'
+      : 'ScalePerRow'
+  );
   const resultHeading = $derived(
     text(run?.runType === 'salvage' ? 'Recovered' : account.gathering ? 'BroughtBack' : 'Crafted')
   );
@@ -192,7 +199,7 @@
         entries={run.gatheringYield.entries}
         roll={run.gatheringYield.roll}
         rollModel={run.gatheringYield.rollModel ?? 'shared'}
-        label={text('Scale')}
+        label={text(scaleHeadingKey)}
         labels={{
           evidence: dropEvidence,
           quantity: (entry) =>
@@ -207,8 +214,17 @@
         }}
       />
       {#if account.unattributedResults.length}
-        <p data-history-unattributed>{text('UnattributedAwards')}</p>
-        {@render items(text('BroughtBack'), account.unattributedResults, 'produced')}
+        <!-- Whole-haul and subset need DIFFERENT copy and different headings: the gate is now
+             per-award, and a partial list under "Actual awards are listed once below" with the
+             whole haul's own heading reads as the total. -->
+        <p data-history-unattributed>
+          {text(account.unattributedWholeHaul ? 'UnattributedAwards' : 'UnattributedSome')}
+        </p>
+        {@render items(
+          text(account.unattributedWholeHaul ? 'BroughtBack' : 'UnattributedBroughtBack'),
+          account.unattributedResults,
+          'produced'
+        )}
       {/if}
     {:else if account.mode === 'd100'}
       <JournalFactRow label={text('Scale')} value={text('NotRecorded')} />

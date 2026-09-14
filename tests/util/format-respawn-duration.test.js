@@ -108,6 +108,15 @@ test('formatAuthoredDuration renders nothing for a non-requirement so callers ow
   assert.equal(formatAuthoredDuration(null), '');
 });
 
+// A POSITIVE requirement is never rendered as no requirement. Truncation used to floor a
+// sub-second authored duration to zero, which took the same `''` branch as "no wait at all" and
+// so told a player a stage needed nothing. Only zero and below mean nothing.
+test('formatAuthoredDuration floors a positive sub-second requirement up rather than away', () => {
+  assert.equal(formatAuthoredDuration(0.5), '1 second');
+  assert.equal(formatAuthoredDuration(0.01), '1 second');
+  assert.equal(formatAuthoredDuration(1.9), '1 second', 'and nothing else changed its truncation');
+});
+
 test('formatRelativeWorldTime labels today / yesterday / N days ago', () => {
   const now = 10 * DAY;
   assert.equal(formatRelativeWorldTime(now, now), 'Today');

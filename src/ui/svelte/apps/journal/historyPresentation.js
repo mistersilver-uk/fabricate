@@ -176,6 +176,15 @@ function unattributedScaleResults(run, results) {
     : results;
 }
 
+/**
+ * Whether the unattributed list is the WHOLE haul rather than a subset of it.
+ * The gate moved from all-or-nothing to a per-award subset, and the two need different copy:
+ * a partial list under whole-haul wording reads as the total.
+ */
+function unattributedIsWholeHaul(unattributed, results) {
+  return unattributed.length === results.length;
+}
+
 // Identity comes only from a recorded Actor Item address, never from current metadata.
 // A contradictory actor qualifier, virtual tool or ambiguous address stays an occurrence.
 function physicalToolKey(tool) {
@@ -244,6 +253,7 @@ export function presentHistory(run, localize) {
   const cancelled = run?.status === 'cancelled';
   const failed = run?.status === 'failed';
   const stage = stages[0];
+  const unattributed = unattributedScaleResults(run, results);
   return {
     stages,
     consumed: materials(run?.consumedIngredients, localize),
@@ -253,7 +263,8 @@ export function presentHistory(run, localize) {
     gathering,
     mode,
     usableScale: usableHistoricalScale(run),
-    unattributedResults: unattributedScaleResults(run, results),
+    unattributedResults: unattributed,
+    unattributedWholeHaul: unattributedIsWholeHaul(unattributed, results),
     settling: run?.recoveryEvidence?.status === 'planned',
     gatheringCheck: checkText(run?.gatheringYield?.check, localize),
     gatheringOutcome: run?.gatheringYield?.check?.outcome || localize(`${prefix}NotRecorded`),

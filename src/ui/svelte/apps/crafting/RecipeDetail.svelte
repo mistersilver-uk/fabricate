@@ -64,6 +64,13 @@
   const mode = $derived(String(recipe?.modeToken ?? 'simple'));
 
   // Craft-button gating (the button is a fixed footer below the scrolling body).
+  //
+  // Deliberately NOT gated on `authorityRefusal`. Availability is a CACHE the boot and journal
+  // hooks refresh, so a stale `false` would disable the only CTA this pane has and leave the
+  // player no way to clear it short of reloading Foundry — while an enabled button costs at
+  // worst one click answered by the same sentence the header is already showing, and "try again
+  // in a moment" is the documented remedy for every transient authority state. The header states
+  // the consequence in its callout instead (`RecipeDetailHeader.svelte`, `refusalLine`).
   const canCraft = $derived(craftability?.canCraft === true);
   const craftLabel = $derived(
     rollResult

@@ -522,6 +522,12 @@ const HISTORY_DATA_WITNESS = {
     assert.ok(guidanceOf(target).includes(historyLabel('ClosedSuccess')));
   },
   'history-data-shared-roll-control'(target) {
+    // The control for #1648 A8: genuinely SHARED evidence has one cut to describe, so it keeps
+    // the heading that names one roll. Only `perRow`/`unknown` take the wording that does not.
+    assert.equal(
+      target.querySelector('[data-yield-scale] .fab-yield-kicker').textContent,
+      historyLabel('Scale')
+    );
     const cut = target.querySelector('[data-yield-cut]');
     assert.ok(cut.textContent.includes(historyLabel('RolledValue', { roll: 40 })));
     assert.ok(cut.textContent.includes(historyLabel('Cut')));
@@ -586,11 +592,23 @@ const HISTORY_DATA_WITNESS = {
       assert.ok(rows[2].textContent.includes(historyLabel(key)), key);
     }
     const unattributed = target.querySelector('[data-history-unattributed]');
-    assert.ok(unattributed.textContent.includes(historyLabel('UnattributedAwards')));
+    // A SUBSET, not the haul (#1648 A6). The gate moved from all-or-nothing to a per-award
+    // subset and this record has one unmatched award among three rows, so the whole-haul
+    // sentence — "Actual awards are listed once below" — and the whole-haul heading both state
+    // the list is the total. Subset copy and a subset heading say what this list actually is.
+    assert.ok(unattributed.textContent.includes(historyLabel('UnattributedSome')));
+    assert.ok(
+      !unattributed.textContent.includes(historyLabel('UnattributedAwards')),
+      'the whole-haul sentence must not appear over a partial list'
+    );
     assert.equal(
       unattributed.nextElementSibling,
       section(target, 'produced'),
       'the unresolved awards are listed immediately under the note that explains them'
+    );
+    assert.ok(
+      section(target, 'produced').textContent.includes(historyLabel('UnattributedBroughtBack')),
+      'and under its own heading rather than the whole haul’s'
     );
     assert.deepEqual(namesOf(section(target, 'produced')), ['Cave Ruby']);
   },
@@ -872,6 +890,12 @@ describe('Journal versioned lifecycle (mounted)', () => {
       [true, 'ledger-missing', 'LedgerMissing'],
       [false, 'ledger-missing', 'LedgerMissing'],
       [true, 'ledger-ambiguous', 'LedgerAmbiguous'],
+      // The A1 code itself: minted at five `src/main.js` sites and one Svelte services bag,
+      // outside the drift guard's reach, and unmapped for as long as it existed.
+      [false, 'authority-unavailable', 'AuthorityUnavailable'],
+      // And an unwordable one, which must NOT fall through to the time-gate hint: that told a
+      // player to wait for world time while the authority was what was missing.
+      [false, 'a-reason-nobody-mapped', 'Unavailable'],
     ]) {
       let setupCalls = 0;
       const { target, store, commands } = await mountState('authority-unavailable', {
@@ -901,6 +925,36 @@ describe('Journal versioned lifecycle (mounted)', () => {
         `${reason} is worded rather than left blank for a ${who}`
       );
       assert.deepEqual(commands, [], 'and a blocked run executes nothing');
+      await harness.remount();
+    }
+  });
+
+  // The OTHER half of #1648 A1, and the half a ready gate cannot see. `RunJournalBuilder`
+  // passes an authority reason straight through as `actions.disabledReason`, and the panel used
+  // to fall through an unwordable one to its POSITIONAL fallbacks — so on a run still waiting on
+  // its world-time gate, an absent authority was reported as "wait for world time". The wait
+  // hint now applies only when the builder gave no code at all.
+  it('never words an unmappable refusal as the time-gate hint on a waiting run', async () => {
+    for (const [reason, key] of [
+      ['a-reason-nobody-mapped', 'Unavailable'],
+      ['authority-unavailable', 'AuthorityUnavailable'],
+    ]) {
+      const mounted = await mountState('waiting-auto-eligible', {
+        builderOptions: { authority: { available: false, reason } },
+      });
+      await settleAction();
+      assert.equal(
+        mounted.store.selectedRun.actions.disabledReason,
+        reason,
+        'the builder passes the authority reason through verbatim'
+      );
+      const primary = mounted.target.querySelector('[data-run-action="primary"]');
+      assert.equal(primary.title, english.FABRICATE.App.Journal.Actions[key]);
+      assert.notEqual(
+        primary.title,
+        english.FABRICATE.App.Journal.Actions.WaitingHint,
+        `${reason} is a refusal, not a reason to wait for world time`
+      );
       await harness.remount();
     }
   });

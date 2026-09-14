@@ -4993,9 +4993,13 @@ The authority ledger is provisioned automatically (`data-models/spec.md` _Author
 Every authority refusal MUST instead be reported as a readable localized reason drawn from one shared vocabulary, so a refusal never surfaces as `undefined`, as a raw reason code, or as silence.
 A refusal reports the result's own message when it has one, then its localized reason, then the caller's generic failure text.
 An unmapped reason MUST fall through to that generic rather than render its own slug.
+Every surface that can mint a refusal reason keeps that vocabulary as its single home, including the module edges that report an absent command service, so the drift guard that re-derives the vocabulary can see every code a player may read.
+An AVAILABILITY answer MUST fail CLOSED on a code it cannot word: `available: false` means the operation will be refused whatever the code says, so an unmappable reason renders the generic sentence and never restores an available presentation.
 
 Any surface that offers to start or change a versioned run MUST NOT present it as available while the authority is unavailable.
 In particular the player Crafting detail header MUST NOT read Ready to craft when the authority refuses; it shows the authority's reason in the recipe's own blocking callout and withholds the status chip.
+The recipe's OWN blocking reason leads that callout and the authority's follows it, because the recipe's is the cause the player can act on while a transient authority state usually is not.
+The authority's line MUST also state its consequence for the primary craft action, which stays enabled on an otherwise craftable recipe: availability is a cache, and a stale refusal that disabled the only call to action would leave the player no way to clear it.
 
 Recovery details MUST distinguish confirmed receipts, an uncertain applying effect and unstarted effects without treating planned amounts as received awards.
 They MUST explain that a retained claim can block other runs until the active GM manually records a disposition through `reconcileJournalRunAuthority({ claimId, disposition })`.

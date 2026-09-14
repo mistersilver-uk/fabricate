@@ -227,12 +227,16 @@ describe('CraftingView mounted behavior', () => {
   // versioned-run authority, so "Ready to craft" over a refused authority promised something
   // the Craft button could only refuse. The header now drops the chip and leads its blocking
   // callout with the refusal — worded by the SHARED `journalRunReasonMessage` vocabulary, not a
-  // second map — while an available authority, or a reason that vocabulary cannot word, leaves
-  // the ready state exactly as it was.
+  // second map — while an available authority leaves the ready state exactly as it was.
+  //
+  // AN UNMAPPED REASON BLOCKS TOO, and that is a reversal. It used to keep the chip, which for an
+  // AVAILABILITY answer is backwards and is exactly what hid `authority-unavailable` for as long
+  // as that code went unmapped: `available === false` means the craft WILL be refused whatever
+  // the code says, so an unwordable one falls back to the generic sentence rather than silence.
   for (const [name, availability, ready] of [
     ['an available authority', { available: true, reason: null }, true],
     ['a refusal it can word', { available: false, reason: 'active-gm-missing' }, false],
-    ['a reason nobody mapped', { available: false, reason: 'a-reason-nobody-mapped' }, true],
+    ['a reason nobody mapped', { available: false, reason: 'a-reason-nobody-mapped' }, false],
   ]) {
     it(`renders the ready chip ${ready ? 'with' : 'without'} it, given ${name}`, async () => {
       const store = fakeCraftingStore({ recipes: [recipe()] });

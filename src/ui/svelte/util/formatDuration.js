@@ -135,6 +135,8 @@ const AUTHORED_DURATION_UNITS = [
  * than as a countdown: `2 hours`, `1 hour 27 minutes 42 seconds`. Every non-zero
  * unit is rendered so a requirement is never rounded away. Returns `''` for
  * zero/negative/non-finite input so callers can render their own "no wait" copy.
+ * A positive sub-second requirement floors UP to `1 second`: truncating it to zero
+ * answered `''`, which reads as "no wait at all" for a stage that does have one.
  * Pure: the localized unit words arrive through the injected `localize`.
  *
  * @param {number} seconds Authored requirement in world-time seconds.
@@ -143,8 +145,9 @@ const AUTHORED_DURATION_UNITS = [
  * @returns {string} e.g. "2 hours", or '' when not renderable.
  */
 export function formatAuthoredDuration(seconds, { localize = null } = {}) {
-  const total = Math.trunc(Number(seconds));
-  if (!Number.isFinite(total) || total <= 0) return '';
+  const raw = Number(seconds);
+  if (!Number.isFinite(raw) || raw <= 0) return '';
+  const total = Math.max(1, Math.trunc(raw));
 
   let rest = total;
   const parts = [];
