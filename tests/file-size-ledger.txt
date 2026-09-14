@@ -15,7 +15,7 @@ src/migration/mergeEquivalentWorldEssences.js::mergeEquivalentWorldEssences	163
 src/migration/migrateRecipeForModeChange.js::migrateRecipeForModeChange	107
 src/migration/migrateUnifyGatheringRegions.js::migrateUnifyGatheringRegions	126
 src/migration/migrateWorldScopeEntities.js::migrateWorldScopeEntities	286
-src/migration/remapWorldScopeIdentityFlags.js	983
+src/migration/remapWorldScopeIdentityFlags.js	980
 src/models/IngredientSet.js	1905
 src/models/Recipe.js	1039
 src/models/Recipe.js::_validate	126
@@ -67,12 +67,12 @@ src/systems/GatheringEngine.js::startAttempt	289
 src/systems/GatheringListingBuilder.js	1074
 src/systems/GatheringListingBuilder.js::_buildEnvironmentListing	225
 src/systems/GatheringListingBuilder.js::listForActor	108
-src/systems/GatheringRichStateService.js	3060
+src/systems/GatheringRichStateService.js	3037
 src/systems/GatheringRichStateService.js::_resolveCharacterModifierContribution	129
 src/systems/GatheringRichStateService.js::composeEnvironment	119
 src/systems/GatheringRichStateService.js::previewDropBreakdown	125
 src/systems/GatheringRichStateService.js::resolveD100Attempt	105
-src/systems/GatheringRunManager.js	958
+src/systems/GatheringRunManager.js	956
 src/systems/InventoryListingBuilder.js	2480
 src/systems/InventoryListingBuilder.js::_buildRecipeItemRows	195
 src/systems/InventoryListingBuilder.js::_buildSalvage	133
@@ -112,7 +112,7 @@ src/systems/journalRunAuthority.js::createJournalRunAuthority>run>queue	105
 src/systems/journalRunCommands.js	947
 src/systems/journalRunCommands.js::createJournalRunCommandService	396
 src/systems/journalRunCommands.js::createJournalRunCommandService>executeOperation	179
-src/systems/scopedDefinitionStore.js	891
+src/systems/scopedDefinitionStore.js	888
 src/systems/systemValidation.js::collectSystemBlockers	180
 src/toolBreakageRuntime.js::createToolBreakageRuntime	207
 src/ui/InteractableConfigApp.svelte.js::_buildServices	383
