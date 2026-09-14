@@ -163,9 +163,9 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
   const objectResolving = resolved.filter(([, value]) => value !== undefined && typeof value !== 'string');
   assert.equal(
     objectResolving.length,
-    47,
-    'expected 47 legitimate namespace bases to resolve to an object — ' +
-      '#1648 uses Journal Actions, Mode, Verdict, History, StepDetails and Yields.AwardModes (the parity correction replaces Stage.State), whose ' +
+    46,
+    'expected 46 legitimate namespace bases to resolve to an object — ' +
+      '#1648 uses Journal Mode, Verdict, History, StepDetails and Yields.AwardModes (the parity correction replaces Stage.State), whose ' +
       'leaf suffixes are selected from run state. ' +
       'update this count only if the number of such bases genuinely changes. It fell from 44 ' +
       'when issue 1282 deleted `GatheringTravelTabs.svelte`, whose template literal was the ' +
@@ -194,7 +194,7 @@ test('assertion A: every FABRICATE key literal in src resolves to something in e
       'renders ONE panel block for three vocabularies, so the middle segment is data and the ' +
       'base is the literal. Two more are the Preview and Tabs ' +
       'bases in `src/ui/svelte/apps/manager/downtime/`; each composes one of the four fixed ' +
-      'Downtime tab suffixes from provider data, so the complete leaf key is only known at render time. One more is `KEY` in `src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte` (issue 1371 r16-list), the `Component.BulkEdit` base the rebuilt system bulk panel composes its forty-odd inset, foot and remove-leg strings under — the same pure-string-table shape, kept as a base so the panel is not forty full literals long. And it fell from 42 to 41 at issue 1517, for the same STRENGTHENING reason issue 1362 did: the environment Validation tab composed its severity word from a `Severity.${severity}` suffix, which made `FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity` a base this assertion could only check for existing. The tab was converted onto `EditorValidationSurface`, whose row vocabulary has no severity word to compose, and the two chips in the summary inspector — the last complete literals under that base — now read the shared `Admin.Manager.Validation` count words, because they report the same two numbers the tab and the tab badge do. The base and its two keys are gone from `en.json` entirely, so nothing under it is composed or resolved any more.'
+      'Downtime tab suffixes from provider data, so the complete leaf key is only known at render time. One more is `KEY` in `src/ui/svelte/apps/manager/components/ComponentBulkEditPanel.svelte` (issue 1371 r16-list), the `Component.BulkEdit` base the rebuilt system bulk panel composes its forty-odd inset, foot and remove-leg strings under — the same pure-string-table shape, kept as a base so the panel is not forty full literals long. And it fell from 42 to 41 at issue 1517, for the same STRENGTHENING reason issue 1362 did: the environment Validation tab composed its severity word from a `Severity.${severity}` suffix, which made `FABRICATE.Admin.Manager.EnvironmentEditor.Validation.Severity` a base this assertion could only check for existing. The tab was converted onto `EditorValidationSurface`, whose row vocabulary has no severity word to compose, and the two chips in the summary inspector — the last complete literals under that base — now read the shared `Admin.Manager.Validation` count words, because they report the same two numbers the tab and the tab badge do. The base and its two keys are gone from `en.json` entirely, so nothing under it is composed or resolved any more. And it fell from 47 to 46 at issue 1648, for that same STRENGTHENING reason: `ActionsPanel.svelte` composed its disabled-reason sentence from a `FABRICATE.App.Journal.Actions.${key}` suffix, which made `FABRICATE.App.Journal.Actions` a base this assertion could only check for existing. That vocabulary moved into `src/ui/svelte/util/journalRunReasons.js`, which the stores share, and every entry there is a COMPLETE literal this assertion checks — which is also how the six dead `Actions` leaves the base was masking (TriggerNextStep, FinishCrafting, TriggerHint, FinishHint, AutoResolve and the bare CancelConfirm) surfaced and were deleted.'
   );
 });
 

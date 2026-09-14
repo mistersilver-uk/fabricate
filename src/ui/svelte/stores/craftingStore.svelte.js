@@ -42,13 +42,15 @@
  *   `evaluateSelectedSet({ recipeId, setId, optionOverrides, actorId, componentSourceActorIds })`
  *   (fresh per-set craftability for an in-session option override — issue 552),
  *   `notify(message)`, `craftErrorMessage()` (localized generic craft-failure
- *   text for a thrown craft), `getRecipeManager()`, `getCraftingSourceActors()`,
+ *   text), `localize(key)` (used to word an authority refusal that carries a
+ *   `reason` and no `message`), `getRecipeManager()`, `getCraftingSourceActors()`,
  *   `getSelectedCraftingActorId()`, `getCraftingComponentSourceIds()`, and the
  *   optional sibling `craftingSources` store.
  * @returns {object} The reactive crafting store.
  */
 
 import { aggregateShoppingList } from '../util/shoppingListAggregator.js';
+import { journalRefusalMessage } from '../util/journalRunReasons.js';
 import {
   CLOSED_SLOT_ID,
   buildRequirementSlots,
@@ -870,8 +872,12 @@ export function createCraftingStore({ services } = {}) {
       if (result && result.cancelled === true) {
         return result;
       }
+      // A versioned-run authority refusal carries `reason` and NO `message`, so
+      // notifying `result.message` alone showed the literal text "undefined".
       if (result && result.success === false) {
-        services?.notify?.(result.message);
+        services?.notify?.(
+          journalRefusalMessage(result, services?.localize, services?.craftErrorMessage?.())
+        );
         return result;
       }
       lastRollResult = { ...lastRollResult, [recipeId]: result ?? null };

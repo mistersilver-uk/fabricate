@@ -26,6 +26,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/formatDuration.js',
     'src/ui/svelte/util/worldTimeLabel.js',
+    // Issue 1648: the shared authority-refusal wording the Journal panels and stores read.
+    'src/ui/svelte/util/journalRunReasons.js',
     'src/systems/foundryCalendar.js',
     'src/ui/svelte/apps/journal/journalRunStatus.js',
     'src/ui/svelte/apps/journal/historyPresentation.js',

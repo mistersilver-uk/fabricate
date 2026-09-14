@@ -1,10 +1,22 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { createSvelteModuleCompiler } from '../helpers/compile-svelte-module.js';
 import { progressiveStageThresholds } from '../../src/utils/progressiveStageThresholds.js';
 import { resolveProgressiveAward } from '../../src/utils/progressiveAward.js';
+
+const EN = JSON.parse(
+  readFileSync(resolve(import.meta.dirname, '../../lang/en.json'), 'utf8')
+);
+
+/** Resolve a dotted `lang/en.json` path to its string leaf, or undefined. */
+function langLeaf(key) {
+  const leaf = key.split('.').reduce((node, segment) => node?.[segment], EN);
+  return typeof leaf === 'string' ? leaf : undefined;
+}
 
 function makeServices(overrides = {}) {
   const calls = {
@@ -45,6 +57,9 @@ function makeServices(overrides = {}) {
       }),
     notify: (message) => calls.notify.push(message),
     craftErrorMessage: () => 'Crafting failed.',
+    // The REAL shipped strings, not a stub: a fake that echoed its key would let a
+    // missing or shadowed `lang/en.json` leaf pass as a localized sentence.
+    localize: (key) => langLeaf(key) ?? key,
     evaluateSelectedSet:
       overrides.evaluateSelectedSet ??
       ((opts) => {
@@ -114,6 +129,9 @@ async function setupCraftingStoreCompiler(prefix) {
   compiler.copyPlain('src/utils/progressiveStageThresholds.js');
   // The requirement rail's slot projection (issue 917) — same rule again.
   compiler.copyPlain('src/ui/svelte/util/requirementSlots.js');
+  // The authority-refusal wording the store falls back to when a result carries a
+  // `reason` and no `message` (issue 1648) — same rule again.
+  compiler.copyPlain('src/ui/svelte/util/journalRunReasons.js');
   const { createCraftingStore } = await compiler.load('src/ui/svelte/stores/craftingStore.svelte.js');
   return { compiler, createCraftingStore };
 }
@@ -544,6 +562,57 @@ describe('craftingStore', () => {
     assert.equal(result.success, false);
     assert.deepEqual(calls.notify, ['Missing materials']);
     assert.equal(calls.listCraftingForActor.length, 0, 'failed craft does not refetch');
+  });
+
+  // ── Issue 1648: the versioned-run authority refuses with `{success:false, reason}`
+  // and NO `message`, so `notify(result.message)` displayed the literal "undefined".
+  it('words a reason-only authority refusal instead of notifying undefined', async () => {
+    const craftRecipe = async () => ({ success: false, reason: 'ledger-missing' });
+    const { services, calls } = makeServices({ craftRecipe });
+    const store = createCraftingStore({ services });
+
+    const result = await store.craft({ id: 'r1' });
+    flushSync();
+
+    assert.equal(result.success, false);
+    assert.equal(calls.notify.length, 1, 'a refused craft raises exactly one notification');
+    assert.equal(calls.notify[0], langLeaf('FABRICATE.App.Journal.Actions.LedgerMissing'));
+    assert.equal(calls.listCraftingForActor.length, 0, 'a refused craft does not refetch');
+  });
+
+  it('falls back to the generic craft error when a failure carries neither message nor reason', async () => {
+    const craftRecipe = async () => ({ success: false });
+    const { services, calls } = makeServices({ craftRecipe });
+    const store = createCraftingStore({ services });
+
+    await store.craft({ id: 'r1' });
+    flushSync();
+
+    assert.deepEqual(calls.notify, ['Crafting failed.']);
+  });
+
+  it('never passes a non-string to notify, whatever shape the failure has', async () => {
+    const shapes = [
+      { success: false },
+      { success: false, message: undefined },
+      { success: false, message: null },
+      { success: false, message: 42 },
+      { success: false, message: '   ' },
+      { success: false, reason: 'command-timeout' },
+      { success: false, reason: 'a-reason-nobody-mapped' },
+      { success: false, reason: 7, message: {} },
+    ];
+    for (const shape of shapes) {
+      const { services, calls } = makeServices({ craftRecipe: async () => shape });
+      const store = createCraftingStore({ services });
+      await store.craft({ id: 'r1' });
+      flushSync();
+      const label = JSON.stringify(shape);
+      assert.equal(calls.notify.length, 1, `one notification for ${label}`);
+      assert.equal(typeof calls.notify[0], 'string', `a string for ${label}`);
+      assert.notEqual(calls.notify[0], 'undefined', `never the text "undefined" for ${label}`);
+      assert.notEqual(calls.notify[0].trim(), '', `never blank for ${label}`);
+    }
   });
 
   it('surfaces a thrown craftRecipe as a notification and clears craftInFlight', async () => {

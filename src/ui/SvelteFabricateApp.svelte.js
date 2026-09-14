@@ -381,6 +381,9 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       // Localized generic craft-failure message for a thrown craft (the engine can
       // throw on the currency-payment macro path, producing no result message).
       craftErrorMessage: () => localize('FABRICATE.App.Crafting.Notify.CraftFailed'),
+      // The stores stay Foundry-free, so the i18n lookup an authority refusal needs
+      // (`{success:false, reason}` carries no `message`) arrives as a seam too.
+      localize: (key, data) => localize(key, data),
       listSelectableActors: () => game?.fabricate?.listSelectableActors?.() ?? [],
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
       setSelectedActorId: (id) => game?.fabricate?.setSelectedGatheringActorId?.(id),

@@ -31,6 +31,21 @@ function writeCompiledModule(sourcePath) {
   writeFileSync(destination, rewriteClientImports(compiled.js.code));
 }
 
+/** Copy a plain `.js` leaf the compiled store imports into the temp tree. */
+function writePlainModule(sourcePath) {
+  const destination = join(tempRoot, sourcePath);
+  mkdirSync(dirname(destination), { recursive: true });
+  writeFileSync(destination, readFileSync(resolve(repoRoot, sourcePath), 'utf8'));
+}
+
+const EN = JSON.parse(readFileSync(resolve(repoRoot, 'lang/en.json'), 'utf8'));
+
+/** Resolve a dotted `lang/en.json` path to its string leaf, or undefined. */
+function langLeaf(key) {
+  const leaf = key.split('.').reduce((node, segment) => node?.[segment], EN);
+  return typeof leaf === 'string' ? leaf : undefined;
+}
+
 function run(overrides = {}) {
   const runType = overrides.runType ?? 'crafting';
   const id = overrides.id ?? 'run-1';
@@ -117,7 +132,9 @@ function makeServices(overrides = {}) {
       return overrides.dismissResult ?? { success: true, message: 'Dismissed' };
     },
     notify: (message) => calls.notify.push(message),
-    craftErrorMessage: () => 'Crafting failed.'
+    craftErrorMessage: () => 'Crafting failed.',
+    // The REAL shipped strings: an echoing stub would hide a missing lang leaf.
+    localize: (key) => langLeaf(key) ?? key
   };
   return { services, calls, state };
 }
@@ -133,6 +150,9 @@ describe('journalStore', () => {
   before(async () => {
     tempRoot = mkdtempSync(join(tmpdir(), 'fabricate-journal-'));
     symlinkSync(resolve(repoRoot, 'node_modules'), join(tempRoot, 'node_modules'), 'junction');
+    // Issue 1648: the authority-refusal wording. A leaf the store imports but the
+    // temp tree lacks throws in `before` and CANCELS every subtest here.
+    writePlainModule('src/ui/svelte/util/journalRunReasons.js');
     writeCompiledModule('src/ui/svelte/stores/journalStore.svelte.js');
     createJournalStore = (await import(pathToFileURL(join(
       tempRoot,
@@ -628,6 +648,53 @@ describe('journalStore', () => {
     flushSync();
     assert.equal(store.commandError, null);
     assert.equal(setup.calls.command.length, 2);
+  });
+
+  // Issue 1648: a versioned-run authority refusal is `{success:false, reason}` with no
+  // `message`, so `safeCommandMessage` produced '' — an EMPTY command-error notice and
+  // no toast at all.
+  it('words a reason-only command refusal in both the notice and the toast', async () => {
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+    const setup = makeServices({
+      listing: baseListing({ activeRuns: [current], history: [] }),
+      commandResult: { success: false, reason: 'ledger-missing' },
+    });
+    const store = await loadedStore(setup);
+    store.select(current);
+
+    await store.pause(current);
+    flushSync();
+
+    const expected = langLeaf('FABRICATE.App.Journal.Actions.LedgerMissing');
+    assert.equal(store.commandError.message, expected, 'the retry notice is never blank');
+    assert.deepEqual(setup.calls.notify, [expected], 'a refused command is never silent');
+  });
+
+  it('falls back to the generic error, and never notifies undefined, for any failure shape', async () => {
+    const shapes = [
+      { success: false },
+      { success: false, message: undefined },
+      { success: false, message: '   ' },
+      { success: false, message: 42 },
+      { success: false, reason: 'command-timeout' },
+      { success: false, reason: 'a-reason-nobody-mapped' },
+    ];
+    for (const commandResult of shapes) {
+      const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+      const setup = makeServices({
+        listing: baseListing({ activeRuns: [current], history: [] }),
+        commandResult,
+      });
+      const store = await loadedStore(setup);
+      await store.pause(current);
+      flushSync();
+      const label = JSON.stringify(commandResult);
+      assert.equal(setup.calls.notify.length, 1, `one notification for ${label}`);
+      assert.equal(typeof setup.calls.notify[0], 'string', `a string for ${label}`);
+      assert.notEqual(setup.calls.notify[0], 'undefined', `never "undefined" for ${label}`);
+      assert.notEqual(setup.calls.notify[0].trim(), '', `never blank for ${label}`);
+      assert.equal(store.commandError.message, setup.calls.notify[0], `notice matches for ${label}`);
+    }
   });
 
   it('treats a cancelled versioned command as a silent retryable-state clear', async () => {

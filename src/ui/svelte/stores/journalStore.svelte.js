@@ -1,3 +1,5 @@
+import { journalRefusalMessage } from '../util/journalRunReasons.js';
+
 const PAGE_SIZES = Object.freeze([4, 6, 12, 25]);
 const RECENT_TERMINAL_LIMIT = 3;
 const KIND_FILTERS = new Set(['all', 'crafting', 'alchemy', 'gathering', 'salvage']);
@@ -315,7 +317,12 @@ export function createJournalStore({ services } = {}) {
         payload: payload ?? {},
       });
       if (result?.cancelled === true) return;
-      const message = safeCommandMessage(result?.message);
+      // A refusal from the versioned-run authority carries `reason` and no
+      // `message`, which recorded an EMPTY command error and toasted nothing.
+      const message =
+        result?.success === false
+          ? journalRefusalMessage(result, services?.localize, services?.craftErrorMessage?.())
+          : safeCommandMessage(result?.message);
       if (result?.success === false) setCommandError(request, message);
       if (message) services?.notify?.(message);
       await load(true);

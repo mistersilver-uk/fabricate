@@ -28,6 +28,7 @@
  */
 
 import { canonicalSignatureKey } from '../../../utils/alchemySignatureKey.js';
+import { journalRefusalMessage } from '../util/journalRunReasons.js';
 
 export function createAlchemyStore({ services } = {}) {
   let listing = $state(null);
@@ -516,7 +517,11 @@ export function createAlchemyStore({ services } = {}) {
       //  brewing           — a time-gated brew was STARTED: the signature matched, the
       //                      inputs are consumed and the run is live in the Journal
       //                      awaiting world time. Not a failure (issue 966);
-      //  no-match-fizzle   — no reaction (or a Tiered fail / misconfiguration).
+      //  no-match-fizzle   — no reaction (or a Tiered fail / misconfiguration);
+      //  refused           — the versioned-run authority REFUSED the brew before any
+      //                      reaction was attempted (`{success:false, reason}`, no
+      //                      `message`). Nothing was consumed, so it must not read as
+      //                      a fizzle, and its reason must be both banner and toast.
       if (result && result.success === true) {
         const tiered =
           discovered?.checkMode === 'tiered' ||
@@ -540,9 +545,18 @@ export function createAlchemyStore({ services } = {}) {
         lastBrew = { status: 'brewing', discovered: discoveredName, message: '' };
       } else if (result && result.disposition === 'no-match') {
         lastBrew = { status: 'no-match-fizzle', discovered: null, message: result.message ?? '' };
+      } else if (typeof result?.reason === 'string' && result.reason.trim() !== '') {
+        const refusal = journalRefusalMessage(
+          result,
+          services?.localize,
+          services?.craftErrorMessage?.()
+        );
+        lastBrew = { status: 'refused', discovered: null, message: refusal };
+        if (refusal) services?.notify?.(refusal);
       } else {
-        lastBrew = { status: 'no-match-fizzle', discovered: null, message: result?.message ?? '' };
-        if (result?.message) services?.notify?.(result.message);
+        const message = journalRefusalMessage(result, services?.localize, '');
+        lastBrew = { status: 'no-match-fizzle', discovered: null, message };
+        if (message) services?.notify?.(message);
       }
       return result ?? null;
     } catch (err) {

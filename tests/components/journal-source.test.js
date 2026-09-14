@@ -23,6 +23,7 @@ const detailSource = read('../../src/ui/svelte/apps/journal/RunDetail.svelte');
 const statusSource = read('../../src/ui/svelte/apps/journal/journalRunStatus.js');
 const actionsSource = read('../../src/ui/svelte/apps/journal/ActionsPanel.svelte');
 const stepSource = read('../../src/ui/svelte/apps/journal/StepDetails.svelte');
+const reasonsSource = read('../../src/ui/svelte/util/journalRunReasons.js');
 const builderSource = read('../../src/systems/RunJournalBuilder.js');
 const historySource = read('../../src/ui/svelte/apps/journal/HistoricalRunDetail.svelte');
 const cssSource = read('../../styles/fabricate.css');
@@ -159,10 +160,15 @@ describe('Journal label mirrors resolve in lang/en.json (drift guard)', () => {
   it('resolves literal UI copy and every dynamic authority and progressive-mode label', () => {
     const sources = [viewSource, detailSource, actionsSource, stepSource];
     const literals = sources.flatMap((source) => [...source.matchAll(/'(FABRICATE\.App\.Journal\.[A-Za-z.]+)'/g)].map((match) => match[1]));
-    const reasonMap = actionsSource.slice(actionsSource.indexOf('const key = {'), actionsSource.indexOf('}[code]'));
-    const reasons = [...reasonMap.matchAll(/:\s*'([A-Za-z]+)'/g)].map((match) => `FABRICATE.App.Journal.Actions.${match[1]}`);
+    // Issue 1648 moved the authority vocabulary out of ActionsPanel into the UI-free
+    // `journalRunReasons.js` the player stores share, where every entry is a COMPLETE key.
+    const reasonMap = reasonsSource.slice(
+      reasonsSource.indexOf('JOURNAL_RUN_REASON_KEYS = Object.freeze({'),
+      reasonsSource.indexOf('});')
+    );
+    const reasons = [...reasonMap.matchAll(/:\s*'(FABRICATE\.[A-Za-z.]+)'/g)].map((match) => match[1]);
     const modes = ['equal', 'exceed', 'partial'].map((mode) => `FABRICATE.App.Journal.Yields.AwardModes.${mode}`);
-    assert.ok(reasons.length >= 10, 'authority label map was extracted');
+    assert.ok(reasons.length >= 40, 'authority label map was extracted');
     for (const key of new Set([...literals, ...reasons, ...modes])) {
       assert.equal(typeof resolveLangKey(key), 'string', `${key} resolves without an English fallback`);
     }

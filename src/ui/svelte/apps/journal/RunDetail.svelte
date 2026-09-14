@@ -4,6 +4,7 @@
   import { formatAuthoredDuration, formatDurationHMS } from '../../util/formatDuration.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import { worldTimeLabel } from '../../util/worldTimeLabel.js';
+  import { journalRunReasonMessage } from '../../util/journalRunReasons.js';
   import Callout from '../manager/Callout.svelte';
   import Chip from '../../components/Chip.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
@@ -139,19 +140,12 @@
   const authoritySetupError = $derived(
     journal?.authoritySetupError?.runKey === runIdentity ? journal.authoritySetupError : null
   );
-  const authoritySetupErrorKey = $derived.by(() => {
-    const key = {
-      'active-gm-required': 'FABRICATE.App.Journal.Actions.ActiveGmRequired',
-      'ledger-already-exists': 'FABRICATE.App.Journal.AuthoritySetup.AlreadyExists',
-      'ledger-ambiguous': 'FABRICATE.App.Journal.Actions.LedgerAmbiguous',
-      'claim-held': 'FABRICATE.App.Journal.Actions.ClaimHeld',
-      'claim-release-failed': 'FABRICATE.App.Journal.Actions.ClaimReleaseFailed',
-      'secure-random-unavailable': 'FABRICATE.App.Journal.Actions.SecureRandomUnavailable',
-      'reconstruction-failed': 'FABRICATE.App.Journal.AuthoritySetup.RecoveryFailed',
-      'reconstruction-unavailable': 'FABRICATE.App.Journal.AuthoritySetup.RecoveryFailed',
-    }[authoritySetupError?.reason];
-    return key ?? 'FABRICATE.App.Journal.AuthoritySetup.Failed';
-  });
+  // Setup reports its own store-local codes (`setup-failed`) alongside authority
+  // reasons, so an unmapped code keeps the setup-specific generic.
+  const authoritySetupErrorText = $derived(
+    journalRunReasonMessage(authoritySetupError?.reason, localize) ||
+      localize('FABRICATE.App.Journal.AuthoritySetup.Failed')
+  );
   function effectPhaseText(phase) {
     const key = {
       applied: 'FABRICATE.App.Journal.Notice.EffectPhase.applied',
@@ -493,7 +487,7 @@
   {#if authoritySetupError}
     <Notice
       tone="danger"
-      title={localize(authoritySetupErrorKey)}
+      title={authoritySetupErrorText}
       dataAttr="data-journal-authority-setup-error"
       dataValue={authoritySetupError.reason}
     />

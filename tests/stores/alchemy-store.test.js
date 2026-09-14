@@ -1,5 +1,7 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 
 import { CraftingEngine } from '../../src/systems/CraftingEngine.js';
@@ -65,6 +67,16 @@ function baseListing(overrides = {}) {
   };
 }
 
+const EN = JSON.parse(
+  readFileSync(resolve(import.meta.dirname, '../../lang/en.json'), 'utf8')
+);
+
+/** Resolve a dotted `lang/en.json` path to its string leaf, or undefined. */
+function langLeaf(key) {
+  const leaf = key.split('.').reduce((node, segment) => node?.[segment], EN);
+  return typeof leaf === 'string' ? leaf : undefined;
+}
+
 function makeServices(overrides = {}) {
   const calls = { list: [], submit: [], notify: [], setSystem: [] };
   let listing = overrides.listing ?? baseListing();
@@ -82,6 +94,8 @@ function makeServices(overrides = {}) {
       }),
     notify: (message) => calls.notify.push(message),
     craftErrorMessage: () => 'failed',
+    // The REAL shipped strings: an echoing stub would hide a missing lang leaf.
+    localize: (key) => langLeaf(key) ?? key,
     getSelectedCraftingActorId: () => overrides.actorId ?? 'pc',
     getCraftingComponentSourceIds: () => overrides.sourceIds ?? [],
     getSelectedAlchemySystemId: () => alchemySystem,
@@ -113,6 +127,9 @@ describe('alchemyStore', () => {
   before(async () => {
     compiler = createSvelteModuleCompiler('fabricate-alchemy-store-');
     compiler.copyPlain('src/utils/alchemySignatureKey.js');
+    // Issue 1648: the authority-refusal wording the brew path now falls back to. A
+    // dependency the store imports but the compiler does not copy CANCELS this suite.
+    compiler.copyPlain('src/ui/svelte/util/journalRunReasons.js');
     ({ createAlchemyStore } = await compiler.load('src/ui/svelte/stores/alchemyStore.svelte.js'));
   });
 
@@ -456,6 +473,51 @@ describe('alchemyStore', () => {
     );
     assert.deepEqual(harness.calls.notify ?? [], [], 'a started brew is not an error to toast');
     assert.equal(store.benchEmpty, true);
+  });
+
+  // Issue 1648: the versioned-run authority refuses a brew with `{success:false, reason}`
+  // and no `message`, so the store toasted NOTHING and bannered `no-match-fizzle` —
+  // telling the player their reaction failed when nothing was ever attempted.
+  it('banners and toasts an authority refusal instead of reporting a fizzle', async () => {
+    const harness = makeServices({
+      submitAlchemyAttempt: async () => ({ success: false, reason: 'ledger-missing' }),
+    });
+    const store = createAlchemyStore({ services: harness.services });
+    await store.load();
+    flushSync();
+    store.add('ashsalt');
+    flushSync();
+    await store.brew();
+    flushSync();
+
+    const expected = langLeaf('FABRICATE.App.Journal.Actions.LedgerMissing');
+    assert.equal(store.lastBrew.status, 'refused', 'a refusal is not a no-reaction fizzle');
+    assert.equal(store.lastBrew.message, expected, 'the banner carries the worded reason');
+    assert.deepEqual(harness.calls.notify, [expected], 'a refused brew is never silent');
+  });
+
+  it('never passes a non-string to notify on a refused or failed brew', async () => {
+    const shapes = [
+      { success: false, reason: 'command-timeout' },
+      { success: false, reason: 'a-reason-nobody-mapped' },
+      { success: false, reason: 'ledger-missing', message: 42 },
+      { success: false, message: 'Plain engine failure' },
+    ];
+    for (const shape of shapes) {
+      const harness = makeServices({ submitAlchemyAttempt: async () => shape });
+      const store = createAlchemyStore({ services: harness.services });
+      await store.load();
+      flushSync();
+      store.add('ashsalt');
+      flushSync();
+      await store.brew();
+      flushSync();
+      const label = JSON.stringify(shape);
+      assert.equal(harness.calls.notify.length, 1, `one notification for ${label}`);
+      assert.equal(typeof harness.calls.notify[0], 'string', `a string for ${label}`);
+      assert.notEqual(harness.calls.notify[0], 'undefined', `never "undefined" for ${label}`);
+      assert.equal(typeof store.lastBrew.message, 'string', `a string banner for ${label}`);
+    }
   });
 
   it('removeAll deletes every placed unit of a component (removes the key)', async () => {

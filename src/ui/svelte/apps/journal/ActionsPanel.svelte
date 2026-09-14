@@ -1,6 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
+  import { journalRunReasonMessage } from '../../util/journalRunReasons.js';
   import RunActionBar from '../../components/RunActionBar.svelte';
   import Notice from '../../components/Notice.svelte';
   import { formatDurationHMS } from '../../util/formatDuration.js';
@@ -38,24 +39,12 @@
     )
   );
 
+  // The code vocabulary itself lives in `journalRunReasons.js` so the stores that
+  // report an authority refusal share it; only the panel's two positional
+  // fallbacks (waiting on the time gate, then the generic) stay here.
   function reasonFor(code, ready) {
-    const key = {
-      authorityUnavailable: 'AuthorityUnavailable',
-      'active-gm-missing': 'AuthorityUnavailable',
-      'active-gm-required': 'ActiveGmRequired',
-      'ledger-missing': 'LedgerMissing',
-      'ledger-ambiguous': 'LedgerAmbiguous',
-      recoveryRequired: 'RecoveryRequired',
-      'recovery-required': 'RecoveryRequired',
-      'claim-held': 'ClaimHeld',
-      'claim-release-failed': 'ClaimReleaseFailed',
-      'secure-random-unavailable': 'SecureRandomUnavailable',
-      executionInProgress: 'ExecutionInProgress',
-      unsupportedLifecycle: 'UnsupportedLifecycle',
-      selectionRequired: 'SelectionRequired',
-    }[code];
-    if (key) return localize(`FABRICATE.App.Journal.Actions.${key}`);
-    if (code === 'notOwner') return localize('FABRICATE.App.Journal.Actions.NeedsOwner');
+    const message = journalRunReasonMessage(code, localize);
+    if (message) return message;
     if (!ready) return localize('FABRICATE.App.Journal.Actions.WaitingHint');
     return localize('FABRICATE.App.Journal.Actions.Unavailable');
   }
