@@ -79,7 +79,6 @@
   import ManagerButton from '../../components/ManagerButton.svelte';
   import { buildComponentEditorState } from '../../util/componentEditor.js';
   import { getCurrencyProvidersForFoundrySystem } from '../../../../config/currencyProviders.js';
-  import { isPlayerCharacterActor } from '../../../../config/playerCharacterTypes.js';
   import ComponentEditView from './ComponentEditView.svelte';
   import ComponentEditorHeader from './component/ComponentEditorHeader.svelte';
   import ComponentsBrowserView from './ComponentsBrowserView.svelte';
@@ -8617,38 +8616,32 @@
   /**
    * The actors the world Tool entry's `Preview as` region offers.
    *
+   * ── READ FROM THE STORE'S PUBLISHED `actorOptions`, THE ROSTER THE SYSTEM TOOL RULES EDITOR
+   * ALREADY READS. This used to call `services.getWorldActors`, and the services bag this root
+   * receives is the app's NARROWED one, which does not carry it: the optional chain answered
+   * `[]` and the picker offered `No actor` alone in every world.
+   *
    * ── THE SAME PREDICATE THE CHECKS STUDIO'S PICKER USES, and for the same reason it states:
    * a real world's actor directory is mostly bestiary, and a crafting Tool is wielded by a
-   * CHARACTER, so an unfiltered roster buries the three actors a GM would ever pick. The
-   * predicate is the shared, GM-configurable one rather than a second `type === 'character'`
-   * test, so the two pickers cannot disagree about who a player character is.
+   * CHARACTER. Each published row carries `isPlayerCharacter`, stamped by the app service from
+   * the shared GM-configurable predicate, so the two pickers cannot disagree about who a player
+   * character is.
    *
-   * PROJECTED TO `{id, name, img}` HERE. The page is a leaf with no Foundry in its closure, and
-   * handing it live Actor documents would put one there.
+   * KEYED BY UUID, carried in `id`: the page maps `id` onto the rail's `uuid`, and
+   * `worldToolPreviewRollData` below resolves the same UUID through the store.
    *
-   * @returns {Array<{id: string, name: string, img: string}>}
+   * @type {Array<{id: string, name: string, img: string}>}
    */
-  function listWorldToolPreviewActors() {
-    const rows = [];
-    let actors;
-    try {
-      actors = services?.getWorldActors?.() ?? [];
-    } catch {
-      return rows;
-    }
-    for (const actor of actors) {
-      if (!actor?.id || !isPlayerCharacterActor(actor)) continue;
-      rows.push({
-        id: String(actor.id),
-        name: String(actor.name ?? actor.id),
-        img: typeof actor.img === 'string' ? actor.img : '',
-      });
-    }
-    return rows;
-  }
-
   const worldToolPreviewActors = $derived(
-    currentView === 'world-tool-entry' ? listWorldToolPreviewActors() : []
+    currentView === 'world-tool-entry'
+      ? ($viewState.actorOptions || [])
+          .filter((actor) => actor?.uuid && actor.isPlayerCharacter === true)
+          .map((actor) => ({
+            id: String(actor.uuid),
+            name: String(actor.name ?? actor.uuid),
+            img: typeof actor.img === 'string' ? actor.img : '',
+          }))
+      : []
   );
 
   /**
@@ -8659,19 +8652,12 @@
    * `{}` — every `@` path would then resolve to zero and a numeric gate would read as FAILED
    * rather than as unevaluated, which is a plausible wrong answer rather than a missing one.
    *
-   * @param {string} actorId
-   * @returns {object|null}
+   * @param {string} actorUuid
+   * @returns {Promise<object|null>|null}
    */
-  function worldToolPreviewRollData(actorId) {
-    if (!actorId) return null;
-    try {
-      const actor = (services?.getWorldActors?.() ?? []).find(
-        (candidate) => String(candidate?.id ?? '') === String(actorId)
-      );
-      return actor?.getRollData?.() ?? null;
-    } catch {
-      return null;
-    }
+  function worldToolPreviewRollData(actorUuid) {
+    if (!actorUuid) return null;
+    return store?.getActorRollData?.(actorUuid) ?? null;
   }
 
   async function relinkWorldToolSource(data) {

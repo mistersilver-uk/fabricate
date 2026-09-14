@@ -28091,6 +28091,10 @@ describe('CraftingSystemManager mounted behavior', () => {
       // shell reaches `services.resolveToolSource` to turn a drag payload into a snapshot, and
       // that seam has no other route into the mounted tree (issue 1373).
       componentServices = {},
+      // The ADMIN store's actor roster, published as `viewState.actorOptions`. The world Tool
+      // entry's `Preview as` picker reads it; it used to read a `getWorldActors` the root's
+      // narrowed services bag never carried, and rendered `No actor` alone in every world.
+      actorOptions = [],
     } = {}) {
       scopeStores = {
         component: scopeStore(worldComponents ?? worldEntities(3, 'comp')),
@@ -28122,6 +28126,9 @@ describe('CraftingSystemManager mounted behavior', () => {
         getEssenceScopeStore: () => scopeStores.essence,
         getToolScopeStore: () => scopeStores.tool,
         getVocabularyScopeStore: () => scopeStores.vocabulary,
+        getActorOptions: () => actorOptions,
+        getActorRollData: async (uuid) =>
+          actorOptions.some((actor) => actor.uuid === uuid) ? { level: 3 } : null,
       });
       const store = createAdminStore(services);
       await store.refresh();
@@ -28752,8 +28759,8 @@ describe('CraftingSystemManager mounted behavior', () => {
         target.querySelector('[data-world-tool-entry-heading] .manager-title')?.textContent?.trim();
 
       /** Open `pick`'s world entry editor the way a GM does: rail, then the row's pen. */
-      async function openPickEntry() {
-        await mountWithRealStore({ worldTools: [...WORLD_TOOLS] });
+      async function openPickEntry(mountOptions = {}) {
+        await mountWithRealStore({ worldTools: [...WORLD_TOOLS], ...mountOptions });
         worldNavItem('tool-catalogue').click();
         await settleToolEntryRoute();
         const open = target.querySelector(
@@ -28813,6 +28820,28 @@ describe('CraftingSystemManager mounted behavior', () => {
           'Tool entry',
           'an authored empty name must reach the crumb — `??` on "no editor", never `||` on ' +
             '"nothing typed"'
+        );
+      });
+
+      it('offers the player characters in the `Preview as` picker, and nothing else', async () => {
+        // Maintainer defect report: the picker offered `No actor` alone. The root read
+        // `services.getWorldActors`, which the narrowed bag it receives never carried, so the
+        // roster was empty in every world. It now reads the store's published `actorOptions`.
+        await openPickEntry({
+          actorOptions: [
+            { uuid: 'Actor.mira', id: 'mira', name: 'Mira', img: '', isPlayerCharacter: true },
+            { uuid: 'Actor.wolf', id: 'wolf', name: 'Dire Wolf', img: '', isPlayerCharacter: false },
+          ],
+        });
+        const picker = target.querySelector('[data-tool-preview-actor]');
+        assert.ok(Boolean(picker), 'the world tool entry rendered no Preview as picker');
+        assert.deepEqual(
+          [...picker.querySelectorAll('option')].map((option) => [option.value, option.textContent.trim()]),
+          [
+            ['', 'No actor'],
+            ['Actor.mira', 'Mira'],
+          ],
+          'the picker must list the player character by UUID and leave the bestiary out'
         );
       });
     });

@@ -120,12 +120,17 @@ export function toolBreakModeLabel(authority, text) {
  * TWO options, never three: the world is where this value is authored, so there is nothing
  * above it to inherit from.
  *
+ * A world that has authored nothing SELECTS THE SHIPPED FALLBACK, `toolSpecific`, because that
+ * is the value every system resolves to: a control with neither segment lit states a mode the
+ * resolver never answers, and it disagreed with the card's own note and the override count,
+ * which both already applied the fallback.
+ *
  * @param {unknown} worldAuthority The world's own token, or anything falsy.
  * @param {(key: string, fallback: string) => string} text
  * @returns {Array<{value: string, label: string, icon: string, selected: boolean}>}
  */
 export function worldBreakModeOptions(worldAuthority, text) {
-  const authored = toolBreakModeToken(worldAuthority);
+  const authored = toolBreakModeToken(worldAuthority) || DEFAULT_TOOL_BREAKAGE_AUTHORITY;
   return TOOL_BREAKAGE_AUTHORITIES.map((value) => ({
     value,
     label: toolBreakModeLabel(value, text),

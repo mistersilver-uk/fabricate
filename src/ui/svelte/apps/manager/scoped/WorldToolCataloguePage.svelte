@@ -495,6 +495,7 @@
     rowSecondLine="meta"
     systemRowAction="navigate"
     membershipFilter={false}
+    autoSelectFirst
     bind:selectedId
     onSelect={(entityId) => (selectedId = entityId)}
     {onOpenEntry}

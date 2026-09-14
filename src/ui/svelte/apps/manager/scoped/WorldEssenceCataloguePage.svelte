@@ -350,6 +350,7 @@
       )}
       inspectorFoot={essenceInspectorFoot}
       inspectorCaption={essenceInspectorCaption}
+      systemRowAction="navigate"
       bind:selectedId
       onSelect={(entityId) => (selectedId = entityId)}
       onOpenEntry={(entityId) => onOpenEntry(entityId)}
