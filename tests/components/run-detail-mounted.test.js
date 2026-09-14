@@ -492,6 +492,48 @@ describe('RunDetail mounted behavior', () => {
     assert.match(target.querySelector('.fab-stage-card-name').textContent, /Brew/);
   });
 
+  // D-025: a TIME card's AUTHORED requirement follows the prototype and reads "2 hours";
+  // the LIVE "Left" countdown is a genuine H:M:S quantity and keeps its existing form.
+  it('words the authored time requirement while the countdown beside it stays H:M:S', async () => {
+    const step = {
+      stepId: 's1', stepName: 'Brew', index: 0, status: 'waitingTime',
+      timeGate: { availableAt: 7200, initiatedAt: 0, requiredSeconds: 7200 },
+      detail: { requiredSeconds: 7200, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+      lastCheckResult: null
+    };
+    const run = makeCraftingRun({ multiStep: false, isFinalStep: true, stepLabel: '', steps: [step], currentStep: step });
+    const target = await harness.mount({ run, now: 1800, services: services() });
+    const rows = [...target.querySelectorAll('[data-journal-summary-card="time"] [data-journal-fact]')];
+    assert.ok(rows.length >= 2, 'the TIME card renders a Needs row and a Left row');
+    assert.match(rows[0].textContent, /Summary\.Needs/, 'first row is the authored requirement');
+    assert.match(rows[0].textContent, /Duration\.HourMany:\{"count":2\}/, 'the requirement reads as 2 hours');
+    assert.doesNotMatch(rows[0].textContent, /2h 0m 0s/, 'the requirement is no longer the countdown form');
+    assert.match(rows[1].textContent, /Summary\.Left/, 'second row is the live countdown');
+    assert.match(rows[1].textContent, /1h 30m 0s/, 'the countdown keeps H:M:S');
+  });
+
+  it('words the authored requirement on a stage the player is not working', async () => {
+    const current = {
+      stepId: 's1', stepName: 'Brew', index: 0, status: 'waitingTime',
+      timeGate: { availableAt: 1000, initiatedAt: 0, requiredSeconds: 1000 },
+      detail: { requiredSeconds: 1000, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+      lastCheckResult: null
+    };
+    const future = {
+      stepId: 's2', stepName: 'Bottle', index: 1, status: 'pending', timeGate: null,
+      detail: { requiredSeconds: 5400, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+      lastCheckResult: null
+    };
+    const svc = { journal: { busyRunId: '', execute() {}, viewedStageIndex: 1 }, getWorldTimeComponents: () => null };
+    const target = await mount({ run: makeCraftingRun({ steps: [current, future] }), now: 0, services: svc });
+    const fact = target.querySelector('[data-stage-fact="time"]');
+    assert.ok(Boolean(fact), 'the frozen stage states the time it needs');
+    assert.match(fact.textContent, /StepDetails\.RequiresTime/, 'the row is the authored requirement');
+    assert.match(fact.textContent, /Duration\.HourOne:\{"count":1\} .*Duration\.MinuteMany:\{"count":30\}/,
+      'a compound requirement states every non-zero unit');
+    assert.doesNotMatch(fact.textContent, /1h 30m 0s/, 'the authored requirement is not the countdown form');
+  });
+
   it('disables Trigger while the gate is unmatured and enables it once ready', async () => {
     const waiting = await harness.mount({ run: makeCraftingRun(), now: 0, services: services() });
     assert.equal(waiting.querySelector('[data-run-action="primary"]').disabled, true, 'waiting → disabled');

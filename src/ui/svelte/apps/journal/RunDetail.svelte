@@ -1,7 +1,7 @@
 <!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import { formatDurationHMS } from '../../util/formatDuration.js';
+  import { formatAuthoredDuration, formatDurationHMS } from '../../util/formatDuration.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import { worldTimeLabel } from '../../util/worldTimeLabel.js';
   import Callout from '../manager/Callout.svelte';
@@ -240,7 +240,7 @@
         id: 'time',
         icon: 'fas fa-clock',
         label: localize('FABRICATE.App.Journal.StepDetails.RequiresTime'),
-        value: formatDurationHMS(stage.detail.requiredSeconds),
+        value: formatAuthoredDuration(stage.detail.requiredSeconds, { localize }),
       });
     if (stage?.detail?.primaryToolName)
       facts.push({
@@ -755,7 +755,7 @@
             icon="fa-clock"
             label={localize('FABRICATE.App.Journal.Summary.Needs')}
             value={requiredSeconds > 0
-              ? formatDurationHMS(requiredSeconds)
+              ? formatAuthoredDuration(requiredSeconds, { localize })
               : localize('FABRICATE.App.Journal.Summary.None')}
           />
           <JournalFactRow

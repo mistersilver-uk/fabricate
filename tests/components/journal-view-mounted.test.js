@@ -682,7 +682,12 @@ describe('JournalView mounted behavior', () => {
     store.viewedStageIndex = 1;
     const futureTarget = await harness.mount({ services: makeServices(store) });
     assert.ok(!futureTarget.querySelector('[data-journal-summary]'));
-    assert.match(futureTarget.querySelector('[data-stage-card]').textContent, /2h 0m 0s/u);
+    // D-025: a future stage states the time it NEEDS in words; only a live countdown is H:M:S.
+    assert.match(
+      futureTarget.querySelector('[data-stage-card]').textContent,
+      /Duration\.HourMany:\{"count":2\}/u
+    );
+    assert.doesNotMatch(futureTarget.querySelector('[data-stage-card]').textContent, /2h 0m 0s/u);
     const check = futureTarget.querySelector('[data-stage-card]').textContent;
     assert.match(check, /FUTURE CHECK/u);
     assert.doesNotMatch(check, /CURRENT CHECK/u);

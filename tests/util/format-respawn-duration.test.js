@@ -9,6 +9,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  formatAuthoredDuration,
   formatRespawnDuration,
   formatDurationHMS,
   formatRelativeWorldTime
@@ -69,6 +70,42 @@ test('formatDurationHMS floors non-positive / non-finite input to 0s', () => {
   assert.equal(formatDurationHMS(0), '0s');
   assert.equal(formatDurationHMS(-5), '0s');
   assert.equal(formatDurationHMS(NaN), '0s');
+});
+
+// D-025: a TIME card's AUTHORED requirement follows the prototype, whose own helper
+// renders `2 hours` — never the `2h 0m 0s` countdown form the live "Left" row keeps.
+test('formatAuthoredDuration words an authored requirement, pluralizing correctly', () => {
+  assert.equal(formatAuthoredDuration(2 * HOUR), '2 hours');
+  assert.equal(formatAuthoredDuration(HOUR), '1 hour');
+  assert.equal(formatAuthoredDuration(60), '1 minute');
+  assert.equal(formatAuthoredDuration(45), '45 seconds');
+  assert.equal(formatAuthoredDuration(1), '1 second');
+  assert.notEqual(formatAuthoredDuration(2 * HOUR), formatDurationHMS(2 * HOUR));
+});
+
+test('formatAuthoredDuration states every non-zero unit rather than rounding a requirement away', () => {
+  assert.equal(formatAuthoredDuration(HOUR + 27 * 60 + 42), '1 hour 27 minutes 42 seconds');
+  assert.equal(formatAuthoredDuration(3 * HOUR + 30 * 60), '3 hours 30 minutes');
+  assert.equal(formatAuthoredDuration(90), '1 minute 30 seconds');
+  assert.equal(formatAuthoredDuration(2 * HOUR + 1), '2 hours 1 second');
+  assert.equal(formatAuthoredDuration(DAY), '24 hours', 'no day unit: the prototype helper has none');
+});
+
+test('formatAuthoredDuration localizes the unit words through the injected localize', () => {
+  const localize = (key, data) => `${key.split('.').at(-1)}${data ? JSON.stringify(data) : ''}`;
+  assert.equal(formatAuthoredDuration(2 * HOUR, { localize }), 'HourMany{"count":2}');
+  assert.equal(formatAuthoredDuration(HOUR, { localize }), 'HourOne{"count":1}');
+  assert.equal(
+    formatAuthoredDuration(HOUR + 90, { localize }),
+    'HourOne{"count":1} MinuteOne{"count":1} SecondMany{"count":30}'
+  );
+});
+
+test('formatAuthoredDuration renders nothing for a non-requirement so callers own the empty copy', () => {
+  assert.equal(formatAuthoredDuration(0), '');
+  assert.equal(formatAuthoredDuration(-5), '');
+  assert.equal(formatAuthoredDuration(NaN), '');
+  assert.equal(formatAuthoredDuration(null), '');
 });
 
 test('formatRelativeWorldTime labels today / yesterday / N days ago', () => {

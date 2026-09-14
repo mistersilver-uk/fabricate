@@ -1265,6 +1265,14 @@
           "Yesterday": "Yesterday",
           "DaysAgo": "{days} days ago"
         },
+        "Duration": {
+          "HourOne": "1 hour",
+          "HourMany": "{count} hours",
+          "MinuteOne": "1 minute",
+          "MinuteMany": "{count} minutes",
+          "SecondOne": "1 second",
+          "SecondMany": "{count} seconds"
+        },
         "Actions": {
           "Wait": "{time} to wait",
           "RollCheck": "Roll check",

@@ -103,3 +103,60 @@ export function formatRelativeWorldTime(finishedAt, now, { secondsPerDay = 86400
   if (elapsedDays === 1) return yesterday;
   return daysAgo(elapsedDays);
 }
+
+// Unit ladder for an AUTHORED duration, largest first. Hours/minutes/seconds only:
+// the prototype's own duration helper (`dur(h)`) has no day unit, and these three
+// are calendar-independent, so no calendar has to be threaded in. Plurals are TWO
+// whole literal keys chosen by a ternary — a concatenated suffix credits only the
+// prefix under the lang-key orphan guard and strands the leaf.
+const AUTHORED_DURATION_UNITS = [
+  {
+    seconds: HOUR,
+    word: 'hour',
+    one: 'FABRICATE.App.Journal.Duration.HourOne',
+    many: 'FABRICATE.App.Journal.Duration.HourMany',
+  },
+  {
+    seconds: MINUTE,
+    word: 'minute',
+    one: 'FABRICATE.App.Journal.Duration.MinuteOne',
+    many: 'FABRICATE.App.Journal.Duration.MinuteMany',
+  },
+  {
+    seconds: 1,
+    word: 'second',
+    one: 'FABRICATE.App.Journal.Duration.SecondOne',
+    many: 'FABRICATE.App.Journal.Duration.SecondMany',
+  },
+];
+
+/**
+ * Format an AUTHORED duration requirement (what a stage NEEDS) in words rather
+ * than as a countdown: `2 hours`, `1 hour 27 minutes 42 seconds`. Every non-zero
+ * unit is rendered so a requirement is never rounded away. Returns `''` for
+ * zero/negative/non-finite input so callers can render their own "no wait" copy.
+ * Pure: the localized unit words arrive through the injected `localize`.
+ *
+ * @param {number} seconds Authored requirement in world-time seconds.
+ * @param {object} [options]
+ * @param {Function} [options.localize] `(key, data?) => string`; English fallback when absent.
+ * @returns {string} e.g. "2 hours", or '' when not renderable.
+ */
+export function formatAuthoredDuration(seconds, { localize = null } = {}) {
+  const total = Math.trunc(Number(seconds));
+  if (!Number.isFinite(total) || total <= 0) return '';
+
+  let rest = total;
+  const parts = [];
+  for (const unit of AUTHORED_DURATION_UNITS) {
+    const count = Math.floor(rest / unit.seconds);
+    rest -= count * unit.seconds;
+    if (count > 0) parts.push(authoredUnit(count, unit, localize));
+  }
+  return parts.join(' ');
+}
+
+function authoredUnit(count, unit, localize) {
+  if (typeof localize !== 'function') return plural(count, unit.word);
+  return localize(count === 1 ? unit.one : unit.many, { count });
+}
