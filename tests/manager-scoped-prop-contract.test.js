@@ -114,7 +114,6 @@ const ROOT_IMPORT_SPECIFIERS = Object.freeze([
   // test. The projection to `{id, name, img}` happens in the shell because the page is a leaf
   // with no Foundry in its closure; the predicate is what makes that roster the same one the
   // Checks Studio's picker already offers.
-  '../../../../config/playerCharacterTypes.js',
   '../../../../gatheringImageDefaults.js',
   '../../../../systems/characterModifierPrerequisiteCopy.js',
   '../../../../systems/checkModifierResolver.js',
