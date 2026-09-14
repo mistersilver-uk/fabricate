@@ -1790,9 +1790,9 @@ function journalLifecycleCases() {
     'future-routed-stage': [{ selector: '[data-stage-nav-index="3"]' }],
     'kind-menu-open': [{ selector: '[data-journal-kind-filter]' }],
     'essence-overshoot': [
-      { selector: '[data-essence-source="Item.jp-duskglass"] [data-stepper-increment]' },
-      { selector: '[data-essence-source="Item.jp-duskglass"] [data-stepper-increment]' },
-      { selector: '[data-essence-source="Item.jp-sunmote"] [data-stepper-increment]' },
+      { selector: '[data-essence-source$=".Item.jp-duskglass"] [data-stepper-increment]' },
+      { selector: '[data-essence-source$=".Item.jp-duskglass"] [data-stepper-increment]' },
+      { selector: '[data-essence-source$=".Item.jp-sunmote"] [data-stepper-increment]' },
     ],
     ...Object.fromEntries(
       ['history-cancelled-before', 'history-cancelled-multi'].map((state) => [
@@ -2080,7 +2080,7 @@ function journalLifecycleCases() {
       has('[data-stage-state="current"] [data-slot-row] button.fab-slot-tile') +
       lacks('[data-choice-options]'),
     'essence-overshoot':
-      detail + has('[data-essence-overshoot]', '[data-essence-source="Item.jp-duskglass"]'),
+      detail + has('[data-essence-overshoot]', '[data-essence-source$=".Item.jp-duskglass"]'),
     'past-routed-stage':
       detail +
       has(
@@ -2180,7 +2180,7 @@ function journalLifecycleCases() {
     paused: '[data-run-action="resume"]',
     'ingredient-route': '[data-journal-route]',
     'check-route': '[data-run-action="primary"]',
-    'essence-overshoot': '[data-essence-source="Item.jp-sunmote"] [data-stepper-increment]',
+    'essence-overshoot': '[data-essence-source$=".Item.jp-sunmote"] [data-stepper-increment]',
     'past-stage': '[data-stage-nav-return]',
     'future-stage': '[data-stage-nav-return]',
     'past-routed-stage': '[data-stage-nav-return]',

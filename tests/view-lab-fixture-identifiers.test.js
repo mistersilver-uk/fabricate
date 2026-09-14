@@ -19,6 +19,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
+import { getCompendiumSourceUuid, getItemSourceReferences } from '../src/utils/sourceUuid.js';
 import { VIEW_LAB_CASES } from '../scripts/lib/viewLabCases.js';
 import { buildLabContent, LAB_SYSTEM_IDS } from './view-lab/world/labContent.js';
 import { buildLabActors, buildDocumentIndex } from './view-lab/world/labActors.js';
@@ -970,9 +971,14 @@ test('alchemy Journal uses a supplied authored recipe revealed to its player, no
   const run = containers.craftingRuns.active['lab-v1-alchemy'];
   assert.equal(run.recipeId, 'al-r-fire');
   const ingredientSet = recipes.find((recipe) => recipe.id === run.recipeId).ingredientSets[0];
-  const matches = (option, held) =>
-    seeded.components.find((entry) => entry.id === option.match.componentId)?.originItemUuid ===
-    held.uuid;
+  // Match on the source-reference UNION, as production does. A real owned item's uuid is
+  // `<actor.uuid>.Item.<id>`; its origin lives in `flags.core.sourceId`, which is what
+  // `getItemSourceReferences` folds in. Comparing `held.uuid` only worked while the lab
+  // double conflated the two.
+  const matches = (option, held) => {
+    const component = seeded.components.find((entry) => entry.id === option.match.componentId);
+    return Boolean(component) && getItemSourceReferences(held).includes(component.originItemUuid);
+  };
   const resolveSelection = () => ingredientSet.resolveIngredientSelection(actor.items, matches);
   assert.equal(resolveSelection().success, false, 'the default smith has no alchemy reagents');
   await stockJournalPrototype(actor, seeded);
@@ -982,7 +988,7 @@ test('alchemy Journal uses a supplied authored recipe revealed to its player, no
   assert.deepEqual(
     actor.items
       .filter((held) => ingredientSet.ingredients.some((option) => matches(option, held)))
-      .map((held) => [held.uuid, held.system.quantity]),
+      .map((held) => [getCompendiumSourceUuid(held) ?? held.uuid, held.system.quantity]),
     [
       ['Item.al-sulphur', 2],
       ['Item.al-quicksilver', 1],

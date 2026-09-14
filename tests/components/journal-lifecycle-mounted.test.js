@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
+import { getItemSourceReferences } from '../../src/utils/sourceUuid.js';
 import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
 import { RecipeVisibilityService } from '../../src/systems/RecipeVisibilityService.js';
@@ -302,10 +303,14 @@ function makeBuilder(
     },
     recipeManager: {
       getRecipe: (id) => recipeById.get(id) ?? null,
+      // Production matches on the SOURCE-REFERENCE UNION, never on the owned uuid: a real owned
+      // item's uuid is `<actor.uuid>.Item.<id>` and its origin lives in `flags.core.sourceId`.
+      // Comparing `held.uuid` only ever worked while the lab double conflated the two.
       ingredientMatchesItem: (_recipe, option, held) =>
         option?.match?.componentId === held?.componentId ||
-        getComponent(_recipe.craftingSystemId, option?.match?.componentId)?.originItemUuid ===
-          held.uuid,
+        getItemSourceReferences(held).includes(
+          getComponent(_recipe.craftingSystemId, option?.match?.componentId)?.originItemUuid
+        ),
     },
     resolutionModeService: new ResolutionModeService({ getSystem }),
     recipeVisibility: content
@@ -322,8 +327,8 @@ function makeBuilder(
       resolveItemEssences ??
       (content
         ? ({ item, recipe }) =>
-            getSystem(recipe.craftingSystemId).components.find(
-              (entry) => entry.originItemUuid === item.uuid
+            getSystem(recipe.craftingSystemId).components.find((entry) =>
+              getItemSourceReferences(item).includes(entry.originItemUuid)
             )?.essences ?? {}
         : null),
     getComponentSourceActors: () => [actor],
