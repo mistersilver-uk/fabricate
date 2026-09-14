@@ -525,10 +525,16 @@ export function buildLabActors(content) {
        * component share an address — which `InventoryListingBuilder.documentIdentity` collapses
        * into a single card, undercounting real holdings.
        */
-      async createEmbeddedDocuments(type, specs = []) {
+      async createEmbeddedDocuments(type, specs = [], options = {}) {
         if (type !== 'Item') return [];
         const created = specs.map((spec, offset) => {
-          const id = `item-${definition.id}-${items.length + offset}`;
+          // Foundry mints a fresh id and IGNORES a payload's `_id` unless the caller asks to
+          // keep it, which is what `keepId` is for. Honouring it only under that flag matters
+          // both ways: a fixture that stocks an actor gets a readable, stable address, while a
+          // crafted output — whose `itemData` is `sourceItem.toObject()` and therefore always
+          // carries the SOURCE item's `_id` — gets a new one, as a new document must.
+          const id =
+            (options?.keepId === true && spec._id) || `item-${definition.id}-${items.length + offset}`;
           const item = {
             uuid: `${actor.uuid}.Item.${id}`,
             id,
@@ -567,9 +573,9 @@ export function buildLabActors(content) {
     // Installed HERE rather than in `ownedItem`/`recipeItemCopy`, because an item can only remove
     // itself from a collection that exists — and the actor holding it is built after its items.
     // `parent` is set in the same pass and for the same reason. An owned item's parent IS its
-    // Actor in Foundry, and a dozen production reads derive the owning actor from it rather than
-    // from the call's own argument: `mapConsumedIngredientRef` stamps every consumed-ingredient
-    // receipt's `actorUuid` from `item.parent?.uuid`, and a null there is the key
+    // Actor in Foundry, and production derives the owning actor from it rather than from the
+    // call's own argument: `mapConsumedIngredientRef` stamps every consumed-ingredient receipt's
+    // `actorUuid` from `item.parent?.uuid`, and a null there is the key
     // `addHistoricalEssenceContribution` then fails to find a carrier under.
     for (const item of items) {
       item.parent = actor;

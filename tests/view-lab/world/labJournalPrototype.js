@@ -613,18 +613,24 @@ export async function stockJournalPrototype(actor, content, state = null) {
   }
   if (!stock.length) return;
   const byId = new Map(content.components.map((entry) => [entry.id, entry]));
+  // `keepId` so each stocked stack keeps a readable, stable owned address
+  // (`<actor uuid>.Item.<component id>`) rather than an index-dependent one. The cases and
+  // fixtures that name a specific carrier pin that address, and an id that shifted with
+  // stocking order would make those pins meaningless.
   await actor.createEmbeddedDocuments(
     'Item',
     stock.map(([id, quantity]) => {
       const entry = byId.get(id);
       return {
+        _id: entry.id,
         name: entry.name,
         img: entry.img,
         type: 'loot',
         system: { quantity },
         flags: { core: { sourceId: entry.originItemUuid } },
       };
-    })
+    }),
+    { keepId: true }
   );
 }
 
