@@ -16,6 +16,9 @@
 //   - every skill-backed role pins its declared model tier's model in both
 //     provider bindings, and a model-tiered binding's description names its own
 //     model tier and neither of the other two;
+//   - every binding file is byte-identical to its render from
+//     scripts/lib/agentBindingRoles.js, so a hand edit to a generated file fails
+//     here (`--write` regenerates them);
 //   - a model-tiered family declares all three model tiers, resolves to its BASE
 //     family skill, and the AGENTS.md `Family` table names exactly those tokens;
 //   - the AGENTS.md "Shared skills with no persona binding" list must equal the
@@ -32,25 +35,20 @@
 // Pure Node, no dependencies, no Docker/network — behaves identically in CI and
 // local dev. Run with `npm run validate:agents`. Exits non-zero on any mismatch.
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { bindingRenderErrors, renderedBindings, roleCount } from './lib/agentBindingRender.js';
 import {
   familyCompletenessErrors,
-  isReadonlyBashAllowed,
   modelPinErrors,
   parseBindingsTable,
   resolveRole,
+  toolParityErrors,
 } from './lib/agentModelTiers.js';
 
 const SKILLS_ROOT = '.agents/skills';
-
-// Tools that let a role mutate the workspace. A Claude binding that mirrors a
-// Codex `sandbox_mode = "read-only"` must include none of these.
-const WRITE_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
-// Tools that let a role spawn/route sub-agents. Role agents must never nest.
-const SPAWN_TOOLS = ['Agent', 'Task'];
 
 // A backtick token is treated as a checkable repo path only when it is
 // conservative: a known root file, or slash-joined under a known top-level
@@ -208,34 +206,15 @@ function validateMappingRole(ctx, row, resolved) {
 }
 
 function validateToolParity(ctx, { token, claudePath, claude, codexPath, codex }) {
-  const { req } = ctx;
-  const tools = parseTools(claude);
-  req(tools, `${claudePath} must declare an explicit tools: allowlist (no default inheritance)`);
-  if (!tools) return;
-  for (const banned of SPAWN_TOOLS) {
-    req(
-      !tools.includes(banned),
-      `${claudePath} must not include ${banned} — role agents must not spawn or route`
-    );
-  }
-  const writeTools = tools.filter((t) => WRITE_TOOLS.includes(t));
-  if (/sandbox_mode\s*=\s*"read-only"/.test(codex)) {
-    req(
-      writeTools.length === 0,
-      `${claudePath} must omit all mutation tools (${WRITE_TOOLS.join('/')}) to match ${codexPath} sandbox_mode = "read-only"; found ${writeTools.join(', ') || 'none'}`
-    );
-    // Resolved against the BASE FAMILY token, so foundry_integrator keeps its
-    // read-only Bash exemption at all three model tiers and no other family gains it.
-    req(
-      !tools.includes('Bash') || isReadonlyBashAllowed(token),
-      `${claudePath} must omit Bash to match ${codexPath} sandbox_mode = "read-only" (or add its base family to READONLY_BASH_ALLOWED in scripts/lib/agentModelTiers.js with a reason)`
-    );
-  } else {
-    req(
-      tools.includes('Edit') && tools.includes('Write'),
-      `${claudePath} must allow Edit and Write to match ${codexPath} full-access sandbox`
-    );
-  }
+  ctx.errors.push(
+    ...toolParityErrors({
+      token,
+      tools: parseTools(claude),
+      readOnly: /sandbox_mode\s*=\s*"read-only"/.test(codex),
+      subject: claudePath,
+      against: codexPath,
+    })
+  );
 }
 
 function validateSkillBackedRole(ctx, row, resolved, skillCell) {
@@ -594,13 +573,57 @@ export function main(root) {
   return errors;
 }
 
+/**
+ * Every gate, composed. The CLI is a thin caller over this so a test drives the SAME
+ * composition — dropping the render gate from the command line would otherwise be invisible.
+ * @param {string} root Absolute path to the repository root.
+ * @returns {string[]}
+ */
+export function allErrors(root) {
+  return [...main(root), ...bindingRenderErrors(createIo(root).read)];
+}
+
+/**
+ * Write every generated binding. Refuses to write anything when a role record is unrenderable
+ * or fails tool/sandbox parity, so an unsafe record never reaches a file.
+ * @param {string} root Absolute path to the repository root.
+ * @returns {{ written: string[], errors: string[] }}
+ */
+export function writeBindings(root) {
+  const { files, errors } = renderedBindings();
+  if (errors.length > 0) return { written: [], errors };
+  const io = createIo(root);
+  const written = [];
+  for (const [rel, text] of files) {
+    if (io.read(rel) === text) continue;
+    mkdirSync(dirname(io.abs(rel)), { recursive: true });
+    writeFileSync(io.abs(rel), text, 'utf8');
+    written.push(rel);
+  }
+  return { written, errors };
+}
+
 const invokedPath = process.argv[1] ? pathToFileURL(process.argv[1]).href : null;
 if (invokedPath === import.meta.url) {
   const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
-  const errors = main(repoRoot);
+  if (process.argv.includes('--write')) {
+    const { written, errors } = writeBindings(repoRoot);
+    if (errors.length) {
+      console.error(`Refusing to write ${roleCount()} roles' bindings (${errors.length}):`);
+      for (const e of errors) console.error(`  - ${e}`);
+      process.exit(1);
+    }
+    const summary = written.length === 0 ? 'already up to date' : `updated ${written.length}`;
+    console.log(`Rendered agent bindings from ${roleCount()} role records: ${summary}.`);
+    for (const rel of written) console.log(`  ~ ${rel}`);
+  }
+  const errors = allErrors(repoRoot);
   if (errors.length) {
     console.error(`Agent binding validation failed (${errors.length}):`);
     for (const e of errors) console.error(`  - ${e}`);
     process.exit(1);
   }
+  console.log(
+    `All ${renderedBindings().files.size} binding files are byte-identical to their render from ${roleCount()} role records in scripts/lib/agentBindingRoles.js.`
+  );
 }
