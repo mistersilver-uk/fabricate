@@ -88,6 +88,10 @@ Treat the shipped canonical specs under `openspec/specs/` — and the issue delt
 If the source is ambiguous, leave a TODO note in the doc.
 - Verify every capability claim against `src/` (and the shipped canonical spec), never against other documentation.
 Documentation is a claim under test, not a source of truth — a stale docs claim once led analysis to conclude a shipped flagship feature did not exist, so treat an existing doc as the thing to check, not the evidence.
+- Write JSDoc for a reader, not a type checker.
+Nothing in this repository consumes JSDoc, so a tag that restates the signature is deleted rather than corrected, per the JSDoc rule in `AGENTS.md`.
+- Keep the docs handover to what changed and what is still open.
+The reasoning, the alternatives and the review history belong in the issue and the PR, per "Observed failure mode: bloat" in `AGENTS.md`.
 
 ## Screenshots
 

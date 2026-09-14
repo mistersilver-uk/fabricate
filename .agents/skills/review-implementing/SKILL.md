@@ -61,6 +61,8 @@ Repository specifics that shape the fix:
 - New mounted Svelte component tests use `createMountedComponentHarness` from `tests/helpers/svelte-component-harness.js`, never inlined compile/mount boilerplate
 - A component missing from a mount harness allowlist hangs and reports `# cancelled`, not a failure — after component changes confirm `# cancelled 0`
 - Keep dependencies explicit and constructors boring per `.agents/skills/javascript-structural-design/SKILL.md` when the fix reshapes module boundaries
+- Answering a finding does not license prose: do not record the review round, the rejected fix, or the reviewer's argument in a comment, because "Observed failure mode: bloat" in `AGENTS.md` puts that record in the issue and the PR
+- A fix that grows a unit past the size gate (`tests/file-size-ledger.txt`) or adds a `Source.includes(` pin (`tests/source-pin-ledger.txt`) trades one finding for another
 
 ### 4. Validation
 
