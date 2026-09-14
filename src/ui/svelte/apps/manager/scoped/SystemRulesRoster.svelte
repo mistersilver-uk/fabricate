@@ -40,8 +40,10 @@
   put the create verb on the world catalogue, one scope away from the record it writes.
 
   The link is still meaningful for a NON-MEMBER under this mode: the rules list it opens is the
-  system's whole Tool Rules screen, which is exactly where the adoption happens. `manage` stays
-  the default, so the component and essence catalogues render exactly what they render today.
+  system's whole Tool Rules screen, which is exactly where the adoption happens. The world
+  component and essence catalogues take it too, the essence one after the maintainer reported
+  its full-width `Add to this system` rows as malformed beside the tool catalogue's links.
+  `manage` stays the default for any caller that opts into nothing.
 
   Props:
    - rows: the entity's projected per-system rows, `{systemId, systemName, member, enabled}[]`.

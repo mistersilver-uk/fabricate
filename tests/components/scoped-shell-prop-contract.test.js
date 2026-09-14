@@ -64,7 +64,7 @@ const CATALOGUE_PROPS = [
   'actions',
   // THE FIRST-ROW AUTO-SELECTION (issue 1371 r13-cat, maintainer ruling M14). OPT-IN and OFF by
   // default: with it unset the frame opens on a resting inspector exactly as it always did, so
-  // the essence and tool catalogues are byte-identical; the world Component catalogue turns it
+  // the essence catalogue is byte-identical; the world Component and Tools catalogues turn it
   // on. It is the shell's because a page composes the shell and never the frame.
   'autoSelectFirst',
   'bulk',
