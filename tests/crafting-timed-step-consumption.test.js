@@ -21,6 +21,43 @@ import assert from 'node:assert/strict';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
 import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
+import { createPersistedCraftingHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
+
+for (const timed of [false, true]) {
+  for (const [checked, failLast] of [[true, false], [true, true], [false, false]]) {
+    test(`managed native writer captures resolution and receipts: timed=${timed}, checked=${checked}, failed=${failLast}`, async () => {
+      const fixture = await createPersistedCraftingHistory({ legacy: true, stageCount: 1, timed, checked, failLast });
+      assert.equal(fixture.error, null, JSON.stringify(fixture));
+      assert.equal(fixture.record.status, failLast ? 'failed' : 'succeeded');
+      assert.deepEqual(fixture.model.steps[0].resolutionSnapshot, { kind: checked ? 'check' : 'none', mode: 'simple' });
+      assert.deepEqual(fixture.sourceItemsRemaining, [0, 0]);
+      assert.deepEqual(fixture.model.steps[0].consumedIngredients.map((entry) => entry.quantity), [1, 1]);
+      assert.equal(fixture.model.steps[0].historySettlement.awards, 'complete');
+      if (!failLast) assert.deepEqual(fixture.model.createdResults.map((entry) => entry.quantity), [1]);
+    });
+  }
+}
+
+test('managed native writer retains uncertain partial consumption rather than discarding the run', async () => {
+  const fixture = await createPersistedCraftingHistory({ legacy: true, stageCount: 1, timed: false, refuseConsumeAt: 1 });
+  assert.equal(fixture.error.code, 'HISTORY_EFFECT_UNCERTAIN');
+  assert.deepEqual(fixture.sourceItemsRemaining, [0, 1]);
+  assert.equal(fixture.record.steps[0].historySettlement.consumption, 'uncertain');
+  assert.equal(fixture.model.recoveryEvidence.required, true);
+  assert.equal(fixture.model.actions.execute, false);
+  assert.equal(fixture.model.actions.cancel, false);
+});
+
+for (const timed of [false, true]) {
+  test(`native crafting failed terminal settlement refuses same-run re-entry (timed=${timed})`, async () => {
+    const fixture = await createPersistedCraftingHistory({ legacy: true, stageCount: 1, timed, refuseSettlement: true });
+    assert.equal(fixture.error.code, 'HISTORY_EFFECT_UNCERTAIN');
+    assert.deepEqual(fixture.retryErrors, ['HISTORY_EFFECT_UNCERTAIN', 'HISTORY_EFFECT_UNCERTAIN']);
+    assert.deepEqual(fixture.sourceItemsRemaining, [0, 0]);
+    assert.equal(fixture.awardedCount, 1);
+    assert.equal(fixture.model.recoveryEvidence.required, true);
+  });
+}
 
 function reloadLegacyHistory(actor, recipe, system) {
   actor._flags = JSON.parse(JSON.stringify(actor._flags));
@@ -84,6 +121,7 @@ class FakeItem {
   }
   async delete() {
     this._deleted = true;
+    return this;
   }
   // Applies ANY flattened payload key by dotted path rather than the hardcoded default
   // stack-quantity one (issue 1024). A fake keyed on one literal cannot tell a routed
@@ -91,6 +129,8 @@ class FakeItem {
   async update(payload) {
     this._updates.push({ ...payload });
     for (const [key, value] of Object.entries(payload)) setProperty(this, key, value);
+    if (this._source) for (const [key, value] of Object.entries(payload)) setProperty(this._source, key, value);
+    return this;
   }
   toObject() {
     return { name: this.name, img: this.img, type: 'loot', system: { ...this.system } };
@@ -113,8 +153,8 @@ class FakeActor {
   }
   async setFlag(ns, key, value) {
     this._flags[ns] = this._flags[ns] || {};
-    this._flags[ns][key] = value;
-    return value;
+    this._flags[ns][key] = mergeHistoryFlag(this._flags[ns][key], value);
+    return this;
   }
   async createEmbeddedDocuments(type, data) {
     if (type === 'ActiveEffect') {
@@ -124,6 +164,8 @@ class FakeActor {
     const created = data.map((d, i) => {
       const item = new FakeItem(`created-${this._createdDocs.length + i}`, d.name, d.system?.quantity || 1);
       item.parent = this;
+      item.uuid = `${this.uuid}.Item.${item.id}`;
+      item._source = structuredClone(item.toObject());
       item.createEmbeddedDocuments = async (t, effectData) => {
         item.effects.push(...effectData);
         return effectData;
@@ -133,6 +175,13 @@ class FakeActor {
     this._createdDocs.push(...created);
     return created;
   }
+}
+
+function publishResultSource(system, componentId, item) {
+  const component = system.components.find((entry) => entry.id === componentId);
+  if (component) component.registeredItemUuid = item.uuid;
+  else system.components.push({ id: componentId, name: item.name, registeredItemUuid: item.uuid });
+  globalThis.fromUuid = async (uuid) => uuid === item.uuid ? item : null;
 }
 
 // A duck-typed ingredient set whose resolveIngredientSelection matches items by
@@ -333,6 +382,55 @@ test('timed step consumes components at START (gate arm), leaving a waitingTime 
   assert.equal(step.preparedConsumption.consumedSummary[0].componentId, 'wood');
 });
 
+for (const boundary of ['prepared', 'gate']) {
+  for (const refusal of ['throw', 'undefined']) {
+    test(`timed START cannot replay after ${boundary} persistence returns ${refusal}`, async () => {
+      const system = {
+        id: 'timed-persistence', resolutionMode: 'simple',
+        features: { craftingChecks: false, essences: false },
+        craftingCheck: { enabled: false, consumption: {} },
+        components: [{ id: 'wood', name: 'Wood' }],
+      };
+      setupGame(system, 1000);
+      const wood = new FakeItem('wood', 'Wood', 5);
+      const actor = new FakeActor('Crafter');
+      const source = new FakeActor('Source', [wood]);
+      const set = buildIngredientSet('set', [{ componentId: 'wood', quantity: 2 }]);
+      const recipe = buildRecipe({
+        craftingSystemId: system.id, ingredientSets: [set],
+        steps: [timedStep({ ingredientSets: [set] })],
+      });
+      const persist = actor.setFlag.bind(actor);
+      actor.setFlag = async (namespace, key, value) => {
+        const stage = Object.values(value.active ?? {})[0]?.steps?.[0];
+        if (boundary === 'gate' ? stage?.timeGate : stage?.preparedConsumption) {
+          if (refusal === 'throw') throw new Error('storage unavailable');
+          return undefined;
+        }
+        return persist(namespace, key, value);
+      };
+      const manager = new CraftingRunManager();
+      const recipeManager = buildRecipeManager({ ingredientSet: set });
+      const engine = new CraftingEngine(recipeManager, manager, null);
+      await assert.rejects(engine.craft(actor, [source], recipe));
+      assert.equal(wood.system.quantity, 3);
+      actor.setFlag = persist;
+      const reloaded = new CraftingRunManager();
+      for (const reader of [manager, reloaded]) {
+        const [run] = reader.getActiveRuns(actor);
+        assert.ok(run, 'consumed work must remain recoverable');
+        assert.ok(['pending', 'uncertain'].includes(run.steps[0].historySettlement.awards));
+        assert.equal(run.steps[0].consumedIngredients[0].quantity, 2);
+        const resumed = new CraftingEngine(recipeManager, reader, null);
+        await assert.rejects(resumed.craft(actor, [source], recipe, null, { runId: run.id }),
+          { code: 'HISTORY_EFFECT_UNCERTAIN' });
+      }
+      assert.equal(wood.system.quantity, 3, 're-entry cannot consume a second batch');
+      assert.equal(actor._createdDocs.length, 0);
+    });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // 2c. The same START consumption under a CONFIGURED stack-quantity path (issue 1024,
 //     acceptance criterion 6). The wood carries ONLY `system.qtd` — no `system.quantity`
@@ -420,7 +518,7 @@ test('a timed step resolves immediately when requirements.time.enabled === false
   const runManager = new CraftingRunManager();
   const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
-  engine._createSingleResult = async () => plank;
+  publishResultSource(system, 'plank', plank);
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -500,7 +598,7 @@ test('timed step FINISH produces results without the components present and comp
   const runManager = new CraftingRunManager();
   const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
-  engine._createSingleResult = async () => plank;
+  publishResultSource(system, 'plank', plank);
 
   // START: arm gate + consume (wood 2 -> deleted).
   const startResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
@@ -539,7 +637,7 @@ test('timed step FINISH produces results without the components present and comp
   assert.equal(projected.consumedIngredients[0].actorUuid, sourceActor.uuid);
   assert.equal(projected.createdResults[0].name, 'Plank');
   assert.equal(projected.completedAt, game.time.worldTime);
-  assert.equal(projected.resolutionSnapshot, null, 'legacy completion does not fabricate mode evidence');
+  assert.deepEqual(projected.resolutionSnapshot, { kind: 'none', mode: 'simple' }, 'new native completion captures its effective resolution');
   assert.deepEqual(projected.currencySpends, [], 'the legacy START receipt recorded zero settlement');
 });
 
@@ -590,7 +688,7 @@ test('timed FINISH excludes partially consumed ingredient docs while revalidatin
     finishToolItem = options.toolItems[0]?.item ?? null;
     return { success: true, outcome: null, value: null, data: {} };
   };
-  engine._createSingleResult = async () => plank;
+  publishResultSource(system, 'plank', plank);
 
   const startResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
   assert.equal(startResult.success, false, 'START arms the timed gate');
@@ -648,7 +746,7 @@ test('an already-armed gate still resumes (no double consume) when time requirem
   const runManager = new CraftingRunManager();
   const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
-  engine._createSingleResult = async () => plank;
+  publishResultSource(system, 'plank', plank);
 
   // START (time on by default): arm the gate + consume the wood.
   const startResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
@@ -793,7 +891,7 @@ test('timed step failed FINISH check does not refund and completes the run as fa
   assert.equal(projected.attempted, true);
   assert.equal(projected.consumedIngredients[0].name, 'Wood');
   assert.deepEqual(projected.createdResults, []);
-  assert.equal(projected.presentationSnapshot, null);
+  assert.equal(projected.presentationSnapshot.name, 'Timed Step');
 });
 
 // ---------------------------------------------------------------------------
@@ -883,7 +981,7 @@ test('non-timed step still consumes at finish and produces results (regression g
   const runManager = new CraftingRunManager();
   const engine = new CraftingEngine(buildRecipeManager({ ingredientSet: set }), runManager, null);
   engine._runCraftingCheck = async () => ({ success: true, outcome: null, value: null, data: {} });
-  engine._createSingleResult = async () => plank;
+  publishResultSource(system, 'plank', plank);
 
   const result = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
 
@@ -985,11 +1083,6 @@ function stubCollapsedEngine(engine, { checkFailsForStep = null } = {}) {
     data: {},
     message: step?.id === checkFailsForStep ? 'Check failed' : 'Success',
   });
-  engine._createResultItems = async (_actor, _execRecipe, step) => {
-    const componentId = step?.resultGroups?.[0]?.results?.[0]?.componentId ?? 'unknown';
-    const item = new FakeItem(`result-${step.id}`, componentId, 1);
-    return { items: [item] };
-  };
   engine._postCraftChatMessage = async () => {};
 }
 
@@ -1011,7 +1104,7 @@ test('collapsed chain runs both steps back-to-back in one call and returns the f
 
   assert.equal(result.success, true, 'the whole chain resolves in a single craft action');
   assert.equal(result.results.length, 1, 'the returned results are the final step output');
-  assert.equal(result.results[0].name, 'final', 'the effective result is the FINAL step result');
+  assert.equal(result.results[0].name, 'Final', 'the effective result is the FINAL step result');
   assert.equal(wood.system.quantity, 6, 'both steps consumed (10 -> 6, 2 per step)');
   assert.equal(
     runManager.getActiveRuns(craftingActor).length,
@@ -1087,7 +1180,7 @@ test('collapsed chain sums step durations into ONE time gate for the single acti
   globalThis.game.time.worldTime = 1000 + 7200;
   const finishResult = await engine.craft(craftingActor, [sourceActor], recipe, null, {});
   assert.equal(finishResult.success, true, 'the matured chain completes in one resume call');
-  assert.equal(finishResult.results[0].name, 'final', 'the final step output is returned');
+  assert.equal(finishResult.results[0].name, 'Final', 'the final step output is returned');
   assert.equal(wood.system.quantity, 6, 'both steps consumed at maturity (10 -> 6)');
   assert.equal(
     runManager.getActiveRuns(craftingActor).length,

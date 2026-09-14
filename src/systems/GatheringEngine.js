@@ -49,9 +49,14 @@ import { evaluateEnvironmentMatch } from './gatheringMatch.js';
 import { getDiscoveredRealmIds } from './gatheringRealmDiscovery.js';
 import { getRealmRevealMode, isGatheringRealmsEnabled } from './gatheringRealms.js';
 import { GatheringWorldTimeProcessor } from './GatheringWorldTimeProcessor.js';
-import { readStoredStackQuantity } from './itemStackQuantity.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
 import { getCommittedExecutionOutcome } from './runExecutionJournal.js';
+import {
+  itemReceipt,
+  linkResultGroups,
+  receiptQuantity,
+  unconfirmedHistoryError,
+} from './runHistoryEvidence.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
 import { resolvedComponentsFor } from './scopedEntityReads.js';
 import { computeSystemVisibility } from './systemValidation.js';
@@ -1443,33 +1448,8 @@ export class GatheringEngine {
       });
     }
 
-    const richEvidence = await this._commitRichAttempt({
-      actor,
-      system,
-      environment,
-      task,
-      outcome,
-      viewer,
-      interactableRef,
-      // Second of this run's two commits: the node was already consumed at
-      // `waitingStart` unless the task defers it to `onSuccess`. A BLIND run is
-      // the exception — it holds a reservation rather than a decrement — so it
-      // commits as `immediate` here and converts that reservation into the one
-      // real decrement it is owed. See `maturityCommitPhase`.
-      phase: maturityCommitPhase(run),
-    });
-    const completedRunWithRichEvidence =
-      richEvidence && typeof richEvidence === 'object'
-        ? {
-            ...completedRun,
-            economyEvidence: {
-              ...completedRun.economyEvidence,
-              ...richEvidence,
-            },
-          }
-        : completedRun;
-
-    const { complications } = await this._commitTerminalSideEffects({
+    const settlement = await this._commitLegacyTerminal({
+      run: completedRun,
       viewer,
       actor,
       system,
@@ -1477,6 +1457,8 @@ export class GatheringEngine {
       task,
       outcome,
       checkResult,
+      interactableRef,
+      phase: maturityCommitPhase(run),
     });
     // The reservation has now been converted into the real decrement (or was
     // never owed, for a failed `onSuccess` task), so the claim is spent.
@@ -1489,11 +1471,11 @@ export class GatheringEngine {
       environment,
       task,
       status: outcome.status,
-      run: completedRunWithRichEvidence,
-      createdResults: plan.createdResults,
+      run: settlement.run,
+      createdResults: settlement.createdResults,
       usedTools: plan.usedTools ?? [],
       checkResult,
-      complications,
+      complications: settlement.complications,
       initiatedBy: 'timed',
     });
   }
@@ -3538,26 +3520,8 @@ export class GatheringEngine {
       });
     }
 
-    const richEvidence = await this._commitRichAttempt({
-      actor,
-      system,
-      environment,
-      task,
-      outcome,
-      viewer,
-      interactableRef,
-    });
-    if (richEvidence && typeof richEvidence === 'object') {
-      run = {
-        ...run,
-        economyEvidence: {
-          ...run.economyEvidence,
-          ...richEvidence,
-        },
-      };
-    }
-
-    const { complications } = await this._commitTerminalSideEffects({
+    const settlement = await this._commitLegacyTerminal({
+      run,
       viewer,
       actor,
       system,
@@ -3566,6 +3530,7 @@ export class GatheringEngine {
       outcome,
       checkResult,
       presentTools,
+      interactableRef,
     });
 
     return await this._terminalStart({
@@ -3575,11 +3540,11 @@ export class GatheringEngine {
       environment,
       task,
       status: outcome.status,
-      run,
-      createdResults: plan.createdResults,
+      run: settlement.run,
+      createdResults: settlement.createdResults,
       usedTools: plan.usedTools ?? [],
       checkResult,
-      complications,
+      complications: settlement.complications,
     });
   }
 
@@ -3588,10 +3553,11 @@ export class GatheringEngine {
     actor,
     system,
     environment,
-    task,
+    task: sourceTask,
     interactive = false,
     resolvedCheckResult = null,
   }) {
+    const task = { ...sourceTask, resultGroups: linkResultGroups(sourceTask.resultGroups) };
     let outcome;
     switch (task.resolutionMode) {
       case 'straight': {
@@ -3756,7 +3722,12 @@ export class GatheringEngine {
     }
 
     const payload = {
-      createdResults: plan.createdResults,
+      createdResults: [],
+      historySettlement: { awards: 'pending' },
+      resolutionSnapshot: {
+        kind: task.resolutionMode === 'straight' ? 'none' : 'check',
+        mode: task.resolutionMode,
+      },
       usedTools: plan.usedTools ?? [],
     };
     if (checkResult !== undefined) payload.checkResult = checkResult;
@@ -3928,7 +3899,7 @@ export class GatheringEngine {
     );
     return refreshVersionedTerminalResponse(state.response, state.run, {
       opaqueBlind,
-      createdResults: plan.createdResults,
+      createdResults: state.createdResults ?? [],
       usedTools: plan.usedTools ?? [],
       checkResult,
     });
@@ -3967,21 +3938,26 @@ export class GatheringEngine {
         });
         return opaqueBlind ? { applied: true } : (cloneJson(state.richEvidence) ?? null);
       }),
+      versionedEffect('results', 'createGatheredResults', safeResults, async () => {
+        if (!awardsResultsFor(outcome, system) || !hasAwardedResults(outcome.resultGroups)) {
+          state.createdResults = [];
+          return opaqueBlind ? { count: 0 } : [];
+        }
+        const created = await this._createGatheredResults({
+          viewer,
+          actor,
+          system,
+          environment,
+          task,
+          outcome,
+        });
+        const actual = normalizeRunItems(created, { actor });
+        state.createdResults = actual;
+        return opaqueBlind ? { count: actual.length } : actual;
+      }),
     ];
-    if (awardsResultsFor(outcome, system)) {
+    if (awardsResultsFor(outcome, system) && hasAwardedResults(outcome.resultGroups)) {
       effects.push(
-        versionedEffect('results', 'createGatheredResults', safeResults, async () => {
-          const created = await this._createGatheredResults({
-            viewer,
-            actor,
-            system,
-            environment,
-            task,
-            outcome,
-          });
-          const actual = normalizeRunItems(created, { actor });
-          return opaqueBlind ? { count: actual.length } : actual;
-        }),
         versionedEffect('complications', 'fireGatheringComplications', null, async () => {
           const fired = await this._fireGatheringComplications({ actor, system, task, outcome });
           state.complications = publicComplications(fired?.fired);
@@ -4055,7 +4031,7 @@ export class GatheringEngine {
           task,
           status: outcome.status,
           run: displayRun,
-          createdResults: plan.createdResults,
+          createdResults: state.createdResults ?? [],
           usedTools: plan.usedTools ?? [],
           checkResult,
           complications: state.complications,
@@ -4078,6 +4054,15 @@ export class GatheringEngine {
     try {
       receipt = (await definition.apply()) ?? null;
     } catch (error) {
+      if (error.receipts?.length > 0 && state.run.checkResult?.blind !== true) {
+        state.run = await this.runManager.retainUncertainReceipt(
+          actor,
+          state.run.id,
+          definition.effectId,
+          error.receipts,
+          { executionOperationId: operationId }
+        );
+      }
       await this._markVersionedGatheringRecovery(actor, state.run, operationId);
       throw gatheringLifecycleError(
         `Gathering effect "${definition.effectId}" requires recovery`,
@@ -4115,6 +4100,36 @@ export class GatheringEngine {
     }
   }
 
+  async _commitLegacyTerminal({ run, ...context }) {
+    const opaque = this._isOpaqueBlindTask(context);
+    let createdResults;
+    let complications = [];
+    let richEvidence = null;
+    let failure = null;
+    try {
+      richEvidence = await this._commitRichAttempt(context);
+      ({ createdResults, complications } = await this._commitTerminalSideEffects(context));
+    } catch (error) {
+      createdResults = normalizeList(error.receipts).map(itemReceipt);
+      failure = error;
+    }
+    const settled = await this.runManager.settleHistory(context.actor, run.id, {
+      createdResults: opaque ? [] : createdResults,
+      ...(!opaque && { historySettlement: { awards: failure ? 'uncertain' : 'complete' } }),
+      economyEvidence: {
+        ...run.economyEvidence,
+        ...(opaque ? redactRichEvidence(richEvidence, { viewer: context.viewer }) : richEvidence),
+      },
+    });
+    if (failure)
+      throw unconfirmedHistoryError(
+        'Gathering effects require reconciliation',
+        opaque ? [] : createdResults,
+        failure
+      );
+    return { run: settled, createdResults, complications };
+  }
+
   async _commitTerminalSideEffects({
     viewer,
     actor,
@@ -4136,44 +4151,60 @@ export class GatheringEngine {
     // into the terminal response a player reads and into the chat card a player sees —
     // has no unredacted list to thread by mistake, whatever the acting user's role is.
     let complications = [];
-    if (awardsResultsFor(outcome, system)) {
-      await this._createGatheredResults({ viewer, actor, system, environment, task, outcome });
-      // Component complications (issue 1286), INSIDE the award gate and immediately after
-      // the award: an outcome this predicate refuses awarded nothing, so its stages never
-      // happened. Progressive attempts only — every d100 and routed outcome returns
-      // without planning anything. The chat card is posted by the caller, after this.
-      const fired = await this._fireGatheringComplications({ actor, system, task, outcome });
-      complications = publicComplications(fired?.fired);
-    }
-    await this._applyTerminalTools({
-      viewer,
-      actor,
-      system,
-      environment,
-      task,
-      outcome,
-      presentTools,
-    });
-    if (outcome.status === 'failed') {
-      await this._applyFailureFeedback({
+    let createdResults = [];
+    try {
+      if (awardsResultsFor(outcome, system)) {
+        createdResults = await this._createGatheredResults({
+          viewer,
+          actor,
+          system,
+          environment,
+          task,
+          outcome,
+        });
+        // Component complications (issue 1286), INSIDE the award gate and immediately after
+        // the award: an outcome this predicate refuses awarded nothing, so its stages never
+        // happened. Progressive attempts only — every d100 and routed outcome returns
+        // without planning anything. The chat card is posted by the caller, after this.
+        const fired = await this._fireGatheringComplications({ actor, system, task, outcome });
+        complications = publicComplications(fired?.fired);
+      }
+      await this._applyTerminalTools({
         viewer,
         actor,
         system,
         environment,
         task,
         outcome,
-        checkResult,
+        presentTools,
       });
+      if (outcome.status === 'failed') {
+        await this._applyFailureFeedback({
+          viewer,
+          actor,
+          system,
+          environment,
+          task,
+          outcome,
+          checkResult,
+        });
+      }
+      await this.eventSceneTrigger?.apply?.({
+        events: checkResult?.events,
+        viewer,
+        actor,
+        system,
+        environment,
+        task,
+      });
+      return { complications, createdResults };
+    } catch (error) {
+      throw unconfirmedHistoryError(
+        'Gathering terminal effects are uncertain',
+        error.receipts ?? createdResults,
+        error
+      );
     }
-    await this.eventSceneTrigger?.apply?.({
-      events: checkResult?.events,
-      viewer,
-      actor,
-      system,
-      environment,
-      task,
-    });
-    return { complications };
   }
 
   async _resolveRoutedOutcome({
@@ -4425,6 +4456,7 @@ export class GatheringEngine {
         name: task.name || 'Gathered',
         results: normalizeList(resolved?.items).map((item) => ({
           id: item.id,
+          resultRowId: item.resultRowId,
           componentId: stringOrNull(item.componentId),
           itemUuid: stringOrNull(item.itemUuid),
           quantity: Number(item.quantity || 1),
@@ -4581,9 +4613,9 @@ export class GatheringEngine {
   async _createGatheredResults({ viewer, actor, system, environment, task, outcome }) {
     if (!hasAwardedResults(outcome.resultGroups)) return [];
     if (typeof this.resultCreator?.create !== 'function') {
-      return [];
+      throw unconfirmedHistoryError('Gathering result creation is unavailable');
     }
-    return this.resultCreator.create({
+    const created = await this.resultCreator.create({
       actor,
       viewer,
       system,
@@ -4593,6 +4625,16 @@ export class GatheringEngine {
       checkResult: outcome.checkResult ?? null,
       outcome,
     });
+    if (
+      !Array.isArray(created) ||
+      created.some((entry) => receiptQuantity(entry?.quantity) === null || !entry?.itemUuid)
+    ) {
+      throw unconfirmedHistoryError(
+        'Invalid gathering creation receipts',
+        normalizeList(created).filter((entry) => receiptQuantity(entry?.quantity) !== null)
+      );
+    }
+    return created.map(itemReceipt);
   }
 
   async _planGatheredResults({ viewer, actor, system, environment, task, outcome }) {
@@ -4903,7 +4945,7 @@ export class GatheringEngine {
             stringOrNull(resolvedDoc?.img) ||
             stringOrNull(entry?.img) ||
             'icons/svg/item-bag.svg',
-          quantity: Number(entry?.quantity) || 1,
+          quantity: receiptQuantity(entry?.quantity),
         };
       });
 
@@ -6124,43 +6166,19 @@ function hasRichGatheringData(environment, task) {
 }
 
 function normalizeRunItems(items, { actor = null } = {}) {
-  return (
-    normalizeList(items)
-      .filter((item) => item && typeof item === 'object')
-      .map((item) => {
-        const source = item.item && typeof item.item === 'object' ? item.item : item;
-        const actorUuid =
-          stringOrNull(item.actorUuid) ||
-          stringOrNull(item.actor?.uuid) ||
-          stringOrNull(actor?.uuid);
-        const itemUuid = stringOrNull(item.itemUuid) || stringOrNull(source.uuid);
-        const componentId = stringOrNull(item.componentId);
-        // Only the SOURCE term is a stack read; `item.quantity` is the run entry's own
-        // awarded amount and is preferred whenever it is present.
-        const quantity = Number(
-          item.quantity ?? readStoredStackQuantity(source, { absentDefault: 1 })
-        );
-        const entry = {
-          actorUuid,
-          itemUuid,
-          quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
-        };
-        if (componentId) entry.componentId = componentId;
-        // Carry name/img (when known) so the run journal can list the gathered items,
-        // not just a count — the awarded item document is in hand here.
-        const name = stringOrNull(item.name) || stringOrNull(source.name);
-        const img = stringOrNull(item.img) || stringOrNull(source.img);
-        if (name) entry.name = name;
-        if (img) entry.img = img;
-        return entry;
-      })
-      // A ref needs SOME identity, but not necessarily a uuid. Planned awards are built
-      // before their documents exist, so a result resolving to a bare component has no
-      // uuid yet and a uuid-only filter discarded it — emptying the chat card and the run
-      // journal for a gather that really did award items. `componentId` is that missing
-      // pre-creation identity.
-      .filter((item) => item.actorUuid && (item.itemUuid || item.componentId))
-  );
+  return normalizeList(items)
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => {
+      const source = item.item ?? item;
+      return itemReceipt({
+        ...item,
+        actorUuid: item.actorUuid ?? item.actor?.uuid ?? actor?.uuid,
+        itemUuid: item.itemUuid ?? source.uuid,
+        name: item.name ?? source.name,
+        img: item.img ?? source.img,
+      });
+    })
+    .filter((item) => item.actorUuid && (item.itemUuid || item.componentId));
 }
 
 function gatheringTaskRequiresPlayerCheck(task) {

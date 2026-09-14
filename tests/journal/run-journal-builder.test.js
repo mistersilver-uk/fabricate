@@ -18,6 +18,27 @@ const ACTOR = { id: 'actor-1', uuid: 'Actor.actor-1', name: 'Akra', img: 'icons/
 const PLAYER = { id: 'user-1', isGM: false };
 const GM = { id: 'gm-1', isGM: true };
 
+for (const permission of ['denied', 'throws', 'absent']) {
+  test(`future native evidence uses the requested viewer rather than ambient GM ownership (${permission})`, () => {
+    const actor = { ...ACTOR, isOwner: true };
+    if (permission !== 'absent') actor.testUserPermission = () => {
+      if (permission === 'throws') throw new Error('permission unavailable');
+      return false;
+    };
+    const record = { id: 'native-private', userId: 'another-user', craftingSystemId: 'sys', taskId: 'PRIVATE_TASK', status: 'succeeded',
+      resolutionSnapshot: { kind: 'none', mode: 'straight' }, historySettlement: { awards: 'complete' },
+      createdResults: [{ itemUuid: 'Item.private', name: 'PRIVATE_AWARD', img: 'PRIVATE_IMAGE', quantity: 3 }],
+    };
+    const builder = new RunJournalBuilder({ gatheringRunSource: { getRunHistory: () => [record] },
+      getGatheringTask: () => ({ name: 'PRIVATE_TASK_NAME', img: 'PRIVATE_TASK_IMAGE' }) });
+    const model = builder.buildListing({ actor, viewer: PLAYER }).history[0];
+    assert.equal(model.redacted, true);
+    assert.equal(model.createdResultsRecorded, false);
+    assert.doesNotMatch(JSON.stringify(model), /PRIVATE_/);
+    assert.equal(builder.buildListing({ actor, viewer: GM }).history[0].createdResults[0].quantity, 3);
+  });
+}
+
 test('historical steps retain nullable source identities, distinct awards and recorded meaning', () => {
   const run = terminalCraftingRun({ steps: [
     { stepId: 'first', stepName: 'Old name', status: 'succeeded', completedAt: 42,
@@ -2740,7 +2761,7 @@ test('recovery projects actual safe receipts and an uncertain boundary without l
   assert.ok(hidden.recoveryEvidence.effects.every((effect) => effect.receipt === null && effect.kind === 'other'));
   assert.doesNotMatch(JSON.stringify(hidden.recoveryEvidence), /Iron|Item.iron|PRIVATE_|UNCONFIRMED/);
   const gatheringRun = {
-    id: 'gather-recovery', lifecycleVersion: 1, status: 'succeeded', taskId: 'visible-task',
+    id: 'gather-recovery', userId: PLAYER.id, lifecycleVersion: 1, status: 'succeeded', taskId: 'visible-task',
     executionJournal: { status: 'recoveryRequired', effects: [{ kind: 'createGatheredResults',
       phase: 'applied', receipt: [{ name: 'Gathered herb', quantity: 3, secret: 'PRIVATE_SNAPSHOT' }] }] },
   };

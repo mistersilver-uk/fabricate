@@ -45,11 +45,7 @@ import {
 } from './checkModifierResolver.js';
 import { runFormulaPassFail, runFormulaProgressive, runFormulaRouted } from './checkRoll.js';
 import { fireComplications } from './complicationRuntime.js';
-import {
-  awardedQuantityOf,
-  createOrStackComponentItem,
-  tagAwardedQuantity,
-} from './componentStacking.js';
+import { createOrStackComponentItem } from './componentStacking.js';
 import { buildCraftingChatContent } from './CraftingChatCard.js';
 import { CraftingFizzleExecutor } from './CraftingFizzleExecutor.js';
 import {
@@ -72,11 +68,24 @@ import {
   readStackQuantity,
   readStoredStackQuantity,
   setStackQuantity,
+  itemStackQuantityPath,
   updateStackQuantity,
 } from './itemStackQuantity.js';
 import { planFirstFitDrain, pooledItemOrder } from './pooledAllocation.js';
 import { resolveCheckTriggerMatches } from './ResolutionModeService.js';
 import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
+import {
+  attachAwardReceipts,
+  awardReceipts,
+  createItemReceiptCollector,
+  itemReceipt,
+  sourceItemQuantity,
+  receiptQuantity,
+  requireDocumentAcknowledgment,
+  unconfirmedHistoryError,
+  linkResultGroups,
+  assertNativeEffectsUninvoked,
+} from './runHistoryEvidence.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
 import { buildSalvageChatContent } from './SalvageChatCard.js';
 import { resolveSalvageCheck } from './salvageCheckUsability.js';
@@ -196,7 +205,8 @@ function tierStepForCard(checkResult) {
  * @param {{item: object, quantity: number}} consumed
  * @returns {{actorUuid: string|null, itemUuid: string|null, quantity: number, name: string|null, img: string|null}}
  */
-function mapConsumedIngredientRef({ item, quantity }) {
+function mapConsumedIngredientRef({ item, quantity, receipt }) {
+  if (receipt) return itemReceipt(receipt);
   return {
     actorUuid: item.parent?.uuid || null,
     itemUuid: item.uuid,
@@ -212,56 +222,6 @@ function addHistoricalEssenceContribution(carriers, essenceId, source) {
   const prior = carrier.contributions.find((entry) => entry.essenceId === essenceId);
   if (prior) prior.amount += source.essenceTotal;
   else carrier.contributions.push({ essenceId, amount: source.essenceTotal });
-}
-
-/**
- * Map one CRAFTED result document to the persisted run-record `createdResults` shape.
- *
- * ONE shape, THREE writers (issue 1098): the success path, the immediate failure branch
- * and the timed failure recorder. The success path has always written this literal; the
- * two failure writers are new and write THE SAME SHAPE through this mapper rather than a
- * lookalike, because the record lands in the actor's Fabricate run-container flag and a
- * failure run whose `createdResults` disagreed with the items on the actor would be a
- * durable contradiction — the Journal history reporting an empty award beside real loot.
- *
- * @param {object} item the created Item document
- * @param {object} craftingActor the actor it was created on
- * @returns {{actorUuid: string, itemUuid: string, quantity: number, name: string|null, img: string|null}}
- */
-function craftedResultRecord(item, craftingActor) {
-  return {
-    actorUuid: craftingActor.uuid,
-    itemUuid: item.uuid,
-    quantity: awardedQuantityOf(item),
-    name: item.name ?? null,
-    img: item.img ?? null,
-  };
-}
-
-/**
- * Map one salvage award record to the persisted run-record `createdResults` shape.
- *
- * ONE shape, TWO branches (issue 1098). The success branch has always written this; the
- * new failure branch writes THE SAME SHAPE rather than a lookalike, because the record
- * lands in the actor's Fabricate run-container flag and a failure run whose
- * `createdResults` disagreed with the items actually on the actor would be a durable
- * contradiction — the Journal history would report an empty award beside real loot.
- *
- * Name/img are captured at award time (mirroring the crafting award record) so a salvage
- * record is self-describing in the Journal even if the item is later deleted. Older
- * records without them fall back to the componentId resolver.
- *
- * @param {{item: object, componentId: string|null}} record
- * @returns {{itemUuid: string, componentId: string|null, quantity: number, name: string|null, img: string|null}}
- */
-function salvageCreatedResultRecord({ item, componentId }) {
-  return {
-    itemUuid: item.uuid,
-    componentId,
-    quantity: awardedQuantityOf(item),
-    name: item.name ?? null,
-    img: item.img ?? null,
-  };
 }
 
 /**
@@ -733,7 +693,7 @@ export class CraftingEngine {
           {
             effectId: 'record-dead-end',
             kind: 'recordAlchemyDeadEnd',
-            planned: { craftingSystemId, key: deadEndKey },
+            planned: { craftingSystemId },
             apply: async () => {
               const before = this._hasAlchemyDeadEnd(actor, craftingSystemId, deadEndKey);
               await this._recordAlchemyDeadEnd(
@@ -743,7 +703,6 @@ export class CraftingEngine {
                 current.system.alchemy || {}
               );
               return {
-                key: deadEndKey,
                 recorded: !before && this._hasAlchemyDeadEnd(actor, craftingSystemId, deadEndKey),
               };
             },
@@ -763,7 +722,13 @@ export class CraftingEngine {
             }),
           });
         }
-        return effects;
+        effects.push({
+          effectId: 'award-results',
+          kind: 'awardResults',
+          planned: [],
+          apply: async () => ({ results: [] }),
+        });
+        return this._captureVersionedEffectPrefixes(effects, actor);
       },
       outcome: () => ({
         success: false,
@@ -1073,6 +1038,105 @@ export class CraftingEngine {
 
   _craftingRunManager() {
     return this.craftingRunManager || game.fabricate?.getCraftingRunManager?.() || null;
+  }
+
+  _captureVersionedEffectPrefixes(effects, actor, runId = null) {
+    return effects.map((effect) => ({
+      ...effect,
+      apply: async (context) => {
+        try {
+          return await effect.apply(context);
+        } catch (error) {
+          if (error.receipts?.length > 0) {
+            const manager = this._craftingRunManager();
+            const id =
+              runId ??
+              manager
+                .getRunHistory(actor)
+                .find((run) => run.executionJournal?.operationId === context.trusted.operationId)
+                ?.id;
+            await manager.retainUncertainReceipt(actor, id, effect.effectId, error.receipts, {
+              executionOperationId: context.trusted.operationId,
+            });
+          }
+          throw error;
+        }
+      },
+    }));
+  }
+
+  async _beginNativeStage({
+    craftingActor,
+    run,
+    runManager,
+    stepIndex,
+    recipe,
+    step,
+    componentSourceActors,
+    timedStart = false,
+  }) {
+    if (!run || !runManager || getRunLifecycleContract(run) !== 'legacy') return;
+    const stage = run.steps[stepIndex];
+    assertNativeEffectsUninvoked(stage);
+    const viewer =
+      game.users?.get?.(run.userId) ?? (game.user?.id === run.userId ? game.user : null);
+    const snapshots = this._stageHistorySnapshots({
+      recipe,
+      step,
+      actor: craftingActor,
+      viewer,
+      sourceActors: componentSourceActors,
+    });
+    const system = this._getRecipeSystem(recipe);
+    if (
+      snapshots.resolutionSnapshot?.mode === 'simple' &&
+      system?.features?.craftingChecks !== true &&
+      system?.craftingCheck?.enabled !== true
+    ) {
+      snapshots.resolutionSnapshot.kind = 'none';
+    }
+    if (timedStart) delete snapshots.resolutionSnapshot;
+    Object.assign(stage, snapshots);
+    stage.historySettlement = {
+      consumption: stage.historySettlement?.consumption ?? 'notApplicable',
+      awards: 'pending',
+    };
+    await runManager.updateRun(craftingActor, run);
+  }
+
+  async _consumeNativeIngredients(plan, { craftingActor, run, runManager, stepIndex }) {
+    if (!run || !runManager || getRunLifecycleContract(run) !== 'legacy')
+      return this._consumeIngredients(plan);
+    const stage = run.steps[stepIndex];
+    stage.historySettlement = { ...stage.historySettlement, consumption: 'pending' };
+    await runManager.updateRun(craftingActor, run);
+    const consumed = await this._consumeIngredients(plan);
+    await this._saveNativeConsumption(consumed, { craftingActor, run, runManager, stepIndex });
+    return consumed;
+  }
+
+  async _saveNativeConsumption(consumed, { craftingActor, run, runManager, stepIndex }) {
+    if (!run || !runManager || getRunLifecycleContract(run) !== 'legacy') return;
+    const stage = run.steps[stepIndex];
+    stage.consumedIngredients = consumed.map(mapConsumedIngredientRef);
+    stage.historySettlement.consumption = 'complete';
+    await runManager.updateRun(craftingActor, run);
+  }
+
+  async _recordNativeStageUncertainty(actor, runManager, run, error) {
+    if (!runManager || !run || getRunLifecycleContract(run) !== 'legacy') return;
+    const saved = runManager.getActiveRun(actor, run.id);
+    const stage = saved?.steps?.[saved.currentStepIndex];
+    if (!stage?.historySettlement) return;
+    const field = error.historyField ?? 'awards';
+    stage.historySettlement[field] = 'uncertain';
+    const receiptKey = field === 'consumption' ? 'consumedIngredients' : 'createdResults';
+    const prefix =
+      error.receipts?.length > 0
+        ? error.receipts
+        : run.steps?.[saved.currentStepIndex]?.[receiptKey];
+    if (Array.isArray(prefix)) stage[receiptKey] = prefix.map(itemReceipt);
+    await runManager.updateRun(actor, saved);
   }
 
   _consumeVersionedGrant(executionGrant, context) {
@@ -1599,7 +1663,7 @@ export class CraftingEngine {
           );
           state.resultItems = created.items;
           state.resolutionMeta = created.resolutionMeta;
-          state.resultRecords = state.resultItems.map((item) => craftedResultRecord(item, actor));
+          state.resultRecords = awardReceipts(state.resultItems);
           return {
             results: state.resultRecords,
             resolutionMeta: cloneJsonValue(state.resolutionMeta) ?? null,
@@ -1679,7 +1743,7 @@ export class CraftingEngine {
     });
     return {
       intent: { stepIndex, recipeId: recipe.id, trigger },
-      effects,
+      effects: this._captureVersionedEffectPrefixes(effects, actor, runId),
       hydrate: ({ receipts }) => this._hydrateVersionedStageState(state, receipts),
       outcome: () => ({
         success: succeeded,
@@ -1739,7 +1803,10 @@ export class CraftingEngine {
     const awardReceipt = receipts['award-results'];
     if (awardReceipt) {
       state.resultRecords = cloneJsonValue(awardReceipt.results) ?? [];
-      state.resultItems = state.resultRecords.map(rehydrateVersionedResultItem);
+      state.resultItems = attachAwardReceipts(
+        state.resultRecords.map(rehydrateVersionedResultItem),
+        state.resultRecords
+      );
       state.resolutionMeta = cloneJsonValue(awardReceipt.resolutionMeta) ?? null;
     }
     if (receipts['fire-complications']) {
@@ -2008,19 +2075,16 @@ export class CraftingEngine {
     this._assertAlchemySubmissionStock(sourceActors, submittedItems);
     const counts = new Map();
     for (const { item } of submittedItems) counts.set(item, (counts.get(item) || 0) + 1);
-    const receipts = [];
-    for (const [item, count] of counts) {
-      const before = readStoredStackQuantity(item, { absentDefault: 1 });
-      await this._consumeItemQuantity(item, count, true);
-      receipts.push({
-        actorUuid: item.parent?.uuid ?? null,
-        itemUuid: item.uuid,
-        consumedQuantity: count,
-        beforeQuantity: before,
-        afterQuantity: Math.max(0, before - count),
-      });
-    }
-    return receipts;
+    const before = new Map([...counts.keys()].map((item) => [item, sourceItemQuantity(item)]));
+    const consumed = await this._consumeIngredients(
+      [...counts].map(([item, quantity]) => ({ item, quantity }))
+    );
+    return consumed.map((entry) => ({
+      ...mapConsumedIngredientRef(entry),
+      consumedQuantity: entry.quantity,
+      beforeQuantity: before.get(entry.item),
+      afterQuantity: before.get(entry.item) - entry.quantity,
+    }));
   }
 
   _hasAlchemyDeadEnd(actor, craftingSystemId, key) {
@@ -2522,6 +2586,8 @@ export class CraftingEngine {
       let stepIndex = Number(run?.currentStepIndex);
       if (!Number.isFinite(stepIndex) || stepIndex < 0) stepIndex = 0;
       const step = executionSteps[stepIndex];
+      if (getRunLifecycleContract(run) === 'legacy')
+        assertNativeEffectsUninvoked(run?.steps?.[stepIndex]);
       if (!step) {
         return {
           success: false,
@@ -2793,6 +2859,15 @@ export class CraftingEngine {
       if (checkResult.cancelled) {
         return { success: false, cancelled: true, results: null, message: 'Crafting cancelled' };
       }
+      await this._beginNativeStage({
+        craftingActor,
+        run,
+        runManager,
+        stepIndex,
+        recipe: executionRecipe,
+        step,
+        componentSourceActors,
+      });
       if (!checkResult.success) {
         // Matched Simple alchemy attempt: a failed check is a genuine outcome, not a
         // fizzle. Consume per `alchemy.consumeOnFail`, produce the reserved failure
@@ -2828,7 +2903,12 @@ export class CraftingEngine {
         let usedToolsOnFail = [];
         try {
           if (failurePolicy.consumeIngredientsOnFail) {
-            consumedOnFail = await this._consumeIngredients(craftSelection.plan);
+            consumedOnFail = await this._consumeNativeIngredients(craftSelection.plan, {
+              craftingActor,
+              run,
+              runManager,
+              stepIndex,
+            });
             // Currency is consumed alongside items on the failure path only when the
             // policy consumes ingredients on failure (it is a chosen ingredient).
             await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
@@ -2852,6 +2932,7 @@ export class CraftingEngine {
             });
           }
         } catch (consumptionError) {
+          if (consumptionError.code === 'HISTORY_EFFECT_UNCERTAIN') throw consumptionError;
           console.error('Fabricate | Error during failure-path consumption:', consumptionError);
         }
         // THE FAILURE AWARD (issue 1098). It runs AFTER consumption and breakage, so the
@@ -2888,9 +2969,7 @@ export class CraftingEngine {
               // In the SUCCESS branch's shape, through the same mapper: the record lands
               // in the actor's run-container flag, so an empty list beside real items is a
               // durable contradiction rather than a cosmetic gap.
-              createdResults: failureResults.map((item) =>
-                craftedResultRecord(item, craftingActor)
-              ),
+              createdResults: awardReceipts(failureResults),
             },
             this._versionedMutationOptions(options, run)
           );
@@ -2930,7 +3009,12 @@ export class CraftingEngine {
         let usedToolsOnValidationFail = [];
         try {
           if (validationFailurePolicy.consumeIngredientsOnFail) {
-            consumedOnValidationFail = await this._consumeIngredients(craftSelection.plan);
+            consumedOnValidationFail = await this._consumeNativeIngredients(craftSelection.plan, {
+              craftingActor,
+              run,
+              runManager,
+              stepIndex,
+            });
             await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
           }
           if (validationFailurePolicy.breakToolsOnFail) {
@@ -2955,6 +3039,7 @@ export class CraftingEngine {
             );
           }
         } catch (consumptionError) {
+          if (consumptionError.code === 'HISTORY_EFFECT_UNCERTAIN') throw consumptionError;
           console.error('Fabricate | Error during failure-path consumption:', consumptionError);
         }
         if (runManager && run) {
@@ -3059,11 +3144,22 @@ export class CraftingEngine {
       }
 
       // Consume ingredients from the single craft selection's item plan.
-      const consumedItems = await this._consumeIngredients(craftSelection.plan);
+      const consumedItems = await this._consumeNativeIngredients(craftSelection.plan, {
+        craftingActor,
+        run,
+        runManager,
+        stepIndex,
+      });
 
       // For alchemy attempts: also consume submitted items that weren't handled
       // by standard ingredient matching (e.g. items used only for essences).
       await this._consumeAlchemyExtraItems(consumedItems, componentSourceActors, options);
+      await this._saveNativeConsumption(consumedItems, {
+        craftingActor,
+        run,
+        runManager,
+        stepIndex,
+      });
 
       // Deduct the chosen currency spends after item consumption (the afford gate above
       // already confirmed every spend is affordable). A mid-loop spend failure is logged
@@ -3124,9 +3220,7 @@ export class CraftingEngine {
             },
             consumedIngredients: consumedItems.map(mapConsumedIngredientRef),
             usedTools,
-            createdResults: (resultItems || []).map((item) =>
-              craftedResultRecord(item, craftingActor)
-            ),
+            createdResults: awardReceipts(resultItems),
           },
           this._versionedMutationOptions(options, run)
         );
@@ -3207,6 +3301,12 @@ export class CraftingEngine {
             ? `Successfully crafted ${recipe.name}`
             : `Completed ${step.name || `step ${stepIndex + 1}`} for ${recipe.name}`,
       };
+    } catch (error) {
+      if (error.code === 'HISTORY_EFFECT_UNCERTAIN') {
+        resolved = true;
+        await this._recordNativeStageUncertainty(craftingActor, runManager, run, error);
+      }
+      throw error;
     } finally {
       // A run created this call that never armed a time gate or completed a step is a
       // phantom stranded by a pre-check early-return (or a mid-execution throw).
@@ -3214,7 +3314,13 @@ export class CraftingEngine {
       // already surfaced the failure message. Completed runs are already moved to
       // history (getActiveRun → null), and a reused pre-existing run
       // (createdThisCall=false) is never touched.
-      if (createdThisCall && !resolved && run && runManager?.getActiveRun(craftingActor, run.id)) {
+      if (
+        createdThisCall &&
+        !resolved &&
+        run &&
+        !run.steps?.some((step) => step.historySettlement) &&
+        runManager?.getActiveRun(craftingActor, run.id)
+      ) {
         await runManager.discardRun(craftingActor, run.id);
       }
     }
@@ -3355,7 +3461,22 @@ export class CraftingEngine {
     }
 
     // Consume NOW (at START): items first, then currency (both gates passed).
-    const consumedItems = await this._consumeIngredients(craftSelection.plan);
+    await this._beginNativeStage({
+      craftingActor,
+      run,
+      runManager,
+      stepIndex,
+      recipe: executionRecipe,
+      step,
+      componentSourceActors,
+      timedStart: true,
+    });
+    const consumedItems = await this._consumeNativeIngredients(craftSelection.plan, {
+      craftingActor,
+      run,
+      runManager,
+      stepIndex,
+    });
     // The deduction deliberately does not abort the craft on failure (clause 4 forbids
     // both aborting and rolling back), so the run must record what SETTLED rather than
     // what was planned — otherwise a cancel refunds currency the actor never paid.
@@ -3382,16 +3503,12 @@ export class CraftingEngine {
       resolvedEssences,
       this._getRecipeSystem(executionRecipe)
     );
-    const consumedSummary = consumedItems.map(({ item, quantity, ingredient }) => ({
-      itemUuid: item.uuid ?? null,
-      actorUuid: item.parent?.uuid ?? null,
-      quantity,
-      name: item.name ?? null,
-      img: item.img ?? null,
+    const consumedSummary = consumedItems.map((consumed) => ({
+      ...mapConsumedIngredientRef(consumed),
       componentId:
-        ingredient?.match?.componentId ??
-        ingredient?.componentId ??
-        ingredient?.systemItemId ??
+        consumed.ingredient?.match?.componentId ??
+        consumed.ingredient?.componentId ??
+        consumed.ingredient?.systemItemId ??
         null,
     }));
 
@@ -3403,7 +3520,8 @@ export class CraftingEngine {
       consumedSummary,
     });
 
-    // Arm the gate now that the components are secured.
+    // Only the acknowledged waiting transition releases the invocation guard.
+    run.steps[stepIndex].historySettlement.awards = 'notApplicable';
     const armedRun = await runManager.markStepWaitingForTime(
       craftingActor,
       run,
@@ -3551,6 +3669,16 @@ export class CraftingEngine {
       };
     }
 
+    await this._beginNativeStage({
+      craftingActor,
+      run,
+      runManager,
+      stepIndex,
+      recipe: executionRecipe,
+      step,
+      componentSourceActors,
+    });
+
     // Shared timed-step failure recorder: components are already gone (consumed at
     // START), so NEVER re-consume or refund — only break tools per the failure
     // policy, archive the failed run, and post the failure chat.
@@ -3602,7 +3730,7 @@ export class CraftingEngine {
         },
         consumedIngredients: consumedRunRefs,
         usedTools,
-        createdResults: failureResults.map((item) => craftedResultRecord(item, craftingActor)),
+        createdResults: awardReceipts(failureResults),
       });
       await this._postCraftChatMessage({
         success: false,
@@ -3749,7 +3877,7 @@ export class CraftingEngine {
       },
       consumedIngredients: consumedRunRefs,
       usedTools,
-      createdResults: (resultItems || []).map((item) => craftedResultRecord(item, craftingActor)),
+      createdResults: awardReceipts(resultItems),
     });
 
     const visibilityService = game.fabricate?.getRecipeVisibilityService?.();
@@ -3898,11 +4026,11 @@ export class CraftingEngine {
       );
       return Array.isArray(items) ? items : [];
     } catch (error) {
-      // A failed craft that cannot build its failure output still has to RECORD the
-      // failure the caller is in the middle of writing. Throwing here would abandon the
-      // run mid-write, after consumption, which is strictly worse than awarding nothing.
-      console.error('Fabricate | Error producing crafting failure results:', error);
-      return [];
+      throw unconfirmedHistoryError(
+        'Failure awards require reconciliation',
+        error.receipts ?? [],
+        error
+      );
     }
   }
 
@@ -4108,8 +4236,19 @@ export class CraftingEngine {
     let usedTools = [];
     try {
       if (consumeOnFail) {
-        consumedItems = await this._consumeIngredients(craftSelection.plan);
+        consumedItems = await this._consumeNativeIngredients(craftSelection.plan, {
+          craftingActor,
+          run,
+          runManager,
+          stepIndex,
+        });
         await this._consumeAlchemyExtraItems(consumedItems, componentSourceActors, options);
+        await this._saveNativeConsumption(consumedItems, {
+          craftingActor,
+          run,
+          runManager,
+          stepIndex,
+        });
         await this._spendCraftCurrency(craftingActor, executionRecipe, currencySpends);
       }
       const breakDecision = this._resolveCraftingBreakageDecision(
@@ -4124,6 +4263,7 @@ export class CraftingEngine {
         triggerId: breakDecision.triggerId,
       });
     } catch (consumptionError) {
+      if (consumptionError.code === 'HISTORY_EFFECT_UNCERTAIN') throw consumptionError;
       console.error(
         'Fabricate | Error during alchemy failure-result consumption:',
         consumptionError
@@ -4276,27 +4416,42 @@ export class CraftingEngine {
     const shouldConsume = alchemyCfg.consumeOnFail !== false;
 
     if (!matchResult.matched) {
-      // Fizzle: this concrete submitted multiset matches NO enabled recipe. Record
-      // a per-character x system dead-end key (gated by showAttemptHistoryToPlayers)
-      // so the workbench can flip this exact set from `untried` -> `no-reaction` on a
-      // re-brew. The fizzle branch runs NO check and returns `disposition:'no-match'`
-      // with no roll, so the UI must not show a roll animation on this path.
-      await this._recordAlchemyDeadEnd(craftingActor, systemId, submittedItems, alchemyCfg);
-      if (shouldConsume) {
-        await this._consumeSubmittedAlchemyItems(componentSourceActors, submissionItems);
-      }
-      // Record the fizzle as failed run history. A fizzle matches no enabled
-      // recipe, so the entry is recipe-less and carries no recipe/signature data
-      // (it cannot leak an undiscovered recipe). Recording is UNCONDITIONAL: the
-      // `showAttemptHistoryToPlayers` flag gates only player VISIBILITY of the
-      // entry at the Journal, never whether the attempt is recorded — so do NOT
-      // copy `_recordAlchemyDeadEnd`'s recording gate here.
       const runManager = this.craftingRunManager || game.fabricate?.getCraftingRunManager?.();
-      if (typeof runManager?.recordFizzle === 'function') {
-        await runManager.recordFizzle(craftingActor, {
-          craftingSystemId: systemId,
-          userId: game.user?.id ?? null,
-        });
+      if (options.runId)
+        assertNativeEffectsUninvoked(runManager?.getRun(craftingActor, options.runId));
+      const fizzle = await runManager?.recordFizzle(craftingActor, {
+        craftingSystemId: systemId,
+        userId: game.user?.id ?? null,
+        resolutionSnapshot: { kind: 'none', mode: 'alchemy' },
+        createdResults: [],
+        historySettlement: {
+          consumption: shouldConsume ? 'pending' : 'notApplicable',
+          awards: 'complete',
+        },
+      });
+      let consumed = [];
+      try {
+        await this._recordAlchemyDeadEnd(craftingActor, systemId, submittedItems, alchemyCfg);
+        if (shouldConsume)
+          consumed = await this._consumeSubmittedAlchemyItems(
+            componentSourceActors,
+            submissionItems
+          );
+        if (fizzle)
+          await runManager.settleHistory(craftingActor, fizzle.id, {
+            consumedIngredients: consumed,
+            historySettlement: {
+              consumption: shouldConsume ? 'complete' : 'notApplicable',
+              awards: 'complete',
+            },
+          });
+      } catch (error) {
+        if (fizzle)
+          await runManager.settleHistory(craftingActor, fizzle.id, {
+            consumedIngredients: error.historyField === 'consumption' ? error.receipts : consumed,
+            historySettlement: { consumption: 'uncertain', awards: 'complete' },
+          });
+        throw error;
       }
       return {
         success: false,
@@ -4304,6 +4459,7 @@ export class CraftingEngine {
         message: 'FABRICATE.Alchemy.NoMatch',
         disposition: 'no-match',
         consumed: shouldConsume,
+        runId: fizzle?.id ?? null,
       };
     }
 
@@ -4526,13 +4682,22 @@ export class CraftingEngine {
         essenceConsumeCounts.set(item.uuid, (essenceConsumeCounts.get(item.uuid) || 0) + 1);
       }
     }
-    for (const actor of componentSourceActors) {
-      for (const item of actor.items || []) {
-        const count = essenceConsumeCounts.get(item.uuid);
-        if (!count) continue;
-        await this._consumeItemQuantity(item, count, options.requireConfirmation === true);
-        consumedItems.push({ item, quantity: count, ingredient: null });
-      }
+    const plan = componentSourceActors
+      .flatMap((actor) => [...(actor.items || [])])
+      .filter((item) => essenceConsumeCounts.has(item.uuid))
+      .map((item) => ({ item, quantity: essenceConsumeCounts.get(item.uuid), ingredient: null }));
+    try {
+      if (plan.length !== essenceConsumeCounts.size)
+        throw unconfirmedHistoryError('Submitted alchemy Items are missing');
+      consumedItems.push(...(await this._consumeIngredients(plan)));
+    } catch (error) {
+      const failure = unconfirmedHistoryError(
+        'Alchemy consumption requires reconciliation',
+        [...consumedItems.map(mapConsumedIngredientRef), ...(error.receipts ?? [])],
+        error
+      );
+      failure.historyField = 'consumption';
+      throw failure;
     }
   }
 
@@ -4542,25 +4707,21 @@ export class CraftingEngine {
    * @private
    */
   async _consumeSubmittedAlchemyItems(componentSourceActors, submittedItems) {
-    // Count how many times each UUID appears in submitted items
     const consumeCounts = new Map();
     for (const item of submittedItems) {
       if (item.uuid) {
         consumeCounts.set(item.uuid, (consumeCounts.get(item.uuid) || 0) + 1);
       }
     }
-    for (const actor of componentSourceActors) {
-      for (const item of actor.items || []) {
-        const count = consumeCounts.get(item.uuid);
-        if (!count) continue;
-        try {
-          const qty = readStoredStackQuantity(item, { absentDefault: 1 });
-          await (count >= qty ? item.delete() : updateStackQuantity(item, qty - count));
-        } catch (error) {
-          console.error('Fabricate | Alchemy: failed to consume item', item.uuid, error);
-        }
-      }
+    const available = componentSourceActors.flatMap((actor) => [...(actor.items || [])]);
+    const plan = [];
+    for (const [uuid, quantity] of consumeCounts) {
+      const matches = available.filter((item) => item.uuid === uuid);
+      if (matches.length !== 1)
+        throw unconfirmedHistoryError('Submitted alchemy Item identity is unavailable');
+      plan.push({ item: matches[0], quantity });
     }
+    return (await this._consumeIngredients(plan)).map(mapConsumedIngredientRef);
   }
 
   /**
@@ -4926,6 +5087,8 @@ export class CraftingEngine {
       return { success: false, message: 'There is no in-progress craft to cancel.' };
     }
     const lifecycleContract = getRunLifecycleContract(run);
+    if (lifecycleContract === 'legacy')
+      for (const step of run.steps ?? []) assertNativeEffectsUninvoked(step);
     if (lifecycleContract === 'unsupported') {
       return versionedFailure('The crafting run lifecycle version is unsupported.');
     }
@@ -5106,39 +5269,57 @@ export class CraftingEngine {
    * @param {Array<{item: Item, quantity: number, ingredient: object}>} consumptionPlan
    * @param {{requireConfirmation?: boolean}} [options] Versioned effects require document acknowledgement.
    */
-  async _consumeIngredients(consumptionPlan = [], { requireConfirmation = false } = {}) {
+  async _consumeIngredients(consumptionPlan = [], { requireConfirmation = true } = {}) {
     const consumedItems = [];
-
-    // Execute consumption
-    for (const { item, quantity, ingredient } of consumptionPlan) {
-      await this._consumeItemQuantity(item, quantity, requireConfirmation);
-      // A versioned receipt may describe only confirmed writes. If a later item
-      // refuses, the executor retains the batch as uncertain and never replays it.
-      consumedItems.push({
-        item,
-        quantity,
-        ingredient,
-      });
+    try {
+      for (const { item, quantity, ingredient } of consumptionPlan) {
+        const captured = mapConsumedIngredientRef({ item, quantity });
+        const snapshot = snapshotVersionedItem(item);
+        const actual = await this._consumeItemQuantity(item, quantity, requireConfirmation);
+        const consumed = {
+          item,
+          quantity: actual,
+          ...(ingredient !== undefined && { ingredient }),
+        };
+        Object.defineProperties(consumed, {
+          receipt: { value: Object.freeze({ ...captured, quantity: actual }) },
+          snapshot: { value: snapshot },
+        });
+        consumedItems.push(consumed);
+        if (actual !== quantity) throw unconfirmedHistoryError('Partial consumption');
+      }
+    } catch (error) {
+      const failure = unconfirmedHistoryError(
+        'Consumption requires reconciliation',
+        [...consumedItems.map(mapConsumedIngredientRef), ...(error.receipts ?? [])],
+        error
+      );
+      failure.historyField = 'consumption';
+      throw failure;
     }
-
     return consumedItems;
   }
 
-  /** Consume one physical stack, retaining legacy return tolerance outside versioned effects. */
-  async _consumeItemQuantity(item, quantity, requireConfirmation) {
-    const before = readStoredStackQuantity(item, { absentDefault: 1 });
+  /** Only the acknowledged source decrement establishes consumption. */
+  async _consumeItemQuantity(item, quantity, _requireConfirmation) {
+    const path = itemStackQuantityPath();
+    const before = sourceItemQuantity(item, { path });
+    const captured = mapConsumedIngredientRef({ item, quantity });
+    if (before === null || receiptQuantity(quantity) === null)
+      throw unconfirmedHistoryError('Unknown consumption quantity');
     const result = await (quantity >= before
       ? item.delete()
-      : updateStackQuantity(item, before - quantity));
-    if (
-      requireConfirmation &&
-      (result == null || typeof result !== 'object' || !item.uuid || result.uuid !== item.uuid)
-    ) {
-      throw new CraftingLifecycleExecutionError(
-        'Ingredient consumption was not confirmed by the document write',
-        'CONSUMPTION_UNCONFIRMED'
-      );
-    }
+      : updateStackQuantity(item, before - quantity, path));
+    requireDocumentAcknowledgment(item, result);
+    if (quantity >= before) return before;
+    const after = sourceItemQuantity(item, { path, absentDefault: null });
+    if (after === null || after > before)
+      throw unconfirmedHistoryError('Consumption decrement is uncertain');
+    if (before - after !== quantity)
+      throw unconfirmedHistoryError('Partial consumption decrement', [
+        { ...captured, quantity: before - after },
+      ]);
+    return before - after;
   }
 
   /**
@@ -5483,7 +5664,7 @@ export class CraftingEngine {
   async _createResultItems(
     craftingActor,
     recipe,
-    step,
+    sourceStep,
     ingredientSet,
     consumedItems,
     toolItems,
@@ -5495,6 +5676,7 @@ export class CraftingEngine {
       resolveComponent = findMatchingComponent,
     } = {}
   ) {
+    const step = { ...sourceStep, resultGroups: linkResultGroups(sourceStep?.resultGroups) };
     const resolutionService =
       this.resolutionModeService || game.fabricate?.getResolutionModeService?.();
 
@@ -5514,33 +5696,35 @@ export class CraftingEngine {
     const groupsToCreate = Array.isArray(resolved?.groups) ? resolved.groups : [];
 
     const createdItems = [];
-    for (const group of groupsToCreate) {
-      for (const result of group.results || []) {
-        const resultItem = await this._createSingleResult(
-          craftingActor,
-          result,
-          consumedItems,
-          toolItems,
-          recipe,
-          {
-            ...checkResult,
-            resolutionMeta: resolved?.meta || {},
-          },
-          { step, precomputedEssences, essenceEnabled, resolveComponent }
-        );
+    const receiptCollector = createItemReceiptCollector();
+    try {
+      for (const group of groupsToCreate) {
+        for (const result of group.results || []) {
+          const resultItem = await this._createSingleResult(
+            craftingActor,
+            result,
+            consumedItems,
+            toolItems,
+            recipe,
+            {
+              ...checkResult,
+              resolutionMeta: resolved?.meta || {},
+            },
+            { step, precomputedEssences, essenceEnabled, resolveComponent, receiptCollector }
+          );
 
-        // De-dup: when two result rows produce the SAME managed component, the second
-        // stacks onto the first and `_createSingleResult` returns the same item object.
-        // The award tag accumulates both amounts, so the item is reported ONCE with the
-        // summed quantity rather than twice (issue 858 review).
-        if (resultItem && !createdItems.includes(resultItem)) {
-          createdItems.push(resultItem);
+          // Return each physical Item once; the collector retains every row's delta.
+          if (resultItem && !createdItems.includes(resultItem)) {
+            createdItems.push(resultItem);
+          }
         }
       }
+    } catch (error) {
+      throw receiptCollector.failure(error);
     }
 
     return {
-      items: createdItems,
+      items: attachAwardReceipts(createdItems, receiptCollector.snapshot()),
       resolutionMeta: resolved?.meta || null,
     };
   }
@@ -5556,7 +5740,13 @@ export class CraftingEngine {
     toolItems,
     recipe,
     checkResult = null,
-    { step = null, precomputedEssences = null, essenceEnabled = null, resolveComponent } = {}
+    {
+      step = null,
+      precomputedEssences = null,
+      essenceEnabled = null,
+      resolveComponent,
+      receiptCollector = null,
+    } = {}
   ) {
     // Get the source item
     let sourceItem;
@@ -5600,7 +5790,7 @@ export class CraftingEngine {
       console.error(
         `Fabricate | Result item not found: ${result.itemUuid || result.componentId || result.systemItemId}`
       );
-      return null;
+      throw unconfirmedHistoryError('Crafting result source is unavailable');
     }
 
     // Set quantity
@@ -5671,7 +5861,7 @@ export class CraftingEngine {
     // effects — any of which makes the produced item materially distinct from an
     // existing stack. Matches are resolved through the same system-scoped resolver
     // salvage/craft already use to find component items on the actor.
-    const awardedQuantity = Number(result.quantity) || 1;
+    const awardedQuantity = receiptQuantity(result.quantity ?? 1);
     const itemsIterable =
       craftingActor?.items != null && typeof craftingActor.items[Symbol.iterator] === 'function';
     let matchingItems = [];
@@ -5684,13 +5874,17 @@ export class CraftingEngine {
       itemData,
       matchingItems,
       awardedQuantity,
+      receiptCollector,
+      receiptIdentity: {
+        actorUuid: craftingActor.uuid,
+        componentId: managedItem?.id ?? null,
+        resultRowId: result.resultRowId ?? null,
+        sourceItemUuid: sourceItem?.uuid ?? null,
+      },
     });
     if (!resultItem) return null;
 
     const stacked = matchingItems.includes(resultItem);
-    // Record THIS award's contribution so chat/run reporting shows the amount
-    // produced now, not the merged stack total after a stack.
-    tagAwardedQuantity(resultItem, awardedQuantity);
 
     // Transfer active effects if configured (requires both recipe- and system-level
     // flags). Only ever applies to a freshly created item — a stacked item keeps its
@@ -7096,11 +7290,7 @@ export class CraftingEngine {
         status: success ? 'succeeded' : 'failed',
         actorName: craftingActor?.name || '',
         recipeName: recipe?.name || '',
-        results: (createdResults || []).map((item) => ({
-          name: item?.name || '',
-          img: item?.img || '',
-          quantity: awardedQuantityOf(item),
-        })),
+        results: awardReceipts(createdResults),
         consumed: (consumedIngredients || []).map(({ item, quantity }) => ({
           name: item?.name || '',
           img: item?.img || '',
@@ -7275,11 +7465,7 @@ export class CraftingEngine {
         status: success ? 'succeeded' : 'failed',
         actorName: actor?.name || '',
         componentName: component?.name || '',
-        results: (results || []).map((item) => ({
-          name: item?.name || '',
-          img: item?.img || '',
-          quantity: awardedQuantityOf(item),
-        })),
+        results: awardReceipts(results),
         consumed,
         tools: this._resolveBrokenToolChatEntries(usedTools, system),
         rollValue: Number.isFinite(rollValue) ? rollValue : null,
@@ -7695,7 +7881,16 @@ export class CraftingEngine {
     }
 
     const managedItems = resolvedComponentsFor(system);
-    const component = findById(getDefinitionIndex(managedItems), componentId);
+    const componentDefinition = findById(getDefinitionIndex(managedItems), componentId);
+    const component = componentDefinition
+      ? {
+          ...componentDefinition,
+          salvage: {
+            ...componentDefinition.salvage,
+            resultGroups: linkResultGroups(componentDefinition.salvage?.resultGroups),
+          },
+        }
+      : null;
     if (!component) {
       return {
         success: false,
@@ -7757,6 +7952,7 @@ export class CraftingEngine {
         ? salvageRunManager.getActiveRun(actor, options.runId)
         : salvageRunManager.findActiveRunForComponent(actor, craftingSystemId, componentId);
     }
+    if (salvageRun) assertNativeEffectsUninvoked(salvageRun);
 
     if (options?.runId && !salvageRun && salvageRunManager) {
       return {
@@ -7920,252 +8116,300 @@ export class CraftingEngine {
       };
     }
 
-    if (!checkResult.success) {
-      let consumedOnFail = [];
-      let usedTools = [];
-      try {
-        if (failurePolicy.consumeComponentOnFail) {
-          consumedOnFail = await this._consumeComponentItems(
-            actor,
-            componentItems,
-            ingredientQuantity
-          );
+    const salvageCheck = resolveSalvageCheck(system);
+    if (salvageRunManager && salvageRun) {
+      salvageRun.resolutionSnapshot = {
+        kind: salvageCheck.checkUsable ? 'check' : 'none',
+        mode: salvageCheck.mode,
+      };
+      salvageRun.historySettlement = {
+        consumption:
+          checkResult.success || failurePolicy.consumeComponentOnFail ? 'pending' : 'notApplicable',
+        awards: 'pending',
+      };
+      await salvageRunManager.updateRun(actor, salvageRun);
+    }
+    try {
+      if (!checkResult.success) {
+        let consumedOnFail = [];
+        let usedTools = [];
+        try {
+          if (failurePolicy.consumeComponentOnFail) {
+            consumedOnFail = await this._consumeComponentItems(
+              actor,
+              componentItems,
+              ingredientQuantity
+            );
+            await this._recordSalvageConsumption(
+              actor,
+              salvageRunManager,
+              salvageRun,
+              consumedOnFail
+            );
+          }
+          if (failurePolicy.breakToolsOnFail) {
+            // Salvage parity (issue 419): the FAILURE path breaks required tools only
+            // when `breakToolsOnFail === true` (this gate), matching crafting.
+            const salvageFailBreak = this._resolveSalvageBreakageDecision(system, checkResult);
+            usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
+              forceBreak: salvageFailBreak.forceBreak,
+              authority: salvageFailBreak.authority,
+              reason: salvageFailBreak.reason,
+              triggerId: salvageFailBreak.triggerId,
+            });
+          }
+        } catch (error) {
+          if (error.code === 'HISTORY_EFFECT_UNCERTAIN') throw error;
+          console.error('Fabricate | Error during salvage failure-path consumption:', error);
         }
-        if (failurePolicy.breakToolsOnFail) {
-          // Salvage parity (issue 419): the FAILURE path breaks required tools only
-          // when `breakToolsOnFail === true` (this gate), matching crafting.
-          const salvageFailBreak = this._resolveSalvageBreakageDecision(system, checkResult);
-          usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
-            forceBreak: salvageFailBreak.forceBreak,
-            authority: salvageFailBreak.authority,
-            reason: salvageFailBreak.reason,
-            triggerId: salvageFailBreak.triggerId,
+
+        // THE FAILURE AWARD (issue 1098, decision 5). Until this issue `salvage()` returned
+        // here unconditionally, so a failed salvage produced nothing whatever a component
+        // authored — which is why `salvageCraftingCheck.failureResultPolicy: 'never'` is
+        // what the 1.25.0 migration seeds onto every existing world.
+        //
+        // The disposition is EXPLICIT. `_resolveSalvageResultGroups` selects the reserved
+        // group BY ROLE under `'failure'`; the default `'success'` would hand back
+        // `resultGroups[0]`, which the retain-one clamp guarantees is the SUCCESS group —
+        // i.e. the full success salvage output, awarded for failing.
+        const failureResultGroups = activityPermitsFailureResults(system, 'salvage')
+          ? this._resolveSalvageResultGroups(component, system, checkResult, salvageRun, 'failure')
+          : [];
+        // The success branch builds this view before `_createSingleResult`; the failure
+        // branch had none, because it never created anything.
+        const failureSalvageRecipeView =
+          failureResultGroups.length > 0 ? this._buildSalvageRecipeView(component, system) : null;
+        const { resultItems: failureResultItems, createdRecords: failureCreatedRecords } =
+          failureSalvageRecipeView
+            ? await this._awardSalvageResultGroups({
+                actor,
+                resultGroups: failureResultGroups,
+                consumedItems: consumedOnFail,
+                tools: toolValidation.tools,
+                salvageRecipeView: failureSalvageRecipeView,
+                checkResult,
+              })
+            : { resultItems: [], createdRecords: [] };
+
+        if (salvageRunManager && salvageRun) {
+          salvageRun.createdResults = failureCreatedRecords.map(itemReceipt);
+          await salvageRunManager.updateRun(actor, salvageRun);
+          salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
+            consumedComponents: consumedOnFail.map(mapConsumedIngredientRef),
+            historySettlement: {
+              consumption: salvageRun.historySettlement?.consumption ?? 'notApplicable',
+              awards: 'complete',
+            },
+            usedTools,
+            // In the SUCCESS BRANCH'S SHAPE, through the same mapper. An empty list beside
+            // real items on the actor is a durable contradiction, not a cosmetic gap.
+            createdResults: failureCreatedRecords.map(itemReceipt),
+            checkResult: {
+              success: false,
+              outcome: checkResult.outcome,
+              value: checkResult.value,
+              data: checkResult.data || {},
+            },
+            failureReason: checkResult.message || 'Salvage check failed',
           });
         }
-      } catch (error) {
-        console.error('Fabricate | Error during salvage failure-path consumption:', error);
+
+        // Salvage chat parity (issue 675): crafting posts on failure too. Report the
+        // source forfeited on failure (per the consumption policy) and any tools that
+        // broke — merged into one "Consumed on Failure" section by the shared card.
+        const forfeitedQuantity = consumedOnFail.reduce(
+          (sum, { quantity }) => sum + (Number(quantity) || 0),
+          0
+        );
+        await this._postSalvageChatMessage({
+          success: false,
+          actor,
+          system,
+          component,
+          consumedQuantity: forfeitedQuantity,
+          // The card renders these under its own failure-award section (issue 1098);
+          // an empty list leaves every existing failure card byte-for-byte unchanged.
+          results: failureResultItems,
+          usedTools,
+          failureReason: checkResult.message || 'Salvage check failed',
+          rollValue: rollTotalForCard(checkResult),
+          tierStep: tierStepForCard(checkResult),
+          suppressed: options?.suppressChat === true,
+        });
+
+        return {
+          success: false,
+          // `null` when nothing was awarded — that is what every existing caller reads as
+          // "a failed salvage produced nothing", and the bulk-salvage surfaces read THIS
+          // value rather than the run record or the card (issue 1098, AF5/CF9).
+          results: failureResultItems.length > 0 ? failureResultItems : null,
+          message: checkResult.message || 'Salvage check failed',
+          salvageRun,
+        };
       }
 
-      // THE FAILURE AWARD (issue 1098, decision 5). Until this issue `salvage()` returned
-      // here unconditionally, so a failed salvage produced nothing whatever a component
-      // authored — which is why `salvageCraftingCheck.failureResultPolicy: 'never'` is
-      // what the 1.25.0 migration seeds onto every existing world.
+      const resultGroups = this._resolveSalvageResultGroups(
+        component,
+        system,
+        checkResult,
+        salvageRun
+      );
+      // Captured HERE, beside the resolution it must agree with, because `completeRun`
+      // below reassigns `salvageRun` and the ordered list is read off its captured
+      // `resultOrder` (issue 1286). Null for every non-progressive salvage.
+      const complicationInputs = this._progressiveSalvagePlanInputs(
+        component,
+        system,
+        checkResult,
+        salvageRun
+      );
+      const consumedItems = await this._consumeComponentItems(
+        actor,
+        componentItems,
+        ingredientQuantity
+      );
+      await this._recordSalvageConsumption(actor, salvageRunManager, salvageRun, consumedItems);
+      // Salvage parity (issue 419): the SUCCESS path always applies breakage (no
+      // `breakToolsOnFail` gate exists here), via the shared seam.
+      const salvageSuccessBreak = this._resolveSalvageBreakageDecision(system, checkResult);
+      const usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
+        forceBreak: salvageSuccessBreak.forceBreak,
+        authority: salvageSuccessBreak.authority,
+        reason: salvageSuccessBreak.reason,
+        triggerId: salvageSuccessBreak.triggerId,
+      });
+
+      const salvageRecipeView = this._buildSalvageRecipeView(component, system);
+      const { resultItems, createdRecords } = await this._awardSalvageResultGroups({
+        actor,
+        resultGroups,
+        consumedItems,
+        tools: toolValidation.tools,
+        salvageRecipeView,
+        checkResult,
+      });
+      if (salvageRunManager && salvageRun) {
+        salvageRun.createdResults = createdRecords.map(itemReceipt);
+        await salvageRunManager.updateRun(actor, salvageRun);
+      }
+
+      // Component complications (issue 1286): after the items are on the actor — the award
+      // is committed and a complication is strictly downstream of it — and before the card
+      // is posted. The FAILURE branch above has no such site and needs none: progressive
+      // salvage returns `[]` for a failed check, so there are no stages, no award and no
+      // candidates.
       //
-      // The disposition is EXPLICIT. `_resolveSalvageResultGroups` selects the reserved
-      // group BY ROLE under `'failure'`; the default `'success'` would hand back
-      // `resultGroups[0]`, which the retain-one clamp guarantees is the SUCCESS group —
-      // i.e. the full success salvage output, awarded for failing.
-      const failureResultGroups = activityPermitsFailureResults(system, 'salvage')
-        ? this._resolveSalvageResultGroups(component, system, checkResult, salvageRun, 'failure')
-        : [];
-      // The success branch builds this view before `_createSingleResult`; the failure
-      // branch had none, because it never created anything.
-      const failureSalvageRecipeView =
-        failureResultGroups.length > 0 ? this._buildSalvageRecipeView(component, system) : null;
-      const { resultItems: failureResultItems, createdRecords: failureCreatedRecords } =
-        failureSalvageRecipeView
-          ? await this._awardSalvageResultGroups({
-              actor,
-              resultGroups: failureResultGroups,
-              consumedItems: consumedOnFail,
-              tools: toolValidation.tools,
-              salvageRecipeView: failureSalvageRecipeView,
-              checkResult,
-            })
-          : { resultItems: [], createdRecords: [] };
+      // It sits BEFORE the run completion rather than after it because `firedComplications`
+      // has to be written AT WRITE TIME, in the completion payload. `completeRun` moves the
+      // run out of `active` and into `history`, and there is no supported way to amend a
+      // history entry afterwards — so firing after it would force either a second, ad-hoc
+      // actor-flag write or a run record that never carries what fired. The award itself is
+      // untouched by the move: the items exist and the tools have broken by this line.
+      let complicationRequests = null;
+      let firedComplications = null;
+      if (complicationInputs) {
+        const fired = await this._fireComponentComplications({
+          activity: 'salvage',
+          actor,
+          craftingSystemId,
+          stages: complicationInputs.stages,
+          award: complicationInputs.award,
+          checkBreakage: this._resolveSalvageCheckBreakage(system),
+          checkResult,
+          deliver: deferComplicationDelivery !== true,
+        });
+        firedComplications = fired?.fired ?? null;
+        if (deferComplicationDelivery === true) complicationRequests = fired?.gmRequests ?? [];
+      }
+      // TWO redactions of one list, deliberately: the run record narrows to four durable
+      // keys, the return carries the seven a view-model renders. Both start from
+      // `publicComplications`, so neither can widen past the player audience.
+      const runComplications = salvageRunComplicationRecords(firedComplications);
+      const playerComplications = publicComplications(firedComplications);
 
       if (salvageRunManager && salvageRun) {
-        salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'failed', {
-          consumedComponents: consumedOnFail.map(({ item, quantity }) => ({
-            itemUuid: item.uuid,
-            quantity,
-          })),
+        salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'succeeded', {
+          consumedComponents: consumedItems.map(mapConsumedIngredientRef),
+          historySettlement: { consumption: 'complete', awards: 'complete' },
           usedTools,
-          // In the SUCCESS BRANCH'S SHAPE, through the same mapper. An empty list beside
-          // real items on the actor is a durable contradiction, not a cosmetic gap.
-          createdResults: failureCreatedRecords.map(salvageCreatedResultRecord),
+          createdResults: createdRecords.map(itemReceipt),
           checkResult: {
-            success: false,
+            success: true,
             outcome: checkResult.outcome,
             value: checkResult.value,
             data: checkResult.data || {},
           },
-          failureReason: checkResult.message || 'Salvage check failed',
+          failureReason: null,
+          // Spread conditionally so a salvage that fired nothing — which is every
+          // non-progressive salvage and most progressive ones — writes a record with no
+          // such key at all, exactly as it did before this feature existed. `completeRun`
+          // spreads its payload with NO allowlist, so the field persists once written.
+          ...(runComplications.length > 0 && { firedComplications: runComplications }),
         });
       }
 
-      // Salvage chat parity (issue 675): crafting posts on failure too. Report the
-      // source forfeited on failure (per the consumption policy) and any tools that
-      // broke — merged into one "Consumed on Failure" section by the shared card.
-      const forfeitedQuantity = consumedOnFail.reduce(
+      // Salvage chat parity (issue 675): the same card crafting posts, reading as a
+      // salvage analogue — the source broken down, the materials recovered, and any
+      // tools that broke. Gated on the same `chatOutput` toggle inside the poster.
+      const consumedQuantity = consumedItems.reduce(
         (sum, { quantity }) => sum + (Number(quantity) || 0),
         0
       );
       await this._postSalvageChatMessage({
-        success: false,
+        success: true,
         actor,
         system,
         component,
-        consumedQuantity: forfeitedQuantity,
-        // The card renders these under its own failure-award section (issue 1098);
-        // an empty list leaves every existing failure card byte-for-byte unchanged.
-        results: failureResultItems,
+        consumedQuantity,
+        results: resultItems,
         usedTools,
-        failureReason: checkResult.message || 'Salvage check failed',
+        failureReason: '',
         rollValue: rollTotalForCard(checkResult),
         tierStep: tierStepForCard(checkResult),
         suppressed: options?.suppressChat === true,
+        firedComplications,
       });
 
       return {
-        success: false,
-        // `null` when nothing was awarded — that is what every existing caller reads as
-        // "a failed salvage produced nothing", and the bulk-salvage surfaces read THIS
-        // value rather than the run record or the card (issue 1098, AF5/CF9).
-        results: failureResultItems.length > 0 ? failureResultItems : null,
-        message: checkResult.message || 'Salvage check failed',
+        success: true,
+        results: resultItems,
+        message: `Successfully salvaged ${component.name || componentId}`,
+        // Present ONLY when the caller asked to batch (bulk salvage). Addressing only, by
+        // construction: a GM request carries no name, description, macro uuid or
+        // visibility, so there is nothing here for a player-facing surface to redact.
+        ...(complicationRequests === null ? undefined : { complicationRequests }),
+        // The FIRED surface, and unlike the requests above it needs redacting — it is read
+        // by the player's own salvage view-model, so a `gmOnly` complication must not be
+        // here even when a GM is the acting user. Omitted entirely when nothing
+        // player-visible fired, so an unchanged caller sees an unchanged return.
+        ...(playerComplications.length > 0 && { complications: playerComplications }),
+        // The rolled total, threaded top-level so the player summary can read it even on
+        // the RUNLESS path (no salvage run manager) where `salvageRun` is null. `null` for
+        // a no-check simple salvage (nothing was rolled); a finite number otherwise.
+        value: checkResult.value ?? null,
         salvageRun,
       };
+    } catch (error) {
+      if (salvageRunManager && salvageRun) {
+        const saved = salvageRunManager.getActiveRun(actor, salvageRun.id);
+        if (saved) {
+          const field = error.historyField ?? 'awards';
+          saved.historySettlement = { ...saved.historySettlement, [field]: 'uncertain' };
+          if (Array.isArray(error.receipts))
+            saved[field === 'consumption' ? 'consumedComponents' : 'createdResults'] =
+              error.receipts.map(itemReceipt);
+          await salvageRunManager.updateRun(actor, saved);
+        }
+      }
+      throw error;
     }
+  }
 
-    const resultGroups = this._resolveSalvageResultGroups(
-      component,
-      system,
-      checkResult,
-      salvageRun
-    );
-    // Captured HERE, beside the resolution it must agree with, because `completeRun`
-    // below reassigns `salvageRun` and the ordered list is read off its captured
-    // `resultOrder` (issue 1286). Null for every non-progressive salvage.
-    const complicationInputs = this._progressiveSalvagePlanInputs(
-      component,
-      system,
-      checkResult,
-      salvageRun
-    );
-    const consumedItems = await this._consumeComponentItems(
-      actor,
-      componentItems,
-      ingredientQuantity
-    );
-    // Salvage parity (issue 419): the SUCCESS path always applies breakage (no
-    // `breakToolsOnFail` gate exists here), via the shared seam.
-    const salvageSuccessBreak = this._resolveSalvageBreakageDecision(system, checkResult);
-    const usedTools = await this._applyToolBreakage(syntheticRecipe, toolValidation.tools, {
-      forceBreak: salvageSuccessBreak.forceBreak,
-      authority: salvageSuccessBreak.authority,
-      reason: salvageSuccessBreak.reason,
-      triggerId: salvageSuccessBreak.triggerId,
-    });
-
-    const salvageRecipeView = this._buildSalvageRecipeView(component, system);
-    const { resultItems, createdRecords } = await this._awardSalvageResultGroups({
-      actor,
-      resultGroups,
-      consumedItems,
-      tools: toolValidation.tools,
-      salvageRecipeView,
-      checkResult,
-    });
-
-    // Component complications (issue 1286): after the items are on the actor — the award
-    // is committed and a complication is strictly downstream of it — and before the card
-    // is posted. The FAILURE branch above has no such site and needs none: progressive
-    // salvage returns `[]` for a failed check, so there are no stages, no award and no
-    // candidates.
-    //
-    // It sits BEFORE the run completion rather than after it because `firedComplications`
-    // has to be written AT WRITE TIME, in the completion payload. `completeRun` moves the
-    // run out of `active` and into `history`, and there is no supported way to amend a
-    // history entry afterwards — so firing after it would force either a second, ad-hoc
-    // actor-flag write or a run record that never carries what fired. The award itself is
-    // untouched by the move: the items exist and the tools have broken by this line.
-    let complicationRequests = null;
-    let firedComplications = null;
-    if (complicationInputs) {
-      const fired = await this._fireComponentComplications({
-        activity: 'salvage',
-        actor,
-        craftingSystemId,
-        stages: complicationInputs.stages,
-        award: complicationInputs.award,
-        checkBreakage: this._resolveSalvageCheckBreakage(system),
-        checkResult,
-        deliver: deferComplicationDelivery !== true,
-      });
-      firedComplications = fired?.fired ?? null;
-      if (deferComplicationDelivery === true) complicationRequests = fired?.gmRequests ?? [];
-    }
-    // TWO redactions of one list, deliberately: the run record narrows to four durable
-    // keys, the return carries the seven a view-model renders. Both start from
-    // `publicComplications`, so neither can widen past the player audience.
-    const runComplications = salvageRunComplicationRecords(firedComplications);
-    const playerComplications = publicComplications(firedComplications);
-
-    if (salvageRunManager && salvageRun) {
-      salvageRun = await salvageRunManager.completeRun(actor, salvageRun, 'succeeded', {
-        consumedComponents: consumedItems.map(({ item, quantity }) => ({
-          itemUuid: item.uuid,
-          quantity,
-        })),
-        usedTools,
-        createdResults: createdRecords.map(salvageCreatedResultRecord),
-        checkResult: {
-          success: true,
-          outcome: checkResult.outcome,
-          value: checkResult.value,
-          data: checkResult.data || {},
-        },
-        failureReason: null,
-        // Spread conditionally so a salvage that fired nothing — which is every
-        // non-progressive salvage and most progressive ones — writes a record with no
-        // such key at all, exactly as it did before this feature existed. `completeRun`
-        // spreads its payload with NO allowlist, so the field persists once written.
-        ...(runComplications.length > 0 && { firedComplications: runComplications }),
-      });
-    }
-
-    // Salvage chat parity (issue 675): the same card crafting posts, reading as a
-    // salvage analogue — the source broken down, the materials recovered, and any
-    // tools that broke. Gated on the same `chatOutput` toggle inside the poster.
-    const consumedQuantity = consumedItems.reduce(
-      (sum, { quantity }) => sum + (Number(quantity) || 0),
-      0
-    );
-    await this._postSalvageChatMessage({
-      success: true,
-      actor,
-      system,
-      component,
-      consumedQuantity,
-      results: resultItems,
-      usedTools,
-      failureReason: '',
-      rollValue: rollTotalForCard(checkResult),
-      tierStep: tierStepForCard(checkResult),
-      suppressed: options?.suppressChat === true,
-      firedComplications,
-    });
-
-    return {
-      success: true,
-      results: resultItems,
-      message: `Successfully salvaged ${component.name || componentId}`,
-      // Present ONLY when the caller asked to batch (bulk salvage). Addressing only, by
-      // construction: a GM request carries no name, description, macro uuid or
-      // visibility, so there is nothing here for a player-facing surface to redact.
-      ...(complicationRequests === null ? undefined : { complicationRequests }),
-      // The FIRED surface, and unlike the requests above it needs redacting — it is read
-      // by the player's own salvage view-model, so a `gmOnly` complication must not be
-      // here even when a GM is the acting user. Omitted entirely when nothing
-      // player-visible fired, so an unchanged caller sees an unchanged return.
-      ...(playerComplications.length > 0 && { complications: playerComplications }),
-      // The rolled total, threaded top-level so the player summary can read it even on
-      // the RUNLESS path (no salvage run manager) where `salvageRun` is null. `null` for
-      // a no-check simple salvage (nothing was rolled); a finite number otherwise.
-      value: checkResult.value ?? null,
-      salvageRun,
-    };
+  async _recordSalvageConsumption(actor, manager, run, consumed) {
+    if (!manager || !run) return;
+    run.consumedComponents = consumed.map(mapConsumedIngredientRef);
+    run.historySettlement = { ...run.historySettlement, consumption: 'complete' };
+    await manager.updateRun(actor, run);
   }
 
   /**
@@ -8259,15 +8503,19 @@ export class CraftingEngine {
    * @private
    */
   async _consumeComponentItems(actor, items, quantity) {
-    const consumed = [];
-
-    for (const take of planFirstFitDrain(items, quantity).takes) {
-      consumed.push({ item: take.item, quantity: take.quantity });
-      await (take.exhausted
-        ? take.item.delete()
-        : updateStackQuantity(take.item, take.remainingQuantity));
+    const snapshots = items.map((item) => ({ ...(item._source ?? item), original: item }));
+    const plan = planFirstFitDrain(snapshots, quantity);
+    const consumed = await this._consumeIngredients(
+      plan.takes.map((take) => ({ item: take.item.original, quantity: take.quantity }))
+    );
+    if (consumed.reduce((sum, entry) => sum + entry.quantity, 0) !== quantity) {
+      const error = unconfirmedHistoryError(
+        'Partial salvage consumption',
+        consumed.map(mapConsumedIngredientRef)
+      );
+      error.historyField = 'consumption';
+      throw error;
     }
-
     return consumed;
   }
 
@@ -8308,28 +8556,30 @@ export class CraftingEngine {
     // `result.systemItemId`), the same accessor `_createSingleResult` and progressive
     // award use.
     const createdRecords = [];
-    for (const group of resultGroups) {
-      for (const result of group.results || []) {
-        const created = await this._createSingleResult(
-          actor,
-          result,
-          consumedItems,
-          tools,
-          salvageRecipeView,
-          checkResult
-        );
-        // De-dup a stacked-twice component (same object returned): the award tag
-        // accumulates, so one record carries the summed quantity (issue 858 review).
-        if (created && !resultItems.includes(created)) {
-          resultItems.push(created);
-          createdRecords.push({
-            item: created,
-            componentId: result.componentId || result.systemItemId || null,
-          });
+    const receiptCollector = createItemReceiptCollector();
+    try {
+      for (const group of resultGroups) {
+        for (const result of group.results || []) {
+          const created = await this._createSingleResult(
+            actor,
+            result,
+            consumedItems,
+            tools,
+            salvageRecipeView,
+            checkResult,
+            { receiptCollector }
+          );
+          // Return each physical Item once while preserving all receipt rows.
+          if (created && !resultItems.includes(created)) {
+            resultItems.push(created);
+          }
         }
       }
+    } catch (error) {
+      throw receiptCollector.failure(error);
     }
-    return { resultItems, createdRecords };
+    createdRecords.push(...receiptCollector.snapshot());
+    return { resultItems: attachAwardReceipts(resultItems, createdRecords), createdRecords };
   }
 
   /**
@@ -8918,9 +9168,9 @@ function rehydrateVersionedItem(snapshot = {}) {
   };
 }
 
-function snapshotVersionedConsumedItem({ item, quantity, ingredient }) {
+function snapshotVersionedConsumedItem({ item, quantity, ingredient, snapshot }) {
   return {
-    ...snapshotVersionedItem(item),
+    ...(snapshot ?? snapshotVersionedItem(item)),
     quantity: Number(quantity) || 0,
     ingredient: cloneJsonValue(ingredient) ?? null,
   };
@@ -8955,7 +9205,7 @@ function rehydrateVersionedResultItem(record) {
     name: record?.name,
     img: record?.img,
   });
-  return tagAwardedQuantity(item, Number(record?.quantity) || 1);
+  return item;
 }
 
 function findItemByUuid(actors, itemUuid) {

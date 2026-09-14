@@ -7,6 +7,13 @@ import {
   transitionExecutionJournal,
 } from './runExecutionJournal.js';
 import {
+  historyEvidenceFields,
+  itemReceipt,
+  preserveSettledHistory,
+  retainUncertainReceipt,
+  writeAcknowledgedRunContainer,
+} from './runHistoryEvidence.js';
+import {
   assertRunLifecycleMutation,
   buildNewRunLifecycleFields,
   getRunLifecycleContract,
@@ -299,6 +306,33 @@ export class GatheringRunManager {
     return activeRun;
   }
 
+  async settleHistory(actor, runId, payload) {
+    this.invalidateCache(actorKey(actor));
+    const container = cloneContainer(this._getContainer(actor));
+    const location = findRun(container, runId);
+    if (!location?.terminal || getRunLifecycleContract(location.run) !== 'legacy') {
+      throw new GatheringRunManagerError(
+        'Native terminal history is required',
+        'INVALID_SETTLEMENT'
+      );
+    }
+    if (['complete', 'uncertain'].includes(location.run.historySettlement?.awards))
+      return cloneJson(location.run);
+    const settled = this._normalizeRun({ ...location.run, ...payload }, { actor, terminal: true });
+    container.history = container.history.map((run) => (run.id === settled.id ? settled : run));
+    await this._persist(actor, container);
+    return cloneJson(settled);
+  }
+
+  async retainUncertainReceipt(actor, runId, effectId, receipts, options) {
+    return retainUncertainReceipt(
+      this._locateRunPersistence(actor, runId, { activeOnly: false }),
+      effectId,
+      receipts,
+      options
+    );
+  }
+
   async cancelRun(actor, runId, options = {}) {
     if (options.expectedRevision !== undefined || options.executionOperationId) {
       this.invalidateCache(actorKey(actor));
@@ -449,17 +483,25 @@ export class GatheringRunManager {
   async _persist(actor, container) {
     const normalized = this._normalizeContainer(container, actor);
     const key = actorKey(actor);
+    const current = this._normalizeContainer(readGatheringRunsFlag(actor), actor);
+    normalized.history = preserveSettledHistory(current.history, normalized.history);
     // Reconcile against the CURRENT document so a stale in-memory view cannot clobber
     // runs written out-of-band by another client/session or the world-time resume
     // (issues 733 + 739): union history by id, keep other writers' active runs.
     const reconciled = reconcileAgainstDocument({
-      current: this._normalizeContainer(readGatheringRunsFlag(actor), actor),
+      current,
       next: normalized,
       baseline: this._baseline.get(key),
       compareHistory: compareNewestFirst,
       historyLimit: HISTORY_LIMIT,
     });
-    await writeGatheringRunsFlag(actor, reconciled);
+    for (const run of reconciled.history) delete reconciled.active[run.id];
+    try {
+      await writeAcknowledgedRunContainer(actor, FLAG_NAMESPACE, FLAG_KEY, current, reconciled);
+    } catch (error) {
+      this.invalidateCache(key);
+      throw error;
+    }
     this._cache.set(key, reconciled);
     this._recordBaseline(key, reconciled);
   }
@@ -540,6 +582,8 @@ export class GatheringRunManager {
     if (!terminal && status === 'waitingTime' && !timeGate) return null;
 
     copyGatheringRunEvidence(run, record);
+    Object.assign(run, historyEvidenceFields(record));
+    if (getRunLifecycleContract(record) === 'current') delete run.historySettlement;
     run.usedTools = normalizeRunItems(record.usedTools);
     run.createdResults =
       terminal && status === 'cancelled' ? [] : normalizeRunItems(record.createdResults);
@@ -621,7 +665,7 @@ export class GatheringRunManager {
   }
 
   _terminalPayload(status, payload = {}, { preserveMissingTimeGate = false } = {}) {
-    const terminalPayload = {};
+    const terminalPayload = historyEvidenceFields(payload);
     if (!preserveMissingTimeGate || payload.timeGate !== undefined) {
       terminalPayload.timeGate = payload.timeGate;
     }
@@ -688,30 +732,6 @@ function readGatheringRunsFlag(actor) {
   }
 }
 
-async function writeGatheringRunsFlag(actor, value) {
-  const current = readGatheringRunsFlag(actor);
-  const currentActive =
-    current?.active && typeof current.active === 'object' && !Array.isArray(current.active)
-      ? current.active
-      : {};
-  const nextActive =
-    value?.active && typeof value.active === 'object' && !Array.isArray(value.active)
-      ? value.active
-      : {};
-  const activeDeletions = Object.keys(currentActive)
-    .filter((runId) => !(runId in nextActive))
-    .reduce((updates, runId) => {
-      updates[`flags.${FLAG_NAMESPACE}.${FLAG_KEY}.active.-=${runId}`] = null;
-      return updates;
-    }, {});
-
-  if (Object.keys(activeDeletions).length > 0 && typeof actor.update === 'function') {
-    await actor.update(activeDeletions);
-  }
-
-  return actor.setFlag(FLAG_NAMESPACE, FLAG_KEY, cloneJson(value));
-}
-
 function pickRunPayload(data = {}) {
   const payload = {};
   for (const field of [
@@ -735,6 +755,8 @@ function pickRunPayload(data = {}) {
     'pauseState',
     'pausedDurationSeconds',
     'executionJournal',
+    'resolutionSnapshot',
+    'historySettlement',
   ]) {
     if (data[field] !== undefined) payload[field] = data[field];
   }
@@ -756,11 +778,7 @@ function normalizeRunItems(items) {
     items
       .filter((item) => item && typeof item === 'object')
       .map((item) => {
-        const entry = {
-          actorUuid: stringOrNull(item.actorUuid),
-          itemUuid: stringOrNull(item.itemUuid),
-          quantity: positiveNumberOrDefault(item.quantity, 1),
-        };
+        const entry = itemReceipt(item);
         // Preserve the display name/image (when present) so the journal can list
         // gathered items; absent for legacy/lean records.
         const componentId = stringOrNull(item.componentId);
@@ -838,11 +856,6 @@ function numberOrDefault(...values) {
     if (Number.isFinite(number)) return number;
   }
   return null;
-}
-
-function positiveNumberOrDefault(value, fallback) {
-  const number = Number(value);
-  return Number.isFinite(number) && number > 0 ? number : fallback;
 }
 
 function cloneContainer(container) {

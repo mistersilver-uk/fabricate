@@ -17,6 +17,7 @@ import { gatheringHistoryEvidence } from './gatheringHistoryEvidence.js';
 import { enrichHistoricalConsumption, historicalItemSources } from './historyItemEvidence.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
+import { historyEvidenceFields } from './runHistoryEvidence.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
 import { resolvedComponentsFor, resolvedEssencesFor } from './scopedEntityReads.js';
 
@@ -35,9 +36,13 @@ function recordedNumber(value) {
 // Versioned terminal history is persisted BEFORE effects. Its createdResults is
 // a plan, even after commit; the applied results receipt is the award authority.
 function gatheringActualAwards(run) {
+  if (run.checkResult?.blind === true) return null;
   if (getRunLifecycleContract(run) !== 'current') {
+    if (run.historySettlement?.awards === 'pending') return null;
     // Older failure normalization erased these refs; an empty list cannot prove zero.
-    return run.status === 'failed' && normalizeList(run.createdResults).length === 0
+    return run.status === 'failed' &&
+      normalizeList(run.createdResults).length === 0 &&
+      run.historySettlement?.awards !== 'complete'
       ? null
       : run.createdResults;
   }
@@ -664,7 +669,11 @@ export class RunJournalBuilder {
       flavor: '',
       failureReason,
       craftingYield: currentStep?.craftingYield ?? null,
-      ...this._craftingResults(runSteps, redacted, stringOrNull(run.craftingSystemId)),
+      ...this._craftingResults(
+        runSteps,
+        redacted || !historyEntitled,
+        stringOrNull(run.craftingSystemId)
+      ),
       // `manualAdvance` states what the run TYPE needs, not what the viewer may do:
       // a crafting run always advances on a click, where gathering and salvage
       // auto-resolve off the world-time hook. Redaction must NOT suppress it
@@ -698,8 +707,17 @@ export class RunJournalBuilder {
     const isGM = viewer?.isGM === true;
     const visibleToPlayers = system?.alchemy?.showAttemptHistoryToPlayers === true;
     if (!isGM && !visibleToPlayers) return null;
+    const historyEntitled = this._nativeHistoryEntitled({ actor, viewer, run });
 
     const status = stringOrNull(run.status) || 'failed';
+    const consumed =
+      getRunLifecycleContract(run) === 'current'
+        ? normalizeList(run.executionJournal?.effects).flatMap((effect) =>
+            effect.kind === 'consumeAlchemyItems' && effect.phase === 'applied'
+              ? normalizeList(effect.receipt?.items)
+              : []
+          )
+        : normalizeList(run.consumedIngredients);
     return {
       id: stringOrNull(run.id),
       ...this._runLifecycleProjection({
@@ -709,7 +727,7 @@ export class RunJournalBuilder {
         actor,
         actorUuid,
         terminal: true,
-        entitled: isGM,
+        entitled: historyEntitled,
         derivedStatus: status,
         authority,
       }),
@@ -743,6 +761,19 @@ export class RunJournalBuilder {
       failureReason: this.localize('FABRICATE.App.Journal.Fizzle.Failure'),
       craftingYield: null,
       createdResults: [],
+      ...(historyEntitled && historyEvidenceFields(run)),
+      consumedIngredients: historyEntitled
+        ? consumed.map((entry) => this._mapResult(entry, run.craftingSystemId, false))
+        : [],
+      createdResultsRecorded:
+        historyEntitled &&
+        (run.historySettlement?.awards === 'complete' ||
+          normalizeList(run.executionJournal?.effects).some(
+            (effect) =>
+              effect.kind === 'awardResults' &&
+              effect.phase === 'applied' &&
+              Array.isArray(effect.receipt?.results)
+          )),
       createdResultCount: 0,
       isFizzle: true,
       manualAdvance: false,
@@ -804,6 +835,7 @@ export class RunJournalBuilder {
       completedAt: historyEntitled ? recordedNumber(runStep?.completedAt) : null,
       presentationSnapshot: evidence.presentationSnapshot ?? null,
       resolutionSnapshot: evidence.resolutionSnapshot ?? null,
+      ...(historyEntitled && historyEvidenceFields(runStep)),
       essenceSpend: evidence.essenceSpend ?? null,
       currencySpends:
         evidence.currencySpends ??
@@ -825,7 +857,10 @@ export class RunJournalBuilder {
       createdResults: normalizeList(historyEntitled ? runStep?.createdResults : null).map((entry) =>
         this._mapResult(entry, systemId)
       ),
-      createdResultsRecorded: historyEntitled && Array.isArray(runStep?.createdResults),
+      createdResultsRecorded:
+        historyEntitled &&
+        Array.isArray(runStep?.createdResults) &&
+        !['pending', 'uncertain'].includes(runStep.historySettlement?.awards),
       usedTools: normalizeList(historyEntitled ? runStep?.usedTools : null).map((entry) =>
         this._historicalTool(entry, systemId)
       ),
@@ -1691,6 +1726,7 @@ export class RunJournalBuilder {
     authority = null,
   }) {
     if (!run?.id) return null;
+    const historyEntitled = this._nativeHistoryEntitled({ actor, viewer, run });
     const system = this._getSystem(stringOrNull(run.craftingSystemId));
     const status = stringOrNull(run.status) || (terminal ? 'succeeded' : 'inProgress');
     const timeGate = plainObjectOrNull(run.timeGate);
@@ -1707,6 +1743,8 @@ export class RunJournalBuilder {
       runType === 'gathering' ? this._gatheringRunDisplayTask({ run, viewer }) : null;
     const resultRun =
       runType === 'gathering' ? { ...run, createdResults: gatheringActualAwards(run) } : run;
+    const withheld = Boolean(run.resolutionSnapshot || run.historySettlement) && !historyEntitled;
+    const createdResults = withheld ? null : resultRun.createdResults;
     const { title, img, blindSecretPreview } = this._passthroughRunIdentity({
       run,
       runType,
@@ -1731,6 +1769,7 @@ export class RunJournalBuilder {
         timeGate,
         hasPlayerCheck,
         entitled: !gatheringContext?.blind || viewer?.isGM === true,
+        evidenceEntitled: historyEntitled && (!gatheringContext?.blind || viewer?.isGM === true),
         authority,
       }),
       runType,
@@ -1739,11 +1778,11 @@ export class RunJournalBuilder {
       craftingSystemId: stringOrNull(run.craftingSystemId),
       craftingSystemName: stringOrEmpty(system?.name),
       names: {
-        title,
-        subtitle: stringOrEmpty(system?.name),
+        title: withheld ? this.localize('FABRICATE.App.Journal.Redacted.Title') : title,
+        subtitle: withheld ? '' : stringOrEmpty(system?.name),
       },
-      redacted: false,
-      img,
+      redacted: withheld,
+      img: withheld ? ({ gathering: DEFAULT_GATHERING_IMAGE }[runType] ?? DEFAULT_RUN_IMAGE) : img,
       stepIndex: null,
       stepCount: 0,
       multiStep: false,
@@ -1757,20 +1796,33 @@ export class RunJournalBuilder {
       finishedAt,
       structureLabel: '',
       resolutionModeLabel: '',
+      ...(historyEntitled && historyEvidenceFields(run)),
+      consumedIngredients:
+        historyEntitled && runType === 'salvage'
+          ? normalizeList(run.consumedComponents).map((entry) =>
+              this._mapResult(entry, run.craftingSystemId, false)
+            )
+          : [],
+      lastCheckResult:
+        historyEntitled && runType === 'salvage' ? this._checkResultModel(run.checkResult) : null,
       gatheringYield:
-        runType === 'gathering'
+        runType === 'gathering' && !withheld
           ? this._gatheringYield({ run: resultRun, system, context: gatheringContext, terminal })
           : null,
       recipeId: null,
       environmentId:
-        runType === 'gathering' && gatheringContext?.task ? stringOrNull(run.environmentId) : null,
-      taskId: stringOrNull(run.taskId),
+        runType === 'gathering' && gatheringContext?.task && !withheld
+          ? stringOrNull(run.environmentId)
+          : null,
+      taskId: withheld ? null : stringOrNull(run.taskId),
       // GM-only marker: this row names a task the acting player cannot see.
       blindSecretPreview,
       flavor: '',
-      failureReason: stringOrNull(run.failureReason),
-      createdResultsRecorded: Array.isArray(resultRun.createdResults),
-      ...this._passthroughResults(resultRun.createdResults, stringOrNull(run.craftingSystemId)),
+      failureReason: withheld ? null : stringOrNull(run.failureReason),
+      createdResultsRecorded:
+        Array.isArray(createdResults) &&
+        !['pending', 'uncertain'].includes(run.historySettlement?.awards),
+      ...this._passthroughResults(createdResults, stringOrNull(run.craftingSystemId)),
       manualAdvance: false,
     };
   }
@@ -1888,10 +1940,10 @@ export class RunJournalBuilder {
   _gatheringHistoryYield(run, system) {
     const result = plainObjectOrNull(run?.checkResult);
     const task = plainObjectOrNull(run?.economyEvidence?.runtimeSnapshot?.task);
-    let mode = stringOrNull(task?.resolutionMode);
+    let mode = stringOrNull(run.resolutionSnapshot?.mode) || stringOrNull(task?.resolutionMode);
     if (result?.provider === 'd100') mode = 'd100';
     else if (Object.hasOwn(result ?? {}, 'outcome')) mode = 'routed';
-    if (!['straight', 'd100', 'routed'].includes(mode)) return null;
+    if (!['straight', 'd100', 'routed', 'progressive'].includes(mode)) return null;
     const evidence = gatheringHistoryEvidence({
       result: result ?? {},
       awards: run.createdResults,
@@ -1906,7 +1958,7 @@ export class RunJournalBuilder {
       roll: evidence.roll,
       rollModel: evidence.rollModel,
       unattributedAwardIndexes: evidence.unattributedAwardIndexes,
-      check: mode === 'routed' ? this._checkResultModel(result) : null,
+      check: ['routed', 'progressive'].includes(mode) ? this._checkResultModel(result) : null,
       tiers: [],
     };
   }
@@ -2112,11 +2164,12 @@ export class RunJournalBuilder {
     authority = null,
   }) {
     const lifecycleContract = getRunLifecycleContract(run);
-    const recoveryEvidence = this._recoveryEvidence(
-      run?.executionJournal,
-      evidenceEntitled,
-      stringOrNull(run?.craftingSystemId)
-    );
+    const recoveryEvidence =
+      this._recoveryEvidence(
+        run?.executionJournal,
+        evidenceEntitled,
+        stringOrNull(run?.craftingSystemId)
+      ) ?? this._nativeRecoveryEvidence(run, evidenceEntitled);
     const blockedReason = terminal
       ? null
       : this._mutationBlockedReason({
@@ -2137,8 +2190,13 @@ export class RunJournalBuilder {
     const materialBlocked = current && live && runType === 'crafting' && knownMaterialShortfall;
     const readyToExecute =
       derivedStatus !== 'waiting' && derivedStatus !== 'paused' && !materialBlocked;
-    const legacyExecute = lifecycleContract === 'legacy' && live && runType === 'crafting' && owner;
-    const legacyCancel = lifecycleContract === 'legacy' && live && runType === 'crafting' && owner;
+    const legacyExecute =
+      lifecycleContract === 'legacy' &&
+      live &&
+      runType === 'crafting' &&
+      owner &&
+      !executionBlocked;
+    const legacyCancel = legacyExecute;
     return {
       key: JSON.stringify([actorUuid, runType, stringOrNull(run?.id)]),
       actorUuid,
@@ -2197,7 +2255,9 @@ export class RunJournalBuilder {
       phase: EXECUTION_EFFECT_PHASES.has(effect?.phase) ? effect.phase : 'unknown',
       hasReceipt: Object.hasOwn(effect || {}, 'receipt'),
       receipt:
-        entitled && effect?.phase === 'applied' ? this._safeEffectReceipt(effect, systemId) : null,
+        entitled && (effect?.phase === 'applied' || effect?.receipt?.uncertain === true)
+          ? this._safeEffectReceipt(effect, systemId)
+          : null,
     }));
     return {
       status,
@@ -2209,11 +2269,71 @@ export class RunJournalBuilder {
     };
   }
 
+  _nativeRecoveryEvidence(run, entitled) {
+    if (getRunLifecycleContract(run) !== 'legacy') return null;
+    const owner = run.historySettlement ? run : run.steps?.[run.currentStepIndex];
+    const settlement = owner?.historySettlement;
+    if (Object.values(settlement ?? {}).every((state) => !['pending', 'uncertain'].includes(state)))
+      return null;
+    const required = Object.values(settlement).includes('uncertain');
+    const effects = ['consumption', 'awards']
+      .filter((key) => settlement[key])
+      .map((key, index) => ({
+        index,
+        kind: key === 'consumption' ? 'consumeItems' : 'awardItems',
+        phase: {
+          complete: 'applied',
+          pending: 'applying',
+          uncertain: 'applying',
+          notApplicable: 'notApplicable',
+        }[settlement[key]],
+        hasReceipt: true,
+        receipt: entitled
+          ? {
+              items: normalizeList(
+                key === 'consumption'
+                  ? (owner.consumedIngredients ?? owner.consumedComponents)
+                  : owner.createdResults
+              ).map((entry) => this._mapResult(entry, run.craftingSystemId, false)),
+              currencies: [],
+            }
+          : null,
+      }));
+    return {
+      status: required ? 'recoveryRequired' : 'planned',
+      required,
+      appliedEffectCount: effects.filter((effect) => effect.phase === 'applied').length,
+      effectCount: effects.length,
+      effects,
+      uncertainEffectIndex: effects.find((effect) => effect.phase === 'applying')?.index ?? null,
+    };
+  }
+
+  _nativeHistoryEntitled({ actor, viewer, run }) {
+    if (viewer?.isGM === true) return true;
+    if (!viewer?.id) return false;
+    try {
+      if (typeof actor?.testUserPermission === 'function')
+        return actor.testUserPermission(viewer, 'OWNER') === true;
+      return viewer.id === run.userId;
+    } catch {
+      return false;
+    }
+  }
+
   _safeEffectReceipt(effect, systemId) {
     const receipt = effect?.receipt;
     if (!receipt || typeof receipt !== 'object') return null;
     let entries = [];
-    if (['consumeIngredients', 'consumeAlchemyExtras', 'consumeItems'].includes(effect.kind)) {
+    if (receipt.uncertain === true) entries = normalizeList(receipt.confirmed);
+    else if (
+      [
+        'consumeIngredients',
+        'consumeAlchemyExtras',
+        'consumeItems',
+        'consumeAlchemyItems',
+      ].includes(effect.kind)
+    ) {
       entries = normalizeList(receipt.items);
     } else if (['awardResults', 'awardItems'].includes(effect.kind)) {
       entries = normalizeList(receipt.results);

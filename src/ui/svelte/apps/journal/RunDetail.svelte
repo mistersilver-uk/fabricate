@@ -158,6 +158,7 @@
       applying: 'FABRICATE.App.Journal.Notice.EffectPhase.applying',
       planned: 'FABRICATE.App.Journal.Notice.EffectPhase.planned',
       unknown: 'FABRICATE.App.Journal.Notice.EffectPhase.unknown',
+      notApplicable: 'FABRICATE.App.Journal.History.NotApplicable',
     }[phase];
     return localize(key);
   }

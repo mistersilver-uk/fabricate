@@ -171,7 +171,9 @@ export function makeCapturingActor(items = []) {
       captured.push(...dataArray);
       return dataArray.map((data, index) => ({
         ...data,
-        uuid: `Item.created-${index}`,
+        uuid: `${this.uuid}.Item.created-${index}`,
+        parent: this,
+        _source: structuredClone(data),
         effects: [],
         async createEmbeddedDocuments(_effectType, effects) {
           this.effects.push(...effects);
@@ -203,6 +205,7 @@ export function makeOwnedStack(name, quantity = 1) {
       if (payload['system.quantity'] !== undefined) {
         this.system.quantity = payload['system.quantity'];
       }
+      return this;
     },
   };
 }

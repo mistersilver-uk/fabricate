@@ -5,6 +5,11 @@ import {
   transitionExecutionJournal,
 } from './runExecutionJournal.js';
 import {
+  historyEvidenceFields,
+  itemReceipt,
+  retainUncertainReceipt,
+} from './runHistoryEvidence.js';
+import {
   assertRunLifecycleMutation,
   buildNewRunLifecycleFields,
   getRunLifecycleContract,
@@ -463,7 +468,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * @param {string|null} [details.userId]
    * @returns {Promise<object>} the recorded fizzle history entry
    */
-  async recordFizzle(actor, { craftingSystemId = null, userId = null } = {}) {
+  async recordFizzle(actor, { craftingSystemId = null, userId = null, ...evidence } = {}) {
     const container = this._getContainer(actor);
     const now = this._nowWorldTime();
     const entry = {
@@ -479,6 +484,13 @@ export class CraftingRunManager extends RunContainerManagerBase {
       finishedAt: now,
       currentStepIndex: null,
       steps: [],
+      ...historyEvidenceFields(evidence),
+      ...(Array.isArray(evidence.consumedIngredients) && {
+        consumedIngredients: evidence.consumedIngredients.map(itemReceipt),
+      }),
+      ...(Array.isArray(evidence.createdResults) && {
+        createdResults: evidence.createdResults.map(itemReceipt),
+      }),
     };
     container.history.unshift(entry);
     if (container.history.length > HISTORY_LIMIT) {
@@ -517,6 +529,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
       recipeId: null,
       isFizzle: true,
       activityKind: 'alchemy',
+      resolutionSnapshot: { kind: 'none', mode: 'alchemy' },
       status: 'failed',
       startedAt: now,
       updatedAt: now,
@@ -673,6 +686,15 @@ export class CraftingRunManager extends RunContainerManagerBase {
       this._locateRunPersistence(actor, runId, { activeOnly: false }),
       transition,
       { expectedRevision }
+    );
+  }
+
+  async retainUncertainReceipt(actor, runId, effectId, receipts, options) {
+    return retainUncertainReceipt(
+      this._locateRunPersistence(actor, runId, { activeOnly: false }),
+      effectId,
+      receipts,
+      options
     );
   }
 
@@ -938,6 +960,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
 
       for (const [runId, run] of Object.entries(container.active || {})) {
         if (getRunLifecycleContract(run) !== 'legacy') continue;
+        if (run.steps?.some((step) => step.historySettlement)) continue;
         const recipe = run?.recipeId ? resolveRecipe(run.recipeId) : null;
         if (!recipe) continue;
         const steps =
@@ -1046,6 +1069,16 @@ function applyStepHistoryEvidence(step, payload) {
   const evidence = craftingStepHistoryEvidence(payload);
   if (step.presentationSnapshot) delete evidence.presentationSnapshot;
   Object.assign(step, evidence);
+  Object.assign(step, historyEvidenceFields(payload));
+  for (const field of ['consumedIngredients', 'createdResults']) {
+    if (Array.isArray(step[field])) step[field] = step[field].map(itemReceipt);
+  }
+  if (step.historySettlement && ['succeeded', 'failed'].includes(step.status)) {
+    step.historySettlement = {
+      ...step.historySettlement,
+      awards: payload.historySettlement?.awards ?? 'complete',
+    };
+  }
 }
 
 function cloneObject(value) {

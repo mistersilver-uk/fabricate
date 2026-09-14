@@ -13,7 +13,7 @@ import {
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness
 } from '../helpers/svelte-component-harness.js';
-import { makeCraftingRun, makeGatheringRun, makeSucceededRun, createPersistedCraftingHistory, legacyGatheringEvidence } from '../helpers/journal-fixtures.js';
+import { makeCraftingRun, makeGatheringRun, makeSucceededRun, createPersistedCraftingHistory, createPersistedGatheringHistory, createPersistedSalvageHistory, createPersistedFizzleHistory, legacyGatheringEvidence } from '../helpers/journal-fixtures.js';
 import { GatheringRichStateService } from '../../src/systems/GatheringRichStateService.js';
 import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
 import { GatheringRunManager } from '../../src/systems/GatheringRunManager.js';
@@ -77,7 +77,7 @@ async function projectGatheringRecord(payload, status = 'succeeded', executionJo
   const flags = {};
   const actor = { id: 'gatherer', uuid: 'Actor.gatherer',
     getFlag: (_scope, key) => flags[key],
-    setFlag: async (_scope, key, value) => { flags[key] = JSON.parse(JSON.stringify(value)); },
+    setFlag: async (_scope, key, value) => { flags[key] = JSON.parse(JSON.stringify(value)); return actor; },
   };
   const manager = new GatheringRunManager({ randomID: () => 'gathered', nowWorldTime: () => 100, getUserId: () => 'player' });
   await manager.createTerminalRun(actor, { craftingSystemId: 'system', environmentId: 'environment', taskId: 'forage' }, status, payload);
@@ -92,6 +92,46 @@ describe('RunDetail mounted behavior', () => {
   before(() => harness.setup());
   afterEach(() => harness.remount());
   after(() => harness.teardown());
+
+  it('renders the real settled d100 writer output after source/configuration lookup removal', async () => {
+    const fixture = await createPersistedGatheringHistory({ mode: 'd100', versioned: true });
+    const target = await harness.mount({ run: fixture.model });
+    assert.equal(target.querySelectorAll('[data-yield-cut]').length, 1);
+    assert.equal(target.querySelectorAll('[data-yield-entry]').length, 2);
+    assert.match(target.querySelector('[data-yield-scale]').textContent, /Quantity.*"n":2/);
+    assert.match(target.querySelector('[data-yield-scale]').textContent, /Quantity.*"n":1/);
+  });
+
+  it('renders a real confirmed award prefix with uncertainty ahead of closed-success guidance', async () => {
+    const fixture = await createPersistedGatheringHistory({ refuseAt: 2 });
+    const target = await harness.mount({ run: fixture.model });
+    assert.ok(target.querySelector('[data-journal-recovery]'));
+    const receipts = target.querySelector('[data-journal-recovery-evidence]');
+    assert.equal(receipts.querySelectorAll('[data-list-row]').length, 1);
+    assert.match(receipts.textContent, /Gathered 0/);
+    assert.match(receipts.textContent, /Quantity.*"n":2/);
+    assert.doesNotMatch(target.querySelector('[data-journal-guidance]').textContent, /ClosedSuccess/);
+  });
+
+  for (const timed of [false, true]) {
+    it(`renders native salvage writer receipts and captured no-check meaning (timed=${timed})`, async () => {
+      const fixture = await createPersistedSalvageHistory({ timed });
+      assert.deepEqual(fixture.record.createdResults.map((entry) => entry.quantity), [2, 1]);
+      assert.deepEqual(fixture.inventory.map((item) => item.quantity), [3]);
+      const target = await harness.mount({ run: fixture.model });
+      assert.match(target.querySelector('[data-history-items="consumed"]').textContent, /Carrier 1/);
+      assert.match(target.querySelector('[data-history-items="produced"]').textContent, /Recovered material/);
+      assert.match(target.querySelector('[data-history-summary]').textContent, /NoCheck/);
+    });
+  }
+
+  it('renders native non-consuming fizzle as no check and not applicable without a synthetic stage', async () => {
+    const fixture = await createPersistedFizzleHistory({ consume: false });
+    const target = await harness.mount({ run: fixture.model });
+    assert.match(target.querySelector('[data-history-summary]').textContent, /NoCheck/);
+    assert.match(target.textContent, /NotApplicable/);
+    assert.ok(!target.querySelector('[data-stage-card]'));
+  });
 
   it('keeps one compact Tools used section through transient, ordinary and protected history', async () => {
     const { model } = await createPersistedCraftingHistory({ stageCount: 2 });
@@ -173,7 +213,7 @@ describe('RunDetail mounted behavior', () => {
     it(`keeps zero crafting receipts visible without claiming positive awards (${status})`, async () => {
       const flags = {};
       const actor = { id: 'zero', uuid: 'Actor.zero', getFlag: (_scope, key) => flags[key],
-        setFlag: async (_scope, key, value) => { flags[key] = structuredClone(value); } };
+        setFlag: async (_scope, key, value) => { flags[key] = structuredClone(value); return actor; } };
       const recipe = { id: 'zero', craftingSystemId: 'system', getExecutionSteps: () => [{ id: 'only', name: 'Zero award' }] };
       const savedFoundry = globalThis.foundry;
       globalThis.foundry = { utils: { randomID: () => 'zero-run' } };

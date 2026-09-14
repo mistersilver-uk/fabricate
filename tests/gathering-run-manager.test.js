@@ -22,8 +22,8 @@ class FakeActor {
   async setFlag(namespace, key, value) {
     this.setFlagCalls.push({ namespace, key, value });
     this.flags[namespace] = this.flags[namespace] || {};
-    this.flags[namespace][key] = value;
-    return value;
+    this.flags[namespace][key] = mergeObjects(this.flags[namespace][key], value);
+    return this;
   }
 }
 
@@ -59,7 +59,7 @@ class MergingActor extends FakeActor {
     this.setFlagCalls.push({ namespace, key, value });
     this.flags[namespace] = this.flags[namespace] || {};
     this.flags[namespace][key] = mergeObjects(this.flags[namespace][key], value);
-    return this.flags[namespace][key];
+    return this;
   }
 }
 
@@ -82,6 +82,47 @@ function runData(overrides = {}) {
     ...overrides
   };
 }
+
+test('pending and settlement writes require Actor acknowledgment without phantom cache state', async () => {
+  const actor = new FakeActor();
+  actor.setFlag = async function(namespace, key, value) {
+    if (this.refuse) return undefined;
+    this.flags[namespace] ??= {};
+    this.flags[namespace][key] = structuredClone(value);
+    return this;
+  };
+  const runs = manager();
+  const active = await runs.createRun(actor, runData());
+  actor.refuse = true;
+  await assert.rejects(runs.completeRun(actor, active, 'succeeded', { historySettlement: { awards: 'pending' } }));
+  for (const current of [runs, manager()]) {
+    assert.equal(current.getActiveRuns(actor).length, 1);
+    assert.equal(current.getRunHistory(actor).length, 0);
+  }
+  actor.refuse = false;
+  await runs.completeRun(actor, active, 'succeeded', { historySettlement: { awards: 'pending' } });
+  actor.refuse = true;
+  await assert.rejects(runs.settleHistory(actor, active.id, { createdResults: [], historySettlement: { awards: 'complete' } }));
+  for (const current of [runs, manager()]) assert.equal(current.getRunHistory(actor)[0].historySettlement.awards, 'pending');
+});
+
+test('an unrelated stale manager write preserves settled same-ID history and another new run', async () => {
+  const actor = new FakeActor();
+  actor.setFlag = async function(namespace, key, value) { this.flags[namespace] ??= {}; this.flags[namespace][key] = structuredClone(value); return this; };
+  const first = manager();
+  const other = manager({ randomID: () => 'other-run' });
+  const pending = await first.createTerminalRun(actor, runData(), 'succeeded', { historySettlement: { awards: 'pending' } });
+  first.getRunHistory(actor);
+  const receipt = { actorUuid: actor.uuid, itemUuid: `${actor.uuid}.Item.award`, quantity: 2, resultRowId: 'ore-row', sourceItemUuid: 'Item.ore' };
+  await other.settleHistory(actor, pending.id, { createdResults: [receipt], historySettlement: { awards: 'complete' } });
+  await other.createTerminalRun(actor, runData({ taskId: 'other-task' }));
+  await first.createRun(actor, runData({ taskId: 'unrelated' }));
+  const history = manager().getRunHistory(actor);
+  assert.equal(history.length, 2);
+  assert.deepEqual(history.find((run) => run.id === pending.id).createdResults.map((row) => row.quantity), [2]);
+  const repeated = await first.settleHistory(actor, pending.id, { createdResults: [], historySettlement: { awards: 'complete' } });
+  assert.equal(repeated.createdResults[0].resultRowId, 'ore-row');
+});
 
 test('GatheringRunManager writes canonical gatheringRuns flag path only', async () => {
   const actor = new FakeActor();
@@ -282,7 +323,7 @@ test('GatheringRunManager creates active runs with only canonical fields', async
   ]);
   assert.equal(run.id, 'run-1');
   assert.equal(run.status, 'inProgress');
-  assert.deepEqual(run.usedTools, [{ actorUuid: actor.uuid, itemUuid: 'Item.tool', quantity: 1 }]);
+  assert.deepEqual(run.usedTools, [{ actorUuid: actor.uuid, itemUuid: 'Item.tool', quantity: 1, name: null, img: null }]);
   // name/img are canonical display fields for created results (for the run journal);
   // other extras (e.g. `leaked`) are still stripped.
   assert.deepEqual(run.createdResults, [
@@ -621,7 +662,7 @@ test('GatheringRunManager retains permitted failure awards across completion and
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }]
   });
 
-  assert.deepEqual(failed.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 1 }]);
+  assert.deepEqual(failed.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 1, name: null, img: null }]);
   assert.deepEqual(cancelled.createdResults, []);
   assert.deepEqual(manager().getRunHistory(actor).map(run => run.createdResults), [[], failed.createdResults]);
 });
@@ -664,8 +705,8 @@ test('GatheringRunManager drops malformed run item refs', async () => {
     ]
   }));
 
-  assert.deepEqual(run.usedTools, [{ actorUuid: actor.uuid, itemUuid: 'Item.valid-tool', quantity: 1 }]);
-  assert.deepEqual(run.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.valid-result', quantity: 2 }]);
+  assert.deepEqual(run.usedTools, [{ actorUuid: actor.uuid, itemUuid: 'Item.valid-tool', quantity: 1, name: null, img: null }]);
+  assert.deepEqual(run.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.valid-result', quantity: 2, name: null, img: null }]);
 });
 
 test('GatheringRunManager creates terminal history directly for immediate attempts', async () => {
@@ -686,9 +727,9 @@ test('GatheringRunManager creates terminal history directly for immediate attemp
   });
 
   assert.equal(succeeded.status, 'succeeded');
-  assert.deepEqual(succeeded.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 3 }]);
+  assert.deepEqual(succeeded.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 3, name: null, img: null }]);
   assert.equal(failed.status, 'failed');
-  assert.deepEqual(failed.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.failure-award', quantity: 1 }]);
+  assert.deepEqual(failed.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.failure-award', quantity: 1, name: null, img: null }]);
   assert.deepEqual(manager().getRunHistory(actor)[0].createdResults, failed.createdResults);
   assert.deepEqual(runs.getActiveRuns(actor), []);
   assert.deepEqual(runs.getRunHistory(actor).map(run => run.taskId), ['task-failed', 'task-success']);
@@ -755,7 +796,7 @@ test('GatheringRunManager completes terminal runs newest-first and caps history 
   assert.ok(history.every(run => Number.isFinite(run.completedAtWorldTime)));
 });
 
-test('GatheringRunManager deletes completed active runs before replacing flags in Foundry-style merging updates', async () => {
+test('GatheringRunManager commits history and active deletions in one acknowledged flag update', async () => {
   const actor = new MergingActor();
   const runs = manager();
   const run = await runs.createWaitingRun(actor, runData({ taskId: 'task-time' }), { minutes: 1 });
@@ -766,8 +807,8 @@ test('GatheringRunManager deletes completed active runs before replacing flags i
   assert.equal(actor.flags.fabricate.gatheringRuns.history[0].taskId, 'task-time');
   assert.deepEqual(runs.getActiveRuns(actor), []);
   assert.ok(
-    actor.updateCalls.some(call => Object.hasOwn(call, `flags.fabricate.gatheringRuns.active.-=${run.id}`)),
-    'completed run should be explicitly deleted for merging Foundry flag updates'
+    actor.setFlagCalls.some(call => Object.hasOwn(call.value.active, `-=${run.id}`) && call.value.history.some(entry => entry.id === run.id)),
+    'the deletion and terminal recovery evidence belong to the same write'
   );
 });
 
@@ -864,7 +905,8 @@ function mergeObjects(previous, next) {
 
   const merged = clonePlain(previous);
   for (const [key, value] of Object.entries(next)) {
-    merged[key] = mergeObjects(merged[key], value);
+    if (key.startsWith('-=')) delete merged[key.slice(2)];
+    else merged[key] = mergeObjects(merged[key], value);
   }
   return merged;
 }

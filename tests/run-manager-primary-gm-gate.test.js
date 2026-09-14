@@ -30,7 +30,7 @@ class FakeActor {
     this.setFlagCalls += 1;
     this._flags[namespace] = this._flags[namespace] || {};
     this._flags[namespace][key] = value;
-    return value;
+    return this;
   }
 }
 

@@ -127,6 +127,7 @@ function makeEngine({
       getActiveRuns: () => [],
       getRunHistory: () => [],
       findActiveRunForTask: () => null,
+      settleHistory: async (_actor, id, payload) => settleRecordedCall(calls, id, payload),
       createTerminalRun: async (selectedActor, runData, status, payload) => {
         calls.terminal.push({ selectedActor, runData, status, payload });
         return { id: 'run-d100', status, ...runData, ...payload };
@@ -145,6 +146,13 @@ function makeEnvironmentStore() {
   });
 }
 
+function settleRecordedCall(calls, id, payload) {
+  const terminal = calls.terminal?.at(-1);
+  const previous = calls.completed ?? { ...terminal?.runData, ...terminal?.payload, status: terminal?.status };
+  calls.completed = { ...previous, ...payload, id };
+  return calls.completed;
+}
+
 function makeFlagActor(overrides = {}) {
   let flags = {};
   return {
@@ -153,9 +161,9 @@ function makeFlagActor(overrides = {}) {
     name: 'Flagged Gatherer',
     items: [],
     getFlag: (namespace, key) => flags[`${namespace}.${key}`],
-    setFlag: async (namespace, key, value) => {
+    async setFlag(namespace, key, value) {
       flags = { ...flags, [`${namespace}.${key}`]: value };
-      return value;
+      return this;
     },
     ...overrides,
   };
@@ -1538,6 +1546,7 @@ test('timed d100 runs complete from their start-time library snapshot after cond
       return activeRun;
     },
     getMaturedWaitingRuns: () => (activeRun ? [{ actor, run: activeRun }] : []),
+    settleHistory: async (_actor, id, payload) => settleRecordedCall(calls, id, payload),
     completeRun: async (_selectedActor, run, status, payload, options) => {
       const completed = {
         ...run,
@@ -1640,6 +1649,7 @@ test('timed d100 legacy runs snapshot legacy event behavior before rules are aut
       return activeRun;
     },
     getMaturedWaitingRuns: () => (activeRun ? [{ actor, run: activeRun }] : []),
+    settleHistory: async (_actor, id, payload) => settleRecordedCall(calls, id, payload),
     completeRun: async (_selectedActor, run, status, payload, options) => {
       const completed = {
         ...run,

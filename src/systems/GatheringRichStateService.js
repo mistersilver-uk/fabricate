@@ -628,8 +628,8 @@ export class GatheringRichStateService {
 
     const conditions = environment?.conditions || {};
     const biomes = Array.isArray(environment?.biomes) ? environment.biomes : [];
-    const itemRows = rowContributions.map((entry, index) =>
-      rollDropRow({
+    const itemRows = rowContributions.map((entry, index) => ({
+      ...rollDropRow({
         row: entry.row,
         index,
         roll: attemptRoll,
@@ -639,8 +639,9 @@ export class GatheringRichStateService {
         biomeAggregation: rules.biomeModifierAggregation,
         dropModifierMode: rules.dropModifierMode,
         characterModifierContributions: entry.contributions,
-      })
-    );
+      }),
+      resultRowId: `${entry.row.id ?? 'drop'}:${index}`,
+    }));
     const droppedItems = itemRows.filter((result) => result.dropped);
     return {
       roll: attemptRoll,

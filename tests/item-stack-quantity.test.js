@@ -238,21 +238,28 @@ const SITE_MAPPING = [
     anchors: [/return readStackQuantity\(item\);/],
   },
   {
-    site: 'componentStacking.createOrStackComponentItem (existing stack)',
-    file: 'src/systems/componentStacking.js',
+    site: 'runHistoryEvidence.sourceItemQuantity stored source read',
+    file: 'src/systems/runHistoryEvidence.js',
     accessor: 'readStoredStackQuantity',
     sites: 1,
-    absentDefault: 1,
+    absentDefault: null,
     anchors: [
-      /const base = readStoredStackQuantity\(existing, \{ absentDefault: 1, path: quantityPath \}\)/,
+      /readStoredStackQuantity\(source, \{ path, absentDefault: null \}\)/,
     ],
   },
   {
-    site: 'componentStacking.createOrStackComponentItem (increment write)',
-    file: 'src/systems/componentStacking.js',
+    site: 'runHistoryEvidence.writeItemAward increment write',
+    file: 'src/systems/runHistoryEvidence.js',
     accessor: 'updateStackQuantity',
     sites: 1,
-    anchors: [/updateStackQuantity\(existing, base \+ delta, quantityPath\)/],
+    anchors: [/updateStackQuantity\(existing, before \+ quantity, path\)/],
+  },
+  {
+    site: 'runHistoryEvidence.sourceItemQuantity presence before caller default',
+    file: 'src/systems/runHistoryEvidence.js',
+    accessor: 'hasStackQuantity',
+    sites: 1,
+    anchors: [/hasStackQuantity\(source, path\)/],
   },
   {
     site: 'CraftingEngine.selectedQuantityItems + salvage totalAvailable',
@@ -274,32 +281,6 @@ const SITE_MAPPING = [
     file: 'src/systems/pooledAllocation.js',
     accessor: 'readStackQuantity',
     sites: 1,
-    // The read that decides delete-versus-decrement for the salvage consume. It is the
-    // coercing reader on purpose: a stored 0 read as 0 would make every take exhaust its
-    // item, so the consume would DELETE where it should decrement.
-    deleteSites: 1,
-  },
-  {
-    site: 'CraftingEngine._consumeSubmittedAlchemyItems legacy no-match consumption',
-    file: 'src/systems/CraftingEngine.js',
-    accessor: 'readStoredStackQuantity',
-    sites: 1,
-    absentDefault: 1,
-    deleteSites: 1,
-    anchors: [/const qty = readStoredStackQuantity\(item, \{ absentDefault: 1 \}\);/],
-  },
-  {
-    site: 'CraftingEngine._consumeItemQuantity shared ingredient and alchemy consumption',
-    file: 'src/systems/CraftingEngine.js',
-    accessor: 'readStoredStackQuantity',
-    sites: 1,
-    absentDefault: 1,
-    deleteSites: 1,
-    // One physical read/delete site now serves ingredients, alchemy extras and versioned
-    // alchemy. Anchor the owning helper to distinguish its read from the receipt base read.
-    anchors: [
-      /async _consumeItemQuantity\(item, quantity, requireConfirmation\)\s*\{\s*const before = readStoredStackQuantity\(item, \{ absentDefault: 1 \}\);/,
-    ],
   },
   {
     site: 'CraftingEngine award creation stackability probe',
@@ -309,14 +290,13 @@ const SITE_MAPPING = [
     anchors: [/if \(hasStackQuantity\(itemData\) \|\| !sourceItem\)/],
   },
   {
-    site: 'CraftingEngine versioned alchemy validation and consumption base (#1648)',
+    site: 'CraftingEngine versioned alchemy validation (#1648)',
     file: 'src/systems/CraftingEngine.js',
     accessor: 'readStoredStackQuantity',
-    sites: 2,
+    sites: 1,
     absentDefault: 1,
     anchors: [
       /if \(readStoredStackQuantity\(item, \{ absentDefault: 1 \}\) < count\)/,
-      /const before = readStoredStackQuantity\(item, \{ absentDefault: 1 \}\);\s*await this\._consumeItemQuantity\(item, count, true\);/,
     ],
   },
   {
@@ -324,7 +304,8 @@ const SITE_MAPPING = [
     file: 'src/systems/CraftingEngine.js',
     accessor: 'updateStackQuantity',
     sites: 1,
-    anchors: [/updateStackQuantity\(item, before - quantity\)/],
+    deleteSites: 1,
+    anchors: [/updateStackQuantity\(item, before - quantity, path\)/],
   },
   {
     site: 'RunJournalBuilder candidate held quantity (#1648)',
@@ -339,23 +320,6 @@ const SITE_MAPPING = [
     accessor: 'setStackQuantity',
     sites: 2,
     anchors: [/setStackQuantity\(itemData, qty\);/, /setStackQuantity\(itemData, result\.quantity\);/],
-  },
-  {
-    site: 'CraftingEngine legacy no-match alchemy and pooled salvage decrement writes',
-    file: 'src/systems/CraftingEngine.js',
-    accessor: 'updateStackQuantity',
-    sites: 2,
-    anchors: [
-      /updateStackQuantity\(item, qty - count\)/,
-      /updateStackQuantity\(take\.item, take\.remainingQuantity\)/,
-    ],
-  },
-  {
-    site: 'GatheringEngine.normalizeRunItems (source term only)',
-    file: 'src/systems/GatheringEngine.js',
-    accessor: 'readStoredStackQuantity',
-    sites: 1,
-    absentDefault: 1,
   },
   {
     site: 'RecipeManager have counts',
@@ -438,22 +402,7 @@ const SITE_MAPPING = [
     file: 'src/gatheringResultCreation.js',
     accessor: 'setStackQuantity',
     sites: 1,
-    anchors: [/setStackQuantity\(itemData, Number\(result\.quantity \|\| 1\)\)/],
-  },
-  {
-    site: 'gatheringResultCreation stack-onto-existing',
-    file: 'src/gatheringResultCreation.js',
-    accessor: 'readStoredStackQuantity',
-    sites: 1,
-    absentDefault: 0,
-    anchors: [/readStoredStackQuantity\(existing, \{ absentDefault: 0 \}\)/],
-  },
-  {
-    site: 'gatheringResultCreation stack-onto-existing write',
-    file: 'src/gatheringResultCreation.js',
-    accessor: 'updateStackQuantity',
-    sites: 1,
-    anchors: [/updateStackQuantity\(existing, next\)/],
+    anchors: [/setStackQuantity\(itemData, quantity\)/],
   },
   {
     site: 'toolBreakageRuntime replacement payload write',
@@ -493,10 +442,7 @@ const SITE_MAPPING = [
     file: 'src/systems/companionComponentAward.js',
     accessor: 'readStoredStackQuantity',
     sites: 1,
-    // The ONLY `absentDefault: null` site in `src/**`, and it is the whole of the award's
-    // "nothing is invented" rule: a target carrying no readable count is not stacked onto at
-    // all, so the award creates a second document instead of authoring a count field on an
-    // item type that has none.
+    // A missing stack base creates a separate document rather than inventing a count.
     absentDefault: null,
     anchors: [
       /readStoredStackQuantity\(target, \{ absentDefault: null, path: quantityPath \}\)/,
@@ -673,7 +619,7 @@ describe('the per-site accessor mapping', () => {
   it('uses only 1, 0 and null as absent defaults, and only on the stored reader', () => {
     // `null` is the third value, and it is a DIFFERENT KIND of answer from the other two:
     // 1 and 0 supply a base, while `null` says the item carries no readable count at all and
-    // hands the decision back to the caller. Exactly one site uses it (issue 1301).
+    // hands the decision back to the caller.
     const ABSENT_DEFAULTS = [0, 1, null];
     for (const entry of SITE_MAPPING) {
       if (entry.accessor === 'readStoredStackQuantity') {
@@ -693,11 +639,6 @@ describe('the per-site accessor mapping', () => {
     // that 0 to a 1 inflates every gathered stack by one on the very first award onto an
     // existing item, and it is the drift a reviewer used to prove the earlier table
     // discovered nothing — so it is asserted against SOURCE, not against the table.
-    const zeroDefault = SITE_MAPPING.filter((entry) => entry.absentDefault === 0);
-    assert.deepEqual(
-      zeroDefault.map((entry) => entry.site),
-      ['gatheringResultCreation stack-onto-existing']
-    );
     assert.deepEqual(
       [...countAbsentDefaults(0).entries()],
       [['src/gatheringResultCreation.js', 1]],
@@ -705,19 +646,16 @@ describe('the per-site accessor mapping', () => {
     );
   });
 
-  it('records exactly one absent-default-null site, and live source agrees', () => {
-    // Pinned in both directions for the same reason the `0` site is: `null` is the value that
-    // makes the component award REFUSE to stack rather than inventing a base, so a second site
-    // adopting it — or this one losing it — is a behavioural change that must be deliberate.
+  it('records the stored-reader and measured-delta unknown defaults exactly', () => {
     const nullDefault = SITE_MAPPING.filter((entry) => entry.absentDefault === null);
     assert.deepEqual(
       nullDefault.map((entry) => entry.site),
-      ['companionComponentAward stack-target base read']
+      ['runHistoryEvidence.sourceItemQuantity stored source read', 'companionComponentAward stack-target base read']
     );
     assert.deepEqual(
       [...countAbsentDefaults('null').entries()],
-      [['src/systems/companionComponentAward.js', 1]],
-      'exactly one `absentDefault: null` in src/**, and only in the component award'
+      [['src/systems/companionComponentAward.js', 1], ['src/systems/CraftingEngine.js', 1], ['src/systems/runHistoryEvidence.js', 2]],
+      'post-write measurements remain unknown when the quantity field is absent'
     );
   });
 
@@ -730,7 +668,7 @@ describe('the per-site accessor mapping', () => {
     assert.deepEqual(asSortedPairs(countAbsentDefaults(1)), asSortedPairs(declared));
   });
 
-  it('records exactly three delete-on-underrun sites, and three decrement writes beside them', () => {
+  it('records one shared consumption delete/decrement boundary', () => {
     // Counted from an explicit field rather than parsed out of the label: a label-substring
     // filter reads as a check while actually depending on prose nobody validates.
     const total = SITE_MAPPING.reduce((sum, entry) => sum + (entry.deleteSites ?? 0), 0);
@@ -740,7 +678,7 @@ describe('the per-site accessor mapping', () => {
     const contributors = SITE_MAPPING.filter((entry) => (entry.deleteSites ?? 0) > 0).map(
       (entry) => `${entry.site} (${entry.deleteSites})`
     );
-    assert.equal(total, 3, `expected three delete-on-underrun sites: ${contributors.join('; ')}`);
+    assert.equal(total, 1, `expected one shared delete-on-underrun site: ${contributors.join('; ')}`);
     for (const entry of SITE_MAPPING) {
       assert.ok(
         (entry.deleteSites ?? 0) <= entry.sites,
@@ -754,7 +692,7 @@ describe('the per-site accessor mapping', () => {
       (entry) =>
         entry.file === 'src/systems/CraftingEngine.js' && entry.accessor === 'updateStackQuantity'
     ).reduce((sum, entry) => sum + entry.sites, 0);
-    assert.equal(engineWrites, 3);
+    assert.equal(engineWrites, 1);
   });
 });
 

@@ -2,6 +2,8 @@
 // A minimal actor whose flags stand in for the SYNCED Foundry actor document, plus a
 // globals shim wiring foundry.utils.randomID and game.{user,time,actors}.
 
+import { mergeHistoryFlag } from './journal-fixtures.js';
+
 export class FakeActor {
   constructor(name = 'Shared') {
     this.id = name.replace(/\s+/g, '-').toLowerCase();
@@ -16,8 +18,8 @@ export class FakeActor {
 
   async setFlag(namespace, key, value) {
     this._flags[namespace] = this._flags[namespace] || {};
-    this._flags[namespace][key] = value;
-    return value;
+    this._flags[namespace][key] = mergeHistoryFlag(this._flags[namespace][key], value);
+    return this;
   }
 }
 

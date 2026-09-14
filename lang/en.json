@@ -1048,6 +1048,7 @@
           "RollNotRecorded": "Roll not recorded",
           "ThresholdNotRecorded": "Threshold not recorded",
           "OutcomeNotRecorded": "Outcome not recorded",
+          "NotApplicable": "Not applicable",
           "UnattributedAwards": "The check outcomes are recorded, but the awarded quantities cannot be assigned to individual rows. Actual awards are listed once below.",
           "MissedRoll": "Missed the roll",
           "SettlementTitle": "Settling results",

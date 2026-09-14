@@ -15,7 +15,7 @@ import {
   postCheckRollHandoff,
 } from '../src/systems/checkRoll.js';
 import { transitionExecutionJournal } from '../src/systems/runExecutionJournal.js';
-import { createPersistedCraftingHistory } from './helpers/journal-fixtures.js';
+import { createPersistedCraftingHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
 
 for (const failLast of [false, true]) {
   test(`writer/reload/projection retains distinct stage awards, source-qualified essence and settled currency (failure=${failLast})`, async () => {
@@ -438,8 +438,8 @@ class FakeActor {
 
   async setFlag(namespace, key, value) {
     this.flags[namespace] ||= {};
-    this.flags[namespace][key] = value;
-    return value;
+    this.flags[namespace][key] = mergeHistoryFlag(this.flags[namespace][key], value);
+    return this;
   }
 }
 
@@ -495,6 +495,21 @@ function setupEngineFixture() {
   const runManager = new CraftingRunManager();
   const engine = new CraftingEngine(recipeManager, runManager);
   return { engine, ingredientSet, recipe, recipeManager, runManager };
+}
+
+function installActualRunOutput(actor, recipe, id, name, img) {
+  const sourceUuid = `Item.${id}`;
+  globalThis.fromUuid = async (uuid) => uuid === sourceUuid ? { uuid: sourceUuid,
+    toObject: () => ({ name, img, type: 'loot', system: { quantity: 1 } }),
+  } : null;
+  const step = recipe.getExecutionSteps()[0];
+  recipe.getExecutionSteps = () => [{ ...step, resultGroups: [{ id: 'output', results: [{ id, itemUuid: sourceUuid, quantity: 1 }] }] }];
+  actor.createEmbeddedDocuments = async (type, data) => data.map((entry) => {
+    assert.equal(type, 'Item');
+    const item = { ...structuredClone(entry), id, uuid: `${actor.uuid}.Item.${id}`, parent: actor, _source: structuredClone(entry) };
+    actor.items.push(item);
+    return item;
+  });
 }
 
 function makeCurrentStageImmediate(recipe) {
@@ -1087,7 +1102,8 @@ for (const scenario of ['delete-veto', 'update-refusal', 'prefix-then-veto', 'do
       assert.equal(reloaded.executionJournal.status, 'recoveryRequired');
       const consumption = reloaded.executionJournal.effects.find((effect) => effect.effectId === 'consume-ingredients');
       assert.notEqual(consumption.phase, 'applied');
-      assert.equal(consumption.receipt == null, true);
+      assert.equal(consumption.receipt == null, scenario !== 'prefix-then-veto');
+      if (scenario === 'prefix-then-veto') assert.equal(consumption.receipt.confirmed[0].quantity, 1);
       assert.equal(awards, 0);
       assert.equal(source.items.length, 1, 'a successful prefix stays spent, the vetoed item remains');
       try { assert.equal((await execute()).success, false); }
@@ -1234,9 +1250,12 @@ test('CraftingEngine persists successful spend receipts before a later award amb
   assert.equal(spends, 1);
 });
 
-test('CraftingEngine resumes a real persisted consumption prefix with hydrated production state', async () => {
+test('CraftingEngine resumes a real persisted consumption prefix with hydrated production state', async (t) => {
+  const previous = globalThis.fromUuid;
+  t.after(() => { if (previous === undefined) delete globalThis.fromUuid; else globalThis.fromUuid = previous; });
   const { engine, recipe, runManager } = setupEngineFixture();
   const actor = new FakeActor('resume-crafter');
+  installActualRunOutput(actor, recipe, 'tea-result', 'Sun Tea', 'sun-tea.webp');
   const source = new FakeActor('resume-source');
   const consumedItem = {
     id: 'herb-stack',
@@ -1354,20 +1373,10 @@ test('CraftingEngine resumes a real persisted consumption prefix with hydrated p
   resumedEngine._consumeIngredients = async () => {
     throw new Error('applied consumption must not repeat');
   };
-  resumedEngine._createResultItems = async (_actor, _recipe, _step, _set, consumedItems) => {
-    hydratedConsumed = consumedItems;
-    return {
-      items: [
-        {
-          id: 'tea-result',
-          uuid: 'Actor.resume-crafter.Item.tea-result',
-          name: 'Sun Tea',
-          img: 'sun-tea.webp',
-          system: { quantity: 1 },
-        },
-      ],
-      resolutionMeta: { disposition: 'success' },
-    };
+  const createResults = resumedEngine._createResultItems.bind(resumedEngine);
+  resumedEngine._createResultItems = async (...args) => {
+    hydratedConsumed = args[4];
+    return createResults(...args);
   };
   resumedEngine.installVersionedRunAuthority({
     consumeExecutionGrant: async () => ({
@@ -1399,6 +1408,9 @@ test('CraftingEngine resumes a real persisted consumption prefix with hydrated p
       quantity: 1,
       name: 'Sun Tea',
       img: 'sun-tea.webp',
+      componentId: null,
+      resultRowId: 'output:tea-result:0',
+      sourceItemUuid: 'Item.tea-result',
     },
   ]);
 
@@ -1422,7 +1434,7 @@ test('CraftingEngine resumes a real persisted consumption prefix with hydrated p
       toolItemUuids: [],
     },
     toolItems: [],
-    executionRecipe: recipe,
+    executionRecipe: resumedEngine._buildStepRecipeView(recipe, recipe.getExecutionSteps()[0]),
     craftSelection: { plan: [] },
     toolValidation: { valid: true, tools: [] },
     currencySpends: [],
@@ -1431,20 +1443,10 @@ test('CraftingEngine resumes a real persisted consumption prefix with hydrated p
     selectedSet,
   });
   resumedEngine._consumeIngredients = async () => [];
-  resumedEngine._createResultItems = async () => {
+  installActualRunOutput(actor, recipe, 'final-result', 'Final Tea', 'final-tea.webp');
+  resumedEngine._createResultItems = async (...args) => {
     awardCalls += 1;
-    return {
-      items: [
-        {
-          id: 'final-result',
-          uuid: 'Actor.resume-crafter.Item.final-result',
-          name: 'Final Tea',
-          img: 'final-tea.webp',
-          system: { quantity: 1 },
-        },
-      ],
-      resolutionMeta: { disposition: 'success' },
-    };
+    return createResults(...args);
   };
   resumedEngine.installVersionedRunAuthority({
     consumeExecutionGrant: async (_grant, context) => ({
@@ -1607,7 +1609,7 @@ test('CraftingEngine records a non-consuming fizzle without touching submitted s
   runManager.invalidateCache(actor.id);
   assert.deepEqual(
     runManager.getRunHistory(actor)[0].executionJournal.effects.map((effect) => effect.kind),
-    ['recordAlchemyDeadEnd']
+    ['recordAlchemyDeadEnd', 'awardResults']
   );
 });
 

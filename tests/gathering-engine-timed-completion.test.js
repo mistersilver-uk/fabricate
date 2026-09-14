@@ -34,7 +34,7 @@ class FakeActor {
   async setFlag(namespace, key, value) {
     this.flags[namespace] = this.flags[namespace] || {};
     this.flags[namespace][key] = JSON.parse(JSON.stringify(value));
-    return value;
+    return this;
   }
 }
 
@@ -66,7 +66,7 @@ function timedTask(overrides = {}) {
     resultGroups: [{
       id: 'group-a',
       name: 'Iron',
-      results: [{ id: 'result-a', componentId: 'comp-a', quantity: 2 }]
+      results: [{ id: 'result-a', resultRowId: 'group-a:result-a:0', componentId: 'comp-a', quantity: 2 }]
     }],
     ...overrides
   };
@@ -255,7 +255,7 @@ test('processWorldTime completes matured waitingTime run as succeeded and moves 
   resetActor();
   let worldTime = 1000;
   const runManager = makeRunManager({ now: () => worldTime });
-  const createdResults = [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }];
+  const createdResults = [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2, name: null, img: null }];
   await createWaitingRun(runManager);
   worldTime = 1060;
   const calls = {};
@@ -288,7 +288,7 @@ test('processWorldTime resolves a matured straight task without a check or d100 
     resolutionMode: 'straight',
     dropRows: [{ id: 'inactive-drop', componentId: 'comp-a', quantity: 99, dropRate: 100 }]
   });
-  const createdResults = [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2 }];
+  const createdResults = [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', quantity: 2, name: null, img: null }];
   await createWaitingRun(runManager);
   worldTime = 1060;
   const calls = {};
@@ -1001,7 +1001,7 @@ test('authoritative manual collection persists and settles ordered gathering eff
       .itemUuid,
     'Item.iron'
   );
-  assert.deepEqual(terminal.createdResults, createdResults);
+  assert.deepEqual(terminal.createdResults, [], 'the execution receipt is the sole v1 award authority');
   assert.equal(calls.createResults.length, 1);
   assert.equal(published.length, 1);
 
@@ -1481,7 +1481,7 @@ test('non-blind timed task resolves from its start-time mode and results after l
     {
       id: 'group-a',
       name: 'Iron',
-      results: [{ id: 'result-a', componentId: 'comp-a', quantity: 2 }]
+      results: [{ id: 'result-a', componentId: 'comp-a', quantity: 2, resultRowId: 'group-a:result-a:0' }]
     }
   ]);
 });
@@ -1643,6 +1643,7 @@ test('processWorldTime completes matured failure without results and applies fee
   const order = [];
   const runManager = {
     getMaturedWaitingRuns: (...args) => realRunManager.getMaturedWaitingRuns(...args),
+    settleHistory: (...args) => realRunManager.settleHistory(...args),
     completeRun: async (...args) => {
       order.push('completeRun');
       return realRunManager.completeRun(...args);
@@ -1651,7 +1652,7 @@ test('processWorldTime completes matured failure without results and applies fee
     cancelRun: (...args) => realRunManager.cancelRun(...args)
   };
   const calls = {};
-  const usedTools = [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1 }];
+  const usedTools = [{ actorUuid: actor.uuid, itemUuid: 'Item.pick', quantity: 1, name: null, img: null }];
   const task = timedTask({
     toolIds: ['tool-pick'],
     failureOutcome: { mode: 'text', text: 'The vein is exhausted.' }

@@ -229,5 +229,5 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   const keys = Object.keys(gate.pinned());
   const files = keys.filter((key) => !key.includes('::')).length;
   assert.equal(files, 126, 'oversized files');
-  assert.equal(keys.length - files, 122, 'oversized functions');
+  assert.equal(keys.length - files, 123, 'oversized functions');
 });

@@ -10,6 +10,35 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createPersistedFizzleHistory } from './helpers/journal-fixtures.js';
+
+test('native fizzle failed settlement retains pending history and refuses same-run re-entry', async () => {
+  const fixture = await createPersistedFizzleHistory({ refuseSettlement: true });
+  assert.equal(fixture.error.code, 'HISTORY_EFFECT_UNCERTAIN');
+  assert.deepEqual(fixture.retryErrors, ['HISTORY_EFFECT_UNCERTAIN', 'HISTORY_EFFECT_UNCERTAIN']);
+  assert.equal(fixture.record.historySettlement.consumption, 'pending');
+  assert.equal(fixture.remaining, 0);
+  assert.equal(fixture.historyCount, 1);
+  assert.equal(fixture.model.recoveryEvidence.status, 'planned');
+  assert.equal(fixture.model.actions.execute, false);
+});
+
+for (const versioned of [false, true]) {
+  for (const consume of [false, true]) {
+    test(`actual no-match writer retains recipe-less evidence, v1=${versioned}, consume=${consume}`, async () => {
+      const fixture = await createPersistedFizzleHistory({ versioned, consume });
+      assert.equal(fixture.error, null, JSON.stringify(fixture));
+      assert.equal(fixture.record.recipeId, null);
+      assert.deepEqual(fixture.record.steps, []);
+      assert.deepEqual(fixture.model.resolutionSnapshot, { kind: 'none', mode: 'alchemy' });
+      assert.equal(fixture.model.consumedIngredients.length, consume ? 1 : 0);
+      if (consume) assert.equal(fixture.model.consumedIngredients[0].quantity, 1);
+      assert.equal(fixture.remaining, consume ? 0 : 1);
+      assert.equal(fixture.model.createdResultsRecorded, true);
+      assert.doesNotMatch(JSON.stringify(fixture.record), /signature|canonicalSignature|deadEndKey/);
+    });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Foundry globals
@@ -93,6 +122,7 @@ class FakeDocument {
   async setFlag(scope, key, value) {
     if (!this._flags[scope]) this._flags[scope] = {};
     setPathValue(this._flags[scope], key, value);
+    return this;
   }
 }
 
@@ -979,8 +1009,8 @@ test('_consumeSubmittedAlchemyItems consumes correct quantity when same item sub
   const actorItem = {
     uuid: 'Item.herb-1',
     system: { quantity: 5 },
-    async delete() { deleteCalls.push(this.uuid); },
-    async update(data) { updateCalls.push({ uuid: this.uuid, data }); }
+    async delete() { deleteCalls.push(this.uuid); return this; },
+    async update(data) { updateCalls.push({ uuid: this.uuid, data }); for (const [key, value] of Object.entries(data)) setPathValue(this, key, value); return this; }
   };
 
   const actor = { items: [actorItem] };
@@ -1113,8 +1143,8 @@ test('craftAlchemy reaches the no-match disposition (and consumes) when ingredie
   const actorItem = {
     uuid: registeredItemUuid,
     system: { quantity: 1 },
-    async delete() { deleted.push(this.uuid); },
-    async update() {}
+    async delete() { deleted.push(this.uuid); return this; },
+    async update() { return this; }
   };
   const sourceActor = { items: [actorItem] };
   // Submit only one of the five required ingots.
@@ -1157,6 +1187,7 @@ test('craftAlchemy records a no-signature fizzle as run history, unconditionally
 
   const fizzleCalls = [];
   const runManager = {
+    settleHistory: async (_actor, id, payload) => ({ id, ...payload }),
     async recordFizzle(actor, details) {
       fizzleCalls.push({ actor, details });
       return { id: 'fizz-1', isFizzle: true };
@@ -1167,8 +1198,8 @@ test('craftAlchemy records a no-signature fizzle as run history, unconditionally
   const actorItem = {
     uuid: registeredItemUuid,
     system: { quantity: 1 },
-    async delete() {},
-    async update() {},
+    async delete() { return this; },
+    async update() { return this; },
   };
   const sourceActor = { items: [actorItem] };
   const submitted = toAlchemyRecords(
@@ -1202,8 +1233,8 @@ test('_consumeSubmittedAlchemyItems deletes item when quantity consumed equals i
   const actorItem = {
     uuid: 'Item.herb-1',
     system: { quantity: 2 },
-    async delete() { deleteCalls.push(this.uuid); },
-    async update(data) { updateCalls.push({ uuid: this.uuid, data }); }
+    async delete() { deleteCalls.push(this.uuid); return this; },
+    async update(data) { updateCalls.push({ uuid: this.uuid, data }); for (const [key, value] of Object.entries(data)) setPathValue(this, key, value); return this; }
   };
 
   const actor = { items: [actorItem] };

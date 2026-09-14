@@ -172,7 +172,7 @@
     {:else if !showTransient && account.mode !== 'd100'}
       {@render items(
         text(account.cancelled ? 'AlreadySpent' : 'MaterialsUsed'),
-        single?.consumed ?? [],
+        single?.consumed ?? account.consumed,
         'consumed'
       )}
       {#if single?.route}<JournalFactRow label={text('ChosenRoute')} value={single.route} />{/if}
@@ -182,6 +182,9 @@
         />{/each}
       {@render essenceRecaps()}
       {@render items(resultHeading, account.results, 'produced')}
+      {#if (single?.historySettlement ?? run.historySettlement)?.consumption === 'notApplicable'}
+        <JournalFactRow label={text('MaterialsUsed')} value={text('NotApplicable')} />
+      {/if}
     {/if}
     {#if showTransient && !account.multi}{@render essenceRecaps()}{/if}
     {#if account.usableScale}

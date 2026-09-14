@@ -126,10 +126,17 @@ function recordedEmptyAwards(run, stages, results) {
 }
 
 function gatheringSummary(run, localize) {
+  if (run?.runType !== 'gathering' && run?.resolutionSnapshot?.kind) {
+    const stage = presentStage(
+      { resolutionSnapshot: run.resolutionSnapshot, lastCheckResult: run.lastCheckResult },
+      localize
+    );
+    return { kind: stage.kind, value: stage.resolution };
+  }
   const mode = run?.gatheringYield?.mode;
   if (run?.runType === 'gathering') {
     if (mode === 'straight') return { kind: 'none', value: localize(`${prefix}NoRoll`) };
-    if (mode === 'routed')
+    if (['routed', 'progressive'].includes(mode))
       return {
         kind: 'check',
         value: checkText(run.gatheringYield.check, localize) || localize(`${prefix}NotRecorded`),
@@ -234,6 +241,7 @@ export function presentHistory(run, localize) {
   const stage = stages[0];
   return {
     stages,
+    consumed: materials(run?.consumedIngredients, localize),
     tools: historyTools(stages, localize),
     results,
     multi,

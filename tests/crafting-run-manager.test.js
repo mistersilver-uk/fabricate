@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { CraftingRunManager } from '../src/systems/CraftingRunManager.js';
+import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
+import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 import {
   insertTerminalRuns,
   assertCappedMostRecentFirst,
@@ -33,8 +35,8 @@ class FakeActor {
 
   async setFlag(namespace, key, value) {
     this._flags[namespace] = this._flags[namespace] || {};
-    this._flags[namespace][key] = value;
-    return value;
+    this._flags[namespace][key] = mergeHistoryFlag(this._flags[namespace][key], value);
+    return this;
   }
 }
 
@@ -50,6 +52,52 @@ function setupGlobals(worldTime = 1000) {
     time: { worldTime },
     actors: [],
   };
+}
+
+for (const Manager of [CraftingRunManager, SalvageRunManager]) {
+  const terminal = (manager, actor, pending = false) => Manager === CraftingRunManager
+    ? manager.recordFizzle(actor, { craftingSystemId: 'system', historySettlement: { consumption: pending ? 'pending' : 'complete', awards: 'complete' } })
+    : manager.createRun(actor, { craftingSystemId: 'system', componentId: 'carrier', status: 'succeeded', historySettlement: { awards: pending ? 'pending' : 'complete' } });
+
+  test(`${Manager.name}: stale pending cache and repeated settlement preserve settled evidence`, async () => {
+    setupGlobals();
+    const actor = new FakeActor('Coherence');
+    actor.id = 'coherence';
+    const first = new Manager();
+    const other = new Manager();
+    const pending = await terminal(first, actor, true);
+    first.getRunHistory(actor);
+    const receipt = { actorUuid: actor.uuid, itemUuid: `${actor.uuid}.Item.input`, quantity: 2, name: 'Captured', img: null };
+    await other.settleHistory(actor, pending.id, { consumedIngredients: [receipt], createdResults: [receipt],
+      historySettlement: { consumption: 'complete', awards: 'complete' } });
+    const concurrent = await terminal(other, actor);
+    const unrelated = await terminal(first, actor);
+    const fresh = new Manager();
+    const history = fresh.getRunHistory(actor);
+    assert.deepEqual(new Set(history.map((run) => run.id)), new Set([pending.id, concurrent.id, unrelated.id]));
+    assert.equal(history.length, 3);
+    assert.equal(history.find((run) => run.id === pending.id).createdResults[0].quantity, 2);
+    for (const awards of ['pending', 'complete']) {
+      const repeated = await first.settleHistory(actor, pending.id, { createdResults: [], historySettlement: { awards } });
+      assert.deepEqual(repeated.createdResults, [receipt]);
+    }
+  });
+
+  test(`${Manager.name}: refused settlement leaves cached and reloaded history pending`, async () => {
+    setupGlobals();
+    const actor = new FakeActor('Refusal');
+    actor.id = 'refusal';
+    const manager = new Manager();
+    const pending = await terminal(manager, actor, true);
+    actor.setFlag = async () => undefined;
+    await assert.rejects(manager.settleHistory(actor, pending.id, {
+      historySettlement: { consumption: 'complete', awards: 'complete' }, createdResults: [],
+    }), { code: 'HISTORY_EFFECT_UNCERTAIN' });
+    for (const reader of [manager, new Manager()]) {
+      const run = reader.getRun(actor, pending.id);
+      assert.ok(Object.values(run.historySettlement).includes('pending'));
+    }
+  });
 }
 
 for (const failed of [false, true]) {
@@ -79,6 +127,21 @@ for (const failed of [false, true]) {
     assert.equal(restored.steps[0].essenceSpend.carriers[0].contributions[0].amount, 2);
   });
 }
+
+test('startup phantom pruning retains native invoked work requiring settlement', async () => {
+  setupGlobals();
+  const actor = new FakeActor('Native recovery');
+  actor.id = 'native-recovery';
+  game.actors = [actor];
+  const manager = new CraftingRunManager();
+  const recipe = singleStepRecipe('recovery');
+  const run = await manager.createRun(actor, recipe);
+  run.steps[0].historySettlement = { consumption: 'complete', awards: 'pending' };
+  await manager.updateRun(actor, run);
+  const fresh = new CraftingRunManager();
+  assert.equal(await fresh.pruneInstantaneousActiveRuns(() => recipe), 0);
+  assert.equal(fresh.getActiveRun(actor, run.id).steps[0].historySettlement.awards, 'pending');
+});
 
 test('CraftingRunManager: create/advance/cancel flow moves active run into history', async () => {
   setupGlobals();
@@ -502,6 +565,8 @@ test('CraftingRunManager.completeRun never archives a duplicate history id (lega
   // twin is already in history. Completing it must NOT add a second history row.
   const container = manager._getContainer(actor);
   container.active[run.id] = run;
+  await actor.setFlag('fabricate', 'fabricate.craftingRuns', container);
+  manager.invalidateCache(actor.id);
 
   const warnings = [];
   const original = console.warn;
@@ -550,7 +615,8 @@ class MergeActor {
       active: { ...priorActive, ...(value?.active ?? {}) },
       history: Array.isArray(value?.history) ? value.history : (this._stored?.history ?? []),
     };
-    return value;
+    for (const key of Object.keys(value?.active ?? {})) if (key.startsWith('-=')) { delete this._stored.active[key.slice(2)]; delete this._stored.active[key]; }
+    return this;
   }
 
   async update(data) {
@@ -581,10 +647,8 @@ test('CraftingRunManager._persist deletes removed active runs from the stored fl
   assert.equal(Object.keys(actor._stored.active).length, 0, 'no stale active run lingers');
   assert.equal(actor._stored.history.length, 1, 'the run is archived to history exactly once');
   assert.ok(
-    actor.updateCalls.some((data) =>
-      Object.keys(data).some((path) => path.includes(`active.-=${run.id}`))
-    ),
-    'the persist path issued a Foundry -= deletion for the removed run'
+    actor._stored.history.some((entry) => entry.id === run.id),
+    'terminal evidence survives the same write that removed the active key'
   );
 });
 

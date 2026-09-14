@@ -105,7 +105,7 @@ describe('journal run command protocol', () => {
             async setFlag(scope, key, value) {
               flags[scope] ??= {};
               flags[scope][key] = structuredClone(value);
-              return value;
+              return this;
             },
           };
           const item = { id: 'herb', uuid: 'Actor.a.Item.herb', name: 'Herb',
@@ -255,7 +255,7 @@ describe('journal run command protocol', () => {
         flags[scope] ??= {};
         flags[scope][key] = structuredClone(value);
         writes.push(structuredClone(value));
-        return value;
+        return actor;
       };
       globalThis.fromUuid = async (uuid) => uuid === actor.uuid ? actor : null;
       const run = await fabricate.craftingRunManager.createRun(actor, recipe, [actor], 'player', { lifecycleVersion: 1 });
