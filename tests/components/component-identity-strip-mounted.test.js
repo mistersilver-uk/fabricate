@@ -38,6 +38,8 @@ const harness = createMountedComponentHarness({
     ...COMPONENT_SCOPE_LEAF_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/utils/componentCategories.js',
+    // #1663: the ONE implementation behind both category shims; imports nothing.
+    'src/utils/categoryNormalization.js',
   ],
   compiledModules: [
     // The manager's ONE chip (issue 883). A `.svelte` the tree renders but the harness omits

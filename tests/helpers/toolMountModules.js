@@ -118,6 +118,8 @@ export const WORLD_TOOL_SCOPE_RAW_MODULES = Object.freeze([
   'src/systems/worldVocabulary.js',
   'src/utils/vocabularyUsage.js',
   'src/utils/componentCategories.js',
+  // #1663: the ONE implementation behind both category shims; imports nothing.
+  'src/utils/categoryNormalization.js',
   'src/utils/recipeCategories.js',
   // The shared list frame's LIFTED VIEW-STATE (issue 1438), reached through
   // `EntityCatalogueShell` -> `EntityListInspectorFrame`. Declared here because omitting a

@@ -28,6 +28,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/util/foundryBridge.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/utils/recipeCategories.js',
+    // #1663: the ONE implementation behind both category shims; imports nothing.
+    'src/utils/categoryNormalization.js',
     // The roster's lifted search term (issue 1438).
     'src/utils/managerBrowserViewState.js',
     'src/ui/svelte/apps/manager/knowledge/knowledgeStudio.js',

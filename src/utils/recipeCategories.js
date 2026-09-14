@@ -1,38 +1,26 @@
-export const GENERAL_RECIPE_CATEGORY = 'general';
-
-export function isGeneralRecipeCategory(category) {
-  return typeof category === 'string' && category.trim().toLowerCase() === GENERAL_RECIPE_CATEGORY;
-}
-
-export function normalizeRecipeCategory(category) {
-  if (typeof category !== 'string') return GENERAL_RECIPE_CATEGORY;
-  const trimmed = category.trim();
-  if (!trimmed) return GENERAL_RECIPE_CATEGORY;
-  return isGeneralRecipeCategory(trimmed) ? GENERAL_RECIPE_CATEGORY : trimmed;
-}
-
-export function normalizeCustomRecipeCategories(categories) {
-  if (!Array.isArray(categories)) return [];
-
-  const normalized = [];
-  const seen = new Set();
-
-  for (const category of categories) {
-    const normalizedCategory = normalizeRecipeCategory(category);
-    if (normalizedCategory === GENERAL_RECIPE_CATEGORY || seen.has(normalizedCategory)) continue;
-    seen.add(normalizedCategory);
-    normalized.push(normalizedCategory);
-  }
-
-  return normalized;
-}
-
-export function getEffectiveRecipeCategories(categories) {
-  return [GENERAL_RECIPE_CATEGORY, ...normalizeCustomRecipeCategories(categories)];
-}
-
-export function getRecipeCategoryLabel(category, localize = null) {
-  const normalized = normalizeRecipeCategory(category);
-  if (normalized !== GENERAL_RECIPE_CATEGORY) return normalized;
-  return typeof localize === 'function' ? localize('FABRICATE.Common.General') : 'General';
-}
+/**
+ * Recipe category vocabulary (issue 676), re-exported from the shared implementation (#1663).
+ *
+ * WHAT IS SHARED AND WHAT IS NOT: the helpers below are ONE implementation in
+ * `categoryNormalization.js`, because the recipe and component copies were identical modulo the
+ * entity word. The VOCABULARIES are not shared and must not be — `CraftingSystem.categories` and
+ * `CraftingSystem.componentCategories` are separate stored keys with separate call sites, and the
+ * data-models spec requires they never be merged, aliased or cross-populated. A shared total
+ * function over a string is not a shared list.
+ *
+ * This module is a re-export binding and nothing else; `tests/category-shim-bindings.test.js`
+ * proves it, and proves each name resolves to the SAME object as its original rather than to a
+ * behavioural twin.
+ *
+ * The names below are the PERMANENT public surface: `DOMAIN.md`'s Canonical Mapping cites this
+ * path, and `recipe category` is the ubiquitous language. This is not a bridge to be collapsed
+ * into its importers later.
+ */
+export {
+  GENERAL_CATEGORY_NAME as GENERAL_RECIPE_CATEGORY,
+  getCategoryLabel as getRecipeCategoryLabel,
+  getEffectiveCategoryNames as getEffectiveRecipeCategories,
+  isGeneralCategoryName as isGeneralRecipeCategory,
+  normalizeCategoryName as normalizeRecipeCategory,
+  normalizeCustomCategoryNames as normalizeCustomRecipeCategories,
+} from './categoryNormalization.js';

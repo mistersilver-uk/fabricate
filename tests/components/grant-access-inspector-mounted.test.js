@@ -29,6 +29,8 @@ const harness = createMountedComponentHarness({
     ...SEARCHABLE_POPOVER_RAW_MODULES,
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/utils/recipeCategories.js',
+    // #1663: the ONE implementation behind both category shims; imports nothing.
+    'src/utils/categoryNormalization.js',
     // The inspector's lifted roster view-state (issue 1438).
     'src/utils/managerBrowserViewState.js'
   ],

@@ -114,6 +114,8 @@ const harness = createMountedComponentHarness({
     // the salvage fired tense. Its closure is complicationPlan -> componentComplications.
     'src/utils/complicationPlan.js',
     'src/utils/componentCategories.js',
+    // #1663: the ONE implementation behind both category shims; imports nothing.
+    'src/utils/categoryNormalization.js',
     'src/utils/componentComplications.js',
     'src/utils/craftingCheckExpression.js',
     'src/utils/definitionIndex.js',

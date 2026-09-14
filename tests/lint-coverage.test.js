@@ -68,7 +68,7 @@ const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), 
  * failure here would be to delete the offending fixture line. Pinning the count turns that into an
  * edit to a number.
  */
-const LEGACY_GATE_FILE_COUNT = 360;
+const LEGACY_GATE_FILE_COUNT = 359;
 
 /**
  * Each debt group's file count and (file, rule) pair count, pinned EXACTLY rather than capped.

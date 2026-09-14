@@ -51,6 +51,8 @@ const SCOPED_RAW_MODULES = [
   'src/systems/worldVocabulary.js',
   'src/utils/vocabularyUsage.js',
   'src/utils/componentCategories.js',
+  // #1663: the ONE implementation behind both category shims; imports nothing.
+  'src/utils/categoryNormalization.js',
   'src/utils/recipeCategories.js',
   'src/systems/componentScope.js',
   'src/systems/essenceScope.js',

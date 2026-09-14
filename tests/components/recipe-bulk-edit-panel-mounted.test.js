@@ -50,6 +50,8 @@ const panel = createMountedComponentHarness({
     // `BulkDeleteCard`'s shared focus/announce ordering rule (issue 1157).
     'src/ui/svelte/util/announceAfterFocus.js',
     'src/utils/recipeCategories.js',
+    // #1663: the ONE implementation behind both category shims; imports nothing.
+    'src/utils/categoryNormalization.js',
     // The pure staging model and its shared selection leaf. Both are STATIC imports of the
     // component under test, and the shared harness's closure validator throws loudly on an
     // omission — the hand-rolled suites are the ones that hang instead.

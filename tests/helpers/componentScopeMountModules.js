@@ -59,6 +59,8 @@ export const COMPONENT_SCOPE_LEAF_MODULES = Object.freeze([
   // `worldVocabulary.js`'s own two leaves: it asks each category vocabulary whether a name is
   // the general bucket, so both travel with it.
   'src/utils/componentCategories.js',
+  // #1663: the ONE implementation behind both category shims; imports nothing.
+  'src/utils/categoryNormalization.js',
   'src/utils/recipeCategories.js',
   'src/systems/scopedDefinitions.js',
   'src/systems/scopedDefinitionStore.js',

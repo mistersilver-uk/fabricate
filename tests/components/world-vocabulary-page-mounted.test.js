@@ -90,6 +90,8 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/manager/scoped/worldVocabularyStudio.js',
     'src/systems/worldVocabulary.js',
     'src/utils/componentCategories.js',
+    // #1663: the ONE implementation behind both category shims; imports nothing.
+    'src/utils/categoryNormalization.js',
     'src/utils/recipeCategories.js',
   ],
   compiledModules: [

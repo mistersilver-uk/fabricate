@@ -53,6 +53,8 @@ const RAW_MODULES = [
   'src/models/IngredientGroup.js',
   'src/models/Result.js',
   'src/utils/recipeCategories.js',
+  // #1663: the ONE implementation behind both category shims; imports nothing.
+  'src/utils/categoryNormalization.js',
   'src/utils/routedOutcomeKeywords.js',
   // Issue 1098: `routedOutcomeKeywords.js` reads the failure-result policy to decide
   // which outcome tiers a result-authoring control may offer.
