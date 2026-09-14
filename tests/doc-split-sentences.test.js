@@ -50,7 +50,15 @@ const SOURCES = [
  * sentence could read as surviving in a file nothing else knows about. Phases 3-5 add their
  * destinations here, which is a visible edit in the PR that moves the text.
  */
-const DESTINATIONS = ['AGENTS.md', 'CLAUDE.md', 'CONTRIBUTING.md'];
+const DESTINATIONS = [
+  'AGENTS.md',
+  'CLAUDE.md',
+  'CONTRIBUTING.md',
+  // Phase 3: the smoke-harness narrative and the CI-workflow narrative, moved beside the code
+  // they describe.
+  'scripts/README.md',
+  '.github/workflows/README.md',
+];
 
 /**
  * Sentences deliberately dropped, each naming the location that still carries them.
