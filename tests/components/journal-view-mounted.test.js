@@ -11,6 +11,7 @@ import {
   createMountedComponentHarness,
 } from '../helpers/svelte-component-harness.js';
 import { makeCraftingRun, makeGatheringRun, makeSucceededRun } from '../helpers/journal-fixtures.js';
+import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
 import { chooseSelectOption } from '../helpers/select-control.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -133,6 +134,54 @@ function makeServices(journal) {
     actorBar: { selectedActorId: 'Actor.actor-1' },
     getWorldTimeComponents: () => ({ day: 13, hour: 8, minute: 0, secondsPerDay: 86400 }),
   };
+}
+
+const HISTORY = 'FABRICATE.App.Journal.History.';
+
+/** A terminal legacy gathering record as the builder projects it, never a hand-written yield. */
+function historicalGatheringRun(id, rows, awards) {
+  const record = {
+    id,
+    taskId: 'mining',
+    status: 'succeeded',
+    craftingSystemId: 'mining',
+    checkResult: { provider: 'd100', items: rows },
+    createdResults: awards,
+  };
+  const components = rows.map((row) => ({
+    id: row.componentId,
+    registeredItemUuid: `Compendium.ex.mat.Item.${row.componentId}`,
+  }));
+  return new RunJournalBuilder({
+    gatheringRunSource: { getRunHistory: () => [record] },
+    getSystem: () => ({ id: record.craftingSystemId, components }),
+  }).buildListing({ actor: { id: 'a', uuid: 'Actor.a' }, viewer: { isGM: true } }).history[0];
+}
+
+const award = (componentId, quantity, name) => ({
+  itemUuid: `Compendium.ex.mat.Item.${componentId}`,
+  quantity,
+  name,
+});
+
+/** The ` · `-joined evidence line, split back into the independent fields that built it. */
+const fieldsOf = (row) => row.querySelector('.fabricate-list-row-detail').textContent.split(' · ');
+
+function oddsChipOf(row) {
+  const chips = row.querySelectorAll('.manager-chip');
+  assert.equal(chips.length, 1, 'a yield row carries exactly one odds chip');
+  return chips[0];
+}
+
+async function mountHistory(run) {
+  const { store } = makeJournal({
+    historyPageItems: [run],
+    historyCount: 1,
+    selectedRun: run,
+    selectedRunKey: run.key,
+    selectedRunId: run.id,
+  });
+  return harness.mount({ services: makeServices(store) });
 }
 
 async function settle() {
@@ -452,6 +501,98 @@ describe('JournalView mounted behavior', () => {
     assert.match(target.querySelector('[data-journal-this-run]').textContent, /DayWithClock/u);
     assert.ok(target.querySelector('[data-journal-guidance]'));
     assert.ok(!target.querySelector('[data-journal-verdict="succeeded"]'), 'ordinary reselected history has no transient success banner');
+  });
+
+  it('keeps every unrecorded historical check field unknown and borrows nothing from a neighbour', async () => {
+    const run = historicalGatheringRun(
+      'unknown-legacy',
+      [
+        { id: 'moss', componentId: 'moss' },
+        { id: 'fern', componentId: 'fern' },
+      ],
+      [award('moss', 3, 'Moss')]
+    );
+    assert.equal(run.gatheringYield.rollModel, 'unknown');
+    const target = await mountHistory(run);
+    const rows = [...target.querySelectorAll('[data-yield-entry]')];
+    assert.deepEqual(
+      rows.map((row) => row.getAttribute('data-yield-entry')),
+      ['moss', 'fern']
+    );
+    for (const row of rows) {
+      assert.deepEqual(fieldsOf(row), [
+        `${HISTORY}RollNotRecorded`,
+        `${HISTORY}ThresholdNotRecorded`,
+        `${HISTORY}OutcomeNotRecorded`,
+      ]);
+      assert.equal(row.className.includes('is-cleared'), false, 'an unknown outcome is not a hit');
+      assert.equal(row.className.includes('is-missed'), false, 'nor a miss');
+      assert.equal(oddsChipOf(row).textContent, `${HISTORY}NotRecorded`);
+    }
+    assert.deepEqual(
+      rows.map((row) => row.querySelector('.fabricate-list-row-quantity').textContent),
+      ['FABRICATE.App.Journal.Quantity:{"n":3}', `${HISTORY}NotRecorded`],
+      'the row with no receipt says so rather than inheriting the 3 or settling at zero'
+    );
+    assert.equal(
+      target.querySelectorAll('[data-yield-cut], [data-yield-shared-roll]').length,
+      0,
+      'no recorded roll, so nothing cuts the scale and no shared roll is shown'
+    );
+  });
+
+  it('states a legacy row roll once and never paints a recorded row with the no-roll odds tone', async () => {
+    const run = historicalGatheringRun(
+      'legacy-mining',
+      [
+        { id: 'ore', componentId: 'ore', roll: 12, effectiveRoll: 12,
+          threshold: 11, finalDropRate: 90, dropped: true },
+        { id: 'grit', componentId: 'grit', roll: 5, effectiveRoll: 5,
+          threshold: 1, finalDropRate: 100, dropped: true },
+      ],
+      [award('ore', 2, 'Ore'), award('grit', 1, 'Grit')]
+    );
+    assert.equal(run.gatheringYield.rollModel, 'perRow');
+    assert.equal(run.gatheringYield.roll, null, 'the record has no root roll to share');
+    const target = await mountHistory(run);
+    const rows = [...target.querySelectorAll('[data-yield-entry]')];
+    assert.deepEqual(
+      rows.map((row) => row.getAttribute('data-yield-entry')),
+      ['grit', 'ore'],
+      'rows read down from the highest recorded chance'
+    );
+    const evidence = 'exactly three fields: an effective roll equal to the raw roll adds nothing';
+    assert.deepEqual(
+      fieldsOf(rows[1]),
+      [
+        `${HISTORY}RolledValue:{"roll":12}`,
+        `${HISTORY}RecordedThreshold:{"threshold":11}`,
+        `${HISTORY}CheckCleared`,
+      ],
+      evidence
+    );
+    assert.deepEqual(
+      fieldsOf(rows[0]),
+      [
+        `${HISTORY}RolledValue:{"roll":5}`,
+        `${HISTORY}RecordedThreshold:{"threshold":1}`,
+        `${HISTORY}CheckCleared`,
+      ],
+      evidence
+    );
+    const guaranteed = oddsChipOf(rows[0]);
+    assert.equal(guaranteed.textContent, '100%');
+    assert.ok(guaranteed.className.includes('is-neutral'), guaranteed.className);
+    assert.equal(
+      guaranteed.className.includes('is-positive'),
+      false,
+      'the guaranteed-odds tone belongs to a preview with no roll, not to a row with its own outcome'
+    );
+    assert.equal(target.querySelectorAll('[data-yield-cut], [data-yield-shared-roll]').length, 0);
+    assert.ok(
+      !target.querySelector('[data-history-unattributed]'),
+      'every receipt is attributed, so nothing is listed a second time'
+    );
   });
 
   it('anchors a terminal detail with no browse index at its final stage', async () => {

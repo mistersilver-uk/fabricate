@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { presentHistory, presentStage, materialText } from '../../src/ui/svelte/apps/journal/historyPresentation.js';
-import { createPersistedCraftingHistory } from '../helpers/journal-fixtures.js';
+import { createPersistedCraftingHistory, createPersistedGatheringHistory } from '../helpers/journal-fixtures.js';
 
 const text = (key, data) => `${key.split('.').at(-1)}${data ? JSON.stringify(data) : ''}`;
 
@@ -93,6 +93,16 @@ describe('recorded Journal presentation', () => {
     assert.equal(essence.carriers.length, 2);
     assert.notEqual(essence.carriers[0].id, essence.carriers[1].id);
     assert.deepEqual(essence.totals, { sun: 4, moon: 6 });
+  });
+
+  it('reads a progressive gathering verdict from its own persisted check, not as unrecorded', async () => {
+    const { model } = await createPersistedGatheringHistory({ mode: 'progressive' });
+    assert.equal(model.gatheringYield.mode, 'progressive');
+    assert.equal(model.steps.length, 0, 'a gathering record carries no stage to summarise from');
+    const { summary } = presentHistory(model, text);
+    assert.equal(summary.kind, 'check');
+    const { formula, total } = model.gatheringYield.check;
+    assert.equal(summary.value, `RollResult${JSON.stringify({ formula, total, value: total })}`);
   });
 
   for (const [checked, kind] of [[true, 'check'], [false, 'none']]) {
