@@ -1,4 +1,8 @@
-import { createJournalRunLedgerProvisioner, createLedgerRetry } from './journalRunLedger.js';
+import {
+  createJournalRunLedgerProvisioner,
+  createLedgerRetry,
+  retainedClaimIdentity,
+} from './journalRunLedger.js';
 
 const AUTHORITY_VERSION = 1;
 const AUTHORITY_FLAG = 'journalRunAuthorityLedger';
@@ -239,9 +243,13 @@ export function createJournalRunAuthority({
     const ledger = ledgers[0];
     const claim = await readClaim(ledger);
     if (!claim) return { success: true, ledger };
-    const standing = claimStanding(claim, normalizedState(await readState(ledger)), now());
+    const state = normalizedState(await readState(ledger));
+    const standing = claimStanding(claim, state, now());
     if (standing === 'live') return unavailable('claim-held', { ledger, claim });
-    if (standing === 'retained') return unavailable('recovery-required', { ledger, claim });
+    if (standing === 'retained') {
+      const retained = retainedClaimIdentity(claim, state);
+      return unavailable('recovery-required', { ledger, claim, retained });
+    }
     // A non-GM realm cannot write, and does not need to: the claim guards nothing, and the
     // elected GM that actually executes the command reaps it on its own acquire.
     if (!activeGmMatches(currentUser?.(), gm)) return { success: true, ledger };
@@ -249,16 +257,24 @@ export function createJournalRunAuthority({
     return released ? { success: true, ledger } : unavailable('claim-held', { ledger, claim });
   }
 
+  /** Cache an answer WITH any retained-claim identity it carries, for every realm. */
+  function cacheAvailability(available, reason, result) {
+    const next = { available, reason };
+    if (result?.retained) next.retained = result.retained;
+    cachedAvailability = next;
+    return next;
+  }
+
   async function refreshAvailability() {
     const result = await ledgerResult();
     const activeRealmNeedsRecovery = activeGmMatches(currentUser?.(), activeGM?.());
     if (!activeRealmNeedsRecovery) recoveryReady = false;
     const available = result.success === true && (!activeRealmNeedsRecovery || recoveryReady);
-    cachedAvailability = {
+    return cacheAvailability(
       available,
-      reason: available ? null : result.success === true ? 'recovery-pending' : result.reason,
-    };
-    return cachedAvailability;
+      available ? null : result.success === true ? 'recovery-pending' : result.reason,
+      result
+    );
   }
 
   /** Idempotent ensure: boot and the command path provision automatically, so this only confirms. */
@@ -324,7 +340,7 @@ export function createJournalRunAuthority({
     const requestId = `boot-${bootId}`;
     const acquired = await acquire({ requestId });
     if (!acquired.success) {
-      cachedAvailability = { available: false, reason: acquired.reason };
+      cacheAvailability(false, acquired.reason, acquired);
       return unavailable(acquired.reason);
     }
     const { ledger, claimId } = acquired;
@@ -499,7 +515,7 @@ export function createJournalRunAuthority({
       }
       const acquired = await acquire(request);
       if (!acquired.success) {
-        cachedAvailability = { available: false, reason: acquired.reason };
+        cacheAvailability(false, acquired.reason, acquired);
         return unavailable(acquired.reason);
       }
       const { claimId } = acquired;

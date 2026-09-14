@@ -834,10 +834,25 @@ describe('journal run authority ledger', () => {
     // exactly what the recovery design exists for, so its claim is NEVER reaped, however old.
     plant('kept', 'uncertain-request', { kind: 'command', status: 'recoveryRequired' }, 9000);
     world.setNow(9000 + JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS * 1000);
-    assert.deepEqual(await authority.refreshAvailability(), {
-      available: false,
-      reason: 'recovery-required',
-    });
+    assert.deepEqual(
+      await authority.refreshAvailability(),
+      {
+        available: false,
+        reason: 'recovery-required',
+        // Issue 1648: the identity a GM needs to reconcile it in the app, rather than only from
+        // a console macro that first had to read the claim page's flags by hand.
+        retained: {
+          claimId: 'kept',
+          requestId: 'uncertain-request',
+          requestKind: 'command',
+          requestStatus: 'recoveryRequired',
+          failureReason: null,
+          failureMessage: null,
+          claimedAt: 9000,
+        },
+      },
+      'a retained claim publishes the exact token reconciliation requires'
+    );
     assert.equal(world.ledger.claim?.claimId, 'kept', 'the uncertain claim is still held');
     let handlerCalls = 0;
     assert.equal(
@@ -874,6 +889,15 @@ describe('journal run authority ledger', () => {
     assert.deepEqual(await authority.refreshAvailability(), {
       available: false,
       reason: 'recovery-required',
+      retained: {
+        claimId: 'orphan',
+        requestId: 'abandoned-command',
+        requestKind: 'command',
+        requestStatus: 'processing',
+        failureReason: null,
+        failureMessage: null,
+        claimedAt: 1000,
+      },
     });
     assert.equal(world.ledger.claim?.claimId, 'orphan');
   });

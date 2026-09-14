@@ -192,3 +192,33 @@ export function createJournalRunLedgerProvisioner({
 
   return { ensureSingleLedger };
 }
+
+/**
+ * Name a RETAINED claim well enough for a GM to decide about it: the exact token
+ * `reconcileJournalRunAuthority` requires, and the recorded refusal that left it behind. The
+ * request id is opaque, so the recorded response is the only thing that says what was
+ * interrupted (issue 1648).
+ *
+ * @param {{claimId?: unknown, requestId?: unknown, acquiredAt?: unknown}} claim
+ * @param {{requests: Record<string, object>}} state The normalised ledger state.
+ * @returns {{claimId: string, requestId: string, requestKind: string|null,
+ *   requestStatus: string|null, failureReason: string|null, failureMessage: string|null,
+ *   claimedAt: number|null}|null} `null` when the claim carries no usable token.
+ */
+export function retainedClaimIdentity(claim, state) {
+  const claimId = typeof claim?.claimId === 'string' ? claim.claimId : '';
+  if (!claimId) return null;
+  const requestId = typeof claim?.requestId === 'string' ? claim.requestId : '';
+  const request = state.requests[requestId];
+  const text = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
+  const claimedAt = Number(claim?.acquiredAt);
+  return {
+    claimId,
+    requestId,
+    requestKind: text(request?.kind),
+    requestStatus: text(request?.status),
+    failureReason: text(request?.response?.reason),
+    failureMessage: text(request?.response?.message),
+    claimedAt: Number.isFinite(claimedAt) ? claimedAt : null,
+  };
+}
