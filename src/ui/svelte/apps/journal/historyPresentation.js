@@ -99,10 +99,7 @@ function closedKey(run, stages, results) {
   if (run?.recoveryEvidence?.required) return 'ClosedRecovery';
   if (run?.recoveryEvidence?.status === 'planned') return 'SettlementPending';
   if (run?.redacted) return 'ClosedRedacted';
-  if (run?.status === 'cancelled') {
-    if (run?.lifecycleContract === 'legacy') return 'ClosedLegacyCancelled';
-    return stages.length > 0 ? 'ClosedCancelled' : 'ClosedCancelledBefore';
-  }
+  if (run?.status === 'cancelled') return cancelledClosedKey(run, stages);
   if (run?.status === 'failed') {
     if (results.some((entry) => finite(entry.quantity) && Number(entry.quantity) > 0))
       return 'ClosedFailureAwards';
@@ -114,6 +111,14 @@ function closedKey(run, stages, results) {
   if (results.some((entry) => finite(entry.quantity) && Number(entry.quantity) > 0))
     return 'ClosedSuccess';
   return recordedEmptyAwards(run, stages, results) ? 'ClosedSuccessEmpty' : 'ClosedMissing';
+}
+
+// Plurals are TWO whole literal keys chosen by a ternary. A concatenated suffix
+// credits only the prefix under the lang-key orphan guard and strands the leaf.
+function cancelledClosedKey(run, stages) {
+  if (run?.lifecycleContract === 'legacy') return 'ClosedLegacyCancelled';
+  if (stages.length === 0) return 'ClosedCancelledBefore';
+  return stages.length === 1 ? 'ClosedCancelledOne' : 'ClosedCancelledMany';
 }
 
 function recordedEmptyAwards(run, stages, results) {

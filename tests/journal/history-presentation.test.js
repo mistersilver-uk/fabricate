@@ -70,6 +70,17 @@ describe('recorded Journal presentation', () => {
     assert.equal(materialText({ name: null, quantity: null }, text), 'UnknownMaterial · NotRecorded');
   });
 
+  it('cancels with a singular stage count, so no player reads "after 1 attempted stages"', () => {
+    const cancelled = (count) => presentHistory({ status: 'cancelled',
+      steps: Array.from({ length: count }, (_, index) => ({ stepId: `s${index}`, index, attempted: true })) }, text).closed;
+    assert.equal(cancelled(1), 'ClosedCancelledOne{"count":1}', 'one attempted stage takes the written-out singular key');
+    assert.equal(cancelled(2), 'ClosedCancelledMany{"count":2}', 'two keeps the interpolated plural');
+    assert.equal(cancelled(0), 'ClosedCancelledBefore{"count":0}', 'no attempted stage still reads as cancelled before resolving');
+    assert.equal(presentHistory({ status: 'cancelled', lifecycleContract: 'legacy',
+      steps: [{ stepId: 's0', index: 0, attempted: true }] }, text).closed, 'ClosedLegacyCancelled{"count":1}',
+      'a legacy cancellation is unaffected by the plural split');
+  });
+
   it('keeps the real reloaded writer evidence and actor-qualified shared carriers', async () => {
     const { model } = await createPersistedCraftingHistory({ failLast: true });
     const account = presentHistory(model, text);
