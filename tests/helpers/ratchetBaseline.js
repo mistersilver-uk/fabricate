@@ -279,6 +279,47 @@ export function formatLedger(ledger) {
     .join('\n')}\n`;
 }
 
+/**
+ * A `ledgerGate` plus the baseline assertion every ledger repeats, registered in one call.
+ *
+ * Four ledgers now share the same call-site scaffold — the options object, the nested `wording`,
+ * and a test whose whole body is `gate.check(assert)`. SonarCloud normalises literals, so those
+ * scaffolds read as one duplicated block of over 100 tokens and count against the duplication gate
+ * on whichever copy is newest; `sonar.cpd.exclusions` does NOT cover `tests/**` because Automatic
+ * Analysis ignores that setting. Removing the repetition here is the fix the repository's own
+ * `sonar-project.properties` prescribes over suppressing the report.
+ *
+ * `wording` is flattened into the options rather than nested, because the nested literal was most
+ * of the duplicated run.
+ *
+ * @param {{test: Function, assert: object, title: string, ledgerPath: string,
+ *   regenerateEnv: string, build: Function, subject: string, regenerate: string,
+ *   structuralHint: string, roseHint: string, fellHint: string}} options
+ * @returns {ReturnType<typeof ledgerGate>}
+ */
+export function pinnedLedgerGate({
+  test,
+  assert,
+  title,
+  ledgerPath,
+  regenerateEnv,
+  build,
+  subject,
+  regenerate,
+  structuralHint,
+  roseHint,
+  fellHint,
+}) {
+  const gate = ledgerGate({
+    ledgerPath,
+    regenerateEnv,
+    build,
+    wording: { subject, regenerate, structuralHint, roseHint, fellHint },
+  });
+  test(title, () => gate.check(assert));
+  return gate;
+}
+
 export function ledgerGate({ ledgerPath, regenerateEnv, build, wording }) {
   let cached;
   const current = () => {

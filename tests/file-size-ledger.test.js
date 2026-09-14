@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 
-import { byCodePoint, ledgerGate } from './helpers/ratchetBaseline.js';
+import { byCodePoint, pinnedLedgerGate } from './helpers/ratchetBaseline.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 import {
   FILE_THRESHOLDS,
@@ -66,25 +66,22 @@ function buildLedger() {
   return Object.fromEntries(entries.sort(([left], [right]) => byCodePoint(left, right)));
 }
 
-const gate = ledgerGate({
+const gate = pinnedLedgerGate({
+  test,
+  assert,
+  title: 'the file-size ledger matches the pinned baseline exactly',
   ledgerPath: LEDGER_PATH,
   regenerateEnv: 'UPDATE_FILE_SIZE_LEDGER',
   build: buildLedger,
-  wording: {
-    subject: 'oversized files and functions',
-    regenerate: REGENERATE,
-    structuralHint:
-      'A unit appears when it crosses its threshold and vanishes when it falls below; an ' +
-      'extraction is expected to remove entries, and adding one needs a reason. A `#N` suffix ' +
-      'is positional among same-named functions, so an added or removed sibling renumbers those ' +
-      'after it: a matched added/removed pair at the same line count is that renumber, not debt.',
-    roseHint: 'means a unit this epic exists to shrink has grown instead',
-    fellHint: 'needs the ledger lowered to bank the extraction',
-  },
-});
-
-test('the file-size ledger matches the pinned baseline exactly', () => {
-  gate.check(assert);
+  subject: 'oversized files and functions',
+  regenerate: REGENERATE,
+  structuralHint:
+    'A unit appears when it crosses its threshold and vanishes when it falls below; an ' +
+    'extraction is expected to remove entries, and adding one needs a reason. A `#N` suffix ' +
+    'is positional among same-named functions, so an added or removed sibling renumbers those ' +
+    'after it: a matched added/removed pair at the same line count is that renumber, not debt.',
+  roseHint: 'means a unit this epic exists to shrink has grown instead',
+  fellHint: 'needs the ledger lowered to bank the extraction',
 });
 
 test('the thresholds are the two the issue states, and exclusive', () => {

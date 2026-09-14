@@ -14,7 +14,7 @@ import { ESLint, Linter } from 'eslint';
 import { DOMAIN_LAYER_ROOTS, DOMAIN_RESTRICTED_GLOBALS } from '../eslint.config.js';
 import { ESLINT_DEBT } from '../eslint.debt.js';
 
-import { byCodePoint, ledgerGate } from './helpers/ratchetBaseline.js';
+import { byCodePoint, pinnedLedgerGate } from './helpers/ratchetBaseline.js';
 import { collectWorkingTreeSources } from './helpers/sourceScan.js';
 
 const RULE = 'no-restricted-globals';
@@ -52,25 +52,22 @@ function buildLedger() {
   return Object.fromEntries(entries.sort(([left], [right]) => byCodePoint(left, right)));
 }
 
-const gate = ledgerGate({
+const gate = pinnedLedgerGate({
+  test,
+  assert,
+  title: 'the domain-layer bare-global ledger matches the pinned baseline exactly',
   ledgerPath: LEDGER_PATH,
   regenerateEnv: 'UPDATE_FOUNDRY_GLOBAL_READS_LEDGER',
   build: buildLedger,
-  wording: {
-    subject: 'bare Foundry-global reads in the domain layer',
-    regenerate: REGENERATE,
-    structuralHint:
-      'A file cannot appear without also being added to `eslint-debt.txt`, since the rule is ' +
-      'armed on these roots; that pair of edits is what needs justifying. A file vanishes when ' +
-      'its last read moves to an edge: drop its `no-restricted-globals` line from ' +
-      '`eslint-debt.txt` and lower the srcRoot counts in `tests/lint-coverage.test.js` too.',
-    roseHint: 'means a debted file took on more coupling behind its own disable',
-    fellHint: 'needs the ledger lowered to bank the reads that moved to an edge',
-  },
-});
-
-test('the domain-layer bare-global ledger matches the pinned baseline exactly', () => {
-  gate.check(assert);
+  subject: 'bare Foundry-global reads in the domain layer',
+  regenerate: REGENERATE,
+  structuralHint:
+    'A file cannot appear without also being added to `eslint-debt.txt`, since the rule is ' +
+    'armed on these roots; that pair of edits is what needs justifying. A file vanishes when ' +
+    'its last read moves to an edge: drop its `no-restricted-globals` line from ' +
+    '`eslint-debt.txt` and lower the srcRoot counts in `tests/lint-coverage.test.js` too.',
+  roseHint: 'means a debted file took on more coupling behind its own disable',
+  fellHint: 'needs the ledger lowered to bank the reads that moved to an edge',
 });
 
 test('the ledger reports the figures issue 1677 measured', (t) => {
