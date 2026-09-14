@@ -15,7 +15,7 @@
   import { craftingRecipeStatus } from '../../util/craftingRecipeStatus.js';
   import { TIME_UNITS, formatTimeRequirementCompact } from '../../util/recipeDuration.js';
 
-  let { recipe = null } = $props();
+  let { recipe = null, authorityRefusal = '' } = $props();
 
   const name = $derived(String(recipe?.name ?? ''));
   const modeLabel = $derived(String(recipe?.modeLabel ?? ''));
@@ -53,6 +53,15 @@
   const blockingReasons = $derived(
     Array.isArray(recipe?.blockingReasons) ? recipe.blockingReasons : []
   );
+  // EVERY player-app craft is routed through the versioned-run authority
+  // (`CraftingEngine._routeVersionedCraft`, reached because `main.js` always sends
+  // `lifecycleVersion: 1`), so an authority refusal blocks this recipe whatever its own browse
+  // status says. It therefore drops the status chip — "Ready to craft" is a lie while the craft
+  // would be refused — and leads the blocking callout, which is where the recipe's own reasons
+  // already read. The already-localized sentence arrives as a prop: `journalRunReasonMessage` is
+  // the ONE reason vocabulary and this header is not a second one.
+  const refusal = $derived(String(authorityRefusal ?? '').trim());
+  const calloutReasons = $derived(refusal ? [refusal, ...blockingReasons] : blockingReasons);
 </script>
 
 <header class="crafting-detail-header" data-recipe-header>
@@ -102,7 +111,7 @@
         <!-- Uncraftable moves the status onto the thumbnail pip, so the labelled
              badge is dropped here to avoid a duplicate icon; the blocking-reasons
              callout below still spells out the reason. -->
-        {#if !uncraftable}
+        {#if !uncraftable && !refusal}
           <Chip
             density="list"
             tone={statusChipTone(descriptor.tone)}
@@ -125,7 +134,7 @@
       <p class="crafting-detail-flavor">{flavor}</p>
     {/if}
 
-    {#if blockingReasons.length > 0}
+    {#if calloutReasons.length > 0}
       <!-- THE SHARED `Notice`, NON-BLOCKING (issue 1514). This well already carried
            `role="status"`, and `Notice` is the only primitive that can keep it: `Callout` emits
            `role="note"` or nothing (`Callout.svelte:131`) and cannot express a live status
@@ -147,9 +156,11 @@
       <Notice
         tone={uncraftable ? 'danger' : 'warning'}
         icon="fas fa-triangle-exclamation"
-        title={blockingReasons[0]}
-        detail={blockingReasons.slice(1).join(' ')}
+        title={calloutReasons[0]}
+        detail={calloutReasons.slice(1).join(' ')}
         dataAttr="data-recipe-blocking"
+        stateDataAttr={refusal ? 'data-recipe-authority-blocked' : ''}
+        stateDataValue="true"
       />
     {/if}
   {/if}

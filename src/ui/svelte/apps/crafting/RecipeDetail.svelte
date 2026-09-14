@@ -55,6 +55,9 @@
     // that skips this dispatcher silently drops to null and every step block falls back
     // to its baked projection.
     displayedStepId = null,
+    // The localized versioned-run authority refusal, or '' when the authority is available.
+    // Read by the HEADER alone, but declared here because this dispatcher is the only route to it.
+    authorityRefusal = '',
   } = $props();
 
   const redacted = $derived(recipe?.redaction?.redacted === true);
@@ -109,7 +112,7 @@
   </div>
 {:else}
   <div class="crafting-detail" data-crafting-detail-state="selected" data-recipe-detail-mode={mode}>
-    <RecipeDetailHeader {recipe} />
+    <RecipeDetailHeader {recipe} {authorityRefusal} />
     {#if !redacted}
       <div class="crafting-detail-body" data-crafting-detail-scroll>
         <Body

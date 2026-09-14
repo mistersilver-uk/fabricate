@@ -222,6 +222,39 @@ describe('CraftingView mounted behavior', () => {
     assert.match(calls.pickForMe.at(-1), /Slots\.PickedForYou/, 'the view owns the i18n');
     assert.deepEqual(calls.allocate.at(-1), ['Item.dusk-1', 2]);
   });
+
+  // Issue 1648, the reported bug's own header. EVERY player-app craft routes through the
+  // versioned-run authority, so "Ready to craft" over a refused authority promised something
+  // the Craft button could only refuse. The header now drops the chip and leads its blocking
+  // callout with the refusal — worded by the SHARED `journalRunReasonMessage` vocabulary, not a
+  // second map — while an available authority, or a reason that vocabulary cannot word, leaves
+  // the ready state exactly as it was.
+  for (const [name, availability, ready] of [
+    ['an available authority', { available: true, reason: null }, true],
+    ['a refusal it can word', { available: false, reason: 'active-gm-missing' }, false],
+    ['a reason nobody mapped', { available: false, reason: 'a-reason-nobody-mapped' }, true],
+  ]) {
+    it(`renders the ready chip ${ready ? 'with' : 'without'} it, given ${name}`, async () => {
+      const store = fakeCraftingStore({ recipes: [recipe()] });
+      const target = await harness.mount({
+        services: services(store, { getJournalRunAuthorityAvailability: () => availability }),
+      });
+      const chip = target.querySelector('.crafting-detail-header-meta [data-crafting-status]');
+      assert.equal(Boolean(chip), ready, `the ready chip is ${ready ? 'kept' : 'withheld'}`);
+      const notice = target.querySelector('[data-recipe-blocking]');
+      assert.equal(
+        Boolean(notice),
+        !ready,
+        'a withheld chip is replaced by a stated reason, never by nothing'
+      );
+      if (ready) return;
+      assert.equal(notice.getAttribute('data-recipe-authority-blocked'), 'true');
+      assert.ok(
+        notice.textContent.includes('FABRICATE.App.Journal.Actions.AuthorityUnavailable'),
+        'and it is the shared vocabulary that words it'
+      );
+    });
+  }
 });
 
 /**

@@ -4994,6 +4994,9 @@ Every authority refusal MUST instead be reported as a readable localized reason 
 A refusal reports the result's own message when it has one, then its localized reason, then the caller's generic failure text.
 An unmapped reason MUST fall through to that generic rather than render its own slug.
 
+Any surface that offers to start or change a versioned run MUST NOT present it as available while the authority is unavailable.
+In particular the player Crafting detail header MUST NOT read Ready to craft when the authority refuses; it shows the authority's reason in the recipe's own blocking callout and withholds the status chip.
+
 Recovery details MUST distinguish confirmed receipts, an uncertain applying effect and unstarted effects without treating planned amounts as received awards.
 They MUST explain that a retained claim can block other runs until the active GM manually records a disposition through `reconcileJournalRunAuthority({ claimId, disposition })`.
 Automatic provisioning MUST NOT clear a retained claim; reconciliation remains manual and follows the separate non-replayable recovery contract in `data-models/spec.md`.
