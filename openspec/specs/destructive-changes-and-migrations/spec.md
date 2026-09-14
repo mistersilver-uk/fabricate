@@ -327,7 +327,7 @@ The layout reaches both surfaces from the value the pass already resolved, never
 Every data-migration GM notice is a concise toast plus a console detail (issue 1737), because Foundry's `.notification` has no `max-height` and no overflow and a permanent paragraph covers the canvas.
 
 1. **The toast says what happened in short count sentences.**
-   It names things only under a cap, as the `1.34.0` merge names five essences and then an overflow count.
+   It names essences, recipes, entries and ids only under a cap, as the `1.34.0` merge names five essences and then an overflow count; a crafting-system list is short enough to name in full.
    Every toast string under `FABRICATE.Migration` in `lang/en.json` is at most 160 characters before interpolation, which `tests/migration-notice-detail.test.js` enforces; the recovery dialog's `Recovery.*` strings, every `…Detail` string and the console-only `IdentityDrift` strings are exempt.
 2. **The explanation, every remedy and every uncapped enumeration are the console detail.**
    Each lives in a `…Detail` sibling of its toast key, and a toast that has a detail ends with the one shared pointer `FABRICATE.Migration.ConsoleDetails`.

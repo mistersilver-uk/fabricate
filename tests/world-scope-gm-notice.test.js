@@ -99,10 +99,14 @@ test('the CREATED counts are the numbers the report carries, per entity type', (
 test('each optional clause appears only when its list is non-empty, and names its count', () => {
   const full = buildWorldScopeEntityNotice(fullReport(), noLocalizer);
   assert.match(full.message, /1 definition\(s\)/, 'the RENAMES clause is counted in the toast');
-  assert.match(full.message, /1 system\/entity pair\(s\)/, 'the REFUSALS clause');
+  assert.match(full.message, /1 system\(s\) could not be re-keyed/, 'the REFUSALS clause');
   assert.match(full.message, /1 reference\(s\)/, 'the FLAGGED clause');
-  assert.match(full.detail, /2 group\(s\)/, 'the MERGED clause is console detail');
-  assert.match(full.detail, /1 group\(s\) were formed transitively/, 'the TRANSITIVE clause');
+  assert.match(full.detail, /2 of them were the same real item/, 'the MERGED clause is console detail');
+  assert.match(
+    full.detail,
+    /1 group\(s\) were merged through a shared source item/,
+    'the TRANSITIVE clause'
+  );
   assert.doesNotMatch(full.message, /group\(s\)/, 'neither reaches the toast');
 
   const bare = buildWorldScopeEntityNotice(createdOnly(), noLocalizer);
@@ -643,7 +647,7 @@ test('src/main.js composes and posts the essence remap notice from the pass summ
   );
 });
 
-test('the 1.34.0 fallbacks and their lang/en.json strings compose the SAME notices', () => {
+test('the 1.34.0 and 1.30.0 remap fallbacks and their lang/en.json strings compose the SAME notices', () => {
   // Existence is not agreement: the key-exists guards stayed green while an inline English
   // fallback kept a sentence `lang/en.json` had already been corrected away from. The fallback
   // fires whenever `game.i18n` cannot resolve a key, so both renderings must match — toast,
@@ -665,6 +669,13 @@ test('the 1.34.0 fallbacks and their lang/en.json strings compose the SAME notic
   assert.deepEqual(
     buildWorldEssenceMergeRemapNotice(summary, noLocalizer),
     buildWorldEssenceMergeRemapNotice(summary, localizeLang)
+  );
+  // Not `buildWorldScopeEntityNotice`: its Created fallback differs from lang on purpose, for the
+  // View Lab anchor `tests/view-lab-world-migration.test.js` guards.
+  const remapSummary = { unsafeSystemIdSkips: ['a.b'], lockedSkips: 2, skippedErrors: 3 };
+  assert.deepEqual(
+    buildWorldScopeIdentityRemapNotice(remapSummary, noLocalizer),
+    buildWorldScopeIdentityRemapNotice(remapSummary, localizeLang)
   );
 });
 

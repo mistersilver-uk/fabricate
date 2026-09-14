@@ -1,11 +1,6 @@
 /**
- * A MIGRATION NOTICE IS A CONCISE TOAST PLUS A CONSOLE DETAIL (issue 1737).
- *
- * Foundry's `.notification` has no `max-height` and no overflow, so a paragraph posted as a
- * permanent warning covers the canvas until the GM dismisses it. Every data-migration notice
- * therefore says what happened in short sentences and points once at the console, where the
- * explanation, the remedies and every uncapped enumeration are logged through
- * {@link logMigrationNoticeDetail}.
+ * A migration notice is a concise toast plus a console detail (issue 1737): Foundry's
+ * `.notification` has no `max-height`, so the explanation belongs in the console, not the toast.
  */
 
 import { localizeWith } from '../utils/localizeWithFallback.js';
@@ -20,30 +15,16 @@ function fillNoticeTemplate(template, data) {
   );
 }
 
-/**
- * Localize one clause, falling back to its `{token}` English template filled with `data`.
- *
- * @param {(key: string, data?: object) => string|undefined} localize
- * @param {string} key
- * @param {object|undefined} data
- * @param {string} template
- * @returns {string}
- */
+/** Localize one clause, falling back to its `{token}` English template filled with `data`. */
 export function localizeNoticeClause(localize, key, data, template) {
   return localizeWith(localize, key, data, fillNoticeTemplate(template, data));
 }
 
 /**
  * Compose a notice from its findings, in reading order; a finding whose `when` is false says nothing.
+ * A finding with a `key` adds a toast clause; its `detailKey` clause (or, without one, the toast
+ * clause again) goes to the detail. `detailData` defaults to `data`.
  *
- * A finding with a `key` contributes a toast clause; one with a `detailKey` contributes its own
- * detail clause, and one without repeats its toast clause there, so the detail stands on its own.
- *
- * @param {(key: string, data?: object) => string|undefined} localize
- * @param {Array<{when: boolean, data?: object, detailData?: object, key?: string,
- *   fallback?: string, detailKey?: string, detailFallback?: string}>} findings `detailData`
- *   defaults to `data`; pass it when the detail enumerates what the toast only counts or caps.
- * @param {string[]} [trailingDetail] Unlocalized detail lines appended last, such as an id list.
  * @returns {{message: string, detail: string}}
  */
 export function composeFindingsNotice(localize, findings, trailingDetail = []) {
@@ -68,17 +49,7 @@ export function composeFindingsNotice(localize, findings, trailingDetail = []) {
   return finishMigrationNotice(toast, [...detail, ...trailingDetail], localize);
 }
 
-/**
- * Join a notice's toast and detail clauses, appending the console pointer once.
- *
- * The detail is `''`, and no pointer is appended, when it would only repeat the toast. Detail
- * clauses are newline-joined so each finding reads on its own line in the console.
- *
- * @param {string[]} toastClauses
- * @param {string[]} detailClauses
- * @param {(key: string, data?: object) => string|undefined} localize
- * @returns {{message: string, detail: string}}
- */
+/** Join the clauses and append the console pointer once; no detail when it would repeat the toast. */
 export function finishMigrationNotice(toastClauses, detailClauses, localize) {
   const toast = toastClauses.filter(Boolean);
   const details = detailClauses.filter(Boolean);
@@ -94,11 +65,7 @@ export function finishMigrationNotice(toastClauses, detailClauses, localize) {
   return { message: `${message} ${pointer}`, detail: details.join('\n') };
 }
 
-/**
- * The single-sentence notices `src/main.js` posts inline, keyed by their toast lang key.
- * Each fallback is its `lang/en.json` string verbatim, which `tests/migration-notice-detail.test.js`
- * holds it to.
- */
+/** The inline `src/main.js` notices; each fallback is its `lang/en.json` string verbatim. */
 const INLINE_NOTICE_COPY = Object.freeze({
   'FABRICATE.Migration.UnifyRegions.Notice': {
     fallback:
@@ -148,14 +115,7 @@ const INLINE_NOTICE_COPY = Object.freeze({
   },
 });
 
-/**
- * Compose one of the inline `src/main.js` notices from its toast key.
- *
- * @param {string} key A key of {@link INLINE_NOTICE_COPY}.
- * @param {object|undefined} data Format data shared by the toast and the detail.
- * @param {(key: string, data?: object) => string|undefined} localize
- * @returns {{message: string, detail: string}}
- */
+/** Compose one inline `src/main.js` notice from its toast key; `data` feeds toast and detail. */
 export function composeMigrationNotice(key, data, localize) {
   const copy = INLINE_NOTICE_COPY[key];
   if (!copy) return { message: '', detail: '' };
@@ -174,16 +134,10 @@ export function inlineMigrationNoticeCopy() {
 }
 
 /**
- * Write a notice's detail to the console at `info`: the one write every detail goes through.
- *
- * AN OPTIONAL CALL, NOT A BARE `console.info(...)` STATEMENT. `vite.config.js` marks
- * `console.info` pure, so the minifier deletes a bare statement from `dist/main.js`; the
- * optional-call form survives, which `tests/release-build.test.js` pins. `info` because
- * `debug` is hidden by Chromium's default filter and the View Lab fails on a `Fabricate |` warning.
- *
- * @param {string} label Names the notice, e.g. `1.34.0 equivalent essence merge`.
- * @param {string} detail
- * @returns {void}
+ * Write a notice's detail to the console at `info`, the one write every detail goes through.
+ * An OPTIONAL call because `vite.config.js` marks `console.info` pure and the minifier deletes a
+ * bare statement (`tests/release-build.test.js` pins the survivor); `info` because `debug` is
+ * hidden by Chromium's default filter and the View Lab fails on a `Fabricate |` warning.
  */
 export function logMigrationNoticeDetail(label, detail) {
   if (!detail) return;

@@ -64,6 +64,8 @@ export function buildWorldScopeEntityNotice(report, localize) {
     {
       when: true,
       data: counts,
+      // Deliberately NOT the lang wording: an unlocalized copy must miss the View Lab tolerance
+      // anchor, which `tests/view-lab-world-migration.test.js` holds it to.
       key: 'FABRICATE.Migration.WorldScopeEntities.Created',
       fallback:
         'Fabricate created {components} world component(s), {essences} world essence(s) and {tools} world tool(s).',
@@ -76,7 +78,7 @@ export function buildWorldScopeEntityNotice(report, localize) {
       data: { count: merged.length },
       detailKey: 'FABRICATE.Migration.WorldScopeEntities.Merged',
       detailFallback:
-        '{count} group(s) spanned more than one crafting system and were merged into one record.',
+        '{count} of them were the same real item in more than one system and are now one record.',
     },
     {
       // EVERY rename, by name, with its two systems. A byte-identical group produces none, so
@@ -94,17 +96,17 @@ export function buildWorldScopeEntityNotice(report, localize) {
       },
       key: 'FABRICATE.Migration.WorldScopeEntities.Renames',
       fallback:
-        "{count} definition(s) took another system's identity or a new id, and every reference was rewritten.",
+        '{count} definition(s) took another system’s identity or a new id, and every reference was rewritten.',
       detailKey: 'FABRICATE.Migration.WorldScopeEntities.RenamesDetail',
       detailFallback:
-        "{count} definition(s) took another system's identity or a new id, and every reference to them was rewritten: {renames}.",
+        '{count} definition(s) took the oldest system’s identity or a new id, and every reference to them was rewritten: {renames}.',
     },
     {
       when: transitive.length > 0,
       data: { count: transitive.length },
       detailKey: 'FABRICATE.Migration.WorldScopeEntities.TransitiveGroups',
       detailFallback:
-        '{count} group(s) were formed transitively from more than two definitions — check them in case two different things were merged.',
+        '{count} group(s) were merged through a shared source item rather than directly. Check them in case two different things were joined.',
     },
     {
       when: refusals.length > 0,
@@ -116,11 +118,10 @@ export function buildWorldScopeEntityNotice(report, localize) {
           .join(', '),
       },
       key: 'FABRICATE.Migration.WorldScopeEntities.Refusals',
-      fallback:
-        '{count} system/entity pair(s) could not be re-keyed safely and were left unchanged.',
+      fallback: '{count} system(s) could not be re-keyed safely and were left unchanged.',
       detailKey: 'FABRICATE.Migration.WorldScopeEntities.RefusalsDetail',
       detailFallback:
-        '{count} system/entity pair(s) could not be re-keyed safely and were left exactly as they were: {refusals}.',
+        '{count} system(s) could not be re-keyed safely, so Fabricate left them exactly as they were and merged nothing there: {refusals}.',
     },
     {
       when: flagged.length > 0,
@@ -130,10 +131,10 @@ export function buildWorldScopeEntityNotice(report, localize) {
         references: flagged.map((entry) => `${entry.referenceId} (${entry.systemId})`).join(', '),
       },
       key: 'FABRICATE.Migration.WorldScopeEntities.FlaggedForReview',
-      fallback: '{count} reference(s) already point at nothing. Nothing has been removed.',
+      fallback: '{count} reference(s) already point at nothing. Nothing was removed.',
       detailKey: 'FABRICATE.Migration.WorldScopeEntities.FlaggedForReviewDetail',
       detailFallback:
-        '{count} reference(s) already point at nothing, and Fabricate can now tell: {references}. Nothing has been removed - review them when you get a chance.',
+        '{count} reference(s) already point at nothing, and Fabricate can now tell you which: {references}. Nothing has been removed - review them when you get a chance.',
     },
   ]);
   const needsAction = renames.length > 0 || refusals.length > 0 || flagged.length > 0;
@@ -170,14 +171,14 @@ export function buildWorldScopeIdentityRemapNotice(summary, localize) {
         '{count} crafting system id(s) cannot be used in an item flag, so their owned items keep resolving by source item.',
       detailKey: 'FABRICATE.Migration.WorldScopeEntities.UnsafeSystemIdsDetail',
       detailFallback:
-        '{count} crafting system id(s) contain a character Fabricate cannot use in an item flag, so owned copies in them were left to resolve by source item instead: {systems}.',
+        '{count} crafting system id(s) contain a character Fabricate cannot use inside an item flag, so owned copies in them were left to resolve by their source item instead: {systems}.',
     },
     {
       when: locked > 0,
       data: { count: locked },
       key: 'FABRICATE.Migration.WorldScopeEntities.LockedSkips',
       fallback:
-        '{count} item(s) refused the update — usually because they live in a locked compendium — and will keep resolving by source item.',
+        '{count} item(s) refused the update — usually because they live in a locked compendium — and will keep resolving by their source item.',
     },
     {
       when: failed > 0,
@@ -339,8 +340,8 @@ export function buildWorldIdentityDriftNotice(driftEntries, localize) {
 
 /**
  * How many essences the toast names before deferring to the console, for the reason
- * {@link IDENTITY_DRIFT_NOTICE_RECORD_CAP} states. The call site must log the full enumeration from
- * {@link describeWorldEssenceMerge}, or "the rest is in the console" is not a true sentence.
+ * {@link IDENTITY_DRIFT_NOTICE_RECORD_CAP} states. The notice's `detail` ends with the full
+ * {@link describeWorldEssenceMerge} enumeration, so the console pointer stays true.
  */
 const ESSENCE_MERGE_NOTICE_NAME_CAP = 5;
 
