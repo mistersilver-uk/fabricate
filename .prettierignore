@@ -79,7 +79,6 @@ examples/macros/05-craft-item.js
 examples/macros/06-tag-items.js
 examples/macros/07-export-recipes.js
 examples/macros/08-import-recipes.js
-lang/en.json
 module.json
 scripts/foundry-setup-data.mjs
 scripts/foundry-test-down.mjs
