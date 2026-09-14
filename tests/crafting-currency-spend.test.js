@@ -59,14 +59,18 @@ function makeItem({ id, name = `Item ${id}`, quantity = 1, componentId = null } 
     deleteCalled: false,
     updateCalled: false,
     updatePayloads: [],
+    // Foundry resolves the DOCUMENT from both writes, and the acknowledged-receipt
+    // contract reads that return before recording an actual consumption.
     async delete() {
       this.deleteCalled = true;
       this.system.quantity = 0;
+      return this;
     },
     async update(payload) {
       this.updateCalled = true;
       this.updatePayloads.push(payload);
       if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+      return this;
     },
   };
 }

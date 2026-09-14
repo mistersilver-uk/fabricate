@@ -5307,11 +5307,16 @@ export class CraftingEngine {
     const captured = mapConsumedIngredientRef({ item, quantity });
     if (before === null || receiptQuantity(quantity) === null)
       throw unconfirmedHistoryError('Unknown consumption quantity');
+    // An acknowledged whole-document delete yields what the PLAN counted the document
+    // as, and every consumption plan reads capacity with `readStackQuantity` ("a present
+    // item is at least one"). Reporting the stored value instead would answer 0 for a
+    // stored-`0` stack the plan took one unit from, and refuse the whole consumption.
+    const whole = readStackQuantity(item?._source ?? item, path);
     const result = await (quantity >= before
       ? item.delete()
       : updateStackQuantity(item, before - quantity, path));
     requireDocumentAcknowledgment(item, result);
-    if (quantity >= before) return before;
+    if (quantity >= before) return whole;
     const after = sourceItemQuantity(item, { path, absentDefault: null });
     if (after === null || after > before)
       throw unconfirmedHistoryError('Consumption decrement is uncertain');
