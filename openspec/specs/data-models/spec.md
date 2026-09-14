@@ -3629,7 +3629,19 @@ The GM-only cascade walkers (`removeRunsForSystem`, `removeRunsForComponent`, an
 4. **Step projection is crafting-only.**
    `steps`, `currentStep`, `structureLabel`, `multiStep`, `isFinalStep`, each step's `detail.checkLabel`, and each step's `requirements` / `consumedIngredients` are populated for crafting runs only; gathering and salvage project `steps: []`, `currentStep: null`, empty structure labels, and `multiStep: false` / `isFinalStep: false`.
    Gathering's permitted mode-specific yield projection supplies its Direct, d100 or Check label independently of crafting step fields.
-   A step's `requirements` come from its persisted snapshot and `consumedIngredients` from the persisted consumed refs; both resolve name/img via the same shared result mapper (consume-time capture, then the item-uuid and component-id fallbacks), so a deleted consumed item still labels from its captured or component name.
+   A step's `requirements` come from its persisted snapshot and `consumedIngredients` from the persisted consumed refs.
+   Historical consumption enrichment MUST clone rows and preserve captured nonempty name/image, physical identity, quantity, order and stage association.
+   Missing metadata MUST use consistent same-stage prepared summaries by exact actor-qualified Item UUID, then permitted exact live Item metadata, then consistent earlier entitled historical Item metadata, then scoped-component metadata only where a genuine component reference exists.
+   Conflicting nonempty candidates at a fallback level MUST leave that field unknown rather than proceed to weaker evidence.
+   A contradictory actor qualifier, bare id, UUID tail, name, image, requirement or array position MUST NOT establish physical identity.
+   Historical metadata sources MUST be currently entitled, earlier terminal legacy reported receipts or applied versioned receipts; planned versioned effects MUST NOT qualify.
+   Equal world-time timestamps MAY use the native newest-first terminal ledger's earlier suffix to establish chronology, but MUST NOT use display sorting or an unrelated collection's order.
+   Historical metadata fallback MUST NOT copy quantities or operational state, write actor flags, or claim new consume-time capture.
+   Recorded gathering yield MUST expose `rollModel: shared | perRow | unknown`, `roll: number | null`, per-row `rawRoll`, `effectiveRoll`, `threshold`, `cleared` and `qty`, and `unattributedAwardIndexes` into its actual receipt list.
+   Quantity attribution MUST prefer explicit row linkage, then exact scoped component identity, then proven full source identity through retained registered, origin or alias Item UUIDs.
+   Only equivalent simple Item compendium addresses with and without the explicit `Item` segment MAY normalize together within history matching; pack, document type and embedded ancestry MUST remain distinct.
+   Conflicting explicit linkage MUST NOT fall back to a weaker match, and an award MUST contribute to exactly one selected row or remain unattributed.
+   Multiple uniquely linked receipts MAY sum for one row; missing or invalid receipt quantities MUST remain unknown, and authored quantities or proportional division MUST NOT replace them.
    A redacted crafting run also projects `steps: []` (its requirements / consumed items never leak).
    Active `multiStep` follows the enabled multi-step feature and `recipe.steps.length > 1`; terminal `multiStep` follows recorded attempts as specified above.
    `isFinalStep` is `stepCount <= 1 || currentStepIndex >= stepCount - 1` for an active run; terminal records drive no execution action.

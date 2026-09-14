@@ -154,24 +154,14 @@ function historySummary(run, stages, localize) {
 }
 
 function usableHistoricalScale(run) {
-  const drops = list(run?.gatheringYield?.entries);
-  if (
-    run?.gatheringYield?.mode !== 'd100' ||
-    !finite(run.gatheringYield.roll) ||
-    drops.length === 0
-  )
-    return false;
-  return drops.every((entry) => typeof entry.cleared === 'boolean' && finite(entry.chance));
+  return run?.gatheringYield?.mode === 'd100' && list(run.gatheringYield.entries).length > 0;
 }
 
-function attributedScaleAwards(run, results) {
-  const drops = list(run?.gatheringYield?.entries);
-  if (drops.some((entry) => !finite(entry.qty)) || results.some((entry) => !finite(entry.quantity)))
-    return false;
-  return (
-    drops.reduce((sum, entry) => sum + Number(entry.qty), 0) ===
-    results.reduce((sum, entry) => sum + Number(entry.quantity), 0)
-  );
+function unattributedScaleResults(run, results) {
+  const indexes = run?.gatheringYield?.unattributedAwardIndexes;
+  return Array.isArray(indexes)
+    ? results.filter((_entry, index) => indexes.includes(index))
+    : results;
 }
 
 // Identity comes only from a recorded Actor Item address, never from current metadata.
@@ -250,7 +240,7 @@ export function presentHistory(run, localize) {
     gathering,
     mode,
     usableScale: usableHistoricalScale(run),
-    attributedScaleAwards: attributedScaleAwards(run, results),
+    unattributedResults: unattributedScaleResults(run, results),
     settling: run?.recoveryEvidence?.status === 'planned',
     gatheringCheck: checkText(run?.gatheringYield?.check, localize),
     gatheringOutcome: run?.gatheringYield?.check?.outcome || localize(`${prefix}NotRecorded`),

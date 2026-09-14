@@ -1,3 +1,4 @@
+<!-- Renders the builder's entitled historical evidence, with unknowns local to each field. -->
 <script>
   import { localize } from '../../util/foundryBridge.js';
   import Callout from '../manager/Callout.svelte';
@@ -23,10 +24,30 @@
     text(run?.runType === 'salvage' ? 'Recovered' : account.gathering ? 'BroughtBack' : 'Crafted')
   );
   function dropEvidence(entry) {
-    const outcome = text(entry.cleared ? 'CheckCleared' : 'MissedRoll');
-    if (entry.threshold == null || entry.effectiveRoll == null)
-      return `${outcome} · ${text('NotRecorded')}`;
-    return `${outcome} · ${text('HighRollEvidence', { roll: entry.effectiveRoll, threshold: entry.threshold })}`;
+    const evidence = [];
+    if (['perRow', 'unknown'].includes(run.gatheringYield.rollModel)) {
+      evidence.push(
+        entry.rawRoll == null
+          ? text('RollNotRecorded')
+          : text('RolledValue', { roll: entry.rawRoll })
+      );
+    }
+    if (
+      entry.effectiveRoll != null &&
+      (run.gatheringYield.rollModel !== 'perRow' || entry.effectiveRoll !== entry.rawRoll)
+    ) {
+      evidence.push(text('EffectiveRollValue', { roll: entry.effectiveRoll }));
+    }
+    evidence.push(
+      entry.threshold == null
+        ? text('ThresholdNotRecorded')
+        : text('RecordedThreshold', { threshold: entry.threshold })
+    );
+    let outcome = 'OutcomeNotRecorded';
+    if (entry.cleared === true) outcome = 'CheckCleared';
+    else if (entry.cleared === false) outcome = 'MissedRoll';
+    evidence.push(text(outcome));
+    return evidence.join(' · ');
   }
   function facts(stage) {
     return [
@@ -167,13 +188,12 @@
       <YieldScale
         entries={run.gatheringYield.entries}
         roll={run.gatheringYield.roll}
+        rollModel={run.gatheringYield.rollModel ?? 'shared'}
         label={text('Scale')}
         labels={{
-          cleared: dropEvidence,
-          missed: dropEvidence,
-          threshold: () => text('NotRecorded'),
+          evidence: dropEvidence,
           quantity: (entry) =>
-            !account.attributedScaleAwards || entry.qty == null
+            entry.qty == null
               ? text('NotRecorded')
               : localize('FABRICATE.App.Journal.Quantity', { n: entry.qty }),
           chance: (entry) => (entry.chance == null ? text('NotRecorded') : `${entry.chance}%`),
@@ -183,9 +203,9 @@
           cutNote: () => text('Cut'),
         }}
       />
-      {#if !account.attributedScaleAwards}
+      {#if account.unattributedResults.length}
         <p data-history-unattributed>{text('UnattributedAwards')}</p>
-        {@render items(text('BroughtBack'), account.results, 'produced')}
+        {@render items(text('BroughtBack'), account.unattributedResults, 'produced')}
       {/if}
     {:else if account.mode === 'd100'}
       <JournalFactRow label={text('Scale')} value={text('NotRecorded')} />

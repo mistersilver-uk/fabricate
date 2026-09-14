@@ -310,6 +310,22 @@ export async function createPersistedCraftingHistory({
   }
 }
 
+/** Minimal legacy persisted shape: component-only rows, equivalent full pack Item receipts. */
+export function legacyGatheringEvidence() {
+  return {
+    result: { provider: 'd100', items: [
+      { id: 'ore', componentId: 'ore', itemUuid: '', roll: 12, effectiveRoll: 12, threshold: 11, finalDropRate: 90, dropped: true },
+      { id: 'gem', componentId: 'gem', itemUuid: '', roll: 94, effectiveRoll: 94, threshold: 81, finalDropRate: 20, dropped: true },
+    ] },
+    awards: [
+      { itemUuid: 'Compendium.example.materials.Item.ore', quantity: 2, name: 'Ore' },
+      { itemUuid: 'Compendium.example.materials.Item.gem', quantity: 1, name: 'Gem' },
+    ],
+    systemId: 'mining',
+    components: ['ore', 'gem'].map((id) => ({ id, registeredItemUuid: `Compendium.example.materials.${id}` })),
+  };
+}
+
 function historyActor(id) {
   return { id, uuid: `Actor.${id}`, isOwner: true, items: [], flags: {},
     getFlag(namespace, key) { return this.flags[namespace]?.[key]; },

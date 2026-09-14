@@ -1597,7 +1597,13 @@ Repeated thresholds for the same essence MUST sum their required amounts before 
 `SlotRow` MUST retain a caller's explicit infeasibility verdict even when held stock alone reaches the required quantity.
 Stale selections MUST remain visibly repairable, including a single surviving option; a route change MUST replace route-scoped choices and allocation rather than silently carrying them into another set.
 `StageCard` MUST derive its completion marker from an explicit stage status when supplied; past browse position alone cannot mark an unexecuted or failed stage successful.
-`YieldScale` MUST show one shared d100 cut against the item chances rather than implying separate item rolls.
+`YieldScale` MUST show one shared d100 cut against the item chances when shared-roll evidence is established.
+Its opt-in `rollModel` MUST accept `shared` (default), `perRow` and `unknown`; the latter two MUST omit the global cut and MUST NOT infer an outcome from the root roll.
+Historical callers MUST select `perRow` for recorded row rolls without an explicit shared root roll, even when those row values are equal.
+The optional `labels.evidence(entry)` callback MUST support each row's independently recorded raw roll, effective roll when different, threshold and outcome, alongside its attributable actual quantity.
+A missing field MUST NOT hide other known fields or rows, and unknown outcomes MUST remain neutral.
+A known shared roll whose unknown outcomes prevent locating a cut MUST remain visible as a standalone roll reading without inventing a cut position.
+Default preview callers MUST retain the existing shared comparison and ordering.
 An explicitly recorded `cleared` boolean MUST govern historical row outcomes, preserving native high-roll semantics; an explicit unknown outcome MUST remain unknown, while callers omitting that field retain the default low-roll comparison.
 `OutcomeLadder` MUST display the complete noninteractive routed outcome ladder for authored previews; ordinary routed history MUST instead use its recorded outcome log as specified by `ui-integration`.
 

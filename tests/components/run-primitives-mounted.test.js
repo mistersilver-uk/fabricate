@@ -94,6 +94,26 @@ describe('run primitives mounted behavior', () => {
     for (const harness of harnesses) harness.teardown();
   });
 
+  it('opts out of the shared cut without coercing unknown row outcomes or losing recorded fields', async () => {
+    yieldHarness.remount();
+    const props = { roll: 12, entries: [
+      { id: 'known', name: 'Known', chance: 90, qty: 0, rawRoll: 12, cleared: true },
+      { id: 'unknown', name: 'Unknown', chance: null, qty: null, rawRoll: 94, cleared: null },
+    ], labels: { evidence: (entry) => `Raw ${entry.rawRoll}`, quantity: (entry) => entry.qty ?? 'Not recorded' } };
+    const target = await yieldHarness.mount({ ...props, rollModel: 'perRow' });
+    assert.ok(!target.querySelector('[data-yield-cut]'));
+    assert.match(target.querySelector('[data-yield-entry="known"]').textContent, /Raw 12.*0/);
+    assert.match(target.querySelector('[data-yield-entry="unknown"]').textContent, /Raw 94.*Not recorded/);
+    assert.equal(target.querySelector('[data-yield-entry="unknown"]').classList.contains('is-missed'), false);
+    await yieldHarness.setProps({ ...props, rollModel: 'unknown' });
+    assert.ok(!target.querySelector('[data-yield-cut]'));
+    await yieldHarness.setProps({ ...props, rollModel: 'shared' });
+    assert.equal(target.querySelector('[data-yield-shared-roll]').textContent.trim(), '12');
+    assert.ok(!target.querySelector('[data-yield-cut]'));
+    await yieldHarness.setProps({ ...props, entries: props.entries.map((entry) => ({ ...entry, cleared: true })), rollModel: 'shared' });
+    assert.equal(target.querySelectorAll('[data-yield-cut]').length, 1);
+  });
+
   it('keeps the default pager face and opts into compact without changing its named controls', async () => {
     const props = { totalCount: 12, pageSize: 4, pageSizeOptions: [4, 6, 12], persistent: true,
       label: 'Finished runs', navLabel: 'Finished pages' };

@@ -1,9 +1,26 @@
-<!-- Yield rows honor recorded cleared/missed evidence when supplied, including high-roll d100. -->
+<!--
+  Displays yield rows with recorded outcomes or a shared preview comparison.
+
+  Props:
+  | prop | values | default | contract |
+  | `rollModel` | `shared`, `perRow`, `unknown` | `shared` | Only explicit shared evidence permits a global cut. |
+  | `labels` | callbacks | `{}` | `evidence(entry)` optionally owns field-local recorded text; quantities are caller-formatted. |
+
+  Invariants:
+  - Explicit null outcomes remain neutral; row-only evidence never creates a cut.
+-->
 <script>
   import Chip from './Chip.svelte';
   import ListRow from './ListRow.svelte';
 
-  let { entries = [], roll = null, labels = {}, label = '', hint = '' } = $props();
+  let {
+    entries = [],
+    roll = null,
+    rollModel = 'shared',
+    labels = {},
+    label = '',
+    hint = '',
+  } = $props();
 
   const sorted = $derived(
     entries
@@ -13,7 +30,9 @@
           Number(right.chance) - Number(left.chance) || left.authoredIndex - right.authoredIndex
       )
   );
-  const hasRoll = $derived(roll !== null && roll !== undefined && Number.isFinite(Number(roll)));
+  const hasRoll = $derived(
+    rollModel === 'shared' && roll !== null && roll !== undefined && Number.isFinite(Number(roll))
+  );
   const cutIndex = $derived(hasRoll ? sorted.findIndex((entry) => cleared(entry) === false) : -1);
   const hasCut = $derived(hasRoll && sorted.every((entry) => cleared(entry) !== null));
 
@@ -24,6 +43,7 @@
   }
 
   function reading(entry) {
+    if (labels.evidence) return labels.evidence(entry);
     if (cleared(entry) === null) return labels.threshold?.(entry);
     return cleared(entry)
       ? labels.cleared?.(entry, Number(roll))
@@ -37,6 +57,12 @@
   }
 </script>
 
+{#snippet sharedRoll()}
+  <Chip density="list" tone="accent" mono icon="fas fa-dice"
+    >{labels.cut?.(Number(roll)) ?? String(roll)}</Chip
+  >
+{/snippet}
+
 <section class="fab-yield-scale" data-yield-scale>
   {#if label || hint}
     <header class="fab-yield-heading">
@@ -44,13 +70,14 @@
       {#if hint}<span class="fab-yield-hint">{hint}</span>{/if}
     </header>
   {/if}
+  {#if hasRoll && !hasCut}
+    <span data-yield-shared-roll>{@render sharedRoll()}</span>
+  {/if}
   <div class="fab-yield-rows">
     {#each sorted as entry, index (entry.id)}
       {#if hasCut && cutIndex === index}
         <div class="fab-yield-cut" data-yield-cut>
-          <Chip density="list" tone="accent" mono icon="fas fa-dice"
-            >{labels.cut?.(Number(roll)) ?? String(roll)}</Chip
-          >
+          {@render sharedRoll()}
           <span class="fab-yield-cut-rule"></span>
           <span class="fab-yield-cut-note">{cutNote(index)}</span>
         </div>
@@ -65,7 +92,7 @@
           name={entry.name}
           art={entry.art || ''}
           icon={entry.icon || 'fas fa-circle'}
-          tint={hasRoll && !cleared(entry) ? '' : entry.tint || ''}
+          tint={cleared(entry) === false ? '' : entry.tint || ''}
           detail={reading(entry)}
           quantity={labels.quantity?.(entry) ?? entry.qty}
           tone={cleared(entry) === true ? 'positive' : 'neutral'}
@@ -74,7 +101,9 @@
           {#snippet trailing()}
             <Chip
               density="list"
-              tone={!hasRoll && Number(entry.chance) >= 100 ? 'positive' : 'neutral'}
+              tone={rollModel === 'shared' && !hasRoll && Number(entry.chance) >= 100
+                ? 'positive'
+                : 'neutral'}
               mono>{labels.chance?.(entry) ?? entry.chance}</Chip
             >
           {/snippet}
@@ -83,9 +112,7 @@
     {/each}
     {#if hasCut && sorted.length > 0 && cutIndex === -1}
       <div class="fab-yield-cut" data-yield-cut>
-        <Chip density="list" tone="accent" mono icon="fas fa-dice"
-          >{labels.cut?.(Number(roll)) ?? String(roll)}</Chip
-        >
+        {@render sharedRoll()}
         <span class="fab-yield-cut-rule"></span>
         <span class="fab-yield-cut-note">{cutNote(sorted.length)}</span>
       </div>

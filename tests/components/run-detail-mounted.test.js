@@ -13,7 +13,7 @@ import {
   STATUS_TONE_RAW_MODULES,
   createMountedComponentHarness
 } from '../helpers/svelte-component-harness.js';
-import { makeCraftingRun, makeGatheringRun, makeSucceededRun, createPersistedCraftingHistory } from '../helpers/journal-fixtures.js';
+import { makeCraftingRun, makeGatheringRun, makeSucceededRun, createPersistedCraftingHistory, legacyGatheringEvidence } from '../helpers/journal-fixtures.js';
 import { GatheringRichStateService } from '../../src/systems/GatheringRichStateService.js';
 import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
 import { GatheringRunManager } from '../../src/systems/GatheringRunManager.js';
@@ -116,6 +116,44 @@ describe('RunDetail mounted behavior', () => {
   });
 
   const forbiddenHistory = '[data-run-progress], [data-stage-nav], [data-journal-actions], [data-journal-summary], [data-journal-record], [data-journal-stage-details], [data-journal-time-remaining]';
+  for (const mixed of [false, true]) {
+    it(`renders each legacy row's known evidence independently (mixed=${mixed})`, async () => {
+      const fixture = legacyGatheringEvidence();
+      if (mixed) {
+        fixture.result.items[1].effectiveRoll = 98;
+        delete fixture.result.items[1].dropped;
+        fixture.awards[1].itemUuid = 'Compendium.unrelated.materials.Item.gem';
+        fixture.awards[1].name = 'Unattributed gem';
+      }
+      const record = { id: 'old-mining', taskId: 'mining', status: 'succeeded', craftingSystemId: fixture.systemId,
+        checkResult: fixture.result, createdResults: fixture.awards };
+      const run = new RunJournalBuilder({ gatheringRunSource: { getRunHistory: () => [record] },
+        getSystem: () => ({ id: fixture.systemId, components: fixture.components }),
+      }).buildListing({ actor: { id: 'a', uuid: 'Actor.a' }, viewer: { isGM: true } }).history[0];
+      const target = await harness.mount({ run });
+      assert.ok(!target.querySelector('[data-yield-cut]'));
+      const ore = target.querySelector('[data-yield-entry="ore"]');
+      const gem = target.querySelector('[data-yield-entry="gem"]');
+      assert.ok(ore && gem);
+      assert.match(ore.textContent, /RolledValue.*"roll":12/);
+      assert.match(ore.textContent, /Quantity.*"n":2/);
+      assert.match(gem.textContent, /RolledValue.*"roll":94/);
+      if (mixed) {
+        assert.match(gem.textContent, /EffectiveRollValue.*"roll":98/);
+        assert.match(gem.textContent, /OutcomeNotRecorded/);
+        assert.equal(gem.classList.contains('is-missed'), false);
+        assert.match(gem.textContent, /NotRecorded/);
+        const unmatched = target.querySelector('[data-history-items="produced"]');
+        assert.equal(unmatched.querySelectorAll('[data-list-row]').length, 1);
+        assert.match(unmatched.textContent, /Unattributed gem/);
+        assert.doesNotMatch(unmatched.textContent, /Ore/);
+      } else {
+        assert.match(gem.textContent, /Quantity.*"n":1/);
+        assert.ok(!target.querySelector('[data-history-items="produced"]'));
+      }
+      assert.ok(!target.querySelector(forbiddenHistory));
+    });
+  }
   it('renders all authored future requirement kinds without selecting or persisting them', async () => {
     const fixture = await createPersistedCraftingHistory({ previewOnly: true });
     const future = fixture.model.steps[1].inputPreview;
@@ -167,8 +205,8 @@ describe('RunDetail mounted behavior', () => {
       createdResults: awards }, 'succeeded', { status: 'committed', effects: [{ effectId: 'results', kind: 'createGatheredResults', phase: 'applied', receipt: awards }] });
     const target = await harness.mount({ run });
     assert.ok(target.querySelector('[data-yield-scale]'));
-    assert.match(target.textContent, /HighRollEvidence.*"threshold":31/);
-    assert.match(target.textContent, /HighRollEvidence.*"threshold":81/);
+    assert.match(target.textContent, /RecordedThreshold.*"threshold":31/);
+    assert.match(target.textContent, /RecordedThreshold.*"threshold":81/);
     assert.equal(target.querySelectorAll('[data-history-items="produced"]').length, 1);
     assert.ok(target.querySelector('[data-history-unattributed]'));
   });

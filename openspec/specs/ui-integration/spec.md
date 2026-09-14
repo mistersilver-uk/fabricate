@@ -4951,7 +4951,11 @@ Before any attempt, cancellation shows timing and cancellation guidance only; af
 Earlier awards/spending and known legacy refunds remain visible without implying a rollback of versioned effects.
 
 Direct gathering history MUST show Resolution/No roll and actual Brought back once.
-D100 history MUST preserve its recorded roll, effective high-roll thresholds and cleared/missed outcomes in one historical scale/cut, without duplicate Final check or Received lists.
+D100 history MUST preserve its recorded rolls, effective high-roll thresholds and cleared/missed outcomes in one historical scale, without duplicate Final check or Received lists.
+An explicit shared root roll MUST retain one cut; legacy row-only rolls MUST render per row without a global cut, and equal row values MUST NOT establish sharing.
+Each field and row MUST retain its known evidence independently: raw roll, effective roll when different, threshold, outcome and attributable actual quantity, including zero.
+Unknown outcomes MUST remain neutral rather than missed; missing quantities MUST NOT hide known quantities on neighboring rows.
+Actual receipts not uniquely attributed to a selected row MUST appear once below the scale, excluding receipts already represented by row quantities.
 Unknown per-row award attribution MUST NOT erase known check evidence: retain those outcomes with Not recorded amounts and show the unattributed actual award once with an explanation.
 Routed gathering success shows Final check, Brought back and How the check landed; routed failure shows its verdict and actual outcome log without repeating the log's roll in the verdict.
 The full OutcomeLadder remains an active preview; its native selection bands and highest-matching/lowest-relative-fallback rule MUST be stated truthfully rather than adopting prototype low-roll semantics.

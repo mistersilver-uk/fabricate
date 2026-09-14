@@ -608,7 +608,7 @@ test('v1 gathering awards come only from applied result receipts, including old 
     ['recoveryRequired', 'applied', [award], [3]],
     ['committed', 'applied', { count: 1 }, []],
   ]) {
-    const record = { id: 'v1-awards', lifecycleVersion: 1, taskId: 'forage', status: 'failed', createdResults: [planned],
+    const record = { id: 'v1-awards', craftingSystemId: SYSTEM.id, lifecycleVersion: 1, taskId: 'forage', status: 'failed', createdResults: [planned],
       checkResult: { provider: 'd100', roll: 80, itemRows: [{ id: 'herb', componentId: 'herb', dropped: true, finalDropRate: 70 }], items: [{ id: 'herb' }] },
       executionJournal: { status, effects: [{ effectId: 'results', kind: 'createGatheredResults', phase, receipt, planned: [planned] }] } };
     const builder = makeBuilder({ gatheringHistory: [record] });
@@ -627,7 +627,7 @@ test('recorded gathering quantities require unique receipt attribution and never
     { id: 'second', componentId: 'herb', quantity: 99, finalDropRate: 20, dropped: true },
     { id: 'missed', componentId: 'seed', quantity: 99, finalDropRate: 5, dropped: false },
   ];
-  const run = { id: 'actual', taskId: 'forage', status: 'succeeded', checkResult: { provider: 'd100', roll: 100, itemRows: rows, items: rows.slice(0, 2) },
+  const run = { id: 'actual', craftingSystemId: SYSTEM.id, taskId: 'forage', status: 'succeeded', checkResult: { provider: 'd100', roll: 100, itemRows: rows, items: rows.slice(0, 2) },
     createdResults: [{ componentId: 'herb', name: 'Actual Herb', quantity: 4 }] };
   const project = (record) => makeBuilder({ gatheringHistory: [record], getGatheringTask: () => ({ resolutionMode: 'straight', dropRows: [{ name: 'LIVE_SECRET' }] }) })
     .buildListing({ actor: ACTOR, viewer: PLAYER }).history[0];
@@ -641,7 +641,8 @@ test('recorded gathering quantities require unique receipt attribution and never
   assert.equal(project({ ...run, taskId: 'blind:env' }).gatheringYield, null);
   assert.equal(project({ ...run, checkResult: { blind: true, ...run.checkResult } }).gatheringYield, null);
   const legacy = { ...run, checkResult: { provider: 'd100', items: [{ ...rows[0], roll: 90 }] } };
-  assert.equal(project(legacy).gatheringYield.roll, 90);
+  assert.equal(project(legacy).gatheringYield.roll, null);
+  assert.equal(project(legacy).gatheringYield.rollModel, 'perRow');
   assert.equal(project(legacy).gatheringYield.entries[0].qty, 4);
   assert.equal(project({ ...legacy, checkResult: { provider: 'd100', roll: null } }).gatheringYield.roll, null);
 });
@@ -1103,6 +1104,7 @@ test('gathering yield projects straight and d100 authored previews without repla
         qty: 2,
         chance: 71,
         cleared: true,
+        rawRoll: 42,
         effectiveRoll: null,
         threshold: null,
       },
@@ -1112,11 +1114,14 @@ test('gathering yield projects straight and d100 authored previews without repla
         qty: 0,
         chance: 23,
         cleared: false,
+        rawRoll: 42,
         effectiveRoll: null,
         threshold: null,
       },
     ],
     roll: 42,
+    rollModel: 'shared',
+    unattributedAwardIndexes: [],
     tiers: [],
     check: null,
   });

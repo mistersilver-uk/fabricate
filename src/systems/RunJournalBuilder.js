@@ -13,10 +13,12 @@ import {
   stringOrEmpty,
   stringOrNull,
 } from './gatheringEngineInternals.js';
+import { gatheringHistoryEvidence } from './gatheringHistoryEvidence.js';
+import { enrichHistoricalConsumption, historicalItemSources } from './historyItemEvidence.js';
 import { readStackQuantity } from './itemStackQuantity.js';
 import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
-import { resolvedEssencesFor } from './scopedEntityReads.js';
+import { resolvedComponentsFor, resolvedEssencesFor } from './scopedEntityReads.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';
@@ -26,12 +28,8 @@ const BLIND_TASK_LABEL_KEY = 'FABRICATE.Gathering.BlindTaskLabel';
 const DAY_SECONDS = 24 * 60 * 60;
 
 function recordedNumber(value) {
-  return value == null || value === '' ? null : numberOrNull(value);
-}
-
-function dropMatchesAward(row, award) {
-  if (row?.componentId && award?.componentId) return row.componentId === award.componentId;
-  return Boolean(row?.itemUuid && row.itemUuid === award?.itemUuid);
+  if (typeof value !== 'number' && typeof value !== 'string') return null;
+  return typeof value === 'string' && value.trim() === '' ? null : numberOrNull(value);
 }
 
 // Versioned terminal history is persisted BEFORE effects. Its createdResults is
@@ -49,23 +47,6 @@ function gatheringActualAwards(run) {
   );
   if (effects.length !== 1 || effects[0].phase !== 'applied') return null;
   return Array.isArray(effects[0].receipt) ? effects[0].receipt : null;
-}
-
-// An evaluated quantity is authored intent. Only uniquely attributable receipts
-// establish an award; duplicate winning references cannot divide a shared total.
-function recordedDropQuantity(row, winners, awards, recordedAwards, selectionRecorded) {
-  if (!Array.isArray(recordedAwards)) return null;
-  if (row?.dropped === false) return 0;
-  if (!winners.includes(row)) return selectionRecorded ? 0 : null;
-  if (awards.length === 0) return recordedAwards.length === 0 ? 0 : null;
-  if (
-    awards.some((award) => winners.filter((winner) => dropMatchesAward(winner, award)).length !== 1)
-  )
-    return null;
-  const quantities = awards.map((award) => recordedNumber(award.quantity));
-  return quantities.some((quantity) => quantity === null || quantity < 0)
-    ? null
-    : quantities.reduce((sum, quantity) => sum + quantity, 0);
 }
 
 function historicalConsumedIngredients(step) {
@@ -429,7 +410,21 @@ export class RunJournalBuilder {
     // for a direct caller while `buildListing` still resolves each run's recipe exactly once
     // for both phases.
     const recipes = recipesByRunId ?? this._craftingRunRecipes(runs);
-    const crafting = runs.map((run) =>
+    const accessByRun = new Map(
+      runs.map((run) => [
+        run,
+        this._craftingAccess({
+          recipe: recipes.get(run?.id) ?? null,
+          actor,
+          viewer,
+          snapshot,
+        }),
+      ])
+    );
+    const entitledHistory = terminal
+      ? runs.filter((run) => accessByRun.get(run)?.visible === true && !run.isFizzle)
+      : [];
+    const crafting = runs.map((run, runIndex) =>
       this._craftingRunModel({
         run,
         actor,
@@ -440,6 +435,11 @@ export class RunJournalBuilder {
         snapshot,
         actorUuid,
         authority,
+        access: accessByRun.get(run),
+        // Native history is newest-first; its suffix establishes order for equal world times.
+        entitledHistory: runs
+          .slice(runIndex + 1)
+          .filter((source) => entitledHistory.includes(source)),
       })
     );
 
@@ -518,13 +518,14 @@ export class RunJournalBuilder {
     snapshot = null,
     actorUuid = null,
     authority = null,
+    access = null,
+    entitledHistory = [],
   }) {
     if (!run?.id) return null;
     if (run.isFizzle === true) {
       return this._fizzleRunModel({ run, actor, actorUuid, viewer, authority });
     }
     const system = this._getSystem(stringOrNull(run.craftingSystemId));
-    const access = this._craftingAccess({ recipe, actor, viewer, snapshot });
     // Keep the inherited identity fallback bounded; new evidence requires an
     // affirmative disclosure decision, independently of ownership/action access.
     const redacted = viewer?.isGM !== true && (!recipe || access?.visible === false);
@@ -569,6 +570,7 @@ export class RunJournalBuilder {
             isCurrent: !terminal && index === currentStepIndex,
             terminal,
             historyEntitled,
+            entitledHistory,
           })
         );
     const currentStep =
@@ -779,10 +781,19 @@ export class RunJournalBuilder {
     isCurrent = false,
     terminal = false,
     historyEntitled = false,
+    entitledHistory = [],
   }) {
     const evidence = historyEntitled ? craftingStepHistoryEvidence(runStep) : {};
     const consumed = historyEntitled
-      ? historicalConsumedIngredients(runStep)
+      ? enrichHistoricalConsumption(runStep, {
+          earlierItems: historicalItemSources(
+            entitledHistory,
+            runStep?.startedAt ?? run?.startedAt ?? runStep?.completedAt ?? run?.finishedAt,
+            { sameTimeIsEarlier: true }
+          ),
+          liveItem: this._getResultItem,
+          component: (id) => this._getComponent(systemId, id),
+        })
       : normalizeList(runStep?.consumedIngredients);
     return {
       stepId: stringOrNull(runStep?.stepId),
@@ -803,15 +814,14 @@ export class RunJournalBuilder {
       timeGate: plainObjectOrNull(runStep?.timeGate),
       detail: this._stepDetail({ runStep, recipeStep, system, recipe, terminal, historyEntitled }),
       lastCheckResult: this._checkResultModel(runStep?.lastCheckResult),
-      // The recipe's authored ingredient requirements (persisted snapshot at run
-      // creation) and the items actually consumed this step, each resolved to a
-      // UI-safe {componentId,itemUuid,quantity,name,img} row via the shared mapper.
-      // Consumed items are deleted at consume time, so their name/img come from the
-      // consume-time capture (or the componentId fallback) rather than a live lookup.
+      // Requirements retain their authored identity; consumption retains physical receipts.
+      // Only entitled consumption receives the separate historical metadata enrichment.
       requirements: normalizeList(runStep?.requirements).map((entry) =>
         this._mapResult(entry, systemId)
       ),
-      consumedIngredients: consumed.map((entry) => this._mapResult(entry, systemId)),
+      consumedIngredients: consumed.map((entry) =>
+        this._mapResult(entry, systemId, !historyEntitled)
+      ),
       createdResults: normalizeList(historyEntitled ? runStep?.createdResults : null).map((entry) =>
         this._mapResult(entry, systemId)
       ),
@@ -1532,34 +1542,20 @@ export class RunJournalBuilder {
     return stringOrNull(failed?.failureReason);
   }
 
-  /**
-   * Aggregate every step's `createdResults` into a UI-safe `ResultModel[]`.
-   * Returns `createdResults: []` + `createdResultCount: 0` for a redacted run.
-   * @private
-   */
-  /**
-   * Map a persisted created-result to the UI shape, resolving name/img when the
-   * record does not carry them. Two ordered fallbacks cover records that predate
-   * name/img capture: first the actual item by its recorded uuid, then (for a
-   * salvage result, which always carries a `componentId`) the source component's
-   * authored name/img via `getComponent`. Both fallbacks are no-ops when the
-   * resolver is absent/returns null, and never override a captured name/img.
-   * @param {object} result The persisted created-result record.
-   * @param {string|null} [systemId] The run's crafting system id, needed to resolve
-   *   a `componentId` to its component (threaded from the run/model).
-   * @private
-   */
-  _mapResult(result, systemId = null) {
+  // Captures win over display fallbacks. Already enriched consumption disables further
+  // lookups so conflicting evidence cannot silently regain a weaker catalogue label.
+  _mapResult(result, systemId = null, resolveMetadata = true) {
     const itemUuid = stringOrNull(result?.itemUuid);
     const componentId = stringOrNull(result?.componentId);
+    const quantity = recordedNumber(result?.quantity);
     let name = stringOrNull(result?.name);
     let img = stringOrNull(result?.img);
-    if ((!name || !img) && itemUuid) {
+    if (resolveMetadata && (!name || !img) && itemUuid) {
       const doc = this._getResultItem(itemUuid);
       name ||= stringOrNull(doc?.name);
       img ||= stringOrNull(doc?.img);
     }
-    if ((!name || !img) && componentId && systemId) {
+    if (resolveMetadata && (!name || !img) && componentId && systemId) {
       const component = this._getComponent(systemId, componentId);
       name ||= stringOrNull(component?.name);
       img ||= stringOrNull(component?.img);
@@ -1568,7 +1564,7 @@ export class RunJournalBuilder {
       actorUuid: stringOrNull(result?.actorUuid),
       componentId,
       itemUuid,
-      quantity: recordedNumber(result?.quantity),
+      quantity: quantity !== null && quantity >= 0 ? quantity : null,
       name,
       img,
     };
@@ -1864,7 +1860,7 @@ export class RunJournalBuilder {
   _gatheringYield({ run, system, context, terminal = false }) {
     if (context?.blind && !context.secret) return null;
     if (run?.checkResult?.blind === true) return null;
-    if (terminal) return this._gatheringHistoryYield(run);
+    if (terminal) return this._gatheringHistoryYield(run, system);
     if (!context?.task) return null;
     const mode = stringOrNull(context.task.resolutionMode) || 'd100';
     if (!['straight', 'd100', 'routed'].includes(mode)) return null;
@@ -1885,66 +1881,53 @@ export class RunJournalBuilder {
   }
 
   /**
-   * Recorded gatheringYield carries source, mode, roll, safe check, entries and no
-   * preview tiers. Drop entries retain cleared/effectiveRoll/threshold; qty is an
-   * attributable actual award or null, never the evaluated row's authored quantity.
-   * A deleted or edited task cannot change recorded mode, odds, check or outcomes.
+   * Historical yield uses recorded fields and uniquely attributed receipts, never live odds.
+   * Only explicit root evidence is shared; independent row rolls cannot create a global cut.
    * @private
    */
-  _gatheringHistoryYield(run) {
+  _gatheringHistoryYield(run, system) {
     const result = plainObjectOrNull(run?.checkResult);
     const task = plainObjectOrNull(run?.economyEvidence?.runtimeSnapshot?.task);
     let mode = stringOrNull(task?.resolutionMode);
     if (result?.provider === 'd100') mode = 'd100';
     else if (Object.hasOwn(result ?? {}, 'outcome')) mode = 'routed';
     if (!['straight', 'd100', 'routed'].includes(mode)) return null;
+    const evidence = gatheringHistoryEvidence({
+      result: result ?? {},
+      awards: run.createdResults,
+      systemId: stringOrNull(run.craftingSystemId),
+      components: resolvedComponentsFor(system),
+    });
     return {
       source: 'recorded',
       mode,
-      entries: mode === 'd100' ? this._historicalDropEntries(run) : [],
-      roll: this._gatheringActualRoll(run),
+      entries:
+        mode === 'd100' ? this._historicalDropEntries(evidence.entries, run.craftingSystemId) : [],
+      roll: evidence.roll,
+      rollModel: evidence.rollModel,
+      unattributedAwardIndexes: evidence.unattributedAwardIndexes,
       check: mode === 'routed' ? this._checkResultModel(result) : null,
       tiers: [],
     };
   }
 
-  _historicalDropEntries(run) {
-    const result = run.checkResult ?? {};
-    const rows = Array.isArray(result.itemRows) ? result.itemRows : normalizeList(result.items);
-    const winners = Array.isArray(result.items)
-      ? rows.filter((row) => result.items.some((winner) => winner?.id === row?.id))
-      : rows.filter((row) => row?.dropped === true);
-    return rows.map((row, index) => {
-      const awards = normalizeList(run.createdResults).filter((award) =>
-        dropMatchesAward(row, award)
-      );
-      const mapped = this._mapResult(
-        {
-          ...row,
-          name: stringOrNull(awards[0]?.name) || stringOrNull(row?.name),
-          img: stringOrNull(awards[0]?.img) || stringOrNull(row?.img),
-        },
-        stringOrNull(run.craftingSystemId)
-      );
+  _historicalDropEntries(rows, systemId) {
+    return rows.map((row) => {
+      const mapped = this._mapResult(row, systemId);
       return {
         ...compactPresentation({
-          id: stringOrNull(row?.id) || `drop-${index + 1}`,
+          id: row.id,
           name:
             stringOrNull(mapped.name) ||
             this.localize('FABRICATE.App.Journal.History.UnknownMaterial'),
           art: stringOrNull(mapped.img),
         }),
-        chance: recordedNumber(row?.finalDropRate),
-        cleared: typeof row?.dropped === 'boolean' ? row.dropped : null,
-        effectiveRoll: recordedNumber(row?.effectiveRoll),
-        threshold: recordedNumber(row?.threshold),
-        qty: recordedDropQuantity(
-          row,
-          winners,
-          awards,
-          run.createdResults,
-          Array.isArray(result.items)
-        ),
+        chance: row.chance,
+        cleared: row.cleared,
+        rawRoll: row.rawRoll,
+        effectiveRoll: row.effectiveRoll,
+        threshold: row.threshold,
+        qty: row.qty,
       };
     });
   }
@@ -1994,12 +1977,7 @@ export class RunJournalBuilder {
 
   _gatheringActualRoll(run) {
     const result = plainObjectOrNull(run?.checkResult);
-    const candidates = [
-      result?.value,
-      result?.roll,
-      result?.data?.total,
-      ...normalizeList(result?.itemRows ?? result?.items).map((item) => item?.roll),
-    ];
+    const candidates = [result?.value, result?.roll, result?.data?.total];
     return candidates.map(recordedNumber).find((value) => value !== null) ?? null;
   }
 

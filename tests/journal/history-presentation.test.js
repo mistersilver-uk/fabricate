@@ -52,7 +52,7 @@ describe('recorded Journal presentation', () => {
       })) },
     }, text);
     assert.equal(account.usableScale, true);
-    assert.equal(account.attributedScaleAwards, false);
+    assert.equal(account.unattributedResults[0].quantity, 4);
     assert.equal(account.results[0].quantity, 4);
   });
   it('distinguishes unknown quantities from confirmed-empty direct awards', () => {
