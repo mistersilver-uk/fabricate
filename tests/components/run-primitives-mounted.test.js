@@ -278,7 +278,24 @@ describe('run primitives mounted behavior', () => {
     assert.equal(chip.textContent.replaceAll(/\s+/gu, ' ').trim(), 'World clock Day 14 · 08:00');
     assert.ok(!chip.querySelector('button'), 'the player clock has no control');
     assert.ok(chip.classList.contains('is-clock'));
-    assert.deepEqual([...chip.children].map((node) => node.tagName), ['I', 'SPAN', 'SPAN']);
+    // Issue 1648: ONE flex child holding ONE line box, so the glyph, the label and the value
+    // share a baseline. As three flex children at three type sizes they could not — centring
+    // three boxes of 9.92px, 9px and 10.5px put their baselines 1.25px apart, which is what
+    // "the world time text is not vertically centred" was.
+    assert.deepEqual(
+      [...chip.children].map((node) => node.tagName),
+      ['SPAN']
+    );
+    const line = chip.querySelector('.fab-world-clock-line');
+    assert.deepEqual(
+      [...line.children].map((node) => node.tagName),
+      ['I', 'SPAN', 'SPAN']
+    );
+    expectGeometry('WorldClockChip', '.fab-world-clock-line', [
+      /display:\s*flex/u,
+      /align-items:\s*baseline/u,
+      /gap:\s*var\(--fab-space-2\)/u,
+    ]);
     expectGeometry('Chip', '.manager-chip.is-clock', [
       /height:\s*28px/u,
       /min-height:\s*28px/u,

@@ -85,7 +85,7 @@ src/systems/RecipeVisibilityService.js::evaluateRecipeAccess	141
 src/systems/ResolutionModeService.js	1036
 src/systems/ResolutionModeService.js::validateRecipe	158
 src/systems/ResolutionModeService.js::validateSalvage	116
-src/systems/RunJournalBuilder.js	2472
+src/systems/RunJournalBuilder.js	2502
 src/systems/RunJournalBuilder.js::_craftingRunModel	182
 src/systems/RunJournalBuilder.js::_craftingStepModel	102
 src/systems/RunJournalBuilder.js::_passthroughRunModel	111
@@ -106,7 +106,7 @@ src/systems/gatheringLocation.js::evaluateLocationAvailability	101
 src/systems/importReferenceResolver.js	1047
 src/systems/importReferenceResolver.js::collectBrokenInternalReferences	155
 src/systems/inventorySnapshot.js::buildInventorySnapshot	152
-src/systems/journalRunAuthority.js::createJournalRunAuthority	504
+src/systems/journalRunAuthority.js::createJournalRunAuthority	516
 src/systems/journalRunAuthority.js::createJournalRunAuthority>run	125
 src/systems/journalRunAuthority.js::createJournalRunAuthority>run>queue	123
 src/systems/journalRunCommands.js	991
@@ -121,7 +121,7 @@ src/ui/SvelteCraftingSystemManagerApp.svelte.js	1614
 src/ui/SvelteCraftingSystemManagerApp.svelte.js::_buildServices	494
 src/ui/SvelteCraftingSystemManagerApp.svelte.js::_buildServices>renderSystemImportDialog	111
 src/ui/SvelteCraftingSystemManagerApp.svelte.js::_prepareSvelteProps	412
-src/ui/SvelteFabricateApp.svelte.js::_buildServices	191
+src/ui/SvelteFabricateApp.svelte.js::_buildServices	196
 src/ui/extensionRegistry.js::createExtensionRegistry	179
 src/ui/navTabBadgeStore.js::createNavTabBadgeStore	123
 src/ui/svelte/SvelteApplicationMixinCore.js::createSvelteApplicationMixin	111
@@ -143,7 +143,7 @@ src/ui/svelte/apps/inventory/InventoryItemCard.svelte	550
 src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte	852
 src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte	705
 src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte	793
-src/ui/svelte/apps/journal/RunDetail.svelte	820
+src/ui/svelte/apps/journal/RunDetail.svelte	791
 src/ui/svelte/apps/manager/BooksScrollsView.svelte	753
 src/ui/svelte/apps/manager/BulkEditPanelShell.svelte	564
 src/ui/svelte/apps/manager/BulkStagingInset.svelte	599
