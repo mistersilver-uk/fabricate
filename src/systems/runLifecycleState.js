@@ -1,3 +1,5 @@
+import { cloneJson } from '../utils/scalars.js';
+
 /** Current opt-in run contract. Missing versions retain legacy behavior. */
 export const RUN_LIFECYCLE_VERSION = 1;
 
@@ -259,8 +261,4 @@ function unsupportedVersionError(version) {
 
 function hasOwn(value, key) {
   return Boolean(value && typeof value === 'object' && Object.hasOwn(value, key));
-}
-
-function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }

@@ -1,5 +1,6 @@
 import { resolveRecipeImage } from '../ui/svelte/util/craftingImageDefaults.js';
 import { activityPermitsFailureResults } from '../utils/failureResultPolicy.js';
+import { cloneJson } from '../utils/scalars.js';
 
 import { resolveActiveCraftingCheckFormula } from './checkModifierResolver.js';
 import { craftingStepHistoryEvidence } from './CraftingRunManager.js';
@@ -2351,10 +2352,6 @@ export class RunJournalBuilder {
           : [],
     };
   }
-}
-
-function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
 function normalizeRevision(value) {

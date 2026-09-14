@@ -136,7 +136,6 @@ src/ui/svelte/stores/adminRecipeRowProjection.js
 src/ui/svelte/stores/adminStore.js
 src/ui/svelte/stores/alchemyStore.svelte.js
 src/ui/svelte/stores/craftingStore.svelte.js
-src/ui/svelte/stores/journalStore.svelte.js
 src/ui/svelte/util/alchemyTabAvailability.js
 src/ui/svelte/util/autoFillResolver.js
 src/ui/svelte/util/componentEditor.js

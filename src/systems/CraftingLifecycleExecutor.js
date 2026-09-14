@@ -1,3 +1,5 @@
+import { cloneJson } from '../utils/scalars.js';
+
 import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
 
@@ -275,9 +277,4 @@ function stringValue(value) {
 
 function executionError(message, code) {
   return new CraftingLifecycleExecutionError(message, code);
-}
-
-function cloneJson(value) {
-  if (value === undefined) return;
-  return JSON.parse(JSON.stringify(value));
 }

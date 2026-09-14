@@ -1,3 +1,5 @@
+import { cloneJson } from '../utils/scalars.js';
+
 import { incrementRunRevision, RunLifecycleError } from './runLifecycleState.js';
 
 const JOURNAL_STATUSES = new Set(['planned', 'committed', 'recoveryRequired']);
@@ -285,8 +287,4 @@ function assertPlanRevision(run, transition) {
 
 function journalError(message, code) {
   return new RunExecutionJournalError(message, code);
-}
-
-function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }

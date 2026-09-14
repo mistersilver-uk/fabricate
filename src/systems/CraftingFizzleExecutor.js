@@ -1,3 +1,5 @@
+import { cloneJson } from '../utils/scalars.js';
+
 import { CraftingLifecycleExecutionError } from './CraftingLifecycleExecutor.js';
 import { getCommittedExecutionOutcome, observeExecutionJournal } from './runExecutionJournal.js';
 
@@ -175,8 +177,4 @@ function requiredString(value, label) {
 
 function executionError(message, code) {
   return new CraftingLifecycleExecutionError(message, code);
-}
-
-function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }

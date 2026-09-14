@@ -1,3 +1,5 @@
+import { cloneJson } from '../utils/scalars.js';
+
 import { RunContainerManagerBase } from './runContainerStore.js';
 import {
   observeExecutionJournal,
@@ -1096,8 +1098,4 @@ function findRunLocation(container, runId) {
 function stringOrNull(value) {
   const normalized = String(value ?? '').trim();
   return normalized || null;
-}
-
-function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }

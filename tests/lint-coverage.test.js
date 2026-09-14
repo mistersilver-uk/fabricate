@@ -98,7 +98,7 @@ const TESTS_DEBT_RULE_COUNT = 82;
 const PRETTIER_DEBT_MARKER = '# --- FORMATTING DEBT BASELINE';
 
 /** Entries in that section, pinned exactly. */
-const PRETTIER_DEBT_COUNT = 101;
+const PRETTIER_DEBT_COUNT = 100;
 
 
 /** Whether an ESLint rule entry is switched on. */
