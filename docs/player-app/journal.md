@@ -126,6 +126,7 @@ After execution, history reports actual awards as **Crafted**, **Brought back**,
 - **d100** gathering compares one shared roll against the item drop chances.
   It does not roll separately for each item.
   Higher effective rolls clear the displayed thresholds.
+  Some older recorded runs did roll separately for each item, and their history shows what was actually recorded.
 - **Check** gathering shows the outcome ladder, including failure.
   The preview ladder explains outcomes and does not let you select one.
 - Existing **Progressive** gathering uses its accumulated yield budget and ordered component costs.
@@ -154,13 +155,23 @@ Matching names or images alone do not combine separate tools.
 
 Material, essence-carrier, currency, and award receipts describe recorded spending or delivery, not the recipe's planned amounts.
 A carrier's recorded contributions can include several essences even though that physical unit was consumed once.
-Missing evidence is unknown, while an explicitly recorded empty receipt or zero amount establishes zero.
-A displayed zero quantity is never a positive award.
+History tells five different situations apart, row by row and field by field, and never trades one for another.
+**Not recorded** means nothing was captured for that fact.
+A run whose identity or details you are not entitled to see is withheld from you rather than missing, and it is shown as a hidden entry instead of an empty one.
+**Not applicable** means the run genuinely never attempted that fact, such as materials for a failure that consumes nothing.
+An explicitly recorded empty receipt, or a recorded zero amount, is a decided nothing rather than an absence.
+An effect that was started and never confirmed stays unsettled: its confirmed part is shown, the rest is reported as still settling or needing reconciliation, and the run is never repeated to find out.
+A displayed zero quantity is never a positive award, and a missing amount is never shown as zero.
 Missing item details can appear as **Unknown material** or **Not recorded**.
+Where a name or image was missing, the Journal may recover it from another record of the same physical item that you are entitled to see.
+That recovery only ever fills in a name or an image, never a quantity.
 Later recipe edits do not rewrite captured stage purpose or executed resolution evidence.
 
 Direct gathering shows **Resolution** with **No roll** and its **Brought back** items.
 D100 history keeps the recorded roll, high-roll thresholds, cleared or missed rows, and attributable awarded quantities together on one scale.
+Older runs that recorded a separate roll for each row show each row's own roll and no shared cut, because there was never one roll to draw a cut from.
+A run that recorded a shared roll still shows its single cut.
+Two rows recording the same value does not make a run a shared-roll run, and a missing shared roll is never filled in from the first row.
 If an actual award cannot be attributed to individual rows, their amounts remain **Not recorded** and the award appears once with an explanation.
 Check-based gathering records **How the check landed**, rather than repeating the preview ladder.
 The recorded run status and actual awards are separate facts.
