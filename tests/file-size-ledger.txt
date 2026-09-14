@@ -85,7 +85,7 @@ src/systems/RecipeVisibilityService.js::evaluateRecipeAccess	141
 src/systems/ResolutionModeService.js	1036
 src/systems/ResolutionModeService.js::validateRecipe	158
 src/systems/ResolutionModeService.js::validateSalvage	116
-src/systems/RunJournalBuilder.js	2503
+src/systems/RunJournalBuilder.js	2472
 src/systems/RunJournalBuilder.js::_craftingRunModel	182
 src/systems/RunJournalBuilder.js::_craftingStepModel	102
 src/systems/RunJournalBuilder.js::_passthroughRunModel	111
