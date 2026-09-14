@@ -1,10 +1,14 @@
+import { isSafeFlagKeySegment } from '../config/flags.js';
+
 import {
   cloneJson,
   durationToSeconds,
+  FLAG_NAMESPACE,
   nonNegativeNumber,
   normalizeList,
   numberOrNullStrict,
   readState,
+  STATE_FLAG_KEY,
   writeState,
 } from './gatheringRichStateInternals.js';
 
@@ -131,6 +135,7 @@ export class GatheringStaminaService {
       max,
       lastRegenWorldTime: this.now(),
     };
+    await this._deleteRetiredStaminaKeys(actor, key, existing, entry);
     state.stamina = { ...state.stamina, [key]: entry };
     state.history = [
       this.historyEvent('stamina.seed', { systemId: key, current: entry.current, max }),
@@ -171,6 +176,31 @@ export class GatheringStaminaService {
         : Number(expression);
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : null;
+  }
+
+  /**
+   * Explicitly delete every key the STORED entry carries that the rebuilt one
+   * omits (a cleared `maxOverride`, a retired legacy `provider`). `writeState`
+   * persists through `Actor#setFlag`, whose recursive merge never removes an
+   * omitted key, so without this a cleared value resurrects on the next read.
+   * Mirrors `deleteRemovedActiveRunFlags` in `src/config/flags.js`; the `-=`
+   * write form is unchanged across V13 and V14.
+   *
+   * @param {object} actor Foundry actor.
+   * @param {string} key The stamina map key (system id, or 'default').
+   * @param {object|null|undefined} stored The currently persisted entry.
+   * @param {object} next The entry about to be merged in.
+   */
+  async _deleteRetiredStaminaKeys(actor, key, stored, next) {
+    // A dotted/unsafe key cannot be addressed by a deletion path at all —
+    // `expandObject` re-splits it and the `-=` would land on another node.
+    if (typeof actor?.update !== 'function' || !isSafeFlagKeySegment(key)) return;
+    const retired = Object.keys(stored || {}).filter(
+      (field) => isSafeFlagKeySegment(field) && !(field in (next || {}))
+    );
+    if (retired.length === 0) return;
+    const path = `flags.${FLAG_NAMESPACE}.${STATE_FLAG_KEY}.stamina.${key}`;
+    await actor.update(Object.fromEntries(retired.map((field) => [`${path}.-=${field}`, null])));
   }
 
   async setActorStamina(
@@ -232,6 +262,7 @@ export class GatheringStaminaService {
         lastRegenWorldTime: previous.lastRegenWorldTime,
       }),
     };
+    await this._deleteRetiredStaminaKeys(actor, key, previous, next);
     state.stamina = { ...state.stamina, [key]: next };
     state.history = [
       this.historyEvent('stamina.set', {
@@ -271,6 +302,7 @@ export class GatheringStaminaService {
         lastRegenWorldTime: previous.lastRegenWorldTime,
       }),
     };
+    await this._deleteRetiredStaminaKeys(actor, key, previous, entry);
     state.stamina = { ...state.stamina, [key]: entry };
     state.history = [
       this.historyEvent('stamina.adjust', {
