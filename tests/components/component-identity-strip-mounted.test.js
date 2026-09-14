@@ -38,8 +38,7 @@ const harness = createMountedComponentHarness({
     ...COMPONENT_SCOPE_LEAF_MODULES,
     'src/ui/svelte/util/foundryBridge.js',
     'src/utils/componentCategories.js',
-    // Since #1663 the component and recipe category modules are aliasing shims, and this is
-    // the ONE implementation behind both; it imports nothing, so one entry closes the graph.
+    // #1663: the ONE implementation behind both category shims; imports nothing.
     'src/utils/categoryNormalization.js',
   ],
   compiledModules: [

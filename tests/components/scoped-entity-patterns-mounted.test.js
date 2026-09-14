@@ -34,8 +34,7 @@ const SCOPED_RAW_MODULES = [
   'src/systems/worldVocabulary.js',
   'src/utils/vocabularyUsage.js',
   'src/utils/componentCategories.js',
-  // Since #1663 the component and recipe category modules are aliasing shims, and this is
-  // the ONE implementation behind both; it imports nothing, so one entry closes the graph.
+  // #1663: the ONE implementation behind both category shims; imports nothing.
   'src/utils/categoryNormalization.js',
   'src/utils/recipeCategories.js',
   'src/systems/componentScope.js',

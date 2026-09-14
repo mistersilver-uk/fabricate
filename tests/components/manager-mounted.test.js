@@ -826,8 +826,7 @@ function compileManagerRoot() {
     'src/models/Tool.js',
     'src/models/match/matchTypes.js',
     'src/utils/recipeCategories.js',
-    // Since #1663 the component and recipe category modules are aliasing shims, and this is
-    // the ONE implementation behind both; it imports nothing, so one entry closes the graph.
+    // #1663: the ONE implementation behind both category shims; imports nothing.
     'src/utils/categoryNormalization.js',
     // The component category vocabulary (issue 676) — the SIBLING of the above, not a
     // reuse of it. Imported by ComponentEditView and the component browser.

@@ -45,8 +45,7 @@ const RECIPE_RAW_MODULES = [
   'src/ui/svelte/util/listReorderAnnouncement.js',
   'src/ui/svelte/util/craftingImageDefaults.js',
   'src/utils/recipeCategories.js',
-  // Since #1663 the component and recipe category modules are aliasing shims, and this is
-  // the ONE implementation behind both; it imports nothing, so one entry closes the graph.
+  // #1663: the ONE implementation behind both category shims; imports nothing.
   'src/utils/categoryNormalization.js',
   'src/utils/recipeBrowserModel.js',
   // recipeBrowserModel imports the shared category totals (issue 676); omitting it here

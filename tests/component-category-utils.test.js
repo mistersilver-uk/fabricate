@@ -38,6 +38,12 @@ describe('component category helpers (issue 676)', () => {
     assert.equal(normalizeComponentCategory('Reagent'), 'Reagent');
     assert.equal(isGeneralComponentCategory('GENERAL'), true);
     assert.equal(isGeneralComponentCategory('Reagent'), false);
+    // The non-string guard, which `normalizeComponentCategory` never reaches — it early-returns
+    // first. Its live callers are the direct ones in `worldVocabulary.js` and `adminStore.js`,
+    // which hand it unvalidated stored values, and since #1663 it is ONE guard answering for
+    // both vocabularies.
+    assert.equal(isGeneralComponentCategory(null), false);
+    assert.equal(isGeneralComponentCategory(42), false);
   });
 
   it('never persists the reserved general bucket in the custom array, and dedupes/trims', () => {
@@ -59,7 +65,10 @@ describe('component category helpers (issue 676)', () => {
   });
 
   it('localizes only general; a custom token is surfaced verbatim', () => {
-    const localize = (key) => (key === 'FABRICATE.Common.General' ? 'Allgemein' : key);
+    // NOT the identity on a non-general key. Returning `key` verbatim made the custom-token
+    // assertion below pass whether or not the token was routed through `localize`, so "only the
+    // reserved bucket is localizable" — the property the module documents — was asserted by nothing.
+    const localize = (key) => (key === 'FABRICATE.Common.General' ? 'Allgemein' : `L:${key}`);
     assert.equal(getComponentCategoryLabel('general', localize), 'Allgemein');
     assert.equal(getComponentCategoryLabel('', localize), 'Allgemein');
     assert.equal(getComponentCategoryLabel('Reagent', localize), 'Reagent');

@@ -53,8 +53,7 @@ const RAW_MODULES = [
   'src/models/IngredientGroup.js',
   'src/models/Result.js',
   'src/utils/recipeCategories.js',
-  // Since #1663 the component and recipe category modules are aliasing shims, and this is
-  // the ONE implementation behind both; it imports nothing, so one entry closes the graph.
+  // #1663: the ONE implementation behind both category shims; imports nothing.
   'src/utils/categoryNormalization.js',
   'src/utils/routedOutcomeKeywords.js',
   // Issue 1098: `routedOutcomeKeywords.js` reads the failure-result policy to decide

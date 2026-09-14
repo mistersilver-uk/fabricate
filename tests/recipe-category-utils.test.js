@@ -23,6 +23,10 @@ describe('recipe category helpers', () => {
     assert.equal(normalizeRecipeCategory('Potions'), 'Potions');
     assert.equal(isGeneralRecipeCategory('GENERAL'), true);
     assert.equal(isGeneralRecipeCategory('Potions'), false);
+    // The non-string guard, which `normalizeRecipeCategory` never reaches — it early-returns
+    // first. Since #1663 this is ONE guard answering for both vocabularies.
+    assert.equal(isGeneralRecipeCategory(null), false);
+    assert.equal(isGeneralRecipeCategory(42), false);
   });
 
   it('strips the reserved general category from persisted custom category arrays', () => {
@@ -61,5 +65,9 @@ describe('recipe category helpers', () => {
       'General'
     );
     assert.equal(getRecipeCategoryLabel('Weapons'), 'Weapons');
+    // The NO-LOCALIZER fallback: the English literal, not the raw key. This branch was
+    // component-only until #1663 made these ONE function — which is precisely why a reader of the
+    // recipe path could not see that it was covered.
+    assert.equal(getRecipeCategoryLabel('general'), 'General');
   });
 });
