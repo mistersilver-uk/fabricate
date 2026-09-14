@@ -1,5 +1,6 @@
 import { authoredCheckModifierIds } from '../utils/checkModifierPicks.js';
 import { authoredFailureOutcome } from '../utils/gatheringFailureOutcome.js';
+import { normalizeConditionId, normalizeTag, normalizeTagList } from '../utils/scalars.js';
 
 import { resolveModifierLibrary } from './characterLibraries.js';
 import {
@@ -2785,33 +2786,9 @@ function normalizeVocabularyOptions(kind, value) {
   return options;
 }
 
-function normalizeTagList(value) {
-  const values = Array.isArray(value) ? value : value ? [value] : [];
-  return [...new Set(values.map(normalizeTag).filter(Boolean))];
-}
-
-function normalizeTag(value) {
-  return String(value ?? '')
-    .trim()
-    .toLowerCase();
-}
-
 function normalizeConditionIdList(value) {
   const values = Array.isArray(value) ? value : value ? [value] : [];
   return [...new Set(values.map(normalizeConditionId).filter(Boolean))];
-}
-
-function normalizeConditionId(value) {
-  if (value && typeof value === 'object') {
-    return normalizeConditionId(value.id ?? value.value ?? value.label);
-  }
-  return String(value ?? '')
-    .trim()
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, '-')
-    .split('-')
-    .filter(Boolean)
-    .join('-');
 }
 
 function normalizeConditionIcon(icon, fallback) {

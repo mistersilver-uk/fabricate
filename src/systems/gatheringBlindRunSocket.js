@@ -34,6 +34,8 @@
  * (`game.socket.emit`, `game.users.activeGM`, the apply body).
  */
 
+import { trimString } from '../utils/scalars.js';
+
 import { createDepletionRateLimiter } from './gatheringNodeSocket.js';
 
 export const GATHERING_BLIND_START = 'gatheringBlindStart';
@@ -43,10 +45,6 @@ export const BLIND_START_RATE_LIMIT = 20;
 
 /** Rolling window for {@link BLIND_START_RATE_LIMIT}, in milliseconds. */
 export const BLIND_START_RATE_WINDOW_MS = 60_000;
-
-function trimString(value) {
-  return typeof value === 'string' ? value.trim() : '';
-}
 
 function normalizeInteractableRef(ref) {
   if (!ref || typeof ref !== 'object') return null;

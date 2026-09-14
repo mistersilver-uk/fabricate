@@ -88,6 +88,7 @@
  */
 
 import { WORLD_IDENTITY_FIELDS } from '../migration/worldScopeEntityGrouping.js';
+import { isPlainObject } from '../utils/scalars.js';
 
 import { subKeyEntries } from './scopedDefinitionStore.js';
 
@@ -99,10 +100,6 @@ const ENTITY_FIELDS = Object.freeze({
   essences: 'essenceDefinitions',
   tools: 'tools',
 });
-
-function isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function arrayOf(value) {
   return Array.isArray(value) ? value : [];

@@ -3,6 +3,7 @@ import {
   setSetting as defaultSetSetting,
   SETTING_KEYS,
 } from '../config/settings.js';
+import { cloneJson } from '../utils/scalars.js';
 
 import {
   normalizeGatheringRealm,
@@ -285,10 +286,6 @@ export class GatheringRealmStore {
   async save(config) {
     return this._persist(config);
   }
-}
-
-function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
 function replaceAt(array, index, value) {

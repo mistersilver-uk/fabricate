@@ -105,6 +105,7 @@ export const WORLD_TOOL_SCOPE_RAW_MODULES = Object.freeze([
   'src/systems/componentScope.js',
   'src/systems/essenceScope.js',
   'src/systems/scopedDefinitionStore.js',
+  'src/utils/scalars.js',
   'src/systems/scopedDefinitions.js',
   'src/systems/toolScope.js',
   'src/ui/svelte/apps/manager/scoped/scopedStudio.js',

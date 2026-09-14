@@ -10,6 +10,8 @@
  * collaborators alike.
  */
 
+import { cloneJson } from '../utils/scalars.js';
+
 /** Foundry flag namespace + key the actor-scoped gathering state persists under. */
 export const FLAG_NAMESPACE = 'fabricate';
 export const STATE_FLAG_KEY = 'gatheringState';
@@ -21,10 +23,6 @@ const SECONDS_PER_UNIT = Object.freeze({
   days: 86_400,
   weeks: 604_800,
 });
-
-export function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
-}
 
 export function normalizeList(value) {
   return Array.isArray(value) ? value : [];
@@ -88,3 +86,5 @@ export function durationToSeconds(secondsPerUnit, count, unit) {
   const safe = seconds > 0 ? seconds : SECONDS_PER_UNIT.hours;
   return Math.max(0, Number(count || 0) * safe);
 }
+
+export { cloneJson } from '../utils/scalars.js';

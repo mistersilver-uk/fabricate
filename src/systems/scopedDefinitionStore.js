@@ -3,6 +3,7 @@ import {
   identityOf,
   WORLD_IDENTITY_FIELDS,
 } from '../migration/worldScopeEntityGrouping.js';
+import { cloneJson } from '../utils/scalars.js';
 
 import { findWorldDefault, membershipKey } from './scopedDefinitions.js';
 
@@ -884,8 +885,4 @@ function carriedSubKeys(raw) {
     carried[key] = Object.prototype.hasOwnProperty.call(source, key);
   }
   return carried;
-}
-
-function cloneJson(value) {
-  return value == null ? value : JSON.parse(JSON.stringify(value));
 }

@@ -67,6 +67,7 @@ const harness = createMountedComponentHarness({
     'src/systems/componentScope.js',
     'src/systems/essenceScope.js',
     'src/systems/scopedDefinitionStore.js',
+    'src/utils/scalars.js',
     'src/systems/scopedDefinitions.js',
   ],
   compiledModules: [

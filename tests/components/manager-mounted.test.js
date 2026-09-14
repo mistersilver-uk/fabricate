@@ -1050,6 +1050,7 @@ function compileManagerRoot() {
     'src/systems/toolScope.js',
     'src/systems/scopedDefinitions.js',
     'src/systems/scopedDefinitionStore.js',
+    'src/utils/scalars.js',
     // Issue 1370 (epic 1357, PR 8a): `toolBreakageRuntime.js` now reads the system's TOOL
     // LIBRARY through the shared read seam too, so its closure gains the seam, the two
     // remaining scope modules, the migration module holding the ONE lifted-identity field

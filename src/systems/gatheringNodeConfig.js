@@ -29,6 +29,8 @@
  * environment store, the rich-state runtime, and the admin UI store all agree.
  */
 
+import { cloneJson } from '../utils/scalars.js';
+
 export const VALID_DEPLETION_TIMINGS = new Set(['onStart', 'onSuccess']);
 export const VALID_RESPAWN_POLICIES = new Set(['manual', 'overTime', 'nonRegenerating']);
 export const VALID_RESPAWN_GAIN_MODES = new Set(['guaranteed', 'chance', 'expression']);
@@ -50,10 +52,6 @@ function numberOrNull(value) {
   if (value == null || value === '') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
-}
-
-function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
 /**

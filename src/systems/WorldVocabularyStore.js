@@ -1,3 +1,5 @@
+import { cloneJson } from '../utils/scalars.js';
+
 import { normalizeWorldVocabularyEntries, WORLD_VOCABULARY_KINDS } from './worldVocabulary.js';
 
 /**
@@ -100,10 +102,6 @@ function carriedKinds(raw) {
     carried[kind] = Object.prototype.hasOwnProperty.call(source, kind);
   }
   return carried;
-}
-
-function cloneJson(value) {
-  return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
 /**

@@ -3,6 +3,7 @@ import {
   setSetting as defaultSetSetting,
   SETTING_KEYS,
 } from '../config/settings.js';
+import { cloneJson } from '../utils/scalars.js';
 
 const OVERRIDE_MODES = new Set(['none', 'manual']);
 
@@ -355,10 +356,6 @@ function normalizeOverride(value) {
     null
   );
   return winner ? single(winner) : null;
-}
-
-function cloneJson(value) {
-  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
 function replaceAt(array, index, value) {

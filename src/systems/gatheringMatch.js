@@ -17,29 +17,7 @@
  * @typedef {{ biome: MatchFieldEvidence, weather: MatchFieldEvidence, time: MatchFieldEvidence, danger: MatchFieldEvidence }} MatchEvidence
  */
 
-function normalizeTag(value) {
-  return String(value ?? '')
-    .trim()
-    .toLowerCase();
-}
-
-function normalizeTagList(value) {
-  const values = Array.isArray(value) ? value : value ? [value] : [];
-  return [...new Set(values.map(normalizeTag).filter(Boolean))];
-}
-
-function normalizeConditionId(value) {
-  if (value && typeof value === 'object') {
-    return normalizeConditionId(value.id ?? value.value ?? value.label);
-  }
-  return String(value ?? '')
-    .trim()
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, '-')
-    .split('-')
-    .filter(Boolean)
-    .join('-');
-}
+import { normalizeConditionId, normalizeTag, normalizeTagList } from '../utils/scalars.js';
 
 function normalizeConditionIdList(value) {
   const values = Array.isArray(value) ? value : value ? [value] : [];

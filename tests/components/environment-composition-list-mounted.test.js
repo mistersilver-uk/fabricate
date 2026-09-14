@@ -174,6 +174,10 @@ describe('CompositionList mounted layout', () => {
       // the missing file instead.
       'src/systems/gatheringComposition.js',
       'src/systems/gatheringMatch.js',
+      // `gatheringMatch.js` imports the shared scalar helpers (issue #1662). This loop has no
+      // dependency validator, so omitting it does not fail an assertion — the whole file is
+      // reported as `# cancelled` behind one ERR_MODULE_NOT_FOUND in the hook.
+      'src/utils/scalars.js',
       'src/ui/svelte/apps/manager/environment/compositionStateMeta.js',
       'src/ui/svelte/util/foundryBridge.js',
       'src/ui/svelte/util/listReorderAnnouncement.js',

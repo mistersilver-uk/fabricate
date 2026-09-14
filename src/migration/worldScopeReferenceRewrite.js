@@ -57,6 +57,8 @@
  * later reader mistakes it for a live production site.
  */
 
+import { isPlainObject } from '../utils/scalars.js';
+
 /**
  * Every leaf position the walk rewrites, as a normalized path with array indices collapsed to
  * `[]`, rooted at the three persisted payloads plus the world scope payloads.
@@ -309,10 +311,6 @@ export const WORLD_SCOPE_ESSENCE_DEFENSIVE_SITES = Object.freeze([
   'systems[].components[].salvage.catalysts[].alternatives[].match.essenceId',
   'systems[].components[].salvage.catalysts[].match.essenceId',
 ]);
-
-function isPlainObject(value) {
-  return value != null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function arrayOf(value) {
   return Array.isArray(value) ? value : [];
