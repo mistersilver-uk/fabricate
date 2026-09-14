@@ -20,6 +20,8 @@
 
 import { localizeWith } from '../utils/localizeWithFallback.js';
 
+import { composeFindingsNotice, localizeNoticeClause } from './migrationNoticeDetail.js';
+
 function arrayOf(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -34,99 +36,109 @@ function arrayOf(value) {
  * in its own copy rather than implying a deletion the GM must race. A pass that changed nothing
  * produces NO message at all, because a notice that always fires is a notice nobody reads.
  *
+ * The toast COUNTS the renames, refusals and flagged references; the console `detail` names every
+ * one of them and carries the merged and transitive-group clauses (issue 1737).
+ *
  * @param {object|null} report The transient `_worldScopeEntityReport`.
  * @param {(key: string, data?: object) => string|undefined} localize
- * @returns {{message: string, severity: 'info'|'warn'}}
+ * @returns {{message: string, detail: string, severity: 'info'|'warn'}}
  */
 export function buildWorldScopeEntityNotice(report, localize) {
   const created = report?.createdEntities ?? {};
-  const componentCount = Number(created.components) || 0;
-  const essenceCount = Number(created.essences) || 0;
-  const toolCount = Number(created.tools) || 0;
-  const totalCreated = componentCount + essenceCount + toolCount;
+  const counts = {
+    components: Number(created.components) || 0,
+    essences: Number(created.essences) || 0,
+    tools: Number(created.tools) || 0,
+  };
   const merged = arrayOf(report?.mergedGroups);
   const renames = arrayOf(report?.renames);
   const refusals = arrayOf(report?.refusals);
   const flagged = arrayOf(report?.flaggedForReview);
   const transitive = arrayOf(report?.transitiveGroups);
-
-  if (totalCreated === 0 && merged.length === 0 && renames.length === 0 && refusals.length === 0) {
-    return { message: '', severity: 'info' };
+  const createdTotal = counts.components + counts.essences + counts.tools;
+  if (createdTotal + merged.length + renames.length + refusals.length === 0) {
+    return { message: '', detail: '', severity: 'info' };
   }
 
-  const clauses = [
-    localizeWith(
-      localize,
-      'FABRICATE.Migration.WorldScopeEntities.Created',
-      { components: componentCount, essences: essenceCount, tools: toolCount },
-      `Fabricate created ${componentCount} world component(s), ${essenceCount} world essence(s) and ${toolCount} world tool(s).`
-    ),
-  ];
-  if (merged.length > 0) {
-    clauses.push(
-      localizeWith(
-        localize,
-        'FABRICATE.Migration.WorldScopeEntities.Merged',
-        { count: merged.length },
-        `${merged.length} group(s) spanned more than one crafting system and were merged into one record.`
-      )
-    );
-  }
-  if (renames.length > 0) {
-    // EVERY rename, by name, with its two systems. A byte-identical group produces none, so
-    // everything listed here actually changed something a GM can see.
-    const named = renames
-      .map(
-        (entry) => `${entry.oldId} → ${entry.newId} (${entry.systemId} ← ${entry.donorSystemId})`
-      )
-      .join(', ');
-    clauses.push(
-      localizeWith(
-        localize,
-        'FABRICATE.Migration.WorldScopeEntities.Renames',
-        { count: renames.length, renames: named },
-        `${renames.length} definition(s) took another system's identity or a new id: ${named}.`
-      )
-    );
-  }
-  if (transitive.length > 0) {
-    clauses.push(
-      localizeWith(
-        localize,
-        'FABRICATE.Migration.WorldScopeEntities.TransitiveGroups',
-        { count: transitive.length },
-        `${transitive.length} group(s) were formed transitively from more than two definitions — check them in case two different things were merged.`
-      )
-    );
-  }
-  if (refusals.length > 0) {
-    const named = refusals
-      .map((entry) => `${entry.systemId} (${entry.entityType}: ${entry.reason})`)
-      .join(', ');
-    clauses.push(
-      localizeWith(
-        localize,
-        'FABRICATE.Migration.WorldScopeEntities.Refusals',
-        { count: refusals.length, refusals: named },
-        `${refusals.length} system/entity pair(s) could not be re-keyed safely and were left exactly as they were: ${named}.`
-      )
-    );
-  }
-  if (flagged.length > 0) {
-    const named = flagged.map((entry) => `${entry.referenceId} (${entry.systemId})`).join(', ');
-    clauses.push(
-      localizeWith(
-        localize,
-        'FABRICATE.Migration.WorldScopeEntities.FlaggedForReview',
-        { count: flagged.length, references: named },
-        `${flagged.length} reference(s) already point at nothing, and Fabricate can now tell: ${named}. Nothing has been removed - review them when you get a chance.`
-      )
-    );
-  }
-
-  const severity =
-    renames.length > 0 || refusals.length > 0 || flagged.length > 0 ? 'warn' : 'info';
-  return { message: clauses.join(' '), severity };
+  const notice = composeFindingsNotice(localize, [
+    {
+      when: true,
+      data: counts,
+      // Deliberately NOT the lang wording: an unlocalized copy must miss the View Lab tolerance
+      // anchor, which `tests/view-lab-world-migration.test.js` holds it to.
+      key: 'FABRICATE.Migration.WorldScopeEntities.Created',
+      fallback:
+        'Fabricate created {components} world component(s), {essences} world essence(s) and {tools} world tool(s).',
+      detailKey: 'FABRICATE.Migration.WorldScopeEntities.CreatedDetail',
+      detailFallback:
+        'Fabricate created {components} world component(s), {essences} world essence(s) and {tools} world tool(s). Every crafting system keeps exactly the behaviour it had.',
+    },
+    {
+      when: merged.length > 0,
+      data: { count: merged.length },
+      detailKey: 'FABRICATE.Migration.WorldScopeEntities.Merged',
+      detailFallback:
+        '{count} of them were the same real item in more than one system and are now one record.',
+    },
+    {
+      // EVERY rename, by name, with its two systems. A byte-identical group produces none, so
+      // everything listed here actually changed something a GM can see.
+      when: renames.length > 0,
+      data: { count: renames.length },
+      detailData: {
+        count: renames.length,
+        renames: renames
+          .map(
+            (entry) =>
+              `${entry.oldId} → ${entry.newId} (${entry.systemId} ← ${entry.donorSystemId})`
+          )
+          .join(', '),
+      },
+      key: 'FABRICATE.Migration.WorldScopeEntities.Renames',
+      fallback:
+        '{count} definition(s) took another system’s identity or a new id, and every reference was rewritten.',
+      detailKey: 'FABRICATE.Migration.WorldScopeEntities.RenamesDetail',
+      detailFallback:
+        '{count} definition(s) took the oldest system’s identity or a new id, and every reference to them was rewritten: {renames}.',
+    },
+    {
+      when: transitive.length > 0,
+      data: { count: transitive.length },
+      detailKey: 'FABRICATE.Migration.WorldScopeEntities.TransitiveGroups',
+      detailFallback:
+        '{count} group(s) were merged through a shared source item rather than directly. Check them in case two different things were joined.',
+    },
+    {
+      when: refusals.length > 0,
+      data: { count: refusals.length },
+      detailData: {
+        count: refusals.length,
+        refusals: refusals
+          .map((entry) => `${entry.systemId} (${entry.entityType}: ${entry.reason})`)
+          .join(', '),
+      },
+      key: 'FABRICATE.Migration.WorldScopeEntities.Refusals',
+      fallback: '{count} system(s) could not be re-keyed safely and were left unchanged.',
+      detailKey: 'FABRICATE.Migration.WorldScopeEntities.RefusalsDetail',
+      detailFallback:
+        '{count} system(s) could not be re-keyed safely, so Fabricate left them exactly as they were and merged nothing there: {refusals}.',
+    },
+    {
+      when: flagged.length > 0,
+      data: { count: flagged.length },
+      detailData: {
+        count: flagged.length,
+        references: flagged.map((entry) => `${entry.referenceId} (${entry.systemId})`).join(', '),
+      },
+      key: 'FABRICATE.Migration.WorldScopeEntities.FlaggedForReview',
+      fallback: '{count} reference(s) already point at nothing. Nothing was removed.',
+      detailKey: 'FABRICATE.Migration.WorldScopeEntities.FlaggedForReviewDetail',
+      detailFallback:
+        '{count} reference(s) already point at nothing, and Fabricate can now tell you which: {references}. Nothing has been removed - review them when you get a chance.',
+    },
+  ]);
+  const needsAction = renames.length > 0 || refusals.length > 0 || flagged.length > 0;
+  return { ...notice, severity: needsAction ? 'warn' : 'info' };
 }
 
 /**
@@ -140,49 +152,45 @@ export function buildWorldScopeEntityNotice(report, localize) {
  * malformed document - that leaves that actor still naming retired ids. It also WITHHOLDS the
  * re-key map clear, so the GM needs to know both that the repair is incomplete and that it will
  * be retried; a notice silent on it would leave a partial repair looking like a complete one.
+ * The toast counts; the console `detail` names the unsafe systems and the manual re-run command.
  *
  * @param {object|null} summary The remap pass summary.
  * @param {(key: string, data?: object) => string|undefined} localize
- * @returns {string} the message, or `''` when there is nothing to say.
+ * @returns {{message: string, detail: string}} both `''` when there is nothing to say.
  */
 export function buildWorldScopeIdentityRemapNotice(summary, localize) {
   const unsafe = arrayOf(summary?.unsafeSystemIdSkips);
   const locked = Number(summary?.lockedSkips) || 0;
   const failed = Number(summary?.skippedErrors) || 0;
-  if (unsafe.length === 0 && locked === 0 && failed === 0) return '';
-  const clauses = [];
-  if (unsafe.length > 0) {
-    const named = unsafe.join(', ');
-    clauses.push(
-      localizeWith(
-        localize,
-        'FABRICATE.Migration.WorldScopeEntities.UnsafeSystemIds',
-        { count: unsafe.length, systems: named },
-        `${unsafe.length} crafting system id(s) contain a character Fabricate cannot use in an item flag, so owned copies in them were left to resolve by source item instead: ${named}.`
-      )
-    );
-  }
-  if (locked > 0) {
-    clauses.push(
-      localizeWith(
-        localize,
-        'FABRICATE.Migration.WorldScopeEntities.LockedSkips',
-        { count: locked },
-        `${locked} item(s) refused the update — usually because they live in a locked compendium — and will keep resolving by source item.`
-      )
-    );
-  }
-  if (failed > 0) {
-    clauses.push(
-      localizeWith(
-        localize,
-        'FABRICATE.Migration.WorldScopeEntities.SkippedErrors',
-        { count: failed },
-        `${failed} document(s) could not be updated at all, so the repair is INCOMPLETE. Fabricate has kept its record of what to change and will retry on the next reload; you can also run it now from the console with game.fabricate.remapWorldScopeIdentityFlags().`
-      )
-    );
-  }
-  return clauses.join(' ');
+  return composeFindingsNotice(localize, [
+    {
+      when: unsafe.length > 0,
+      data: { count: unsafe.length, systems: unsafe.join(', ') },
+      key: 'FABRICATE.Migration.WorldScopeEntities.UnsafeSystemIds',
+      fallback:
+        '{count} crafting system id(s) cannot be used in an item flag, so their owned items keep resolving by source item.',
+      detailKey: 'FABRICATE.Migration.WorldScopeEntities.UnsafeSystemIdsDetail',
+      detailFallback:
+        '{count} crafting system id(s) contain a character Fabricate cannot use inside an item flag, so owned copies in them were left to resolve by their source item instead: {systems}.',
+    },
+    {
+      when: locked > 0,
+      data: { count: locked },
+      key: 'FABRICATE.Migration.WorldScopeEntities.LockedSkips',
+      fallback:
+        '{count} item(s) refused the update — usually because they live in a locked compendium — and will keep resolving by their source item.',
+    },
+    {
+      when: failed > 0,
+      data: { count: failed },
+      key: 'FABRICATE.Migration.WorldScopeEntities.SkippedErrors',
+      fallback:
+        '{count} document(s) could not be updated, so the repair is incomplete. Fabricate will retry on the next reload.',
+      detailKey: 'FABRICATE.Migration.WorldScopeEntities.SkippedErrorsDetail',
+      detailFallback:
+        '{count} document(s) could not be updated at all, so the repair is INCOMPLETE. Fabricate has kept its record of what to change and will retry on the next reload; you can also run it now from the console with game.fabricate.remapWorldScopeIdentityFlags().',
+    },
+  ]);
 }
 
 /**
@@ -332,8 +340,8 @@ export function buildWorldIdentityDriftNotice(driftEntries, localize) {
 
 /**
  * How many essences the toast names before deferring to the console, for the reason
- * {@link IDENTITY_DRIFT_NOTICE_RECORD_CAP} states. The call site must log the full enumeration from
- * {@link describeWorldEssenceMerge}, or "the rest is in the console" is not a true sentence.
+ * {@link IDENTITY_DRIFT_NOTICE_RECORD_CAP} states. The notice's `detail` ends with the full
+ * {@link describeWorldEssenceMerge} enumeration, so the console pointer stays true.
  */
 const ESSENCE_MERGE_NOTICE_NAME_CAP = 5;
 
@@ -375,20 +383,19 @@ function describeCappedEssences(entries, describe, localize) {
   const withheld = entries.length - shown.length;
   const named = shown.map((entry) => describe(entry)).join(', ');
   if (withheld === 0) return named;
-  return `${named} ${localizeWith(
+  return `${named} ${localizeNoticeClause(
     localize,
     'FABRICATE.Migration.WorldEssenceMerge.Overflow',
     { count: withheld },
-    `and ${withheld} more - the full list is in the console`
+    '…and {count} more'
   )}`;
 }
 
 /**
- * Every group, by id, uncapped - the detail the notice's own cap defers to the console.
+ * Every group, by id, uncapped - the enumeration the notice's `detail` ends with.
  *
- * Separate from the notice for the reason {@link describeWorldIdentityDrift} is: core logs the
- * message it was handed, which is the capped one. The call site logs this at `console.info` and not
- * `console.debug`, which maps to DevTools' verbose level and is excluded by Chromium's default.
+ * Separate from the toast for the reason {@link describeWorldIdentityDrift} is: core logs the
+ * message it was handed, which is the capped one, so Fabricate has to log the full list itself.
  *
  * @param {object|null} report The transient `_worldEssenceMergeReport`.
  * @returns {string} the full enumeration, or `''` when there is nothing to say.
@@ -418,84 +425,88 @@ export function describeWorldEssenceMerge(report) {
 }
 
 /**
+ * One merged, refused or declined group's finding: capped names in the toast, every group
+ * described in full in the detail, both under the same `token`.
+ */
+function essenceGroupFinding(entries, localize, spec) {
+  const count = entries.length;
+  return {
+    ...spec,
+    when: count > 0,
+    data: { count, [spec.token]: describeCappedEssences(entries, spec.name, localize) },
+    detailData: { count, [spec.token]: entries.map(spec.describe).join(', ') },
+  };
+}
+
+/**
  * The one-time notice describing what the `1.34.0` equivalent-essence merge did.
  *
- * Severity is constant-`warn` by construction, which is why this returns a bare string rather than
- * the `{message, severity}` pair its `1.30.0` sibling returns: every case that produces a message is
- * one the GM must act on or know about, so a derived severity would be a branch with one arm.
+ * Severity is constant-`warn` by construction, so this returns no severity: every case that
+ * produces a message is one the GM must act on or know about.
  *
  * Silent when nothing happened. `orphaned` alone produces no message, because a world essence with
  * no live membership record is left exactly as it is.
  *
- * It discloses its own reach: the item-override remap walks owned actor Items only, so the same
- * `flags.fabricate.essences` override on a world Item, a compendium Item or an unlinked synthetic
- * token actor stays stale permanently and only the GM can find those documents.
+ * The toast names the groups under a cap. The console `detail` carries each group's explanation and
+ * remedy, the item-override scope bound (the remap walks owned actor Items only, so a world Item, a
+ * compendium Item or an unlinked token actor keeps a stale override) and every id (issue 1737).
  *
  * @param {object|null} report The transient `_worldEssenceMergeReport`.
  * @param {(key: string, data?: object) => string|undefined} localize
- * @returns {string} the message, or `''` when there is nothing to say.
+ * @returns {{message: string, detail: string}} both `''` when there is nothing to say.
  */
 export function buildWorldEssenceMergeNotice(report, localize) {
   const merged = arrayOf(report?.mergedGroups);
   const refusals = arrayOf(report?.refusals);
   const declined = arrayOf(report?.declined);
-  if (merged.length === 0 && refusals.length === 0 && declined.length === 0) return '';
+  if (merged.length === 0 && refusals.length === 0 && declined.length === 0) {
+    return { message: '', detail: '' };
+  }
 
   const retired = report?.retired ?? null;
   const nameOf = (entry) => essenceGroupName(entry, retired);
-  const clauses = [];
-
-  if (merged.length > 0) {
-    const names = describeCappedEssences(merged, nameOf, localize);
-    clauses.push(
-      localizeWith(
-        localize,
-        'FABRICATE.Migration.WorldEssenceMerge.Merged',
-        { count: merged.length, names },
-        `Fabricate found ${merged.length} set(s) of essences that were the same essence in more than one system — same name, same macro and same active-effect source — and made each set one shared essence: ${names}. Every reference was updated. This cannot be undone: the other essences in each set are gone, along with their own world icon, colour and description, and the systems that held them now resolve the surviving essence as the shared definition — but each system's own essence row keeps the name, icon and description it was authored with, so what you see inside a system may not change at all.`
-      )
-    );
-  }
-  if (refusals.length > 0) {
-    const named = describeCappedEssences(
-      refusals,
-      (entry) => `${nameOf(entry)} (${entry?.reason})`,
-      localize
-    );
-    clauses.push(
-      localizeWith(
-        localize,
-        'FABRICATE.Migration.WorldEssenceMerge.Refusals',
-        { count: refusals.length, refusals: named },
-        `${refusals.length} set(s) could not be merged safely, so Fabricate left them exactly as they were and merged nothing there: ${named}. This will not be retried — to merge them, delete the duplicate essence from the offending system's Essences tab yourself.`
-      )
-    );
-  }
-  if (declined.length > 0) {
-    const named = describeCappedEssences(
-      declined,
-      (entry) => `${nameOf(entry)} (${arrayOf(entry?.sections).join(', ') || entry?.reason})`,
-      localize
-    );
-    clauses.push(
-      localizeWith(
-        localize,
-        'FABRICATE.Migration.WorldEssenceMerge.Declined',
-        { count: declined.length, essences: named },
-        `${declined.length} essence(s) were left alone because the crafting systems using them disagree about their macro or active-effect source, so Fabricate cannot tell whether they are one essence or several: ${named}. Nothing has been changed — review them under World › Essences.`
-      )
-    );
-  }
-  if (merged.length > 0) {
-    // Only when something merged: only a merge retires an id for a stale override to name.
-    clauses.push(
-      localizeWith(
-        localize,
-        'FABRICATE.Migration.WorldEssenceMerge.ItemOverrideScope',
-        undefined,
-        'Fabricate could only update the per-item essence overrides on items your characters are carrying, so a world item, a compendium item or an unlinked token actor may still name a merged-away essence. Nothing resolves to the wrong essence — a retired id is never reused — but a merged-away id counts for nothing, so those items contribute less essence than they did, or none at all. Fabricate has no screen for these overrides, so whatever set them — a GM, a macro or another module — has to set them again.'
-      )
-    );
-  }
-  return clauses.join(' ');
+  const findings = [
+    essenceGroupFinding(merged, localize, {
+      token: 'names',
+      name: nameOf,
+      describe: nameOf,
+      key: 'FABRICATE.Migration.WorldEssenceMerge.Merged',
+      fallback:
+        'Fabricate merged {count} set(s) of duplicate essences into one shared essence each: {names}. This cannot be undone.',
+      detailKey: 'FABRICATE.Migration.WorldEssenceMerge.MergedDetail',
+      detailFallback:
+        "Fabricate found {count} set(s) of essences that were the same essence in more than one system — same name, same macro and same active-effect source — and made each set one shared essence: {names}. Every reference was updated. This cannot be undone: the other essences in each set are gone, along with their own world icon, colour and description, and the systems that held them now resolve the surviving essence as the shared definition — but each system's own essence row keeps the name, icon and description it was authored with, so what you see inside a system may not change at all.",
+    }),
+    essenceGroupFinding(refusals, localize, {
+      token: 'refusals',
+      name: nameOf,
+      describe: (entry) => `${nameOf(entry)} (${entry?.reason})`,
+      key: 'FABRICATE.Migration.WorldEssenceMerge.Refusals',
+      fallback:
+        '{count} essence set(s) could not be merged safely and were left unchanged: {refusals}.',
+      detailKey: 'FABRICATE.Migration.WorldEssenceMerge.RefusalsDetail',
+      detailFallback:
+        "{count} set(s) could not be merged safely, so Fabricate left them exactly as they were and merged nothing there: {refusals}. This will not be retried — to merge them, delete the duplicate essence from the offending system's Essences tab yourself.",
+    }),
+    essenceGroupFinding(declined, localize, {
+      token: 'essences',
+      name: nameOf,
+      describe: (entry) =>
+        `${nameOf(entry)} (${arrayOf(entry?.sections).join(', ') || entry?.reason})`,
+      key: 'FABRICATE.Migration.WorldEssenceMerge.Declined',
+      fallback:
+        '{count} essence(s) were left alone because their crafting systems disagree about them: {essences}.',
+      detailKey: 'FABRICATE.Migration.WorldEssenceMerge.DeclinedDetail',
+      detailFallback:
+        '{count} essence(s) were left alone because the crafting systems using them disagree about their macro or active-effect source, so Fabricate cannot tell whether they are one essence or several: {essences}. Nothing has been changed — review them under World › Essences.',
+    }),
+    {
+      // Only when something merged: only a merge retires an id for a stale override to name.
+      when: merged.length > 0,
+      detailKey: 'FABRICATE.Migration.WorldEssenceMerge.ItemOverrideScopeDetail',
+      detailFallback:
+        'Fabricate could only update the per-item essence overrides on items your characters are carrying, so a world item, a compendium item or an unlinked token actor may still name a merged-away essence. Nothing resolves to the wrong essence — a retired id is never reused — but a merged-away id counts for nothing, so those items contribute less essence than they did, or none at all. Fabricate has no screen for these overrides, so whatever set them — a GM, a macro or another module — has to set them again.',
+    },
+  ];
+  return composeFindingsNotice(localize, findings, [describeWorldEssenceMerge(report)]);
 }

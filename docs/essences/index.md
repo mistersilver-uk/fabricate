@@ -98,6 +98,7 @@ A colour, an icon and a description are presentation, so they never decide wheth
 Until this version the catalogue held a separate record for every system's copy of the same essence.
 Three systems with Iron gave you three Iron records.
 On first load after upgrading, Fabricate makes each set of matching essences one shared essence, rewrites every reference to the records it retires, and posts a standing notice describing what it did.
+The notice is short, and the full explanation is in the browser console, which you open with F12.
 
 Six things are worth knowing.
 

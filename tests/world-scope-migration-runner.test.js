@@ -442,16 +442,17 @@ test('the GM notice names every rename, every refusal and every newly-prunable r
   const notice = buildWorldScopeEntityNotice(summary.worldScopeEntityReport, () => undefined);
   assert.ok(notice.message.length > 0, 'the notice must be PRESENT, not inferred');
   assert.equal(notice.severity, 'warn', 'a rename or a prune is a permanent warning');
+  // Named in the console detail; the toast counts them (issue 1737).
   for (const rename of summary.worldScopeEntityReport.renames) {
     assert.ok(
-      notice.message.includes(rename.oldId) && notice.message.includes(rename.newId),
+      notice.detail.includes(rename.oldId) && notice.detail.includes(rename.newId),
       `every rename is named: ${rename.oldId} -> ${rename.newId}`
     );
-    assert.ok(notice.message.includes(rename.systemId));
-    assert.ok(notice.message.includes(rename.donorSystemId));
+    assert.ok(notice.detail.includes(rename.systemId));
+    assert.ok(notice.detail.includes(rename.donorSystemId));
   }
   for (const flagged of summary.worldScopeEntityReport.flaggedForReview) {
-    assert.ok(notice.message.includes(flagged.referenceId));
+    assert.ok(notice.detail.includes(flagged.referenceId));
   }
   assert.ok(
     summary.worldScopeEntityReport.flaggedForReview.length > 0,

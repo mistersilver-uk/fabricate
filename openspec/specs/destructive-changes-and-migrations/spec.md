@@ -322,6 +322,23 @@ The prompt's DialogV2 configuration (window title, content mirroring the console
 The runner exposes a `promptRecovery` seam invoked with `{ downgradeTo, documents, label }` on abort; `src/main.js` `_runMigrations` wires the thin Foundry edge that opens DialogV2 from that config.
 The layout reaches both surfaces from the value the pass already resolved, never from a second read: a re-read at guidance time can report a layout a remote conversion moved mid-pass, and the message must describe the pass that just failed.
 
+### Migration Notices
+
+Every data-migration GM notice is a concise toast plus a console detail (issue 1737), because Foundry's `.notification` has no `max-height` and no overflow and a permanent paragraph covers the canvas.
+
+1. **The toast says what happened in short count sentences.**
+   It names essences, recipes, entries and ids only under a cap, as the `1.34.0` merge names five essences and then an overflow count; a crafting-system list is short enough to name in full.
+   Every toast string under `FABRICATE.Migration` in `lang/en.json` is at most 160 characters before interpolation, which `tests/migration-notice-detail.test.js` enforces; the recovery dialog's `Recovery.*` strings, every `…Detail` string and the console-only `IdentityDrift` strings are exempt.
+2. **The explanation, every remedy and every uncapped enumeration are the console detail.**
+   Each lives in a `…Detail` sibling of its toast key, and a toast that has a detail ends with the one shared pointer `FABRICATE.Migration.ConsoleDetails`.
+   A notice whose detail would only repeat its toast has no detail and no pointer.
+3. **The detail is logged at `console.info` through `logMigrationNoticeDetail`**, as one console entry per notice, from `src/migration/migrationNoticeDetail.js`.
+   The write is an optional call, because `vite.config.js` marks `console.info` pure and the minifier deletes a bare `console.info(...)` statement from the release bundle; `tests/release-build.test.js` asserts the call reaches a file the entry script loads statically.
+   It is `info` rather than `debug`, which Chromium's default level filter hides, and rather than `warn`, which the View Lab treats as a failed capture.
+4. **Splitting a notice changes nothing else about it.**
+   Severity, permanence, GM and primary-GM gating and the silence rules are exactly those each migration's own section states.
+   A deferred pass carries its detail on the `console.error` line that already reports the deferral, and the aborted-pass toast has no detail because the runner already logs the per-document recovery guidance.
+
 ### Write-on-Change Persistence
 
 - Each of the eight migrated settings (`recipes`, `systems`, `gatheringConfig`, `environments`, `gatheringParties`, `currencyConfig`, `travelConfig`, `characterLibraries`) is persisted only when its own JSON-serialized output differs from that setting's pre-migration snapshot; the comparison is per-setting, not a single all-or-nothing check.
@@ -583,7 +600,8 @@ Those counts ride a transient `data._retiredCraftingModCounts` field that `Migra
 The notice's COMPOSITION is not in `src/main.js`: `buildRetiredCraftingModNotice` (in the migration module, beside the counts it reports) owns the totals, the systems list, the clause selection, the join and the severity, and `src/main.js` keeps only the Foundry edge — the GM gate, the localizer, and which notification channel the composed severity selects.
 The lift is not cosmetic: `src/main.js` cannot be imported by a unit test, so everything it holds is covered by source-text greps, which can pin a dispatch but not a sum — three semantic mutations to that arithmetic survived a green suite while it lived inline.
 `_runMigrations` is gated on `game.users?.activeGM?.id !== game.user?.id`, so the notice is **primary-GM-only**: exactly one client in a multi-GM world posts it, and an assistant GM (who holds `isGM`) never does.
-**The remedy is spelled out in the notice text, and it names ONE action:** a GM who authored a catalogue and deliberately never spent the placeholder must CLEAR the Default modifiers set (`defaultModifierIds`) on those systems to preserve the previous total.
+The toast carries the lead naming the affected systems and, only when a formula was left untouched, the warning that those checks will not roll until rewritten; every non-zero clause is in the console detail (§ Migration Notices).
+**The remedy is spelled out in that console detail, and it names ONE action:** a GM who authored a catalogue and deliberately never spent the placeholder must CLEAR the Default modifiers set (`defaultModifierIds`) on those systems to preserve the previous total.
 An earlier draft also offered "move to a rule whose set resolves to 0", which names no rule that does that — every combination rule reduces the same eligible set, so switching between them cannot zero it — and that clause is gone from both the notice copy and this entry.
 6. **It does not seed a missing check block**, the same call the `1.20.0` and Progressive Reorder-Flag migrations make for the same reason: a block that does not exist carries no formula, so there is no storage churn to spend for zero observable change.
 7. **Mutated setting key:** `craftingSystems`, and only it.
@@ -929,7 +947,7 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
    It is nevertheless a write to a row the GM authored rather than to world-scope bookkeeping, which is the one place this pass changes an authored field's VALUE, so every one is RECORDED in the transient report's `inSystemFreezes` leg (requirement 13) rather than made with no record at all.
    **THAT RECORD IS NOT A GM-FACING DISCLOSURE TODAY, AND THE DIFFERENCE IS STATED RATHER THAN BLURRED.**
    `describeWorldEssenceMerge`'s uncapped console enumeration reads the leg and names every freeze, because writing a value a GM authored is the one substantive edit this pass makes and it must not be silent.
-   `buildWorldEssenceMergeNotice` does NOT read it: the toast is capped and names merged groups, and a freeze is a consequence of a merge the toast already reports rather than a separate event a GM must act on.
+   The TOAST `buildWorldEssenceMergeNotice` composes does NOT render it: the toast is capped and names merged groups, and a freeze is a consequence of a merge the toast already reports rather than a separate event a GM must act on; the enumeration reaches the GM only as the tail of that notice's console detail.
    The leg is therefore a REVIEW and TEST surface — it is what makes the write assertable and what a future channel would render — and any requirement that called it a disclosure to the GM would be claiming a channel that does not exist.
    **AND THE FREEZE IS THE ONE THING A TEAR CAN LOSE PERMANENTLY, WHICH IS AN ACCEPTED BOUND RATHER THAN A GAP.**
    `essenceScope` is written BEFORE `craftingSystems`, so a tear between the two lands the MEMBERSHIP half alone; on the re-run the landed record already names the SURVIVOR, is therefore not a key of the map, is not re-pointed, and the in-system half never lands.
@@ -953,11 +971,11 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
    For `craftingRuns` the retired key happens to be cleared today, because `resolvedEssences` lives at `active[runId].steps[i].preparedConsumption.resolvedEssences` and `steps` is an ARRAY, which Foundry's recursive merge REPLACES WHOLESALE rather than merging entry by entry — the same property that same docblock already relies on for `alchemyDeadEnds`.
    THAT SHIELDING IS INCIDENTAL AND IS NOT RELIED ON: `active` one level up is already a plain map, `steps` could become one, and a single container-shape change would turn a passing write into the corruption below with nothing to signal it.
    A stale key in a CONSUMED `resolvedEssences` snapshot makes a resumed run transfer essences it never consumed, so this is DATA CORRUPTION rather than untidiness.
-   **THE PASS REACHES OWNED ACTOR ITEMS ONLY**: the same override on a world Item, a compendium Item or an unlinked synthetic token actor is never seen and is left stale PERMANENTLY, which the notice states rather than implies.
+   **THE PASS REACHES OWNED ACTOR ITEMS ONLY**: the same override on a world Item, a compendium Item or an unlinked synthetic token actor is never seen and is left stale PERMANENTLY, which the merge notice's console detail states rather than implies, and which the toast points at.
    **AND THE REMAP HAS ITS OWN GM NOTICE, SEPARATE FROM THE MIGRATION-TIME ONE**, built from the pass summary and posted permanently exactly as the `1.30.0` sibling's is.
    The migration-time notice describes what MERGED; this one describes what the remap could NOT repair, and the two are not substitutes.
    The reachable case is a merged essence id that is not a safe flag-path segment: the map is derived from the RAW settings corpus, so a hand-edited or imported id trips `isSafeFlagKeySegment`, the WHOLE group is refused, and the world is then merged in its SETTINGS and un-merged in its ACTOR FLAGS — a consumed `resolvedEssences` snapshot keeping a retired key, which this requirement already calls data corruption.
-   It reports the refused groups with the offending ids, the `lockedSkips` that are a standing condition, and the `skippedErrors` that withhold the map clear, and it is SILENT on a clean pass.
+   Its toast counts the refused groups, the `lockedSkips` that are a standing condition, and the `skippedErrors` that withhold the map clear; its console detail names the offending ids and the remedies; and it is SILENT on a clean pass.
 10. **THE MAP IS ITS OWN SETTING, NOT A LEG ON `fabricate.worldScopeRekeyMap`**, and the three reasons are structural rather than stylistic.
     `normalizeRekeyMap` drops any leg outside `REKEYABLE_ENTITY_TYPES`; widening that list would newly REFUSE a `1.30.0` pair on a world carrying a native duplicate essence id, which is a behaviour change to a shipped pass; and `mayClearWorldScopeRekeyMap` is read by two unrelated `1.30.0` source-Item stamp gates that have no business consulting an essence decision.
     `fabricate.worldEssenceMergeMap` is therefore written as the SECOND writeback leg, immediately after `worldScopeRekeyMap` and before `recipes`, with its own containment, on the same order-independent-recovery-record rule § Migration Registry states.
@@ -994,8 +1012,8 @@ It mutates no input, throws no `FatalMigrationError`, and returns the ORIGINAL o
     It therefore says what makes two essences one, that the merge is IRREVERSIBLE, that a refused group is left untouched and not retried, that each system keeps its own name, icon and description so the catalogue may newly report a presentation disagreement that is ACCURATE rather than an error, that two component essence values landing on one id are ADDED, and what the downgrade does and does not cost.
     Where it says every merged essence is listed by name with the systems it came from, it is making a PROMISE ABOUT ANOTHER CHANNEL rather than a statement about itself.
     **THREE RUNTIME CHANNELS CARRY THE SUCCESS PATH, AND THEY ARE NOT SUBSTITUTES FOR EACH OTHER.**
-    A permanent GM `warn` toast built by `buildWorldEssenceMergeNotice` names the merged, refused and declined groups and the item-override scope bound, and it is SILENT when only `orphaned` is non-empty.
-    An uncapped `console.info` enumeration from `describeWorldEssenceMerge` carries the IDS the toast caps and folds — including the `orphaned` leg the toast never mentions — because most ids this pass retires are `crypto.randomUUID()` values and an id wall in a corner toast is unreadable.
+    A permanent GM `warn` toast built by `buildWorldEssenceMergeNotice` names the merged, refused and declined groups under a cap of five, ends with the console pointer, and is SILENT when only `orphaned` is non-empty.
+    That builder's console `detail`, logged at `console.info` through `logMigrationNoticeDetail` (§ Migration Notices), carries each group's explanation and remedy, the item-override scope bound requirement 9 states, and finally the uncapped `describeWorldEssenceMerge` enumeration of the IDS the toast caps and folds — including the `orphaned` leg the toast never mentions — because most ids this pass retires are `crypto.randomUUID()` values and an id wall in a corner toast is unreadable.
     And requirement 9's own remap notice is the third, describing what the ACTOR-FLAG repair could not fix rather than what merged.
     So no single string covers this migration, and a requirement that named one would send a reader to fix the wrong file.
 17. **A RETIRED ESSENCE ID IS NEVER REISSUED.**
@@ -1132,7 +1150,7 @@ The divergence is also REPORTED once per session to the active GM, as a disclosu
    Refusal is per `(system, entityType)`, so a system whose COMPONENTS pair is refused while its TOOLS pair is accepted still has its `component.salvage.toolIds` rewritten — those are TOOL references, and the tools pair was not refused.
    What the refusal withholds is the component pair's own lift, re-key and membership.
    A refusal is also not always caused by this migration: a system carrying a NATIVE duplicate definition id fails the output-uniqueness invariant on its own.
-   Because a refusal removes that system's definitions from every group they belonged to, it can change ANOTHER system's elected identity donor — which is reported by name like any other identity change, and named in the GM notice's refusal reason.
+   Because a refusal removes that system's definitions from every group they belonged to, it can change ANOTHER system's elected identity donor — which is reported by name like any other identity change, and named with the refusal reason in the GM notice's console detail.
    TWO invariants decide it, and the second is a POST-condition rather than a pre-condition.
    DISJOINTNESS: the map's image must not intersect its key set, or a single simultaneous lookup is not idempotent.
    OUTPUT UNIQUENESS: the ids the pair emits must be unique, because disjointness alone does not forbid an output id colliding with an id in the same pair that was NOT re-keyed, and such a duplicate is silently last-wins in both index builders — making a definition unreachable with no error.
@@ -1229,7 +1247,7 @@ The divergence is also REPORTED once per session to the active GM, as a disclosu
     Gating for the pass to RUN is corpus-derived plus its own Number version; gating for it to DESTROY the decision record is `compareSemver(migrationVersion, '1.30.0') >= 0` and NEVER a bare JavaScript `>=`, which is a LEXICOGRAPHIC compare and is TRUE for `'1.4.0'` through `'1.9.0'` — all six registered migration versions, and the worlds running the longest multi-migration pass.
     The version advance shares that gate because the shipped one-shot precedent writes its version unconditionally: a pass that skips the clear but advances its version short-circuits on every later boot and NEVER clears, orphaning the setting permanently.
 18. **The pass REPORTS every reference that resolves to nothing, and does NOT delete any of them.**
-    They are listed under `flaggedForReview` and named in the GM notice.
+    They are listed under `flaggedForReview`, counted in the GM toast and named in its console detail.
 
     **The report is not a predicted deletion, and this is stated because an earlier form of this requirement said it was.**
     Measured across the whole acceptance set, ten references resolve to nothing before the migration and ZERO disappear after the round-trip save.
@@ -1238,6 +1256,7 @@ The divergence is also REPORTED once per session to the active GM, as a disclosu
     So these references become prunable AT THE SWEEP; the value of reporting them here is that this is the one moment the whole corpus is walked.
 19. **The TRANSIENT REPORT** carries entities created per type, groups merged, every rename with its two systems, transitively-formed groups, refusals with reasons, the references that ALREADY RESOLVE TO NOTHING, and the world-default sections a constraint declined, through a `_worldScopeEntityReport` field the runner captures and DELETES so it is never persisted.
     The reference list is `flaggedForReview` and it is NOT a list of newly-prunable references: requirement 18 establishes that nothing is pruned at this release and that they become prunable only at the CONSUMER SWEEP.
+    The GM toast COUNTS the renames, the refusals and the references that resolve to nothing, and its console detail names every one with its systems or reason, alongside the merged and transitive groups (§ Migration Notices).
     `refusedDefaultSections` is a DIAGNOSTIC and is deliberately NOT in the GM notice, because requirement 7's constraint (0) makes decline the DOMINANT class - a notice enumerating it would fire on nearly every migrated world - and because a declined section has no observable consequence until a reader resolves through the world layer.
 20. **`migrateWorldScopeEntities` ITSELF is SHARED with the export-payload upcast**, not reimplemented; `migrateExportPayload` applies it branch-independently to a synthesized ONE-SYSTEM corpus, exactly as the four world-scope lifts before it apply theirs.
     An export bundle IS a one-system corpus, so the union across systems degenerates there to that system's own definitions — but it is the same function, so a world upgrade and an imported bundle cannot drift on how a world entity is derived.

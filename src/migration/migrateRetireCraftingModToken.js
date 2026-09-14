@@ -84,6 +84,8 @@ import {
   planRetiredPlaceholderStrip,
 } from '../utils/craftingCheckExpression.js';
 
+import { finishMigrationNotice, localizeNoticeClause } from './migrationNoticeDetail.js';
+
 /**
  * Every check block and slot swept, in the order a GM reads them. Gathering has no
  * `simple` slot — its non-formula mode is `d100`, which authors nothing.
@@ -288,14 +290,18 @@ const NOTICE_CLAUSES = Object.freeze([
   ]),
   Object.freeze([
     'untouched',
-    'Untouched',
+    'UntouchedDetail',
     '{count} formula(s) were left exactly as authored because the placeholder sat where it could not be removed safely; those checks will not roll until you rewrite them.',
   ]),
 ]);
 
-/** The lead sentence's lang key suffix and English fallback. */
+/** The toast's lead and untouched fallbacks; the console detail leads with the full sentence. */
 const NOTICE_LEAD_FALLBACK =
+  'Fabricate now adds check modifiers to crafting-check rolls automatically and removed the old placeholder from: {systems}.';
+const NOTICE_LEAD_DETAIL_FALLBACK =
   'Fabricate now adds check modifiers to every crafting-check roll automatically, so the roll-formula placeholder they used to need has been removed from these systems: {systems}.';
+const NOTICE_UNTOUCHED_FALLBACK =
+  '{count} formula(s) could not be updated and will not roll until you rewrite them.';
 
 const NOTICE_KEY_PREFIX = 'FABRICATE.Migration.RetireCheckModifierPlaceholder.';
 
@@ -329,15 +335,15 @@ const NOTICE_KEY_PREFIX = 'FABRICATE.Migration.RetireCheckModifierPlaceholder.';
  * @param {(key: string, data: object) => string|undefined} [format] Localizer seam
  *   (`game.i18n.format`). Anything falsy falls back to the English copy above, with the
  *   same interpolation.
+ * THE TOAST IS THE LEAD PLUS THE UNTOUCHED WARNING; the console `detail` carries the lead in
+ * full and every non-zero clause, including the remedy (issue 1737).
+ *
  * @returns {{ totals: { inert: number, subtractive: number, repeated: number, untouched: number },
- *   systems: string, message: string, severity: 'warn'|'info', permanent: boolean }}
+ *   systems: string, message: string, detail: string, severity: 'warn'|'info',
+ *   permanent: boolean }}
  */
 export function buildRetiredCraftingModNotice(reported, format) {
   const entries = Array.isArray(reported) ? reported : [];
-  // `''` rather than `undefined` for the no-localizer case: every consumer below tests the
-  // result for FALSINESS (an unresolved key returns the key, a missing `game.i18n` returns
-  // nothing), so the sentinel only has to be falsy.
-  const localize = typeof format === 'function' ? format : () => '';
 
   // `MigrationRunner` already coerces the transient report, so this is belt and braces —
   // but a NaN here would not be caught by the `count <= 0` gate below (every comparison
@@ -356,24 +362,22 @@ export function buildRetiredCraftingModNotice(reported, format) {
     .filter((name) => name !== '')
     .join(', ');
 
-  const lead =
-    localize(`${NOTICE_KEY_PREFIX}Lead`, { systems }) ||
-    NOTICE_LEAD_FALLBACK.replace('{systems}', systems);
-
-  const clauses = NOTICE_CLAUSES.map(([countKey, langKey, fallback]) => {
-    const count = totals[countKey];
-    if (count <= 0) return null;
-    return (
-      localize(`${NOTICE_KEY_PREFIX}${langKey}`, { count }) ||
-      fallback.replace('{count}', String(count))
-    );
-  }).filter(Boolean);
+  const clause = (suffix, data, template) =>
+    localizeNoticeClause(format, `${NOTICE_KEY_PREFIX}${suffix}`, data, template);
+  const toast = [clause('Lead', { systems }, NOTICE_LEAD_FALLBACK)];
+  const detail = [clause('LeadDetail', { systems }, NOTICE_LEAD_DETAIL_FALLBACK)];
+  if (totals.untouched > 0) {
+    toast.push(clause('Untouched', { count: totals.untouched }, NOTICE_UNTOUCHED_FALLBACK));
+  }
+  for (const [countKey, langKey, fallback] of NOTICE_CLAUSES) {
+    if (totals[countKey] > 0) detail.push(clause(langKey, { count: totals[countKey] }, fallback));
+  }
 
   const permanent = totals.untouched > 0;
   return {
     totals,
     systems,
-    message: [lead, ...clauses].join(' '),
+    ...finishMigrationNotice(toast, detail, format),
     severity: permanent ? 'warn' : 'info',
     permanent,
   };

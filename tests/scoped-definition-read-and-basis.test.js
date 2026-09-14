@@ -840,7 +840,7 @@ describe('src/main.js construction order', () => {
     const audit = at('reportWorldIdentityDrift(readPersistedCraftingSystems(');
     // The report is CONSOLE ONLY (maintainer, 2026-09-06): its dispatch is the `info` line, not
     // a toast, and there must be no toast at all for it.
-    const dispatch = at('console.info(`Fabricate | world identity drift:');
+    const dispatch = at("logMigrationNoticeDetail('world identity drift', driftDetail);");
     assert.ok(audit < dispatch, 'the report is logged after the audit');
     const between = MAIN_SOURCE.slice(audit, dispatch);
     assert.equal(between.includes('setSetting'), false, 'the audit must not write a setting');
