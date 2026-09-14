@@ -26,6 +26,11 @@ import {
   blindLibraryTask,
   makeBlindWorld,
 } from './helpers/gathering-blind-runs.js';
+import {
+  compendiumSourceItem,
+  gatheringFixture,
+  runRealGatheringAttempt,
+} from './helpers/real-gathering-attempt.js';
 
 const BLIND_MARKER = `blind:${BLIND_ENVIRONMENT_ID}`;
 
@@ -349,4 +354,128 @@ test('a waiting run written before this change resolves from its own task id and
   // so maturity must still run as the second of two commits, not as a blind run's
   // single reservation-converting commit.
   assert.equal(world.nodePool('task-silver').current, 1);
+});
+
+/**
+ * ## The receipt and linkage fields as a disclosure channel (issue 1648, acceptance 8)
+ *
+ * Issue 1648 adds `resultRowId` to evaluated rows and actual refs and `sourceItemUuid` to
+ * receipts. Both name AUTHORED CONFIGURATION — a drop row's id, and the pack Item a task
+ * awards from — so each is a new way for a blind run to name the task behind it. These
+ * drive a real blind gather that genuinely awards an item, then check what a protected
+ * viewer can reach in persistence, in the response, and in the journal projection.
+ */
+
+const SECRET_SOURCE_UUID = 'Compendium.secrets.lodes.Item.moonsilver';
+const SECRET_SOURCE = compendiumSourceItem({
+  uuid: SECRET_SOURCE_UUID,
+  name: 'Moonsilver Nugget',
+  img: 'icons/commodities/metal/ingot-silver.webp',
+});
+const PROTECTED_STRINGS = [
+  'Moonsilver Lode',
+  'icons/environment/wilderness/cave-entrance.webp',
+  'task-fixture',
+  'row-moonsilver',
+  SECRET_SOURCE_UUID,
+];
+
+function secretGather() {
+  return {
+    ...gatheringFixture({
+      selectionMode: 'blind',
+      taskName: 'Moonsilver Lode',
+      taskImg: 'icons/environment/wilderness/cave-entrance.webp',
+      chatOutput: true,
+      components: [
+        {
+          id: 'moon',
+          name: SECRET_SOURCE.name,
+          img: SECRET_SOURCE.img,
+          registeredItemUuid: SECRET_SOURCE_UUID,
+          difficulty: 1,
+        },
+      ],
+      dropRows: [{ id: 'row-moonsilver', componentId: 'moon', quantity: 2, dropRate: 90, enabled: true }],
+    }),
+    sources: { [SECRET_SOURCE_UUID]: SECRET_SOURCE },
+    // A blind environment DRAWS its task; naming one would bypass the whole mechanism.
+    taskId: null,
+    rolls: [50],
+  };
+}
+
+const leaks = (value) =>
+  PROTECTED_STRINGS.filter((secret) => JSON.stringify(value ?? null).includes(secret));
+
+test('a blind gather that really awards an item persists no row link, source uuid or task identity', async () => {
+  const attempt = await runRealGatheringAttempt({ ...secretGather(), viewer: BLIND_PLAYER });
+
+  assert.equal(attempt.error, null);
+  assert.equal(attempt.actor.items.length, 1, 'the award really happened');
+  assert.equal(attempt.record.taskId, 'blind');
+  assert.deepEqual(attempt.record.createdResults, [], 'no receipt reaches the player-readable flag');
+  assert.deepEqual(leaks(attempt.actor._flags), [], 'nothing in the run container names the drawn task');
+  // The character-modifier snapshot is the one surviving per-row structure, and its row
+  // id is nulled rather than dropped — a retained id would fingerprint the drop row.
+  assert.deepEqual(attempt.record.economyEvidence.characterModifierSnapshot.rows, [{ rowId: null, contributions: [] }]);
+  assert.deepEqual(leaks(attempt.response), []);
+
+  const projected = attempt.project({ projectionViewer: BLIND_PLAYER });
+  assert.equal(projected.names.title, 'FABRICATE.Gathering.BlindTaskLabel');
+  assert.equal(projected.gatheringYield, null);
+  assert.deepEqual(leaks(projected), []);
+  // The chat card is broadcast, so it names the blind label rather than the drawn task.
+  assert.equal(attempt.chat.length, 1);
+  assert.deepEqual(
+    PROTECTED_STRINGS.filter((secret) => attempt.chat[0].content.includes(secret)),
+    [],
+    'the posted card names neither the task nor the pack Item it awarded from'
+  );
+});
+
+test("a GM-executed run is withheld from the acting player's own journal projection", async () => {
+  const attempt = await runRealGatheringAttempt({ ...secretGather(), viewer: BLIND_GM });
+
+  // A GM may see behind the marker, so the record they write is not opaque.
+  assert.equal(attempt.record.taskId, 'task-fixture');
+  assert.equal(attempt.record.createdResults[0].sourceItemUuid, SECRET_SOURCE_UUID);
+
+  const projected = attempt.project({ projectionViewer: BLIND_PLAYER });
+  assert.equal(projected.names.title, 'FABRICATE.App.Journal.Redacted.Title');
+  assert.deepEqual(projected.createdResults, [], 'no receipt, row link or source uuid is projected');
+  assert.equal(projected.gatheringYield, null);
+  assert.deepEqual(leaks(projected), []);
+});
+
+for (const [label, getGatheringBlindSecret] of [
+  ['absent', undefined],
+  ['denied', () => null],
+  ['recorded for a deleted task', () => ({ taskId: 'task-fixture' })],
+]) {
+  test(`a GM previewing a blind record with ${label} entitlement sees the blind label, not a guess`, async () => {
+    const attempt = await runRealGatheringAttempt({ ...secretGather(), viewer: BLIND_PLAYER });
+
+    const projected = attempt.project({
+      projectionViewer: BLIND_GM,
+      getGatheringBlindSecret,
+      getGatheringTask: () => null,
+    });
+    assert.equal(projected.names.title, 'FABRICATE.Gathering.BlindTaskLabel');
+    assert.equal(projected.blindSecretPreview, false);
+    assert.deepEqual(leaks(projected), []);
+  });
+}
+
+test('a THROWING blind-secret source is never consulted for a protected viewer', async () => {
+  const attempt = await runRealGatheringAttempt({ ...secretGather(), viewer: BLIND_PLAYER });
+
+  const projected = attempt.project({
+    projectionViewer: BLIND_PLAYER,
+    getGatheringBlindSecret: () => {
+      throw new Error('entitlement unavailable');
+    },
+  });
+  assert.equal(projected.names.title, 'FABRICATE.Gathering.BlindTaskLabel');
+  assert.deepEqual(leaks(projected), []);
 });
