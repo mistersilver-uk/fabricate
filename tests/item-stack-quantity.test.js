@@ -300,6 +300,18 @@ const SITE_MAPPING = [
     ],
   },
   {
+    // The DELETE half of the boundary below, and the reason it reads the present-item
+    // accessor rather than the stored one: the consumption plan counted this document
+    // with `readStackQuantity`, so a stack stored at `0` was planned as one unit and
+    // must settle as one unit. Reading it as stored answers zero and refuses the whole
+    // consumption as uncertain (#1648).
+    site: 'CraftingEngine._consumeItemQuantity whole-document delete delta (#1648)',
+    file: 'src/systems/CraftingEngine.js',
+    accessor: 'readStackQuantity',
+    sites: 1,
+    anchors: [/const whole = readStackQuantity\(item\?\._source \?\? item, path\);/],
+  },
+  {
     site: 'CraftingEngine._consumeItemQuantity shared decrement write (#1648)',
     file: 'src/systems/CraftingEngine.js',
     accessor: 'updateStackQuantity',
