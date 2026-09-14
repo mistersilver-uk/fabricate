@@ -8,6 +8,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { importsModule, parseComponent } from '../helpers/svelteStructureContract.js';
+import { calledName, walkNodes } from '../helpers/moduleAst.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -22,6 +24,7 @@ const statusSource = read('../../src/ui/svelte/apps/journal/journalRunStatus.js'
 const actionsSource = read('../../src/ui/svelte/apps/journal/ActionsPanel.svelte');
 const stepSource = read('../../src/ui/svelte/apps/journal/StepDetails.svelte');
 const builderSource = read('../../src/systems/RunJournalBuilder.js');
+const historySource = read('../../src/ui/svelte/apps/journal/HistoricalRunDetail.svelte');
 const cssSource = read('../../styles/fabricate.css');
 const enLang = JSON.parse(read('../../lang/en.json'));
 
@@ -31,7 +34,11 @@ function resolveLangKey(key) {
 
 describe('FabricateAppRoot Journal wiring', () => {
   it('renders JournalView on the journal tab (every tab now routes to a real view)', () => {
-    assert.ok(rootSource.includes("import JournalView from './journal/JournalView.svelte'"), 'imports JournalView');
+    // Structural rather than textual, so an import reorder cannot red it (issue 1658).
+    assert.ok(
+      importsModule(parseComponent(rootSource), './journal/JournalView.svelte'),
+      'imports JournalView'
+    );
     // `tab.tabId`, not `tab.id`: a rail entry is addressed by its ROUTE KEY since issue 1198
     // and carries the bare tab id separately, so a Core branch reads the bare id.
     assert.ok(rootSource.includes("tab.tabId === 'journal'"), 'branches on the journal tab');
@@ -158,6 +165,43 @@ describe('Journal label mirrors resolve in lang/en.json (drift guard)', () => {
     assert.ok(reasons.length >= 10, 'authority label map was extracted');
     for (const key of new Set([...literals, ...reasons, ...modes])) {
       assert.equal(typeof resolveLangKey(key), 'string', `${key} resolves without an English fallback`);
+    }
+  });
+
+  // The historical branch spells no whole key: `tests/ui-lang-keys-resolve.test.js` sees only the
+  // interpolated prefix, resolves it to an object and checks nothing beneath it, so deleting
+  // `History.RollNotRecorded` passed every gate. Prefix and leaves both come from the AST.
+  it('resolves every prefixed History label the historical branch reads through its text helper', () => {
+    const ast = parseComponent(historySource);
+    const leaves = (node) => {
+      if (node?.type === 'Literal' && typeof node.value === 'string') return [node.value];
+      if (node?.type === 'ConditionalExpression')
+        return [...leaves(node.consequent), ...leaves(node.alternate)];
+      return [];
+    };
+    let prefix = null;
+    const keys = [];
+    for (const node of walkNodes(ast)) {
+      if (
+        node.type === 'VariableDeclarator' &&
+        node.id?.name === 'text' &&
+        calledName(node.init?.body) === 'localize'
+      ) {
+        prefix = node.init.body.arguments[0]?.quasis?.[0]?.value?.cooked ?? null;
+      }
+      if (calledName(node) === 'text') keys.push(...leaves(node.arguments?.[0]));
+    }
+    assert.ok(prefix?.startsWith('FABRICATE.'), `the text helper localizes a prefix: ${prefix}`);
+    assert.ok(
+      keys.length >= 45,
+      `extracted the text() call sites, not a stopped scan: ${keys.length}`
+    );
+    for (const key of new Set(keys)) {
+      assert.equal(
+        typeof resolveLangKey(prefix + key),
+        'string',
+        `${prefix}${key} must resolve to a string in lang/en.json`
+      );
     }
   });
 

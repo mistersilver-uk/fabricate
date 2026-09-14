@@ -472,9 +472,16 @@ function assertLockedStage(target) {
   );
 }
 
+// A missing key formats to the key, and the component renders the same key, so an expectation
+// built from one would match the defect. Refuse the key itself before it becomes the expectation.
+function localizedLabel(key, data = {}) {
+  const value = globalThis.game.i18n.format(key, data);
+  assert.notEqual(value, key, `${key} must resolve in lang/en.json`);
+  return value;
+}
 const historyLabel = (key, data = {}) =>
-  globalThis.game.i18n.format(`FABRICATE.App.Journal.History.${key}`, data);
-const quantityLabel = (n) => globalThis.game.i18n.format('FABRICATE.App.Journal.Quantity', { n });
+  localizedLabel(`FABRICATE.App.Journal.History.${key}`, data);
+const quantityLabel = (n) => localizedLabel('FABRICATE.App.Journal.Quantity', { n });
 const guidanceOf = (target) => target.querySelector('[data-journal-guidance]').textContent;
 const textsOf = (root, selector) =>
   [...root.querySelectorAll(selector)].map((node) => node.textContent);
