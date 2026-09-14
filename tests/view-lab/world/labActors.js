@@ -509,21 +509,36 @@ export function buildLabActors(content) {
       },
       /**
        * The smoke's seed stocks the crafter through this, so an actor has to accept embedded items
-       * or every inventory-dependent frame renders empty. Items arrive as plain specs carrying
-       * `flags.core.sourceId`, which is how Fabricate matches an owned stack to a managed component.
+       * or every inventory-dependent frame renders empty.
+       *
+       * A created document gets a NEW OWNED ADDRESS — `<actor uuid>.Item.<item id>`, and `parent`
+       * set to the actor — because that is what Foundry returns and what `writeItemAward`
+       * (`src/systems/runHistoryEvidence.js`) requires before it will count an award as landed:
+       * without both halves every craft, salvage and gathering award refuses with "Item creation
+       * was not acknowledged" and the run reports an effect needing reconciliation.
+       *
+       * The spec's `flags.core.sourceId` is therefore left WHERE IT IS rather than becoming the
+       * uuid. It names where the stack came from, and that is the field production actually
+       * matches on: `getCompendiumSourceUuid` reads it into `getItemSourceReferences`, whose
+       * raw-reference tier is what `resolveComponentForItem` falls through to. Spelling the
+       * source id as the uuid conflated the two, and also made two stacks created from one
+       * component share an address — which `InventoryListingBuilder.documentIdentity` collapses
+       * into a single card, undercounting real holdings.
        */
       async createEmbeddedDocuments(type, specs = []) {
         if (type !== 'Item') return [];
         const created = specs.map((spec, offset) => {
+          const id = `item-${definition.id}-${items.length + offset}`;
           const item = {
-            uuid: spec.flags?.core?.sourceId ?? `Item.${definition.id}-${items.length + offset}`,
-            id: `item-${definition.id}-${items.length + offset}`,
+            uuid: `${actor.uuid}.Item.${id}`,
+            id,
             name: spec.name,
             img: spec.img ?? null,
             type: spec.type ?? 'loot',
             system: { quantity: 1, description: { value: '' }, ...(spec.system ?? {}) },
             flags: spec.flags ?? {},
             isOwner: true,
+            parent: actor,
           };
           // The same V13 semantics the statically-built stacks get. An embedded item is where tool
           // wear and breakage flags land, so a literal-key lookup here renders every tool pristine.
@@ -551,7 +566,15 @@ export function buildLabActors(content) {
     installUpdateSemantics(actor);
     // Installed HERE rather than in `ownedItem`/`recipeItemCopy`, because an item can only remove
     // itself from a collection that exists — and the actor holding it is built after its items.
-    for (const item of items) installDeleteSemantics(item, actor);
+    // `parent` is set in the same pass and for the same reason. An owned item's parent IS its
+    // Actor in Foundry, and a dozen production reads derive the owning actor from it rather than
+    // from the call's own argument: `mapConsumedIngredientRef` stamps every consumed-ingredient
+    // receipt's `actorUuid` from `item.parent?.uuid`, and a null there is the key
+    // `addHistoricalEssenceContribution` then fails to find a carrier under.
+    for (const item of items) {
+      item.parent = actor;
+      installDeleteSemantics(item, actor);
+    }
     const learned = LEARNED_RECIPES[definition.id];
     // `flags.fabricate.fabricate.learnedRecipes`, which is where production's dotted-top-level-key
     // `update` lands it after V13 expands the path — the same doubly-nested depth every Fabricate
