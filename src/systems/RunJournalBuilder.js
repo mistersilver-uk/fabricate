@@ -19,6 +19,7 @@ import { enrichHistoricalConsumption, historicalItemSources } from './historyIte
 import { readStackQuantity } from './itemStackQuantity.js';
 import { buildPassInventorySnapshot } from './passInventorySnapshot.js';
 import { historyEvidenceFields } from './runHistoryEvidence.js';
+import { craftingOutcomeBand, routedOutcomeBand } from './runJournalOutcomeBands.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
 import { resolvedComponentsFor, resolvedEssencesFor } from './scopedEntityReads.js';
 
@@ -2383,38 +2384,6 @@ function normalizeName(value) {
   return String(value ?? '')
     .trim()
     .toLowerCase();
-}
-
-function routedOutcomeBand(outcome, routed, task) {
-  if (routed?.type === 'fixed') {
-    const start = numberOrNull(outcome?.start) ?? 0;
-    const end = numberOrNull(outcome?.end) ?? start;
-    return start === end ? String(start) : `${start}–${end}`;
-  }
-  // Mirrors GatheringEngine._resolveGatheringRoutedDc exactly: a finite task
-  // override, then the routed slot's DC, then its canonical legacy fallback.
-  const baseDc = numberOrNull(task?.dcOverride) ?? numberOrNull(routed?.dc) ?? 15;
-  const threshold = baseDc + (numberOrNull(outcome?.dc) ?? 0);
-  const thresholds = normalizeList(routed?.relativeOutcomes).map(
-    (entry) => baseDc + (numberOrNull(entry?.dc) ?? 0)
-  );
-  const next = Math.min(...thresholds.filter((value) => value > threshold));
-  const lowest = threshold === Math.min(...thresholds);
-  const exceed = routed?.thresholdMode === 'exceed';
-  if (!Number.isFinite(next)) return lowest ? '−∞–∞' : `${exceed ? '>' : '≥'}${threshold}`;
-  if (lowest) return `${exceed ? '≤' : '<'}${next}`;
-  return `${exceed ? '>' : '≥'}${threshold}, ${exceed ? '≤' : '<'}${next}`;
-}
-
-function craftingOutcomeBand(outcome, routed, dc) {
-  if (routed?.type === 'fixed') return routedOutcomeBand(outcome, routed, null);
-  const offset = numberOrNull(outcome?.dc) ?? 0;
-  if (dc !== null) {
-    const threshold = dc + offset;
-    return routed?.thresholdMode === 'exceed' ? `>${threshold}` : `${threshold}+`;
-  }
-  const relative = offset === 0 ? 'DC' : `DC${offset > 0 ? '+' : '−'}${Math.abs(offset)}`;
-  return routed?.thresholdMode === 'exceed' ? `>${relative}` : `${relative}+`;
 }
 
 function ingredientOverrideIndex(group, optionOverrides) {

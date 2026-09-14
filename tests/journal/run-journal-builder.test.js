@@ -11,6 +11,10 @@ import assert from 'node:assert/strict';
 
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
 import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
+import {
+  craftingOutcomeBand,
+  routedOutcomeBand,
+} from '../../src/systems/runJournalOutcomeBands.js';
 import { IngredientSet } from '../../src/models/IngredientSet.js';
 import { runStatusPresentation } from '../../src/ui/svelte/apps/journal/journalRunStatus.js';
 
@@ -775,7 +779,7 @@ test('routed-by-check crafting projects the authored outcome ladder through reso
     presentation: 'tiers',
     entries: [],
     tiers: [
-      { id: 'setback', name: 'Setback', band: '9+', fail: true, yields: [] },
+      { id: 'setback', name: 'Setback', band: '<16', fail: true, yields: [] },
       {
         id: 'masterwork',
         name: 'Masterwork',
@@ -2772,4 +2776,33 @@ test('recovery projects actual safe receipts and an uncertain boundary without l
   const blind = makeBuilder({ gatheringHistory: [{ ...gatheringRun, taskId: 'blind' }] })
     .buildListing({ actor: ACTOR, viewer: PLAYER }).history[0];
   assert.equal(blind.recoveryEvidence.effects[0].receipt, null);
+});
+
+// The bottom tier of a routed ladder has no lower bound (both activities resolve with
+// `clampToNearest`), so stating it as `threshold+` was wrong in general and printed a
+// nonsensical `-5+` whenever the offset drove the threshold below zero.
+test('the lowest crafting tier reads as an upper bound, exactly as its gathering sibling does', () => {
+  const tiers = [
+    { id: 'setback', dc: -15 },
+    { id: 'fine', dc: 0 },
+    { id: 'masterwork', dc: 4 },
+  ];
+  const routed = { type: 'relative', thresholdMode: 'meet', relativeOutcomes: tiers };
+  assert.equal(craftingOutcomeBand(tiers[0], routed, 10), '<10', 'no nonsensical -5+');
+  assert.equal(craftingOutcomeBand(tiers[1], routed, 10), '10+');
+  assert.equal(craftingOutcomeBand(tiers[2], routed, 10), '14+');
+
+  const exceed = { ...routed, thresholdMode: 'exceed' };
+  assert.equal(craftingOutcomeBand(tiers[0], exceed, 10), '≤10');
+  assert.equal(craftingOutcomeBand(tiers[2], exceed, 10), '>14');
+
+  // An unresolved DC keeps the relative vocabulary on the same ladder geometry.
+  assert.equal(craftingOutcomeBand(tiers[0], routed, null), '<DC');
+  assert.equal(craftingOutcomeBand(tiers[1], routed, null), 'DC+');
+  assert.equal(craftingOutcomeBand(tiers[2], routed, null), 'DC+4+');
+
+  // A one-tier ladder covers everything, and both renderers say so the same way.
+  const only = { type: 'relative', relativeOutcomes: [{ id: 'only', dc: 0 }] };
+  assert.equal(craftingOutcomeBand(only.relativeOutcomes[0], only, 10), '−∞–∞');
+  assert.equal(routedOutcomeBand(only.relativeOutcomes[0], only, null), '−∞–∞');
 });
