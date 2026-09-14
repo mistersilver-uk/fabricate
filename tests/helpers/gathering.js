@@ -19,9 +19,15 @@ export const DEFAULT_TEST_SYSTEM = Object.freeze({
   components: [{ id: 'herb' }]
 });
 
+/**
+ * A minimal Actor double whose `setFlag` resolves the updated DOCUMENT, as Foundry's
+ * does — `writeAcknowledgedRunContainer` treats anything else as an unacknowledged
+ * write. The stored value REPLACES rather than merging, so run-container suites, whose
+ * writes carry `-=id` deletion keys, use `FakeActor` from `run-manager-fakes.js`.
+ */
 export function makeFakeActor(overrides = {}) {
   let flags = {};
-  return {
+  const actor = {
     id: 'actor-flag',
     uuid: 'Actor.actor-flag',
     name: 'Flag Actor',
@@ -29,10 +35,11 @@ export function makeFakeActor(overrides = {}) {
     getFlag: (namespace, key) => flags[`${namespace}.${key}`],
     setFlag: async (namespace, key, value) => {
       flags = { ...flags, [`${namespace}.${key}`]: value };
-      return value;
+      return actor;
     },
     ...overrides
   };
+  return actor;
 }
 
 /**
@@ -95,6 +102,40 @@ export function makeRichState({
   return { service, system, settings, writes, hooks, rollCalls, evaluateCalls, macroCalls };
 }
 
+/**
+ * The terminal-history half of a gathering run-manager double, with the real
+ * manager's settlement semantics (`GatheringRunManager.settleHistory`): the
+ * settlement resolves the record its own writer returned and REFUSES an
+ * unknown run, so an engine that stops linking the settlement to the record it
+ * created fails here instead of silently settling nothing.
+ *
+ * @param {object} [hooks] Optional `onCreate`/`onComplete`/`onSettle` spies.
+ */
+export function terminalHistoryRunManager({ onCreate, onComplete, onSettle } = {}) {
+  const saved = new Map();
+  const save = (run) => {
+    saved.set(run.id, run);
+    return run;
+  };
+  return {
+    async createTerminalRun(actor, runData, status, payload) {
+      onCreate?.({ actor, runData, status, payload });
+      return save({ id: `run-${saved.size + 1}`, status, ...runData, ...payload });
+    },
+    async completeRun(actor, activeRun, status, payload, { terminalRunData } = {}) {
+      onComplete?.({ actor, activeRun, status, payload, terminalRunData });
+      return save({ ...activeRun, ...terminalRunData, status, ...payload });
+    },
+    async settleHistory(actor, runId, payload) {
+      const run = saved.get(runId);
+      if (!run) throw new Error(`settleHistory has no terminal history record for run ${runId}`);
+      onSettle?.({ actor, runId, payload });
+      return save({ ...run, ...payload });
+    },
+    savedRun: (runId) => saved.get(runId) ?? null
+  };
+}
+
 export function environment(overrides = {}) {
   return {
     id: 'env-test',
@@ -153,10 +194,10 @@ export function makeEngine({ richState, env = environment(), calls = {}, runMana
       getActiveRuns: () => [],
       getRunHistory: () => [],
       findActiveRunForTask: () => null,
-      createTerminalRun: async (selectedActor, runData, status, payload) => {
-        calls.terminal.push({ selectedActor, runData, status, payload });
-        return { id: 'run-test', status, ...runData, ...payload };
-      }
+      ...terminalHistoryRunManager({
+        onCreate: ({ actor: selectedActor, runData, status, payload }) =>
+          calls.terminal.push({ selectedActor, runData, status, payload })
+      })
     },
     localize: key => key
   });

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { GatheringEngine } from '../src/systems/GatheringEngine.js';
-import { routedRoll, routedSystemCheck } from './helpers/gathering.js';
+import { routedRoll, routedSystemCheck, terminalHistoryRunManager } from './helpers/gathering.js';
 
 const viewer = { id: 'user-1', isGM: false };
 const gmViewer = { id: 'gm-1', isGM: true };
@@ -46,6 +46,7 @@ function makeEngine({
   calls.activeRuns = [];
   calls.validate = [];
   calls.createTerminalRun = [];
+  calls.settleHistory = [];
   calls.createWaitingRun = [];
   calls.resolveProgressive = [];
   calls.evaluateCheck = [];
@@ -97,7 +98,11 @@ function makeEngine({
         calls.activeRuns.push({ actor: selectedActor, taskId });
         return activeRuns instanceof Map ? activeRuns.get(taskId) : activeRuns?.[taskId] ?? null;
       },
-      createTerminalRun: (...args) => calls.createTerminalRun.push(args),
+      ...terminalHistoryRunManager({
+        onCreate: ({ actor: selectedActor, runData, status, payload }) =>
+          calls.createTerminalRun.push([selectedActor, runData, status, payload]),
+        onSettle: ({ runId, payload }) => calls.settleHistory.push({ runId, payload })
+      }),
       createWaitingRun: async (...args) => {
         calls.steps.push('createWaitingRun');
         calls.createWaitingRun.push(args);
@@ -261,6 +266,38 @@ test('startAttempt resolves a fully guarded immediate task into terminal history
   assert.equal(calls.createTerminalRun[0][3].checkResult.outcome, 'Iron');
   assert.equal(calls.createTerminalRun[0][3].checkResult.success, true);
   assert.deepEqual(calls.createWaitingRun, []);
+});
+
+// Mutation control for the settlement linkage: the record the writer created is
+// empty of awards, so only the SAME-record settlement can put the actual receipts
+// into history and into the response. Dropping the settleHistory call, or aiming it
+// at any other run id, fails here rather than silently reporting an award-free run.
+test('startAttempt settles the actual awards into the terminal record it created', async () => {
+  const calls = {};
+  const immediateTask = task({
+    resultGroups: [{ id: 'group-a', name: 'Iron', results: [{ id: 'result-a', componentId: 'iron', quantity: 2 }] }]
+  });
+  const awarded = [{ actorUuid: actor.uuid, itemUuid: 'Item.iron', name: null, img: null, quantity: 2 }];
+  const engine = makeEngine({
+    environments: [environment({ tasks: [immediateTask] })],
+    createdResults: awarded,
+    calls
+  });
+
+  let result;
+  routedRoll(true);
+  try {
+    result = await engine.startAttempt({ viewer, actor, environmentId: 'env-a', taskId: 'task-a' });
+  } finally {
+    delete globalThis.Roll;
+  }
+
+  assert.deepEqual(calls.createTerminalRun[0][3].createdResults, []);
+  assert.equal(calls.settleHistory.length, 1);
+  assert.equal(calls.settleHistory[0].runId, result.runId);
+  assert.deepEqual(calls.settleHistory[0].payload.createdResults, awarded);
+  assert.equal(calls.settleHistory[0].payload.historySettlement.awards, 'complete');
+  assert.deepEqual(result.createdResults, awarded);
 });
 
 test('startAttempt creates one waitingTime run for a fully guarded timed task', async () => {
