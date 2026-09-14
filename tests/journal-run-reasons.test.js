@@ -9,7 +9,7 @@
  * `journalRefusalMessage` implements is pinned to always answer a string.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -22,10 +22,26 @@ import {
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-const AUTHORITY_SOURCES = Object.freeze([
-  'src/systems/journalRunAuthority.js',
-  'src/systems/journalRunCommands.js',
-]);
+// DISCOVERED, not listed. This guard was first written against two named files, and the
+// ledger-arbitration module that landed later carried four more reason literals that it
+// therefore could not see — `ledger-create-denied` and `ledger-create-failed` would have
+// reached a player as the generic fallback with nothing red. A `journalRun*.js` glob cannot
+// be blind to the next such module; the floor below keeps the glob itself from silently
+// matching nothing.
+const AUTHORITY_SOURCE_DIR = 'src/systems';
+const AUTHORITY_SOURCE_PATTERN = /^journalRun[A-Za-z]*\.js$/;
+
+function authoritySources() {
+  const names = readdirSync(join(ROOT, AUTHORITY_SOURCE_DIR))
+    .filter((name) => AUTHORITY_SOURCE_PATTERN.test(name))
+    .sort();
+  assert.ok(
+    names.length >= 3,
+    `expected at least the three journalRun* authority modules, found ${names.length}: ` +
+      'a glob that stops matching makes every assertion below vacuous'
+  );
+  return names.map((name) => `${AUTHORITY_SOURCE_DIR}/${name}`);
+}
 
 // A line that mentions `reason`, `unavailable(` or `failure(` carries a refusal code;
 // on such a line a HYPHENATED lower-case literal is one. Requiring the hyphen is what
@@ -36,7 +52,7 @@ const REASON_LITERAL = /'([a-z][a-z0-9]*(?:-[a-z0-9]+)+)'/g;
 
 function authorityReasons() {
   const found = new Set();
-  for (const source of AUTHORITY_SOURCES) {
+  for (const source of authoritySources()) {
     for (const line of readFileSync(join(ROOT, source), 'utf8').split(/\r?\n/)) {
       if (!REASON_LINE.test(line)) continue;
       for (const match of line.matchAll(REASON_LITERAL)) found.add(match[1]);

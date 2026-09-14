@@ -20,6 +20,13 @@ export const JOURNAL_RUN_REASON_KEYS = Object.freeze({
   'active-gm-missing': 'FABRICATE.App.Journal.Actions.AuthorityUnavailable',
   'active-gm-required': 'FABRICATE.App.Journal.Actions.ActiveGmRequired',
   'ledger-missing': 'FABRICATE.App.Journal.Actions.LedgerMissing',
+  // Added with ledger auto-provisioning. `lifecycle-refused` always carries a human
+  // `message`, which the refusal chain prefers, so its own wording is the fallback for a
+  // refusal that somehow arrives without one.
+  'lifecycle-refused': 'FABRICATE.App.Journal.Reason.LifecycleRefused',
+  'ledger-create-denied': 'FABRICATE.App.Journal.Reason.LedgerCreateDenied',
+  'ledger-create-failed': 'FABRICATE.App.Journal.Reason.LedgerCreateFailed',
+  'ledger-unsettled': 'FABRICATE.App.Journal.Reason.LedgerUnsettled',
   'ledger-ambiguous': 'FABRICATE.App.Journal.Actions.LedgerAmbiguous',
   'ledger-already-exists': 'FABRICATE.App.Journal.AuthoritySetup.AlreadyExists',
   'secure-random-unavailable': 'FABRICATE.App.Journal.Actions.SecureRandomUnavailable',

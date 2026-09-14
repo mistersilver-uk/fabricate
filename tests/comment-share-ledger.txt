@@ -46,10 +46,10 @@ src/ui/svelte/apps/manager/tools	1852
 src/ui/svelte/apps/manager/world	352
 src/ui/svelte/components	6850
 src/ui/svelte/stores	6945
-src/ui/svelte/util	3425
+src/ui/svelte/util	3428
 src/utils	7546
 styles	7499
-tests	40052
+tests	40058
 tests/actions	155
 tests/canvas	622
 tests/canvas/regions	292
