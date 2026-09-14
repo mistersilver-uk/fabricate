@@ -580,9 +580,7 @@ Shell is parsed by no linter and formatted by no formatter here, and that list p
 
 ## The View Lab (Foundry-free window captures)
 
-The View Lab renders whole Fabricate application windows in Chromium — the real app roots, the real
-stores, production `styles/fabricate.css` at its production cascade layer — with no Foundry, no
-Docker, and no world.
+The View Lab renders whole Fabricate application windows in Chromium — the real app roots, the real stores, production `styles/fabricate.css` at its production cascade layer — with no Foundry, no Docker, and no world.
 It exists because PR screenshot evidence should not cost a container boot and a twenty-minute walk.
 
 ```sh
@@ -591,34 +589,23 @@ node scripts/view-lab-screenshots.mjs apps  # every registry case -> ui-screensh
 npm run viewlab:index                       # regenerate the evidence index on its own
 ```
 
-The window chrome is Foundry's own, harvested from the release archive `npm run test:foundry:up`
-already caches under `.foundry-e2e/cache/`.
-That material is proprietary: it lands in the gitignored `.foundry-chrome/`, is never committed, and
-is never downloaded for you.
-Without it the lab fails closed rather than approximating — a frame drawn without the real cascade is
-worse than no frame, because it looks authoritative.
+The window chrome is Foundry's own, harvested from the release archive `npm run test:foundry:up` already caches under `.foundry-e2e/cache/`.
+That material is proprietary: it lands in the gitignored `.foundry-chrome/`, is never committed, and is never downloaded for you.
+Without it the lab fails closed rather than approximating — a frame drawn without the real cascade is worse than no frame, because it looks authoritative.
 
 A capture accumulates in `ui-screenshot-artifact/apps/` rather than replacing it.
-Each frame's manifest entry records the head sha it was drawn at, so a rerun can tell an older frame
-from a fresh one.
+Each frame's manifest entry records the head sha it was drawn at, so a rerun can tell an older frame from a fresh one.
 Pass `--clean` to force a full reset.
-The same directory also carries a self-contained `index.html`, grouped by application and area with
-a multi-tag filter, written automatically at the end of every capture.
+The same directory also carries a self-contained `index.html`, grouped by application and area with a multi-tag filter, written automatically at the end of every capture.
 It shows the lab's own frames only, never a smoke label, because it is not a comparison.
 
 Cases live in `scripts/lib/viewLabCases.js`.
-A case names a window, the state to drive it to, and the `sourceMatches` patterns that select it from
-a changed-file set.
-Every manager case declares `expectView`, which the capture asserts against the app's actual route
-before taking the frame — without it a mis-click silently screenshots the wrong screen.
+A case names a window, the state to drive it to, and the `sourceMatches` patterns that select it from a changed-file set.
+Every manager case declares `expectView`, which the capture asserts against the app's actual route before taking the frame — without it a mis-click silently screenshots the wrong screen.
 
-A case also declares `reaches`: `exact` when the frame lands on its smoke counterpart's own
-condition, `window` when it reaches the right application window but not that condition (known
-remaining work), and `beyond` for a condition the live smoke never walks at all — the routed recipe
-resolution modes, the visibility modes it does not visit, Foundry's light application theme.
+A case also declares `reaches`: `exact` when the frame lands on its smoke counterpart's own condition, `window` when it reaches the right application window but not that condition (known remaining work), and `beyond` for a condition the live smoke never walks at all — the routed recipe resolution modes, the visibility modes it does not visit, Foundry's light application theme.
 A `beyond` case carries an empty `smokeLabels`, because there is nothing to compare it against.
-A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in
-`scripts/README.md`, not by a per-case comment.
+A `window` case's shortfall is accounted for by a class-level entry in the known-gaps register in `scripts/README.md`, not by a per-case comment.
 As of this writing the registry holds 379 cases: 148 `exact`, 8 `window`, 223 `beyond`.
 
 A change to the lab's own inputs is attributed rather than treated like an ordinary render-file change.
@@ -639,27 +626,17 @@ A patch to anything else in `labActors.js`, such as `ACTOR_DEFINITIONS` or a sha
 So does a patch to any lab input the registry does not attribute, or a hunk whose content cannot be anchored at all.
 Widening is always a UNION with whatever the change did attribute, never a replacement of it: a PR that edits one case literal and also touches shared code gets coverage AND that case's own frame.
 
-Steps are ordered and take five verbs: `{selector}` clicks, `{selector, select}` chooses a
-`<select>` option, `{selector, fill}` types (the only route to a dirty form), `{selector, scroll:
-true}` scrolls an element into view inside its own overflow container, and `{selector, upload}`
-chooses a file on a native file input.
-The scroll verb matters more than it sounds: `frame.screenshot()` on the outer `.application` does
-not scroll nested containers, so a card that never scrolled into view is absent from the frame while
-every assertion still passes.
+Steps are ordered and take five verbs: `{selector}` clicks, `{selector, select}` chooses a `<select>` option, `{selector, fill}` types (the only route to a dirty form), `{selector, scroll:
+true}` scrolls an element into view inside its own overflow container, and `{selector, upload}` chooses a file on a native file input.
+The scroll verb matters more than it sounds: `frame.screenshot()` on the outer `.application` does not scroll nested containers, so a card that never scrolled into view is absent from the frame while every assertion still passes.
 
-A real `DialogV2` confirmation or prompt, transcribed from the harvested
-`client/applications/api/dialog.mjs`, can be left open for the screenshot, answered with its default
-button, or answered with a named button action, so a state that used to be blocked behind a native
-Foundry dialog is often reachable now.
-`input` and `query` are not wired, and a native drag-and-drop payload is outside the runner's step
-vocabulary, so a handful of cases still cannot reach their state.
+A real `DialogV2` confirmation or prompt, transcribed from the harvested `client/applications/api/dialog.mjs`, can be left open for the screenshot, answered with its default button, or answered with a named button action, so a state that used to be blocked behind a native Foundry dialog is often reachable now.
+`input` and `query` are not wired, and a native drag-and-drop payload is outside the runner's step vocabulary, so a handful of cases still cannot reach their state.
 The known-gaps register in `scripts/README.md` names them.
 
 **The live smoke is still the fidelity authority.**
-Where a View Lab frame and a smoke frame of the same view disagree, the smoke frame is correct and
-the lab is defective.
-`scripts/README.md` carries the standing fidelity register (no canvas, no sidebar, a real `DialogV2`
-confirmation but otherwise no live Foundry JS, fixture world rather than the smoke world).
+Where a View Lab frame and a smoke frame of the same view disagree, the smoke frame is correct and the lab is defective.
+`scripts/README.md` carries the standing fidelity register (no canvas, no sidebar, a real `DialogV2` confirmation but otherwise no live Foundry JS, fixture world rather than the smoke world).
 
 ## Foundry integration (smoke) tests
 

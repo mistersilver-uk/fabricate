@@ -6,10 +6,10 @@
  * sentence was lost", and a human diff review of a 1,100-line move is precisely where a lost
  * sentence hides. This is the mechanical replacement.
  *
- * THE UNIT IS A LINE, AND THAT IS NOT A SHORTCUT. `markdownlint-sentences-per-line` is enforced
- * across every authored Markdown file in this repository, so a line already IS a sentence. Parsing
- * prose into sentences would introduce a second, fallible definition of the boundary for no gain,
- * and would disagree with the gate that actually holds the property.
+ * The unit is a sentence, and `joinWraps` is what makes it one. `AGENTS.md` requires one sentence
+ * per line, but `markdownlint-sentences-per-line` only caps sentences per line: it permits a
+ * sentence wrapped across several lines, so nothing enforces the rule. Both sides of every
+ * comparison below are wrap-normalised here rather than assumed to be normalised already.
  *
  * WHAT NORMALISATION DELIBERATELY DOES NOT DO. It strips list markers, blockquote markers and
  * heading hashes, and collapses internal whitespace — the things a move legitimately changes when
@@ -28,6 +28,7 @@
  * `scripts/lib/agentModelTiers.js`. Every other fence moves or does not move as a visible unit in
  * the diff, and this checker will not tell you which.
  */
+import { joinWraps } from './markdownWraps.js';
 
 /** Lines that carry no rule text and are dropped before comparison. */
 const STRUCTURAL = [
@@ -50,7 +51,7 @@ const LEADING_MARKER = /^\s*(?:>+\s*)?(?:[-*+]\s+|\d+\.\s+|#{1,6}\s+)?/u;
 export function sentencesOf(markdown) {
   const sentences = [];
   let inFence = false;
-  for (const line of String(markdown).split('\n')) {
+  for (const line of joinWraps(String(markdown)).split('\n')) {
     if (/^\s*(?:```|~~~)/u.test(line)) {
       inFence = !inFence;
       continue;

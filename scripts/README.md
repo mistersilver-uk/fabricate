@@ -2,11 +2,8 @@
 
 ## Latest Module Versions
 
-`latest-module-versions.mjs` queries the current latest manifest for Fabricate and the
-premium sibling modules without requiring S3 bucket listing permission.
-It reads the root
-`release.s3.config.json` plus `../fabricate-premium/release.config.json`, then fetches
-exact keys in the form `modules/<moduleId>/<channel>/latest/module.json`.
+`latest-module-versions.mjs` queries the current latest manifest for Fabricate and the premium sibling modules without requiring S3 bucket listing permission.
+It reads the root `release.s3.config.json` plus `../fabricate-premium/release.config.json`, then fetches exact keys in the form `modules/<moduleId>/<channel>/latest/module.json`.
 
 ```bash
 node scripts/latest-module-versions.mjs --profile fabricate-beta
@@ -49,10 +46,8 @@ If a future bundle breaks that, the generator says so on stderr rather than emit
 
 ## Foundry Integration Smoke Test
 
-The smoke test (`foundry-test-run.mjs`) verifies that Fabricate loads and functions correctly
-in a live Foundry VTT instance.
-It uses Playwright to drive a headless Chromium browser
-through the full crafting lifecycle.
+The smoke test (`foundry-test-run.mjs`) verifies that Fabricate loads and functions correctly in a live Foundry VTT instance.
+It uses Playwright to drive a headless Chromium browser through the full crafting lifecycle.
 
 ### Running
 
@@ -78,8 +73,7 @@ npm run test:foundry:v13       # Foundry 13.351 + dnd5e 5.2.5
 npm run test:foundry:v14       # the default 14.365 build, same assertions
 ```
 
-The two arms share one container identity (the felddy licence binds to the hostname), so they must
-never run at the same time in one worktree.
+The two arms share one container identity (the felddy licence binds to the hostname), so they must never run at the same time in one worktree.
 See "Smoke arms" in `CONTRIBUTING.md`.
 
 ### Environment Variables
@@ -165,8 +159,7 @@ The smoke test executes 6 phases:
 ### Screenshot Catalog
 
 All screenshots are written to `test-results/` with auto-incrementing numeric prefixes.
-The
-stable part of each filename is the trailing label, not the numeric prefix.
+The stable part of each filename is the trailing label, not the numeric prefix.
 
 | File label | Contents |
 |---|---|
@@ -186,8 +179,7 @@ The smoke test creates the following Foundry documents:
 
 **Actors:**
 
-All actors are imported from the dnd5e **Starter Heroes** compendium (`dnd5e.heroes`) and
-tagged `flags.fabricate.smokeSeed` for idempotent cleanup.
+All actors are imported from the dnd5e **Starter Heroes** compendium (`dnd5e.heroes`) and tagged `flags.fabricate.smokeSeed` for idempotent cleanup.
 The two heroes' ids are recorded at seed time, and Travel seeding selects the party's crafter and travel member by those stable ids rather than by name-sort position (#816), so grant-only actors can never displace the intended party.
 Grant-only actors seeded for the Access-tab grid are additionally namespaced with `flags.fabricate.smokeSeedRole = 'access-grant'` to distinguish them from the two hero fixtures; cleanup still keys solely on `smokeSeed` so both cohorts are torn down.
 Sorted by name, the first two heroes are used by current flows; the rest fill the gathering actor-selection bar:
@@ -195,8 +187,7 @@ Sorted by name, the first two heroes are used by current flows; the rest fill th
 - crafter — first hero alphabetically (inventory: 3x Mystic Herb, 3x Empty Vial, 1x Dragon Scale); owned by the Fabricate Gatherer user and remembered as the default gathering actor
 - travel-party member — second hero alphabetically (inventory: 3x Iron Ore, 1x Dragon Scale)
 
-**World Items (7):**
-Iron Ore, Mystic Herb, Dragon Scale, Empty Vial, Iron Sword, Healing Potion, Dragon Scale Armor
+**World Items (7):** Iron Ore, Mystic Herb, Dragon Scale, Empty Vial, Iron Sword, Healing Potion, Dragon Scale Armor
 
 **Crafting System:** "Arcane Forge" with all 7 items registered as components
 
@@ -238,14 +229,10 @@ The smoke test gates releases via the `foundry-integration.yml` workflow:
 
 ## Foundry performance profile
 
-`npm run test:foundry:perf` measures Fabricate at scale **inside a real Foundry**
-(issue 1073, part of the performance programme in issue 1070).
+`npm run test:foundry:perf` measures Fabricate at scale **inside a real Foundry** (issue 1073, part of the performance programme in issue 1070).
 
-It is the `perf` arm of the harness above, not a second harness: the same
-`docker-compose.foundry.yml`, the same per-worktree container identity, the same
-`up` → `run` → `down` lifecycle, the same disposable world.
-Only the thing that runs against the booted container is different —
-`foundry-perf-run.mjs` instead of `foundry-test-run.mjs`.
+It is the `perf` arm of the harness above, not a second harness: the same `docker-compose.foundry.yml`, the same per-worktree container identity, the same `up` → `run` → `down` lifecycle, the same disposable world.
+Only the thing that runs against the booted container is different — `foundry-perf-run.mjs` instead of `foundry-test-run.mjs`.
 
 ```bash
 npm run test:foundry:perf                          # seed, measure, record
@@ -257,21 +244,12 @@ node scripts/foundry-perf-run.mjs                  # against an already-running 
 ### It is opt-in, and it must stay that way
 
 The profile appears in **no** GitHub Actions workflow and in no required check.
-It needs licensed Foundry credentials and local Docker, and
-`docker-compose.foundry.yml` documents credential activation as intermittently
-flaky.
-`tests/foundry-perf-profile.test.js` asserts that no workflow invokes it, so
-wiring it into CI fails `npm test` rather than surfacing as a red required check
-on somebody else's pull request.
+It needs licensed Foundry credentials and local Docker, and `docker-compose.foundry.yml` documents credential activation as intermittently flaky.
+`tests/foundry-perf-profile.test.js` asserts that no workflow invokes it, so wiring it into CI fails `npm test` rather than surfacing as a red required check on somebody else's pull request.
 
 The run also **refuses rather than fetches**.
-A missing Docker CLI, missing credentials, a Foundry image that is not already in
-the local image store, or a checkout without issue 1071's fixtures each exits 2
-with the command that fixes it — before the build, before `up`, and without
-pulling anything.
-An image pull is hundreds of megabytes and a container boot activates a licence
-against the container hostname; neither should be a side effect of asking for a
-measurement.
+A missing Docker CLI, missing credentials, a Foundry image that is not already in the local image store, or a checkout without issue 1071's fixtures each exits 2 with the command that fixes it — before the build, before `up`, and without pulling anything.
+An image pull is hundreds of megabytes and a container boot activates a licence against the container hostname; neither should be a side effect of asking for a measurement.
 
 ### The two measurement classes
 
@@ -288,61 +266,36 @@ Inherited from issue 1071's headless harness and not re-invented.
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-Note the difference from issue 1071: there, class 1 is committed to
-`benchmarks/baselines/` and asserted by a drift test.
+Note the difference from issue 1071: there, class 1 is committed to `benchmarks/baselines/` and asserted by a drift test.
 Here it is not, and cannot be.
-A count taken inside a live Foundry is invariant only *given the Foundry build and
-the game system*, because those decide document schemas, what a `create` call
-preserves and which hooks fire.
-The committed, cross-machine baseline is the headless one; this profile is the
-instrument that tells you whether the headless model still resembles reality.
+A count taken inside a live Foundry is invariant only *given the Foundry build and the game system*, because those decide document schemas, what a `create` call preserves and which hooks fire.
+The committed, cross-machine baseline is the headless one; this profile is the instrument that tells you whether the headless model still resembles reality.
 
 **Report ratios, never absolute milliseconds.**
-`scripts/lib/foundryPerfRecord.js` refuses to compare two runs whose Node version,
-CPU model, architecture, arm, Foundry build, image, game system, browser build,
-fixture profile or fixture seed differ, naming every field that does.
+`scripts/lib/foundryPerfRecord.js` refuses to compare two runs whose Node version, CPU model, architecture, arm, Foundry build, image, game system, browser build, fixture profile or fixture seed differ, naming every field that does.
 
 ### What it measures
 
-Every measurement is declared in `scripts/lib/foundryPerfMeasurements.js` with its
-class and its status, and the run record reconciles the walk's output against that
-registry — so a measurement that produced nothing is reported by name rather than
-being indistinguishable from one that measured zero.
+Every measurement is declared in `scripts/lib/foundryPerfMeasurements.js` with its class and its status, and the run record reconciles the walk's output against that registry — so a measurement that produced nothing is reported by name rather than being indistinguishable from one that measured zero.
 
 Startup attribution is not a stopwatch around the `ready` hook.
-`src/utils/startupMarks.js` opens explicit `performance.mark` boundaries around
-`Fabricate.initialize()` and around three spans nested inside it — migrations,
-corpus load, and startup maintenance — so the profile reports what Fabricate cost
-rather than what the whole boot cost.
-The remainder (`initialize` minus its three children) is reported too: it is
-collaborator construction and hook registration, and a remainder that grows is a
-finding a single total would hide.
+`src/utils/startupMarks.js` opens explicit `performance.mark` boundaries around `Fabricate.initialize()` and around three spans nested inside it — migrations, corpus load, and startup maintenance — so the profile reports what Fabricate cost rather than what the whole boot cost.
+The remainder (`initialize` minus its three children) is reported too: it is collaborator construction and hook registration, and a remainder that grows is a finding a single total would hide.
 
 Two declared measurements are **deferred**, each carrying what blocks it:
 
-- `propagation-unhydrated` — issue 1073 asks for both a hydrated and an
-  un-hydrated receiver.
-  That distinction belongs to the Documents backend issue 1088 probed; on the
-  shipped **settings** backend every world setting replicates in full to every
-  client at connect (issue 1088 Q4), so there is no un-hydrated receiver to time
-  and a number reported here would be the hydrated one under a second name.
+- `propagation-unhydrated` — issue 1073 asks for both a hydrated and an un-hydrated receiver.
+  That distinction belongs to the Documents backend issue 1088 probed; on the shipped **settings** backend every world setting replicates in full to every client at connect (issue 1088 Q4), so there is no un-hydrated receiver to time and a number reported here would be the hydrated one under a second name.
   Issue 1092 fills this slot.
 - `persistence-experiments` — issue 1079's prototypes do not exist yet.
-  The settings arm is measured by `definition-edit`, which is the control any
-  later prototype is compared against.
+  The settings arm is measured by `definition-edit`, which is the control any later prototype is compared against.
 
 ### Seeding
 
-The corpus is written as **three writes, whatever its size**: one
-`fabricate.craftingSystems` setting, one `fabricate.recipes` setting, and one
-batched `Actor.createDocuments` carrying every seeded actor with its held items
-nested.
-Seeding through `createRecipe()` would be one whole-corpus save per recipe —
-quadratic, hours long, and a measurement of the defect rather than a setup for
-measuring it.
+The corpus is written as **three writes, whatever its size**: one `fabricate.craftingSystems` setting, one `fabricate.recipes` setting, and one batched `Actor.createDocuments` carrying every seeded actor with its held items nested.
+Seeding through `createRecipe()` would be one whole-corpus save per recipe — quadratic, hours long, and a measurement of the defect rather than a setup for measuring it.
 
-The fixtures are issue 1071's, imported rather than re-generated, so the Foundry
-and headless layers measure the same corpus.
+The fixtures are issue 1071's, imported rather than re-generated, so the Foundry and headless layers measure the same corpus.
 `FOUNDRY_PERF_FIXTURE` selects one (`simple-corpus`, `held-inventory`, …).
 
 Measured against those fixtures, the three writes hold at every scale:
@@ -356,30 +309,18 @@ Measured against those fixtures, the three writes hold at every scale:
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-**The held-inventory axis is a series, and `FOUNDRY_PERF_INVENTORY` picks the
-point.**
-`held-inventory` varies 100 / 500 / 1,000 held stacks against the same
-5,000-component library, and a bare `fixture.inventory` is only its *first* point.
-Seeding that unconditionally would run the whole profile at 100 stacks while
-reporting it under the axis's name — the cheapest point of the axis, named after
-the axis.
+**The held-inventory axis is a series, and `FOUNDRY_PERF_INVENTORY` picks the point.**
+`held-inventory` varies 100 / 500 / 1,000 held stacks against the same 5,000-component library, and a bare `fixture.inventory` is only its *first* point.
+Seeding that unconditionally would run the whole profile at 100 stacks while reporting it under the axis's name — the cheapest point of the axis, named after the axis.
 The chosen point and the series length are recorded on every run.
 
-The chosen inventory point's composition is recomputed from the translated
-payloads rather than copied from the fixture's own declaration, so a translation
-bug that dropped every flag shows up as a mix that disagrees with the fixture
-instead of being masked by the fixture restating what it intended.
+The chosen inventory point's composition is recomputed from the translated payloads rather than copied from the fixture's own declaration, so a translation bug that dropped every flag shows up as a mix that disagrees with the fixture instead of being masked by the fixture restating what it intended.
 
-The seeded world is then **reloaded** before anything is timed, so the startup
-measurement is taken against the seeded corpus rather than the empty world the
-container booted into.
+The seeded world is then **reloaded** before anything is timed, so the startup measurement is taken against the seeded corpus rather than the empty world the container booted into.
 
-One thing the seeder cannot assume: `_stats.compendiumSource` is core-managed, so
-Foundry may ignore a value supplied to `create`.
-If it does, every source-reference stack silently becomes an unmatched one and the
-run reports an inventory composition it does not have.
-The run therefore takes a census against the **created documents** and prints the
-drift.
+One thing the seeder cannot assume: `_stats.compendiumSource` is core-managed, so Foundry may ignore a value supplied to `create`.
+If it does, every source-reference stack silently becomes an unmatched one and the run reports an inventory composition it does not have.
+The run therefore takes a census against the **created documents** and prints the drift.
 
 ### Capturing a Chrome trace
 
@@ -387,18 +328,12 @@ drift.
 FOUNDRY_PERF_TRACE=1 npm run test:foundry:perf
 ```
 
-The run opens a CDP `Tracing` session over the GM page for the whole walk and
-writes the raw Chrome DevTools trace to `.foundry-perf/traces/`.
-Load it with **chrome://tracing**, or via the Performance panel's *Load profile*
-button in any Chromium DevTools.
-A trace failure never fails the run: a diagnostic aid is not worth losing a walk
-that costs a container boot to reproduce.
+The run opens a CDP `Tracing` session over the GM page for the whole walk and writes the raw Chrome DevTools trace to `.foundry-perf/traces/`.
+Load it with **chrome://tracing**, or via the Performance panel's *Load profile* button in any Chromium DevTools.
+A trace failure never fails the run: a diagnostic aid is not worth losing a walk that costs a container boot to reproduce.
 
-Long tasks are captured separately and always, through a `PerformanceObserver`
-installed by `addInitScript` **before any page script runs** — an observer added
-after `game.ready` would miss the boot, which is the densest stretch of the run.
-Each task is attributed to the scenario open at the time; one landing between
-scenarios is reported as `unattributed` rather than charged to whichever ran next.
+Long tasks are captured separately and always, through a `PerformanceObserver` installed by `addInitScript` **before any page script runs** — an observer added after `game.ready` would miss the boot, which is the densest stretch of the run.
+Each task is attributed to the scenario open at the time; one landing between scenarios is reported as `unattributed` rather than charged to whichever ran next.
 
 ### Comparing two commits
 
@@ -409,17 +344,12 @@ git switch <candidate-commit>
 npm run test:foundry:perf
 ```
 
-Then compare the two records with
-`assertFoundryComparable` / `compareTimings` / `compareInvariants` from
-`scripts/lib/foundryPerfRecord.js`.
-Run both on **one machine, one arm and one fixture**, back to back, and quote the
-ratio.
-A ratio is the only form that survives being pasted into an issue by someone who
-did not run it.
+Then compare the two records with `assertFoundryComparable` / `compareTimings` / `compareInvariants` from `scripts/lib/foundryPerfRecord.js`.
+Run both on **one machine, one arm and one fixture**, back to back, and quote the ratio.
+A ratio is the only form that survives being pasted into an issue by someone who did not run it.
 
 `compareInvariants` is the half worth reading first.
-A moved class-1 value — `recipesBytes`, a row count, a hook-delivery count — is a
-fact about the code and is reported as a finding.
+A moved class-1 value — `recipesBytes`, a row count, a hook-delivery count — is a fact about the code and is reported as a finding.
 A moved duration may only be a fact about the machine.
 
 ### Environment
@@ -437,26 +367,19 @@ A moved duration may only be a fact about the machine.
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-The arm is selected the same way as everywhere else — `--arm=v13` reaches compose
-through `FOUNDRY_IMAGE` and never edits `docker-compose.foundry.yml`.
+The arm is selected the same way as everywhere else — `--arm=v13` reaches compose through `FOUNDRY_IMAGE` and never edits `docker-compose.foundry.yml`.
 
 ### Baseline runs are a maintainer step
 
 An agent can write the profile, the seeding, the capture and this documentation.
-The baseline run itself needs licensed credentials and local Docker and must be
-performed and attested by a maintainer.
+The baseline run itself needs licensed credentials and local Docker and must be performed and attested by a maintainer.
 
 ## Svelte Render Comparison
 
-`compare-svelte-render.mjs` answers one question a source diff cannot: did a change to a
-`.svelte` file change what it RENDERS?
+`compare-svelte-render.mjs` answers one question a source diff cannot: did a change to a `.svelte` file change what it RENDERS?
 
-Whitespace between elements is significant in Svelte markup and whitespace inside an attribute
-list is not, so a reformat and a real markup change look alike in a diff.
-This compiles every `src/**/*.svelte` on both sides and compares the compiler's output — all
-generated template literals, every DOM-writing statement (`set_text`, `set_class`,
-`set_attribute`, `set_style`, …), and the compiled CSS — with code whitespace and quote style
-normalised away.
+Whitespace between elements is significant in Svelte markup and whitespace inside an attribute list is not, so a reformat and a real markup change look alike in a diff.
+This compiles every `src/**/*.svelte` on both sides and compares the compiler's output — all generated template literals, every DOM-writing statement (`set_text`, `set_class`, `set_attribute`, `set_style`, …), and the compiled CSS — with code whitespace and quote style normalised away.
 It reports the compiler warning count for the working tree in the same pass.
 
 ```bash
@@ -476,28 +399,19 @@ node scripts/compare-svelte-render.mjs --json --fail-on-drift
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-Drift is a finding, not a verdict: it means a whitespace text node appeared or disappeared in the
-DOM, which no other gate in this repository can see.
+Drift is a finding, not a verdict: it means a whitespace text node appeared or disappeared in the DOM, which no other gate in this repository can see.
 Read the reported window, decide whether it matters, and pin it with a test where it does.
 
 ## Svelte Compiler Warning Sweep
 
-`check-svelte-warnings.mjs` fails on any Svelte compiler warning, across every component under
-`src/` — not just the reachable ones (issue 924).
+`check-svelte-warnings.mjs` fails on any Svelte compiler warning, across every component under `src/` — not just the reachable ones (issue 924).
 
-`svelte.config.js` carries an `onwarn` hook, so `npm run build` fails on a warning too, and that is
-the fast local signal.
-It is not sufficient on its own: a Vite build compiles the ENTRY GRAPH, and this repository has
-components nothing imports (`RowDisclosure.svelte`; the sweep was motivated by issue 927), whose
-warnings would never reach it.
-So this walks the tree directly with `lib/svelteComponentFiles.js` — the same walker
-`compare-svelte-render.mjs` uses — and compiles each component with the build's own options, read
-out of `svelte.config.js` by `lib/svelteCompilerWarnings.js`.
-That shared read is what makes a disagreement between the two halves diagnostic: it can only be
-graph reachability, never drift in `compilerOptions`.
+`svelte.config.js` carries an `onwarn` hook, so `npm run build` fails on a warning too, and that is the fast local signal.
+It is not sufficient on its own: a Vite build compiles the ENTRY GRAPH, and this repository has components nothing imports (`RowDisclosure.svelte`; the sweep was motivated by issue 927), whose warnings would never reach it.
+So this walks the tree directly with `lib/svelteComponentFiles.js` — the same walker `compare-svelte-render.mjs` uses — and compiles each component with the build's own options, read out of `svelte.config.js` by `lib/svelteCompilerWarnings.js`.
+That shared read is what makes a disagreement between the two halves diagnostic: it can only be graph reachability, never drift in `compilerOptions`.
 
-A disagreement in which the sweep is the clean one is a bug in the sweep, not grounds to override
-`onwarn`.
+A disagreement in which the sweep is the clean one is a bug in the sweep, not grounds to override `onwarn`.
 
 ```bash
 npm run lint:svelte:warnings    # what CI runs, as its own step of the lint job
@@ -519,19 +433,15 @@ node scripts/check-svelte-warnings.mjs --json
 
 <!-- markdownlint-enable markdownlint-sentences-per-line -->
 
-The first line of the report is byte-identical in shape to the `svelte_compiler_warnings=N over M
-files` line `compare-svelte-render.mjs` prints, so two runs can be diffed without reading past it.
+The first line of the report is byte-identical in shape to the `svelte_compiler_warnings=N over M files` line `compare-svelte-render.mjs` prints, so two runs can be diffed without reading past it.
 The bar is zero: fix the code rather than suppressing the warning, or suppress it at its site with a
 `<!-- svelte-ignore <code> -->` comment and a stated reason.
 There is deliberately no allowlist.
 
 ## View Lab window chrome
 
-`scripts/view-lab-screenshots.mjs` renders whole Fabricate application windows in Chromium with no
-Foundry, no Docker, and no world, and writes one PNG per registry case into
-`ui-screenshot-artifact/apps/`.
-The chrome those windows wear is Foundry's own, harvested from the release archive
-`npm run test:foundry:up` already caches.
+`scripts/view-lab-screenshots.mjs` renders whole Fabricate application windows in Chromium with no Foundry, no Docker, and no world, and writes one PNG per registry case into `ui-screenshot-artifact/apps/`.
+The chrome those windows wear is Foundry's own, harvested from the release archive `npm run test:foundry:up` already caches.
 
 ```sh
 npm run viewlab:chrome:harvest     # extract chrome + core art into the gitignored .foundry-chrome/
@@ -552,29 +462,18 @@ npm run viewlab:chrome:harvest -- --from-dir "C:\Program Files\Foundry Virtual T
 ```
 
 The archive is what CI harvests, so it is the only source `--write-provenance` accepts.
-`--from-dir` reads an unpacked desktop installation instead, which needs neither Docker nor
-credentials and renders identical frames.
-It may not record provenance, because the two hold the same Foundry as different bytes: the Windows
-installer ships `client/applications/api/application.mjs` with CRLF line endings where the release
-archive uses LF, so their digests differ.
-A record written from an installation would pin digests CI could never reproduce, and the
-frame-builder drift gate would fail on every later pull request.
+`--from-dir` reads an unpacked desktop installation instead, which needs neither Docker nor credentials and renders identical frames.
+It may not record provenance, because the two hold the same Foundry as different bytes: the Windows installer ships `client/applications/api/application.mjs` with CRLF line endings where the release archive uses LF, so their digests differ.
+A record written from an installation would pin digests CI could never reproduce, and the frame-builder drift gate would fail on every later pull request.
 The harvest refuses rather than letting that happen.
 
 ### Keeping the smoke and the lab on one Foundry
 
 The lab has no Foundry of its own.
-It harvests whatever archive the smoke's container downloaded, which is the right coupling: the live
-smoke is the fidelity authority, and drawing from the same build is what makes a lab frame and a
-smoke frame comparable.
-`docker-compose.foundry.yml` pins an exact build, `scripts/foundry-test-up.mjs` reads that pin rather
-than restating it, and `tests/view-lab-chrome-version-lock.test.js` fails when the committed
-provenance names a different build from the pinned image.
-Bumping Foundry therefore means bumping the pin, the smoke world fixture, and the provenance record
-together.
-Re-recording provenance is deliberately a human act: someone re-reads
-`client/applications/api/application.mjs` and confirms `scripts/lib/foundryChromeSpec.js` still
-transcribes it.
+It harvests whatever archive the smoke's container downloaded, which is the right coupling: the live smoke is the fidelity authority, and drawing from the same build is what makes a lab frame and a smoke frame comparable.
+`docker-compose.foundry.yml` pins an exact build, `scripts/foundry-test-up.mjs` reads that pin rather than restating it, and `tests/view-lab-chrome-version-lock.test.js` fails when the committed provenance names a different build from the pinned image.
+Bumping Foundry therefore means bumping the pin, the smoke world fixture, and the provenance record together.
+Re-recording provenance is deliberately a human act: someone re-reads `client/applications/api/application.mjs` and confirms `scripts/lib/foundryChromeSpec.js` still transcribes it.
 `tests/view-lab-chrome-drift.test.js` names anything that moved.
 
 Nothing harvested is ever committed.
@@ -583,24 +482,19 @@ Captured PNGs are ordinary evidence and stay publishable.
 The restriction is on redistributing Foundry's assets, not on frames drawn with them.
 
 A capture accumulates rather than replacing the directory.
-Each frame's manifest entry records the head sha it was drawn at, and a rerun merges into the
-existing manifest instead of wiping it.
+Each frame's manifest entry records the head sha it was drawn at, and a rerun merges into the existing manifest instead of wiping it.
 Pass `--clean` to force a full reset instead.
 
-Every capture writes `ui-screenshot-artifact/apps/index.html` when it finishes, a self-contained
-evidence index grouped by application and area with a multi-tag filter.
-`npm run viewlab:index` regenerates it on its own from whatever manifest and PNGs are already on
-disk, without capturing anything.
+Every capture writes `ui-screenshot-artifact/apps/index.html` when it finishes, a self-contained evidence index grouped by application and area with a multi-tag filter.
+`npm run viewlab:index` regenerates it on its own from whatever manifest and PNGs are already on disk, without capturing anything.
 It shows the lab's own frames only.
-Smoke labels are deliberately not shown, because this page is the lab's evidence, not a comparison
-against the smoke.
+Smoke labels are deliberately not shown, because this page is the lab's evidence, not a comparison against the smoke.
 
 <!-- markdownlint-disable markdownlint-sentences-per-line -->
 
 ## What a case claims
 
-Every entry in `scripts/lib/viewLabCases.js` declares `reaches`, which is the registry's honesty
-field — an approximate case that does not say it is approximate is worse than no case at all.
+Every entry in `scripts/lib/viewLabCases.js` declares `reaches`, which is the registry's honesty field — an approximate case that does not say it is approximate is worse than no case at all.
 
 | `reaches` | Meaning | `smokeLabels` |
 |---|---|---|
@@ -608,17 +502,12 @@ field — an approximate case that does not say it is approximate is worse than 
 | `window` | The frame reaches the right application window but not that counterpart's condition — known remaining work, accounted for by the register below. | one or more |
 | `beyond` | A condition the live smoke never walks, so there is no counterpart to fall short of. | empty, always |
 
-`beyond` exists because the smoke is not a coverage ceiling worth inheriting: it visits one crafting
-system per window, so two of the three visibility modes, both routed recipe resolution modes, and
-Foundry's light application theme appear in no frame it produces.
-The lab carries a fixture system per canonical **recipe** resolution mode (`simple`,
-`routedByIngredients`, `routedByCheck`, `progressive`, `alchemy`) precisely so those paths can be
-photographed.
+`beyond` exists because the smoke is not a coverage ceiling worth inheriting: it visits one crafting system per window, so two of the three visibility modes, both routed recipe resolution modes, and Foundry's light application theme appear in no frame it produces.
+The lab carries a fixture system per canonical **recipe** resolution mode (`simple`, `routedByIngredients`, `routedByCheck`, `progressive`, `alchemy`) precisely so those paths can be photographed.
 Salvage has its own separate mode enum and is not covered by that claim — see the register below.
 
 A `window`-reach case does not carry its own written excuse.
-Near-identical case comments would rot, so the shortfalls are recorded once per **class** in the
-known-gaps register below, which is where a reviewer can actually find them.
+Near-identical case comments would rot, so the shortfalls are recorded once per **class** in the known-gaps register below, which is where a reviewer can actually find them.
 There are 148 `exact` cases, 8 `window`, and 223 `beyond`, out of 379 total.
 
 ## Fidelity gap
