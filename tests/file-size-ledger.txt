@@ -121,7 +121,7 @@ src/ui/SvelteCraftingSystemManagerApp.svelte.js	1614
 src/ui/SvelteCraftingSystemManagerApp.svelte.js::_buildServices	494
 src/ui/SvelteCraftingSystemManagerApp.svelte.js::_buildServices>renderSystemImportDialog	111
 src/ui/SvelteCraftingSystemManagerApp.svelte.js::_prepareSvelteProps	412
-src/ui/SvelteFabricateApp.svelte.js::_buildServices	206
+src/ui/SvelteFabricateApp.svelte.js::_buildServices	191
 src/ui/extensionRegistry.js::createExtensionRegistry	179
 src/ui/navTabBadgeStore.js::createNavTabBadgeStore	123
 src/ui/svelte/SvelteApplicationMixinCore.js::createSvelteApplicationMixin	111
@@ -143,7 +143,7 @@ src/ui/svelte/apps/inventory/InventoryItemCard.svelte	550
 src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte	852
 src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte	705
 src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte	793
-src/ui/svelte/apps/journal/RunDetail.svelte	862
+src/ui/svelte/apps/journal/RunDetail.svelte	820
 src/ui/svelte/apps/manager/BooksScrollsView.svelte	753
 src/ui/svelte/apps/manager/BulkEditPanelShell.svelte	564
 src/ui/svelte/apps/manager/BulkStagingInset.svelte	599
@@ -236,7 +236,7 @@ src/ui/svelte/stores/craftingStore.svelte.js::createCraftingStore	970
 src/ui/svelte/stores/inventoryStore.svelte.js	1833
 src/ui/svelte/stores/inventoryStore.svelte.js::createInventoryStore	1260
 src/ui/svelte/stores/inventoryStore.svelte.js::createInventoryStore>salvage	137
-src/ui/svelte/stores/journalStore.svelte.js::createJournalStore	571
+src/ui/svelte/stores/journalStore.svelte.js::createJournalStore	528
 src/ui/svelte/stores/worldScopeActions.js	881
 src/ui/svelte/stores/worldScopeActions.js::createWorldScopeEntityActions	467
 src/ui/svelte/stores/worldScopeActions.js::createWorldVocabularyActions	128
