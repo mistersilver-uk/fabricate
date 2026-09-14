@@ -719,8 +719,14 @@ describe('the world identity drift report', () => {
     const after = MAIN_SOURCE.slice(dump, dump + 600);
     // THE LEVEL IS PART OF THE PROMISE: `console.debug` maps to DevTools' VERBOSE level, which
     // Chromium's default filter excludes, so a GM who presses F12 would not see the dump at all.
-    assert.match(after, /console\.info\(/, 'the dump must be console.info');
-    assert.doesNotMatch(after, /console\.debug\(/, 'debug is specifically not acceptable');
+    // Through the shared helper, whose `console.info?.(...)` write survives the release build; a
+    // bare `console.info(...)` statement is stripped from dist/main.js (issue 1737).
+    assert.match(
+      after,
+      /logMigrationNoticeDetail\('world identity drift', driftDetail\)/,
+      'the dump must go through the info-level detail helper'
+    );
+    assert.doesNotMatch(after, /console\.(debug|info)\(/, 'no bare console statement');
     assert.equal(
       MAIN_SOURCE.includes('ui.notifications?.info?.(driftNotice)'),
       false,

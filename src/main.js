@@ -147,7 +147,8 @@ import { resolvedComponentsFor, resolvedToolsFor } from './systems/scopedEntityR
 import { readPersistedCraftingSystems } from './systems/SettingsCraftingDefinitionRepository.js';
 import { reportWorldIdentityDrift } from './systems/worldIdentityDrift.js';
 import { restampOwnedItemComponentIdentity } from './migration/restampOwnedItemComponentIdentity.js';
-import { buildWorldEssenceMergeNotice, buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice, describeWorldEssenceMerge, describeWorldIdentityDrift } from './migration/worldScopeEntityNotice.js';
+import { buildWorldEssenceMergeNotice, buildWorldScopeEntityNotice, buildWorldScopeIdentityRemapNotice, describeWorldIdentityDrift } from './migration/worldScopeEntityNotice.js';
+import { composeMigrationNotice, logMigrationNoticeDetail } from './migration/migrationNoticeDetail.js';
 import { buildMigrationRecoveryPrompt } from './migration/migrationRecoveryPrompt.js';
 import { buildRetiredCraftingModNotice } from './migration/migrateRetireCraftingModToken.js';
 import { ItemPilesIntegration } from './integrations/ItemPilesIntegration.js';
@@ -1258,17 +1259,12 @@ class Fabricate {
       // same truncated sentence, with the withheld records unrecoverable from a running
       // client. Verified against V14.365.0.
       //
-      // `info`, NOT `debug`, and that is the difference between a working pointer and a dead
-      // one. `console.debug` maps to DevTools' VERBOSE level, which Chromium's default level
-      // filter EXCLUDES - so a GM who follows the copy literally, presses F12 and reads the
-      // console would see core's own `console.info` line for the toast (the CAPPED message) and
-      // not this one. `info` is also the level core's notification logger uses for an info
-      // notice, so the two lines sit at the same level in the same place.
-      //
-      // It costs nothing elsewhere: the View Lab's console gate is fatal on `error` and on
-      // `Fabricate |`-prefixed `warning` only, and does not collect `info`.
+      // `info`, NOT `debug`: `console.debug` maps to DevTools' VERBOSE level, which Chromium's
+      // default level filter EXCLUDES. Written through `logMigrationNoticeDetail` because a bare
+      // `console.info(...)` statement is stripped from the release bundle (issue 1737). The View
+      // Lab's console gate is fatal on `error` and `Fabricate |`-prefixed `warning` only.
       const driftDetail = describeWorldIdentityDrift(worldIdentityDrift);
-      if (driftDetail) console.info(`Fabricate | world identity drift: ${driftDetail}`);
+      logMigrationNoticeDetail('world identity drift', driftDetail);
       // CONSOLE ONLY (maintainer, 2026-09-06): the toast this used to raise repeated the whole
       // drifted list in the notification bar and read as an alarm for a state that is, by its own
       // copy, harmless. The `info` line above is the whole report; nothing is shown in the UI.
@@ -1680,6 +1676,7 @@ class Fabricate {
       promptRecovery: (context) => this._promptMigrationRecovery(context)
     });
     const summary = await runner.run();
+    const localize = (key, data) => (data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key));
 
     // Deferred pass (issue 1242): a corpus could not be read, or a writeback
     // leg failed, so the pass persisted nothing and left `migrationVersion` where it found it.
@@ -1687,17 +1684,16 @@ class Fabricate {
     // to recommend — so it gets its own permanent GM notice rather than the recovery dialog.
     // Placed ABOVE the abort branch because a deferred summary reports `aborted: false`.
     if (summary?.deferred === true) {
-      console.error(`Fabricate | migration pass deferred (${summary.deferredReason})`, summary.deferredError ?? '');
-      if (game.user?.isGM) {
-        // A COMPLETE localized sentence per reason; only the writeback failure instructs a
-        // reload, and that distinction is the point. On a writeback failure the migrations
-        // have already transformed this session's live setting values, so a GM who keeps
-        // working writes migrated records back under an un-advanced version. The read
-        // failure refuses before any migration runs, so nothing in the session was touched.
-        const key = MIGRATION_DEFERRAL_NOTICES[summary.deferredReason] ?? MIGRATION_DEFERRAL_NOTICES[MIGRATION_DEFERRAL_REASONS.CORPUS_READ_FAILED];
-        const message = game.i18n?.localize?.(key) || key;
-        ui.notifications?.error?.(message, { permanent: true });
-      }
+      // A COMPLETE localized sentence per reason; only the writeback failure instructs a
+      // reload, and that distinction is the point. On a writeback failure the migrations
+      // have already transformed this session's live setting values, so a GM who keeps
+      // working writes migrated records back under an un-advanced version. The read
+      // failure refuses before any migration runs, so nothing in the session was touched.
+      // The explanation rides the `console.error` line, which the concise toast points at.
+      const key = MIGRATION_DEFERRAL_NOTICES[summary.deferredReason] ?? MIGRATION_DEFERRAL_NOTICES[MIGRATION_DEFERRAL_REASONS.CORPUS_READ_FAILED];
+      const notice = composeMigrationNotice(key, undefined, localize);
+      console.error(`Fabricate | migration pass deferred (${summary.deferredReason}): ${notice.detail}`, summary.deferredError ?? '');
+      if (game.user?.isGM) ui.notifications?.error?.(notice.message, { permanent: true });
       return;
     }
 
@@ -1707,9 +1703,7 @@ class Fabricate {
     // per-document recovery guidance is already emitted to the console by the runner.
     if (summary?.aborted === true) {
       if (game.user?.isGM) {
-        const message = game.i18n?.localize?.('FABRICATE.Migration.Aborted.Notice')
-          || "Fabricate migration aborted. This pass saved nothing: your stored data is exactly as it was before this startup. Reload Foundry to discard this session's partly-migrated copy, then see the console (F12) for per-document recovery guidance.";
-        ui.notifications?.error?.(message);
+        ui.notifications?.error?.(composeMigrationNotice('FABRICATE.Migration.Aborted.Notice', undefined, localize).message);
       }
       return;
     }
@@ -1730,10 +1724,9 @@ class Fabricate {
     // appear in more environments. GM-only; only when something was migrated.
     const unifiedRegionSystems = Array.isArray(summary?.unifiedRegionSystems) ? summary.unifiedRegionSystems : [];
     if (unifiedRegionSystems.length > 0 && game.user?.isGM) {
-      const systemList = unifiedRegionSystems.join(', ');
-      const message = game.i18n?.format?.('FABRICATE.Migration.UnifyRegions.Notice', { systems: systemList })
-        || `Fabricate unified gathering realms for: ${systemList}. Travel & Realms is disabled by default — enable it per system. Realm-scoped tasks/events may now appear in more environments.`;
-      ui.notifications?.info?.(message);
+      const notice = composeMigrationNotice('FABRICATE.Migration.UnifyRegions.Notice', { systems: unifiedRegionSystems.join(', ') }, localize);
+      logMigrationNoticeDetail('0.9.0 unified gathering realms', notice.detail);
+      ui.notifications?.info?.(notice.message);
     }
 
     // One-time GM-facing notice: when the 1.6.0 migration removed the legacy routed
@@ -1768,11 +1761,12 @@ class Fabricate {
       ? summary.essenceCollisionDisabledRecipes
       : [];
     if (essenceCollisionDisabledRecipes.length > 0 && game.user?.isGM) {
-      const recipeList = essenceCollisionDisabledRecipes.join(', ');
-      const message = game.i18n?.format?.('FABRICATE.Migration.EssenceGroups.CollisionNotice', {
-        recipes: recipeList,
-      }) || `Fabricate disabled ${essenceCollisionDisabledRecipes.length} alchemy recipe(s) whose essence requirements now collide: ${recipeList}. Rework their ingredients and re-enable them.`;
-      ui.notifications?.warn?.(message);
+      const notice = composeMigrationNotice('FABRICATE.Migration.EssenceGroups.CollisionNotice', {
+        count: essenceCollisionDisabledRecipes.length,
+        recipes: essenceCollisionDisabledRecipes.join(', '),
+      }, localize);
+      logMigrationNoticeDetail('1.17.0 essence-group collisions', notice.detail);
+      ui.notifications?.warn?.(notice.message);
     }
 
     // One-time GM-facing notice: the 1.21.0 migration retired the check-modifier
@@ -1790,10 +1784,8 @@ class Fabricate {
     const retiredCraftingModCounts = Array.isArray(summary?.retiredCraftingModCounts)
       ? summary.retiredCraftingModCounts : [];
     if (retiredCraftingModCounts.length > 0 && game.user?.isGM) {
-      const notice = buildRetiredCraftingModNotice(
-        retiredCraftingModCounts,
-        (key, data) => game.i18n?.format?.(key, data)
-      );
+      const notice = buildRetiredCraftingModNotice(retiredCraftingModCounts, localize);
+      logMigrationNoticeDetail('1.21.0 retired check-modifier placeholder', notice.detail);
       if (notice.severity === 'warn') ui.notifications?.warn?.(notice.message, { permanent: true });
       else ui.notifications?.info?.(notice.message);
     }
@@ -1808,13 +1800,12 @@ class Fabricate {
     const unifiedModifierCollisions = Array.isArray(summary?.unifiedModifierCollisions)
       ? summary.unifiedModifierCollisions : [];
     if (unifiedModifierCollisions.length > 0 && game.user?.isGM) {
-      const total = unifiedModifierCollisions.reduce((sum, entry) => sum + entry.collisions, 0);
-      const systemList = unifiedModifierCollisions.map((entry) => entry.system).join(', ');
-      const message = game.i18n?.format?.('FABRICATE.Migration.UnifyModifiers.CollisionNotice', {
-        count: total,
-        systems: systemList,
-      }) || `Fabricate merged each system's check modifiers and gathering character modifiers into one Modifiers library. ${total} gathering modifier(s) in ${systemList} shared an id with a check modifier and were renamed with a "-gathering" suffix; every reference to them was updated. Review them under System settings › Modifiers.`;
-      ui.notifications?.warn?.(message, { permanent: true });
+      const notice = composeMigrationNotice('FABRICATE.Migration.UnifyModifiers.CollisionNotice', {
+        count: unifiedModifierCollisions.reduce((sum, entry) => sum + entry.collisions, 0),
+        systems: unifiedModifierCollisions.map((entry) => entry.system).join(', '),
+      }, localize);
+      logMigrationNoticeDetail('1.23.0 unified modifier collisions', notice.detail);
+      ui.notifications?.warn?.(notice.message, { permanent: true });
     }
 
     // 1.28.0 (issue 1308): the character-library id collisions where two systems disagreed about
@@ -1826,12 +1817,12 @@ class Fabricate {
     const characterLibraryCollisions = Array.isArray(summary?.characterLibraryCollisions)
       ? summary.characterLibraryCollisions : [];
     if (characterLibraryCollisions.length > 0 && game.user?.isGM) {
-      const names = [...new Set(characterLibraryCollisions.map((entry) => entry.entryId))].join(', ');
-      const message = game.i18n?.format?.('FABRICATE.Migration.CharacterLibraries.CollisionNotice', {
+      const notice = composeMigrationNotice('FABRICATE.Migration.CharacterLibraries.CollisionNotice', {
         count: characterLibraryCollisions.length,
-        entries: names,
-      }) || `Fabricate merged every crafting system's character prerequisites and modifiers into one world library. ${characterLibraryCollisions.length} entr(ies) shared an id across systems but were defined differently, so only one definition survived: ${names}. Every reference still resolves, but it now resolves to the surviving rule — review them under World › Rules & Resources.`;
-      ui.notifications?.warn?.(message, { permanent: true });
+        entries: [...new Set(characterLibraryCollisions.map((entry) => entry.entryId))].join(', '),
+      }, localize);
+      logMigrationNoticeDetail('1.28.0 character library collisions', notice.detail);
+      ui.notifications?.warn?.(notice.message, { permanent: true });
     }
 
     // 1.30.0 (issue 1363): what the world-scope entity migration actually did. The composition
@@ -1846,10 +1837,9 @@ class Fabricate {
     // appears — which is why the notice's PRESENCE is asserted by test rather than inferred.
     const worldScopeEntityReport = summary?.worldScopeEntityReport ?? null;
     if (worldScopeEntityReport && game.user?.isGM) {
-      const notice = buildWorldScopeEntityNotice(worldScopeEntityReport, (key, data) =>
-        data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
-      );
+      const notice = buildWorldScopeEntityNotice(worldScopeEntityReport, localize);
       if (notice.message) {
+        logMigrationNoticeDetail('1.30.0 world-scope entities', notice.detail);
         if (notice.severity === 'warn') ui.notifications?.warn?.(notice.message, { permanent: true });
         else ui.notifications?.info?.(notice.message);
       }
@@ -1858,16 +1848,14 @@ class Fabricate {
     // 1.34.0 (issue 1654): the equivalent-essence merge notice, read off the runner summary's
     // `worldEssenceMergeReport` key. Always a permanent warning, because every case that produces
     // a message is one the GM must act on: the merge is irreversible and a refusal is not retried.
-    // The id-level detail goes to `console.info`; Chromium's default filter hides `console.debug`.
+    // The toast names the groups under a cap; the explanation, the item-override scope and every id
+    // go to the console at `info` (issue 1737).
     const worldEssenceMergeReport = summary?.worldEssenceMergeReport ?? null;
     if (worldEssenceMergeReport && game.user?.isGM) {
-      const essenceNotice = buildWorldEssenceMergeNotice(worldEssenceMergeReport, (key, data) =>
-        data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
-      );
-      if (essenceNotice) {
-        const detail = describeWorldEssenceMerge(worldEssenceMergeReport);
-        if (detail) console.info('Fabricate | 1.34.0 equivalent essence merge:', detail);
-        ui.notifications?.warn?.(essenceNotice, { permanent: true });
+      const essenceNotice = buildWorldEssenceMergeNotice(worldEssenceMergeReport, localize);
+      if (essenceNotice.message) {
+        logMigrationNoticeDetail('1.34.0 equivalent essence merge', essenceNotice.detail);
+        ui.notifications?.warn?.(essenceNotice.message, { permanent: true });
       }
     }
   }
@@ -5643,7 +5631,10 @@ async function applyWorldScopeIdentityFlagRemap(rekeyMap) {
     const notice = buildWorldScopeIdentityRemapNotice(summary, (key, data) =>
       data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
     );
-    if (notice && game.user?.isGM) ui.notifications?.warn?.(notice, { permanent: true });
+    if (notice.message && game.user?.isGM) {
+      logMigrationNoticeDetail('1.30.0 world-scope identity flag remap', notice.detail);
+      ui.notifications?.warn?.(notice.message, { permanent: true });
+    }
     return summary;
 }
 
@@ -5751,7 +5742,10 @@ async function applyWorldEssenceMergeFlagRemap(mergeMap) {
   const notice = buildWorldEssenceMergeRemapNotice(summary, (key, data) =>
     data ? game.i18n?.format?.(key, data) : game.i18n?.localize?.(key)
   );
-  if (notice && game.user?.isGM) ui.notifications?.warn?.(notice, { permanent: true });
+  if (notice.message && game.user?.isGM) {
+    logMigrationNoticeDetail('1.34.0 essence flag remap', notice.detail);
+    ui.notifications?.warn?.(notice.message, { permanent: true });
+  }
   return summary;
 }
 

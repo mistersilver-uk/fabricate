@@ -64,9 +64,9 @@
 
 import { FABRICATE_FLAG_NAMESPACE, isSafeFlagKeySegment } from '../config/flags.js';
 import { canonicalSignatureKey } from '../utils/alchemySignatureKey.js';
-import { localizeWith } from '../utils/localizeWithFallback.js';
 import { isPlainObject } from '../utils/scalars.js';
 
+import { composeFindingsNotice } from './migrationNoticeDetail.js';
 import { compareSemver } from './MigrationRunner.js';
 
 /**
@@ -935,46 +935,42 @@ export async function remapWorldEssenceIdentityFlags({
  *
  * @param {object|null} summary The pass summary from {@link remapWorldEssenceIdentityFlags}.
  * @param {(key: string, data?: object) => string|undefined} localize
- * @returns {string} the message, or `''` when there is nothing to say.
+ * The toast counts; the console `detail` names the offending ids and the remedies (issue 1737).
+ *
+ * @returns {{message: string, detail: string}} both `''` when there is nothing to say.
  */
 export function buildWorldEssenceMergeRemapNotice(summary, localize) {
   const unsafe = Array.isArray(summary?.unsafeEssenceIdSkips) ? summary.unsafeEssenceIdSkips : [];
   const refused = Number(summary?.refusedGroups) || 0;
   const locked = Number(summary?.lockedSkips) || 0;
   const failed = Number(summary?.skippedErrors) || 0;
-  if (unsafe.length === 0 && refused === 0 && locked === 0 && failed === 0) return '';
-
-  const clauses = [];
-  if (refused > 0) {
-    const named = unsafe.join(', ');
-    clauses.push(
-      localizeWith(
-        localize,
-        'FABRICATE.Migration.WorldEssenceMerge.UnsafeEssenceIds',
-        { count: refused, essences: named },
-        `${refused} merged essence set(s) contain an id Fabricate cannot use inside a flag path, so the merge landed in your world's settings but NOT on your characters' in-progress runs: ${named}. Those runs may still name an essence that no longer exists — finish or cancel them, and rename the offending essence before merging again.`
-      )
-    );
-  }
-  if (locked > 0) {
-    clauses.push(
-      localizeWith(
-        localize,
-        'FABRICATE.Migration.WorldEssenceMerge.RemapLockedSkips',
-        { count: locked },
-        `${locked} item(s) refused the update — usually because they live in a locked compendium — and may still name a merged-away essence.`
-      )
-    );
-  }
-  if (failed > 0) {
-    clauses.push(
-      localizeWith(
-        localize,
-        'FABRICATE.Migration.WorldEssenceMerge.RemapSkippedErrors',
-        { count: failed },
-        `${failed} document(s) could not be updated at all, so the repair is INCOMPLETE. Fabricate has kept its record of what to change and will retry on the next reload; you can also run it now from the console with game.fabricate.remapWorldEssenceIdentityFlags().`
-      )
-    );
-  }
-  return clauses.join(' ');
+  return composeFindingsNotice(localize, [
+    {
+      when: refused > 0,
+      data: { count: refused, essences: unsafe.join(', ') },
+      key: 'FABRICATE.Migration.WorldEssenceMerge.UnsafeEssenceIds',
+      fallback:
+        "{count} merged essence set(s) could not be applied to your characters' in-progress runs.",
+      detailKey: 'FABRICATE.Migration.WorldEssenceMerge.UnsafeEssenceIdsDetail',
+      detailFallback:
+        "{count} merged essence set(s) contain an id Fabricate cannot use inside a flag path, so the merge landed in your world's settings but NOT on your characters' in-progress runs: {essences}. Those runs may still name an essence that no longer exists — finish or cancel them, and rename the offending essence before merging again.",
+    },
+    {
+      when: locked > 0,
+      data: { count: locked },
+      key: 'FABRICATE.Migration.WorldEssenceMerge.RemapLockedSkips',
+      fallback:
+        '{count} item(s) refused the update — usually because they live in a locked compendium — and may still name a merged-away essence.',
+    },
+    {
+      when: failed > 0,
+      data: { count: failed },
+      key: 'FABRICATE.Migration.WorldEssenceMerge.RemapSkippedErrors',
+      fallback:
+        '{count} document(s) could not be updated, so the repair is incomplete. Fabricate will retry on the next reload.',
+      detailKey: 'FABRICATE.Migration.WorldEssenceMerge.RemapSkippedErrorsDetail',
+      detailFallback:
+        '{count} document(s) could not be updated at all, so the repair is INCOMPLETE. Fabricate has kept its record of what to change and will retry on the next reload; you can also run it now from the console with game.fabricate.remapWorldEssenceIdentityFlags().',
+    },
+  ]);
 }

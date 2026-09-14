@@ -536,15 +536,16 @@ It keeps its record of what to change and retries on the next reload.
 **Step-by-step checks:**
 
 1. Read the standing notice Fabricate posted on load.
-It names the sets it merged, the sets it refused and why, and counts the items that refused the update.
-It names up to five essences at a time and then says how many more there were, and it tells you where the rest of the list is.
+It is deliberately short: it names up to five of the sets it merged or refused, says how many more there were, and counts the items that refused the update.
+The full explanation is in the browser console, which you open with F12.
+It lists every set, why each refused set was refused, and the ids involved.
 2. Open the item and set its essence values again, choosing the essence that survived the merge.
 Re-saving it is what replaces the retired reference.
 3. Unlock the compendium first if the item lives in one, so that setting its values again can save.
 4. If the notice said the repair was incomplete, reload your world once the cause is fixed.
 Fabricate runs the repair again on its own.
 5. Check in-progress crafting runs.
-Where Fabricate could not record a merge against a character's in-progress runs, it says so and names the essences involved.
+Where Fabricate could not record a merge against a character's in-progress runs, it says so in a notice, and the browser console names the essences involved.
 Finishing or cancelling those runs clears it.
 
 **See also:** [Essences]({% link essences/index.md %}#one-shared-essence-per-behaviour) covers what the shared record holds and what each crafting system keeps for itself.
