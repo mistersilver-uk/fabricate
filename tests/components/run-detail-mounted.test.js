@@ -38,6 +38,10 @@ const harness = createMountedComponentHarness({
     'src/systems/foundryCalendar.js',
     'src/ui/svelte/apps/journal/journalRunStatus.js',
     'src/ui/svelte/apps/journal/historyPresentation.js',
+    'src/ui/svelte/apps/journal/runStateNotice.js',
+    'src/ui/svelte/apps/journal/runDetailPresentation.js',
+    'src/ui/svelte/apps/journal/stageHeading.js',
+    'src/ui/svelte/apps/journal/runRecovery.js',
     // Issue 1506: the run's status is a `<Chip>` now, and the chip tone it wears comes from
     // the ONE map the retired status vocabularies were routed through.
     ...STATUS_TONE_RAW_MODULES
@@ -436,6 +440,148 @@ describe('RunDetail mounted behavior', () => {
     assert.match(target.querySelector('[data-journal-guidance]').textContent, /ClosedFailureAwards/);
   });
 
+  // ── ONE RUN, ONE STATE, ONE NOTICE (issue 1648) ───────────────────────────────────────
+  // The maintainer's own frame carried THREE alert blocks for a single paused run: a floating
+  // blocker beside the Cancel/Resume controls, a "Run paused" notice under the header, and a
+  // bottom callout whose entire content was a signpost back to the first.
+
+  function blockedPausedRun(extraActions = {}) {
+    return makeCraftingRun({
+      derivedStatus: 'paused',
+      pauseState: { pausedAt: 100, remainingSeconds: 900 },
+      actions: {
+        ...makeCraftingRun().actions,
+        execute: false,
+        pause: false,
+        resume: false,
+        cancel: false,
+        disabledReason: 'recovery-required',
+        ...extraActions,
+      },
+    });
+  }
+
+  it('states a blocked, paused run once — in one notice, with the actionable part first', async () => {
+    const target = await harness.mount({ run: blockedPausedRun(), now: 0, services: services() });
+    const detail = target.querySelector('[data-journal-detail]');
+    const notices = detail.querySelectorAll('.fab-notice');
+    assert.equal(notices.length, 1, 'one run state is reported by one notice');
+
+    const notice = notices[0];
+    assert.equal(notice.getAttribute('data-journal-action-blocker'), 'recovery-required');
+    assert.equal(
+      notice.getAttribute('data-journal-paused'),
+      'true',
+      'the paused state rides the SAME notice rather than minting a second one'
+    );
+    assert.match(
+      notice.querySelector('.fab-notice-title').textContent,
+      /Actions\.RecoveryRequired/,
+      'the refusal leads, because it is the part a reader can act on'
+    );
+    assert.match(notice.querySelector('.fab-notice-detail').textContent, /Notice\.PausedInline/);
+
+    // The bottom callout is documentation again, not a pointer at a notice beside it.
+    assert.doesNotMatch(
+      detail.querySelector('[data-journal-guidance]').textContent,
+      /WhatToExpect\.Blocked/
+    );
+    // And the controls and the sentence that refuses them are one block.
+    assert.ok(
+      Boolean(detail.querySelector('.journal-detail-state [data-journal-actions]')),
+      'the action bar sits inside the state block'
+    );
+    assert.ok(Boolean(notice.closest('.journal-detail-state')), 'and so does the notice');
+  });
+
+  it('keeps a plain paused run on its own titled notice', async () => {
+    // The control for the composition above: with nothing refusing it, a paused run still
+    // reads as "Run paused" with its own detail rather than as a blocker sentence.
+    const run = makeCraftingRun({
+      derivedStatus: 'paused',
+      pauseState: { pausedAt: 100, remainingSeconds: 900 },
+    });
+    const target = await harness.mount({ run, now: 0, services: services() });
+    const notice = target.querySelector('[data-journal-detail] .fab-notice');
+    assert.equal(notice.getAttribute('data-journal-paused'), 'true');
+    assert.ok(!notice.hasAttribute('data-journal-action-blocker'));
+    assert.match(notice.querySelector('.fab-notice-title').textContent, /Notice\.PausedTitle/);
+  });
+
+  it('gives an active GM the two dispositions the authority honours, and a player none', async () => {
+    const claim = {
+      claimId: 'claim-7',
+      requestKind: 'command',
+      failureReason: 'operation-failed',
+      failureMessage: 'The run is already paused',
+      claimedAt: 1000,
+    };
+    const player = await harness.mount({ run: blockedPausedRun(), now: 0, services: services() });
+    assert.ok(
+      !player.querySelector('[data-notice-action]'),
+      'a player sees the explanation and no control they could not use'
+    );
+    harness.remount();
+
+    const calls = [];
+    const gmServices = {
+      ...services(),
+      notify: (message) => calls.push(['notify', message]),
+      reconcileJournalRunAuthority: (options) => {
+        calls.push(['reconcile', options]);
+        return Promise.resolve({ success: true, disposition: options.disposition });
+      },
+    };
+    gmServices.journal.load = (quiet) => calls.push(['load', quiet]);
+    const dialogs = [];
+    const priorFoundry = globalThis.foundry;
+    globalThis.foundry = {
+      // `normalizeDialogOptions` clones its options through `foundry.utils.deepClone`, and its
+      // fallback is `JSON.parse(JSON.stringify(...))` — which DELETES every button callback.
+      // A stub without this renders the dialog and then never resolves.
+      utils: { deepClone: (value) => ({ ...value }) },
+      applications: {
+        api: {
+          DialogV2: class {
+            constructor(options) {
+              this.options = options;
+            }
+            render() {
+              dialogs.push(this.options);
+              this.options.buttons.find((button) => button.action === 'reconciled')?.callback?.();
+            }
+          },
+        },
+      },
+    };
+    try {
+      const target = await harness.mount({
+        run: blockedPausedRun({ recoveryClaim: claim }),
+        now: 0,
+        services: gmServices,
+        journal: gmServices.journal,
+      });
+      const action = target.querySelector('[data-notice-action]');
+      assert.ok(Boolean(action), 'the GM is offered the door out of the retained claim');
+      assert.match(action.textContent, /Recovery\.Action/);
+      action.click();
+      await new Promise((settle) => setTimeout(settle, 0));
+
+      assert.equal(dialogs.length, 1, 'one dialog, offering exactly what reconcile accepts');
+      assert.deepEqual(
+        dialogs[0].buttons.map((button) => button.action),
+        ['reconciled', 'abandoned', 'cancel']
+      );
+      assert.match(dialogs[0].content, /Recovery\.Effect/, 'it says what the choice does');
+      assert.match(dialogs[0].content, /The run is already paused/, 'and names what is uncertain');
+      assert.deepEqual(calls[0], ['reconcile', { claimId: 'claim-7', disposition: 'reconciled' }]);
+      assert.deepEqual(calls[1], ['notify', 'FABRICATE.App.Journal.Recovery.Released:{"disposition":"FABRICATE.App.Journal.Recovery.Disposition.reconciled"}']);
+      assert.deepEqual(calls[2], ['load', true], 'and the run is re-read rather than left stale');
+    } finally {
+      globalThis.foundry = priorFoundry;
+    }
+  });
+
   it('renders no action or stage for an absent run (the Journal owns the empty state)', async () => {
     const target = await mount({ run: null, now: 0, services: services() });
     assert.ok(!target.querySelector('[data-journal-actions]'));
@@ -448,9 +594,14 @@ describe('RunDetail mounted behavior', () => {
     assert.equal(detail.getAttribute('data-run-key'), makeCraftingRun().key);
     assert.ok(target.querySelector('[data-stage-nav]'), 'stage navigation rendered');
     assert.ok(target.querySelector('[data-stage-card]'), 'step details rendered');
+    // Issue 1648: required tools are a four-column image-card group, not an invented
+    // "primary tool" fact row with one right-aligned value.
+    const tools = target.querySelector('[data-stage-io="tools"]');
+    assert.ok(Boolean(tools), 'the stage lists its required tools');
+    assert.ok(tools.textContent.includes('Mortar & Pestle'), 'and names the authored tool');
     assert.ok(
-      target.querySelector('[data-stage-card]').textContent.includes('Mortar & Pestle'),
-      'primary tool fact rendered'
+      Boolean(tools.querySelector('.fab-stage-card-items.is-grid [data-list-row]')),
+      'as a truncated-name image card in the four-column grid'
     );
     assert.ok(target.querySelector('[data-run-action="primary"]'), 'primary action rendered for a crafting run');
     // The active node (index 0) is time-gated, so it takes the distinct "waiting"
@@ -477,7 +628,7 @@ describe('RunDetail mounted behavior', () => {
       index: 0,
       status: 'waitingTime',
       timeGate: { availableAt: 1000, initiatedAt: 0, requiredSeconds: 1000 },
-      detail: { requiredSeconds: 1000, primaryToolName: 'Mortar & Pestle', toolNames: ['Mortar & Pestle'], checkLabel: null, failureText: null },
+      detail: { requiredSeconds: 1000, tools: [{ id: 'tool-mortar', name: 'Mortar & Pestle', img: 'icons/tool.webp' }], checkLabel: null, failureText: null },
       lastCheckResult: null
     };
     const run = makeCraftingRun({
@@ -491,7 +642,44 @@ describe('RunDetail mounted behavior', () => {
     const target = await harness.mount({ run, now: 0, services: services() });
     assert.ok(!target.querySelector('[data-stage-nav]'), 'single-step run omits navigation');
     assert.ok(!target.querySelector('.fab-stage-card-number'), 'single-step run omits redundant numeral');
-    assert.match(target.querySelector('.fab-stage-card-name').textContent, /Brew/);
+    // M1 (issue 1648): a single-step recipe has no step to name, so no "Step 1" and no step
+    // name either — the run header already says what is being made.
+    assert.ok(
+      !target.querySelector('.fab-stage-card-name'),
+      'single-step run with no authored description omits the step heading entirely'
+    );
+    assert.doesNotMatch(target.querySelector('[data-stage-card]').textContent, /Stage\.Number/);
+  });
+
+  it('gives a single-step stage its own description sentence and state chip', async () => {
+    const step = {
+      stepId: 's1',
+      stepName: 'Step 1',
+      index: 0,
+      status: 'waitingTime',
+      timeGate: { availableAt: 1000, initiatedAt: 0, requiredSeconds: 1000 },
+      presentationSnapshot: { name: '', description: 'Draw a hemp cord through warm wax.' },
+      detail: { requiredSeconds: 1000, tools: [], checkLabel: null, failureText: null },
+      lastCheckResult: null,
+    };
+    const run = makeCraftingRun({
+      multiStep: false,
+      isFinalStep: true,
+      stepLabel: '',
+      steps: [step],
+      currentStep: step,
+      derivedStatus: 'ready',
+      status: 'ready',
+      actions: { ...makeCraftingRun().actions, execute: true },
+    });
+    const target = await harness.mount({ run, now: 2000, services: services() });
+    const name = target.querySelector('.fab-stage-card-name');
+    assert.equal(name.textContent, 'Draw a hemp cord through warm wax.');
+    assert.doesNotMatch(target.querySelector('[data-stage-card]').textContent, /Step 1/);
+    assert.ok(
+      Boolean(target.querySelector('[data-stage-card] .manager-chip')),
+      'the state chip stays on the right of that sentence'
+    );
   });
 
   // D-025: a TIME card's AUTHORED requirement follows the prototype and reads "2 hours";
@@ -500,7 +688,7 @@ describe('RunDetail mounted behavior', () => {
     const step = {
       stepId: 's1', stepName: 'Brew', index: 0, status: 'waitingTime',
       timeGate: { availableAt: 7200, initiatedAt: 0, requiredSeconds: 7200 },
-      detail: { requiredSeconds: 7200, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+      detail: { requiredSeconds: 7200, tools: [], checkLabel: null, failureText: null },
       lastCheckResult: null
     };
     const run = makeCraftingRun({ multiStep: false, isFinalStep: true, stepLabel: '', steps: [step], currentStep: step });
@@ -518,12 +706,12 @@ describe('RunDetail mounted behavior', () => {
     const current = {
       stepId: 's1', stepName: 'Brew', index: 0, status: 'waitingTime',
       timeGate: { availableAt: 1000, initiatedAt: 0, requiredSeconds: 1000 },
-      detail: { requiredSeconds: 1000, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+      detail: { requiredSeconds: 1000, tools: [], checkLabel: null, failureText: null },
       lastCheckResult: null
     };
     const future = {
       stepId: 's2', stepName: 'Bottle', index: 1, status: 'pending', timeGate: null,
-      detail: { requiredSeconds: 5400, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+      detail: { requiredSeconds: 5400, tools: [], checkLabel: null, failureText: null },
       lastCheckResult: null
     };
     const svc = { journal: { busyRunId: '', execute() {}, viewedStageIndex: 1 }, getWorldTimeComponents: () => null };
@@ -573,7 +761,7 @@ describe('RunDetail mounted behavior', () => {
           index: 0,
           status: 'failed',
           timeGate: null,
-          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: 'Botched' },
+          detail: { requiredSeconds: null, tools: [], checkLabel: null, failureText: 'Botched' },
           lastCheckResult: null
         }
       ]
@@ -593,7 +781,7 @@ describe('RunDetail mounted behavior', () => {
           index: 0,
           status: 'succeeded',
           timeGate: null,
-          detail: { requiredSeconds: 600, primaryToolName: 'Mortar & Pestle', toolNames: ['Mortar & Pestle'], checkLabel: null, failureText: null },
+          detail: { requiredSeconds: 600, tools: [{ id: 'tool-mortar', name: 'Mortar & Pestle', img: 'icons/tool.webp' }], checkLabel: null, failureText: null },
           lastCheckResult: null
         },
         {
@@ -602,7 +790,7 @@ describe('RunDetail mounted behavior', () => {
           index: 1,
           status: 'succeeded',
           timeGate: null,
-          detail: { requiredSeconds: 300, primaryToolName: 'Flask', toolNames: ['Flask'], checkLabel: null, failureText: null },
+          detail: { requiredSeconds: 300, tools: [{ id: 'tool-flask', name: 'Flask', img: 'icons/tool.webp' }], checkLabel: null, failureText: null },
           lastCheckResult: null
         }
       ]
@@ -629,7 +817,7 @@ describe('RunDetail mounted behavior', () => {
           index: 0,
           status: 'failed',
           timeGate: null,
-          detail: { requiredSeconds: null, primaryToolName: 'Mortar & Pestle', toolNames: ['Mortar & Pestle'], checkLabel: null, failureText: 'Botched the brew' },
+          detail: { requiredSeconds: null, tools: [{ id: 'tool-mortar', name: 'Mortar & Pestle', img: 'icons/tool.webp' }], checkLabel: null, failureText: 'Botched the brew' },
           lastCheckResult: { success: false, formula: '1d20', total: 7, dc: 12, value: 7 },
           requirements: [],
           consumedIngredients: []
@@ -640,7 +828,7 @@ describe('RunDetail mounted behavior', () => {
           index: 1,
           status: 'pending',
           timeGate: null,
-          detail: { requiredSeconds: null, primaryToolName: 'Flask', toolNames: ['Flask'], checkLabel: null, failureText: null },
+          detail: { requiredSeconds: null, tools: [{ id: 'tool-flask', name: 'Flask', img: 'icons/tool.webp' }], checkLabel: null, failureText: null },
           lastCheckResult: null,
           requirements: [],
           consumedIngredients: []
@@ -666,7 +854,7 @@ describe('RunDetail mounted behavior', () => {
           index: 0,
           status: 'failed',
           timeGate: null,
-          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+          detail: { requiredSeconds: null, tools: [], checkLabel: null, failureText: null },
           // Legacy record: only a bare value, no formula/total.
           lastCheckResult: { success: false, formula: null, total: null, value: 9, dc: null },
           requirements: [],
@@ -695,7 +883,7 @@ describe('RunDetail mounted behavior', () => {
           index: 0,
           status: 'failed',
           timeGate: null,
-          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+          detail: { requiredSeconds: null, tools: [], checkLabel: null, failureText: null },
           lastCheckResult: { success: false, formula: '1d20', total: 7, dc: null, value: 7 },
           requirements: [],
           consumedIngredients: []
@@ -721,7 +909,7 @@ describe('RunDetail mounted behavior', () => {
           index: 0,
           status: 'failed',
           timeGate: null,
-          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+          detail: { requiredSeconds: null, tools: [], checkLabel: null, failureText: null },
           lastCheckResult: { success: false, formula: null, total: null, value: 9, dc: null },
           requirements: [],
           consumedIngredients: []
@@ -747,7 +935,7 @@ describe('RunDetail mounted behavior', () => {
           index: 0,
           status: 'succeeded',
           timeGate: null,
-          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+          detail: { requiredSeconds: null, tools: [], checkLabel: null, failureText: null },
           lastCheckResult: null,
           consumedIngredients: [
             { componentId: 'c-iron', itemUuid: null, quantity: 2, name: 'Iron', img: 'icons/iron.webp' },
@@ -776,8 +964,7 @@ describe('RunDetail mounted behavior', () => {
           timeGate: null,
           detail: {
             requiredSeconds: null,
-            primaryToolName: null,
-            toolNames: [],
+            tools: [],
             checkLabel: null,
             failureText: 'Botched the brew'
           },
@@ -806,7 +993,7 @@ describe('RunDetail mounted behavior', () => {
           index: 0,
           status: 'succeeded',
           timeGate: null,
-          detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+          detail: { requiredSeconds: null, tools: [], checkLabel: null, failureText: null },
           lastCheckResult: null,
           requirements: [{ componentId: 'c-herb', itemUuid: null, quantity: 2, name: 'Dried Herb', img: 'icons/herb.webp' }],
           consumedIngredients: [{ componentId: 'c-herb', itemUuid: 'Item.herb', quantity: 2, name: 'Dried Herb', img: 'icons/herb.webp' }]

@@ -1001,7 +1001,7 @@ test('the history-data witnesses name their defining evidence on the selected re
   // The two families this one sits beside are unchanged by it.
   assert.equal(
     VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-lifecycle-')).length,
-    67
+    68
   );
   assert.equal(
     VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-')).length,
@@ -1044,7 +1044,7 @@ test('all Journal lifecycle captures assert defining product state rather than a
   const cases = VIEW_LAB_CASES.filter((entry) =>
     entry.id.startsWith('fabricate-journal-lifecycle-')
   );
-  assert.equal(cases.length, 67);
+  assert.equal(cases.length, 68);
   for (const entry of cases) {
     assert.equal(entry.expectTab, 'journal', entry.id);
     assert.ok(entry.expectSelector, `${entry.id} has an explicit assertion`);
@@ -1066,6 +1066,11 @@ test('all Journal lifecycle captures assert defining product state rather than a
     undefined,
     'the player refusal frame, which shows a blocker that still happens, is retained'
   );
+  // Issue 1648: the retained-claim frame is GM-only BY CONSTRUCTION. Only the active GM may
+  // reconcile a claim, so the affordance it photographs exists for no other viewer, and a
+  // player frame of it would show a run blocked with no way out — the defect, not the fix.
+  assert.equal(byState.get('claim-retained').query.viewer, 'gm');
+  assert.match(byState.get('claim-retained').expectSelector, /data-notice-action/);
   for (const state of ['stale-action', 'command-timeout']) {
     assert.match(byState.get(state).expectSelector, /data-journal-command-error/);
     assert.match(byState.get(state).expectSelector, /data-notice-action/);

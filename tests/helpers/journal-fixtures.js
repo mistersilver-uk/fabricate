@@ -17,8 +17,7 @@ export function makeCraftingRun(overrides = {}) {
       timeGate: { availableAt: 1000, initiatedAt: 0, requiredSeconds: 1000 },
       detail: {
         requiredSeconds: 1000,
-        primaryToolName: 'Mortar & Pestle',
-        toolNames: ['Mortar & Pestle'],
+        tools: [{ id: 'tool-mortar', name: 'Mortar & Pestle', img: 'icons/mortar.webp' }],
         checkLabel: '1d20 vs DC 12',
         failureText: null
       },
@@ -30,7 +29,7 @@ export function makeCraftingRun(overrides = {}) {
       index: 1,
       status: 'pending',
       timeGate: null,
-      detail: { requiredSeconds: null, primaryToolName: null, toolNames: [], checkLabel: null, failureText: null },
+      detail: { requiredSeconds: null, tools: [], checkLabel: null, failureText: null },
       lastCheckResult: null
     }
   ];

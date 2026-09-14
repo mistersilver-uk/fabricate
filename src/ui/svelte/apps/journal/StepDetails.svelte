@@ -409,10 +409,6 @@
   {/if}
 
   <div class="journal-stage-facts" data-journal-stage-evidence>
-    {#if step?.detail?.primaryToolName}<JournalFactRow
-        label={localize('FABRICATE.App.Journal.StepDetails.PrimaryTool')}
-        value={step.detail.primaryToolName}
-      />{/if}
     {#if step?.detail?.failureText}<JournalFactRow
         label={localize('FABRICATE.App.Journal.StepDetails.Failure')}
         value={step.detail.failureText}

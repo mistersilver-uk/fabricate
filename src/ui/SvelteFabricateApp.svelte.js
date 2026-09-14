@@ -14,7 +14,10 @@ import { notifyWarn, localize, confirmDialog } from './svelte/util/foundryBridge
 // import beyond what it itself guards), reused rather than re-authored so the
 // bulk salvage/destroy progress toast cannot drift from the compendium import's.
 import { createDefaultProgressReporter } from '../systems/CompendiumImporter.js';
-import { authorityUnavailableAvailability } from '../systems/journalRunCommands.js';
+import {
+  authorityUnavailableAvailability,
+  authorityUnavailableRefusal,
+} from '../systems/journalRunCommands.js';
 import { playerExtensions } from './playerExtensions.js';
 import {
   buildRouteKey,
@@ -409,6 +412,11 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       getJournalRunAuthorityAvailability: () =>
         game?.fabricate?.getJournalRunAuthorityAvailability?.()
         ?? authorityUnavailableAvailability(),
+      // Active-GM manual disposition of a retained execution claim (issue 1648). The
+      // authority itself refuses a non-active-GM caller, so this seam adds no authorization.
+      reconcileJournalRunAuthority: (opts = {}) =>
+        game?.fabricate?.reconcileJournalRunAuthority?.(opts)
+        ?? Promise.resolve(authorityUnavailableRefusal()),
       advanceCraftingRun: (opts = {}) => game?.fabricate?.advanceCraftingRun?.(opts) ?? null,
       cancelCraftingRun: (opts = {}) => game?.fabricate?.cancelCraftingRun?.(opts) ?? null,
       getWorldTime: () => game?.fabricate?.getWorldTime?.() ?? 0,

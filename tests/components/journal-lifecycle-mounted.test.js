@@ -31,6 +31,7 @@ import {
 } from '../view-lab/world/labContent.js';
 import {
   LAB_JOURNAL_CASE_STATE_RUN_IDS,
+  LAB_RETAINED_CLAIM,
   buildLabRunStates,
   createLabJournalCaseController,
 } from '../view-lab/world/labRunStates.js';
@@ -53,6 +54,10 @@ const harness = createMountedComponentHarness({
     'src/systems/foundryCalendar.js',
     'src/ui/svelte/apps/journal/journalRunStatus.js',
     'src/ui/svelte/apps/journal/historyPresentation.js',
+    'src/ui/svelte/apps/journal/runStateNotice.js',
+    'src/ui/svelte/apps/journal/runDetailPresentation.js',
+    'src/ui/svelte/apps/journal/stageHeading.js',
+    'src/ui/svelte/apps/journal/runRecovery.js',
   ],
   runeModules: ['src/ui/svelte/stores/journalStore.svelte.js'],
   compiledModules: [
@@ -1183,10 +1188,15 @@ describe('Journal versioned lifecycle (mounted)', () => {
       await stockJournalPrototype(actor, content, state);
       const recipes = labRecipes(content);
       const delayed = ['loading', 'error-retry'].includes(state);
+      // `labWorld.js` reaches these by withholding the ledger and by seeding a retained claim
+      // page; this harness has no ledger, so it states the answer the real authority derives.
+      // The claim itself is the ONE exported fixture, so the two routes cannot drift.
       const authority =
         state === 'authority-unavailable'
           ? { available: false, reason: 'active-gm-missing' }
-          : { available: true, reason: null };
+          : state === 'claim-retained'
+            ? { available: false, reason: 'recovery-required', retained: LAB_RETAINED_CLAIM }
+            : { available: true, reason: null };
       const mounted = await mountState(state, {
         initialLoad: !delayed,
         builderOptions: {

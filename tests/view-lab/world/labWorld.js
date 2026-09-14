@@ -23,6 +23,7 @@
 import { installFoundryShim, settingsKey } from '../foundry/installFoundryShim.js';
 import { createLocalizer, toI18nStub } from '../labI18n.js';
 import { JOURNAL_RUN_SOCKET_KIND } from '../../../src/systems/journalRunCommands.js';
+import { JOURNAL_RUN_CLAIM_PAGE_ID } from '../../../src/systems/journalRunAuthority.js';
 
 import { buildLabActors, buildDocumentIndex } from './labActors.js';
 import {
@@ -39,6 +40,7 @@ import {
   buildLabRunStates,
   createLabJournalCaseController,
   installLabRunStates,
+  LAB_RETAINED_CLAIM,
 } from './labRunStates.js';
 
 const FABRICATE_NAMESPACE = 'fabricate';
@@ -463,7 +465,7 @@ export async function buildLabWorld({
   world.shim = shim;
   // The authority-unavailable case starts without a ledger, which is what blocks its actions.
   if (journalCaseState !== 'authority-unavailable') {
-    const ledger = createLabRunAuthorityLedger();
+    const ledger = createLabRunAuthorityLedger(journalCaseState === 'claim-retained');
     const journal = globalThis.game.journal;
     const get = journal.get;
     journal.contents.push(ledger);
@@ -608,13 +610,20 @@ function invalidateJournalFixtureCaches(fabricate) {
 
 // The in-memory document edge lets the REAL authority and craft pipeline run in local and CI
 // captures. It is deliberately not evidence of server arbitration or cross-client persistence.
-function createLabRunAuthorityLedger() {
+/**
+ * @param {boolean} [retainedClaim] Seed a RETAINED execution claim — the state a refused
+ *   command leaves behind when the authority cannot prove the refusal happened before any
+ *   write. Only `reconcileJournalRunAuthority` clears it, which is the affordance issue 1648
+ *   put in the app, so the lab has to be able to reach the state to photograph it.
+ */
+function createLabRunAuthorityLedger(retainedClaim = false) {
   const ledger = installUpdateSemantics({
     id: 'lab-run-authority',
     flags: { fabricate: { journalRunAuthorityLedger: true } },
     pages: new Map(),
   });
   ledger.getFlag = makeGetFlag(ledger);
+  if (retainedClaim) seedRetainedClaim(ledger);
   ledger.createEmbeddedDocuments = async (type, sources, options) => {
     if (type !== 'JournalEntryPage' || options?.keepId !== true) {
       throw new Error('view lab: unexpected authority claim creation');
@@ -638,6 +647,48 @@ function createLabRunAuthorityLedger() {
     });
   };
   return ledger;
+}
+
+/**
+ * The maintainer's own stuck world, in fixture form: a `pause` the lifecycle refused before it
+ * wrote anything, recorded `recoveryRequired` with its refusal message, whose claim the
+ * authority KEPT. `acquiredAt: 0` puts it far outside the live window, so it reads as retained
+ * rather than as a command still running.
+ */
+function seedRetainedClaim(ledger) {
+  const { claimId, requestId, requestKind, requestStatus, failureReason, failureMessage, claimedAt } =
+    LAB_RETAINED_CLAIM;
+  ledger.flags.fabricate.journalRunAuthorityState = {
+    version: 1,
+    requests: {
+      [requestId]: {
+        kind: requestKind,
+        operationId: requestId,
+        status: requestStatus,
+        senderId: 'user-lab-player',
+        sessionId: 'lab-session',
+        startedAt: claimedAt,
+        settledAt: claimedAt,
+        claimId,
+        response: { success: false, reason: failureReason, message: failureMessage },
+      },
+    },
+    prepareTokens: {},
+    reconciliations: [],
+  };
+  const page = {
+    id: JOURNAL_RUN_CLAIM_PAGE_ID,
+    _id: JOURNAL_RUN_CLAIM_PAGE_ID,
+    flags: {
+      fabricate: {
+        journalRunClaimId: claimId,
+        journalRunRequestId: requestId,
+        journalRunClaimedAt: claimedAt,
+      },
+    },
+  };
+  page.getFlag = makeGetFlag(page);
+  ledger.pages.set(page.id, page);
 }
 
 // There is one browser realm in the lab. Serialize server delivery under the elected GM,

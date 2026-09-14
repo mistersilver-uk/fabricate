@@ -957,7 +957,7 @@
         },
         "StepDetails": {
           "RequiresTime": "Requires time",
-          "PrimaryTool": "Primary tool",
+          "RequiredTools": "Required tools",
           "Check": "Check",
           "Failure": "Failure",
           "CheckWithDc": "{formula} vs DC {dc}",
@@ -1142,7 +1142,6 @@
           "Mode": "Mode"
         },
         "WhatToExpect": {
-          "Blocked": "This run cannot execute yet. Resolve the blocker shown beside its controls; no new execution can begin while it remains blocked.",
           "Protected": "Protected details are hidden. Use the available run controls when ready; missing check details do not mean this run has no check.",
           "Past": "You are looking back at a finished step. Nothing here can be changed — step {index} is the one the run is waiting on.",
           "Future": "You are looking ahead at a step the run has not reached. Its choices open when it gets there; step {index} is the one waiting on you.",
@@ -1181,7 +1180,26 @@
             "unknown": "Unknown"
           },
           "RecoveryDetail": "Fabricate recorded {count} completed effects and stopped before it could confirm the rest.",
+          "PausedInline": "Run paused — its countdown is frozen until you resume it.",
           "UnsupportedTitle": "This run is read-only"
+        },
+        "Recovery": {
+          "Title": "Release the retained execution claim",
+          "ClaimDetail": "An interrupted Journal operation kept this run's execution claim: {failure}",
+          "UnknownFailure": "Fabricate recorded no reason for it.",
+          "Inspect": "Fabricate cannot tell whether that operation changed anything. Check the actor's items and currency before you decide.",
+          "Effect": "Both choices do the same thing to the run: nothing. Neither applies, undoes nor repeats the interrupted operation. They release the claim so the run can be used again, and record which of the two you chose.",
+          "Reconciled": "I checked it — release",
+          "Abandoned": "Abandon it — release",
+          "Cancel": "Not yet",
+          "Action": "Release claim…",
+          "Released": "The execution claim was released and recorded as {disposition}.",
+          "ReleaseFailed": "The execution claim could not be released. Check that you are the active GM and try again.",
+          "InvalidDisposition": "That is not a disposition this run's claim can be recorded as.",
+          "Disposition": {
+            "reconciled": "checked",
+            "abandoned": "abandoned"
+          }
         },
         "Verdict": {
           "succeeded": "Run completed",

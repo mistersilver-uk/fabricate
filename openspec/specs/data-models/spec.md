@@ -3523,8 +3523,7 @@ StepModel = {
   timeGate: object | null,
   detail: {
     requiredSeconds: number | null,
-    primaryToolName: string | null,
-    toolNames: string[],
+    tools: Array<{ id: string | null, name: string, img: string | null }>, // every REQUIRED tool; a step has no "primary" one
     checkLabel: string | null,           // rollFormula + resolved DC; no skill name (none is stored)
     checkKind?: "check" | "none" | "unknown", // active disclosed configuration; omitted from terminal detail
     failureText: string | null,

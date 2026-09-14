@@ -419,8 +419,13 @@ test('resolves tool, check (formula + DC), and required time on the step detail'
   }).activeRuns[0];
   const detail = run.steps[1].detail;
 
-  assert.deepEqual(detail.toolNames, ['Hammer']);
-  assert.equal(detail.primaryToolName, 'Hammer');
+  // Issue 1648: every REQUIRED tool, with the artwork the four-column card draws. There is no
+  // "primary tool" in the domain, so the projection elects none.
+  assert.deepEqual(
+    detail.tools.map((tool) => tool.name),
+    ['Hammer']
+  );
+  assert.ok(!Object.hasOwn(detail, 'primaryToolName'), 'the invented primary tool is gone');
   assert.equal(
     detail.checkLabel,
     'FABRICATE.App.Journal.StepDetails.CheckWithDc|{"formula":"1d20","dc":15}'
@@ -2422,6 +2427,59 @@ test('authority availability gates current actions with its safe reason', () => 
   assert.equal(run.actions.cancel, false);
   assert.equal(run.actions.disabledReason, 'authorityUnavailable');
   assert.equal(reads, 1, 'authority is read once for the listing pass');
+});
+
+// Issue 1648: the retained claim's token is what `reconcileJournalRunAuthority` needs, and it
+// was reachable only from a console macro that read the ledger's flags by hand. It reaches the
+// run it blocks, and only for a GM — nobody else may reconcile one.
+test('a retained authority claim reaches the blocked run, for a GM viewer only', () => {
+  const availability = {
+    available: false,
+    reason: 'recovery-required',
+    retained: {
+      claimId: 'claim-7',
+      requestId: 'req-7',
+      requestKind: 'command',
+      requestStatus: 'recoveryRequired',
+      failureReason: 'operation-failed',
+      failureMessage: 'The run is already paused',
+      claimedAt: 1000,
+    },
+  };
+  const project = (viewer) =>
+    makeBuilder({
+      active: [activeCraftingRun({ lifecycleVersion: 1, runRevision: 2 })],
+      getJournalActionAvailability: () => availability,
+    }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer }).activeRuns[0].actions;
+
+  const gm = project(GM);
+  assert.equal(gm.disabledReason, 'recovery-required');
+  assert.deepEqual(gm.recoveryClaim, {
+    claimId: 'claim-7',
+    requestKind: 'command',
+    failureReason: 'operation-failed',
+    failureMessage: 'The run is already paused',
+    claimedAt: 1000,
+  });
+
+  const player = project(PLAYER);
+  assert.equal(player.disabledReason, 'recovery-required');
+  assert.equal(player.recoveryClaim, undefined, 'a player is never handed a claim token');
+});
+
+test('a claim is withheld when the authority is blocked for some OTHER reason', () => {
+  // The control for the test above: the affordance must not appear beside a refusal
+  // `reconcileJournalRunAuthority` cannot clear.
+  const run = makeBuilder({
+    active: [activeCraftingRun({ lifecycleVersion: 1, runRevision: 2 })],
+    getJournalActionAvailability: () => ({
+      available: false,
+      reason: 'claim-held',
+      retained: { claimId: 'claim-7' },
+    }),
+  }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: GM }).activeRuns[0];
+  assert.equal(run.actions.disabledReason, 'claim-held');
+  assert.equal(run.actions.recoveryClaim, undefined);
 });
 
 test('completion-mode switching is limited to an active countdown without a player check', () => {

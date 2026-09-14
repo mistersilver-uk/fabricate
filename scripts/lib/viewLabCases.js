@@ -1646,6 +1646,7 @@ function journalLifecycleCases() {
     'roll-cancelled',
     'unsupported-version',
     'recovery-required',
+    'claim-retained',
     'wide',
     'narrow',
     'history-checked-choice',
@@ -2063,6 +2064,18 @@ function journalLifecycleCases() {
         `${primary}:disabled`,
         '[data-run-action="cancel-arm"]:disabled'
       ),
+    // ONE notice for one run state, carrying the GM's way out of it (issue 1648). The run is
+    // ALSO paused, which is the composition the maintainer reported as three separate alert
+    // blocks: the refusal leads, the paused state is its detail, and `data-journal-paused` is
+    // on the same element rather than on a second notice of its own.
+    'claim-retained':
+      detail +
+      has(
+        '[data-journal-action-blocker="recovery-required"][data-journal-paused="true"]' +
+          ' [data-notice-action]',
+        '[data-run-action="resume"]:disabled'
+      ) +
+      lacks('[data-journal-recovery]', '[data-journal-paused]:not([data-journal-action-blocker])'),
     wide: roomy,
     narrow: roomy,
     'current-choice-closed':
@@ -2186,7 +2199,7 @@ function journalLifecycleCases() {
       query: {
         tab: 'journal',
         journalCaseState: state.replace(/-finished$/, ''),
-        ...(state === 'history-gm-deleted-recipe' && { viewer: 'gm' }),
+        ...(['history-gm-deleted-recipe', 'claim-retained'].includes(state) && { viewer: 'gm' }),
         ...(state.startsWith('gathering-straight') && { gatheringTaskMode: 'straight' }),
         ...(state.startsWith('gathering-check') && { gatheringTaskMode: 'routed' }),
       },

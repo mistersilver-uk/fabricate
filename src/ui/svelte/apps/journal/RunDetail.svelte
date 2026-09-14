@@ -1,6 +1,6 @@
 <!-- Svelte 5 runes mode -->
 <script>
-  import { localize } from '../../util/foundryBridge.js';
+  import { choiceDialog, localize } from '../../util/foundryBridge.js';
   import { formatAuthoredDuration, formatDurationHMS } from '../../util/formatDuration.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import { worldTimeLabel } from '../../util/worldTimeLabel.js';
@@ -17,6 +17,18 @@
   import StageNav from '../../components/StageNav.svelte';
   import YieldScale from '../../components/YieldScale.svelte';
   import { runStatusPresentation } from './journalRunStatus.js';
+  import { runStateNotice } from './runStateNotice.js';
+  import { stageHeadingName } from './stageHeading.js';
+  import {
+    applyPersonalizedDrops,
+    effectPhaseText,
+    formatRoll,
+    numberOrNaN,
+    previewName,
+    previewTiers,
+    quantityText,
+  } from './runDetailPresentation.js';
+  import { reconcileRetainedClaim, retainedClaimPrompt } from './runRecovery.js';
   import ActionsPanel from './ActionsPanel.svelte';
   import JournalFactRow from './JournalFactRow.svelte';
   import StepDetails from './StepDetails.svelte';
@@ -53,6 +65,22 @@
   const currentStage = $derived(run?.currentStep ?? stages[currentIndex] ?? null);
   const currentGate = $derived(run?.timeGate ?? currentStage?.timeGate ?? null);
   const viewedIsCurrent = $derived(stages.length === 0 || viewedIndex === currentIndex);
+  const singleStage = $derived(stages.length === 1);
+  const stageName = $derived(
+    stageHeadingName({ singleStage, stage: viewedStage, index: viewedIndex, localize })
+  );
+  const stageTag = $derived.by(() => {
+    if (!viewedIsCurrent) return null;
+    if (!((status === 'ready' && run?.actions?.execute === true) || run?.pauseState)) return null;
+    return {
+      label: localize(
+        run?.pauseState
+          ? 'FABRICATE.App.Journal.Stage.State.paused'
+          : 'FABRICATE.App.Journal.History.YourMove'
+      ),
+      tone: run?.pauseState ? 'warning' : 'positive',
+    };
+  });
   const summaryGate = $derived(viewedStage?.timeGate ?? (viewedIsCurrent ? currentGate : null));
   const elapsed = $derived.by(() => {
     const required = Number(currentGate?.requiredSeconds);
@@ -80,9 +108,12 @@
   let yieldPreviewLoading = $state(false);
   let yieldPreviewError = $state(false);
   const displayedYieldEntries = $derived(
-    (personalizedYieldEntries ?? yieldEntries).map((item) => ({ ...item, name: previewName(item) }))
+    (personalizedYieldEntries ?? yieldEntries).map((item) => ({
+      ...item,
+      name: previewName(item, localize),
+    }))
   );
-  const outcomeTiers = $derived(previewTiers(gatheringYield?.tiers));
+  const outcomeTiers = $derived(previewTiers(gatheringYield?.tiers, localize));
   const resolutionModeLabel = $derived(
     gatheringYield?.mode
       ? localize(`FABRICATE.App.Journal.Mode.${gatheringYield.mode}`)
@@ -115,7 +146,7 @@
   );
   const checkOutcome = $derived(
     viewedStage?.lastCheckResult
-      ? formatRoll(viewedStage.lastCheckResult)
+      ? formatRoll(viewedStage.lastCheckResult, localize)
       : viewedIsCurrent && gatheringYield?.roll != null
         ? String(gatheringYield.roll)
         : ''
@@ -134,15 +165,24 @@
     journal?.commandError?.runKey === runIdentity ? journal.commandError : null
   );
   const transient = $derived(journal?.commandResult?.runKey === runIdentity);
-  function effectPhaseText(phase) {
-    const key = {
-      applied: 'FABRICATE.App.Journal.Notice.EffectPhase.applied',
-      applying: 'FABRICATE.App.Journal.Notice.EffectPhase.applying',
-      planned: 'FABRICATE.App.Journal.Notice.EffectPhase.planned',
-      unknown: 'FABRICATE.App.Journal.Notice.EffectPhase.unknown',
-      notApplicable: 'FABRICATE.App.Journal.History.NotApplicable',
-    }[phase];
-    return localize(key);
+  // ONE run, ONE state, ONE notice — see `runStateNotice.js`.
+  const stateNotice = $derived(runStateNotice(run, localize));
+  let reconciling = $state(false);
+
+  /** Offer the active GM the two dispositions the authority honours, then record one. */
+  async function releaseRetainedClaim() {
+    const claim = stateNotice?.claim;
+    if (!claim || reconciling) return;
+    const disposition = await choiceDialog(retainedClaimPrompt(claim, localize));
+    if (disposition !== 'reconciled' && disposition !== 'abandoned') return;
+    reconciling = true;
+    try {
+      const outcome = await reconcileRetainedClaim({ claim, disposition, services, localize });
+      services?.notify?.(outcome.message);
+      await journal?.load?.(true);
+    } finally {
+      reconciling = false;
+    }
   }
 
   const showActions = $derived(
@@ -154,8 +194,6 @@
   const guidanceKey = $derived.by(() => {
     if (run?.recoveryEvidence?.required) return 'FABRICATE.App.Journal.WhatToExpect.Recovery';
     if (terminal) return 'FABRICATE.App.Journal.WhatToExpect.Terminal';
-    if (run?.actions?.disabledReason && run?.actions?.execute !== true)
-      return 'FABRICATE.App.Journal.WhatToExpect.Blocked';
     if (!viewedIsCurrent)
       return viewedIndex < currentIndex
         ? 'FABRICATE.App.Journal.WhatToExpect.Past'
@@ -195,26 +233,6 @@
     const components = services?.getWorldTimeComponents?.(Number(value)) ?? null;
     return worldTimeLabel(components, { localize });
   }
-  function numberOrNaN(raw) {
-    return raw == null ? Number.NaN : Number(raw);
-  }
-  function formatRoll(check) {
-    const formula = String(check?.formula ?? '');
-    const total = numberOrNaN(check?.total);
-    const value = numberOrNaN(check?.value);
-    const dc = numberOrNaN(check?.dc);
-    if (formula !== '' && Number.isFinite(total)) {
-      return Number.isFinite(dc)
-        ? localize('FABRICATE.App.Journal.StepDetails.RollResultWithDc', { formula, total, dc })
-        : localize('FABRICATE.App.Journal.StepDetails.RollResult', { formula, total });
-    }
-    if (Number.isFinite(value)) {
-      return Number.isFinite(dc)
-        ? localize('FABRICATE.App.Journal.StepDetails.RollResultValueWithDc', { value, dc })
-        : localize('FABRICATE.App.Journal.StepDetails.RollResultValue', { value });
-    }
-    return '';
-  }
   function stageFacts(stage) {
     const facts = [];
     if (Number(stage?.detail?.requiredSeconds) > 0)
@@ -223,12 +241,6 @@
         icon: 'fas fa-clock',
         label: localize('FABRICATE.App.Journal.StepDetails.RequiresTime'),
         value: formatAuthoredDuration(stage.detail.requiredSeconds, { localize }),
-      });
-    if (stage?.detail?.primaryToolName)
-      facts.push({
-        id: 'tool',
-        label: localize('FABRICATE.App.Journal.StepDetails.PrimaryTool'),
-        value: stage.detail.primaryToolName,
       });
     if (viewedIndex > currentIndex && stage?.detail?.checkLabel)
       facts.push({
@@ -265,8 +277,8 @@
     const produced = !past
       ? (craftingYield?.entries ?? []).map((item) => ({
           ...item,
-          name: previewName(item),
-          quantityText: quantityText(item.qty),
+          name: previewName(item, localize),
+          quantityText: quantityText(item.qty, localize),
         }))
       : viewedEvidence.produced;
     const io = [
@@ -288,49 +300,17 @@
         content: !past ? inputs : null,
         emptyText: text('NotRecorded'),
       });
+    // REQUIRED tools, as the same four-column card the history tools section draws. The domain
+    // has no "primary" tool, so the stage lists every tool it needs rather than electing one.
+    const tools = viewedStage?.detail?.tools ?? [];
+    if (tools.length > 0)
+      io.push({
+        kind: 'tools',
+        label: localize('FABRICATE.App.Journal.StepDetails.RequiredTools'),
+        items: tools.map((tool) => ({ ...tool, icon: 'fas fa-hammer' })),
+        emptyText: text('NotRecorded'),
+      });
     return io;
-  }
-
-  function quantityText(quantity) {
-    return quantity != null && Number.isFinite(Number(quantity))
-      ? localize('FABRICATE.App.Journal.Quantity', { n: quantity })
-      : localize('FABRICATE.App.Journal.History.NotRecorded');
-  }
-
-  function previewName(item) {
-    return typeof item?.name === 'string' && item.name.trim()
-      ? item.name
-      : localize('FABRICATE.App.Journal.History.UnknownMaterial');
-  }
-
-  function previewTiers(tiers) {
-    return (Array.isArray(tiers) ? tiers : []).map((tier) => ({
-      ...tier,
-      yields: (tier.yields ?? []).map((item) => ({
-        ...item,
-        name: previewName(item),
-        quantity: item.quantity ?? localize('FABRICATE.App.Journal.History.NotRecorded'),
-      })),
-    }));
-  }
-
-  function personalizedChance(drop) {
-    const raw = Number(drop?.finalDropRate ?? drop?.finalChance);
-    if (!Number.isFinite(raw)) return null;
-    return Math.min(100, Math.max(0, raw <= 1 ? raw * 100 : raw));
-  }
-
-  function applyPersonalizedDrops(entries, breakdown) {
-    const byId = new Map(
-      (Array.isArray(breakdown?.drops) ? breakdown.drops : []).map((drop) => [
-        String(drop?.id ?? ''),
-        drop,
-      ])
-    );
-    return entries.map((entry) => {
-      const chance = personalizedChance(byId.get(String(entry?.id ?? '')));
-      return chance == null ? entry : { ...entry, chance };
-    });
   }
 
   $effect(() => {
@@ -380,53 +360,66 @@
 </script>
 
 <article class="journal-detail" data-journal-detail data-run-key={run?.key ?? run?.id}>
-  <header class="journal-detail-header">
-    <div class="journal-detail-identity">
-      <Medallion art={run?.img ?? ''} icon="fas fa-hammer" alt="" size={38} />
-      <div>
-        <h2>{run?.names?.title ?? ''}</h2>
-        <div class="journal-detail-meta">
-          {#if run?.names?.subtitle}<span>{run.names.subtitle}</span>{/if}
-          {#if resolutionModeLabel}<span>{resolutionModeLabel}</span>{/if}
-          {#if terminal && finishedLabel}<span>{finishedLabel}</span>{/if}
-          <Chip
-            density="list"
-            tone={statusChipTone(statusView.tone)}
-            icon={`fas ${statusView.icon}`}>{localize(statusView.labelKey)}</Chip
-          >
-          {#if run?.blindSecretPreview}<Chip density="list" tone="warning" icon="fas fa-eye-slash"
-              >{localize('FABRICATE.App.Journal.BlindSecret.Badge')}</Chip
-            >{/if}
+  <!-- The controls and the state they are refused by read as ONE block, not as a callout
+       floating beside the buttons it talks about. -->
+  <section class="journal-detail-state">
+    <header class="journal-detail-header">
+      <div class="journal-detail-identity">
+        <Medallion art={run?.img ?? ''} icon="fas fa-hammer" alt="" size={38} />
+        <div>
+          <h2>{run?.names?.title ?? ''}</h2>
+          <div class="journal-detail-meta">
+            {#if run?.names?.subtitle}<span>{run.names.subtitle}</span>{/if}
+            {#if resolutionModeLabel}<span>{resolutionModeLabel}</span>{/if}
+            {#if terminal && finishedLabel}<span>{finishedLabel}</span>{/if}
+            <Chip
+              density="list"
+              tone={statusChipTone(statusView.tone)}
+              icon={`fas ${statusView.icon}`}>{localize(statusView.labelKey)}</Chip
+            >
+            {#if run?.blindSecretPreview}<Chip density="list" tone="warning" icon="fas fa-eye-slash"
+                >{localize('FABRICATE.App.Journal.BlindSecret.Badge')}</Chip
+              >{/if}
+          </div>
         </div>
       </div>
-    </div>
-    {#if showActions}<ActionsPanel {run} {journal} {now} />{/if}
-  </header>
+      {#if showActions}<ActionsPanel {run} {journal} {now} />{/if}
+    </header>
 
-  {#if run?.recoveryEvidence?.required}
-    <Notice
-      tone="danger"
-      blocking
-      title={localize('FABRICATE.App.Journal.Notice.RecoveryTitle')}
-      detail={localize('FABRICATE.App.Journal.Notice.RecoveryDetail', {
-        count: run.recoveryEvidence.appliedEffectCount ?? 0,
-      })}
-      dataAttr="data-journal-recovery"
-      dataValue="true"
-    />
+    {#if stateNotice}
+      <Notice
+        tone={stateNotice.tone}
+        blocking={stateNotice.blocking}
+        title={stateNotice.title}
+        detail={stateNotice.detail}
+        dataAttr={stateNotice.dataAttr}
+        dataValue={stateNotice.dataValue}
+        stateDataAttr={stateNotice.stateDataAttr}
+        stateDataValue={stateNotice.stateDataValue}
+        action={stateNotice.claim
+          ? {
+              label: localize('FABRICATE.App.Journal.Recovery.Action'),
+              onClick: releaseRetainedClaim,
+            }
+          : null}
+      />
+    {/if}
+  </section>
+
+  {#if stateNotice?.evidence}
     <section data-journal-recovery-evidence>
       {#each run.recoveryEvidence.effects ?? [] as effect (effect.index)}
         <div data-journal-effect={effect.index} data-effect-phase={effect.phase}>
           <JournalFactRow
             label={localize('FABRICATE.App.Journal.Notice.Effect', { index: effect.index + 1 })}
-            value={effectPhaseText(effect.phase)}
+            value={effectPhaseText(effect.phase, localize)}
             danger={effect.phase === 'applying'}
           />
           {#each effect.receipt?.items ?? [] as item, index (index)}
             <ListRow
               art={item.img ?? ''}
               name={item.name || localize('FABRICATE.App.Journal.History.UnknownMaterial')}
-              quantity={quantityText(item.quantity)}
+              quantity={quantityText(item.quantity, localize)}
             />
           {/each}
           {#each effect.receipt?.currencies ?? [] as spend, index (index)}
@@ -435,20 +428,6 @@
         </div>
       {/each}
     </section>
-  {:else if run?.pauseState}
-    <Notice
-      tone="warning"
-      title={localize('FABRICATE.App.Journal.Notice.PausedTitle')}
-      detail={localize('FABRICATE.App.Journal.Notice.PausedDetail')}
-      dataAttr="data-journal-paused"
-      dataValue="true"
-    />
-  {:else if run?.actions?.disabledReason === 'unsupportedLifecycle'}
-    <Notice
-      tone="warning"
-      title={localize('FABRICATE.App.Journal.Notice.UnsupportedTitle')}
-      detail={localize('FABRICATE.App.Journal.Actions.UnsupportedLifecycle')}
-    />
   {/if}
 
   {#if commandError}
@@ -503,11 +482,7 @@
           <StageCard
             stage={{
               status: viewedStage.status,
-              name:
-                (stages.length === 1 ? viewedStage.presentationSnapshot?.description : '') ||
-                viewedStage.presentationSnapshot?.name ||
-                viewedStage.stepName ||
-                localize('FABRICATE.App.Journal.Stage.Number', { index: viewedIndex + 1 }),
+              name: stageName,
               summary:
                 stages.length > 1 && viewedIsCurrent
                   ? viewedStage.presentationSnapshot?.description || ''
@@ -516,20 +491,10 @@
             index={viewedIndex}
             current={!terminal && viewedIndex === currentIndex}
             state={stageState(viewedIndex)}
-            tag={viewedIsCurrent &&
-            ((status === 'ready' && run?.actions?.execute === true) || run?.pauseState)
-              ? {
-                  label: localize(
-                    run?.pauseState
-                      ? 'FABRICATE.App.Journal.Stage.State.paused'
-                      : 'FABRICATE.App.Journal.History.YourMove'
-                  ),
-                  tone: run?.pauseState ? 'warning' : 'positive',
-                }
-              : null}
+            tag={stageTag}
             facts={stageFacts(viewedStage)}
-            showHeading={true}
-            showNumber={stages.length > 1}
+            showHeading={!singleStage || Boolean(stageName) || Boolean(stageTag)}
+            showNumber={!singleStage}
             io={stageIo(craftingPreview, futureInputs)}
             note={!viewedIsCurrent
               ? localize(
@@ -609,7 +574,7 @@
             localize('FABRICATE.App.Journal.Yields.Awarded', { chance: entry.chance }),
           missed: (entry) =>
             localize('FABRICATE.App.Journal.Yields.Missed', { chance: entry.chance }),
-          quantity: (entry) => quantityText(entry.qty),
+          quantity: (entry) => quantityText(entry.qty, localize),
           chance: (entry) => `${entry.chance}%`,
           cut: (roll) => String(roll),
         }}
@@ -632,7 +597,7 @@
                 name={option.name || localize('FABRICATE.App.Journal.History.UnknownMaterial')}
                 art={option.img ?? ''}
                 icon={option.icon ?? 'fas fa-box'}
-                quantity={quantityText(option.need)}
+                quantity={quantityText(option.need, localize)}
               />
             {/each}
           {:else}<span>{localize('FABRICATE.App.Journal.History.NoInputs')}</span>{/each}
@@ -645,7 +610,7 @@
         <div data-journal-crafting-yield={craftingYield.presentation}>
           {#if craftingYield.presentation === 'tiers'}
             <OutcomeLadder
-              tiers={previewTiers(craftingYield.tiers)}
+              tiers={previewTiers(craftingYield.tiers, localize)}
               emptyTierText={localize('FABRICATE.App.Journal.Yields.None')}
               label={localize('FABRICATE.App.Journal.Yields.PreviewTitle')}
               hint={localize(
@@ -666,7 +631,7 @@
               />
               {#each craftingYield.progressive?.stages ?? [] as entry, index (index)}
                 <ListRow
-                  name={`${index + 1}. ${previewName(entry)}`}
+                  name={`${index + 1}. ${previewName(entry, localize)}`}
                   art={entry.art ?? ''}
                   quantity={entry.quantity ?? localize('FABRICATE.App.Journal.History.NotRecorded')}
                   detail={entry.cost == null
@@ -685,9 +650,9 @@
                 <Kicker>{route.name || localize('FABRICATE.App.Journal.Stage.Route')}</Kicker>
                 {#each route.entries ?? [] as entry, itemIndex (entry.id ?? itemIndex)}
                   <ListRow
-                    name={previewName(entry)}
+                    name={previewName(entry, localize)}
                     art={entry.art ?? ''}
-                    quantity={quantityText(entry.qty)}
+                    quantity={quantityText(entry.qty, localize)}
                   />
                 {:else}<p>{localize('FABRICATE.App.Journal.History.NotRecorded')}</p>{/each}
               </section>
@@ -769,6 +734,12 @@
     gap: var(--fab-space-4);
     min-width: 0;
     padding: var(--fab-space-4) var(--fab-space-6);
+  }
+  /* The controls and the state notice are ONE block: a tighter gap than the article's, so
+     the sentence explaining a refusal reads as part of the controls it refuses. */
+  .journal-detail-state {
+    display: grid;
+    gap: var(--fab-space-2);
   }
   .journal-detail-header {
     display: flex;

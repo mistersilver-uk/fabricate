@@ -67,19 +67,22 @@
       {#each io as group (group.label)}
         <div class="fab-stage-card-io-group" data-stage-io={group.kind}>
           <Kicker>{group.label}</Kicker>
-          <div class="fab-stage-card-items">
-            {#if group.content}{@render group.content()}{:else}
-              {#each group.items ?? [] as item, index (item.id ?? index)}
+          {#if group.content}
+            <div class="fab-stage-card-items">{@render group.content()}</div>
+          {:else if (group.items ?? []).length > 0}
+            <div class="fab-stage-card-items is-grid">
+              {#each group.items as item, index (item.id ?? index)}
                 <ListRow
                   name={item.name ?? item.label ?? ''}
                   art={item.img ?? item.art ?? ''}
                   icon={item.icon ?? 'fas fa-box'}
                   tint={item.tint ?? ''}
                   quantity={item.quantityText ?? null}
+                  truncateName
                 />
-              {:else}<span class="fab-stage-card-summary">{group.emptyText}</span>{/each}
-            {/if}
-          </div>
+              {/each}
+            </div>
+          {:else}<span class="fab-stage-card-summary">{group.emptyText}</span>{/if}
         </div>
       {/each}
     </div>
@@ -115,9 +118,12 @@
   .fab-stage-card.is-failed {
     border-color: var(--fab-danger-border);
   }
+  /* Each io group takes the FULL width and lays its items out as the four-column
+     truncated-name image card the history sections use, so materials, results and tools
+     read the same wherever they appear (issue 1648). Two groups side by side gave each
+     four cards ~85px, which is not a card. */
   .fab-stage-card-io {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
     gap: var(--fab-space-3);
     padding: 0 var(--fab-space-3) var(--fab-space-3) calc(var(--fab-space-6) * 2);
   }
@@ -133,6 +139,10 @@
     display: grid;
     width: 100%;
     gap: var(--fab-space-1);
+  }
+
+  .fab-stage-card-items.is-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   .fab-stage-card-note {
     margin: 0;

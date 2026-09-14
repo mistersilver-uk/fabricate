@@ -336,7 +336,7 @@ export class RunJournalBuilder {
       resolveComponent: this._resolveComponentForItem,
     });
 
-    const authority = this._actionAvailability();
+    const authority = this._actionAvailability(resolvedViewer);
     const dismissedRunKeys = this._dismissedRunKeys(actor, resolvedViewer);
     const activeRuns = this._buildRunModels({
       actor,
@@ -1480,25 +1480,29 @@ export class RunJournalBuilder {
     if (terminal) {
       return {
         requiredSeconds: recordedNumber(runStep?.timeGate?.requiredSeconds),
-        primaryToolName: null,
-        toolNames: [],
+        tools: [],
         checkLabel: null,
         failureText: stringOrNull(runStep?.failureReason),
       };
     }
-    const toolNames = normalizeList(recipeStep?.toolIds)
-      .map((toolId) =>
-        stringOrEmpty(this._getTool(stringOrNull(recipe?.craftingSystemId), toolId)?.name)
-      )
-      .filter(Boolean);
+    // Every authored tool, with its artwork: a step has REQUIRED tools and nothing else, so
+    // there is no "primary" one to elect (issue 1648).
+    const systemId = stringOrNull(recipe?.craftingSystemId);
+    const tools = normalizeList(recipeStep?.toolIds)
+      .map((toolId) => this._getTool(systemId, toolId))
+      .filter((tool) => stringOrEmpty(tool?.name))
+      .map((tool) => ({
+        id: stringOrNull(tool.id),
+        name: stringOrEmpty(tool.name),
+        img: stringOrNull(tool.img),
+      }));
     const requiredSeconds =
       numberOrNull(runStep?.timeGate?.requiredSeconds) ??
       durationToSeconds(recipeStep?.timeRequirement);
     const failureReason = stringOrNull(runStep?.failureReason);
     return {
       requiredSeconds: requiredSeconds > 0 ? requiredSeconds : null,
-      primaryToolName: toolNames[0] ?? null,
-      toolNames,
+      tools,
       checkLabel: this._checkLabel({ system, recipe }),
       checkKind: historyEntitled ? this._activeCheckKind({ system, recipe }) : 'unknown',
       failureText:
@@ -2126,16 +2130,37 @@ export class RunJournalBuilder {
     return stringOrNull(actor?.uuid) || stringOrNull(idOf(actor));
   }
 
-  _actionAvailability() {
+  /**
+   * The authority's cached availability, plus — for a GM viewer only — the retained claim a
+   * GM can reconcile. Only the active GM may call `reconcileJournalRunAuthority`, so a player
+   * is never told a claim token they could do nothing with.
+   * @private
+   */
+  _actionAvailability(viewer = null) {
     try {
       const value = this._getJournalActionAvailability();
-      return {
+      const retained = viewer?.isGM === true ? this._retainedClaim(value?.retained) : null;
+      const availability = {
         available: value?.available !== false,
         reason: stringOrNull(value?.reason),
       };
+      if (retained) availability.retained = retained;
+      return availability;
     } catch {
       return { available: false, reason: 'authorityUnavailable' };
     }
+  }
+
+  _retainedClaim(value) {
+    const claimId = stringOrNull(value?.claimId);
+    if (!claimId) return null;
+    return {
+      claimId,
+      requestKind: stringOrNull(value?.requestKind),
+      failureReason: stringOrNull(value?.failureReason),
+      failureMessage: stringOrNull(value?.failureMessage),
+      claimedAt: numberOrNull(value?.claimedAt),
+    };
   }
 
   _dismissedRunKeys(actor, viewer) {
@@ -2199,6 +2224,10 @@ export class RunJournalBuilder {
       owner &&
       !executionBlocked;
     const legacyCancel = legacyExecute;
+    // Present ONLY when the authority's retained claim is what blocks this run, so the
+    // affordance a GM is offered is the one that can actually clear what they can see.
+    const recoveryClaim =
+      blockedReason === 'recovery-required' ? (authority?.retained ?? null) : null;
     return {
       key: JSON.stringify([actorUuid, runType, stringOrNull(run?.id)]),
       actorUuid,
@@ -2231,6 +2260,7 @@ export class RunJournalBuilder {
         cancel: legacyCancel || (mutableCurrent && executableType),
         dismiss: terminal,
         disabledReason: blockedReason ?? (materialBlocked ? 'selectionRequired' : null),
+        ...(recoveryClaim && { recoveryClaim }),
       },
     };
   }

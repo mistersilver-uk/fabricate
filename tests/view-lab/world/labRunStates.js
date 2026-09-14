@@ -48,6 +48,25 @@ const NOW = 1_209_600;
 const HOUR = 3600;
 
 /**
+ * The RETAINED execution claim the `claim-retained` fixture leaves on the authority ledger: a
+ * pause the lifecycle refused before it wrote anything, whose claim the authority kept because
+ * it cannot prove the refusal was pre-write. This is the maintainer's own stuck world.
+ *
+ * ONE definition, because two harnesses reach the state by different routes and must not drift:
+ * `labWorld.js` seeds the ledger page and lets the real authority derive it, while the mounted
+ * lifecycle walk stubs the availability answer directly.
+ */
+export const LAB_RETAINED_CLAIM = Object.freeze({
+  claimId: 'lab-retained-claim',
+  requestId: 'lab-retained-request',
+  requestKind: 'command',
+  requestStatus: 'recoveryRequired',
+  failureReason: 'operation-failed',
+  failureMessage: 'The run is already paused',
+  claimedAt: 0,
+});
+
+/**
  * Stable run identity selected by each Journal fixture query. A null identity means the state is
  * produced by the lab-only service seam or by operating a real Journal control after mount.
  */
@@ -89,6 +108,7 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'roll-cancelled': 'lab-v1-roll-cancelled',
   'unsupported-version': 'lab-unsupported-version',
   'recovery-required': 'lab-v1-recovery-required',
+  'claim-retained': 'lab-v1-claim-retained',
   wide: 'lab-v1-wide',
   narrow: 'lab-v1-wide',
   ...Object.fromEntries(
@@ -662,6 +682,16 @@ function journalCaseFactories(context) {
     'unsupported-version': () =>
       active({ ...ready('lab-unsupported-version'), lifecycleVersion: 2 }),
     'recovery-required': () => active(recoveryCase(context, single())),
+    // A paused run the authority's RETAINED claim blocks — the maintainer's own stuck world.
+    // The claim itself is seeded on the ledger by `labWorld.js`; this is the run it blocks.
+    'claim-retained': () =>
+      active(
+        waiting('lab-v1-claim-retained', single(), {
+          runRevision: 3,
+          pauseState: { pausedAt: NOW - HOUR, remainingSeconds: 3 * HOUR },
+          pausedDurationSeconds: HOUR,
+        })
+      ),
     wide: () => wideContainers(context, multi()),
     narrow: () => wideContainers(context, multi()),
     loading: readyAlias('lab-v1-ready-single'),
