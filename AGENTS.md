@@ -577,6 +577,7 @@ Prettier does not format Markdown (its glob is `src/**/*.js` plus `eslint.config
 Do not hard-wrap at a fixed column, and do not apply the one-sentence-per-line rule here (GitHub renders single newlines as spaces, but unwrapped source is cleaner to read and edit).
 - Do not reflow existing documents wholesale just to apply these rules.
 Apply them to new content and to any section you are already editing.
+That is the steady-state rule, and it sits on top of the one-time reflow of the harness documents that issue #1661 sanctioned and `scripts/lib/markdownWraps.js` performed; a further wholesale reflow needs its own sanction.
 
 ## Git Conventions
 
@@ -618,10 +619,8 @@ Bundling is acceptable when changes overlap on the same files such that hunk-spl
 ## Agent Roles & Bindings
 
 Each role is defined **once** in its shared `.agents/skills/<role>/SKILL.md` (the canonical persona and Codex repository-discovery location).
-Both provider agents are **thin bindings** that point at that skill — change behavior in the
-skill, not in the bindings.
-The default workflow above auto-spawns these roles based on change
-signals; explicit requests are only required for roles the routing table does not cover.
+Both provider agents are **thin bindings** that point at that skill — change behavior in the skill, not in the bindings.
+The default workflow above auto-spawns these roles based on change signals; explicit requests are only required for roles the routing table does not cover.
 
 Each row below is one **binding**, so a model-tiered family occupies three rows that share one canonical skill and differ only by model pin.
 [Model tier routing](#model-tier-routing) explains how the driver picks which of the three a given spawn uses.
@@ -651,8 +650,7 @@ Each row below is one **binding**, so a model-tiered family occupies three rows 
 | `fabricate_competitive_analyst`   | `.agents/skills/fabricate-competitive-analyst/SKILL.md` | `.codex/agents/fabricate-competitive-analyst.toml`     | `fabricate-competitive-analyst`  |
 | `fabricate_pr_explorer`           | — (no shared skill; read-only mapping)                  | `.codex/agents/fabricate-pr-explorer.toml`             | `Explore` (built-in)             |
 
-`fabricate_pr_explorer` is read-only codebase mapping; Claude uses its built-in `Explore` agent
-for the same role rather than a dedicated binding.
+`fabricate_pr_explorer` is read-only codebase mapping; Claude uses its built-in `Explore` agent for the same role rather than a dedicated binding.
 
 ### Family to model tiers
 

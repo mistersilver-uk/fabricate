@@ -40,10 +40,11 @@ import {
 const REPOSITORY_ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = 'tests/fixtures/doc-split';
 
-/** The pre-split documents, by the fixture that froze each one. */
+/** The pre-split documents, by the fixture that froze each one. Each floor sits just under the
+ * fixture's sentence count, which fell when `sentencesOf` began joining hard wraps (issue #1661). */
 const SOURCES = [
   { fixture: `${FIXTURES}/AGENTS.pre-split.md`, floor: 850 },
-  { fixture: `${FIXTURES}/CLAUDE.pre-split.md`, floor: 60 },
+  { fixture: `${FIXTURES}/CLAUDE.pre-split.md`, floor: 42 },
   { fixture: `${FIXTURES}/CONTRIBUTING.pre-split.md`, floor: 900 },
 ];
 
