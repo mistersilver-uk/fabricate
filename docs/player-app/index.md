@@ -31,5 +31,5 @@ Which recipes a player sees in the Crafting tab is decided by the system's visib
 See [Settings]({% link crafting/settings.md %}) for the modes, and [Access]({% link crafting/access.md %}) for per-recipe grants.
 
 New crafting and gathering runs default to manual completion when ready.
-The [Journal]({% link player-app/journal.md %}) explains eligible automatic completion, cancellation, GM authority setup, and recovery.
+The [Journal]({% link player-app/journal.md %}) explains eligible automatic completion, cancellation, GM run authority, and recovery.
 Older runs and salvage retain their existing behavior.

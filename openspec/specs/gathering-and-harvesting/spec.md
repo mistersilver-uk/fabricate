@@ -894,7 +894,7 @@ Missing-version records retain legacy automatic completion; unsupported present 
 - New runs default to manual collection when their time gate is ready.
 Eligible waiting stages may retain world-time completion, but player checks remain manual.
 Manual collection and automatic completion enter the same authoritative, revision-guarded operation.
-Every versioned start and mutation requires the active GM and a uniquely provisioned private authority ledger as specified in `data-models/spec.md`.
+Every versioned start and mutation requires the active GM and the world’s single private authority ledger, which the active GM provisions automatically as specified in `data-models/spec.md`.
 The run records the attested initiating user rather than the executing GM as its owner.
 - Pause freezes remaining world time and retains the run's choices; resume reanchors readiness.
 Paused runs do not advance through world-time processing.

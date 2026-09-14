@@ -294,65 +294,32 @@ describe('FabricateAppRoot shell', () => {
 });
 
 describe('SvelteFabricateApp shell window', () => {
-  it('confirms single-session authority setup through the real application service and API', async () => {
+  // Issue 1648: manual authority setup is gone from the player app. The affordance existed only
+  // because a world could boot with no ledger, and this replay proves the premise itself is gone —
+  // boot provisions one. With it gone the services bag must carry neither the setup seam nor the
+  // active-GM check that existed solely to guard it, and no setup dialog copy may survive.
+  it('boots with a provisioned ledger and exposes no manual authority setup seam', async () => {
     await withFabricateLifecycleReplay(async ({ world, loadModule }) => {
       const { SvelteFabricateApp } = await loadModule('/src/ui/SvelteFabricateApp.svelte.js');
       const app = Object.create(SvelteFabricateApp.prototype);
       const services = app._buildServices();
-      const dialog = globalThis.foundry.applications.api.DialogV2;
-      const originalConfirm = dialog.confirm;
-      const originalSetup = world.fabricate.setupJournalRunAuthority;
-      const ledger = globalThis.game.journal.contents.find((entry) => entry.flags?.fabricate?.journalRunAuthorityLedger);
-      let apiCalls = 0;
-      const prompts = [];
-      let answer = false;
-      let onConfirm = () => {};
-      try {
-        world.fabricate.setupJournalRunAuthority = function () {
-          apiCalls += 1;
-          return originalSetup.call(this);
-        };
-        dialog.confirm = async (options) => {
-          prompts.push(options);
-          onConfirm();
-          return answer;
-        };
-        assert.equal(services.isActiveGM(), true);
-        assert.deepEqual(await services.setupJournalRunAuthority(), { cancelled: true });
-        assert.equal(apiCalls, 0, 'declining setup writes nothing');
-        assert.match(prompts[0].content, /Close all other GM tabs/);
-        assert.match(prompts[0].content, /single GM session/);
-        answer = true;
-        onConfirm = () => world.shim.setViewer('player');
-        assert.equal((await services.setupJournalRunAuthority()).reason, 'active-gm-required');
-        assert.equal(apiCalls, 0, 'permission is rechecked after the prompt');
-        const promptCount = prompts.length;
-        await services.setupJournalRunAuthority();
-        assert.equal(prompts.length, promptCount, 'players cannot even open the setup confirmation');
-        onConfirm = () => {};
-        world.shim.setViewer('gm');
-        const result = await services.setupJournalRunAuthority();
-        // Setup is an idempotent ensure since the ledger is auto-provisioned: an existing ledger
-        // is a success carrying its id, not the `ledger-already-exists` refusal it used to be.
-        assert.equal(result.success, true, 'the actual API result is returned unchanged');
-        assert.equal(typeof result.ledgerId, 'string');
-        assert.ok(result.ledgerId, 'the ensure names the ledger it settled on');
-        assert.equal(apiCalls, 1);
-        assert.equal(globalThis.game.journal.contents.filter((entry) => entry.flags?.fabricate?.journalRunAuthorityLedger).length, 1);
-        assert.equal(globalThis.game.journal.contents.includes(ledger), true, 'setup does not replace the existing ledger');
-        const duplicate = {
-          id: 'duplicate-authority',
-          flags: { fabricate: { journalRunAuthorityLedger: true } },
-          getFlag(scope, key) { return this.flags[scope]?.[key]; },
-        };
-        globalThis.game.journal.contents.push(duplicate);
-        assert.equal((await services.setupJournalRunAuthority()).reason, 'ledger-ambiguous');
-        assert.equal(globalThis.game.journal.contents.includes(ledger), true);
-        assert.equal(globalThis.game.journal.contents.includes(duplicate), true, 'neither duplicate is overwritten or deleted');
-      } finally {
-        dialog.confirm = originalConfirm;
-        world.fabricate.setupJournalRunAuthority = originalSetup;
+      const ledgers = globalThis.game.journal.contents.filter(
+        (entry) => entry.flags?.fabricate?.journalRunAuthorityLedger
+      );
+      assert.equal(ledgers.length, 1, 'boot provisions exactly one authority ledger, unprompted');
+      assert.notEqual(
+        world.fabricate.getJournalRunAuthorityAvailability().reason,
+        'ledger-missing',
+        'so the refusal the setup button answered is never the booted state'
+      );
+      for (const seam of ['setupJournalRunAuthority', 'isActiveGM']) {
+        assert.equal(seam in services, false, `${seam} existed only to drive manual setup`);
       }
+      assert.doesNotMatch(
+        appSource,
+        /AuthoritySetup/,
+        'and no setup confirmation copy is left addressing a dialog nothing opens'
+      );
     });
   });
   it('is a single shared window keyed by a stable id', () => {

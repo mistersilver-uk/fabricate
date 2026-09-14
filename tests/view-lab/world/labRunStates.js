@@ -86,7 +86,6 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'stale-action': 'lab-v1-stale-action',
   'command-timeout': 'lab-v1-command-timeout',
   'authority-unavailable': 'lab-v1-authority-unavailable',
-  'authority-setup': 'lab-v1-authority-setup',
   'roll-cancelled': 'lab-v1-roll-cancelled',
   'unsupported-version': 'lab-unsupported-version',
   'recovery-required': 'lab-v1-recovery-required',
@@ -659,7 +658,6 @@ function journalCaseFactories(context) {
     'stale-action': readyAlias('lab-v1-stale-action'),
     'command-timeout': readyAlias('lab-v1-command-timeout'),
     'authority-unavailable': readyAlias('lab-v1-authority-unavailable'),
-    'authority-setup': readyAlias('lab-v1-authority-setup'),
     'roll-cancelled': readyAlias('lab-v1-roll-cancelled'),
     'unsupported-version': () =>
       active({ ...ready('lab-unsupported-version'), lifecycleVersion: 2 }),

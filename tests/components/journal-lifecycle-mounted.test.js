@@ -863,76 +863,48 @@ describe('Journal versioned lifecycle (mounted)', () => {
     }
   });
 
-  it('offers explicit GM setup, reports failure and retries through the setup service', async () => {
-    const authority = { available: false, reason: 'ledger-missing' };
-    let calls = 0;
-    const { target, store, commands } = await mountState('authority-setup', {
-      builderOptions: { authority },
-      prepare({ services }) {
-        services.isActiveGM = () => true;
-        services.setupJournalRunAuthority = async () => {
-          calls += 1;
-          if (calls === 1) throw new Error('setup transport failed');
-          authority.available = true;
-          authority.reason = null;
-          return { success: true };
-        };
-      },
-    });
-    await settleAction();
-    assert.equal(calls, 0, 'opening the Journal never provisions authority');
-    const capture = getCaseById('fabricate-journal-lifecycle-authority-setup');
-    assert.ok(
-      target.querySelector(capture.expectSelector),
-      'the defining capture selector matches actual rendered product state'
-    );
-    assert.match(
-      target.querySelector('[data-journal-authority-setup]').textContent,
-      /Close all other GM tabs/
-    );
-    assert.match(
-      target.querySelector('[data-journal-authority-setup]').textContent,
-      /single GM session/
-    );
-    target.querySelector('[data-journal-authority-setup-action]').click();
-    await settleAction();
-    assert.equal(calls, 1);
-    assert.equal(store.authoritySetupBusy, false);
-    assert.match(
-      target.querySelector('[data-journal-authority-setup-error]').textContent,
-      /could not be completed/i
-    );
-    target.querySelector('[data-journal-authority-setup-action]').click();
-    await settleAction();
-    assert.equal(calls, 2);
-    assert.equal(store.loading, false, 'setup reloads quietly');
-    assert.equal(store.selectedRun.actions.execute, true, 'authoritative listing is refreshed');
-    assert.ok(!target.querySelector('[data-journal-authority-setup-action]'));
-    assert.deepEqual(commands, [], 'setup does not execute or replay a run');
-  });
-
-  it('refuses setup for ineligible viewers and duplicate ledgers', async () => {
-    for (const [isActiveGM, reason] of [
-      [false, 'ledger-missing'],
-      [true, 'ledger-ambiguous'],
+  // Issue 1648: the ledger is provisioned automatically, so the manual setup notice and its
+  // button are gone for EVERY viewer — including the active GM they existed for. The affordance
+  // described a state no world can now reach; the blocker's own REASON is what must survive on
+  // the very run that used to carry the button.
+  it('shows the blocker reason and no manual setup control, for a GM as well as a player', async () => {
+    for (const [isActiveGM, reason, key] of [
+      [true, 'ledger-missing', 'LedgerMissing'],
+      [false, 'ledger-missing', 'LedgerMissing'],
+      [true, 'ledger-ambiguous', 'LedgerAmbiguous'],
     ]) {
-      let calls = 0;
-      const { target, store } = await mountState('authority-unavailable', {
+      let setupCalls = 0;
+      const { target, store, commands } = await mountState('authority-unavailable', {
         builderOptions: { authority: { available: false, reason } },
         prepare({ services }) {
           services.isActiveGM = () => isActiveGM;
           services.setupJournalRunAuthority = async () => {
-            calls += 1;
+            setupCalls += 1;
+            return { success: true };
           };
         },
       });
       await settleAction();
-      assert.ok(!target.querySelector('[data-journal-authority-setup-action]'));
-      await store.setupAuthority(store.selectedRun);
-      assert.equal(calls, 0, 'the store also refuses an ineligible direct invocation');
+      const who = isActiveGM ? 'GM' : 'player';
+      assert.equal(setupCalls, 0, `the player app never provisions authority (${who})`);
+      assert.ok(
+        !target.querySelector(
+          '[data-journal-authority-setup], [data-journal-authority-setup-action], ' +
+            '[data-journal-authority-setup-error]'
+        ),
+        `no manual setup surface remains for ${reason} as ${who}`
+      );
+      assert.equal(store.selectedRun.actions.disabledReason, reason);
+      assert.equal(
+        target.querySelector('[data-run-action="primary"]').title,
+        english.FABRICATE.App.Journal.Actions[key],
+        `${reason} is worded rather than left blank for a ${who}`
+      );
+      assert.deepEqual(commands, [], 'and a blocked run executes nothing');
       await harness.remount();
     }
   });
+
   it('changes the ingredient route through the real store and resets scoped intent and yields', async () => {
     const first = ingredientSet('route-a', [
       { id: 'a', options: [componentOption('iron', 'iron')] },
@@ -1157,12 +1129,10 @@ describe('Journal versioned lifecycle (mounted)', () => {
       await stockJournalPrototype(actor, content, state);
       const recipes = labRecipes(content);
       const delayed = ['loading', 'error-retry'].includes(state);
-      const authority = ['authority-unavailable', 'authority-setup'].includes(state)
-        ? {
-            available: false,
-            reason: state === 'authority-setup' ? 'ledger-missing' : 'active-gm-missing',
-          }
-        : { available: true, reason: null };
+      const authority =
+        state === 'authority-unavailable'
+          ? { available: false, reason: 'active-gm-missing' }
+          : { available: true, reason: null };
       const mounted = await mountState(state, {
         initialLoad: !delayed,
         builderOptions: {
@@ -1187,10 +1157,6 @@ describe('Journal versioned lifecycle (mounted)', () => {
               activeRuns: [],
               history: [],
             });
-          }
-          if (state === 'authority-setup') {
-            services.isActiveGM = () => true;
-            services.setupJournalRunAuthority = async () => ({ success: true });
           }
         },
       });

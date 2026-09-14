@@ -221,16 +221,14 @@ Automatic crafting stops without spending when a stage needs materials, an ingre
 Choosing materials in advance does not authorize automatic material spending.
 The preference is retained when blocked, and eligible stages needing no further input can complete automatically.
 
-## GM setup and recovery
+## GM authority and recovery
 
 Current-lifecycle run changes require an active GM and a single private authority ledger.
-If the selected run reports a missing ledger, the active GM sees **Set up authority…** in the Journal.
-Before confirming, close every other GM tab and session for this world, including other tabs signed in as the same GM user.
-The confirmation explains this single-session prerequisite.
-Choosing **Not now** leaves setup untouched.
-Successful setup creates the private ledger and refreshes the Journal.
-Setup does not replace an existing ledger, resolve duplicates, or clear an interrupted operation.
-Players and other GMs see the availability reason and should ask the active GM for help.
+Fabricate creates that ledger for you.
+The active GM's client provisions it on load and again before the first run change, so there is no setup step and nothing to click.
+If two GM sessions start at the same moment, Fabricate keeps one ledger and removes the unused duplicate.
+Two ledgers that both hold records are left alone and reported, because only a person can decide which one to keep.
+While the authority is unavailable for any other reason — no GM online, an interrupted operation, or a held execution claim — the Journal and the Crafting tab state that reason instead of offering an action.
 
 If an operation stops after an effect may have happened, the Journal can show **This run needs GM attention**.
 Its evidence distinguishes confirmed effects with recorded receipts, an uncertain effect that must not be repeated, and effects not started.
@@ -239,7 +237,7 @@ Ordinary execution and cancellation remain unavailable for a run requiring recov
 
 An unresolved execution claim can also block other current-lifecycle runs.
 The active GM must inspect the recorded receipts and the uncertain boundary, then manually record a reconciliation or abandonment.
-This is a separate recovery procedure, not the **Set up authority…** action.
+Reconciliation is a separate procedure and is deliberately manual; no part of it happens automatically.
 That releases the matching claim only.
 It never retries the uncertain effect, makes the old request replayable, or automatically rolls anything back.
 The uncertain run remains marked as requiring recovery.

@@ -197,33 +197,38 @@ describe('journalStore', () => {
     });
   }
 
-  it('holds a single in-flight setup and treats cancellation and malformed replies truthfully', async () => {
-    const pending = run({ lifecycleContract: 'current', actions: { disabledReason: 'ledger-missing' } });
-    let complete;
+  // Issue 1648: manual setup is GONE. The ledger is provisioned automatically, so the only
+  // run the setup button could ever appear on is one no world reaches, and a store seam for it
+  // would be an affordance for an impossible state. What the store still owes a blocked run is
+  // its REASON, passed through untouched for the shared vocabulary to word.
+  it('offers no manual authority setup and passes a blocked run its reason untouched', async () => {
+    const blocked = run({
+      lifecycleContract: 'current',
+      actions: { disabledReason: 'ledger-missing' },
+    });
     let setupCalls = 0;
-    let listCalls = 0;
     const store = createJournalStore({ services: {
       isActiveGM: () => true,
       getSelectedActorId: () => 'actor-1',
-      listJournalForActor: async () => { listCalls += 1; return baseListing({ activeRuns: [pending] }); },
-      setupJournalRunAuthority: () => { setupCalls += 1; return new Promise((resolve) => { complete = resolve; }); },
+      listJournalForActor: async () => baseListing({ activeRuns: [blocked] }),
+      setupJournalRunAuthority: () => { setupCalls += 1; return { success: true }; },
     } });
     await store.load();
-    const first = store.setupAuthority(store.selectedRun);
-    assert.equal(store.authoritySetupBusy, true);
-    await store.setupAuthority(store.selectedRun);
-    assert.equal(setupCalls, 1);
-    complete({ cancelled: true });
-    await first;
-    assert.equal(store.authoritySetupBusy, false);
-    assert.equal(store.authoritySetupError, null);
-    assert.equal(listCalls, 1, 'cancellation performs no refresh or write');
-    const retry = store.setupAuthority(store.selectedRun);
-    complete(undefined);
-    await retry;
-    assert.equal(store.authoritySetupError.reason, 'setup-failed');
-    assert.equal(store.authoritySetupBusy, false);
-    assert.equal(listCalls, 2, 'an unconfirmed result refreshes authoritative state');
+    for (const removed of [
+      'canSetupAuthority',
+      'setupAuthority',
+      'authoritySetupBusy',
+      'authoritySetupError',
+    ]) {
+      assert.equal(removed in store, false, `${removed} is retired manual-setup surface`);
+    }
+    assert.equal(setupCalls, 0, 'the store never reaches the compatibility setup seam');
+    assert.equal(store.selectedRun.actions.disabledReason, 'ledger-missing');
+    assert.equal(
+      typeof langLeaf('FABRICATE.App.Journal.Actions.LedgerMissing'),
+      'string',
+      'and the reason the detail words it with still resolves to a real string'
+    );
   });
 
   it('loads the listing and exposes navCount from counts.active', async () => {

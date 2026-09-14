@@ -30,8 +30,6 @@ export function createJournalStore({ services } = {}) {
   let commandError = $state(null);
   let commandResult = $state(null);
   let selectionGeneration = 0;
-  let authoritySetupBusy = $state(false);
-  let authoritySetupError = $state(null);
   let commandRetry = null;
   let worldTimeTick = $state(0);
   let loadedOnce = $state(false);
@@ -233,39 +231,6 @@ export function createJournalStore({ services } = {}) {
       return advanceLegacy(run);
     }
     return runCommand(run, 'execute', payload === undefined ? { interactive: true } : payload);
-  }
-
-  // The service confirms the single-GM-session prerequisite before provisioning a missing ledger.
-  function canSetupAuthority(run) {
-    return (
-      services?.isActiveGM?.() === true &&
-      typeof services?.setupJournalRunAuthority === 'function' &&
-      run?.lifecycleContract === 'current' &&
-      run?.actions?.disabledReason === 'ledger-missing'
-    );
-  }
-
-  async function setupAuthority(run) {
-    const current = [...allActiveRuns, ...allHistoryRuns].find(
-      (candidate) => runKey(candidate, listing) === runKey(run, listing)
-    );
-    if (authoritySetupBusy || busyRunKey || !canSetupAuthority(current)) return;
-    const key = runKey(current, listing);
-    authoritySetupBusy = true;
-    authoritySetupError = null;
-    try {
-      const result = await services.setupJournalRunAuthority();
-      if (result?.cancelled === true) return;
-      if (result?.success !== true) {
-        authoritySetupError = { runKey: key, reason: result?.reason ?? 'setup-failed' };
-      }
-      await load(true);
-    } catch {
-      authoritySetupError = { runKey: key, reason: 'setup-failed' };
-      await load(true);
-    } finally {
-      authoritySetupBusy = false;
-    }
   }
 
   async function pause(run) {
@@ -509,12 +474,6 @@ export function createJournalStore({ services } = {}) {
     get commandResult() {
       return commandResult;
     },
-    get authoritySetupBusy() {
-      return authoritySetupBusy;
-    },
-    get authoritySetupError() {
-      return authoritySetupError;
-    },
     get loadedOnce() {
       return loadedOnce;
     },
@@ -568,8 +527,6 @@ export function createJournalStore({ services } = {}) {
     viewStage,
     returnToCurrentStage,
     retryCommandError,
-    canSetupAuthority,
-    setupAuthority,
     execute,
     pause,
     resume,

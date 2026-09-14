@@ -28,7 +28,6 @@ export const JOURNAL_RUN_REASON_KEYS = Object.freeze({
   'ledger-create-failed': 'FABRICATE.App.Journal.Reason.LedgerCreateFailed',
   'ledger-unsettled': 'FABRICATE.App.Journal.Reason.LedgerUnsettled',
   'ledger-ambiguous': 'FABRICATE.App.Journal.Actions.LedgerAmbiguous',
-  'ledger-already-exists': 'FABRICATE.App.Journal.AuthoritySetup.AlreadyExists',
   'secure-random-unavailable': 'FABRICATE.App.Journal.Actions.SecureRandomUnavailable',
   // ── Execution claim and recovery ──────────────────────────────────────────
   'claim-held': 'FABRICATE.App.Journal.Actions.ClaimHeld',
@@ -36,8 +35,8 @@ export const JOURNAL_RUN_REASON_KEYS = Object.freeze({
   'claim-release-failed': 'FABRICATE.App.Journal.Actions.ClaimReleaseFailed',
   'recovery-required': 'FABRICATE.App.Journal.Actions.RecoveryRequired',
   'recovery-pending': 'FABRICATE.App.Journal.Reason.RecoveryPending',
-  'reconstruction-failed': 'FABRICATE.App.Journal.AuthoritySetup.RecoveryFailed',
-  'reconstruction-unavailable': 'FABRICATE.App.Journal.AuthoritySetup.RecoveryFailed',
+  'reconstruction-failed': 'FABRICATE.App.Journal.Reason.ReconstructionFailed',
+  'reconstruction-unavailable': 'FABRICATE.App.Journal.Reason.ReconstructionUnavailable',
   'invalid-reconstruction-scope': 'FABRICATE.App.Journal.Reason.InvalidReconstructionScope',
   'invalid-disposition': 'FABRICATE.App.Journal.Reason.InvalidDisposition',
   // ── Request transport and durability ──────────────────────────────────────

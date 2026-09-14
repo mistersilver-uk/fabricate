@@ -461,8 +461,8 @@ export async function buildLabWorld({
 
   const shim = installFoundryShim(world);
   world.shim = shim;
-  // Both local and CI setup evidence start without a ledger; only the setup case views as GM.
-  if (!['authority-unavailable', 'authority-setup'].includes(journalCaseState)) {
+  // The authority-unavailable case starts without a ledger, which is what blocks its actions.
+  if (journalCaseState !== 'authority-unavailable') {
     const ledger = createLabRunAuthorityLedger();
     const journal = globalThis.game.journal;
     const get = journal.get;

@@ -1238,17 +1238,6 @@
           "LoadingPreview": "Working out your current chances…",
           "PreviewError": "Current chances could not be loaded. Showing the authored chances."
         },
-        "AuthoritySetup": {
-          "Title": "Set up Journal authority",
-          "Prerequisite": "Close all other GM tabs and sessions for this world, including other tabs signed in as you. Continue only as the active GM in a single GM session. Setup creates one private authority ledger for run changes; it never replaces an existing ledger or resolves duplicate ledgers.",
-          "Action": "Set up authority…",
-          "Confirm": "I am the only GM session — set up",
-          "Cancel": "Not now",
-          "Working": "Setting up authority…",
-          "Failed": "Journal authority setup could not be completed. Refresh the Journal before trying again; an existing ledger will not be replaced.",
-          "AlreadyExists": "A Journal authority ledger already exists. It was not replaced. Refresh the Journal for its current state.",
-          "RecoveryFailed": "The authority ledger exists, but its recovery check could not complete. Ask the active GM to inspect the retained execution claim; setup cannot replace it."
-        },
         "Reason": {
           "ActiveRun": "This character already has a run of this kind in progress. Finish or cancel it first.",
           "ActorNotFound": "That character could not be found. Reopen Fabricate and choose the character again.",
@@ -1279,7 +1268,9 @@
           "LifecycleRefused": "This run is not in a state that allows that right now. Nothing was changed.",
           "LedgerCreateDenied": "Fabricate could not set up its run record because your account cannot create journal entries. Ask your GM to grant the Create Journal Entries permission.",
           "LedgerCreateFailed": "Fabricate could not set up its run record. Try again, and tell your GM if it keeps happening.",
-          "LedgerUnsettled": "Fabricate is still settling its run record. Try again in a moment."
+          "LedgerUnsettled": "Fabricate is still settling its run record. Try again in a moment.",
+          "ReconstructionFailed": "The GM’s Journal recovery check could not complete. Ask your GM to inspect the retained execution claim before this run changes again.",
+          "ReconstructionUnavailable": "Fabricate’s Journal recovery service is unavailable on the GM’s client. Ask your GM to reload Foundry."
         },
         "Tips": {
           "Title": "Tips",
@@ -1329,7 +1320,7 @@
           "Resume": "Resume",
           "AuthorityUnavailable": "A GM must be online to change this run.",
           "ActiveGmRequired": "The active GM must process this change. Wait for GM authority to be restored.",
-          "LedgerMissing": "The Journal authority ledger is missing. Ask your GM to set it up.",
+          "LedgerMissing": "Fabricate is still setting up its run record. It is created automatically — try again in a moment.",
           "LedgerAmbiguous": "Multiple Journal authority ledgers were found. Ask your GM to resolve them.",
           "ClaimHeld": "Another Journal operation holds the execution claim. Wait for it to finish; ask your GM if it remains blocked.",
           "ClaimReleaseFailed": "The Journal execution claim could not be released. GM recovery is required before another change.",

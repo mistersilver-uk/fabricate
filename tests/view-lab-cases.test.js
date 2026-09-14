@@ -1001,7 +1001,7 @@ test('the history-data witnesses name their defining evidence on the selected re
   // The two families this one sits beside are unchanged by it.
   assert.equal(
     VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-lifecycle-')).length,
-    68
+    67
   );
   assert.equal(
     VIEW_LAB_CASES.filter((entry) => entry.id.startsWith('fabricate-journal-history-batch-')).length,
@@ -1044,7 +1044,7 @@ test('all Journal lifecycle captures assert defining product state rather than a
   const cases = VIEW_LAB_CASES.filter((entry) =>
     entry.id.startsWith('fabricate-journal-lifecycle-')
   );
-  assert.equal(cases.length, 68);
+  assert.equal(cases.length, 67);
   for (const entry of cases) {
     assert.equal(entry.expectTab, 'journal', entry.id);
     assert.ok(entry.expectSelector, `${entry.id} has an explicit assertion`);
@@ -1057,17 +1057,14 @@ test('all Journal lifecycle captures assert defining product state rather than a
   const byState = new Map(
     cases.map((entry) => [entry.id.replace('fabricate-journal-lifecycle-', ''), entry])
   );
-  const setup = byState.get('authority-setup');
-  assert.equal(setup.query.viewer, 'gm');
-  assert.equal(setup.query.journalCaseState, 'authority-setup');
-  assert.match(setup.expectSelector, /data-journal-authority-setup="ledger-missing"/);
-  assert.match(setup.expectSelector, /data-journal-authority-setup-action\]:not\(:disabled\)/);
-  assert.equal(setup.expectCenterHit, '[data-journal-authority-setup-action]');
-  assert.deepEqual(setup.position, { width: 1240, height: 880 });
+  // The manual setup frame is GONE, and its absence is asserted rather than merely not asserted:
+  // the ledger is provisioned automatically, so a GM blocked by `ledger-missing` is a state no
+  // world can reach and a frame of it would photograph a button that no longer exists.
+  assert.equal(byState.has('authority-setup'), false, 'manual authority setup was removed');
   assert.equal(
     byState.get('authority-unavailable').query.viewer,
     undefined,
-    'the existing player refusal frame is retained'
+    'the player refusal frame, which shows a blocker that still happens, is retained'
   );
   for (const state of ['stale-action', 'command-timeout']) {
     assert.match(byState.get(state).expectSelector, /data-journal-command-error/);

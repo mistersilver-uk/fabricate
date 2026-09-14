@@ -94,6 +94,23 @@ describe('journal run reason vocabulary', () => {
     );
   });
 
+  // THE OTHER DIRECTION, and it is not symmetry for its own sake. `ledger-already-exists` outlived
+  // the refusal that produced it and sat here pointing at an `AuthoritySetup.*` string for a
+  // dialog that had been deleted — unreachable, so nothing above could see it. Every HYPHENATED
+  // key is an authority reason and must still be one; the camelCase keys are the UI's own
+  // `actions.disabledReason` vocabulary and are deliberately exempt.
+  it('maps no reason the authority can no longer return', () => {
+    const derived = authorityReasons();
+    const stale = Object.keys(JOURNAL_RUN_REASON_KEYS).filter(
+      (reason) => reason.includes('-') && !derived.has(reason)
+    );
+    assert.deepEqual(
+      stale,
+      [],
+      'these entries word a refusal nothing produces; delete them with the code that raised them'
+    );
+  });
+
   it('resolves every mapped key to a real lang/en.json string', () => {
     const broken = Object.entries(JOURNAL_RUN_REASON_KEYS)
       .filter(([, key]) => typeof langLeaf(key) !== 'string')

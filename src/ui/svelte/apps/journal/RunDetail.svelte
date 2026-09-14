@@ -4,14 +4,12 @@
   import { formatAuthoredDuration, formatDurationHMS } from '../../util/formatDuration.js';
   import { statusChipTone } from '../../util/statusChipTone.js';
   import { worldTimeLabel } from '../../util/worldTimeLabel.js';
-  import { journalRunReasonMessage } from '../../util/journalRunReasons.js';
   import Callout from '../manager/Callout.svelte';
   import Chip from '../../components/Chip.svelte';
   import InspectorCard from '../../components/InspectorCard.svelte';
   import Medallion from '../../components/Medallion.svelte';
   import ListRow from '../../components/ListRow.svelte';
   import Kicker from '../../components/Kicker.svelte';
-  import ManagerButton from '../../components/ManagerButton.svelte';
   import Notice from '../../components/Notice.svelte';
   import OutcomeLadder from '../../components/OutcomeLadder.svelte';
   import RunProgress from '../../components/RunProgress.svelte';
@@ -136,16 +134,6 @@
     journal?.commandError?.runKey === runIdentity ? journal.commandError : null
   );
   const transient = $derived(journal?.commandResult?.runKey === runIdentity);
-  const canSetupAuthority = $derived(journal?.canSetupAuthority?.(run) === true);
-  const authoritySetupError = $derived(
-    journal?.authoritySetupError?.runKey === runIdentity ? journal.authoritySetupError : null
-  );
-  // Setup reports its own store-local codes (`setup-failed`) alongside authority
-  // reasons, so an unmapped code keeps the setup-specific generic.
-  const authoritySetupErrorText = $derived(
-    journalRunReasonMessage(authoritySetupError?.reason, localize) ||
-      localize('FABRICATE.App.Journal.AuthoritySetup.Failed')
-  );
   function effectPhaseText(phase) {
     const key = {
       applied: 'FABRICATE.App.Journal.Notice.EffectPhase.applied',
@@ -460,36 +448,6 @@
       tone="warning"
       title={localize('FABRICATE.App.Journal.Notice.UnsupportedTitle')}
       detail={localize('FABRICATE.App.Journal.Actions.UnsupportedLifecycle')}
-    />
-  {/if}
-
-  {#if canSetupAuthority}
-    <Notice
-      tone="warning"
-      title={localize('FABRICATE.App.Journal.AuthoritySetup.Title')}
-      detail={localize('FABRICATE.App.Journal.AuthoritySetup.Prerequisite')}
-      dataAttr="data-journal-authority-setup"
-      dataValue="ledger-missing"
-    />
-    <ManagerButton
-      role="primary"
-      disabled={journal?.authoritySetupBusy === true || Boolean(journal?.busyRunKey)}
-      aria-busy={journal?.authoritySetupBusy === true}
-      data-journal-authority-setup-action
-      onclick={() => journal?.setupAuthority?.(run)}
-      >{localize(
-        journal?.authoritySetupBusy
-          ? 'FABRICATE.App.Journal.AuthoritySetup.Working'
-          : 'FABRICATE.App.Journal.AuthoritySetup.Action'
-      )}</ManagerButton
-    >
-  {/if}
-  {#if authoritySetupError}
-    <Notice
-      tone="danger"
-      title={authoritySetupErrorText}
-      dataAttr="data-journal-authority-setup-error"
-      dataValue={authoritySetupError.reason}
     />
   {/if}
 

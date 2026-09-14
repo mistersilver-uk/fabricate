@@ -4987,17 +4987,16 @@ The completion switch is visible on an actively counting-down stage without a pl
 Its displayed choices are Ask me (`manual`) and Complete (`worldTime`); the run-level preference survives automatic blockers and never grants permission to spend editable materials automatically.
 The clock remains read-only; pausing a run never changes world time.
 
-### Explicit Authority Setup and Recovery
+### Authority Reasons and Recovery
 
-A versioned run blocked by a missing authority ledger MUST expose a visible setup action to the active GM.
-The action MUST state the single-session prerequisite before confirmation: close all other GM tabs and sessions for the world, including other tabs signed in as the same GM.
-Confirmation uses the Foundry dialog seam and invokes `setupJournalRunAuthority`; cancellation performs no setup.
-Setup MUST create one private ledger only when none exists, refuse replacement or duplicate-ledger resolution, and refresh the Journal after the attempt.
-Players and non-active GMs MUST receive the applicable authority reason rather than an actionable setup control.
+The authority ledger is provisioned automatically (`data-models/spec.md` _Authority Ledger and Recovery Boundary_), so no surface exposes a manual setup action and no player is ever asked to arrange one.
+Every authority refusal MUST instead be reported as a readable localized reason drawn from one shared vocabulary, so a refusal never surfaces as `undefined`, as a raw reason code, or as silence.
+A refusal reports the result's own message when it has one, then its localized reason, then the caller's generic failure text.
+An unmapped reason MUST fall through to that generic rather than render its own slug.
 
 Recovery details MUST distinguish confirmed receipts, an uncertain applying effect and unstarted effects without treating planned amounts as received awards.
 They MUST explain that a retained claim can block other runs until the active GM manually records a disposition through `reconcileJournalRunAuthority({ claimId, disposition })`.
-The setup action MUST NOT clear a retained claim; reconciliation follows the separate non-replayable recovery contract in `data-models/spec.md`.
+Automatic provisioning MUST NOT clear a retained claim; reconciliation remains manual and follows the separate non-replayable recovery contract in `data-models/spec.md`.
 
 ### Legacy Run Actions
 
