@@ -115,6 +115,7 @@ scripts/verify-manager-chunk-split.mjs	import-x/order
 scripts/vite-foundry-proxy.js	import-x/order
 scripts/vite-foundry-proxy.js	unicorn/no-return-array-push
 scripts/vite-foundry-proxy.js	unicorn/text-encoding-identifier-case
+src/config/settings.js	no-restricted-globals
 src/gatheringBootstrapAdapters.js	unicorn/prefer-includes-over-repeated-comparisons
 src/gatheringBootstrapAdapters.js	unicorn/prefer-spread
 src/gatheringResultCreation.js	unicorn/catch-error-name
@@ -142,6 +143,18 @@ src/main.js	unicorn/prefer-global-this
 src/main.js	unicorn/prefer-optional-catch-binding
 src/main.js	unicorn/prefer-spread
 src/main.js	unicorn/prefer-string-replace-all
+src/models/Recipe.js	no-restricted-globals
+src/systems/CoinSpenders.js	no-restricted-globals
+src/systems/CompendiumImporter.js	no-restricted-globals
+src/systems/CraftingEngine.js	no-restricted-globals
+src/systems/CraftingRunManager.js	no-restricted-globals
+src/systems/CraftingSystemManager.js	no-restricted-globals
+src/systems/FragmentDiscoveryHook.js	no-restricted-globals
+src/systems/RecipeManager.js	no-restricted-globals
+src/systems/RecipeVisibilityService.js	no-restricted-globals
+src/systems/SalvageRunManager.js	no-restricted-globals
+src/systems/currencyAffordance.js	no-restricted-globals
+src/systems/runContainerStore.js	no-restricted-globals
 src/ui/InteractableBrowserApp.svelte.js	import-x/order
 src/ui/InteractableBrowserApp.svelte.js	unicorn/catch-error-name
 src/ui/InteractableBrowserApp.svelte.js	unicorn/no-top-level-side-effects

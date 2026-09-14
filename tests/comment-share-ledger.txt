@@ -1,6 +1,6 @@
-scripts	7422
+scripts	7424
 scripts/foundry	26
-scripts/lib	14799
+scripts/lib	14692
 scripts/visual-parity	163
 scripts/visual-parity/lib	651
 src	3603
@@ -49,7 +49,7 @@ src/ui/svelte/stores	7008
 src/ui/svelte/util	3353
 src/utils	7546
 styles	7502
-tests	39982
+tests	39957
 tests/actions	155
 tests/canvas	622
 tests/canvas/regions	292
