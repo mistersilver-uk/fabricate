@@ -434,14 +434,15 @@ describe('world Tools Catalogue (issue 1373)', () => {
         );
         // The catalogue opens with its first row inspected, so "without selecting" is asserted as
         // the switch leaving the inspected row exactly where it was.
-        const inspectedBefore = [...target.querySelectorAll('[aria-current="true"]')].length;
+        const inspectedIds = () =>
+          [...target.querySelectorAll('[data-scoped-list-row][aria-current="true"]')].map(
+            (row) => row.dataset.scopedListRow
+          );
+        const inspectedBefore = inspectedIds();
+        assert.equal(inspectedBefore.length, 1, 'the catalogue did not open with one row inspected');
         toggle.click();
         await harness.setProps({});
-        assert.equal(
-          [...target.querySelectorAll('[aria-current="true"]')].length,
-          inspectedBefore,
-          'the switch changed which row is inspected'
-        );
+        assert.deepEqual(inspectedIds(), inspectedBefore, 'the switch changed which row is inspected');
         assert.equal(target.querySelector('[data-scoped-list-select="hammer"]').checked, false);
       }
       assert.deepEqual(calls, [['hammer', true], ['hammer', false]]);

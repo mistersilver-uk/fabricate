@@ -308,8 +308,8 @@ describe('criterion 5 — the per-system indicator has three distinct states', (
     // It used to be a strip of one coloured dot per crafting system in the LIST ROW. The
     // prototype's row draws none (`essences.png`), and the strip was about 90px of a 1280px row
     // spent on six identical circles whose system and state were reachable only by hovering one
-    // of them. The three states are now WORDS on the inspector's system rows, beside the Add /
-    // enable / Remove controls that act on them, which is where the prototype puts them.
+    // of them. The three states are now stated on the inspector's system rows, each of which links
+    // to that system's own Essence Rules screen, where the controls that change them live.
     //
     // So the cells are read from the inspector, which means the row has to be SELECTED first —
     // and that is also why the View Lab case for this screen now clicks a row before capturing.
@@ -351,6 +351,37 @@ describe('criterion 5 — the per-system indicator has three distinct states', (
       0,
       'the row draws no per-system strip; the prototype draws none and the inspector says it'
     );
+    pageHarness.remount();
+  });
+
+  it('draws every system row as a Rules link, member or not, with no Add button', async () => {
+    // Maintainer defect report: this inspector drew a full-width `Add to this system` button in
+    // each roster row, where the tool and component catalogues draw `[System] [Rules ↗]`. The page
+    // now takes `systemRowAction="navigate"`, so a NON-member row links to that system's Essence
+    // Rules screen too, which is where adoption happens.
+    const opened = [];
+    const root = await pageHarness.mount(
+      pageProps({ onOpenSystemRules: (entityId, systemId) => opened.push([entityId, systemId]) })
+    );
+    root.querySelector('[data-scoped-list-inspect="ash"]').click();
+    flushSync();
+    const inspector = root.querySelector('[data-scoped-list-inspector]');
+    const rows = [...inspector.querySelectorAll('[data-scoped-list-system]')];
+    assert.equal(rows.length, 3, 'one roster row per crafting system');
+    for (const row of rows) {
+      const systemId = row.getAttribute('data-scoped-list-system');
+      assert.ok(
+        row.querySelector(`[data-scoped-list-system-rules="${systemId}"]`),
+        `the ${systemId} row carries no Rules link`
+      );
+    }
+    assert.equal(
+      inspector.querySelectorAll('[data-scoped-membership-add]').length,
+      0,
+      'the roster still draws an Add button'
+    );
+    inspector.querySelector('[data-scoped-list-system-rules="sys-c"]').click();
+    assert.deepEqual(opened, [['ash', 'sys-c']], 'the non-member Rules link opens that system');
     pageHarness.remount();
   });
 
