@@ -542,7 +542,13 @@ function seedGathering(content, components, template) {
       resolutionMode: 'routed',
       durationSeconds: 6 * 3600,
       description: 'Track and take a balehound for its hide, teeth and acid glands.',
-      dc: 10,
+      // `dcOverride`, NOT `dc`. A task-level `dc` is read by nothing: the base DC is
+      // `_resolveGatheringRoutedDc`'s `task.dcOverride` -> routed slot `dc` -> 15
+      // (`src/systems/GatheringEngine.js`), and `routedOutcomeBand` in `RunJournalBuilder.js`
+      // mirrors that chain. Spelled `dc` the authored 10 was inert and every balehound band
+      // rendered off the 15 fallback, so the gathering-check frames could not be read as
+      // parity evidence for the DC they claim to show.
+      dcOverride: 10,
       resultGroups: tiers.map(([id, name, _dc, _success, awards]) => ({
         id,
         name,
