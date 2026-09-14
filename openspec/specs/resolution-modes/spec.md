@@ -257,6 +257,28 @@ The player-facing Journal screen (see `ui-integration/spec.md` *Journal App*) ma
 - Terminal recipe-backed crafting mode labels MUST use the first attempted stage carrying a captured resolution mode; an absent or unrecognized captured mode yields no mode label, never a fallback inferred from current configuration.
 Recipe-less alchemy fizzle history retains its Alchemy label.
 
+## Captured Resolution Evidence
+
+A completed managed write records the resolution it actually executed, so a run's history can be read without consulting live configuration.
+See `recipes-and-steps/spec.md` § Captured Execution Evidence for the write-side contract and `data-models/spec.md` for the persisted shape.
+
+1. Every applicable completed managed write MUST capture `resolutionSnapshot` as `{kind, mode}`, where `mode` is the resolution mode that executed and `kind` is `check`, `ingredients` or `none`.
+Legacy and version-1 immediate and timed crafting, recipe-less alchemy fizzle, native salvage, and Direct, d100, routed and legacy progressive gathering are all in scope.
+2. On crafting and salvage, `kind` is `check` when the canonical active-check derivation reported the check required or usable at execution, `ingredients` for `routedByIngredients` routing, and `none` only for a confirmed no-check resolution.
+A `simple` stage on a system with crafting checks disabled resolves to `none`, as do a no-check salvage and an alchemy fizzle.
+Native gathering derives `kind` from the task's own mode instead: Direct records `none`, and every rolled mode — d100, routed and legacy progressive — records `check`.
+Reading gathering history back therefore uses `mode`, not `kind`, to choose the terminal composition.
+A recorded `d100` check-result provider, or a recorded outcome tier, overrides the captured mode, because the stored result shape is the stronger evidence of what actually resolved.
+3. The snapshot is captured from the derivation at execution, never re-derived from configuration at read time.
+Editing or deleting the recipe, component, task, system or check configuration afterwards MUST NOT change a captured snapshot, and MUST NOT retroactively supply one.
+4. A record with no captured snapshot is **unknown**.
+Success alone MUST NOT be read as resolution evidence: an older record whose `lastCheckResult` is `{success: true, reason: 'Success', data: {}}` captured no resolution strategy and MUST read as unknown, never as a confirmed no-check resolution.
+Missing check evidence is likewise unknown rather than a confirmed absence of a check.
+5. A genuinely unattempted or cancelled resolution fact is **not applicable**, which is distinct from unknown.
+A storage or effect failure leaves the affected evidence explicitly **uncertain** under the existing no-replay and no-rollback rules; uncertainty is never resolved into invented certainty.
+6. The guarantee covers complete permitted evidence on completed managed writes.
+It does not extend to arbitrary external macro effects, and it does not promise certainty after a storage failure.
+
 ## Gathering Task Modes
 
 1. A gathering task owns its mode; absence selects `d100`, and the economy mode is inert compatibility data.
@@ -274,6 +296,7 @@ Inactive mode data may remain stored but never contributes awards jointly.
 Direct displays its one result set, d100 displays one shared roll cut against drop chances, and Check displays the complete noninteractive outcome ladder including failure.
 Progressive retains ordered component costs and accumulated-budget semantics rather than being rendered as drop chances or outcome tiers.
 Historical d100 uses recorded high-roll thresholds and cleared/missed evidence, and historical routed gathering uses its recorded check/outcome log rather than the authored preview ladder.
+Whether that d100 history shows one shared cut or each row's own recorded roll follows the roll-model rule in `ui-integration/spec.md`.
 Actual awards and terminal status remain independent evidence: all-miss d100 item rows do not themselves establish a failed run, and a permitted routed failure award does not make a failed run successful.
 
 ## Versioned Check Entitlement

@@ -175,6 +175,32 @@ Unconsumed materials remain untouched; legacy consumption and refund behavior an
 - A recipe-less alchemy fizzle persists its versioned terminal-history execution journal before recording a dead end or consuming submitted items.
 It honors the existing consume-on-failure policy and history visibility rules without revealing a recipe or replaying uncertain effects.
 
+### Captured Execution Evidence
+
+A completed managed write — a legacy or version-1 crafting stage, a recipe-less alchemy fizzle, or a native salvage run, each persisted through its own run manager — MUST capture the permitted evidence below.
+Capture is gated by initiating-viewer entitlement at write time and by current-viewer entitlement at projection time; an unknown or failing entitlement evaluation is never affirmative.
+The evidence records what that write actually did, so deleting the recipe, component, task or system configuration afterwards cannot change it.
+
+- **Executed resolution.** Every such write MUST record `resolutionSnapshot` as `{kind, mode}` for the resolution it executed, derived from the canonical active-check derivation at execution rather than from configuration read back later.
+A legacy timed crafting stage captures it on the finishing write rather than on the arming write, because the resolution is unknowable while the gate is still running.
+- **Physical effects.** Consumption and awards MUST be captured at the actual update or delete boundary: require the matching document's acknowledgment, derive each decrement from the captured source quantity, and capture name, image and actor-qualified identity before deletion.
+A requested plan, a swallowed failure, or a calculated after-value alone MUST NOT establish complete consumption.
+Native salvage `consumedComponents` additionally carry `actorUuid`, `name` and `img` while preserving their existing `itemUuid`, `quantity`, lifecycle and public signatures.
+A fizzle record MAY carry permitted `consumedIngredients` and `createdResults` and its explicit no-match, no-check meaning, without a synthetic crafting stage, recipe id or signature.
+- **Settlement state.** `historySettlement.consumption` and `historySettlement.awards` each take `pending`, `complete`, `uncertain` or `notApplicable`, as defined in `data-models/spec.md`.
+A genuinely unattempted fact — a consume-on-failure policy that consumes nothing, a stage armed and waiting — is `notApplicable`, which is neither unknown nor zero.
+A confirmed prefix is retained separately from an uncertain remainder; `pending` and `uncertain` prove no award and authorize no replay, rollback or automatic compensation.
+A further invocation on the same native run MUST refuse while an invoked effect is pending or uncertain or a settlement has failed, through the existing lifecycle and signatures; ordinary timed waiting is not an invoked pending effect.
+- **Five distinct states.** Unknown, withheld, not applicable, complete-empty and uncertain are five separate states, decided per row and per field.
+Missing evidence MUST NOT be rendered as a confirmed no-check resolution, as zero, or as an award.
+Withheld evidence MUST NOT be encoded as a complete empty receipt.
+- **No inference from success.** An older record carrying no captured `resolutionSnapshot` is unknown, whatever its recorded check result says.
+A `lastCheckResult` of `{success: true, reason: 'Success', data: {}}` carries no captured resolution strategy and MUST read as unknown, never as a confirmed no-check resolution.
+- **Identity fallbacks never supply a quantity.** A historical metadata fallback MAY supply a missing name or image under the precedence in `data-models/spec.md`, and MUST NOT supply, copy or scale a quantity, contribution or operational state.
+
+These fields are optional on older records and allowlisted before persistence.
+They change no existing contract: the crafting and gathering economies, legacy cancellation and refund behaviour, permitted failure awards, execution authority, the no-replay rule, and the native salvage lifecycle and public signatures all remain as specified elsewhere in this spec.
+
 ### Start or Resume
 
 1. Resolve recipe and active step.

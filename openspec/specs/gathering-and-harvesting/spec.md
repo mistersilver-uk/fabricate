@@ -914,6 +914,35 @@ A retained global authority claim can also block unrelated versioned runs until 
 - Versioned cancellation forfeits elapsed time and retains costs already incurred and awards already delivered.
 It releases applicable reservations without refunding sunk costs or touching unconsumed materials.
 
+## Native Gathering History Settlement
+
+Native (unversioned) gathering retains its existing terminal-history-before-effects ordering and introduces no new execution-policy deviation.
+The terminal record is persisted first with an empty planned `createdResults`, `historySettlement.awards` of `pending`, and an applicable `resolutionSnapshot` naming the resolution the task actually executed.
+The existing terminal effects then run in their existing order, and the actual receipts MUST settle into that same terminal record, by run id, on the same actor, through the run manager's document-coherent persistence.
+
+- Settlement MUST NOT append a second terminal record, discard concurrently written history, or overwrite settled evidence with a stale pending copy.
+Every gathering persistence path, not the settlement method alone, MUST preserve a settled same-id record against a stale in-memory copy.
+Settling a record whose awards are already `complete` or `uncertain` MUST return the stored record unchanged rather than settle it twice.
+- The terminal response, the posted chat card and the completion publication MUST report the settled actual receipts rather than the pre-effect plan.
+- A failed or partially applied terminal effect MUST record `uncertain` awards, retain its confirmed receipt prefix, and authorize neither replay nor an automatic refund.
+Confirmed legacy cancellation and refund behaviour is unchanged, and uncertainty never triggers one.
+- Pending and uncertain awards project as unknown rather than as zero.
+An existing legacy reported array keeps its existing meaning, so an empty `createdResults` on a succeeded record still reads as zero.
+An older FAILED record is the exception: earlier normalization erased its award refs, so its empty array proves nothing and remains unknown unless an explicit `complete` awards settlement says otherwise.
+- A versioned deliberate no-award branch MUST record an applied empty result receipt without invoking item creation, so a decided zero stays distinguishable from an absent effect.
+- An opaque blind record settles with redacted evidence: it records no itemized receipts and no awards settlement, so its withheld awards remain withheld rather than becoming a confirmed empty.
+
+### Row and Source Linkage
+
+- Every evaluated result row MUST receive a stable `resultRowId` on the evaluated input, before route selection or row filtering, so duplicate component or source rows stay distinct.
+Rendering order MUST NOT reconstruct that identity.
+- History MUST preserve the evaluated rows, which of them were selected, and the linkage between a selected row and its actual receipt.
+- An actual award ref MUST carry the `sourceItemUuid` creation actually used, distinct from the owned destination `itemUuid`.
+- Result creation and shared component stacking MUST require the matching Item document's acknowledgment and derive each delta from the stored source quantity rather than from prepared data.
+An undefined or wrong document return, a short create, or a throw MUST NOT produce a positive receipt.
+Each invocation owns immutable receipts captured at the write, including repeated awards onto one document, so no cumulative mutable award tag can supply a later row's or run's amount.
+- Recorded d100 rows retain their native high-roll semantics, and the resolver's status stays independent of award presence, exactly as specified above.
+
 ## Straight Gathering Resolution
 
 ### Requirements
