@@ -301,7 +301,6 @@ src/systems/worldScopeStores.js
 src/systems/worldVocabulary.js
 src/systems/writableActors.js
 src/toolBreakageRuntime.js
-src/utils/FormulaEvaluator.js
 src/utils/MacroExecutor.js
 src/utils/alchemySignatureKey.js
 src/utils/alchemySubmissions.js

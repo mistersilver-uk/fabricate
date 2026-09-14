@@ -447,8 +447,9 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/systems/stepRecipeView.js',
   // Same rule, issue 1075: the builder's SUMMARY phase projects each browsable recipe
   // through #1091's canonical summary, which reads held quantities from #1077's per-pass
-  // inventory snapshot. These SEVEN entries are that projection's whole transitive closure —
-  // summaryProjection -> componentCategories + inventorySnapshot, and inventorySnapshot ->
+  // inventory snapshot. These EIGHT entries are that projection's whole transitive closure —
+  // summaryProjection -> componentCategories + inventorySnapshot, componentCategories ->
+  // categoryNormalization (issue 1663, an import-free leaf), and inventorySnapshot ->
   // config/flags + itemStackQuantity -> stackQuantityPathPresets + objectPath. (Its other
   // FOUR imports — craftingImageDefaults, recipeCategories, craftingBrowseStatus and
   // stepRecipeView — are already listed above.)
@@ -462,6 +463,9 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   // happens to reach.
   'src/systems/summaryProjection.js',
   'src/utils/componentCategories.js',
+  // Since #1663 the component and recipe category modules are aliasing shims, and this is
+  // the ONE implementation behind both; it imports nothing, so one entry closes the graph.
+  'src/utils/categoryNormalization.js',
   'src/systems/inventorySnapshot.js',
   'src/config/flags.js',
   'src/systems/itemStackQuantity.js',
@@ -483,8 +487,10 @@ export const CRAFTING_APP_RAW_MODULES = Object.freeze([
   'src/utils/sourceReferenceUnion.js',
   // CraftingListingBuilder imports these category helpers (issue 514); the builder
   // is already in the mounted graph, so this transitive dep must be copied too or
-  // the mounted crafting tests hang (# cancelled). recipeCategories.js has no
-  // imports of its own, so this single entry suffices.
+  // the mounted crafting tests hang (# cancelled). Since #1663 recipeCategories.js is an
+  // aliasing shim over `categoryNormalization.js` rather than an import-free leaf, so it no
+  // longer suffices on its own — the one implementation behind it is listed above, and THAT
+  // module imports nothing, so the two entries close the graph.
   'src/utils/recipeCategories.js',
   // Same rule, issue 651: the builder now derives each progressive stage's cumulative
   // "reached at >=N" threshold through this helper. Both of these are deliberately

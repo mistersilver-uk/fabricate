@@ -68,10 +68,26 @@ describe('component category helpers (issue 676)', () => {
   });
 
   it('is a SIBLING of the recipe vocabulary, not an alias of it (AC7)', () => {
-    // The two normalizers share a reserved token STRING but must never share a list.
-    // This is the property decision 5 bought: reuse would have leaked component
-    // categories (Reagent/Metal/Herb) into the Recipe Studio's filter and the
-    // player-facing RecipeListingModel.category filter, and vice versa.
+    // WHAT THIS TEST PROVES, AND WHAT IT NO LONGER PROVES, SINCE #1663.
+    //
+    // The six component helpers and the six recipe helpers are now ONE implementation in
+    // `src/utils/categoryNormalization.js`, re-exported under both families of names. So
+    // `GENERAL_COMPONENT_CATEGORY === GENERAL_RECIPE_CATEGORY` is literally `x === x`, and both
+    // `normalizeCustom*` calls below are the SAME function — the disjointness loop therefore
+    // asserts only that two literal arrays written in this file are disjoint from each other.
+    // Neither assertion can see a leak.
+    //
+    // THE INDEPENDENCE STILL HOLDS WHERE IT IS SPEC'D, which is at the stored data rather than
+    // at the normaliser: `CraftingSystem.componentCategories` and `CraftingSystem.categories`
+    // are separate stored keys with separate call sites, and merging, aliasing or
+    // cross-populating them remains forbidden by `openspec/specs/data-models/spec.md`. That is
+    // the property the STORE-LEVEL suites witness — `tests/component-category-normalization.test.js`'s
+    // 'componentCategories and categories stay independent vocabularies (AC7)' over the real
+    // `CraftingSystemManager._normalizeSystem`, and `tests/admin-store-vocabulary-cascade.test.js`
+    // over the adminStore write ops — not this one.
+    //
+    // KEPT, DELIBERATELY, as the public-name smoke: both families are still reachable under
+    // their own names, from their own module paths, with the shape callers expect.
     assert.equal(GENERAL_COMPONENT_CATEGORY, GENERAL_RECIPE_CATEGORY);
 
     const componentVocabulary = normalizeCustomComponentCategories(['Reagent', 'Metal']);

@@ -1194,8 +1194,10 @@ describe('the catalogue shell FORWARDS what it declares', () => {
  */
 describe('componentScoped.js stays the import-free leaf its consumers assume', () => {
   const LEAF = `${SCOPED_DIR}/componentScoped.js`;
-  // The ONE import this leaf may hold. It is itself import-free, and it is already in every
-  // manifest that carries this file.
+  // The ONE import this leaf may hold. Since #1663 it is an ALIASING SHIM over
+  // `src/utils/categoryNormalization.js` rather than an import-free module of its own, so a
+  // manifest that carries this file must carry BOTH; neither has any further import, so the pair
+  // closes the graph.
   const ALLOWED = ['src/utils/componentCategories.js'];
 
   function importedPaths() {

@@ -36,6 +36,9 @@ const panel = createMountedComponentHarness({
     // The remove leg's focus/announce ordering rule (issue 1157), ported from `BulkDeleteCard`.
     'src/ui/svelte/util/announceAfterFocus.js',
     'src/utils/componentCategories.js',
+    // Since #1663 the component and recipe category modules are aliasing shims, and this is
+    // the ONE implementation behind both; it imports nothing, so one entry closes the graph.
+    'src/utils/categoryNormalization.js',
     // The pure selection + staging model, and the inset pager and `n/N` counts beside it.
     'src/utils/componentBulkEditModel.js',
     // Its shared leaf (issue 1010): a STATIC import of that module.

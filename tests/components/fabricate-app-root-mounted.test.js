@@ -114,6 +114,9 @@ const harness = createMountedComponentHarness({
     // the salvage fired tense. Its closure is complicationPlan -> componentComplications.
     'src/utils/complicationPlan.js',
     'src/utils/componentCategories.js',
+    // Since #1663 the component and recipe category modules are aliasing shims, and this is
+    // the ONE implementation behind both; it imports nothing, so one entry closes the graph.
+    'src/utils/categoryNormalization.js',
     'src/utils/componentComplications.js',
     'src/utils/craftingCheckExpression.js',
     'src/utils/definitionIndex.js',
