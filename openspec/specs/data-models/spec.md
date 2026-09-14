@@ -3045,9 +3045,22 @@ The authority MUST re-resolve the actor, sender ownership, source actors, run re
 The actor UUID identifies the command target; ownership MUST be checked against the attested sender rather than the executing GM's ambient `isOwner`.
 A local queue or revision comparison alone MUST NOT be treated as a cross-browser lock.
 
-The authority requires exactly one private JournalEntry ledger, provisioned explicitly by the active GM in a single GM session.
-Missing or multiple ledgers MUST block versioned mutations; setup MUST NOT replace an existing ledger or silently elect one among duplicates.
+The authority requires exactly one private JournalEntry ledger.
+The active GM MUST provision it automatically when the world holds none, during boot recovery and at the start of the command path, and MUST then run boot reconstruction against it.
+A non-GM realm MUST NOT provision a ledger and keeps its active-GM refusal.
+Provisioning MUST use a server-assigned top-level `_id`, never a fixed one: only the embedded duplicate-`_id` check is enforced, so a fixed top-level `_id` silently overwrites the existing ledger and its durable request state.
+A refused create — `JOURNAL_CREATE` is a revocable user permission — MUST surface its own availability reason rather than an unlabelled failure.
+
+Duplicate ledgers MUST be resolved without a human wherever that is provably safe.
+The active GM MUST rank candidates with a deterministic total order every session computes from the same stored values — a ledger holding durable evidence before a pristine one, then the server-assigned `_stats.createdTime`, then the lowest `_id` — where a pristine ledger is one with no recorded requests, no active prepare tokens and no claim page.
+`_stats.createdTime` is a server wall clock and MUST NOT be read as "first created"; it is a shared value the order converges on.
+Only a pristine non-winner may be deleted, and two or more ledgers holding durable evidence MUST remain `ledger-ambiguous` for a person to resolve.
+Because the client world collection is broadcast-fed, arbitration MUST resolve candidates through an authoritative server read, issued GM-side only because that read is not permission-filtered, ranking its detached documents and acting by ID against the live collection.
+A ledger deleted by a racing session mid-operation MUST be treated as replaced rather than failed: claim creation, receipt writes and prepare-token persistence MUST retry against the surviving ledger after relisting.
+Explicit setup remains available as an idempotent ensure that returns the existing ledger rather than refusing it.
+
 The ledger holds durable request outcomes and one-use prepare tokens; an embedded JournalEntryPage with a fixed ID and `keepId` arbitrates the global execution claim.
+`keepId` is load-bearing: without it the server discards the fixed ID silently, and the cross-browser lock stops existing rather than failing.
 Its claim MUST NOT expire automatically, because an interrupted operation may already have produced irreversible effects.
 This arbitration and the execution journal are not a transaction across Foundry document writes, macros and publications, and MUST NOT be described as atomic execution or automatic rollback.
 
@@ -3057,6 +3070,10 @@ For a retained claim, `reconcileJournalRunAuthority({ claimId, disposition })` r
 It MUST reconstruct that claim's matching execution evidence and durably record the disposition before releasing the claim.
 Reconciliation releases the authority claim only; the prior request remains non-replayable and any uncertain run effect remains recovery-required.
 A retained claim can block other versioned runs, and its availability reason MUST remain visible.
+
+A refusal raised by an in-memory lifecycle guard before any document write MUST be reported as a refusal and MUST release its claim, even when the operation had already redeemed a mutating execution grant: redemption records intent, not an applied effect.
+An operation that fails by throwing remains uncertain, MUST retain its claim, and MUST stay recovery-required until reconciliation.
+The recovery rule MUST NOT be widened beyond the provable pre-write case, because releasing a genuinely half-applied effect is worse than the block it removes.
 
 Command replies MUST use transport-level recipient routing as well as attested-GM and recipient/session/request/run/revision correlation.
 The private ledger MUST NOT be copied into actor flags or reply payloads.

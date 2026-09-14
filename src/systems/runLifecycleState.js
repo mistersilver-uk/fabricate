@@ -15,6 +15,23 @@ export class RunLifecycleError extends Error {
 }
 
 /**
+ * Run a guarded persistence call, returning its refusal instead of throwing it.
+ * Every guard here runs in memory before the location persists, so a `RunLifecycleError`
+ * escaping `mutate` provably wrote nothing; any other error may have half-applied and is
+ * rethrown so the authority keeps its claim for reconciliation.
+ * @param {Function} mutate Async call ending in `location.persist()`.
+ * @returns {Promise<{run?: object|null, refused?: {code: string, message: string}}>}
+ */
+export async function applyGuardedRunMutation(mutate) {
+  try {
+    return { run: await mutate() };
+  } catch (error) {
+    if (!(error instanceof RunLifecycleError)) throw error;
+    return { refused: { code: error.code, message: error.message } };
+  }
+}
+
+/**
  * Classify without coercion or migration. A present undefined/null/string version is unsupported.
  * @param {object|null} run
  * @returns {'legacy'|'current'|'unsupported'}
@@ -163,7 +180,9 @@ export function applyResume(run, { now, expectedRevision } = {}) {
   const remainingSeconds = Math.max(0, finiteNumber(run.pauseState.remainingSeconds, 0));
   run.pausedDurationSeconds =
     Math.max(0, finiteNumber(run.pausedDurationSeconds, 0)) + Math.max(0, resumedAt - pausedAt);
-  delete run.pauseState;
+  // An explicit null, never `delete`: the run container persists through a merging flag write,
+  // which drops a removed key silently and lets the stale pause resurrect on the next cold read.
+  run.pauseState = null;
   incrementRunRevision(run);
   return { run, availableAt: resumedAt + remainingSeconds };
 }
@@ -226,6 +245,7 @@ function normalizeCurrentFields(data) {
   };
   const pauseState = normalizePauseState(data.pauseState);
   if (pauseState) fields.pauseState = pauseState;
+  else if (data.pauseState === null) fields.pauseState = null;
   return fields;
 }
 

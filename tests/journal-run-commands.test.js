@@ -8,6 +8,9 @@ import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
 import { resolveAlchemySubmissions } from '../src/utils/alchemySubmissions.js';
 import { resolvedComponentsFor } from '../src/systems/scopedEntityReads.js';
+import { applyGuardedRunMutation } from '../src/systems/runLifecycleState.js';
+import { createJournalRunAuthority } from '../src/systems/journalRunAuthority.js';
+import { mergeHistoryFlag } from './helpers/journal-fixtures.js';
 
 import {
   JOURNAL_RUN_SOCKET_KIND,
@@ -89,7 +92,8 @@ describe('journal run command protocol', () => {
     const end = source.indexOf('function createJournalCommandsForFabricate(', start);
     assert.ok(start >= 0 && end > start, 'the production operation factory must be present');
     return compileFunction(`${source.slice(start, end)}\nreturn createCraftingJournalOperations;`,
-      ['resolveAlchemySubmissions', 'resolvedComponentsFor'])(resolveAlchemySubmissions, resolvedComponentsFor);
+      ['resolveAlchemySubmissions', 'resolvedComponentsFor', 'applyGuardedRunMutation'])(
+        resolveAlchemySubmissions, resolvedComponentsFor, applyGuardedRunMutation);
   }
 
   for (const kind of ['crafting', 'matched-alchemy', 'fizzle']) {
@@ -1403,4 +1407,173 @@ describe('journal run command protocol', () => {
       'active-run'
     );
   });
+});
+
+describe('journal run pause lifecycle at the real command boundary', () => {
+  function loadCraftingOperations() {
+    const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+    const start = source.indexOf('async function resolveJournalSourceActors(');
+    const end = source.indexOf('function createJournalCommandsForFabricate(', start);
+    assert.ok(start >= 0 && end > start, 'the production operation factory must be present');
+    return compileFunction(`${source.slice(start, end)}\nreturn createCraftingJournalOperations;`, [
+      'resolveAlchemySubmissions',
+      'resolvedComponentsFor',
+      'applyGuardedRunMutation',
+    ])(resolveAlchemySubmissions, resolvedComponentsFor, applyGuardedRunMutation);
+  }
+
+  // A merging flag write, like Foundry's: `setFlag` never removes a key deleted from a nested
+  // object, which is what made a resume vanish and deadlock the next pause.
+  function mergingActor() {
+    const flags = {};
+    return {
+      id: 'crafter',
+      uuid: 'Actor.crafter',
+      isOwner: true,
+      items: [],
+      getFlag: (scope, key) => flags[scope]?.[key],
+      async setFlag(scope, key, value) {
+        flags[scope] ??= {};
+        flags[scope][key] = mergeHistoryFlag(flags[scope][key], value);
+        return this;
+      },
+    };
+  }
+
+  async function pauseHarness() {
+    let seq = 0;
+    globalThis.foundry = { utils: { randomID: () => `rid-${(seq += 1)}` } };
+    const actor = mergingActor();
+    const gm = { id: 'gm', isGM: true };
+    globalThis.game = { user: gm, time: { worldTime: 1000 }, actors: [actor] };
+    globalThis.fromUuid = async (uuid) => (uuid === actor.uuid ? actor : null);
+
+    const manager = new CraftingRunManager();
+    const run = await manager.createRun(
+      actor,
+      {
+        id: 'recipe-pause',
+        craftingSystemId: 'system',
+        getExecutionSteps: () => [{ id: 'step-1', name: 'Wait' }],
+      },
+      [actor],
+      'gm',
+      { lifecycleVersion: 1, completionMode: 'worldTime' }
+    );
+    await manager.markStepWaitingForTime(actor, run, 0, { minutes: 2 });
+
+    const ledger = { id: 'ledger', state: null, claim: null };
+    const authority = createJournalRunAuthority({
+      currentUser: () => gm,
+      activeGM: () => gm,
+      listLedgers: async () => [ledger],
+      createLedger: async () => ledger,
+      deleteLedger: async () => {},
+      readState: async () => structuredClone(ledger.state),
+      writeState: async (_entry, state) => {
+        ledger.state = structuredClone(state);
+      },
+      createClaim: async (_entry, source) => {
+        if (ledger.claim) throw new Error('duplicate embedded id');
+        ledger.claim = { ...source };
+        return ledger.claim;
+      },
+      readClaim: async () => ledger.claim,
+      deleteClaim: async (_entry, claimId) => {
+        if (ledger.claim?.claimId !== claimId) return false;
+        ledger.claim = null;
+        return true;
+      },
+      reconstructExecutions: async () => ({ success: true, reconstructed: 0 }),
+      randomId: () => `claim-${(seq += 1)}`,
+    });
+
+    let service = null;
+    const operations = loadCraftingOperations()({ craftingRunManager: manager }, () => service);
+    service = createJournalRunCommandService({
+      authority,
+      currentUser: () => gm,
+      activeGM: () => gm,
+      getUser: () => gm,
+      resolveUuid: async (uuid) => (uuid === actor.uuid ? actor : null),
+      emit: () => {},
+      randomId: () => `request-${(seq += 1)}`,
+      operations: { crafting: operations },
+    });
+
+    const command = (action, expectedRevision) =>
+      service.executeJournalRunCommand({
+        actorUuid: actor.uuid,
+        runType: 'crafting',
+        runId: run.id,
+        expectedRevision,
+        action,
+        payload: {},
+      });
+    return { actor, authority, command, ledger, manager, run };
+  }
+
+  function withGlobals(body) {
+    return async () => {
+      const saved = {
+        game: globalThis.game,
+        foundry: globalThis.foundry,
+        fromUuid: globalThis.fromUuid,
+      };
+      try {
+        await body();
+      } finally {
+        for (const [key, value] of Object.entries(saved)) {
+          if (value === undefined) delete globalThis[key];
+          else globalThis[key] = value;
+        }
+      }
+    };
+  }
+
+  it(
+    'pauses, resumes and pauses again without the resume being lost to the flag merge',
+    withGlobals(async () => {
+      const { command, manager, actor, run } = await pauseHarness();
+
+      globalThis.game.time.worldTime = 1030;
+      const paused = await command('pause', 1);
+      assert.equal(paused.success, true);
+      assert.equal(paused.runRevision, 2);
+
+      globalThis.game.time.worldTime = 1130;
+      const resumed = await command('resume', 2);
+      assert.equal(resumed.success, true);
+      assert.equal(resumed.runRevision, 3);
+      manager.invalidateCache(actor.id);
+      assert.equal(manager.getActiveRun(actor, run.id).pauseState, null);
+
+      const repaused = await command('pause', 3);
+      assert.equal(repaused.success, true, repaused.message ?? repaused.reason);
+      assert.equal(repaused.runRevision, 4);
+    })
+  );
+
+  it(
+    'releases the execution claim when a pause refusal wrote nothing',
+    withGlobals(async () => {
+      const { command, authority, ledger } = await pauseHarness();
+
+      globalThis.game.time.worldTime = 1030;
+      assert.equal((await command('pause', 1)).success, true);
+
+      const refused = await command('pause', 2);
+
+      assert.equal(refused.success, false);
+      assert.equal(refused.reason, 'lifecycle-refused');
+      assert.equal(refused.message, 'The run is already paused');
+      assert.equal(ledger.claim, null, 'a refusal that wrote nothing releases its claim');
+      assert.deepEqual(authority.availability(), { available: true, reason: null });
+      assert.equal(
+        (await command('resume', 2)).success,
+        true,
+        'the run stays usable rather than needing GM recovery'
+      );
+    })
+  );
 });

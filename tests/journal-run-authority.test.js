@@ -8,8 +8,15 @@ import {
   createJournalRunAuthority,
 } from '../src/systems/journalRunAuthority.js';
 
+/**
+ * Models the V13.351/V14.365 server rules the arbitration rests on: `keepId` is what preserves a
+ * requested embedded `_id` (without it the id is silently replaced by a fresh one), and only then
+ * does the parent collection's duplicate-`_id` check reject the second create.
+ */
 function foundryAuthorityFixture(crypto) {
   const journal = [];
+  const claimCalls = [];
+  let generatedPageIds = 0;
   const makeEntry = (source) => {
     let state = source.flags.fabricate.journalRunAuthorityState;
     const pages = new Map();
@@ -26,11 +33,15 @@ function foundryAuthorityFixture(crypto) {
       get state() {
         return state;
       },
-      createEmbeddedDocuments: async (_type, [pageSource]) => {
-        const page = {
-          id: pageSource._id,
-          getFlag: (scope, key) => pageSource.flags?.[scope]?.[key],
-        };
+      createEmbeddedDocuments: async (_type, [pageSource], options = {}) => {
+        claimCalls.push({ source: pageSource, options });
+        generatedPageIds += 1;
+        const id =
+          options.keepId && pageSource._id ? pageSource._id : `generated-${generatedPageIds}`;
+        if (pages.has(id)) {
+          throw new Error(`The _id [${id}] already exists within the parent collection`);
+        }
+        const page = { id, getFlag: (scope, key) => pageSource.flags?.[scope]?.[key] };
         pages.set(page.id, page);
         return [page];
       },
@@ -52,20 +63,41 @@ function foundryAuthorityFixture(crypto) {
       return entry;
     },
   };
-  return createFoundryJournalRunAuthority({
+  const authority = createFoundryJournalRunAuthority({
     game,
     JournalEntry,
     crypto,
     reconstructExecutions: async () => ({ success: true, reconstructed: 0 }),
   });
+  return Object.assign(authority, { claimCalls, journal, makeEntry });
 }
 
 function sharedAuthorityWorld() {
-  const records = [];
+  const server = new Map();
   const log = [];
-  let ledger = null;
   let nextId = 0;
   let currentTime = 1000;
+  let createdTime = 5000;
+  let ledgerSeq = 0;
+
+  function addLedger(state = null) {
+    ledgerSeq += 1;
+    createdTime += 10;
+    const ledger = {
+      id: ledgerSeq === 1 ? 'ledger' : `ledger-${ledgerSeq}`,
+      createdTime,
+      source: { ownership: { default: 0 }, flags: { fabricate: {} } },
+      state: state ?? { version: 1, requests: {}, prepareTokens: {}, reconciliations: [] },
+      claim: null,
+    };
+    server.set(ledger.id, ledger);
+    return ledger;
+  }
+
+  function present(entry) {
+    if (!server.has(entry?.id)) throw new Error('ledger deleted');
+    return entry;
+  }
 
   const realm = (
     userId = 'gm',
@@ -73,28 +105,44 @@ function sharedAuthorityWorld() {
       reconstructExecutions = async () => ({ success: true, reconstructed: 0 }),
       getCurrentUser = () => ({ id: userId, isGM: userId === 'gm' }),
       getActiveGM = () => ({ id: 'gm', active: true, isGM: true }),
+      canCreateLedger = () => true,
+      beforeCreate = null,
+      beforeClaim = null,
+      beforeWrite = null,
     } = {}
   ) =>
     createJournalRunAuthority({
       currentUser: getCurrentUser,
       activeGM: getActiveGM,
-      listLedgers: async () => (ledger ? [ledger] : []),
+      listLedgers: async () => [...server.values()],
+      listLedgerRecords: async () =>
+        [...server.values()].map((entry) => ({ id: entry.id, createdTime: entry.createdTime })),
+      canCreateLedger,
       createLedger: async (source) => {
-        ledger = { id: 'ledger', source, state: source.state, claim: null };
+        await beforeCreate?.();
+        const ledger = addLedger(source.state);
+        ledger.source = source;
+        log.push(['create', ledger.id]);
         return ledger;
       },
-      readState: async (entry) => structuredClone(entry.state),
+      deleteLedger: async (entry) => {
+        log.push(['delete', entry.id]);
+        server.delete(entry.id);
+      },
+      readState: async (entry) => structuredClone(present(entry).state),
       writeState: async (entry, state) => {
+        await beforeWrite?.(entry);
         log.push(['write', structuredClone(state)]);
-        entry.state = structuredClone(state);
+        present(entry).state = structuredClone(state);
       },
       createClaim: async (entry, source) => {
+        await beforeClaim?.(entry);
         log.push(['claim', source.claimId]);
-        if (entry.claim) throw new Error('duplicate embedded id');
+        if (present(entry).claim) throw new Error('duplicate embedded id');
         entry.claim = { id: JOURNAL_RUN_CLAIM_PAGE_ID, ...structuredClone(source) };
         return entry.claim;
       },
-      readClaim: async (entry) => entry.claim,
+      readClaim: async (entry) => present(entry).claim,
       deleteClaim: async (entry, claimId) => {
         log.push(['release', claimId]);
         if (entry.claim?.claimId !== claimId) return false;
@@ -109,9 +157,11 @@ function sharedAuthorityWorld() {
   return {
     realm,
     log,
-    records,
+    addLedger,
+    removeLedger: (id) => server.delete(id),
+    ledgers: () => [...server.values()],
     get ledger() {
-      return ledger;
+      return [...server.values()][0] ?? null;
     },
     setNow(value) {
       currentTime = value;
@@ -122,6 +172,43 @@ function sharedAuthorityWorld() {
 describe('journal run authority ledger', () => {
   it('uses the one global fixed 16-character embedded page id', () => {
     assert.equal(JOURNAL_RUN_CLAIM_PAGE_ID.length, 16);
+  });
+
+  it('creates the arbitrating claim page with keepId, whose absence is a silent no-op', async () => {
+    const authority = foundryAuthorityFixture({ randomUUID: () => 'secure-uuid' });
+    assert.equal((await authority.setup()).success, true);
+    const claim = authority.claimCalls.at(0);
+    assert.equal(claim.source._id, JOURNAL_RUN_CLAIM_PAGE_ID);
+    assert.deepEqual(claim.options, { keepId: true });
+
+    const ledger = authority.journal.at(0);
+    await ledger.createEmbeddedDocuments('JournalEntryPage', [{ _id: JOURNAL_RUN_CLAIM_PAGE_ID }], {
+      keepId: true,
+    });
+    await assert.rejects(
+      () =>
+        ledger.createEmbeddedDocuments(
+          'JournalEntryPage',
+          [{ _id: JOURNAL_RUN_CLAIM_PAGE_ID }],
+          { keepId: true }
+        ),
+      /already exists within the parent collection/,
+      'the lock exists only because the server rejects a duplicate embedded id'
+    );
+
+    // Mutation control for the invisible half: dropping `keepId` raises NO error. The fixed id
+    // is discarded, a fresh one is written, and the cross-browser lock quietly stops existing.
+    const withoutKeepId = authority.makeEntry({
+      flags: { fabricate: { journalRunAuthorityState: {} } },
+    });
+    const [first] = await withoutKeepId.createEmbeddedDocuments('JournalEntryPage', [
+      { _id: JOURNAL_RUN_CLAIM_PAGE_ID },
+    ]);
+    const [second] = await withoutKeepId.createEmbeddedDocuments('JournalEntryPage', [
+      { _id: JOURNAL_RUN_CLAIM_PAGE_ID },
+    ]);
+    assert.notEqual(first.id, JOURNAL_RUN_CLAIM_PAGE_ID);
+    assert.notEqual(first.id, second.id);
   });
 
   it('uses Web Crypto UUIDs for authority claims and prepare tokens', async () => {
@@ -168,20 +255,226 @@ describe('journal run authority ledger', () => {
     assert.doesNotMatch(source, /Math\.random/);
   });
 
-  it('requires explicit active-GM setup and creates a private ledger once', async () => {
+  it('provisions one private ledger for the active GM and keeps setup an idempotent ensure', async () => {
     const world = sharedAuthorityWorld();
     const player = world.realm('player');
     assert.deepEqual(await player.setup(), {
       success: false,
       reason: 'active-gm-required',
     });
+    assert.deepEqual(world.ledgers(), [], 'a player realm never provisions a ledger');
 
     const gm = world.realm();
-    assert.equal((await gm.availability()).reason, 'ledger-missing');
-    assert.equal((await gm.setup()).success, true);
+    assert.equal(gm.availability().reason, 'ledger-missing');
+    assert.deepEqual(await gm.setup(), { success: true, ledgerId: 'ledger' });
+    assert.equal(world.ledgers().length, 1);
     assert.equal(world.ledger.source.ownership.default, 0);
     assert.equal(world.ledger.source.flags.fabricate.journalRunAuthorityLedger, true);
-    assert.deepEqual(await gm.setup(), { success: false, reason: 'ledger-already-exists' });
+    assert.deepEqual(await gm.setup(), { success: true, ledgerId: 'ledger' });
+    assert.equal(world.ledgers().length, 1, 'the ensure never provisions a second ledger');
+  });
+
+  it('provisions on boot recovery and on a first command, with no explicit setup at all', async () => {
+    const booted = sharedAuthorityWorld();
+    const scopes = [];
+    const booting = booted.realm('gm', {
+      reconstructExecutions: async (scope) => (scopes.push(scope), { success: true }),
+    });
+    assert.deepEqual(await booting.bootstrapRecovery(), { success: true });
+    assert.equal(booted.ledgers().length, 1);
+    assert.deepEqual(scopes, [{ operationId: null, orphaned: true }], 'boot reconstruction runs');
+
+    const commanded = sharedAuthorityWorld();
+    assert.deepEqual(
+      await commanded
+        .realm()
+        .run({ requestId: 'first-command', senderId: 'player', sessionId: 'one' }, async () => ({
+          success: true,
+          ran: true,
+        })),
+      { success: true, ran: true }
+    );
+    assert.equal(commanded.ledgers().length, 1, 'the command path provisions lazily');
+  });
+
+  it('leaves a player with no elected GM refusing rather than provisioning', async () => {
+    const world = sharedAuthorityWorld();
+    const player = world.realm('player', { getActiveGM: () => null });
+    assert.deepEqual(await player.refreshAvailability(), {
+      available: false,
+      reason: 'active-gm-missing',
+    });
+    assert.equal(
+      (
+        await player.run(
+          { requestId: 'player-command', senderId: 'player', sessionId: 'one' },
+          async () => ({ success: true })
+        )
+      ).reason,
+      'active-gm-required'
+    );
+    assert.deepEqual(world.ledgers(), []);
+  });
+
+  it('reports a revoked JOURNAL_CREATE permission rather than failing unlabelled', async () => {
+    const world = sharedAuthorityWorld();
+    const gm = world.realm('gm', { canCreateLedger: () => false });
+    assert.deepEqual(await gm.bootstrapRecovery(), {
+      success: false,
+      reason: 'ledger-create-denied',
+    });
+    assert.deepEqual(gm.availability(), { available: false, reason: 'ledger-create-denied' });
+    assert.deepEqual(world.ledgers(), []);
+  });
+
+  it('converges two racing GM sessions that both create on exactly one ledger', async () => {
+    const world = sharedAuthorityWorld();
+    let releaseSlowCreate;
+    const slowCreateHeld = new Promise((resolve) => (releaseSlowCreate = resolve));
+    // The session that creates SECOND wins here, which is exactly what the "whoever created
+    // first always sees both and defers" argument gets wrong: the loser is the earlier create.
+    const slow = world.realm('gm', { beforeCreate: () => slowCreateHeld });
+    const fast = world.realm();
+
+    const slowBoot = slow.bootstrapRecovery();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(await fast.bootstrapRecovery(), { success: true });
+    const winner = world.ledger.id;
+    releaseSlowCreate();
+
+    assert.deepEqual(await slowBoot, { success: true });
+    assert.deepEqual(
+      world.ledgers().map((entry) => entry.id),
+      [winner],
+      'the ledger holding durable evidence wins and the pristine duplicate is deleted'
+    );
+    assert.deepEqual(slow.availability(), { available: true, reason: null });
+  });
+
+  it('elects the same ledger from two independent sessions, pristine then used', async () => {
+    const world = sharedAuthorityWorld();
+    const early = world.addLedger();
+    world.addLedger();
+
+    assert.deepEqual(await world.realm().bootstrapRecovery(), { success: true });
+    assert.deepEqual(
+      world.ledgers().map((entry) => entry.id),
+      [early.id],
+      'the earliest createdTime wins the total order both sessions compute from the same values'
+    );
+
+    // A second session meeting the now-used ledger plus a fresh pristine duplicate must reach
+    // the same answer, and must never elect the empty one over recorded request evidence.
+    world.addLedger();
+    assert.deepEqual(await world.realm().bootstrapRecovery(), { success: true });
+    assert.deepEqual(
+      world.ledgers().map((entry) => entry.id),
+      [early.id]
+    );
+  });
+
+  it('refuses to elect between two ledgers that both hold durable evidence', async () => {
+    const world = sharedAuthorityWorld();
+    world.addLedger({ version: 1, requests: { 'request-a': { status: 'settled' } } });
+    world.addLedger({ version: 1, requests: { 'request-b': { status: 'settled' } } });
+    const gm = world.realm();
+
+    assert.deepEqual(await gm.bootstrapRecovery(), { success: false, reason: 'ledger-ambiguous' });
+    assert.equal(world.ledgers().length, 2, 'neither used ledger is deleted');
+    assert.deepEqual(gm.availability(), { available: false, reason: 'ledger-ambiguous' });
+  });
+
+  it('retries the claim and the receipt write after a racing session deletes the ledger', async () => {
+    const world = sharedAuthorityWorld();
+    const doomed = world.addLedger();
+    let replaced = 0;
+    const replaceLedger = (entry) => {
+      if (replaced > 0 || entry.id !== doomed.id) return;
+      replaced += 1;
+      world.addLedger();
+      world.removeLedger(doomed.id);
+    };
+    const gm = world.realm('gm', { beforeClaim: replaceLedger });
+
+    assert.deepEqual(await gm.bootstrapRecovery(), { success: true });
+    assert.equal(replaced, 1, 'the racing deletion actually happened');
+    assert.deepEqual(world.ledgers().map((entry) => entry.id), ['ledger-2']);
+    assert.equal(
+      Object.values(world.ledger.state.requests).at(0)?.kind,
+      'bootRecovery',
+      'the receipt landed on the surviving ledger rather than deadlocking the boot'
+    );
+  });
+
+  it('releases a claim for a refusal that wrote nothing and retains it for an uncertain effect', async () => {
+    const world = sharedAuthorityWorld();
+    const authority = world.realm();
+    await authority.setup();
+    const redeem = (grant, requestId) =>
+      authority.consumeExecutionGrant(grant, {
+        operation: 'pause',
+        actorUuid: 'Actor.a',
+        requestId,
+      });
+
+    // Direction one: the grant is redeemed, then an in-memory guard refuses before any document
+    // write, so the handler RETURNS its refusal and the claim must not survive it.
+    const refused = await authority.run(
+      { requestId: 'pre-write-refusal', senderId: 'player', sessionId: 'one' },
+      async ({ createExecutionGrant }) => {
+        const grant = createExecutionGrant({ operation: 'pause', actorUuid: 'Actor.a' });
+        assert.ok(redeem(grant, 'pre-write-refusal'));
+        return {
+          success: false,
+          reason: 'lifecycle-refused',
+          message: 'The run is already paused',
+        };
+      }
+    );
+    assert.deepEqual(refused, {
+      success: false,
+      reason: 'lifecycle-refused',
+      message: 'The run is already paused',
+    });
+    assert.equal(world.ledger.claim, null, 'a refusal that wrote nothing releases its claim');
+    assert.deepEqual(authority.availability(), { available: true, reason: null });
+    assert.deepEqual(
+      await authority.run(
+        { requestId: 'still-usable', senderId: 'player', sessionId: 'one' },
+        async () => ({ success: true })
+      ),
+      { success: true },
+      'the run stays usable after a refusal'
+    );
+
+    // Direction two: the same redeemed grant with a THROWN failure is genuinely uncertain, so
+    // the claim is retained and only reconciliation clears it.
+    const uncertain = await authority.run(
+      { requestId: 'uncertain-effect', senderId: 'player', sessionId: 'two' },
+      async ({ createExecutionGrant }) => {
+        const grant = createExecutionGrant({ operation: 'pause', actorUuid: 'Actor.a' });
+        assert.ok(redeem(grant, 'uncertain-effect'));
+        throw new Error('write acknowledgement lost');
+      }
+    );
+    assert.equal(uncertain.recoveryRequired, true);
+    const claimId = world.ledger.claim.claimId;
+    assert.deepEqual(authority.availability(), { available: false, reason: 'recovery-required' });
+    assert.equal(
+      (
+        await authority.run(
+          { requestId: 'blocked', senderId: 'player', sessionId: 'two' },
+          async () => ({ success: true })
+        )
+      ).reason,
+      'claim-held'
+    );
+    assert.equal(
+      (await authority.reconcile({ claimId, disposition: 'reconciled' })).success,
+      true,
+      'only reconcileJournalRunAuthority clears a retained claim'
+    );
+    assert.equal(world.ledger.claim, null);
   });
 
   it('arbitrates two independent realms through the shared embedded claim', async () => {

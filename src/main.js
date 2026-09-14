@@ -77,6 +77,7 @@ import {
   installCraftingJournalRunAuthority,
   installGatheringJournalRunAuthority,
 } from './systems/journalRunCommands.js';
+import { applyGuardedRunMutation } from './systems/runLifecycleState.js';
 import { SignatureValidator } from './systems/SignatureValidator.js';
 import { Recipe } from './models/Recipe.js';
 import { Ingredient } from './models/Ingredient.js';
@@ -372,8 +373,11 @@ function createCraftingJournalOperations(fabricate, getService) {
       requestId: args.requestId,
     });
     if (!trusted) return { success: false, reason: 'execution-grant-invalid' };
-    const result = await mutate();
-    return result ? { success: true, run: result } : { success: false, reason: 'run-not-found' };
+    const outcome = await applyGuardedRunMutation(mutate);
+    if (outcome.refused) {
+      return { success: false, reason: 'lifecycle-refused', message: outcome.refused.message };
+    }
+    return outcome.run ? { success: true, run: outcome.run } : { success: false, reason: 'run-not-found' };
   };
   return {
     getRun: ({ actor, runId }) => {
@@ -4839,11 +4843,10 @@ class Fabricate {
   }
 
   /**
-   * Explicitly provision the private run-authority ledger as the active GM.
-   * Call after Fabricate initialization, with every other GM session for this world closed,
-   * including other tabs signed in as the same user. This API does not display a confirmation.
-   * The Journal's visible setup action obtains that confirmation before calling this method.
-   * Existing or duplicate ledgers refuse setup. Setup never clears a retained execution claim.
+   * Ensure the private run-authority ledger exists, as the active GM. Idempotent: an existing
+   * ledger is returned rather than refused, and no second ledger is ever created.
+   * Boot recovery and the command path already provision automatically, so this is a no-op in a
+   * healthy world. It never clears a retained execution claim.
    * @returns {Promise<object>} `{success: true, ledgerId}` or `{success: false, reason}`.
    */
   setupJournalRunAuthority() {

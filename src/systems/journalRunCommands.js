@@ -1,3 +1,5 @@
+import { applyGuardedRunMutation } from './runLifecycleState.js';
+
 /** Request/reply discriminators multiplexed on the existing module socket. */
 export const JOURNAL_RUN_SOCKET_KIND = Object.freeze({
   REQUEST: 'fabricate.journalRun.request',
@@ -407,10 +409,13 @@ export function createGatheringJournalRunOperations({
       requestId: args.requestId,
     });
     if (!trusted) return failure('execution-grant-invalid');
-    const result = await runManager[method](args.actor, args.runId, ...values, {
-      expectedRevision: args.expectedRevision,
-    });
-    return result ? { success: true, run: result } : failure('run-not-found');
+    const outcome = await applyGuardedRunMutation(() =>
+      runManager[method](args.actor, args.runId, ...values, {
+        expectedRevision: args.expectedRevision,
+      })
+    );
+    if (outcome.refused) return failure('lifecycle-refused', { message: outcome.refused.message });
+    return outcome.run ? { success: true, run: outcome.run } : failure('run-not-found');
   };
   return {
     getRun: ({ actor, runId }) => {

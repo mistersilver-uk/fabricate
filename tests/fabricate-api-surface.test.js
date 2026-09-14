@@ -328,6 +328,20 @@ test('Fabricate exposes the versioned Journal command and per-user dismissal sea
     mainSource.includes("Hooks.on('userConnected', bootstrapJournalRunAuthority)"),
     'a GM connection transition should trigger guarded recovery bootstrap'
   );
+  // `setupJournalRunAuthority()` survives as an idempotent ensure, not a one-shot provisioner:
+  // every world now provisions automatically, so refusing an existing ledger would make the
+  // documented API report a healthy world as broken.
+  assert.ok(
+    mainSource.includes(
+      'Ensure the private run-authority ledger exists, as the active GM. Idempotent: an existing'
+    ),
+    'setupJournalRunAuthority should be documented as an idempotent ensure'
+  );
+  assert.doesNotMatch(
+    mainSource,
+    /ledger-already-exists/,
+    'an existing ledger is no longer a refusal reason anywhere on the public surface'
+  );
 });
 
 test('the real Journal composition emitter survives socket serialization and preserves recipients', () => {

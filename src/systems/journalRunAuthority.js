@@ -1,3 +1,5 @@
+import { createJournalRunLedgerProvisioner, createLedgerRetry } from './journalRunLedger.js';
+
 const AUTHORITY_VERSION = 1;
 const AUTHORITY_FLAG = 'journalRunAuthorityLedger';
 const AUTHORITY_STATE_FLAG = 'journalRunAuthorityState';
@@ -56,6 +58,16 @@ function activeGmMatches(currentUser, activeGM) {
   );
 }
 
+/** The private ledger's creation source; its top-level `_id` must stay server-assigned. */
+function newLedgerSource() {
+  return {
+    name: 'Fabricate Run Authority',
+    ownership: { default: 0 },
+    flags: { fabricate: { [AUTHORITY_FLAG]: true } },
+    state: emptyState(),
+  };
+}
+
 function unavailable(reason, extras = {}) {
   return { success: false, reason, ...extras };
 }
@@ -73,12 +85,16 @@ function createSecureRandomId(webCrypto) {
 
 /**
  * Cross-realm exclusion requires exclusive fixed-page creation under exactly one private ledger.
- * Setup requires one GM session; settled requests deduplicate and uncertain claims never expire.
+ * The elected GM provisions and arbitrates that ledger; settled requests deduplicate, a pre-write
+ * refusal releases its claim, and a claim left by an uncertain effect never expires.
  * Exclusive recovery reconstructs; reconciliation records disposition before releasing a matching claim.
  * @param {Function} deps.currentUser `() => User|null` for this executing realm.
  * @param {Function} deps.activeGM `() => User|null` for the elected GM.
  * @param {Function} deps.listLedgers `async () => ledger[]`.
  * @param {Function} deps.createLedger `async (source) => ledger`.
+ * @param {Function} [deps.deleteLedger] `async (ledger) => void`, for a pristine duplicate only.
+ * @param {Function} [deps.listLedgerRecords] `async () => [{id, createdTime}]|null`, authoritative.
+ * @param {Function} [deps.canCreateLedger] `() => boolean`; `JOURNAL_CREATE` is revocable.
  * @param {Function} deps.readState `async (ledger) => state`.
  * @param {Function} deps.writeState `async (ledger, state) => void`.
  * @param {Function} deps.createClaim `async (ledger, source) => claim|null` with exclusive creation.
@@ -94,6 +110,9 @@ export function createJournalRunAuthority({
   activeGM,
   listLedgers,
   createLedger,
+  deleteLedger = async () => {},
+  listLedgerRecords = null,
+  canCreateLedger = () => true,
   readState,
   writeState,
   createClaim,
@@ -108,6 +127,29 @@ export function createJournalRunAuthority({
   let recoveryReady = false;
   const grants = new WeakMap();
   const createdGrantRecords = new Set();
+
+  const { ensureSingleLedger } = createJournalRunLedgerProvisioner({
+    listLedgers,
+    listLedgerRecords,
+    createLedger,
+    deleteLedger,
+    readState,
+    readClaim,
+    canCreateLedger,
+    ledgerSource: newLedgerSource,
+  });
+  const { replacementLedger, writeLedgerState } = createLedgerRetry({ listLedgers, writeState });
+
+  /**
+   * Provision or arbitrate this world's single ledger as the elected GM, before any claim.
+   * A freshly provisioned ledger re-arms boot reconstruction, exactly as explicit setup did.
+   */
+  async function ensureLedger() {
+    const ensured = await ensureSingleLedger();
+    if (ensured.provisioned === true) recoveryReady = false;
+    if (!ensured.success) cachedAvailability = { available: false, reason: ensured.reason };
+    return ensured;
+  }
 
   function nextRandomId() {
     try {
@@ -141,27 +183,13 @@ export function createJournalRunAuthority({
     return cachedAvailability;
   }
 
+  /** Idempotent ensure: boot and the command path provision automatically, so this only confirms. */
   async function setup() {
     if (!activeGmMatches(currentUser?.(), activeGM?.())) return unavailable('active-gm-required');
-    const ledgers = (await listLedgers()) ?? [];
-    if (ledgers.length > 0) {
-      const reason = ledgers.length === 1 ? 'ledger-already-exists' : 'ledger-ambiguous';
-      cachedAvailability = { available: false, reason };
-      return unavailable(reason);
-    }
-    await createLedger({
-      name: 'Fabricate Run Authority',
-      ownership: { default: 0 },
-      flags: { fabricate: { [AUTHORITY_FLAG]: true } },
-      state: emptyState(),
-    });
-    const after = (await listLedgers()) ?? [];
-    if (after.length !== 1) {
-      cachedAvailability = { available: false, reason: 'ledger-ambiguous' };
-      return unavailable('ledger-ambiguous');
-    }
     const boot = await bootstrapRecovery();
-    return boot.success ? { success: true, ledgerId: after[0]?.id ?? null } : boot;
+    if (boot.success !== true) return boot.success === false ? boot : unavailable(boot.reason);
+    const ledgers = (await listLedgers()) ?? [];
+    return { success: true, ledgerId: ledgers[0]?.id ?? null };
   }
 
   function createGrant(binding) {
@@ -204,6 +232,8 @@ export function createJournalRunAuthority({
       recoveryReady = false;
       return refreshAvailability();
     }
+    const ensured = await ensureLedger();
+    if (!ensured.success) return unavailable(ensured.reason);
     if (recoveryReady) {
       const availability = await refreshAvailability();
       return availability.available ? { success: true } : unavailable(availability.reason);
@@ -306,18 +336,32 @@ export function createJournalRunAuthority({
     if (!ledgerCheck.success) return ledgerCheck;
     const claimId = nextRandomId();
     if (!claimId) return unavailable('secure-random-unavailable');
-    try {
-      const claim = await createClaim(ledgerCheck.ledger, {
-        _id: JOURNAL_RUN_CLAIM_PAGE_ID,
-        claimId,
-        requestId: request.requestId,
-        acquiredAt: now(),
-      });
+    // `keepId` is what makes the server's duplicate embedded-`_id` rejection reachable; without
+    // it the fixed id is discarded and the cross-browser lock degrades to a silent no-op.
+    const source = {
+      _id: JOURNAL_RUN_CLAIM_PAGE_ID,
+      claimId,
+      requestId: request.requestId,
+      acquiredAt: now(),
+    };
+    const claimOn = async (ledger) => {
+      try {
+        return (await createClaim(ledger, source)) ?? null;
+      } catch {
+        return null;
+      }
+    };
+    let ledger = ledgerCheck.ledger;
+    let claim = await claimOn(ledger);
+    if (!claim) {
+      // A racing session may have deleted this ledger mid-acquire: relist and retry once.
+      const replacement = await replacementLedger(ledger);
+      if (!replacement) return unavailable('claim-held');
+      ledger = replacement;
+      claim = await claimOn(ledger);
       if (!claim) return unavailable('claim-held');
-    } catch {
-      return unavailable('claim-held');
     }
-    return { success: true, ledger: ledgerCheck.ledger, claimId };
+    return { success: true, ledger, claimId };
   }
 
   function tokenHelpers({ state, request, persist }) {
@@ -369,6 +413,8 @@ export function createJournalRunAuthority({
         await refreshAvailability();
         return unavailable('active-gm-required');
       }
+      const ensured = await ensureLedger();
+      if (!ensured.success) return unavailable(ensured.reason);
       if (!recoveryReady) {
         const boot = await performBootstrapRecovery();
         if (!boot.success) return boot;
@@ -378,10 +424,15 @@ export function createJournalRunAuthority({
         cachedAvailability = { available: false, reason: acquired.reason };
         return unavailable(acquired.reason);
       }
-      const { ledger, claimId } = acquired;
+      const { claimId } = acquired;
+      const claimLedger = acquired.ledger;
+      let ledger = claimLedger;
+      // The claim page lives inside its ledger, so a racing deletion released it with the ledger.
+      const releaseClaim = async () =>
+        ledger === claimLedger ? deleteClaim(ledger, claimId) : true;
       if (!activeGmMatches(currentUser?.(), activeGM?.())) {
         recoveryReady = false;
-        const released = await deleteClaim(ledger, claimId);
+        const released = await releaseClaim();
         cachedAvailability = released
           ? { available: false, reason: 'active-gm-required' }
           : { available: false, reason: 'claim-release-failed' };
@@ -390,7 +441,7 @@ export function createJournalRunAuthority({
       const state = normalizedState(await readState(ledger));
       const prior = state.requests[request.requestId];
       if (prior && (prior.senderId !== request.senderId || prior.sessionId !== request.sessionId)) {
-        if (!(await deleteClaim(ledger, claimId))) {
+        if (!(await releaseClaim())) {
           cachedAvailability = { available: false, reason: 'claim-release-failed' };
           return unavailable('claim-release-failed');
         }
@@ -401,7 +452,7 @@ export function createJournalRunAuthority({
         prior?.status === 'abandoned' ||
         prior?.status === 'reconciled'
       ) {
-        if (!(await deleteClaim(ledger, claimId))) {
+        if (!(await releaseClaim())) {
           cachedAvailability = { available: false, reason: 'claim-release-failed' };
           return unavailable('claim-release-failed');
         }
@@ -417,8 +468,10 @@ export function createJournalRunAuthority({
         sessionId: request.sessionId,
         startedAt: now(),
       };
-      await writeState(ledger, state);
-      const persist = async () => writeState(ledger, state);
+      ledger = await writeLedgerState(ledger, state);
+      const persist = async () => {
+        ledger = await writeLedgerState(ledger, state);
+      };
       const helpers = tokenHelpers({ state, request, persist });
       let response;
       try {
@@ -454,7 +507,7 @@ export function createJournalRunAuthority({
         response: durableResponse,
         claimId: mustRecover ? claimId : null,
       };
-      await writeState(ledger, state);
+      ledger = await writeLedgerState(ledger, state);
       if (mustRecover) {
         cachedAvailability = { available: false, reason: 'recovery-required' };
         return response;
@@ -462,7 +515,7 @@ export function createJournalRunAuthority({
       for (const record of createdGrantRecords) {
         if (record.requestId === request.requestId) createdGrantRecords.delete(record);
       }
-      const released = await deleteClaim(ledger, claimId);
+      const released = await releaseClaim();
       cachedAvailability = released
         ? { available: true, reason: null }
         : { available: false, reason: 'claim-release-failed' };
@@ -538,26 +591,42 @@ export function createJournalRunAuthority({
 /**
  * Create the Foundry V13/V14 JournalEntry-backed authority adapter.
  * Ledger ownership defaults to NONE and claims use `JournalEntryPage` creation with `keepId`.
- * Construction does not provision a ledger. Explicit setup must follow single-session confirmation.
+ * The elected GM provisions the ledger automatically on boot and on its first command.
  * @param {object} [options] Foundry globals, secure randomness, clock and reconstruction seams.
  * @returns {object} The authority API from {@link createJournalRunAuthority}.
  */
 export function createFoundryJournalRunAuthority({
   game = globalThis.game,
   JournalEntry = globalThis.JournalEntry,
+  CONFIG = globalThis.CONFIG,
   crypto = globalThis.crypto,
   randomId = createSecureRandomId(crypto),
   now = () => Date.now(),
   reconstructExecutions = null,
 } = {}) {
-  const listLedgers = async () =>
-    [...(game?.journal ?? [])].filter(
-      (entry) => entry?.getFlag?.('fabricate', AUTHORITY_FLAG) === true
-    );
+  const isLedger = (entry) => entry?.getFlag?.('fabricate', AUTHORITY_FLAG) === true;
+  const listLedgers = async () => [...(game?.journal ?? [])].filter(isLedger);
+  // `game.journal` is broadcast-fed, so a post-create relist of it can still miss a racing
+  // session's ledger. This `get` round-trips to the server, but is NOT permission-filtered for
+  // world documents, so it stays behind the GM check. Its documents are detached `fromSource`
+  // copies: rank on them, then act by id against `game.journal`.
+  const listLedgerRecords = async () => {
+    if (game?.user?.isGM !== true || typeof CONFIG?.DatabaseBackend?.get !== 'function') {
+      return null;
+    }
+    const entries = (await CONFIG.DatabaseBackend.get(JournalEntry, { query: {} })) ?? [];
+    return [...entries].filter(isLedger).map((entry) => ({
+      id: entry._id ?? entry.id,
+      createdTime: Number(entry._stats?.createdTime) || 0,
+    }));
+  };
   return createJournalRunAuthority({
     currentUser: () => game?.user ?? null,
     activeGM: () => game?.users?.activeGM ?? null,
     listLedgers,
+    listLedgerRecords,
+    canCreateLedger: () => game?.user?.can?.('JOURNAL_CREATE') !== false,
+    deleteLedger: async (entry) => entry?.delete?.(),
     createLedger: async (source) => {
       if (typeof JournalEntry?.create !== 'function')
         throw new Error('JournalEntry API unavailable');

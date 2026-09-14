@@ -375,8 +375,15 @@ test('CraftingRunManager freezes and resumes v1 gates while preserving legacy wo
   const resumed = await manager.resumeRun(actor, run.id, { expectedRevision: 2 });
   assert.equal(resumed.steps[0].timeGate.availableAt, 1220);
   assert.equal(resumed.pausedDurationSeconds, 100);
-  assert.equal(resumed.pauseState, undefined);
+  assert.equal(resumed.pauseState, null);
   assert.equal(resumed.runRevision, 3);
+  // The container persists through a MERGING flag write, which never removes a key deleted from
+  // a nested object. A resume that only deleted `pauseState` left the stored run paused at the
+  // resumed revision, so the next pause refused with RUN_ALREADY_PAUSED and deadlocked the run.
+  manager.invalidateCache(actor.id);
+  assert.equal(manager.getActiveRun(actor, run.id).pauseState, null);
+  const repaused = await manager.pauseRun(actor, run.id, { expectedRevision: 3 });
+  assert.deepEqual(repaused.pauseState, { pausedAt: 1130, remainingSeconds: 90 });
 
   await assert.rejects(
     () => manager.setCompletionMode(actor, run.id, 'manual', { expectedRevision: 2 }),
