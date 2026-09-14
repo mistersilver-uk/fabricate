@@ -106,7 +106,9 @@ src/systems/gatheringLocation.js::evaluateLocationAvailability	101
 src/systems/importReferenceResolver.js	1047
 src/systems/importReferenceResolver.js::collectBrokenInternalReferences	155
 src/systems/inventorySnapshot.js::buildInventorySnapshot	152
-src/systems/journalRunAuthority.js::createJournalRunAuthority	516
+src/systems/journalRunAuthority.js	820
+src/systems/journalRunAuthority.js::createFoundryJournalRunAuthority	113
+src/systems/journalRunAuthority.js::createJournalRunAuthority	523
 src/systems/journalRunAuthority.js::createJournalRunAuthority>run	125
 src/systems/journalRunAuthority.js::createJournalRunAuthority>run>queue	123
 src/systems/journalRunCommands.js	991

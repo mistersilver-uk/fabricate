@@ -189,6 +189,49 @@ describe('journal run authority ledger', () => {
     assert.equal(JOURNAL_RUN_CLAIM_PAGE_ID.length, 16);
   });
 
+  it('reconciles a claim whose page is already gone, rather than refusing or throwing', async () => {
+    // The maintainer hit this on the release button. `entry.pages` is the BROADCAST-FED local
+    // copy, so the UI can offer a release for a claim the server has already removed — another
+    // realm's reaper, or a release this client has not heard about. Core's
+    // `deleteEmbeddedDocuments` THROWS for an absent id, and the escaping throw left the run
+    // blocked reporting `JournalEntryPage "FabRunAuthority1" does not exist!`.
+    //
+    // Absence IS the goal state reconciliation exists to reach, so reaching it already is a
+    // success, not a `claim-mismatch` refusal. A DIFFERENT claim still refuses — asserted below.
+    const world = sharedAuthorityWorld();
+    const authority = world.realm();
+    await authority.setup();
+    world.ledger.state.requests['req-uncertain'] = {
+      kind: 'command',
+      status: 'recoveryRequired',
+      claimId: 'claim-gone',
+    };
+    world.ledger.claim = null;
+
+    const released = await authority.reconcile({
+      claimId: 'claim-gone',
+      disposition: 'reconciled',
+    });
+    assert.equal(released.success, true, 'an already-absent claim reports the goal state reached');
+    assert.equal(
+      authority.availability().available,
+      true,
+      'and the run the claim blocked is usable again'
+    );
+
+    world.ledger.claim = {
+      id: JOURNAL_RUN_CLAIM_PAGE_ID,
+      claimId: 'someone-elses',
+      requestId: 'req-other',
+      acquiredAt: 1000,
+    };
+    assert.equal(
+      (await authority.reconcile({ claimId: 'claim-gone', disposition: 'reconciled' })).reason,
+      'claim-mismatch',
+      'a DIFFERENT live claim is still a refusal, so the tolerance is not a blanket yes'
+    );
+  });
+
   it('creates the arbitrating claim page with keepId, whose absence is a silent no-op', async () => {
     const authority = foundryAuthorityFixture({ randomUUID: () => 'secure-uuid' });
     assert.equal((await authority.setup()).success, true);

@@ -640,7 +640,14 @@ export function createJournalRunAuthority({
       }
       const ledger = ledgers[0];
       const claim = await readClaim(ledger);
-      if (!claim || claim.claimId !== claimId) return unavailable('claim-mismatch');
+      // A claim that is already gone is the outcome reconciliation exists to reach, so report it
+      // reached rather than refusing. Only a DIFFERENT claim is a genuine mismatch.
+      if (!claim) {
+        recoveryReady = true;
+        cachedAvailability = { available: true, reason: null };
+        return { success: true, disposition, alreadyReleased: true };
+      }
+      if (claim.claimId !== claimId) return unavailable('claim-mismatch');
       const state = normalizedState(await readState(ledger));
       const requestId = claim.requestId;
       const prior = state.requests[requestId] ?? {};
@@ -788,8 +795,23 @@ export function createFoundryJournalRunAuthority({
     deleteClaim: async (entry, claimId) => {
       const page = entry?.pages?.get?.(JOURNAL_RUN_CLAIM_PAGE_ID) ?? null;
       if (!page || page.getFlag?.('fabricate', 'journalRunClaimId') !== claimId) return false;
-      const deleted = await entry.deleteEmbeddedDocuments('JournalEntryPage', [page.id]);
-      return Array.isArray(deleted) && deleted.some((document) => document?.id === page.id);
+      // `pages` is the BROADCAST-FED local copy, so it can still show a page the server has
+      // already deleted — another realm's reaper, or a release this client has not heard about
+      // yet. `deleteEmbeddedDocuments` THROWS for an absent id rather than reporting it, and an
+      // escaping throw stranded the maintainer's run: the release button reported
+      // `JournalEntryPage "FabRunAuthority1" does not exist!` and left the claim un-cleared.
+      //
+      // Absence is the goal state, so re-read after a failed attempt and report released when
+      // the page is genuinely gone. A delete that failed with the page STILL present is a real
+      // failure and still answers false.
+      try {
+        const deleted = await entry.deleteEmbeddedDocuments('JournalEntryPage', [page.id]);
+        if (Array.isArray(deleted) && deleted.some((document) => document?.id === page.id))
+          return true;
+      } catch {
+        // fall through to the absence re-read
+      }
+      return !entry?.pages?.get?.(JOURNAL_RUN_CLAIM_PAGE_ID);
     },
     reconstructExecutions,
     randomId,
