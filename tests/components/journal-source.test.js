@@ -11,6 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { importsModule, parseComponent } from '../helpers/svelteStructureContract.js';
 import { calledName, walkNodes } from '../helpers/moduleAst.js';
 
+import { JOURNAL_RUN_REASON_KEYS } from '../../src/ui/svelte/util/journalRunReasons.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function read(relPath) {
@@ -23,7 +25,6 @@ const detailSource = read('../../src/ui/svelte/apps/journal/RunDetail.svelte');
 const statusSource = read('../../src/ui/svelte/apps/journal/journalRunStatus.js');
 const actionsSource = read('../../src/ui/svelte/apps/journal/ActionsPanel.svelte');
 const stepSource = read('../../src/ui/svelte/apps/journal/StepDetails.svelte');
-const reasonsSource = read('../../src/ui/svelte/util/journalRunReasons.js');
 const builderSource = read('../../src/systems/RunJournalBuilder.js');
 const historySource = read('../../src/ui/svelte/apps/journal/HistoricalRunDetail.svelte');
 const cssSource = read('../../styles/fabricate.css');
@@ -161,12 +162,9 @@ describe('Journal label mirrors resolve in lang/en.json (drift guard)', () => {
     const sources = [viewSource, detailSource, actionsSource, stepSource];
     const literals = sources.flatMap((source) => [...source.matchAll(/'(FABRICATE\.App\.Journal\.[A-Za-z.]+)'/g)].map((match) => match[1]));
     // Issue 1648 moved the authority vocabulary out of ActionsPanel into the UI-free
-    // `journalRunReasons.js` the player stores share, where every entry is a COMPLETE key.
-    const reasonMap = reasonsSource.slice(
-      reasonsSource.indexOf('JOURNAL_RUN_REASON_KEYS = Object.freeze({'),
-      reasonsSource.indexOf('});')
-    );
-    const reasons = [...reasonMap.matchAll(/:\s*'(FABRICATE\.[A-Za-z.]+)'/g)].map((match) => match[1]);
+    // `journalRunReasons.js` the player stores share. Imported rather than read as source
+    // text: the map is exported, so a pin would be strictly weaker and costs a ledger entry.
+    const reasons = Object.values(JOURNAL_RUN_REASON_KEYS);
     const modes = ['equal', 'exceed', 'partial'].map((mode) => `FABRICATE.App.Journal.Yields.AwardModes.${mode}`);
     assert.ok(reasons.length >= 40, 'authority label map was extracted');
     for (const key of new Set([...literals, ...reasons, ...modes])) {
