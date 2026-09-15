@@ -1,99 +1,65 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  Inline two-step confirmation for a high-frequency destructive ROW action (issue
-  785). The first click arms the button; the second executes. It exists alongside
-  `services.confirmDialog` (kept for the heavyweight cases) and alongside
-  VocabularyPanel's expanding confirm strip, which is a different idiom by design:
-  that one carries a reference-count sentence no two-word button label can hold.
-
-  Contract notes that are NOT cosmetic:
-
-  - It is a real `<button type="button">`. The reference prototype used a bare
-    `<span>` with an inline click attribute, which is neither focusable nor
-    keyboard-operable and MUST NOT be copied.
-  - It WRITES THE FAMILY ROOT, `fabricate-button`, first in its own class attribute
-    (issue 1502). This component is a CONSUMER of the `manager-button` CSS contract and
-    not of `ManagerButton.svelte` — a deferral that stands, and that
-    `manager-button-source-contract.test.js` still pins — but the contract is now rooted at
-    the class the primitive emits rather than at `.fabricate-manager`, so a carrier that
-    spells `class="manager-button …"` without the root matches nothing in the family and
-    renders as a bare Foundry `<button>`. One token, no composition, no new props.
-    It does NOT emit `data-keyboard-focus`, which the two button primitives now do, so unlike a
-    primitive-rendered danger button this one still lets Foundry's Space and arrow bindings fire
-    while it holds focus. Issue 1508 was recorded here as closing that and DID NOT: it added the
-    attribute to `StatusToggle` and `ModifierPillSelect` only, and this component still does not
-    emit it. The emission is a real BEHAVIOUR change — it suppresses Foundry's Space and arrow
-    bindings while the control holds focus — so it does not belong inside a re-rooting or a file
-    move, and it is filed as a successor rather than claimed as landed. This component's row
-    stays in the formless-button ledger until that successor lands.
-  - It LIVES UNDER `components/` as of issue 1509, and it gained no root of its own in doing so.
-    It writes `fabricate-button manager-button is-danger`, a family the `ManagerButton` entry
-    already owns and roots, so a `fabricate-danger-button` would own zero rules and would read as
-    an APPLICATION root to the entry that owns them. A component may be shared without being the
-    root of a family; this is the shipped instance of that.
-  - The caller keys the armed token on the TARGET DOCUMENT ID, never a row index.
-    The Knowledge surface re-projects its rows asynchronously from actor/item
-    hooks, so an index-keyed token is a destructive-misfire bug: arm row 2, let
-    another client delete row 0, re-project, and the second click hits a different
-    copy.
-  - The ICON swaps as well as the label, so the armed state survives greyscale
-    (design system "icon + word, always") and does not rest on the danger fill.
-    A caller may pass `idleIcon=""` to suppress the IDLE glyph only, and exactly one does:
-    the Tool rules editor's `Stop using this Tool here` callout already leads with that same
-    mark one column to the left, so drawing it again inside the button was one glyph stated
-    twice (issue 1373). The greyscale guarantee is not weakened by it — a glyphless idle face
-    against a glyphed `Confirm?` differs by MORE than an icon swap, not less — and no caller
-    may suppress the armed one, which is where the guarantee actually earns its keep.
-  - `aria-label` carries the full consequence sentence in both states.
-  - Disarm is the OWNER's job for character/tab/search/publish changes; this
-    component only reports the local `Escape` and `blur` disarms plus the confirm.
+  Inline two-step confirmation for a high-frequency destructive ROW action. The first click arms
+  the button; the second executes. It sits alongside `services.confirmDialog` for the heavyweight
+  cases.
 
   Props:
-   - token: stable arm token, `<action>:<documentId>`.
-   - armed: whether THIS button holds the single armed token (mutual exclusion is
-     the owner's invariant — one token exists at a time).
-   - idleLabel / armedLabel: button copy per state.
-   - idleIcon / armedIcon: Font Awesome classes per state.
-   - idleAriaLabel / armedAriaLabel: consequence sentences per state. Each MUST contain
-     its state's visible label, because WCAG 2.5.3 Label in Name makes a control whose
-     name omits the visible string unactivatable by speech input.
-   - describedBy: OPTIONAL id of an element describing the consequence — the bulk panels'
-     impact list. Omitted by default, so the row call sites (Knowledge, the browsers)
-     render exactly the markup they did before it existed; a bare `aria-describedby=""`
-     would point at nothing and is what the `|| undefined` below avoids.
-   - disabled: disables both arming and confirming.
-   - busy / busyLabel / busyIcon: an OPTIONAL third face for a caller whose confirm starts a
-     write it can await. See the note below — this is not a variant of `armed`.
-   - showTitle: whether the accessible name is ALSO exposed as a hover `title`. Default true,
-     which is right for the ROW call sites: those render a two-word label ("Delete",
-     "Confirm?") while the accessible name names the target document, so the tooltip is the
-     only place a sighted mouse user reads what the button reaches. `BulkDeleteCard` passes
-     `false`, because there the consequence is already on screen as the impact list the
-     control is `aria-describedby`-associated with — and the armed names it renders carry the
-     "(s)" idiom, which is defensible for an AT-only string and reads as an un-interpolated
-     template ("1 recipe(s)") the moment it becomes visible text.
-   - onArm(token) / onDisarm(token) / onConfirm(token).
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `token` | `<action>:<documentId>` | `''` | The stable arm token. See the invariants: NEVER a row index. |
+  | `armed` | boolean | `false` | Whether THIS button holds the single armed token. Mutual exclusion is the owner's invariant — one token exists at a time. |
+  | `idleLabel` / `armedLabel` / `busyLabel` | localized string | `''` | Button copy per face. |
+  | `idleIcon` / `armedIcon` / `busyIcon` | Font Awesome classes | trash / triangle-exclamation / spinner | Glyph per face. `idleIcon=""` suppresses the IDLE glyph only. |
+  | `idleAriaLabel` / `armedAriaLabel` | consequence sentence | `''` | Each MUST contain its state's visible label. |
+  | `describedBy` | element id | `''` | OPTIONAL id of an element describing the consequence — the bulk panels' impact list. A bare `aria-describedby=""` would point at nothing, which is what the `|| undefined` avoids. |
+  | `disabled` | boolean | `false` | Disables both arming and confirming. |
+  | `busy` | boolean | `false` | An OPTIONAL third face for a caller whose confirm starts a write it can await. Not a variant of `armed` — see the invariants. |
+  | `showTitle` | boolean | `true` | Whether the accessible name is ALSO a hover `title`. Right for the ROW call sites, whose two-word label leaves the tooltip the only place a sighted mouse user reads what the button reaches. |
 
-  ── THE BUSY FACE IS NOT DERIVED FROM `armed`, AND THAT IS THE WHOLE POINT ────────
-  Without it a caller that awaits its write leaves the GM looking at a disabled, danger-filled
-  `Confirm delete` — a control still asking for the click it has already had. The obvious repair,
-  reading "armed AND disabled" as "in flight", does not work and fails INVISIBLY:
+  Callbacks:
+  - `onArm(token)` / `onDisarm(token)` / `onConfirm(token)`.
 
-   - `handleBlur` below disarms on blur, and DISABLING A FOCUSED BUTTON FIRES BLUR in Chromium
-     and Firefox. So the moment the caller sets its in-flight flag the control disarms, and an
-     `armed`-derived busy face drops straight back to the IDLE label for the whole write —
-     "Delete 3 recipes", beside a spinnerless disabled button, while the delete is running;
-   - happy-dom does NOT fire that blur, so a mounted assertion passes on behaviour that does
-     not hold in a browser.
+  Exports:
+  - `focus()` — puts the keyboard back on the control after an awaited write REFUSED.
 
-  Hence `busy` is the caller's own flag, `faceOf` reads it FIRST so it wins over `armed`
-  whichever way the disarm race lands, and blur is a no-op while busy so an in-flight write
-  cannot clear the owner's arm token underneath itself.
-
-  The busy face carries `data-busy` and `aria-busy` and NO state class. It briefly carried
-  `class:is-busy`, which was the only occurrence of that name under `src/` or `styles/` — a
-  class implying a treatment that does not exist. `data-busy` is the test hook; if the busy
-  face ever needs an appearance of its own, add the rule and the class together.
+  Invariants:
+  - It is a real `<button type="button">`. The reference prototype used a bare `<span>` with an
+    inline click attribute, which is neither focusable nor keyboard-operable and MUST NOT be
+    copied.
+  - It WRITES THE FAMILY ROOT, `fabricate-button`, FIRST in its own class attribute. This
+    component is a CONSUMER of the `manager-button` CSS contract and not of `ManagerButton.svelte`
+    — a deferral `tests/manager-button-source-contract.test.js` still pins — and the contract is
+    rooted at the class the primitive emits, so a carrier spelling `manager-button` without the
+    root matches nothing in the family and renders as a bare Foundry `<button>`. It gained no
+    root of its own when it moved under `components/`: a component may be shared without being
+    the root of a family.
+  - It does NOT emit `data-keyboard-focus`, which the two button primitives do, so unlike a
+    primitive-rendered danger button this one still lets Foundry's Space and arrow bindings fire
+    while it holds focus. Adding it is a real BEHAVIOUR change and is filed as a successor; this
+    component's row stays in the formless-button ledger until that successor lands.
+  - THE CALLER KEYS THE ARMED TOKEN ON THE TARGET DOCUMENT ID, NEVER A ROW INDEX. The Knowledge
+    surface re-projects its rows asynchronously from actor/item hooks, so an index-keyed token is
+    a destructive-misfire bug: arm row 2, let another client delete row 0, re-project, and the
+    second click hits a different copy.
+  - THE ICON SWAPS AS WELL AS THE LABEL, so the armed state survives greyscale and does not rest
+    on the danger fill. No caller may suppress the ARMED glyph, which is where that guarantee
+    earns its keep; exactly one suppresses the idle one, because its callout already leads with
+    that same mark one column to the left.
+  - `aria-label` CARRIES THE FULL CONSEQUENCE SENTENCE IN BOTH STATES, and each state's sentence
+    must contain that state's visible label: WCAG 2.5.3 Label in Name makes a control whose name
+    omits the visible string unactivatable by speech input. The busy face's accessible name IS
+    its visible label, so it holds by construction rather than by a fourth string.
+  - DISARM IS THE OWNER'S JOB for character/tab/search/publish changes; this component only
+    reports the local `Escape` and `blur` disarms plus the confirm.
+  - THE BUSY FACE IS NOT DERIVED FROM `armed`, and reading "armed AND disabled" as "in flight"
+    fails INVISIBLY. `handleBlur` disarms on blur, and DISABLING A FOCUSED BUTTON FIRES BLUR in
+    Chromium and Firefox, so the moment the caller sets its in-flight flag the control disarms and
+    an `armed`-derived busy face drops back to the IDLE label for the whole write. happy-dom does
+    NOT fire that blur, so a mounted assertion passes on behaviour that does not hold in a
+    browser. Hence `busy` is the caller's own flag, `faceOf` reads it FIRST, and blur is a no-op
+    while busy so an in-flight write cannot clear the owner's arm token underneath itself.
+  - The busy face carries `data-busy` and `aria-busy` and NO state class. `data-busy` is the test
+    hook; if it ever needs an appearance of its own, add the rule and the class together.
 -->
 <script>
   let {
@@ -119,8 +85,8 @@
   let element = $state(null);
 
   const inFlight = $derived(busy === true);
-  // A guard chain rather than a nested ternary: three faces read as three `if`s, and the
-  // SonarCloud quality gate reports a nested conditional as a new code smell.
+
+  // A guard chain rather than a nested ternary, which SonarCloud reports as a new code smell.
   function faceOf(busyFace, armedFace, idleFace) {
     if (busy === true) return busyFace;
     if (armed) return armedFace;
@@ -129,8 +95,6 @@
 
   const label = $derived(faceOf(busyLabel, armedLabel, idleLabel));
   const icon = $derived(faceOf(busyIcon, armedIcon, idleIcon));
-  // The busy face's accessible name is its VISIBLE label, so WCAG 2.5.3 Label in Name holds
-  // for it by construction rather than by a fourth string nobody would keep in step.
   const consequence = $derived(faceOf(busyLabel, armedAriaLabel, idleAriaLabel));
   const isInert = $derived(disabled === true || inFlight);
 
@@ -157,11 +121,8 @@
     if (armed) onDisarm(token);
   }
 
-  /**
-   * Put focus back on this control. Exported so a caller can return the keyboard to the
-   * button after a write it awaited REFUSED: confirming disables the control, which moves
-   * focus to `document.body`, and re-enabling it does not bring focus back.
-   */
+  /** Confirming disables the control, moving focus to `document.body`; re-enabling does not
+   * bring it back. */
   export function focus() {
     element?.focus?.();
   }
