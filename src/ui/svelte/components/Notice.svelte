@@ -97,7 +97,6 @@
       <div class="fab-notice-title">{title}</div>
       {#if detail}<div class="fab-notice-detail">{detail}</div>{/if}
     </div>
-    {#if evidence}<div class="fab-notice-evidence">{@render evidence()}</div>{/if}
     {#if action}
       <button
         type="button"
@@ -119,6 +118,7 @@
         <i class="fas fa-xmark" aria-hidden="true"></i>
       </button>
     {/if}
+    {#if evidence}<div class="fab-notice-evidence">{@render evidence()}</div>{/if}
   </div>
 {/if}
 
