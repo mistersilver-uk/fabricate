@@ -154,6 +154,8 @@ Starting it persists the scoped choices and the full selected authored-requireme
 Run start is the first stage's start, so every versioned run spends its materials when it starts.
 A later stage of a multi-step run is started by its own explicit begin operation; a manual execute on an unstarted stage is refused rather than silently starting it.
 An automatic world-time advance MAY start an unstarted stage it is otherwise permitted to complete, after its conservative blocker has decided, so a blocked automatic stage still spends nothing.
+A stage armed by a release that consumed at execute carries a gate and no start-phase consumption record, and nothing backfills it.
+Every reader of "has this stage started" — the begin operation, the roll-readiness rule, the execute guard and the projection alike — MUST treat such a stage as STARTED, so a run already in flight resolves on the pre-consumption path instead of deadlocking between a begin that refuses it as already started and an execute that refuses it as unstarted.
 - Once a stage has started its selection is authoritative: a caller-supplied selection plan is IGNORED rather than refused, so a redundant resend can never fail a craft the player already committed to.
 A started stage's check, resolution and awards read the start snapshot rather than re-resolving inventory the consumption has emptied.
 - A stage check MUST NOT be describable or rollable until every other stage requirement is met, elapsed time included; the projected actions withhold the roll and the engine refuses it.

@@ -285,9 +285,13 @@ export async function createPersistedCraftingHistory({
     // `drive` hands the live world to the caller INSIDE the installed globals, so a test can
     // act on the real engine, run manager and actor documents at any point after the start.
     if (drive) {
+      // Wired as `main.js` wires them, so the projection reads the same world clock and the
+      // same component sources the engine's own commands are driven with.
       const project = (candidate = gm) => new RunJournalBuilder({ craftingRunManager: manager,
         recipeManager, recipeVisibility: visibility, getSystem: () => system,
         getResultItem: () => null, getComponent: () => null,
+        nowWorldTime: () => Number(game.time?.worldTime ?? 0),
+        getComponentSourceActors: () => sources,
       }).buildListing({ actor, viewer: candidate });
       const driven = await drive({ engine, actor, sources, recipe, steps, set, system, gm, viewer,
         runId: started.runId, started, project, manager: () => manager,
@@ -575,7 +579,8 @@ function historyActor(id) {
   };
 }
 
-function historyItem(actor, index) {
+/** One essence carrier on a source actor, in the shape the fixture's consumption deletes. */
+export function historyItem(actor, index) {
   const item = { id: 'same-id', uuid: `${actor.uuid}.Item.same-id`, parent: actor,
     documentName: 'Item', _source: { system: { quantity: 1 } },
     name: `Carrier ${index + 1}`, img: 'icons/commodities/flowers/flower-white.webp',

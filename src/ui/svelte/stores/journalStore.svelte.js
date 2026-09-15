@@ -240,7 +240,19 @@ export function createJournalStore({ services } = {}) {
   // Beginning a stage is its own command: it locks the choice, spends the materials and
   // starts the clock, and nothing else does any of the three.
   async function beginStep(run) {
-    return runCommand(run, 'beginStep', {});
+    // Beginning COMMITS the stage's choice, so the command carries the plan the screen showed
+    // rather than depending on a separate earlier write having landed. The persisted plan is the
+    // base; the projection's resolved route fills the id a just-advanced stage has yet to record
+    // (issue 1648, M17).
+    const step = run?.currentStep ?? null;
+    const selectedIngredientSetId =
+      step?.selectionPlan?.selectedIngredientSetId ??
+      step?.selectionAvailability?.selectedIngredientSetId ??
+      null;
+    if (!selectedIngredientSetId) return runCommand(run, 'beginStep', {});
+    return runCommand(run, 'beginStep', {
+      selectionPlan: { ...step.selectionPlan, selectedIngredientSetId },
+    });
   }
 
   async function pause(run) {

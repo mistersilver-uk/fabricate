@@ -942,7 +942,10 @@
           "cancelled": "Cancelled",
           "unknown": "Outcome unknown",
           "awaitingChoice": "Needs your choice",
-          "needsMaterials": "Needs materials"
+          "needsMaterials": "Needs materials",
+          "needsEssences": "Needs essences",
+          "needsCurrency": "Needs payment",
+          "needsTools": "Needs tools"
         },
         "Mode": {
           "Standard": "Standard (DC)",
@@ -1367,6 +1370,10 @@
           "RecoveryRequired": "This run needs GM recovery before it can change.",
           "UnsupportedLifecycle": "This run was created by an unsupported Fabricate version and remains available as a record.",
           "SelectionRequired": "Complete the current stage requirements first.",
+          "EssenceRequired": "This stage needs essences you do not hold. Acquire them, or choose another route.",
+          "CurrencyRequired": "This stage costs more than you can pay.",
+          "ToolRequired": "This stage needs a tool you do not hold.",
+          "RouteUnavailable": "This stage's ingredient requirements are no longer part of the recipe. Ask your GM to restore them, or cancel the run.",
           "ChoiceRequired": "Choose this stage's route before it can begin.",
           "StageNotStarted": "Begin this stage before its check can be rolled.",
           "Completion": {

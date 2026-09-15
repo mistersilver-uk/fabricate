@@ -1110,6 +1110,78 @@ test('Journal error fixture refuses repeated initial loads and retries until exp
   assert.equal(await services.listJournalForActor('actor'), listing);
 });
 
+// Cases whose subject is an editable requirement rail on a counting-down stage, which D-028
+// makes unreachable. They are escalated with issue 1648 and stay pre-commit-shaped meanwhile,
+// because making them unbegun removes a countdown nothing yet replaces (manual finding M18).
+const EDITABLE_GATED_STATES = new Set([
+  'waiting-auto-eligible',
+  'waiting-open-choice',
+  'ingredient-route',
+  'check-route',
+  'essence-shared',
+  'essence-overshoot',
+  'paused',
+  // The deliberate pre-D-026 witness: a run the shipped release armed, which is exactly this
+  // shape and is what its frame exists to photograph.
+  'legacy-armed',
+  // A version-1-less record, which has no stage-start commit to carry at all.
+  'legacy',
+]);
+
+test('no Journal fixture arms a clock the product could not have armed', () => {
+  // Under D-026/D-028 a stage cannot hold a `timeGate` without a `preparedConsumption`: both
+  // `markStepStarted` and the legacy `_startTimedStep` write the receipt before they arm the
+  // gate. A fixture that armed one anyway depicted a state the product can no longer create,
+  // which is how the whole active cohort came to model the deadlocked shape (issue 1648).
+  const offenders = [];
+  for (const state of Object.keys(LAB_JOURNAL_CASE_STATE_RUN_IDS)) {
+    if (EDITABLE_GATED_STATES.has(state)) continue;
+    const { containers } = journalFixture(state);
+    for (const run of Object.values(containers.craftingRuns.active)) {
+      for (const [index, step] of (run.steps ?? []).entries()) {
+        if (step?.timeGate && !step?.preparedConsumption) offenders.push(`${state}: ${run.id}[${index}]`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, []);
+});
+
+test('the Journal fixture simulator refuses the stage transitions the engine refuses', async () => {
+  // The simulator used to accept `beginStep` and `execute` unconditionally, so no case could
+  // reach a refusal and the lab could depict a control that works where the product's does
+  // not (issue 1648). These are the engine's own lifecycle preconditions.
+  const refusals = [
+    ['ready-single', 'beginStep', /already started/],
+    ['waiting-auto-eligible', 'execute', /still in progress/],
+    ['stage-not-started', 'execute', /Begin this crafting stage/],
+  ];
+  for (const [state, action, message] of refusals) {
+    const fixture = journalFixture(state);
+    installLabRunStates(fixture.actor, fixture.containers);
+    const controller = createLabJournalCaseController({ ...fixture, state });
+    const runId = LAB_JOURNAL_CASE_STATE_RUN_IDS[state];
+    const result = await controller.execute({ runType: 'crafting', runId, action });
+    assert.equal(result.success, false, `${state}/${action} must refuse`);
+    assert.match(result.message, message, `${state}/${action}`);
+  }
+
+  // The transitions the engine PERMITS still go through, so the guard is not a blanket refusal.
+  for (const [state, action] of [
+    ['stage-not-started', 'beginStep'],
+    ['ready-single', 'execute'],
+  ]) {
+    const fixture = journalFixture(state);
+    installLabRunStates(fixture.actor, fixture.containers);
+    const controller = createLabJournalCaseController({ ...fixture, state });
+    const result = await controller.execute({
+      runType: 'crafting',
+      runId: LAB_JOURNAL_CASE_STATE_RUN_IDS[state],
+      action,
+    });
+    assert.equal(result.success, true, `${state}/${action} must be permitted`);
+  }
+});
+
 test('every Journal state survives the real run-manager normalizers at its declared identity', () => {
   for (const [state, runId] of Object.entries(LAB_JOURNAL_CASE_STATE_RUN_IDS)) {
     const { actor, containers } = journalFixture(state);

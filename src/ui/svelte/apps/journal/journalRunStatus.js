@@ -105,6 +105,29 @@ const MATERIALS_ATTENTION = Object.freeze({
   icon: 'fa-box-open',
   labelKey: 'FABRICATE.App.Journal.Status.needsMaterials',
 });
+// An essence gap, a price and a missing tool are different problems with different fixes, so
+// each says so in its own words rather than collapsing into "materials" (issue 1648).
+const ACQUISITION_ATTENTION = Object.freeze({
+  selectionRequired: MATERIALS_ATTENTION,
+  essenceRequired: Object.freeze({
+    kind: 'essences',
+    tone: 'warning',
+    icon: 'fa-atom',
+    labelKey: 'FABRICATE.App.Journal.Status.needsEssences',
+  }),
+  currencyRequired: Object.freeze({
+    kind: 'currency',
+    tone: 'warning',
+    icon: 'fa-coins',
+    labelKey: 'FABRICATE.App.Journal.Status.needsCurrency',
+  }),
+  toolRequired: Object.freeze({
+    kind: 'tools',
+    tone: 'warning',
+    icon: 'fa-hammer',
+    labelKey: 'FABRICATE.App.Journal.Status.needsTools',
+  }),
+});
 
 /**
  * What this run needs from the player, or `null` when it needs nothing from them.
@@ -114,5 +137,5 @@ const MATERIALS_ATTENTION = Object.freeze({
  */
 export function runAttentionPresentation(run) {
   if (run?.awaitingChoice === true) return CHOICE_ATTENTION;
-  return run?.actions?.disabledReason === 'selectionRequired' ? MATERIALS_ATTENTION : null;
+  return ACQUISITION_ATTENTION[run?.actions?.disabledReason] ?? null;
 }

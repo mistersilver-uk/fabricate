@@ -9,6 +9,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
 import { ResolutionModeService } from '../../src/systems/ResolutionModeService.js';
 import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
 import {
@@ -2226,24 +2227,31 @@ test('incomplete essence allocation is not physical scarcity even with finite mi
 
 test('absent or uncertain resolver evidence never proves a physical shortfall', () => {
   const missing = { ingredient: { match: { type: 'component', componentId: 'ember' } }, have: 1, need: 2 };
-  // The resolver's own evidence is too thin to classify at all: `success: true` answers the
-  // question outright regardless of the (contradictory) `missingGroups` it also carries, and
-  // an uncertain-kind or currency miss still reports SHORT STOCK through the generic have/need
-  // branch (only `essence` is special-cased), so it is never read as an open choice either.
-  // Neither flag fires, so the manual attempt is unchanged: it still reaches the authority's
-  // own no-spend validation.
-  const unclassified = [
-    { success: true, missingGroups: [missing] },
-    { missingGroups: [missing] },
-    { success: false, missingGroups: [{ ...missing, ingredient: undefined }] },
-    { success: false, missingGroups: [{ ...missing, ingredient: { match: { type: 'currency' } } }] },
+  // `success: true` answers the question outright regardless of the (contradictory)
+  // `missingGroups` it also carries, so the stage is offered.
+  const resolved = { id: 'resolved', ingredientGroups: [],
+    resolveIngredientSelection: () => ({ success: true, missingGroups: [missing] }) };
+  const offered = materialShortfallFixture([resolved]).project();
+  assert.equal(offered.actions.execute, true);
+  assert.equal(offered.actions.disabledReason, null);
+
+  // A PROVEN `have < need` refuses the stage whatever ingredient kind the miss carries or
+  // fails to carry — `_prepareVersionedStage` refuses all three — so the control is withheld
+  // and reasoned by cause rather than offered and then refused (issue 1648).
+  const proven = [
+    [{ missingGroups: [missing] }, 'selectionRequired'],
+    [{ success: false, missingGroups: [{ ...missing, ingredient: undefined }] }, 'selectionRequired'],
+    [
+      { success: false, missingGroups: [{ ...missing, ingredient: { match: { type: 'currency' } } }] },
+      'currencyRequired',
+    ],
   ];
-  for (const result of unclassified) {
+  for (const [result, reason] of proven) {
     const set = { id: 'uncertain', ingredientGroups: [], resolveIngredientSelection: () => result };
     const model = materialShortfallFixture([set]).project();
-    assert.equal(model.actions.execute, true, JSON.stringify(result));
-    assert.equal(model.actions.disabledReason, null, JSON.stringify(result));
-    assert.equal(model.currentStep.selectionAvailability.knownMaterialShortfall, false, JSON.stringify(result));
+    assert.equal(model.actions.execute, false, JSON.stringify(result));
+    assert.equal(model.actions.disabledReason, reason, JSON.stringify(result));
+    assert.equal(model.awaitingChoice, false, JSON.stringify(result));
   }
 
   // Every one of these is uncertain only about WHETHER anything is short — have/need absent,
@@ -2367,7 +2375,7 @@ test('an unbegun stage with no route chosen waits on the player rather than on t
   assert.equal(notice(run).title, 'FABRICATE.App.Journal.Notice.ChoiceTitle');
 });
 
-test('an unbegun stage the resolver can already meet owes the player nothing', () => {
+test('an unbegun stage owes the player nothing only once its own pick is persisted', () => {
   const only = unbegunSecondStage([ironRoute()]);
   assert.equal(only.currentStep.selectionAvailability.success, true);
   assert.equal(only.awaitingChoice, false);
@@ -2378,13 +2386,29 @@ test('an unbegun stage the resolver can already meet owes the player nothing', (
   assert.equal(only.actions.atStageStart, true);
   assert.equal(only.actions.beginStep, true);
   assert.equal(only.actions.disabledReason, 'stageNotStarted');
-  // A multi-OPTION group is not an open choice either: the greedy resolver already holds a
-  // workable pick, so nothing is waiting on the player.
+  // A multi-OPTION group IS an open choice. The resolver invents a greedy pick and reports
+  // success, but `beginVersionedStage` demands the pick be PERSISTED and refuses without it
+  // ("Choose the crafting requirements before executing this step."), so the projection reads
+  // readiness from the same predicate the command does (issue 1648).
   const multiOption = unbegunSecondStage([new IngredientSet({ id: 'only',
     ingredientGroups: [{ id: 'metal', name: 'Metal',
       options: [componentOption('iron'), componentOption('silver')] }] })]);
-  assert.equal(multiOption.currentStep.selectionAvailability.success, true);
-  assert.equal(multiOption.awaitingChoice, false);
+  assert.equal(multiOption.currentStep.selectionAvailability.success, true, 'the resolver can meet it');
+  assert.equal(multiOption.awaitingChoice, true, 'but nobody has picked which option it spends');
+  assert.equal(multiOption.actions.atStageStart, true, 'the begin control still renders');
+  assert.equal(multiOption.actions.beginStep, false, 'and is refused until the pick is persisted');
+  assert.equal(multiOption.actions.disabledReason, 'choiceRequired');
+  assert.equal(multiOption.actions.setSelection, true, 'the control that makes the pick is offered');
+
+  // Persisting the pick clears it: the same fixture, one override later, offers begin.
+  const picked = unbegunSecondStage([new IngredientSet({ id: 'only',
+    ingredientGroups: [{ id: 'metal', name: 'Metal',
+      options: [componentOption('iron'), componentOption('silver')] }] })],
+  { selectionPlan: { selectedIngredientSetId: 'only',
+    ingredientOptionOverrides: { metal: { optionIndex: 0 } } } });
+  assert.equal(picked.awaitingChoice, false);
+  assert.equal(picked.actions.beginStep, true);
+  assert.equal(picked.actions.disabledReason, 'stageNotStarted');
 });
 
 test('an untimed stage keeps its choices open for its whole life and says so', () => {
@@ -2405,6 +2429,18 @@ test('an untimed stage keeps its choices open for its whole life and says so', (
   assert.equal(run.currentStep.selectionAvailability.essencePool.requirements[0].owned, 3);
   assert.equal(run.awaitingChoice, true, 'the pool is coverable; the allocation is what is missing');
   assert.equal(notice(run).dataAttr, 'data-journal-awaiting-choice');
+
+  // The ABSENT allocation, which is what the engine actually refuses: the resolver SUGGESTS
+  // one and reports success, so only the persisted-plan question separates it from a ready
+  // stage. Projecting the partial case alone left this one unguarded (issue 1648).
+  const unallocated = untimedStage([essenceSet()], { selectionPlan: { selectedIngredientSetId: 'ess' } },
+  { actor: { ...ACTOR, isOwner: true, items: [carrier] },
+    dependencies: { resolveItemEssences: () => ({ fire: 1 }) } });
+  assert.equal(unallocated.currentStep.selectionAvailability.success, true, 'the resolver suggests one');
+  assert.equal(unallocated.awaitingChoice, true, 'but nothing persisted the allocation it would spend');
+  assert.equal(unallocated.actions.execute, false, 'so the primary must not reach the refusal');
+  assert.equal(unallocated.actions.disabledReason, 'choiceRequired');
+  assert.equal(unallocated.actions.setSelection, true);
 });
 
 test('a pre-start plan that went stale waits on a replacement choice', () => {
@@ -2447,12 +2483,23 @@ test('a shortfall choosing cannot repair is never reported as a choice', () => {
       dependencies: { resolveItemEssences: () => ({ fire: 1 }) } });
   assert.equal(shortEssence.currentStep.selectionAvailability.essencePool.requirements[0].owned, 1);
   assert.equal(shortEssence.awaitingChoice, false, 'the carrier ledger cannot cover the requirement');
+  // Its own word and its own refusal: an essence gap is neither a choice nor a box of
+  // components, and the primary must not reach the engine's refusal (issue 1648).
+  assert.equal(shortEssence.actions.execute, false);
+  assert.equal(shortEssence.actions.disabledReason, 'essenceRequired');
+  assert.equal(runAttentionPresentation(shortEssence).kind, 'essences');
+  assert.equal(notice(shortEssence).dataValue, 'essenceRequired');
+
   const currency = new IngredientSet({ id: 'coin', ingredientGroups: [{ id: 'fee',
     options: [{ match: { type: 'currency', unit: 'gp', amount: 10 } }] }] });
   const unaffordable = untimedStage([currency], { selectionPlan: { selectedIngredientSetId: 'coin' } },
     { dependencies: { affordCurrency: () => false } });
   assert.equal(unaffordable.currentStep.selectionAvailability.success, false);
   assert.equal(unaffordable.awaitingChoice, false);
+  assert.equal(unaffordable.actions.execute, false, 'a price the actor cannot pay refuses the stage');
+  assert.equal(unaffordable.actions.disabledReason, 'currencyRequired');
+  assert.equal(runAttentionPresentation(unaffordable).kind, 'currency');
+  assert.equal(notice(unaffordable).dataValue, 'currencyRequired');
 });
 
 test('a started stage and a paused run hold the choices they already made', () => {
@@ -2475,6 +2522,47 @@ test('a started stage and a paused run hold the choices they already made', () =
   assert.equal(paused.awaitingChoice, false, 'a paused run waits on a resume, not on a pick');
   assert.equal(runAttentionPresentation(paused), null);
   assert.equal(notice(paused).dataAttr, 'data-journal-paused');
+});
+
+test('a started stage whose locked route is deleted reports the edit, not an impossible choice', () => {
+  const orphaned = unbegunSecondStage([silverRoute()], {
+    selectionPlan: { selectedIngredientSetId: 'route-iron' },
+    selectedIngredientSetId: 'route-iron',
+    preparedConsumption: { consumedSummary: [] },
+    timeGate: { requiredSeconds: 3600, initiatedAt: 150, availableAt: 3750 },
+  });
+  assert.equal(orphaned.currentStep.selectionAvailability.staleRoute, true);
+  // The choice locked when the stage started, so `setSelection` is false: telling the player
+  // to choose would name a control they do not have (issue 1648, QE-5).
+  assert.equal(orphaned.actions.setSelection, false);
+  assert.equal(orphaned.awaitingChoice, false, 'there is no pick left to make');
+  assert.equal(orphaned.actions.execute, false, 'and the engine refuses the stage either way');
+  assert.equal(orphaned.actions.disabledReason, 'routeUnavailable');
+  assert.equal(orphaned.actions.cancel, true, 'cancel is the way out that actually exists');
+  assert.equal(notice(orphaned).dataValue, 'routeUnavailable');
+});
+
+test('the projection reads a stage duration exactly as the run manager arms it', () => {
+  // `RunJournalBuilder`'s `durationToSeconds` is a hand-maintained copy of
+  // `CraftingRunManager._durationToSeconds`, and since issue 1648 that copy also decides
+  // whether the begin control renders at all. Drift reproduces the whole "offered, then
+  // refused" class silently, so the two are compared through their public surfaces here.
+  const manager = new CraftingRunManager();
+  const durations = [
+    null, {}, { minutes: 1 }, { hours: 2 }, { days: 3 }, { months: 1 }, { years: 1 },
+    { minutes: 30, hours: 1, days: 2, months: 3, years: 4 },
+    { minutes: -5 }, { hours: '2' }, { days: NaN }, { weeks: 9 },
+  ];
+  for (const timeRequirement of durations) {
+    const label = JSON.stringify(timeRequirement);
+    const armed = manager.durationToSeconds(timeRequirement);
+    const model = projectChoiceRun({
+      executionSteps: [{ id: 's0', toolIds: [], timeRequirement, ingredientSets: [ironRoute()] }],
+      runSteps: [{ stepId: 's0', stepName: 'Make', index: 0, status: 'inProgress' }],
+    });
+    assert.equal(model.currentStep.detail.requiredSeconds, armed > 0 ? armed : null, label);
+    assert.equal(model.actions.atStageStart, armed > 0, `begin control renders iff gated: ${label}`);
+  }
 });
 
 test('waiting on a choice is reported only to a viewer who can make it', () => {
@@ -2912,10 +3000,12 @@ test('current-step availability delegates material choices and shared essence al
   assert.equal(calls[0].options.affordCurrency({ unit: 'gp', amount: 1 }), true);
   const expectedAvailability = {
     success: false,
-    // The fake resolver reports a group short of stock, so the plan waits on acquiring
-    // rather than on a pick even though the miss carries no recognised ingredient kind.
+    // The fake resolver reports a group short of stock, so the plan waits on acquiring rather
+    // than on a pick. A proven `have < need` is stock to acquire whatever ingredient kind the
+    // miss carries, because the stage command refuses it either way (issue 1648).
+    blocker: 'selectionRequired',
     awaitingChoice: false,
-    knownMaterialShortfall: false,
+    knownMaterialShortfall: true,
     missingGroups: [
       {
         id: 'fixed',

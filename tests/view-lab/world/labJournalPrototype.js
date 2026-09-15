@@ -270,6 +270,7 @@ const WORKSHOPS = {
 /** Case-to-original-data binding; canonical extensions are explicitly labelled. */
 export const JOURNAL_PROTOTYPE_BINDINGS = Object.freeze({
   'ready-single': 'cord',
+  'legacy-armed': 'canonical/pre-start-commit-run',
   'waiting-auto-eligible': 'poultice',
   'waiting-open-choice': 'rivets',
   'stage-not-started': 'rivets',

@@ -22,6 +22,16 @@ import { historyEvidenceFields } from './runHistoryEvidence.js';
 import { craftingOutcomeBand, routedOutcomeBand } from './runJournalOutcomeBands.js';
 import { getRunLifecycleContract } from './runLifecycleState.js';
 import { resolvedComponentsFor, resolvedEssencesFor } from './scopedEntityReads.js';
+import {
+  STAGE_BLOCKERS,
+  classifyStageReadiness,
+  ingredientKind,
+  missingGroupBlocker,
+  resolveStageToolStates,
+  scopedEssenceAllocation,
+  stageSelectionInputsComplete,
+  unfundedEssenceGroupIds,
+} from './stageReadiness.js';
 
 const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
 const DEFAULT_GATHERING_IMAGE = 'icons/containers/bags/pouch-leather-brown-green.webp';
@@ -565,10 +575,10 @@ export class RunJournalBuilder {
     );
 
     const systemId = stringOrNull(run.craftingSystemId);
-    const availabilitySnapshot =
+    const availability =
       redacted || terminal
         ? null
-        : this._availabilitySnapshot({ actor, run, recipe, fallback: snapshot });
+        : this._stageAvailability({ actor, run, recipe, fallback: snapshot });
     const steps = redacted
       ? []
       : runSteps.map((runStep, index) =>
@@ -581,7 +591,7 @@ export class RunJournalBuilder {
             systemId,
             actor,
             run,
-            availabilitySnapshot,
+            availability,
             isCurrent: !terminal && index === currentStepIndex,
             terminal,
             historyEntitled,
@@ -823,13 +833,23 @@ export class RunJournalBuilder {
     systemId = null,
     actor = null,
     run = null,
-    availabilitySnapshot = null,
+    availability = null,
     isCurrent = false,
     terminal = false,
     historyEntitled = false,
     entitledHistory = [],
   }) {
     const evidence = historyEntitled ? craftingStepHistoryEvidence(runStep) : {};
+    const toolStates = isCurrent
+      ? resolveStageToolStates({
+          recipeManager: this._recipeManager,
+          recipe,
+          recipeStep,
+          ingredientSet: this._selectedCraftingIngredientSet(runStep, recipeStep),
+          sourceActors: availability?.sourceActors ?? [],
+          primaryActor: actor,
+        })
+      : null;
     const consumed = historyEntitled
       ? enrichHistoricalConsumption(runStep, {
           earlierItems: historicalItemSources(
@@ -859,7 +879,15 @@ export class RunJournalBuilder {
           : null) ??
         null,
       timeGate: plainObjectOrNull(runStep?.timeGate),
-      detail: this._stepDetail({ runStep, recipeStep, system, recipe, terminal, historyEntitled }),
+      detail: this._stepDetail({
+        runStep,
+        recipeStep,
+        system,
+        recipe,
+        terminal,
+        historyEntitled,
+        toolStates,
+      }),
       lastCheckResult: this._checkResultModel(runStep?.lastCheckResult),
       // Requirements retain their authored identity; consumption retains physical receipts.
       // Only entitled consumption receives the separate historical metadata enrichment.
@@ -913,7 +941,8 @@ export class RunJournalBuilder {
             recipe,
             actor,
             run,
-            snapshot: availabilitySnapshot,
+            snapshot: availability?.snapshot ?? null,
+            toolStates,
           })
         : null,
     };
@@ -925,7 +954,7 @@ export class RunJournalBuilder {
    * @private
    * @returns {object} A `selectionAvailability` reporting a satisfied, locked selection.
    */
-  _lockedSelectionAvailability({ runStep, ingredientSet, recipe, setId }) {
+  _lockedSelectionAvailability({ runStep, ingredientSet, recipe, setId, toolStates = null }) {
     const system = this._getSystem(stringOrNull(recipe?.craftingSystemId));
     // The locked OPTION, not the locked item: a consumed item id resolves to no live
     // candidate, which would otherwise read as a stale selection on a stage already paid for.
@@ -940,6 +969,11 @@ export class RunJournalBuilder {
       routes: [{ id: setId, name: stringOrEmpty(ingredientSet?.name) }],
       staleRoute: false,
       success: true,
+      // Its inputs are spent and its choice is locked, but tools are never consumed and are
+      // re-validated live at resolve time: one sold during the wait still refuses the stage.
+      blocker: normalizeList(toolStates).some((tool) => tool?.available !== true)
+        ? STAGE_BLOCKERS.tool
+        : null,
       awaitingChoice: false,
       knownMaterialShortfall: false,
       missingGroups: [],
@@ -1168,23 +1202,33 @@ export class RunJournalBuilder {
     }
   }
 
-  _availabilitySnapshot({ actor, run, recipe, fallback }) {
-    let componentSourceActors;
+  /**
+   * What the live stage is judged against: the inventory the run draws on, and the actors it
+   * draws it from — the second answers tool presence, which no snapshot carries.
+   * @private
+   * @returns {{snapshot: object|null, sourceActors: object[]}}
+   */
+  _stageAvailability({ actor, run, recipe, fallback }) {
+    let sourceActors;
     try {
-      componentSourceActors = normalizeList(this._getComponentSourceActors({ actor, run }));
+      sourceActors = normalizeList(this._getComponentSourceActors({ actor, run }));
     } catch {
-      componentSourceActors = [];
+      sourceActors = [];
     }
-    if (componentSourceActors.length === 0) return fallback;
-    return buildPassInventorySnapshot({
-      craftingActor: actor,
-      componentSourceActors,
-      recipes: [recipe],
-      resolveComponent: this._resolveComponentForItem,
-    });
+    if (sourceActors.length === 0)
+      return { snapshot: fallback, sourceActors: actor ? [actor] : [] };
+    return {
+      snapshot: buildPassInventorySnapshot({
+        craftingActor: actor,
+        componentSourceActors: sourceActors,
+        recipes: [recipe],
+        resolveComponent: this._resolveComponentForItem,
+      }),
+      sourceActors,
+    };
   }
 
-  _selectionAvailability({ runStep, recipeStep, recipe, actor, snapshot }) {
+  _selectionAvailability({ runStep, recipeStep, recipe, actor, snapshot, toolStates = null }) {
     const plan = runStep?.selectionPlan;
     const sets = normalizeList(recipeStep?.ingredientSets);
     // One authored route is not a choice, so a stage that has not chosen yet still reads as
@@ -1201,9 +1245,19 @@ export class RunJournalBuilder {
     // probed against an inventory the consumption has emptied, which would otherwise read
     // back as a material shortfall and block the run it already paid for.
     if (runStep?.preparedConsumption && ingredientSet) {
-      return this._lockedSelectionAvailability({ runStep, ingredientSet, recipe, setId });
+      return this._lockedSelectionAvailability({
+        runStep,
+        ingredientSet,
+        recipe,
+        setId,
+        toolStates,
+      });
     }
-    if (!ingredientSet) return unchosenRouteAvailability(setId, routes);
+    // A STARTED stage cannot be told to choose: its route is locked, so no selection control can
+    // repair a route the recipe no longer holds. It reports the edit; cancel is the way out.
+    if (!ingredientSet) {
+      return unchosenRouteAvailability(setId, routes, Boolean(runStep?.preparedConsumption));
+    }
     if (typeof ingredientSet.resolveIngredientSelection !== 'function' || !snapshot) {
       return null;
     }
@@ -1247,9 +1301,7 @@ export class RunJournalBuilder {
                 optionOverrides: {},
                 essenceAllocation: null,
               });
-        route.shortfallCount = normalizeList(probe?.missingGroups).filter(
-          isPhysicalMaterialShortfall
-        ).length;
+        route.shortfallCount = acquisitionShortfallCount(probe);
         route.needsSelection = probe?.success !== true && route.shortfallCount === 0;
         route.entries =
           this._craftingYieldPreview({
@@ -1261,15 +1313,20 @@ export class RunJournalBuilder {
           })?.entries ?? [];
       }
     }
+    // ONE readiness verdict, from the predicate the engine's own stage commands consult.
+    const { blocker } = classifyStageReadiness({
+      selection,
+      inputsComplete: stageSelectionInputsComplete(ingredientSet, plan, runStep?.stepId),
+      toolsAvailable: normalizeList(toolStates).every((tool) => tool?.available === true),
+    });
     return {
       selectedIngredientSetId: setId,
       routes,
       staleRoute: false,
       success: selection?.success === true,
-      awaitingChoice: awaitsSelectionChoice(selection),
-      knownMaterialShortfall:
-        selection?.success === false &&
-        normalizeList(selection.missingGroups).some(isPhysicalMaterialShortfall),
+      blocker,
+      awaitingChoice: blocker === STAGE_BLOCKERS.choice,
+      knownMaterialShortfall: blocker === STAGE_BLOCKERS.material,
       missingGroups: normalizeList(selection?.missingGroups).map(safeMissingGroup),
       choices,
       requirements: normalizeList(ingredientSet.ingredientGroups).map((group) =>
@@ -1523,14 +1580,20 @@ export class RunJournalBuilder {
   }
 
   _scopedEssenceAllocation(plan, runStep, ingredientSet) {
-    const scoped = plan?.ingredientEssenceAllocation;
-    if (!scoped || typeof scoped !== 'object') return null;
-    if (stringOrNull(scoped.stepId) !== stringOrNull(runStep?.stepId)) return null;
-    if (stringOrNull(scoped.ingredientSetId) !== stringOrNull(ingredientSet?.id)) return null;
-    return plainObjectOrNull(scoped.allocation);
+    return plainObjectOrNull(
+      scopedEssenceAllocation(plan?.ingredientEssenceAllocation, runStep?.stepId, ingredientSet?.id)
+    );
   }
 
-  _stepDetail({ runStep, recipeStep, system, recipe, terminal = false, historyEntitled = false }) {
+  _stepDetail({
+    runStep,
+    recipeStep,
+    system,
+    recipe,
+    terminal = false,
+    historyEntitled = false,
+    toolStates = null,
+  }) {
     if (terminal) {
       return {
         requiredSeconds: recordedNumber(runStep?.timeGate?.requiredSeconds),
@@ -1542,14 +1605,18 @@ export class RunJournalBuilder {
     // Every authored tool, with its artwork: a step has REQUIRED tools and nothing else, so
     // there is no "primary" one to elect (issue 1648).
     const systemId = stringOrNull(recipe?.craftingSystemId);
-    const tools = normalizeList(recipeStep?.toolIds)
-      .map((toolId) => this._getTool(systemId, toolId))
-      .filter((tool) => stringOrEmpty(tool?.name))
-      .map((tool) => ({
-        id: stringOrNull(tool.id),
-        name: stringOrEmpty(tool.name),
-        img: stringOrNull(tool.img),
-      }));
+    // A live stage reports whether each tool is HELD (issue 1648): a tool it lacks refuses the
+    // stage. An authored-only view has no held state to resolve and keeps the authored list.
+    const tools =
+      toolStates ??
+      normalizeList(recipeStep?.toolIds)
+        .map((toolId) => this._getTool(systemId, toolId))
+        .filter((tool) => stringOrEmpty(tool?.name))
+        .map((tool) => ({
+          id: stringOrNull(tool.id),
+          name: stringOrEmpty(tool.name),
+          img: stringOrNull(tool.img),
+        }));
     const requiredSeconds =
       numberOrNull(runStep?.timeGate?.requiredSeconds) ??
       durationToSeconds(recipeStep?.timeRequirement);
@@ -2291,7 +2358,9 @@ export class RunJournalBuilder {
     const mutableCurrent = current && live && owner && authoritative && !executionBlocked;
     const executableType = runType === 'crafting' || runType === 'gathering';
     const craftingStage = current && live && runType === 'crafting';
-    const materialBlocked = craftingStage && selectionAvailability?.knownMaterialShortfall === true;
+    // The one cause this stage is refused for, as the engine's own commands classify it.
+    const stageBlocker = craftingStage ? (selectionAvailability?.blocker ?? null) : null;
+    const materialBlocked = stageBlocker !== null && stageBlocker !== STAGE_BLOCKERS.choice;
     // A stage with its own start is not resolvable until the player has begun it: the roll
     // is withheld rather than offered and then refused (M13/M15).
     const awaitingStageStart = current && live && stageStart?.required === true;
@@ -2303,7 +2372,7 @@ export class RunJournalBuilder {
       runType === 'crafting' &&
       !paused &&
       entitled &&
-      selectionAvailability?.awaitingChoice === true;
+      stageBlocker === STAGE_BLOCKERS.choice;
     const readyToExecute =
       derivedStatus !== 'waiting' &&
       derivedStatus !== 'paused' &&
@@ -2340,9 +2409,8 @@ export class RunJournalBuilder {
         legacyExecute,
         legacyCancel,
         readyToExecute,
-        materialBlocked,
+        stageBlocker,
         awaitingStageStart,
-        choiceRequired,
         blockedReason,
         recoveryClaim,
       }),
@@ -2383,9 +2451,8 @@ export class RunJournalBuilder {
     legacyExecute,
     legacyCancel,
     readyToExecute,
-    materialBlocked,
+    stageBlocker,
     awaitingStageStart,
-    choiceRequired,
     blockedReason,
     recoveryClaim,
   }) {
@@ -2413,26 +2480,15 @@ export class RunJournalBuilder {
         Boolean(timeGate) &&
         !hasPlayerCheck,
       atStageStart,
-      // Also in scope (issue 1648): a KNOWN material shortfall refuses `beginStep` too — the
-      // same "offered, then refused" shape as the choice gap, just on the other axis
-      // (`_prepareVersionedStage`'s `canCraft` check answers "Missing required items"). It
-      // is already detected (`materialBlocked` already gates `readyToExecute`) and reported
-      // (`disabledReason` already prefers `selectionRequired` for it below); only the begin
-      // control's own gate was missing it.
-      beginStep: atStageStart && !choiceRequired && !materialBlocked,
+      // Offered only where `beginVersionedStage` would commit the stage: `stageBlocker` carries
+      // every cause that command refuses on, so none of them is offered and then refused.
+      beginStep: atStageStart && stageBlocker === null,
       setSelection:
         mutableCurrent && runType === 'crafting' && entitled && stageStart?.locked !== true,
       cancel: legacyCancel || (mutableCurrent && executableType),
       dismiss: terminal,
       disabledReason:
-        blockedReason ??
-        (materialBlocked
-          ? 'selectionRequired'
-          : choiceRequired
-            ? 'choiceRequired'
-            : awaitingStageStart
-              ? 'stageNotStarted'
-              : null),
+        blockedReason ?? stageBlocker ?? (awaitingStageStart ? 'stageNotStarted' : null),
       ...(recoveryClaim && { recoveryClaim }),
     };
   }
@@ -2613,14 +2669,6 @@ function selectedIngredientIndex(group, optionOverrides, selection) {
   return Math.max(selectedIndex, 0);
 }
 
-function ingredientKind(option) {
-  if (option?.itemUuid) return 'item';
-  const type = option?.match?.type;
-  if (type === 'tags') return 'tag';
-  if (['component', 'essence', 'currency'].includes(type)) return type;
-  return 'unknown';
-}
-
 function ingredientNeed(option) {
   const match = plainObjectOrNull(option?.match);
   if (match?.type === 'essence' || match?.type === 'currency') {
@@ -2667,13 +2715,15 @@ function runIdentityFields({ run, runType, actorUuid, activityKind, lifecycleCon
 
 /**
  * The stage's answer when its route resolves to no authored set: none has been chosen, or the
- * one that was has gone. Either way it waits on a pick and is short of nothing.
+ * one that was has gone. An unstarted stage waits on a pick; a started one has no pick left to
+ * make and reports the recipe edit instead.
  */
-function unchosenRouteAvailability(setId, routes) {
+function unchosenRouteAvailability(setId, routes, started = false) {
   return {
     success: false,
+    blocker: started ? 'routeUnavailable' : STAGE_BLOCKERS.choice,
     knownMaterialShortfall: false,
-    awaitingChoice: true,
+    awaitingChoice: !started,
     selectedIngredientSetId: setId,
     routes,
     staleRoute: true,
@@ -2685,43 +2735,14 @@ function unchosenRouteAvailability(setId, routes) {
 }
 
 /**
- * Whether a missing group reports stock the player must ACQUIRE rather than a pick they have
- * yet to make. A finite `have < need` is an acquisition whatever the ingredient kind; an
- * essence miss is one only when the carrier ledger cannot cover it, because an allocation the
- * player can still redistribute is a choice.
+ * A route's own count of what the player would have to ACQUIRE to take it, used to rank the
+ * alternatives. Essence and currency gaps count too: every one of them refuses the stage.
  */
-function reportsShortStock(group, uncoveredEssenceGroups) {
-  if (ingredientKind(group?.ingredient) === 'essence') {
-    return uncoveredEssenceGroups.has(missingGroupId(group));
-  }
-  return Number.isFinite(group?.have) && Number.isFinite(group?.need) && group.have < group.need;
-}
-
-/**
- * Whether the stage is waiting on the player's own CHOICE: its plan does not resolve, and
- * nothing it names is short. Choosing fixes this; acquiring does not (issue 1648, M10).
- */
-function awaitsSelectionChoice(selection) {
-  if (selection?.success === true) return false;
-  const uncovered = new Set(
-    normalizeList(selection?.essencePool?.requirements)
-      .filter((entry) => (numberOrNull(entry?.owned) ?? 0) < (numberOrNull(entry?.need) ?? 0))
-      .map((entry) => stringOrNull(entry?.groupId))
-  );
-  return normalizeList(selection?.missingGroups).every(
-    (group) => !reportsShortStock(group, uncovered)
-  );
-}
-
-// Essence have is delivered allocation, not held stock. Classify only physical
-// misses before safeMissingGroup removes the raw ingredient kind.
-function isPhysicalMaterialShortfall(group) {
-  return (
-    ['component', 'tag', 'item'].includes(ingredientKind(group?.ingredient)) &&
-    Number.isFinite(group?.have) &&
-    Number.isFinite(group?.need) &&
-    group.have < group.need
-  );
+function acquisitionShortfallCount(selection) {
+  const unfunded = unfundedEssenceGroupIds(selection?.essencePool);
+  return normalizeList(selection?.missingGroups).filter(
+    (group) => missingGroupBlocker(group, unfunded) !== STAGE_BLOCKERS.choice
+  ).length;
 }
 
 function safeMissingGroup(group) {

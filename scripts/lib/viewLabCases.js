@@ -1614,6 +1614,7 @@ function journalHistoryDataCases() {
 function journalLifecycleCases() {
   const states = [
     'ready-single',
+    'legacy-armed',
     'waiting-auto-eligible',
     'waiting-open-choice',
     'stage-not-started',
@@ -1710,7 +1711,10 @@ function journalLifecycleCases() {
           'finished-cancelled',
         ],
       ],
-      ['Wax a Hemp Cord', ['ready-single', 'history-just-resolved', 'history-cancelled-before']],
+      [
+        'Wax a Hemp Cord',
+        ['ready-single', 'legacy-armed', 'history-just-resolved', 'history-cancelled-before'],
+      ],
       ['Bind a Shield Boss', ['ingredient-route', 'material-shortage']],
       ['Whet a Keen Edge', ['check-route']],
       ['Inscribe a Prismatic Sigil', ['essence-shared', 'essence-overshoot']],
@@ -1879,6 +1883,13 @@ function journalLifecycleCases() {
       '.journal-view-container' +
       has('[data-run-status="ready"]', `${detail} ${enabledPrimary}`) +
       lacks('[data-stage-nav]'),
+    // The pre-D-026 run the shipped release armed. It has taken its start, so it offers the
+    // PRIMARY and no begin control, and nothing refuses it: the deadlock this case exists to
+    // photograph is the absence of a blocker here (issue 1648).
+    'legacy-armed':
+      '.journal-view-container' +
+      has('[data-run-status="ready"]', `${detail} ${enabledPrimary}`) +
+      lacks('[data-run-action="begin"]', '[data-journal-action-blocker]'),
     'waiting-auto-eligible':
       detail +
       has(
@@ -1915,8 +1926,16 @@ function journalLifecycleCases() {
       detail +
       has('[data-journal-stage-details]', '[data-slot-row]') +
       lacks('[data-journal-stage-details][data-editable="true"]', '[data-run-action="begin"]'),
+    // A stage short of its materials has NOT begun — starting is what spends them (D-026) —
+    // so the control it offers is the begin decision, refused and reasoned (issue 1648).
     'material-shortage':
-      detail + has('[data-slot-id="boss-stage-1-sunward-g3"]', `${primary}:disabled`),
+      detail +
+      has(
+        '[data-slot-id="boss-stage-1-sunward-g3"]',
+        '[data-run-action="begin"]:disabled',
+        '[data-journal-action-blocker="selectionRequired"]'
+      ) +
+      lacks(primary),
     'ingredient-route':
       detail +
       has(
@@ -2042,11 +2061,11 @@ function journalLifecycleCases() {
     'automatic-blocker':
       detail +
       has(
-        `${primary}:disabled`,
+        '[data-run-action="begin"]:disabled',
         '[data-essence-threshold="clarity"] [aria-valuenow="0"]',
         '[data-journal-awaiting-choice="true"][data-notice-tone="info"]'
       ) +
-      lacks('[data-journal-command-error]', '[data-journal-action-blocker]'),
+      lacks(primary, '[data-journal-command-error]', '[data-journal-action-blocker]'),
     dismissal:
       '.journal-view-container' +
       has('[data-history-run-id]', detail) +

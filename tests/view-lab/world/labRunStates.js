@@ -72,6 +72,7 @@ export const LAB_RETAINED_CLAIM = Object.freeze({
  */
 export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'ready-single': 'lab-v1-ready-single',
+  'legacy-armed': 'lab-v1-legacy-armed',
   'waiting-auto-eligible': 'lab-v1-waiting-auto-eligible',
   'waiting-open-choice': 'lab-v1-waiting-open-choice',
   'stage-not-started': 'lab-v1-stage-not-started',
@@ -612,18 +613,33 @@ function journalCaseFactories(context) {
       steps: [versionedRecipeStep(recipe, 0, 'waitingTime', futureGate())],
       ...extra,
     });
+  // The stage a player has NOT begun: no gate, no consumption receipt, and therefore the only
+  // shape whose route, options and essence allocation are still editable. Post-D-028 a gated
+  // stage has locked all three, so a fixture cannot arm a clock and stay open (issue 1648).
+  const unbegun = (id, recipe = single(), extra = {}) =>
+    versionedCraftingRun(context, recipe, {
+      id,
+      status: 'inProgress',
+      steps: [versionedRecipeStep(recipe, 0, 'inProgress')],
+      ...extra,
+    });
   const readyAlias = (id) => () => active(ready(id));
 
   return {
     'ready-single': readyAlias('lab-v1-ready-single'),
+    'legacy-armed': () => {
+      const run = ready('lab-v1-legacy-armed');
+      delete run.steps[0].preparedConsumption;
+      return active(run);
+    },
     'waiting-auto-eligible': () => active(waiting('lab-v1-waiting-auto-eligible')),
     'waiting-open-choice': () =>
-      active(waiting('lab-v1-waiting-open-choice', choice(), { completionMode: 'manual' })),
+      active(unbegun('lab-v1-waiting-open-choice', choice(), { completionMode: 'manual' })),
     'material-shortage': () =>
       active(
-        waiting('lab-v1-material-shortage', shortage(), {
+        unbegun('lab-v1-material-shortage', shortage(), {
           completionMode: 'manual',
-          steps: [shortageStep(shortage(), futureGate())],
+          steps: [shortageStep(shortage())],
         })
       ),
     'ingredient-route': () =>
@@ -638,7 +654,7 @@ function journalCaseFactories(context) {
         })
       ),
     'check-route': () => active(ready('lab-v1-check-route', checkRoute())),
-    'essence-shared': () => active(ready('lab-v1-essence-shared', essence())),
+    'essence-shared': () => active(unbegun('lab-v1-essence-shared', essence())),
     paused: () =>
       active(
         waiting('lab-v1-paused', single(), {
@@ -665,13 +681,15 @@ function journalCaseFactories(context) {
     'empty-search': readyAlias('lab-v1-ready-single'),
     'automatic-completion': () =>
       finished(automaticCompletedCase(context, single(), 'lab-v1-automatic-completion')),
+    // D-010: a conservative automatic advance decides BEFORE it spends, so a run it cannot
+    // resolve is never started and never consumes — which is why this one holds no gate.
     'automatic-blocker': () =>
       active(
         versionedCraftingRun(context, shortage(), {
           id: 'lab-v1-automatic-blocker',
-          status: 'waitingTime',
+          status: 'inProgress',
           completionMode: 'worldTime',
-          steps: [shortageStep(shortage(), maturedGate())],
+          steps: [shortageStep(shortage())],
         })
       ),
     dismissal: () =>
@@ -795,24 +813,31 @@ function prototypeContainers(context, state) {
       allocation: { 'Item.jp-bitterroot': 2 },
     };
   }
+  // Both shortage states are UNBEGUN. A stage that has started spent its materials (D-026), so
+  // it can no longer be short of them, and a conservative automatic advance decides before it
+  // spends (D-010), so a run it cannot resolve never arms a clock either (issue 1648).
   if (state === 'material-shortage') {
     const recipe = requireRecipe(context.recipes, selected.recipeId);
-    selected.steps[0] = versionedRecipeStep(recipe, 0, 'waitingTime', {
-      timeGate: selected.steps[0].timeGate,
+    selected.steps[0] = versionedRecipeStep(recipe, 0, 'inProgress', {
       presentationSnapshot: selected.steps[0].presentationSnapshot,
       selectedSetIndex: 1,
     });
+    selected.status = 'inProgress';
   }
   if (state === 'automatic-blocker') {
     selected.completionMode = 'worldTime';
+    selected.status = 'inProgress';
     const current = selected.steps[selected.currentStepIndex];
-    current.timeGate = maturedGate().timeGate;
+    delete current.timeGate;
+    delete current.preparedConsumption;
+    current.status = 'inProgress';
     current.selectionPlan.ingredientEssenceAllocation = {
       stepId: current.stepId,
       ingredientSetId: current.selectedIngredientSetId,
       allocation: {},
     };
   }
+  if (EDITABLE_GATED_CASES.has(state)) reopenEditableStage(selected);
   replacePrototypeFocus(containers.craftingRuns, selected, false);
   return containers;
 }
@@ -895,12 +920,14 @@ function prototypeCraft(context, key, id) {
         description: spec.steps.length === 1 ? (spec.description ?? '') : '',
       };
     if (index < spec.current) recordPrototypeStage(context, key, entry, index, true);
-    if (index === spec.current)
+    if (index === spec.current) {
       entry.timeGate = {
         requiredSeconds: spec.steps[index].hours * HOUR,
         initiatedAt: NOW - (spec.steps[index].hours - spec.left) * HOUR,
         availableAt: NOW + spec.left * HOUR,
       };
+      entry.preparedConsumption ??= startedStageConsumption(entry);
+    }
     if (index === spec.current && key === 'sigil')
       entry.selectionPlan.ingredientEssenceAllocation = {
         stepId: entry.stepId,
@@ -1102,6 +1129,16 @@ function prototypeSpecial(context, state, id, containers) {
   // so `completeStepSuccess` advanced into a stage with two authored routes and no plan at all.
   // It has a time requirement, so it also has its own start — and it cannot take it until the
   // player picks a route, which is exactly what nothing on screen used to say.
+  // A run armed by the release that consumed at EXECUTE: gated, with no start-phase receipt.
+  // Nothing backfills it and there is no migration, so it is a real, reachable state until
+  // those runs drain. Its frame is the repaired behaviour — an enabled primary whose command
+  // resolves the stage — rather than the deadlock it used to depict (issue 1648).
+  if (state === 'legacy-armed') {
+    const run = prototypeCraft(context, 'cord', id);
+    delete run.steps[run.currentStepIndex].preparedConsumption;
+    replacePrototypeFocus(containers.craftingRuns, run, false);
+    return true;
+  }
   if (state === 'awaiting-choice') {
     const run = prototypeCraft(context, 'buckler', id);
     const last = run.steps.length - 1;
@@ -1139,8 +1176,13 @@ function prototypeSpecial(context, state, id, containers) {
       };
     } else {
       delete current.timeGate;
+      delete current.preparedConsumption;
       current.status = 'inProgress';
       run.status = 'inProgress';
+      // The pick a player makes with the option control before they press begin. Without it
+      // the stage is waiting on a CHOICE, not on the start — and `beginVersionedStage`
+      // refuses it, so the control would render enabled and then refuse (issue 1648).
+      persistAuthoredPicks(current);
     }
     replacePrototypeFocus(containers.craftingRuns, run, false);
     return true;
@@ -1221,6 +1263,32 @@ function recipeSteps(recipe) {
   return typeof recipe?.getExecutionSteps === 'function' ? recipe.getExecutionSteps() : [];
 }
 
+/**
+ * The start-commit receipt every gated stage carries. Under D-026/D-028 a stage cannot hold a
+ * time gate without one — both `markStepStarted` and the legacy `_startTimedStep` write the
+ * record before they arm the clock — so a fixture that armed a gate and left this undefined
+ * depicted a state the product can no longer create (issue 1648).
+ */
+function startedStageConsumption(step) {
+  return {
+    selectedIngredientSetId:
+      step.selectionPlan?.selectedIngredientSetId ?? step.selectedIngredientSetId ?? null,
+    currencySpends: [],
+    resolvedEssences: {},
+    essenceEnabled: {},
+    consumedSummary: normalizeLabList(step.selectedRequirementSnapshot?.ingredientGroups).map(
+      (group, index) => ({
+        itemUuid: `Item.lab-consumed-${step.stepId ?? 'stage'}-${index}`,
+        actorUuid: null,
+        quantity: 1,
+        name: group?.options?.[0]?.name ?? null,
+        img: null,
+        componentId: group?.options?.[0]?.match?.componentId ?? null,
+      })
+    ),
+  };
+}
+
 function versionedRecipeStep(recipe, index, status, extra = {}) {
   const authored = recipeSteps(recipe)[index];
   if (!authored) {
@@ -1232,7 +1300,7 @@ function versionedRecipeStep(recipe, index, status, extra = {}) {
   const selectedIngredientSetId = selectedRequirementSnapshot?.id ?? null;
   const fields = { ...extra };
   delete fields.selectedSetIndex;
-  return step(index, status, {
+  const built = step(index, status, {
     stepId: authored.id,
     stepName: authored.name || `Step ${index + 1}`,
     selectedIngredientSetId,
@@ -1242,6 +1310,12 @@ function versionedRecipeStep(recipe, index, status, extra = {}) {
       : null,
     ...fields,
   });
+  // A gate is a start commit's own output, so every fixture that arms one also carries the
+  // receipt the commit writes. A stage that has NOT begun simply has neither.
+  if (built.timeGate && !built.preparedConsumption) {
+    built.preparedConsumption = startedStageConsumption(built);
+  }
+  return built;
 }
 
 function versionedCraftingRun(context, recipe, overrides = {}) {
@@ -1267,8 +1341,54 @@ function versionedCraftingRun(context, recipe, overrides = {}) {
   };
 }
 
-function shortageStep(recipe, gate) {
-  const current = versionedRecipeStep(recipe, 0, 'waitingTime', gate);
+/**
+ * Re-open a stage the case needs EDITABLE. Post-D-028 a gated stage has locked its choice and
+ * spent its inputs, so an open one cannot also be counting down; these cases still depict the
+ * pre-commit shape because making them unbegun removes their countdown, and a gateless run has
+ * no progress reading at all until manual finding M18 lands. Escalated with issue 1648.
+ */
+function reopenEditableStage(run) {
+  const current = run.steps?.[Math.max(0, Number(run.currentStepIndex) || 0)];
+  if (current) delete current.preparedConsumption;
+  return run;
+}
+
+/** @see reopenEditableStage */
+const EDITABLE_GATED_CASES = new Set([
+  'waiting-auto-eligible',
+  'waiting-open-choice',
+  'ingredient-route',
+  'check-route',
+  'essence-shared',
+  'essence-overshoot',
+  'paused',
+]);
+
+/**
+ * Persist the option each multi-option group would be given by the player's own pick, so a
+ * stage that is ready to begin reads as ready to begin. The engine's start commit requires the
+ * pick to be PERSISTED; the resolver's invented one does not satisfy it.
+ */
+function persistAuthoredPicks(step) {
+  const groups = normalizeLabList(step.selectedRequirementSnapshot?.ingredientGroups);
+  step.selectionPlan = {
+    ...(step.selectionPlan ?? {}),
+    selectedIngredientSetId:
+      step.selectionPlan?.selectedIngredientSetId ?? step.selectedIngredientSetId ?? null,
+    ingredientOptionOverrides: Object.fromEntries(
+      groups
+        .filter((group) => normalizeLabList(group?.options).length > 1)
+        .map((group) => [group.id, { optionIndex: 0 }])
+    ),
+  };
+}
+
+function normalizeLabList(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function shortageStep(recipe) {
+  const current = versionedRecipeStep(recipe, 0, 'inProgress');
   // No allocation means "suggest one"; an explicit empty allocation means the player has
   // allocated nothing. This is canonical Chainmail shortage evidence, not Sunward-route parity.
   current.selectionPlan.ingredientEssenceAllocation = {
@@ -1588,6 +1708,13 @@ export function createLabJournalCaseController({
     ) {
       return fixtureFailure('selection-required');
     }
+    const precondition = stagePreconditionFailure({
+      run,
+      command,
+      recipes,
+      now: Number(nowWorldTime()) || NOW,
+    });
+    if (precondition) return precondition;
 
     applyFixtureCommand({
       command,
@@ -1604,12 +1731,50 @@ export function createLabJournalCaseController({
   return { events, execute };
 }
 
+/**
+ * The stage preconditions `beginVersionedStage` and `executeVersionedStage` enforce, so no
+ * fixture control can succeed where the real command refuses (issue 1648). Selection readiness
+ * is not re-derived here — the simulator holds no inventory — only the lifecycle facts the run
+ * record carries: whether the stage has started, and whether its clock has run out.
+ */
+function stagePreconditionFailure({ run, command, recipes, now }) {
+  if (!['beginStep', 'execute'].includes(command?.action)) return null;
+  const index = Math.max(0, Number(run?.currentStepIndex) || 0);
+  const step = run?.steps?.[index];
+  if (!step) return null;
+  const started = Boolean(step.preparedConsumption) || Boolean(step.timeGate);
+  const authored = recipeSteps(recipes.find((entry) => entry?.id === run.recipeId))[index];
+  const needsStart = normalizeLabList(Object.values(authored?.timeRequirement ?? {})).some(
+    (value) => Number(value) > 0
+  );
+  if (command.action === 'beginStep') {
+    if (started) return fixtureFailure('lifecycle-refused', 'This crafting stage has already started.');
+    return needsStart
+      ? null
+      : fixtureFailure('lifecycle-refused', 'This crafting stage has no separate start.');
+  }
+  if (needsStart && !started) {
+    return fixtureFailure(
+      'lifecycle-refused',
+      'Begin this crafting stage before it can be resolved.'
+    );
+  }
+  const availableAt = Number(step.timeGate?.availableAt);
+  return Number.isFinite(availableAt) && now < availableAt
+    ? fixtureFailure('lifecycle-refused', 'The crafting step is still in progress.')
+    : null;
+}
+
 function cloneFixtureValue(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function fixtureFailure(reason) {
-  return { success: false, reason, message: `Journal fixture command refused: ${reason}` };
+function fixtureFailure(reason, message = null) {
+  return {
+    success: false,
+    reason,
+    message: message ?? `Journal fixture command refused: ${reason}`,
+  };
 }
 
 function locateActiveRun(containers, command) {

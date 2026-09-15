@@ -2185,7 +2185,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
   // essence carriers but no allocation — not a physical shortage — so a manual press used to
   // reach the command's own "selection-required" refusal. The primary must now refuse it
   // BEFORE that: no command is ever issued.
-  it('refuses the manual attempt for an unmade-but-coverable essence choice before any command is issued', async () => {
+  it('refuses the begin control for an unmade-but-coverable essence choice before any command is issued', async () => {
     const state = 'automatic-blocker';
     const content = buildLabContent({ journalCaseState: state });
     const actor = buildLabActors(content)[0];
@@ -2212,9 +2212,15 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(availability.knownMaterialShortfall, false, 'the carrier ledger can cover it');
     assert.ok(availability.essencePool.carriers.length > 0);
     assert.equal(refused.store.selectedRun.actions.disabledReason, 'choiceRequired');
-    const primary = refused.target.querySelector('[data-run-action="primary"]');
-    assert.ok(primary && primary.disabled, 'the primary is refused before any command is issued');
-    primary.click();
+    // The stage has NOT begun — starting is what would spend the essences — so the control on
+    // screen is the begin decision, and it is what must be refused (issue 1648).
+    assert.ok(
+      !refused.target.querySelector('[data-run-action="primary"]'),
+      'an unbegun stage offers no primary to refuse'
+    );
+    const begin = refused.target.querySelector('[data-run-action="begin"]');
+    assert.ok(begin && begin.disabled, 'the begin control is refused before any command is issued');
+    begin.click();
     await settleAction();
     assert.deepEqual(refused.commands, [], 'a disabled control issues nothing to click');
     assert.equal(refused.notifications.length, 0);

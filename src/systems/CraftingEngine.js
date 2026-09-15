@@ -95,6 +95,12 @@ import {
   resolvedToolsFor,
 } from './scopedEntityReads.js';
 import { SignatureValidator, signatureDominates } from './SignatureValidator.js';
+import {
+  STAGE_BLOCKERS,
+  classifyStageReadiness,
+  scopedEssenceAllocation,
+  stageSelectionInputsComplete,
+} from './stageReadiness.js';
 import { buildStepRecipeView } from './stepRecipeView.js';
 import { effectiveToolBreakageAuthority } from './toolBreakageAuthority.js';
 import {
@@ -1103,7 +1109,11 @@ export class CraftingEngine {
     if (!selectedSet)
       return versionedFailure('The selected crafting requirements are unavailable.');
     const started = this._versionedStageStarted(run, stepIndex);
-    if (!resuming && !started && this._versionedStageNeedsStart(recipe, step)) {
+    // A stage armed before the start commit has TAKEN its start, so it is not startable: asking
+    // only `_versionedStageStarted` here deadlocked it against begin's own "already started"
+    // refusal. The other three readers already ask the compatibility-aware question.
+    const startable = !started && !this._versionedStageArmedBeforeStartCommit(run, stepIndex);
+    if (!resuming && startable && this._versionedStageNeedsStart(recipe, step)) {
       if (trigger !== 'worldTime') {
         return versionedFailure('Begin this crafting stage before it can be resolved.');
       }
@@ -1812,33 +1822,7 @@ export class CraftingEngine {
   }
 
   _versionedSelectionInputsComplete(selectedSet, selectionPlan, step) {
-    const groups = Array.isArray(selectedSet?.ingredientGroups) ? selectedSet.ingredientGroups : [];
-    const overrides = selectionPlan?.ingredientOptionOverrides ?? {};
-    const selectedOptions = groups.map((group) => {
-      const options = Array.isArray(group?.options) ? group.options : [];
-      const supplied = Object.hasOwn(overrides, group?.id);
-      const raw = supplied ? overrides[group?.id]?.optionIndex : 0;
-      const selectedIndex =
-        ['number', 'string'].includes(typeof raw) && String(raw).trim() ? Number(raw) : NaN;
-      if (options.length > 1 && !supplied) return null;
-      return Number.isSafeInteger(selectedIndex) && selectedIndex >= 0
-        ? (options.at(selectedIndex) ?? null)
-        : null;
-    });
-    if (selectedOptions.includes(null)) return false;
-    const requiresEssenceAllocation =
-      Object.keys(selectedSet?.essences ?? {}).length > 0 ||
-      selectedOptions.some((option) => option.match?.type === 'essence');
-    if (!requiresEssenceAllocation) return true;
-    const allocation = this._scopedEssenceAllocation(
-      selectionPlan?.ingredientEssenceAllocation,
-      step,
-      selectedSet
-    );
-    return (
-      allocation !== null &&
-      Object.values(allocation).some((units) => Number.isFinite(Number(units)) && Number(units) > 0)
-    );
+    return stageSelectionInputsComplete(selectedSet, selectionPlan, step?.id);
   }
 
   async _prepareVersionedStage({
@@ -1850,12 +1834,6 @@ export class CraftingEngine {
     selectedSet,
     selectionPlan,
   }) {
-    if (!this._versionedSelectionInputsComplete(selectedSet, selectionPlan, step)) {
-      return {
-        valid: false,
-        message: 'Choose the crafting requirements before executing this step.',
-      };
-    }
     if (
       !sameStringSet(
         run?.componentSourceActorUuids,
@@ -1881,10 +1859,11 @@ export class CraftingEngine {
       optionOverrides,
     });
     if (!canCraft.canCraft) {
-      return {
-        valid: false,
-        message: `Missing required items:\n${this._formatMissingItems(canCraft.missing, executionRecipe)}`,
-      };
+      return this._versionedStageRefusal(
+        STAGE_BLOCKERS.material,
+        canCraft.missing,
+        executionRecipe
+      );
     }
     const essenceAllocation = this._scopedEssenceAllocation(
       selectionPlan?.ingredientEssenceAllocation,
@@ -1900,14 +1879,18 @@ export class CraftingEngine {
       optionOverrides,
       essenceAllocation
     );
-    const allocationError = this._allocationShortfallMessage(
-      essenceAllocation,
-      craftSelection,
-      executionRecipe
-    );
-    if (allocationError) return { valid: false, message: allocationError };
-    if (craftSelection.success !== true) {
-      return { valid: false, message: 'The selected crafting requirements are unavailable.' };
+    // The predicate the Journal projection reads, so an offered control and this refusal cannot
+    // name different causes (issue 1648).
+    const readiness = classifyStageReadiness({
+      selection: craftSelection,
+      inputsComplete: this._versionedSelectionInputsComplete(selectedSet, selectionPlan, step),
+    });
+    if (!readiness.ready) {
+      return this._versionedStageRefusal(
+        readiness.blocker,
+        { ingredients: craftSelection.missingGroups ?? [], essences: [], tools: [] },
+        executionRecipe
+      );
     }
     const toolsForSet = this.recipeManager.getToolsForSet?.(executionRecipe, selectedSet) ?? [];
     const toolValidation = await this._validateTools(
@@ -1918,7 +1901,9 @@ export class CraftingEngine {
       actor,
       { excludedItems: selectedIngredientItems(craftSelection) }
     );
-    if (!toolValidation.valid) return { valid: false, message: toolValidation.message };
+    if (!toolValidation.valid) {
+      return { valid: false, blocker: STAGE_BLOCKERS.tool, message: toolValidation.message };
+    }
     const currencySpends = craftSelection.currencySpends || [];
     const currencyCheck = await checkCurrencySpends(
       actor,
@@ -1926,9 +1911,13 @@ export class CraftingEngine {
       currencySpends,
       this._currencySeams()
     );
-    if (!currencyCheck.valid) return { valid: false, message: currencyCheck.message };
+    if (!currencyCheck.valid) {
+      return { valid: false, blocker: STAGE_BLOCKERS.currency, message: currencyCheck.message };
+    }
     const itemPilesCheck = await this._checkItemPilesCurrencyCost(actor, recipe);
-    if (!itemPilesCheck.valid) return { valid: false, message: itemPilesCheck.message };
+    if (!itemPilesCheck.valid) {
+      return { valid: false, blocker: STAGE_BLOCKERS.currency, message: itemPilesCheck.message };
+    }
     return {
       valid: true,
       plan: {
@@ -5772,11 +5761,7 @@ export class CraftingEngine {
    * @returns {Record<string, number>|null}
    */
   _scopedEssenceAllocation(payload, step, ingredientSet) {
-    const allocation = payload?.allocation;
-    if (!allocation || typeof allocation !== 'object') return null;
-    if (String(payload.stepId ?? '') !== String(step?.id ?? '')) return null;
-    if (String(payload.ingredientSetId ?? '') !== String(ingredientSet?.id ?? '')) return null;
-    return allocation;
+    return scopedEssenceAllocation(payload, step?.id, ingredientSet?.id);
   }
 
   /**
@@ -5800,6 +5785,15 @@ export class CraftingEngine {
       tools: [],
     };
     return `Missing required items:\n${this._formatMissingItems(missing, executionRecipe)}`;
+  }
+
+  /** One refusal per cause: the projection's own blocker code, and the sentence for it. */
+  _versionedStageRefusal(blocker, missing, executionRecipe) {
+    const message =
+      blocker === STAGE_BLOCKERS.choice
+        ? 'Choose the crafting requirements before executing this step.'
+        : `Missing required items:\n${this._formatMissingItems(missing, executionRecipe)}`;
+    return { valid: false, blocker, message };
   }
 
   /**

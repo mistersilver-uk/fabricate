@@ -26,6 +26,13 @@
   const locked = $derived(availability?.locked === true);
   const plan = $derived(step?.selectionPlan ?? {});
   const routes = $derived(availability?.routes ?? []);
+  // The route this stage will spend. A stage a multi-step run has just advanced into carries NO
+  // persisted plan and no requirement snapshot, so the projection's resolved route is the only
+  // field that names it — reading the snapshot alone sent `setSelection` an empty route id, which
+  // it refused, so the player's pick was never persisted and begin then refused too (M17).
+  const routeId = $derived(
+    plan?.selectedIngredientSetId ?? availability?.selectedIngredientSetId ?? snapshot?.id ?? null
+  );
   function chooseRoute(id) {
     if (!editable || busy || !routes.some((route) => route.id === id)) return;
     openSlot = '';
@@ -217,7 +224,7 @@
     if (!candidate || candidate.disabled) return;
     const next = {
       ...plan,
-      selectedIngredientSetId: plan?.selectedIngredientSetId ?? snapshot?.id,
+      selectedIngredientSetId: routeId,
       ingredientOptionOverrides: {
         ...(plan?.ingredientOptionOverrides ?? {}),
         [groupId]: {
@@ -268,10 +275,10 @@
     try {
       await journal?.setSelection?.(run, {
         ...plan,
-        selectedIngredientSetId: plan?.selectedIngredientSetId ?? snapshot?.id,
+        selectedIngredientSetId: routeId,
         ingredientEssenceAllocation: {
           stepId: step?.stepId,
-          ingredientSetId: plan?.selectedIngredientSetId ?? snapshot?.id,
+          ingredientSetId: routeId,
           allocation: nextAllocation,
         },
       });
