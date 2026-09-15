@@ -9,21 +9,19 @@
   | `checked` / `indeterminate` / `disabled` | booleans | `false` | The three input states. `indeterminate` is a DOM PROPERTY, not an attribute, so it is applied through an effect rather than markup — written in markup it would do nothing at all, silently. |
   | `size` | `'sm'` \| `'md'` \| `'lg'` | `'md'` | 18px/r5, 20px/r6, 22px/r6. Each size is DECLARED, never derived: a scale that multiplied one number would make the shipped 18px box a function of the new ones. An unrecognised value falls back rather than emitting an unstyled class. |
   | `wrapper` | `'label'` \| `'contents'` | `'label'` | `label` renders a `<label>` around the input and box, for a host whose action group would otherwise leave the visible box with no label association and no click target. `contents` renders the two as bare siblings, for a host whose OWN root is a `<label>` — nesting labels is invalid HTML and an ambiguous click target. |
-  | `ariaLabel` | already-localized string | `''` | The accessible name; this is an import-free leaf. |
-  | `element` | bindable | `null` | The real input, exposed so a host can manage focus: it is visually hidden, so a host cannot reach it by query without reaching through this component's internals. |
+  | `ariaLabel` / `element` | already-localized string / bindable | `''` / `null` | The accessible name — this is an import-free leaf — and the real input, exposed so a host can manage focus, since it is visually hidden and cannot be reached by query without reaching through this component's internals. |
   | `onChange(checked)` | function | no-op | The input's new checked state. |
 
   Rest spread:
-  - `{...rest}` lands on the INPUT, because the input is what a caller clicks and what a test
-    drives.
+  - `{...rest}` lands on the INPUT, because the input is what a caller clicks and what a test drives.
 
   Invariants:
   - IT MUST NOT RENDER A `<button>`: the Foundry smoke walk reaches a row's Edit action through
     `.manager-component-row button` selectors, and a selection control matching them would start
     intercepting those clicks.
-  - THE INDETERMINATE GLYPH IS A MINUS, mirroring the tri-state page box: "some of these", not
-    "none of these". A box that is BOTH checked and indeterminate reads as indeterminate, which is
-    what the DOM property does too.
+  - THE INDETERMINATE GLYPH IS A MINUS, mirroring the tri-state page box: "some of these", not "none
+    of these". A box that is BOTH checked and indeterminate reads as indeterminate, which is what
+    the DOM property does too.
 -->
 <script>
   let {
@@ -74,11 +72,6 @@
 {/if}
 
 <style>
-  /* THEME-ROOT TOKENS ONLY. No scoped `<style>` may reference `--fab-manager-*`, or any other
-     property `styles/fabricate.css` declares inside `.fabricate-manager`, from ANY directory: a
-     component is placed in a directory, not in a DOM subtree, so its scoped CSS cannot guarantee
-     where its host renders. `tests/token-generation-gate.test.js` reds the reference. */
-
   .fab-selection-checkbox {
     box-sizing: border-box;
     position: relative;
@@ -92,8 +85,6 @@
     cursor: not-allowed;
   }
 
-  /* The real control stays in the DOM and stays focusable: it is what a keyboard and a test
-     drive. */
   .fab-selection-input {
     position: absolute;
     width: 1px;
@@ -102,8 +93,6 @@
     opacity: 0;
   }
 
-  /* Foundry draws form controls THROUGH pseudo-elements, so a core `input::before` would paint
-     over the visible box. */
   .fab-selection-input::before,
   .fab-selection-input::after {
     display: none;
