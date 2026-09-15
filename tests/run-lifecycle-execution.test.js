@@ -42,10 +42,13 @@ for (const failLast of [false, true]) {
   });
 }
 
-test('applied consumption prefix restores essence spending after the source documents disappear', async () => {
-  const { interruptedRecord, record } = await createPersistedCraftingHistory({ resumePrefix: true });
-  const receipt = interruptedRecord.executionJournal.effects.find((effect) => effect.effectId === 'consume-ingredients').receipt;
+test('the start consumption receipt restores essence spending after the source documents disappear', async () => {
+  const { armedRecord, record } = await createPersistedCraftingHistory({ resumePrefix: true });
+  const receipt = armedRecord.executionJournal.effects.find((effect) => effect.effectId === 'consume-ingredients').receipt;
   assert.equal(receipt.essenceSpend.carriers.length, 2);
+  // The same spending survives the execute journal that REPLACES the start journal,
+  // because the start also persisted it on the stage.
+  assert.deepEqual(armedRecord.steps[0].preparedConsumption.essenceSpend, receipt.essenceSpend);
   assert.deepEqual(record.steps[0].essenceSpend, receipt.essenceSpend);
 });
 
@@ -570,7 +573,7 @@ test('an unavailable history visibility read omits optional snapshots without st
   assert.equal(runManager.getActiveRun(actor, started.runId).steps[0].presentationSnapshot, undefined);
 });
 
-test('CraftingEngine versioned start arms a timed stage with exact intent and zero consumption', async () => {
+test('CraftingEngine versioned start commits the stage: locked plan, spent inputs, armed gate', async () => {
   const { engine, runManager } = setupEngineFixture();
   const actor = new FakeActor('crafter');
   const source = new FakeActor('source');
@@ -607,7 +610,13 @@ test('CraftingEngine versioned start arms a timed stage with exact intent and ze
   const persisted = runManager.getActiveRun(actor, started.runId);
   assert.equal(persisted.lifecycleVersion, 1);
   assert.equal(persisted.completionMode, 'worldTime');
-  assert.equal(persisted.steps[0].preparedConsumption, undefined);
+  // D-026/D-028: the start IS the stage start, so it spends and locks rather than deferring.
+  assert.equal(persisted.steps[0].preparedConsumption.selectedIngredientSetId, 'set-1');
+  assert.equal(persisted.executionJournal.status, 'committed');
+  assert.deepEqual(
+    persisted.executionJournal.effects.map((effect) => effect.effectId),
+    ['consume-ingredients', 'start-stage']
+  );
   assert.equal(persisted.steps[0].selectionPlan.selectedIngredientSetId, 'set-1');
   assert.deepEqual(persisted.steps[0].selectedRequirementSnapshot.ingredients[3], {
     currency: { unit: 'gp', amount: 5 },
@@ -961,7 +970,7 @@ test('CraftingEngine prepares a versioned alchemy match from GM-resolved documen
   assert.deepEqual(source.flags, {});
 });
 
-test('CraftingEngine local v1 cancellation forfeits deferred work without reversing legacy inputs', async () => {
+test('CraftingEngine v1 cancellation reverses the start spend and writes nothing when it spent nothing', async () => {
   const { engine } = setupEngineFixture();
   const actor = new FakeActor('crafter');
   const source = new FakeActor('source');
@@ -988,7 +997,8 @@ test('CraftingEngine local v1 cancellation forfeits deferred work without revers
   });
 
   assert.equal(cancelled.cancelled, true);
-  assert.equal(cancelled.refunded, false);
+  assert.equal(cancelled.refunded, true);
+  assert.equal(cancelled.restoredCount, 0);
   assert.equal(itemWrites, 0);
 });
 
@@ -1228,10 +1238,11 @@ test('CraftingEngine persists successful spend receipts before a later award amb
 
   runManager.invalidateCache(actor.id);
   const run = runManager.getActiveRun(actor, started.runId);
-  const spend = run.executionJournal.effects.find((effect) => effect.effectId === 'spend-currency');
   const award = run.executionJournal.effects.find((effect) => effect.effectId === 'award-results');
   assert.equal(spends, 1);
-  assert.deepEqual(spend.receipt.settledSpends, [{ unit: 'gp', amount: 5 }]);
+  // The currency settled at START, so the record the cancel reversal reads is the stage's,
+  // not the execute journal's — and the award ambiguity below cannot disturb it.
+  assert.deepEqual(run.steps[0].preparedConsumption.currencySpends, [{ unit: 'gp', amount: 5 }]);
   assert.equal(award.phase, 'applying');
   assert.equal(run.executionJournal.status, 'recoveryRequired');
 
@@ -1357,14 +1368,9 @@ test('CraftingEngine resumes a real persisted consumption prefix with hydrated p
   );
   runManager.invalidateCache(actor.id);
   const interruptedRun = runManager.getActiveRun(actor, started.runId);
-  const consumeReceipt = interruptedRun.executionJournal.effects.find(
-    (effect) => effect.effectId === 'consume-ingredients'
-  ).receipt;
-  assert.equal(consumeReceipt.consumedItems[0].data.name, 'Sun Herb');
-  assert.deepEqual(consumeReceipt.consumedItems[0].ingredient, {
-    componentId: 'herb',
-    quantity: 2,
-  });
+  const consumedSnapshots = interruptedRun.steps[0].preparedConsumption.consumedSnapshots;
+  assert.equal(consumedSnapshots[0].data.name, 'Sun Herb');
+  assert.deepEqual(consumedSnapshots[0].ingredient, { componentId: 'herb', quantity: 2 });
 
   source.items = [];
   const freshManager = new CraftingRunManager();
@@ -1653,6 +1659,9 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
     selectionPlan: { selectedIngredientSetId: 'set-1' },
     executionGrant: 'start-grant',
   });
+  // A check is describable only once every other stage requirement is met, elapsed time
+  // included, so the preflight runs against a matured gate.
+  game.time.worldTime = 1120;
 
   try {
     const descriptor = await engine.describeVersionedStageCheck({
@@ -1731,7 +1740,9 @@ test('CraftingEngine check preflight is read-only and a missing trusted result w
   runManager.invalidateCache();
   const unchanged = runManager.getActiveRun(actor, started.runId);
   assert.equal(unchanged.runRevision, started.runRevision);
-  assert.equal(unchanged.executionJournal, undefined);
+  // The start committed its own journal; the refused execute neither planned nor changed one.
+  assert.equal(unchanged.executionJournal.status, 'committed');
+  assert.equal(unchanged.executionJournal.intent.trigger, 'start');
 });
 
 test('CraftingEngine world-time execution keeps an input stage blocked with zero journal effects', async () => {
@@ -1767,7 +1778,10 @@ test('CraftingEngine world-time execution keeps an input stage blocked with zero
   assert.equal(blocked.automaticBlocked, true);
   assert.equal(blocked.blocker, 'materials');
   runManager.invalidateCache();
-  assert.equal(runManager.getActiveRun(actor, started.runId).executionJournal, undefined);
+  // The only journal is the START's, committed; the refused automatic execute planned nothing.
+  const journal = runManager.getActiveRun(actor, started.runId).executionJournal;
+  assert.equal(journal.status, 'committed');
+  assert.deepEqual(journal.intent, { stepIndex: 0, recipeId: 'recipe-1', trigger: 'start' });
 });
 
 test('CraftingEngine delegates due world-time runs to authority without pre-mutating revisions', async () => {

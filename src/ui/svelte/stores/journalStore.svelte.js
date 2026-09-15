@@ -237,6 +237,12 @@ export function createJournalStore({ services } = {}) {
     return runCommand(run, 'execute', payload === undefined ? { interactive: true } : payload);
   }
 
+  // Beginning a stage is its own command: it locks the choice, spends the materials and
+  // starts the clock, and nothing else does any of the three.
+  async function beginStep(run) {
+    return runCommand(run, 'beginStep', {});
+  }
+
   async function pause(run) {
     return runCommand(run, 'pause', {});
   }
@@ -538,6 +544,7 @@ export function createJournalStore({ services } = {}) {
     returnToCurrentStage,
     retryCommandError,
     execute,
+    beginStep,
     pause,
     resume,
     setCompletionMode,

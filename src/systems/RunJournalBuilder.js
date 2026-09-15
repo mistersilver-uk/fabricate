@@ -56,21 +56,21 @@ function gatheringActualAwards(run) {
   return Array.isArray(effects[0].receipt) ? effects[0].receipt : null;
 }
 
-function historicalConsumedIngredients(step) {
-  const consumed = normalizeList(step?.consumedIngredients);
-  return consumed.length > 0 ? consumed : normalizeList(step?.preparedConsumption?.consumedSummary);
-}
-
 function historicalStepAttempted(step, run, index) {
   if (['succeeded', 'failed'].includes(step?.status) || step?.lastCheckResult) return true;
+  // Consumption alone is not an attempt: a stage START spends its inputs (D-026) and a
+  // cancel hands them back, so only a RESOLVED stage records `consumedIngredients`.
   if (
-    historicalConsumedIngredients(step).length > 0 ||
+    normalizeList(step?.consumedIngredients).length > 0 ||
     normalizeList(step?.createdResults).length > 0 ||
     normalizeList(step?.usedTools).length > 0
   ) {
     return true;
   }
   if (Number(run?.executionJournal?.intent?.stepIndex) !== index) return false;
+  // A stage START commits inputs; it does not attempt the stage. Only a resolution does,
+  // and a cancelled run returns what its start spent.
+  if (run?.executionJournal?.intent?.trigger === 'start') return false;
   return normalizeList(run?.executionJournal?.effects).some(
     (effect) => effect?.phase === 'applied'
   );
@@ -617,6 +617,11 @@ export class RunJournalBuilder {
       timeGate: activeStep?.timeGate,
       hasPlayerCheck,
       knownMaterialShortfall: currentStep?.selectionAvailability?.knownMaterialShortfall === true,
+      stageStart: this._stageStartState({
+        activeStep,
+        recipeStep: recipeSteps[currentStepIndex],
+        system,
+      }),
       entitled: !redacted,
       evidenceEntitled: historyEntitled,
       authority,
@@ -796,7 +801,7 @@ export class RunJournalBuilder {
    * gate — `ready` when `availableAt <= worldTime` — never from `run.status`,
    * because `processWorldTime` flips matured `waitingTime` runs to `inProgress`
    * asynchronously off the same hook. A step with no armed gate is `inProgress`
-   * (actionable: the first trigger arms the gate).
+   * (actionable: the player begins it there).
    * @private
    */
   _deriveCraftingStatus({ status, activeStep, worldTime, run = null }) {
@@ -874,6 +879,8 @@ export class RunJournalBuilder {
       usedTools: normalizeList(historyEntitled ? runStep?.usedTools : null).map((entry) =>
         this._historicalTool(entry, systemId)
       ),
+      // A stage that has started spent its inputs and locked its choice (D-026/D-028).
+      stageStarted: Boolean(runStep?.preparedConsumption),
       selectionPlan: cloneJson(runStep?.selectionPlan) ?? null,
       selectedRequirementSnapshot: historyEntitled
         ? (cloneJson(runStep?.selectedRequirementSnapshot) ?? null)
@@ -909,6 +916,45 @@ export class RunJournalBuilder {
             snapshot: availabilitySnapshot,
           })
         : null,
+    };
+  }
+
+  /**
+   * The read-only requirement view of a started stage: the locked route and the option the
+   * run actually spent, with no live probe and no editable choice.
+   * @private
+   * @returns {object} A `selectionAvailability` reporting a satisfied, locked selection.
+   */
+  _lockedSelectionAvailability({ runStep, ingredientSet, recipe, setId }) {
+    const system = this._getSystem(stringOrNull(recipe?.craftingSystemId));
+    // The locked OPTION, not the locked item: a consumed item id resolves to no live
+    // candidate, which would otherwise read as a stale selection on a stage already paid for.
+    const overrides = Object.fromEntries(
+      Object.entries(
+        plainObjectOrNull(runStep?.selectionPlan?.ingredientOptionOverrides) ?? {}
+      ).map(([groupId, entry]) => [groupId, { optionIndex: Number(entry?.optionIndex) || 0 }])
+    );
+    return {
+      locked: true,
+      selectedIngredientSetId: setId,
+      routes: [{ id: setId, name: stringOrEmpty(ingredientSet?.name) }],
+      staleRoute: false,
+      success: true,
+      knownMaterialShortfall: false,
+      missingGroups: [],
+      choices: [],
+      requirements: normalizeList(ingredientSet.ingredientGroups).map((group) =>
+        this._requirementPresentation({
+          group,
+          recipe,
+          items: [],
+          optionOverrides: overrides,
+          selection: null,
+          system,
+          choice: null,
+        })
+      ),
+      essencePool: null,
     };
   }
 
@@ -1139,13 +1185,23 @@ export class RunJournalBuilder {
 
   _selectionAvailability({ runStep, recipeStep, recipe, actor, snapshot }) {
     const plan = runStep?.selectionPlan;
-    const setId = stringOrNull(plan?.selectedIngredientSetId ?? runStep?.selectedIngredientSetId);
     const sets = normalizeList(recipeStep?.ingredientSets);
+    // One authored route is not a choice, so a stage that has not chosen yet still reads as
+    // the only route it could take rather than as a stale selection.
+    const setId =
+      stringOrNull(plan?.selectedIngredientSetId ?? runStep?.selectedIngredientSetId) ??
+      (sets.length === 1 ? stringOrNull(sets[0]?.id) : null);
     const ingredientSet = sets.find((set) => stringOrNull(set?.id) === setId) ?? null;
     const routes = sets.map((set) => ({
       id: stringOrNull(set?.id),
       name: stringOrEmpty(set?.name),
     }));
+    // A started stage already holds what it needs: it is reported as SPENT rather than
+    // probed against an inventory the consumption has emptied, which would otherwise read
+    // back as a material shortfall and block the run it already paid for.
+    if (runStep?.preparedConsumption && ingredientSet) {
+      return this._lockedSelectionAvailability({ runStep, ingredientSet, recipe, setId });
+    }
     if (!ingredientSet) {
       return {
         success: false,
@@ -2215,6 +2271,7 @@ export class RunJournalBuilder {
     timeGate = null,
     hasPlayerCheck = false,
     knownMaterialShortfall = false,
+    stageStart = null,
     entitled = true,
     evidenceEntitled = entitled,
     authority = null,
@@ -2244,8 +2301,14 @@ export class RunJournalBuilder {
     const mutableCurrent = current && live && owner && authoritative && !executionBlocked;
     const executableType = runType === 'crafting' || runType === 'gathering';
     const materialBlocked = current && live && runType === 'crafting' && knownMaterialShortfall;
+    // A stage with its own start is not resolvable until the player has begun it: the roll
+    // is withheld rather than offered and then refused (M13/M15).
+    const awaitingStageStart = current && live && stageStart?.required === true;
     const readyToExecute =
-      derivedStatus !== 'waiting' && derivedStatus !== 'paused' && !materialBlocked;
+      derivedStatus !== 'waiting' &&
+      derivedStatus !== 'paused' &&
+      !materialBlocked &&
+      !awaitingStageStart;
     const legacyExecute =
       lifecycleContract === 'legacy' &&
       live &&
@@ -2269,28 +2332,94 @@ export class RunJournalBuilder {
       pauseState: normalizePauseState(run?.pauseState),
       pausedDurationSeconds: Math.max(0, Number(run?.pausedDurationSeconds) || 0),
       recoveryEvidence,
-      actions: {
-        execute: legacyExecute || (mutableCurrent && !paused && executableType && readyToExecute),
-        pause:
-          mutableCurrent &&
-          executableType &&
-          !paused &&
-          run?.status === 'waitingTime' &&
-          Boolean(timeGate),
-        resume: mutableCurrent && executableType && paused,
-        setCompletionMode:
-          mutableCurrent &&
-          executableType &&
-          !paused &&
-          derivedStatus === 'waiting' &&
-          Boolean(timeGate) &&
-          !hasPlayerCheck,
-        setSelection: mutableCurrent && runType === 'crafting' && entitled,
-        cancel: legacyCancel || (mutableCurrent && executableType),
-        dismiss: terminal,
-        disabledReason: blockedReason ?? (materialBlocked ? 'selectionRequired' : null),
-        ...(recoveryClaim && { recoveryClaim }),
-      },
+      actions: this._runActions({
+        run,
+        runType,
+        terminal,
+        derivedStatus,
+        timeGate,
+        hasPlayerCheck,
+        stageStart,
+        entitled,
+        paused,
+        mutableCurrent,
+        executableType,
+        legacyExecute,
+        legacyCancel,
+        readyToExecute,
+        materialBlocked,
+        awaitingStageStart,
+        blockedReason,
+        recoveryClaim,
+      }),
+    };
+  }
+
+  /** What this viewer may do to this run, and the one code that says why they may not. */
+  /**
+   * Whether the live stage still has its own start, and whether it has taken it. A
+   * zero-duration stage has no waiting window, so it never has one to take.
+   * @private
+   * @returns {{needed: boolean, locked: boolean, started: boolean, required: boolean}|null}
+   */
+  _stageStartState({ activeStep, recipeStep, system }) {
+    if (!activeStep) return null;
+    const needed =
+      durationToSeconds(recipeStep?.timeRequirement) > 0 &&
+      system?.requirements?.time?.enabled !== false;
+    // `locked` is the D-028 commit; `started` also covers a stage armed before it shipped,
+    // which cannot be begun again even though its plan was never locked.
+    const locked = Boolean(activeStep.preparedConsumption);
+    const started = locked || Boolean(activeStep.timeGate);
+    return { needed, locked, started, required: needed && !started };
+  }
+
+  _runActions({
+    run,
+    runType,
+    terminal,
+    derivedStatus,
+    timeGate,
+    hasPlayerCheck,
+    stageStart,
+    entitled,
+    paused,
+    mutableCurrent,
+    executableType,
+    legacyExecute,
+    legacyCancel,
+    readyToExecute,
+    materialBlocked,
+    awaitingStageStart,
+    blockedReason,
+    recoveryClaim,
+  }) {
+    return {
+      execute: legacyExecute || (mutableCurrent && !paused && executableType && readyToExecute),
+      pause:
+        mutableCurrent &&
+        executableType &&
+        !paused &&
+        run?.status === 'waitingTime' &&
+        Boolean(timeGate),
+      resume: mutableCurrent && executableType && paused,
+      setCompletionMode:
+        mutableCurrent &&
+        executableType &&
+        !paused &&
+        derivedStatus === 'waiting' &&
+        Boolean(timeGate) &&
+        !hasPlayerCheck,
+      beginStep:
+        mutableCurrent && runType === 'crafting' && !paused && awaitingStageStart && entitled,
+      setSelection:
+        mutableCurrent && runType === 'crafting' && entitled && stageStart?.locked !== true,
+      cancel: legacyCancel || (mutableCurrent && executableType),
+      dismiss: terminal,
+      disabledReason:
+        blockedReason ??
+        (materialBlocked ? 'selectionRequired' : awaitingStageStart ? 'stageNotStarted' : null),
+      ...(recoveryClaim && { recoveryClaim }),
     };
   }
 

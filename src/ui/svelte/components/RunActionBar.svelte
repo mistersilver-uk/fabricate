@@ -8,11 +8,13 @@
     run = {},
     runLabel = '',
     primary,
+    begin = null,
     pause = {},
     resume = {},
     cancel = {},
     completion = false,
     onPrimary = () => {},
+    onBegin = () => {},
     onPause = () => {},
     onResume = () => {},
     onCancel = () => {},
@@ -32,6 +34,7 @@
   const primaryEnabled = $derived(primary?.enabled === true && !busy);
   const primaryLabel = $derived(busy ? primary?.busyLabel || primary?.label : primary?.label);
   const pauseEnabled = $derived(pause?.enabled !== false && !busy);
+  const beginEnabled = $derived(begin?.enabled === true && !busy);
 
   function confirmCancel() {
     onCancel();
@@ -111,24 +114,43 @@
         </div>
       {/if}
 
-      <ManagerButton
-        role={primaryEnabled ? 'primary' : 'neutral'}
-        class="fab-run-action-control fab-run-action-primary"
-        data-run-action="primary"
-        aria-busy={busy || undefined}
-        title={primaryEnabled ? primary?.title : primary?.reason || primary?.title || undefined}
-        disabled={!primaryEnabled}
-        onclick={onPrimary}
-      >
-        {#if primary?.icon}<i class={primary.icon} aria-hidden="true"></i>{/if}
-        {primaryLabel}
-      </ManagerButton>
+      {#if begin}
+        <div class="fab-run-begin-decision" data-run-begin>
+          {#if begin.prompt}<span class="fab-run-begin-prompt">{begin.prompt}</span>{/if}
+          <ManagerButton
+            role={beginEnabled ? 'primary' : 'neutral'}
+            class="fab-run-action-control fab-run-action-primary"
+            data-run-action="begin"
+            aria-busy={busy || undefined}
+            title={beginEnabled ? begin.prompt : begin.reason || undefined}
+            disabled={!beginEnabled}
+            onclick={onBegin}
+          >
+            <i class={begin.icon || 'fas fa-play'} aria-hidden="true"></i>
+            {busy ? begin.busyLabel || begin.label : begin.label}
+          </ManagerButton>
+        </div>
+      {:else}
+        <ManagerButton
+          role={primaryEnabled ? 'primary' : 'neutral'}
+          class="fab-run-action-control fab-run-action-primary"
+          data-run-action="primary"
+          aria-busy={busy || undefined}
+          title={primaryEnabled ? primary?.title : primary?.reason || primary?.title || undefined}
+          disabled={!primaryEnabled}
+          onclick={onPrimary}
+        >
+          {#if primary?.icon}<i class={primary.icon} aria-hidden="true"></i>{/if}
+          {primaryLabel}
+        </ManagerButton>
+      {/if}
     {/if}
   {/if}
 </div>
 
 <style>
   .fab-run-action-bar,
+  .fab-run-begin-decision,
   .fab-run-cancel-decision {
     display: flex;
     align-items: center;
@@ -190,6 +212,7 @@
     padding-block: 0;
   }
 
+  .fab-run-begin-prompt,
   .fab-run-cancel-prompt {
     color: var(--fab-text-subtle);
     font-size: 10.5px;

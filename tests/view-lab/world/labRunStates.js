@@ -74,6 +74,8 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'ready-single': 'lab-v1-ready-single',
   'waiting-auto-eligible': 'lab-v1-waiting-auto-eligible',
   'waiting-open-choice': 'lab-v1-waiting-open-choice',
+  'stage-not-started': 'lab-v1-stage-not-started',
+  'stage-consumed': 'lab-v1-stage-consumed',
   'material-shortage': 'lab-v1-material-shortage',
   'ingredient-route': 'lab-v1-ingredient-route',
   'check-route': 'lab-v1-check-route',
@@ -1095,6 +1097,37 @@ function prototypeSpecial(context, state, id, containers) {
     replacePrototypeFocus(containers.gatheringRuns, run, true);
     return true;
   }
+  // The two states the stage-start commit creates (issue 1648): a stage the player has not
+  // begun, whose choices are still open and whose materials are unspent, and the same stage
+  // once beginning it locked the choice and consumed them.
+  if (state === 'stage-not-started' || state === 'stage-consumed') {
+    const run = prototypeCraft(context, 'rivets', id);
+    const current = run.steps[run.currentStepIndex];
+    if (state === 'stage-consumed') {
+      current.preparedConsumption = {
+        selectedIngredientSetId: current.selectedIngredientSetId ?? null,
+        currencySpends: [],
+        resolvedEssences: {},
+        essenceEnabled: {},
+        consumedSummary: (current.selectedRequirementSnapshot?.ingredientGroups ?? []).map(
+          (group, index) => ({
+            itemUuid: `${context.actorUuid}.Item.jp-consumed-${index}`,
+            actorUuid: context.actorUuid,
+            quantity: 1,
+            name: group?.options?.[0]?.name ?? null,
+            img: null,
+            componentId: group?.options?.[0]?.match?.componentId ?? null,
+          })
+        ),
+      };
+    } else {
+      delete current.timeGate;
+      current.status = 'inProgress';
+      run.status = 'inProgress';
+    }
+    replacePrototypeFocus(containers.craftingRuns, run, false);
+    return true;
+  }
   const cancelled = {
     'finished-cancelled': ['rivets', 1],
     'history-cancelled-before': ['cord', 0],
@@ -1582,6 +1615,28 @@ function applyFixtureCommand({ command, container, run, recipes, state, now }) {
         run.steps[stepIndex].selectionPlan = cloneFixtureValue(
           command.payload?.selectionPlan ?? {}
         );
+      }
+      bumpRun(run);
+      return;
+    }
+    // The stage-start commit (issue 1648): the choice locks, the materials are spent and the
+    // clock starts, in one act. The fixture records the lock; it holds no live inventory to spend.
+    case 'beginStep': {
+      const stepIndex = Math.max(0, Number(run.currentStepIndex) || 0);
+      const step = run.steps?.[stepIndex];
+      if (step) {
+        const seconds = Number(step.timeGate?.requiredSeconds) || HOUR;
+        step.preparedConsumption = {
+          selectedIngredientSetId:
+            step.selectionPlan?.selectedIngredientSetId ?? step.selectedIngredientSetId ?? null,
+          currencySpends: [],
+          resolvedEssences: {},
+          essenceEnabled: {},
+          consumedSummary: [],
+        };
+        step.timeGate ??= { requiredSeconds: seconds, initiatedAt: now, availableAt: now + seconds };
+        step.status = 'waitingTime';
+        run.status = 'waitingTime';
       }
       bumpRun(run);
       return;

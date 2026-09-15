@@ -21,6 +21,9 @@
     Array.isArray(snapshot?.ingredientGroups) ? snapshot.ingredientGroups : []
   );
   const availability = $derived(step?.selectionAvailability ?? null);
+  // A started stage reads as already spent: its choice was locked and its materials
+  // consumed at the moment it began, so nothing here is an intent any more.
+  const locked = $derived(availability?.locked === true);
   const plan = $derived(step?.selectionPlan ?? {});
   const routes = $derived(availability?.routes ?? []);
   function chooseRoute(id) {
@@ -34,6 +37,7 @@
   }
   const requirementsHint = $derived.by(() => {
     if (busy) return localize('FABRICATE.App.Journal.Actions.Working');
+    if (locked) return localize('FABRICATE.App.Journal.Stage.SpentAtStart');
     if (!editable) return localize('FABRICATE.App.Journal.Stage.Locked');
     if (slots.some((slot) => slot.stale))
       return localize('FABRICATE.App.Journal.Stage.StaleSelection');
@@ -181,7 +185,8 @@
         selected,
         candidates,
         disabled: !editable || busy,
-        stale: !selected && (requirement?.selectedItemId != null || !requirement?.option),
+        stale:
+          !locked && !selected && (requirement?.selectedItemId != null || !requirement?.option),
         poolsRequired: essenceRequirements.length,
         poolsMet: essenceRequirements.filter((entry) => entry?.satisfied === true).length,
       };
@@ -287,10 +292,10 @@
     <RadioCardGroup
       legend={localize('FABRICATE.App.Journal.Stage.Route')}
       legendVisible
-      options={routes.map((route) => ({
+      options={routes.map((route, index) => ({
         ...route,
         value: route.id,
-        label: route.name || route.id,
+        label: route.name || localize('FABRICATE.App.Journal.Stage.RouteOrdinal', { n: index + 1 }),
       }))}
       selectedValue={availability?.selectedIngredientSetId ?? ''}
       groupName={`journal-route-${step?.stepId}`}
@@ -336,7 +341,9 @@
       bind:openSlot
       onChoose={choose}
       locked={!editable}
-      label={localize('FABRICATE.App.Journal.Stage.Requirements')}
+      label={localize(
+        locked ? 'FABRICATE.App.Journal.Stage.Consumed' : 'FABRICATE.App.Journal.Stage.Requirements'
+      )}
       hint={requirementsHint}
       slotLabel={(slot) => slot.label}
       choiceLabel={localize('FABRICATE.App.Journal.Stage.Choose')}

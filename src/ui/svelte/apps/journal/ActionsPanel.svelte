@@ -29,6 +29,12 @@
   const canCancel = $derived(
     currentContract ? actions.cancel === true : legacyContract && run?.canCancel === true
   );
+  // The stage boundary is its own control: it locks the choice, spends the materials and
+  // starts the clock, and it is the ONLY thing that does so.
+  const canBegin = $derived(currentContract && actions.beginStep === true);
+  const awaitingStart = $derived(
+    currentContract && (canBegin || actions.disabledReason === 'stageNotStarted')
+  );
   const reason = $derived(reasonFor(actions.disabledReason, gateReady));
   const hasCheck = $derived(
     Boolean(
@@ -110,6 +116,16 @@
       icon: primaryIcon(),
       reason,
     }}
+    begin={awaitingStart
+      ? {
+          enabled: canBegin,
+          label: localize('FABRICATE.App.Journal.Actions.BeginStep'),
+          busyLabel: localize('FABRICATE.App.Journal.Actions.Working'),
+          icon: 'fas fa-play',
+          prompt: localize('FABRICATE.App.Journal.Actions.BeginStepPrompt'),
+          reason,
+        }
+      : null}
     pause={{
       enabled: actions.pause === true,
       label: localize('FABRICATE.App.Journal.Actions.Pause'),
@@ -125,7 +141,7 @@
       ariaLabel: localize('FABRICATE.App.Journal.Actions.CancelCraft'),
       title: canCancel ? localize('FABRICATE.App.Journal.Actions.CancelCraft') : reason,
       prompt: localize(
-        currentContract || run?.refundOnCancel === false
+        run?.refundOnCancel === false
           ? 'FABRICATE.App.Journal.Actions.CancelConfirmForfeit'
           : 'FABRICATE.App.Journal.Actions.CancelConfirmRefund'
       ),
@@ -134,6 +150,7 @@
     }}
     {completion}
     onPrimary={() => journal?.execute?.(run)}
+    onBegin={() => journal?.beginStep?.(run)}
     onPause={() => journal?.pause?.(run)}
     onResume={() => journal?.resume?.(run)}
     onCancel={() => journal?.cancel?.(run)}

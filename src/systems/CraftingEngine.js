@@ -491,26 +491,34 @@ export class CraftingEngine {
     const recipe = this.recipeManager?.getRecipe?.(run.recipeId) ?? null;
     const stepIndex = Number(run.currentStepIndex);
     const step = this._executionSteps(recipe)[stepIndex];
-    const selectedId =
-      selectionPlan?.selectedIngredientSetId ??
-      run.steps?.[stepIndex]?.selectionPlan?.selectedIngredientSetId;
-    const selectedSet = this._selectedIngredientSet(step, selectedId);
+    const lockedSelection = this._lockedStageSelection(run, stepIndex, selectionPlan);
+    const selectedSet = this._selectedIngredientSet(step, lockedSelection.selectedIngredientSetId);
     if (!recipe || !step || !selectedSet) {
       throw new CraftingLifecycleExecutionError(
         'The crafting stage references are stale',
         'STALE_RUN_STAGE'
       );
     }
+    // A check is describable only once EVERY other stage requirement is met, elapsed time
+    // included. The UI withholds the roll for the same reason; this is its backstop.
+    if (!this._versionedStageRollable({ run, recipe, step, stepIndex })) {
+      throw new CraftingLifecycleExecutionError(
+        'The crafting stage is not available for a check',
+        'STAGE_NOT_EXECUTABLE'
+      );
+    }
     const system = this._getRecipeSystem(recipe);
     const activeCheck = resolveActiveCraftingCheckFormula(system);
-    const prepared = await this._prepareVersionedStage({
+    const prepared = await this._versionedStagePreparation({
+      started: this._versionedStageStarted(run, stepIndex),
       run,
       actor,
       componentSourceActors,
       recipe,
       step,
+      stepIndex,
       selectedSet,
-      selectionPlan: selectionPlan || run.steps?.[stepIndex]?.selectionPlan || {},
+      selectionPlan: lockedSelection,
     });
     if (!prepared.valid) {
       throw new CraftingLifecycleExecutionError(
@@ -762,6 +770,91 @@ export class CraftingEngine {
     if (!actor || !Array.isArray(sourceActors) || sourceActors.length === 0) {
       return versionedFailure('The crafting actor and component sources are required.');
     }
+    const refusal = this._versionedRunStartRefusal({
+      viewer,
+      actor,
+      sourceActors,
+      recipe,
+      trusted,
+    });
+    if (refusal) return refusal;
+
+    const run = await runManager.createRun(actor, recipe, sourceActors, viewer?.id ?? null, {
+      lifecycleVersion: 1,
+      completionMode,
+    });
+    const stepIndex = Number(run.currentStepIndex) || 0;
+    const step = this._executionSteps(recipe)[stepIndex];
+    const selectedSet = this._selectedIngredientSet(step, selectionPlan.selectedIngredientSetId);
+    if (!step || !selectedSet) {
+      await runManager.discardRun(actor, run.id);
+      return versionedFailure('The selected crafting requirements are unavailable.');
+    }
+    const historySnapshots = this._stageHistorySnapshots({
+      recipe,
+      step,
+      actor,
+      viewer,
+      sourceActors,
+    });
+    const stagePlan = {
+      selectedIngredientSetId: selectedSet.id,
+      ingredientOptionOverrides: selectionPlan.ingredientOptionOverrides,
+      ingredientEssenceAllocation: selectionPlan.ingredientEssenceAllocation,
+    };
+    let current = await runManager.setStepSelectionPlan(
+      actor,
+      run.id,
+      stepIndex,
+      {
+        ...stagePlan,
+        selectedRequirementSnapshot: snapshotRequirementSet(selectedSet),
+        ...historySnapshots,
+      },
+      { expectedRevision: run.runRevision }
+    );
+    const opened = await this._startFirstVersionedStage({
+      actor,
+      sourceActors,
+      run: current,
+      recipe,
+      step,
+      stepIndex,
+      selectedSet,
+      selectionPlan: stagePlan,
+      historySnapshots,
+      trusted,
+      requestId,
+    });
+    if (!opened.success) {
+      await runManager.discardRun(actor, run.id);
+      return versionedFailure(opened.message);
+    }
+    current = opened.run;
+    const canExecuteImmediately = await this._canExecuteVersionedStageImmediately({
+      run: current,
+      actor,
+      componentSourceActors: sourceActors,
+      recipe,
+      step,
+      selectedSet,
+    });
+    return {
+      ...versionedTransitionResult(current, { success: true, disposition: 'started' }),
+      started: true,
+      requiresExecution: current.status !== 'waitingTime',
+      canExecuteImmediately,
+    };
+  }
+
+  /**
+   * Why a versioned run may not start: a viewer the recipe is not craftable for, or an
+   * invalid recipe. A grant-attested alchemy match carries its own entitlement and bypasses
+   * the visibility guard. `null` when the run may start.
+   * @private
+   * @returns {object|null}
+   */
+  _versionedRunStartRefusal({ viewer, actor, sourceActors, recipe, trusted }) {
     const trustedAlchemyMatch =
       trusted?.matched === true &&
       trusted?.activityKind === 'alchemy' &&
@@ -780,54 +873,162 @@ export class CraftingEngine {
       if (guard?.craftable !== true) return versionedFailure('Crafting is unavailable.');
     }
     const validation = recipe.validate?.() ?? { valid: true, errors: [] };
-    if (!validation.valid) {
-      return versionedFailure(`Invalid recipe: ${(validation.errors || []).join(', ')}`);
-    }
+    if (validation.valid) return null;
+    return versionedFailure(`Invalid recipe: ${(validation.errors || []).join(', ')}`);
+  }
 
-    const run = await runManager.createRun(actor, recipe, sourceActors, viewer?.id ?? null, {
-      lifecycleVersion: 1,
-      completionMode,
-    });
-    const stepIndex = Number(run.currentStepIndex) || 0;
-    const step = this._executionSteps(recipe)[stepIndex];
-    const selectedSet = this._selectedIngredientSet(step, selectionPlan.selectedIngredientSetId);
-    if (!step || !selectedSet) {
-      await runManager.discardRun(actor, run.id);
-      return versionedFailure('The selected crafting requirements are unavailable.');
-    }
-    let current = await runManager.setStepSelectionPlan(
-      actor,
-      run.id,
-      stepIndex,
-      {
-        selectedIngredientSetId: selectedSet.id,
-        ingredientOptionOverrides: selectionPlan.ingredientOptionOverrides,
-        ingredientEssenceAllocation: selectionPlan.ingredientEssenceAllocation,
-        selectedRequirementSnapshot: snapshotRequirementSet(selectedSet),
-        ...this._stageHistorySnapshots({ recipe, step, actor, viewer, sourceActors }),
-      },
-      { expectedRevision: run.runRevision }
-    );
-
-    const seconds = runManager.durationToSeconds(step.timeRequirement);
-    if (seconds > 0 && this._timeRequirementsEnabled(recipe)) {
-      current = await runManager.markStepWaitingForTime(actor, current, stepIndex, {
-        minutes: seconds / 60,
-      });
-    }
-    const canExecuteImmediately = await this._canExecuteVersionedStageImmediately({
-      run: current,
-      actor,
+  /**
+   * D-026/D-028: for the first stage, run start IS stage start, so the choice locks and the
+   * materials are spent here rather than deferred to the resolve call. A stage with no time
+   * requirement has no separate start and is left for its one resolving act.
+   * @private
+   * @returns {Promise<{success: boolean, run?: object, message?: string}>}
+   */
+  async _startFirstVersionedStage({ sourceActors, run, recipe, step, ...commit }) {
+    const seconds = this._craftingRunManager().durationToSeconds(step.timeRequirement);
+    if (seconds <= 0 || !this._timeRequirementsEnabled(recipe)) return { success: true, run };
+    return this._commitVersionedStageStart({
+      ...commit,
       componentSourceActors: sourceActors,
+      run,
       recipe,
       step,
-      selectedSet,
+      requiredSeconds: seconds,
     });
+  }
+
+  /**
+   * Begin the current versioned stage: lock its choice, spend its materials and start its
+   * clock, in that one act. Nothing else does any of the three, and none of it can be
+   * redone afterwards (D-026, D-028).
+   *
+   * @param {object} options Actor, source actors, run identity and the authority grant.
+   * @returns {Promise<object>} A transition result with `started: true`, or a refusal.
+   */
+  async beginVersionedStage({
+    viewer = null,
+    actor,
+    componentSourceActors,
+    runId,
+    expectedRevision,
+    selectionPlan = null,
+    executionGrant,
+    requestId,
+  }) {
+    const trusted = await this._consumeVersionedGrant(executionGrant, {
+      operation: 'beginStep',
+      actor,
+      runId,
+      expectedRevision,
+      requestId,
+    });
+    const runManager = this._craftingRunManager();
+    if (!runManager) return versionedFailure('Crafting runs are not available.');
+    runManager.invalidateCache?.(actor?.id);
+    const run = runManager.getActiveRun?.(actor, runId) ?? null;
+    if (!run) return versionedFailure('There is no in-progress craft to begin.');
+    if (getRunLifecycleContract(run) !== 'current') {
+      return versionedFailure('The crafting run lifecycle version is unsupported.');
+    }
+    if (Number(expectedRevision) !== Number(run.runRevision)) {
+      throw new CraftingLifecycleExecutionError(
+        'The crafting run revision is stale',
+        'STALE_RUN_REVISION'
+      );
+    }
+    const recipe = this.recipeManager?.getRecipe?.(run.recipeId) ?? null;
+    if (!recipe) return versionedFailure('The crafting recipe is unavailable.');
+    const stepIndex = Number(run.currentStepIndex);
+    const step = this._executionSteps(recipe)[stepIndex];
+    if (!step) return versionedFailure('There is no active crafting step available.');
+    if (
+      this._versionedStageStarted(run, stepIndex) ||
+      this._versionedStageArmedBeforeStartCommit(run, stepIndex)
+    ) {
+      return versionedFailure('This crafting stage has already started.');
+    }
+    if (!this._versionedStageNeedsStart(recipe, step)) {
+      return versionedFailure('This crafting stage has no separate start.');
+    }
+    const selection = this._lockedStageSelection(run, stepIndex, selectionPlan);
+    const selectedSet = this._selectedIngredientSet(step, selection.selectedIngredientSetId);
+    if (!selectedSet) {
+      return versionedFailure('The selected crafting requirements are unavailable.');
+    }
+    const committed = await this._commitVersionedStageStart({
+      actor,
+      componentSourceActors,
+      run,
+      recipe,
+      step,
+      stepIndex,
+      selectedSet,
+      selectionPlan: selection,
+      historySnapshots: this._stageHistorySnapshots({
+        recipe,
+        step,
+        actor,
+        viewer: game.users?.get?.(run.userId) ?? (viewer?.id === run.userId ? viewer : null),
+        sourceActors: componentSourceActors,
+      }),
+      requiredSeconds: runManager.durationToSeconds(step.timeRequirement),
+      trusted,
+      requestId,
+    });
+    if (!committed.success) return versionedFailure(committed.message);
     return {
-      ...versionedTransitionResult(current, { success: true, disposition: 'started' }),
+      ...versionedTransitionResult(committed.run, { success: true, disposition: 'started' }),
       started: true,
-      requiresExecution: current.status !== 'waitingTime',
-      canExecuteImmediately,
+      requiresExecution: false,
+    };
+  }
+
+  /**
+   * The automatic advance's own stage start. A `worldTime` execute reaching an unstarted
+   * stage begins it, because there is no player present to press a button; a manual
+   * execute never does, so the player's commit stays an act they take.
+   * @private
+   */
+  async _startVersionedStageOnExecute({
+    actor,
+    componentSourceActors,
+    run,
+    recipe,
+    step,
+    stepIndex,
+    selectedSet,
+    selectionPlan,
+    historySnapshots,
+    executionGrant,
+    expectedRevision,
+    requestId,
+  }) {
+    const trusted = await this._consumeVersionedGrant(executionGrant, {
+      operation: 'execute',
+      actor,
+      runId: run.id,
+      expectedRevision,
+      requestId,
+    });
+    const committed = await this._commitVersionedStageStart({
+      actor,
+      componentSourceActors,
+      run,
+      recipe,
+      step,
+      stepIndex,
+      selectedSet,
+      selectionPlan,
+      historySnapshots,
+      requiredSeconds: this._craftingRunManager().durationToSeconds(step.timeRequirement),
+      trusted,
+      requestId,
+    });
+    if (!committed.success) return versionedFailure(committed.message);
+    return {
+      ...versionedTransitionResult(committed.run, { success: true, disposition: 'time-armed' }),
+      started: true,
+      requiresExecution: false,
     };
   }
 
@@ -894,45 +1095,44 @@ export class CraftingEngine {
       resuming && permittedSnapshots.resolutionSnapshot
         ? craftingStepHistoryEvidence(run.steps?.[stepIndex])
         : permittedSnapshots;
-    const persistedSelection = selectionPlan || run.steps?.[stepIndex]?.selectionPlan || {};
+    const persistedSelection = this._lockedStageSelection(run, stepIndex, selectionPlan);
     const selectedSet = this._selectedIngredientSet(
       step,
       persistedSelection.selectedIngredientSetId
     );
     if (!selectedSet)
       return versionedFailure('The selected crafting requirements are unavailable.');
-    const gate = run.steps?.[stepIndex]?.timeGate;
-    const durationSeconds = runManager.durationToSeconds(step.timeRequirement);
-    if (!resuming && !gate && durationSeconds > 0 && this._timeRequirementsEnabled(recipe)) {
-      await this._consumeVersionedGrant(executionGrant, {
-        operation: 'execute',
+    const started = this._versionedStageStarted(run, stepIndex);
+    if (!resuming && !started && this._versionedStageNeedsStart(recipe, step)) {
+      if (trigger !== 'worldTime') {
+        return versionedFailure('Begin this crafting stage before it can be resolved.');
+      }
+      // D-010 is retained: a conservative automatic advance decides BEFORE it spends, so
+      // an unattended stage it cannot resolve is never started and never consumes.
+      const blocker = this._automaticStageBlocker(run, recipe, step, selectedSet);
+      if (blocker) {
+        return {
+          ...versionedFailure(blocker.message),
+          automaticBlocked: true,
+          blocker: blocker.code,
+        };
+      }
+      return this._startVersionedStageOnExecute({
         actor,
-        runId,
+        componentSourceActors,
+        run,
+        recipe,
+        step,
+        stepIndex,
+        selectedSet,
+        selectionPlan: persistedSelection,
+        historySnapshots,
+        executionGrant,
         expectedRevision,
         requestId,
       });
-      let armed = await runManager.setStepSelectionPlan(
-        actor,
-        runId,
-        run.currentStepIndex,
-        {
-          ...persistedSelection,
-          selectedIngredientSetId: selectedSet.id,
-          selectedRequirementSnapshot: snapshotRequirementSet(selectedSet),
-          ...historySnapshots,
-        },
-        { expectedRevision }
-      );
-      armed = await runManager.markStepWaitingForTime(actor, armed, run.currentStepIndex, {
-        minutes: durationSeconds / 60,
-      });
-      return {
-        ...versionedTransitionResult(armed, { success: true, disposition: 'time-armed' }),
-        started: true,
-        requiresExecution: false,
-      };
     }
-    if (!resuming && !this._versionedGateReady(run)) {
+    if (!resuming && !this._versionedStageRollable({ run, recipe, step, stepIndex })) {
       return versionedFailure('The crafting step is still in progress.');
     }
     if (!resuming && trigger === 'worldTime') {
@@ -945,25 +1145,19 @@ export class CraftingEngine {
         };
       }
     }
-    const prepared = resuming
-      ? this._reconstructVersionedStagePreparation({
-          run,
-          actor,
-          componentSourceActors,
-          recipe,
-          step,
-          selectedSet,
-          journal,
-        })
-      : await this._prepareVersionedStage({
-          run,
-          actor,
-          componentSourceActors,
-          recipe,
-          step,
-          selectedSet,
-          selectionPlan: persistedSelection,
-        });
+    const prepared = await this._versionedStagePreparation({
+      resuming,
+      started,
+      run,
+      actor,
+      componentSourceActors,
+      recipe,
+      step,
+      stepIndex,
+      selectedSet,
+      selectionPlan: persistedSelection,
+      journal,
+    });
     if (!prepared.valid) return versionedFailure(prepared.message);
     const executor = new CraftingLifecycleExecutor({
       runManager,
@@ -977,14 +1171,15 @@ export class CraftingEngine {
         expectedRevision,
         requestId,
         executionGrant,
-        selectionPlan: resuming
-          ? null
-          : {
-              ...persistedSelection,
-              selectedIngredientSetId: selectedSet.id,
-              selectedRequirementSnapshot: snapshotRequirementSet(selectedSet),
-              ...historySnapshots,
-            },
+        selectionPlan:
+          resuming || started
+            ? null
+            : {
+                ...persistedSelection,
+                selectedIngredientSetId: selectedSet.id,
+                selectedRequirementSnapshot: snapshotRequirementSet(selectedSet),
+                ...historySnapshots,
+              },
         operation: ({ trusted }) =>
           this._buildVersionedStageOperation({
             actor,
@@ -1032,8 +1227,32 @@ export class CraftingEngine {
     if (run.executionJournal?.status === 'recoveryRequired') {
       return versionedFailure('The crafting run requires recovery.');
     }
-    await runManager.cancelRun(actor, runId);
-    return { success: true, cancelled: true, refunded: false, restoredCount: 0 };
+    // A started stage has already spent its materials (D-026), so cancelling returns them
+    // through the shared reversal — the same primitive and the same honest partial report
+    // the legacy cancel path uses. Only a run that spent nothing reports nothing returned.
+    const refundIntended = this._shouldRefundOnCancel(run);
+    let restoredCount = 0;
+    let reversalOk = true;
+    let partialRefund = false;
+    try {
+      if (refundIntended) {
+        const reversal = await this.reverseRunConsumption(actor, run);
+        restoredCount = reversal.restored.length;
+        reversalOk = reversal.ok;
+        partialRefund =
+          !reversal.ok &&
+          (reversal.restored.length > 0 || reversal.currencyRefund.refundedGroups > 0);
+      }
+    } finally {
+      await runManager.cancelRun(actor, runId);
+    }
+    return {
+      success: true,
+      cancelled: true,
+      refunded: refundIntended && reversalOk,
+      partialRefund,
+      restoredCount,
+    };
   }
 
   _craftingRunManager() {
@@ -1210,6 +1429,327 @@ export class CraftingEngine {
     const gate = run.steps?.[run.currentStepIndex]?.timeGate;
     if (!gate) return true;
     return Number(game.time?.worldTime || 0) >= Number(gate.availableAt || 0);
+  }
+
+  /** A stage whose choice is locked and whose materials are already spent (D-026/D-028). */
+  _versionedStageStarted(run, stepIndex = run?.currentStepIndex) {
+    return Boolean(run?.steps?.[stepIndex]?.preparedConsumption);
+  }
+
+  /**
+   * A stage armed by a release that consumed at execute: gated, with no start-phase
+   * consumption record. It resolves on the pre-D-026 path so a run already in flight
+   * when this shipped still completes.
+   * @private
+   */
+  _versionedStageArmedBeforeStartCommit(run, stepIndex = run?.currentStepIndex) {
+    const step = run?.steps?.[stepIndex];
+    return Boolean(step?.timeGate) && !step?.preparedConsumption;
+  }
+
+  /**
+   * Whether the stage has a start of its own. A zero-duration stage has no waiting
+   * window, so beginning and resolving it stay one act.
+   * @private
+   */
+  _versionedStageNeedsStart(recipe, step) {
+    const seconds = this._craftingRunManager()?.durationToSeconds?.(step?.timeRequirement) ?? 0;
+    return seconds > 0 && this._timeRequirementsEnabled(recipe);
+  }
+
+  /**
+   * A check may only be rolled once EVERY other stage requirement is met: the stage has
+   * started, so its choice is locked and its inputs are spent, and its gate has elapsed.
+   * Tool and route validity are answered by the stage preparation that follows.
+   * @private
+   */
+  _versionedStageRollable({ run, recipe, step, stepIndex }) {
+    if (!this._versionedGateReady(run)) return false;
+    if (!this._versionedStageNeedsStart(recipe, step)) return true;
+    return (
+      this._versionedStageStarted(run, stepIndex) ||
+      this._versionedStageArmedBeforeStartCommit(run, stepIndex)
+    );
+  }
+
+  /**
+   * The selection the stage will spend. Once the stage has started the PERSISTED plan is
+   * authoritative (D-028) and a late caller plan is ignored rather than refused, so a
+   * redundant resend can never fail a craft the player already committed to.
+   * @private
+   */
+  _lockedStageSelection(run, stepIndex, selectionPlan) {
+    const persisted = run?.steps?.[stepIndex]?.selectionPlan ?? null;
+    if (this._versionedStageStarted(run, stepIndex)) return persisted ?? {};
+    return selectionPlan || persisted || {};
+  }
+
+  /**
+   * Rebuild the stage preparation from the START snapshot. The ingredients are already
+   * consumed, so nothing is re-resolved from live inventory; only tools, which are never
+   * consumed, are validated again.
+   * @private
+   */
+  async _reconstructStartedVersionedStage({
+    run,
+    actor,
+    componentSourceActors,
+    recipe,
+    step,
+    stepIndex,
+    selectedSet,
+  }) {
+    if (
+      !sameStringSet(
+        run?.componentSourceActorUuids,
+        (componentSourceActors || []).map((source) => source?.uuid).filter(Boolean)
+      )
+    ) {
+      return {
+        valid: false,
+        message: 'The crafting component sources changed after the run started.',
+      };
+    }
+    const started = run.steps[stepIndex].preparedConsumption;
+    const executionRecipe = this._buildStepRecipeView(recipe, step);
+    const resolveComponent =
+      this._getRecipeSystem(recipe)?.resolutionMode === 'alchemy'
+        ? resolveAlchemySubmissionComponent
+        : undefined;
+    const summary = Array.isArray(started.consumedSummary) ? started.consumedSummary : [];
+    const toolsForSet = this.recipeManager.getToolsForSet?.(executionRecipe, selectedSet) ?? [];
+    const toolValidation = await this._validateTools(
+      componentSourceActors,
+      executionRecipe,
+      toolsForSet,
+      null,
+      actor,
+      {
+        excludedItems: resolveLiveInventoryItemsByUuid(
+          componentSourceActors,
+          summary.map((entry) => entry?.itemUuid).filter(Boolean)
+        ),
+      }
+    );
+    if (!toolValidation.valid) return { valid: false, message: toolValidation.message };
+    const currencySpends = cloneJsonValue(started.currencySpends) ?? [];
+    return {
+      valid: true,
+      plan: {
+        recipeId: recipe.id,
+        stepId: step.id ?? null,
+        selectedIngredientSetId: selectedSet.id,
+        items: cloneJsonValue(summary) ?? [],
+        currencySpends,
+        ...versionedToolPlan(toolValidation).plan,
+      },
+      ...versionedToolPlan(toolValidation).items,
+      executionRecipe,
+      craftSelection: { plan: [] },
+      toolValidation,
+      currencySpends,
+      resolveComponent,
+      step,
+      selectedSet,
+      startedConsumption: startedConsumptionState(started),
+    };
+  }
+
+  /**
+   * The stage preparation for the phase the stage is in: a resumed operation rebuilds from
+   * its journal, a started stage from its START snapshot, and an unstarted one resolves
+   * live inventory. One seam so the check preflight and the execution never diverge.
+   * @private
+   */
+  _versionedStagePreparation({ resuming = false, started = false, journal = null, ...stage }) {
+    if (resuming) return this._reconstructVersionedStagePreparation({ ...stage, journal });
+    if (started) return this._reconstructStartedVersionedStage(stage);
+    return this._prepareVersionedStage(stage);
+  }
+
+  /**
+   * Prepare a stage and, in one journalled operation, consume its inputs, lock its
+   * selection and arm its gate. This is the single commit point every versioned stage
+   * start goes through: run start for the first stage, `beginVersionedStage` after it.
+   * @private
+   * @returns {Promise<{success: boolean, run?: object, message?: string}>}
+   */
+  async _commitVersionedStageStart({
+    actor,
+    componentSourceActors,
+    run,
+    recipe,
+    step,
+    stepIndex,
+    selectedSet,
+    selectionPlan,
+    historySnapshots,
+    requiredSeconds,
+    trusted,
+    requestId,
+  }) {
+    const prepared = await this._prepareVersionedStage({
+      run,
+      actor,
+      componentSourceActors,
+      recipe,
+      step,
+      selectedSet,
+      selectionPlan,
+    });
+    if (!prepared.valid) return { success: false, message: prepared.message };
+    const executor = new CraftingLifecycleExecutor({
+      runManager: this._craftingRunManager(),
+      consumeExecutionGrant: () => trusted,
+    });
+    const execution = await executor.execute({
+      actor,
+      runId: run.id,
+      expectedRevision: run.runRevision,
+      // The journal keys idempotency on the request. The authority always supplies one and
+      // mints the operation id FROM it, so the grant is the correct fallback, never a new id.
+      requestId: String(requestId ?? '').trim() || trusted.operationId,
+      operation: () =>
+        this._buildVersionedStageStartOperation({
+          actor,
+          run,
+          recipe,
+          step,
+          stepIndex,
+          selectedSet,
+          prepared,
+          selectionPlan,
+          historySnapshots,
+          requiredSeconds,
+        }),
+    });
+    return { success: true, run: execution.run };
+  }
+
+  /**
+   * The stage-start operation: consume the ingredients, settle the currency, then lock the
+   * selection, record the consumption receipt and arm the gate in one persisted write.
+   * @private
+   */
+  _buildVersionedStageStartOperation({
+    actor,
+    run,
+    recipe,
+    stepIndex,
+    selectedSet,
+    prepared,
+    selectionPlan,
+    historySnapshots,
+    requiredSeconds,
+  }) {
+    const state = {
+      consumedItems: [],
+      resolvedEssences: null,
+      essenceEnabled: null,
+      essenceSpend: historySnapshots?.resolutionSnapshot ? { labels: {}, carriers: [] } : undefined,
+      currencySettlement: null,
+    };
+    const effects = [
+      {
+        effectId: 'consume-ingredients',
+        kind: 'consumeIngredients',
+        planned: prepared.plan.items,
+        apply: async () => {
+          state.consumedItems = await this._consumeIngredients(prepared.craftSelection.plan);
+          return this._versionedConsumptionReceipt(
+            state,
+            prepared.executionRecipe,
+            prepared.resolveComponent,
+            historySnapshots
+          );
+        },
+      },
+    ];
+    if (prepared.currencySpends.length > 0) {
+      effects.push({
+        effectId: 'spend-currency',
+        kind: 'spendCurrency',
+        planned: cloneJsonValue(prepared.currencySpends),
+        apply: async () => {
+          state.currencySettlement = cloneJsonValue(
+            await this._spendCraftCurrencyVersioned(
+              actor,
+              prepared.executionRecipe,
+              prepared.currencySpends
+            )
+          );
+          return state.currencySettlement;
+        },
+      });
+    }
+    effects.push({
+      effectId: 'start-stage',
+      kind: 'startCraftingStage',
+      planned: { runId: run.id, stepIndex, requiredSeconds },
+      apply: async ({ trusted: effectTrusted }) => {
+        const current = this._freshVersionedRun(actor, run.id);
+        const started = await this._craftingRunManager().markStepStarted(
+          actor,
+          current,
+          stepIndex,
+          {
+            selection: {
+              ...selectionPlan,
+              selectedIngredientSetId: selectedSet.id,
+              selectedRequirementSnapshot: snapshotRequirementSet(selectedSet),
+              ...historySnapshots,
+            },
+            prepared: this._startedConsumptionRecord(state, selectedSet),
+            requiredSeconds,
+          },
+          {
+            expectedRevision: current.runRevision,
+            executionOperationId: effectTrusted.operationId,
+          }
+        );
+        return { status: started.status, runRevision: started.runRevision };
+      },
+    });
+    return {
+      intent: { stepIndex, recipeId: recipe.id, trigger: 'start' },
+      effects: this._captureVersionedEffectPrefixes(effects, actor, run.id),
+      hydrate: ({ receipts }) => this._hydrateVersionedStartState(state, receipts),
+      outcome: () => ({ success: true, disposition: 'started' }),
+    };
+  }
+
+  /** The durable START snapshot: what was spent, and the essence context it resolved to. */
+  _startedConsumptionRecord(state, selectedSet) {
+    return {
+      selectedIngredientSetId: selectedSet.id,
+      currencySpends: state.currencySettlement?.settledSpends ?? [],
+      resolvedEssences: state.resolvedEssences,
+      essenceEnabled: state.essenceEnabled,
+      consumedSummary: state.consumedItems.map((consumed) => ({
+        ...mapConsumedIngredientRef(consumed),
+        componentId:
+          consumed.ingredient?.match?.componentId ??
+          consumed.ingredient?.componentId ??
+          consumed.ingredient?.systemItemId ??
+          null,
+      })),
+      consumedSnapshots: state.consumedItems.map(snapshotVersionedConsumedItem),
+      ...craftingStepHistoryEvidence({ essenceSpend: state.essenceSpend }),
+    };
+  }
+
+  /** Restore a resumed start operation's state from its already-applied receipts. */
+  _hydrateVersionedStartState(state, receipts) {
+    const consumption = receipts['consume-ingredients'];
+    if (consumption) {
+      state.consumedItems = (consumption.consumedItems ?? []).map(rehydrateVersionedConsumedItem);
+      state.resolvedEssences = cloneJsonValue(consumption.resolvedEssences) ?? null;
+      state.essenceEnabled = cloneJsonValue(consumption.essenceEnabled) ?? null;
+      state.essenceSpend = craftingStepHistoryEvidence(consumption).essenceSpend;
+    }
+    if (receipts['spend-currency']) {
+      state.currencySettlement = cloneJsonValue(receipts['spend-currency']);
+    }
   }
 
   _automaticStageBlocker(run, recipe, step, selectedSet) {
@@ -1402,11 +1942,9 @@ export class CraftingEngine {
           ingredient: cloneJsonValue(ingredient) ?? null,
         })),
         currencySpends: cloneJsonValue(currencySpends) ?? [],
-        toolItemUuids: toolValidation.tools
-          .map((entry) => entry?.item?.uuid ?? entry?.item?.id ?? null)
-          .filter(Boolean),
+        ...versionedToolPlan(toolValidation).plan,
       },
-      toolItems: toolValidation.tools.map((entry) => entry.item).filter(Boolean),
+      ...versionedToolPlan(toolValidation).items,
       executionRecipe,
       craftSelection,
       toolValidation,
@@ -1423,6 +1961,7 @@ export class CraftingEngine {
     componentSourceActors,
     recipe,
     step,
+    stepIndex,
     selectedSet,
     journal,
   }) {
@@ -1477,6 +2016,7 @@ export class CraftingEngine {
       resolveComponent,
       step,
       selectedSet,
+      startedConsumption: startedConsumptionState(run?.steps?.[stepIndex]?.preparedConsumption),
     };
   }
 
@@ -1542,8 +2082,12 @@ export class CraftingEngine {
       toolPairs: [...prepared.toolValidation.tools],
     };
     const effects = [];
+    // A stage that already spent its inputs at START never re-consumes, re-spends or
+    // refunds here: it resolves against the snapshot the start commit persisted.
+    const spentAtStart = prepared.startedConsumption ?? null;
+    if (spentAtStart) seedStartedStageState(state, spentAtStart);
 
-    if (shouldConsume) {
+    if (!spentAtStart && shouldConsume) {
       effects.push({
         effectId: 'consume-ingredients',
         kind: 'consumeIngredients',
@@ -9170,6 +9714,54 @@ function rehydrateVersionedItem(snapshot = {}) {
     img: data.img ?? snapshot.img ?? null,
     parent: snapshot.actorUuid ? { uuid: snapshot.actorUuid } : null,
     toObject: () => cloneJsonValue(data),
+  };
+}
+
+/**
+ * The tool half of a stage plan: the uuids the plan records and the live documents it holds.
+ * One reader, so the live-resolution and start-snapshot paths cannot describe tools differently.
+ * @param {{tools: Array<{item: object}>}} toolValidation
+ * @returns {{plan: {toolItemUuids: string[]}, items: {toolItems: object[]}}}
+ */
+function versionedToolPlan(toolValidation) {
+  const tools = toolValidation.tools;
+  return {
+    plan: {
+      toolItemUuids: tools
+        .map((entry) => entry?.item?.uuid ?? entry?.item?.id ?? null)
+        .filter(Boolean),
+    },
+    items: { toolItems: tools.map((entry) => entry.item).filter(Boolean) },
+  };
+}
+
+/** Resolve a started stage from what it actually spent, never from live inventory. */
+function seedStartedStageState(state, spentAtStart) {
+  state.consumedItems = spentAtStart.consumedItems;
+  state.resolvedEssences = spentAtStart.resolvedEssences;
+  state.essenceEnabled = spentAtStart.essenceEnabled;
+  state.currencySettlement = spentAtStart.currencySettlement;
+  if (state.essenceSpend && spentAtStart.essenceSpend) {
+    state.essenceSpend = spentAtStart.essenceSpend;
+  }
+}
+
+/**
+ * The resolve-time view of a stage's START consumption: what it spent and the essence
+ * context it resolved to. `null` for a stage that has not started.
+ * @param {object|null|undefined} started A step's `preparedConsumption`.
+ * @returns {object|null}
+ */
+function startedConsumptionState(started) {
+  if (!started || typeof started !== 'object') return null;
+  return {
+    consumedItems: (Array.isArray(started.consumedSnapshots) ? started.consumedSnapshots : []).map(
+      rehydrateVersionedConsumedItem
+    ),
+    resolvedEssences: cloneJsonValue(started.resolvedEssences) ?? {},
+    essenceEnabled: cloneJsonValue(started.essenceEnabled) ?? {},
+    essenceSpend: craftingStepHistoryEvidence(started).essenceSpend,
+    currencySettlement: { settledSpends: cloneJsonValue(started.currencySpends) ?? [] },
   };
 }
 

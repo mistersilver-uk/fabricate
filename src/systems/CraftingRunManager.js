@@ -222,10 +222,10 @@ export class CraftingRunManager extends RunContainerManagerBase {
    * consumed. It is `{}` — not absent — when nothing contributed, and the engine reads an
    * ABSENT map (a run armed before this change) as all-enabled.
    *
-   * **This literal is a whitelist REBUILD.** It emits exactly the keys named below and
-   * silently drops anything else the call site passes, so a new snapshot field must be
-   * added HERE as well as at the call site or the finish path falls back to live values
-   * and the defect ships green.
+   * **{@link buildPreparedConsumption} is a whitelist REBUILD.** It emits exactly the keys
+   * it names and silently drops anything else the call site passes, so a new snapshot field
+   * must be added THERE as well as at the call site or the finish path falls back to live
+   * values and the defect ships green.
    *
    * @param {Actor} actor
    * @param {object} run
@@ -240,20 +240,7 @@ export class CraftingRunManager extends RunContainerManagerBase {
     this._assertRunMutation(run);
     const step = run.steps?.[stepIndex];
     if (!step) return null;
-    step.preparedConsumption = {
-      selectedIngredientSetId: prepared.selectedIngredientSetId ?? null,
-      // SETTLED spends only — see the note above.
-      currencySpends: Array.isArray(prepared.currencySpends) ? prepared.currencySpends : [],
-      resolvedEssences:
-        prepared.resolvedEssences && typeof prepared.resolvedEssences === 'object'
-          ? prepared.resolvedEssences
-          : {},
-      essenceEnabled:
-        prepared.essenceEnabled && typeof prepared.essenceEnabled === 'object'
-          ? prepared.essenceEnabled
-          : {},
-      consumedSummary: Array.isArray(prepared.consumedSummary) ? prepared.consumedSummary : [],
-    };
+    step.preparedConsumption = buildPreparedConsumption(prepared);
     step.selectedIngredientSetId = prepared.selectedIngredientSetId ?? step.selectedIngredientSetId;
     step.updatedAt = this._nowWorldTime();
     await this.updateRun(actor, run);
@@ -659,29 +646,51 @@ export class CraftingRunManager extends RunContainerManagerBase {
         'STALE_RUN_STAGE'
       );
     }
-    // Authority callers supply authored evidence. Validate and clone both values
-    // before touching the live container so a refused edit cannot leak into it.
-    const plan = buildSelectionPlan(selection);
-    const snapshot = cloneJson(
-      selection.selectedRequirementSnapshot ?? step.selectedRequirementSnapshot
-    );
-    if (!snapshot || stringOrNull(snapshot.id) !== plan.selectedIngredientSetId) {
+    if (step.preparedConsumption) {
       throw new RunLifecycleError(
-        'The selected crafting route requires its matching authored snapshot',
-        'INVALID_SELECTION_SNAPSHOT'
+        'The crafting stage selection was locked when the stage started',
+        'SELECTION_LOCKED'
       );
     }
-    step.selectionPlan = plan;
-    step.selectedIngredientSetId = plan.selectedIngredientSetId;
-    step.selectedRequirementSnapshot = snapshot;
-    const evidence = craftingStepHistoryEvidence(selection);
-    if (!step.presentationSnapshot && evidence.presentationSnapshot) {
-      step.presentationSnapshot = evidence.presentationSnapshot;
-    }
-    if (evidence.resolutionSnapshot) step.resolutionSnapshot = evidence.resolutionSnapshot;
+    applyStepSelection(step, selection);
     step.updatedAt = this._nowWorldTime();
     incrementRunRevision(run);
     return location.persist();
+  }
+
+  /**
+   * Commit a versioned stage START in ONE write: lock the selection, record what the
+   * stage actually consumed, and arm its time gate (D-026/D-028). After this the
+   * persisted plan is authoritative and the stage's inputs are already spent.
+   *
+   * @param {Actor} actor
+   * @param {object} run
+   * @param {number} stepIndex
+   * @param {{selection?: object, prepared?: object, requiredSeconds?: number}} started
+   *   `selection` as {@link setStepSelectionPlan}, `prepared` as {@link markStepPrepared}.
+   * @param {{expectedRevision?: number, executionOperationId?: string}} [options]
+   * @returns {Promise<object|null>} The updated run, or null for an invalid step index.
+   */
+  async markStepStarted(actor, run, stepIndex, started = {}, options = {}) {
+    this._assertRunMutation(run, options);
+    const step = run.steps?.[stepIndex];
+    if (!step) return null;
+    applyStepSelection(step, started.selection ?? {});
+    step.preparedConsumption = buildPreparedConsumption(started.prepared ?? {});
+    const worldTime = this._nowWorldTime();
+    const seconds = Math.max(0, Number(started.requiredSeconds) || 0);
+    if (seconds > 0) {
+      step.timeGate ??= {
+        requiredSeconds: seconds,
+        initiatedAt: worldTime,
+        availableAt: worldTime + seconds,
+      };
+      run.status = 'waitingTime';
+      step.status = 'waitingTime';
+    }
+    step.updatedAt = worldTime;
+    await this.updateRun(actor, run, options);
+    return run;
   }
 
   async updateExecutionJournal(actor, runId, transition, { expectedRevision } = {}) {
@@ -981,6 +990,66 @@ export class CraftingRunManager extends RunContainerManagerBase {
     }
     return pruned;
   }
+}
+
+/**
+ * Rebuild `preparedConsumption` from a caller snapshot. A WHITELIST: a new field must be
+ * added here as well as at the call site, or the resume falls back to live values.
+ * `consumedSnapshots` carries the versioned rehydration detail the reconstruction reads;
+ * `consumedSummary` stays the cancel reversal's restore input.
+ * @param {object} prepared
+ * @returns {object}
+ */
+function buildPreparedConsumption(prepared = {}) {
+  const value = {
+    selectedIngredientSetId: prepared.selectedIngredientSetId ?? null,
+    // SETTLED spends only — see the note on markStepPrepared.
+    currencySpends: Array.isArray(prepared.currencySpends) ? prepared.currencySpends : [],
+    resolvedEssences:
+      prepared.resolvedEssences && typeof prepared.resolvedEssences === 'object'
+        ? prepared.resolvedEssences
+        : {},
+    essenceEnabled:
+      prepared.essenceEnabled && typeof prepared.essenceEnabled === 'object'
+        ? prepared.essenceEnabled
+        : {},
+    consumedSummary: Array.isArray(prepared.consumedSummary) ? prepared.consumedSummary : [],
+  };
+  if (Array.isArray(prepared.consumedSnapshots)) {
+    value.consumedSnapshots = cloneJson(prepared.consumedSnapshots);
+  }
+  const evidence = craftingStepHistoryEvidence(prepared);
+  if (evidence.essenceSpend) value.essenceSpend = evidence.essenceSpend;
+  return value;
+}
+
+/**
+ * Apply an authored selection to a step, refusing a plan whose authored snapshot does not
+ * match the route it names. Shared by the pre-start edit and the stage-start lock.
+ * @param {object} step
+ * @param {object} selection
+ */
+function applyStepSelection(step, selection) {
+  // Authority callers supply authored evidence. Validate and clone both values
+  // before touching the live container so a refused edit cannot leak into it.
+  const plan = buildSelectionPlan(selection);
+  const snapshot = cloneJson(
+    selection.selectedRequirementSnapshot ?? step.selectedRequirementSnapshot
+  );
+  if (!snapshot || stringOrNull(snapshot.id) !== plan.selectedIngredientSetId) {
+    throw new RunLifecycleError(
+      'The selected crafting route requires its matching authored snapshot',
+      'INVALID_SELECTION_SNAPSHOT'
+    );
+  }
+  step.selectionPlan = plan;
+  step.selectedIngredientSetId = plan.selectedIngredientSetId;
+  step.selectedRequirementSnapshot = snapshot;
+  const evidence = craftingStepHistoryEvidence(selection);
+  if (!step.presentationSnapshot && evidence.presentationSnapshot) {
+    step.presentationSnapshot = evidence.presentationSnapshot;
+  }
+  if (evidence.resolutionSnapshot) step.resolutionSnapshot = evidence.resolutionSnapshot;
 }
 
 function buildSelectionPlan(selection) {

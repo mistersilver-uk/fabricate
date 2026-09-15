@@ -122,7 +122,11 @@ describe('journal run command protocol', () => {
             components: [{ id: 'herb', name: 'Herb' }],
             alchemy: { consumeOnFail: false, showAttemptHistoryToPlayers: false } };
           const runManager = new CraftingRunManager();
-          const engine = new CraftingEngine({ getRecipe: () => recipe }, runManager);
+          // Starting a run now prepares and SPENDS its stage (D-026), so the double must
+          // answer the craftability boundary the real start crosses.
+          const engine = new CraftingEngine({ getRecipe: () => recipe,
+            canCraft: () => ({ canCraft: true, missing: { ingredients: [], essences: [], tools: [] } }),
+            getToolsForSet: () => [] }, runManager);
           engine._matchAlchemySignature = () => ({ matched: false });
           engine.installVersionedRunAuthority({ consumeExecutionGrant: async (grant) => {
             assert.equal(grant, 'private-grant');

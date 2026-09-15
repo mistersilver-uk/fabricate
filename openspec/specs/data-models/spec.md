@@ -3183,8 +3183,9 @@ CraftingRunStepState = {
     }>,
   },
 
-  // Legacy START-phase consumption snapshot for a time-gated step, written when the gate is ARMED
-  // and read at FINISH (source items are already deleted) and by the cancel reversal.
+  // START-phase consumption snapshot for a time-gated step, written when the stage STARTS
+  // and read at resolution (source items are already deleted) and by the cancel reversal.
+  // Its presence is what makes a versioned stage STARTED, and therefore locked.
   // Absent for instant / non-timed steps and on pre-snapshot historical records.
   preparedConsumption?: {
     selectedIngredientSetId: string | null,
@@ -3195,6 +3196,10 @@ CraftingRunStepState = {
       itemUuid: string | null, actorUuid: string | null, quantity: number,
       name: string | null, img: string | null, componentId: string | null,
     }>,
+    // Versioned only: the rehydratable consumed-item snapshots the resolution rebuilds
+    // its essence transfer, awards and history from, and the captured carrier spending.
+    consumedSnapshots?: Array<object>,
+    essenceSpend?: { labels: object, carriers: Array<object> },
   },
 
   // Legacy authored ingredient requirements snapshot, captured at run creation (`_buildStepStates`).

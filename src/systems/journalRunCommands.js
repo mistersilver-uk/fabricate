@@ -15,6 +15,7 @@ export const JOURNAL_RUN_COMMAND_TIMEOUT_MS = 15_000;
 const DISMISSAL_LIMIT = 500;
 const MUTATING_ACTIONS = new Set([
   'start',
+  'beginStep',
   'execute',
   'pause',
   'resume',

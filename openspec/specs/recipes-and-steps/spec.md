@@ -142,15 +142,23 @@ A presence-only match is spared from usage/breakage and recorded as skipped, and
 
 New applicable crafting and alchemy runs use lifecycle version 1, as defined in `data-models/spec.md`.
 Only an absent version selects the legacy contract; unsupported present versions are preserved and refuse mutation.
-The versioned rules in this section supersede arm-time consumption and cancellation refunds for those new runs alone.
+The versioned rules in this section supersede legacy arming and cancellation behaviour for those new runs alone.
 
 Public `Fabricate.craft`, the global crafting helper and `/craft` MUST preserve one-call execution when the stage is ready and all choices are supplied.
 New public starts MUST select version 1 and use the same active-GM authority for start and execution; this convenience does not bypass ownership, validation, checks or execution receipts.
-Waiting stages and unresolved choices remain in the Journal without editable-material spending.
+A stage that has not started keeps its choices editable in the Journal and has spent nothing.
 Journal start controls may create a run for later manual completion rather than promising immediate execution.
 
-- Arming a timed stage persists its scoped choices and full selected authored-requirement snapshot without spending editable materials or currency.
-- Execution re-resolves the current run, revision, source actors, selected ingredient set, inventory, Tools and requirements under the authoritative operation.
+- A stage with a positive honoured time requirement MUST be STARTED before it can resolve, and that start is a single irreversible commit.
+Starting it persists the scoped choices and the full selected authored-requirement snapshot, LOCKS them, consumes the stage's materials and settles its currency, and arms the gate.
+Run start is the first stage's start, so every versioned run spends its materials when it starts.
+A later stage of a multi-step run is started by its own explicit begin operation; a manual execute on an unstarted stage is refused rather than silently starting it.
+An automatic world-time advance MAY start an unstarted stage it is otherwise permitted to complete, after its conservative blocker has decided, so a blocked automatic stage still spends nothing.
+- Once a stage has started its selection is authoritative: a caller-supplied selection plan is IGNORED rather than refused, so a redundant resend can never fail a craft the player already committed to.
+A started stage's check, resolution and awards read the start snapshot rather than re-resolving inventory the consumption has emptied.
+- A stage check MUST NOT be describable or rollable until every other stage requirement is met, elapsed time included; the projected actions withhold the roll and the engine refuses it.
+- A stage with no honoured time requirement has no waiting window, so beginning and resolving it remain one act that still consumes as part of that act.
+- Execution re-resolves the current run, revision, source actors, selected ingredient set, inventory, Tools and requirements under the authoritative operation when the stage did not start separately.
 Fixed ingredients, alternatives and essence carriers share the canonical physical-item allocation, so one unit cannot fund two requirements.
 - A stale route, option or held-item reference MUST remain blocked instead of selecting a surviving alternative implicitly.
 Explicit route changes replace the previous route's option overrides and shared essence allocation.
@@ -170,8 +178,11 @@ Selecting materials in advance does not authorize automatic material spending; e
 The preference survives that blocker; world-time jumps cannot bypass a check or execute a stage twice.
 - Pausing freezes remaining world time and retains choices; resuming reanchors readiness.
 Paused runs cannot advance manually or through world-time processing, but may be cancelled.
+- Pausing never refunds: the run keeps both the time it has run and the choices it has made.
 - Versioned cancellation forfeits elapsed time and preserves completed-stage spending and awards.
-Unconsumed materials remain untouched; legacy consumption and refund behavior and salvage remain unchanged.
+It reverses a started-but-unresolved stage's consumption through the same shared reversal the legacy cancel uses, honouring the system's `features.refundOnPlayerCancel` flag and reporting the ACTUAL outcome rather than the policy intent.
+A stage START is not an attempt, so a cancelled run's started-but-unresolved stage records no attempted stage.
+Legacy consumption and refund behavior and salvage remain unchanged.
 - A recipe-less alchemy fizzle persists its versioned terminal-history execution journal before recording a dead end or consuming submitted items.
 It honors the existing consume-on-failure policy and history visibility rules without revealing a recipe or replaying uncertain effects.
 

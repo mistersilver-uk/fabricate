@@ -4918,12 +4918,15 @@ Filtered-empty copy MUST say No matching active runs or No matching finished run
 
 The current-stage order MUST be identity/actions and applicable notices, progress/navigation, stage purpose/name, Produces above Consumes, current TIME/CHECK summaries, This run, and guidance.
 An ingredient-route comparison MUST use visible RadioCardGroup choices showing each route's output through dense ListRow and its shortage or unresolved-selection consequence, including alternatives not selected.
+A route label MUST be human-readable: an unnamed authored set takes its ordinal position, never its raw id.
 A supplied material MUST NOT be painted short solely because another requirement blocks the whole plan; execution and candidate feasibility still respect the canonical shared-stock ledger.
 Known physical shortage MUST disable execution while keeping permitted selection repair available.
 Automatic blockers MUST spend nothing and retain the completion preference.
 An unavailable authority reason MUST remain visibly adjacent to disabled controls, and the stage and guidance MUST NOT invite execution while that reason applies.
 No check, Nothing to roll and It simply completes require affirmative disclosed no-check configuration; protected or indeterminate configuration MUST say unavailable without removing owner actions.
 A check-driven primary action MUST say Roll check.
+A stage that has not started MUST offer its own begin control instead of the resolve action, stating that beginning locks the choices, consumes the listed materials and starts the clock, and MUST NOT offer the roll at all.
+A started stage's materials surface MUST read as already consumed and MUST NOT be editable.
 
 Past/future browsing MUST retain progress/navigation but omit separate TIME/CHECK summaries and current countdowns.
 The browsed stage MUST pair its own inert Consumed/Produced or Will consume/Will produce evidence, including route or outcome-ladder output within that pairing, followed by This run and looking-back/ahead guidance.

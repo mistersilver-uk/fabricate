@@ -549,6 +549,22 @@ function createCraftingJournalOperations(fabricate, getService) {
         requestId,
       });
     },
+    beginStep: async ({ actor, run, payload, executionGrant, requestId, expectedRevision, sender }) => {
+      const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
+      if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };
+      const begin = fabricate.craftingEngine?.beginVersionedStage;
+      if (typeof begin !== 'function') return { success: false, reason: 'unsupported-operation' };
+      return begin.call(fabricate.craftingEngine, {
+        viewer: sender,
+        actor,
+        componentSourceActors,
+        runId: run.id,
+        expectedRevision,
+        selectionPlan: payload.selectionPlan,
+        executionGrant,
+        requestId,
+      });
+    },
     cancel: async ({ actor, run, payload, executionGrant, requestId, expectedRevision }) => {
       const componentSourceActors = await resolveJournalSourceActors(run, payload, actor);
       if (!componentSourceActors) return { success: false, reason: 'source-actor-not-found' };

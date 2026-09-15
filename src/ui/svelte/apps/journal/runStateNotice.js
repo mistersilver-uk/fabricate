@@ -8,10 +8,18 @@
  */
 import { journalRefusalMessage, journalRunReasonMessage } from '../../util/journalRunReasons.js';
 
+/**
+ * Codes that report an ordinary next step rather than a refusal. A stage the player has not
+ * begun is the normal state of every timed stage, and it already has its own control, so
+ * raising a warning notice for it would put a banner on routine play.
+ */
+const NON_BLOCKING_REASONS = new Set(['stageNotStarted']);
+
 /** The blocker code, when execution is actually refused. `''` otherwise. */
 export function runBlockerCode(run) {
   const code = run?.actions?.disabledReason;
-  return typeof code === 'string' && code && run?.actions?.execute !== true ? code : '';
+  const reported = typeof code === 'string' && code && !NON_BLOCKING_REASONS.has(code);
+  return reported && run?.actions?.execute !== true ? code : '';
 }
 
 /**

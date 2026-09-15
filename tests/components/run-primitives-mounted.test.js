@@ -246,7 +246,11 @@ describe('run primitives mounted behavior', () => {
     for (const control of waiting.querySelectorAll('button')) {
       assert.equal(control.getAttribute('data-keyboard-focus'), 'true');
     }
-    expectGeometry('RunActionBar', '.fab-run-action-bar,\n  .fab-run-cancel-decision', [/gap:\s*var\(--fab-space-2\)/u]);
+    expectGeometry(
+      'RunActionBar',
+      '.fab-run-action-bar,\n  .fab-run-begin-decision,\n  .fab-run-cancel-decision',
+      [/gap:\s*var\(--fab-space-2\)/u]
+    );
     expectGeometry('RunActionBar', ':global(.fab-run-action-control)', [
       /height:\s*34px/u,
       /border-radius:\s*9px/u,

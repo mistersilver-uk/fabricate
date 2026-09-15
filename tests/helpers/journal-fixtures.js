@@ -165,7 +165,7 @@ export function makeSucceededRun(overrides = {}) {
 export async function createPersistedCraftingHistory({
   failLast = false, cancelAfter = null, armNext = false, opaque = false,
   resumePrefix = false, stageCount = 2, mode = 'simple', checked = true, awardQuantity = undefined, previewOnly = false, transformBeforeResume = null,
-  legacy = false, timed = true, refuseConsumeAt = null, refuseSettlement = false,
+  legacy = false, timed = true, refuseConsumeAt = null, refuseSettlement = false, drive = null,
 } = {}) {
   const { CraftingEngine } = await import('../../src/systems/CraftingEngine.js');
   const { CraftingRunManager } = await import('../../src/systems/CraftingRunManager.js');
@@ -282,6 +282,19 @@ export async function createPersistedCraftingHistory({
       },
       requestId: 'start', executionGrant: 'grant' });
     const armedRecord = structuredClone(manager.getActiveRun(actor, started.runId));
+    // `drive` hands the live world to the caller INSIDE the installed globals, so a test can
+    // act on the real engine, run manager and actor documents at any point after the start.
+    if (drive) {
+      const project = (candidate = gm) => new RunJournalBuilder({ craftingRunManager: manager,
+        recipeManager, recipeVisibility: visibility, getSystem: () => system,
+        getResultItem: () => null, getComponent: () => null,
+      }).buildListing({ actor, viewer: candidate });
+      const driven = await drive({ engine, actor, sources, recipe, steps, set, system, gm, viewer,
+        runId: started.runId, started, project, manager: () => manager,
+        remaining: () => sources.map((source) => source.items.length) });
+      return { armedRecord, sourceItemsRemaining: sources.map((source) => source.items.length),
+        record: structuredClone(manager.getRun(actor, started.runId)), ...driven };
+    }
     if (previewOnly) {
       const before = structuredClone(actor.flags);
       const model = new RunJournalBuilder({ craftingRunManager: new CraftingRunManager(),
@@ -293,8 +306,13 @@ export async function createPersistedCraftingHistory({
     const execute = (requestId) => engine.executeVersionedStage({ viewer: gm, actor,
       componentSourceActors: sources, runId: started.runId,
       expectedRevision: manager.getRun(actor, started.runId).runRevision, requestId, executionGrant: 'grant' });
+    // A stage after the first is begun explicitly: that is where its choice locks and its
+    // materials are spent. Executing an unstarted stage is refused, not silently armed.
+    const begin = (requestId) => engine.beginVersionedStage({ viewer: gm, actor,
+      componentSourceActors: sources, runId: started.runId,
+      expectedRevision: manager.getRun(actor, started.runId).runRevision, requestId, executionGrant: 'grant' });
     for (let index = 0; index < (cancelAfter ?? stageCount); index += 1) {
-      if (index > 0) await execute(`arm-${index}`);
+      if (index > 0) await begin(`arm-${index}`);
       game.time.worldTime += 60;
       if (resumePrefix && index === 0) {
         const update = manager.updateExecutionJournal.bind(manager);
@@ -314,7 +332,7 @@ export async function createPersistedCraftingHistory({
       await execute(`execute-${index}`);
     }
     if (cancelAfter !== null) {
-      if (armNext) await execute('arm-cancelled');
+      if (armNext) await begin('arm-cancelled');
       await engine.cancelVersionedRun({ actor, runId: started.runId,
         expectedRevision: manager.getRun(actor, started.runId).runRevision,
         requestId: 'cancel', executionGrant: 'grant' });

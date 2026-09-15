@@ -82,6 +82,7 @@ export const JOURNAL_RUN_REASON_KEYS = Object.freeze({
   executionInProgress: 'FABRICATE.App.Journal.Actions.ExecutionInProgress',
   unsupportedLifecycle: 'FABRICATE.App.Journal.Actions.UnsupportedLifecycle',
   selectionRequired: 'FABRICATE.App.Journal.Actions.SelectionRequired',
+  stageNotStarted: 'FABRICATE.App.Journal.Actions.StageNotStarted',
   notOwner: 'FABRICATE.App.Journal.Actions.NeedsOwner',
 });
 

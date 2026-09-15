@@ -1003,6 +1003,99 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(saved.ingredientEssenceAllocation.ingredientSetId, second.id);
   });
 
+  it('labels an unnamed ingredient route by its ordinal and never by its raw id', async () => {
+    const anonymous = (id, componentId) => {
+      const set = ingredientSet(id, [{ id: componentId, options: [componentOption(componentId, componentId)] }]);
+      set.name = '';
+      set.resultGroupId = `${id}-results`;
+      return set;
+    };
+    const first = anonymous('od78zBEt6Ymiff7D', 'iron');
+    const second = anonymous('Qk31zBEt6Ymiff7D', 'copper');
+    const mounted = await mountState(
+      'ready-single',
+      selectionFixture([first, second], { selectedIngredientSetId: first.id }, { mode: 'routedByIngredients' })
+    );
+    const labels = [...mounted.target.querySelectorAll('[data-journal-route] [data-radio-card-option]')]
+      .map((card) => card.querySelector('.manager-resolution-option-name').textContent);
+    assert.equal(labels.length, 2);
+    for (const [index, label] of labels.entries()) {
+      assert.equal(
+        label.trim(),
+        english.FABRICATE.App.Journal.Stage.RouteOrdinal.replace('{n}', String(index + 1)),
+        label
+      );
+    }
+    assert.doesNotMatch(
+      mounted.target.querySelector('[data-journal-route]').textContent,
+      /od78zBEt6Ymiff7D|Qk31zBEt6Ymiff7D/,
+      'no raw ingredient-set id reaches the route control'
+    );
+  });
+
+  it('offers the begin control, withholds the roll, and commits through the real store', async () => {
+    const mounted = await mountState(
+      'ready-single',
+      selectionFixture([FIXED_SET], { selectedIngredientSetId: FIXED_SET.id })
+    );
+    const begin = mounted.target.querySelector('[data-run-action="begin"]');
+    assert.ok(begin, 'an unstarted timed stage offers its own begin control');
+    assert.equal(begin.disabled, false);
+    assert.equal(begin.textContent.trim(), english.FABRICATE.App.Journal.Actions.BeginStep);
+    assert.ok(
+      mounted.target
+        .querySelector('[data-run-begin]')
+        .textContent.includes(english.FABRICATE.App.Journal.Actions.BeginStepPrompt),
+      'the control states the irreversible thing it is about to do'
+    );
+    assert.ok(
+      !mounted.target.querySelector('[data-run-action="primary"]'),
+      'the roll is not offered at all while the stage has not started'
+    );
+    assert.equal(mounted.store.selectedRun.actions.disabledReason, 'stageNotStarted');
+    assert.ok(
+      !mounted.target.querySelector('[data-journal-action-blocker]'),
+      'an unbegun stage is an ordinary next step, not a refusal to warn about'
+    );
+    begin.click();
+    await settleAction();
+    assert.equal(mounted.commands.at(-1).action, 'beginStep');
+  });
+
+  it('reads a started stage as already consumed and refuses further selection edits', async () => {
+    const mounted = await mountState('ready-single', {
+      ...selectionFixture([FIXED_SET], { selectedIngredientSetId: FIXED_SET.id }),
+      prepare(runtime) {
+        selectionFixture([FIXED_SET], { selectedIngredientSetId: FIXED_SET.id }).prepare(runtime);
+        const step = runtime.containers.craftingRuns.active['lab-v1-ready-single'].steps[0];
+        step.status = 'waitingTime';
+        step.timeGate = { requiredSeconds: 3600, initiatedAt: 0, availableAt: 1 };
+        step.preparedConsumption = {
+          selectedIngredientSetId: FIXED_SET.id,
+          currencySpends: [],
+          resolvedEssences: {},
+          essenceEnabled: {},
+          consumedSummary: [{ itemUuid: 'Actor.actor-1.Item.iron', actorUuid: ACTOR_UUID,
+            quantity: 1, name: 'Iron', img: null, componentId: 'iron' }],
+        };
+      },
+    });
+    assert.equal(mounted.store.selectedRun.actions.setSelection, false);
+    assert.ok(!mounted.target.querySelector('[data-run-action="begin"]'), 'a started stage cannot begin again');
+    const slots = mounted.target.querySelector('[data-slot-row]');
+    assert.ok(slots, 'the consumed requirements still read back');
+    assert.ok(
+      slots.textContent.includes(english.FABRICATE.App.Journal.Stage.Consumed),
+      'the surface says it was consumed, not that it will be'
+    );
+    assert.ok(slots.textContent.includes(english.FABRICATE.App.Journal.Stage.SpentAtStart));
+    assert.ok(
+      !slots.textContent.includes(english.FABRICATE.App.Journal.Stage.Requirements),
+      'and never the pre-start "this run consumes" heading'
+    );
+    assert.ok(!slots.textContent.includes(english.FABRICATE.App.Journal.Stage.StaleSelection));
+  });
+
   it('requires explicit repair when a removed ingredient route leaves only one route', async () => {
     const remaining = ingredientSet('remaining', [
       { id: 'metal', options: [componentOption('iron', 'iron')] },

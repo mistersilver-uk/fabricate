@@ -1616,6 +1616,8 @@ function journalLifecycleCases() {
     'ready-single',
     'waiting-auto-eligible',
     'waiting-open-choice',
+    'stage-not-started',
+    'stage-consumed',
     'material-shortage',
     'ingredient-route',
     'check-route',
@@ -1693,6 +1695,8 @@ function journalLifecycleCases() {
         'Forge Iron Rivets',
         [
           'waiting-open-choice',
+          'stage-not-started',
+          'stage-consumed',
           'current-choice-closed',
           'paused',
           'cancel-confirmation',
@@ -1885,6 +1889,16 @@ function journalLifecycleCases() {
         '[data-slot-row] button[aria-pressed="true"]',
         `${primary}:disabled`
       ),
+    // The stage the player has not begun: its own control, stating what beginning commits,
+    // and NO roll offered at all until it has started (issue 1648, M13/M15).
+    'stage-not-started':
+      detail + has('[data-run-action="begin"]:not(:disabled)', '[data-run-begin]') + lacks(primary),
+    // The same stage once it started: the materials read as already consumed and nothing
+    // about the choice is editable any more.
+    'stage-consumed':
+      detail +
+      has('[data-journal-stage-details]', '[data-slot-row]') +
+      lacks('[data-journal-stage-details][data-editable="true"]', '[data-run-action="begin"]'),
     'material-shortage':
       detail + has('[data-slot-id="boss-stage-1-sunward-g3"]', `${primary}:disabled`),
     'ingredient-route':
@@ -2189,6 +2203,7 @@ function journalLifecycleCases() {
     'cancel-confirmation': '[data-run-action="cancel-confirm"]',
     paused: '[data-run-action="resume"]',
     'ingredient-route': '[data-journal-route]',
+    'stage-not-started': '[data-run-action="begin"]',
     'check-route': '[data-run-action="primary"]',
     'essence-overshoot': '[data-essence-source$=".Item.jp-sunmote"] [data-stepper-increment]',
     'past-stage': '[data-stage-nav-return]',

@@ -150,10 +150,10 @@ const BASE_SCAN = Object.freeze({
  */
 const SCAN_TOTALS = Object.freeze({
   // #1648: eight unique validated-tool/receipt reads in the same two engine files.
-  matches: 171,
-  lines: 155,
+  matches: 170,
+  lines: 154,
   files: 19,
-  pairs: 126,
+  pairs: 125,
   collisionGroups: 17,
   collisionSites: 46,
 });
@@ -165,8 +165,7 @@ const SCAN_TOTALS = Object.freeze({
  */
 const LEDGER = Object.freeze([
   // #1648: validated tool pairs and durable effect receipts, never system libraries.
-  ['src/systems/CraftingEngine.js', "toolItemUuids: toolValidation.tools", 1, 'not-a-system'],
-  ['src/systems/CraftingEngine.js', "toolItems: toolValidation.tools.map((entry) => entry.item).filter(Boolean),", 1, 'not-a-system'],
+  ['src/systems/CraftingEngine.js', "const tools = toolValidation.tools;", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "toolPairs: [...prepared.toolValidation.tools],", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "if (shouldUseTools && prepared.toolValidation.tools.length > 0) {", 1, 'not-a-system'],
   ['src/systems/CraftingEngine.js', "prepared.toolValidation.tools,", 1, 'not-a-system'],

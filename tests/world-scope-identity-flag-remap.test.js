@@ -53,8 +53,10 @@ test('actual equivalent-essence merge and flag remap preserve captured history t
       assert.equal(merged.worldEssenceMergeMap.systems[system.id].essences.moon, 'light');
       const container = actor.getFlag('fabricate', 'fabricate.craftingRuns');
       const active = Object.values(container.active)[0];
+      // The stage spent its inputs at START (D-026), so the essence snapshot the resume reads
+      // is the step's `preparedConsumption` and it is that copy the merge has to re-key.
       const captures = structuredClone({ selected: active.steps[0].selectedRequirementSnapshot,
-        essence: active.executionJournal.effects.find((effect) => effect.kind === 'consumeIngredients').receipt.essenceSpend });
+        essence: active.steps[0].preparedConsumption.essenceSpend });
       const document = makeMergeDocument({ fabricate: { fabricate: { craftingRuns: container } } });
       document.id = actor.id;
       document.uuid = actor.uuid;
@@ -63,7 +65,7 @@ test('actual equivalent-essence merge and flag remap preserve captured history t
       assert.equal(result.remappedRunContainers, 1);
       afterRemap = document.getFlag('fabricate', 'fabricate.craftingRuns');
       const remappedRun = Object.values(afterRemap.active)[0];
-      const receipt = remappedRun.executionJournal.effects.find((effect) => effect.kind === 'consumeIngredients').receipt;
+      const receipt = remappedRun.steps[0].preparedConsumption;
       assert.deepEqual(receipt.resolvedEssences, { sun: 4, light: 6 });
       assert.deepEqual(receipt.essenceEnabled, { sun: true, light: true });
       assert.deepEqual(remappedRun.steps[0].selectedRequirementSnapshot, captures.selected);

@@ -1149,11 +1149,11 @@
           "Title": "What to expect",
           "Terminal": "This run has ended. Review its recorded stages, spending and received results here.",
           "Recovery": "Review the confirmed receipts and the uncertain effect above. Effects are never replayed or automatically rolled back; an unresolved execution claim can also block other runs until the GM records a manual reconciliation.",
-          "Paused": "This run is paused. Its countdown stays frozen until you resume; it cannot complete while paused.",
-          "Crafting": "This is a crafting run. Trigger the next step when its time gate has passed; each step rolls its crafting check and the run completes (or fails) once the final step resolves.",
-          "CraftingSingleStep": "This is a crafting run. Once its time gate has passed, finish crafting to roll its crafting check — the run completes (or fails) on that result.",
-          "CraftingNoCheck": "This crafting run has no check. Trigger each step once its time gate has passed; the run completes after the final step.",
-          "CraftingSingleStepNoCheck": "This crafting run has no check. Once its time gate has passed, finish crafting to complete the run.",
+          "Paused": "This run is paused. Its countdown stays frozen until you resume; it cannot complete while paused. Nothing it has already spent is returned, and the choices it has made stay made.",
+          "Crafting": "This is a crafting run. Begin each step to lock its choices and consume its materials, then roll its crafting check once the step's time has passed; the run completes (or fails) when the final step resolves.",
+          "CraftingSingleStep": "This is a crafting run. Its materials were consumed when it started. Once its time gate has passed, finish crafting to roll its crafting check — the run completes (or fails) on that result.",
+          "CraftingNoCheck": "This crafting run has no check. Begin each step to lock its choices and consume its materials, then trigger it once its time has passed; the run completes after the final step.",
+          "CraftingSingleStepNoCheck": "This crafting run has no check. Its materials were consumed when it started. Once its time gate has passed, finish crafting to complete the run.",
           "Gathering": "This is a gathering run. It resolves automatically as world time advances — no action is needed from you.",
           "GatheringManual": "This gathering run waits for you when a step is ready. Once its time gate has passed, use the available action to resolve it.",
           "Salvage": "This is a salvage run. It resolves automatically as world time advances — no action is needed from you."
@@ -1210,6 +1210,7 @@
         "Stage": {
           "Number": "Stage {index}",
           "Route": "Ingredient route",
+          "RouteOrdinal": "Route {n}",
           "ChosenRoute": "Chosen",
           "RouteShortfall": "Missing requirements: {count}",
           "CandidateReading": "{held} held · needs {needed} · {spare} spare",
@@ -1234,6 +1235,8 @@
           "Return": "Return to current stage {index}",
           "ReturnFinal": "Return to final stage {index}",
           "StaleSelection": "A selected material is no longer available. Choose a replacement explicitly.",
+          "Consumed": "Consumed when this stage started",
+          "SpentAtStart": "These materials were consumed and this choice was locked when the stage started.",
           "State": {
             "paused": "Paused"
           }
@@ -1325,6 +1328,8 @@
         },
         "Actions": {
           "Wait": "{time} to wait",
+          "BeginStep": "Begin step",
+          "BeginStepPrompt": "Begins the step now: locks these choices, consumes the materials listed and starts the clock. It cannot be undone.",
           "RollCheck": "Roll check",
           "RollD100": "Roll a d100",
           "Complete": "Complete",
@@ -1357,6 +1362,7 @@
           "RecoveryRequired": "This run needs GM recovery before it can change.",
           "UnsupportedLifecycle": "This run was created by an unsupported Fabricate version and remains available as a record.",
           "SelectionRequired": "Complete the current stage requirements first.",
+          "StageNotStarted": "Begin this stage before its check can be rolled.",
           "Completion": {
             "Label": "When ready",
             "Manual": "Ask me",
