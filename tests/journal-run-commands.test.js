@@ -224,6 +224,87 @@ describe('journal run command protocol', () => {
     }
   });
 
+  /**
+   * `source-owner-required` was spelled, localized and vocabulary-tested, but nothing proved it
+   * FIRES (issue 1648, Q-H5): deleting the gate, or making `journalSourcesOwnedBy` return `true`,
+   * left every suite green while a non-GM could consume materials off an actor they do not own.
+   * Only `authorize`/`execute` are substituted here — the gate, `resolveJournalSourceActors` and
+   * `journalSourcesOwnedBy` are the production ones, compiled out of `main.js`.
+   */
+  it('refuses a craft drawing materials from a source actor the sender does not own', async () => {
+    const originalGame = globalThis.game;
+    const originalFromUuid = globalThis.fromUuid;
+    try {
+      globalThis.game = { user: { id: 'gm', isGM: true } };
+      const vault = {
+        uuid: 'Actor.vault',
+        owner: null,
+        testUserPermission(user, level) {
+          return level === 'OWNER' && user?.id === this.owner;
+        },
+      };
+      const run = {
+        id: 'run-1',
+        lifecycleVersion: 1,
+        runRevision: 3,
+        componentSourceActorUuids: [vault.uuid],
+      };
+      const fabricate = {
+        craftingRunManager: { getRun: () => run, invalidateCache: () => {} },
+      };
+      const production = loadCraftingOperations()(fabricate, () => null);
+      const executed = [];
+      const { service, actor } = commandHarness({
+        currentUserId: 'gm',
+        operations: {
+          crafting: {
+            ...production,
+            cancel: async () => (executed.push('cancel'), { success: true, action: 'cancel' }),
+          },
+        },
+      });
+      globalThis.fromUuid = async (uuid) => (uuid === vault.uuid ? vault : null);
+      const request = {
+        kind: JOURNAL_RUN_SOCKET_KIND.REQUEST,
+        sessionId: 'player-tab',
+        actorUuid: actor.uuid,
+        runType: 'crafting',
+        runId: run.id,
+        expectedRevision: 3,
+        action: 'cancel',
+        payload: {},
+      };
+      const send = (requestId, senderId) =>
+        service.handleSocketMessage({ ...request, requestId, senderId }, senderId);
+
+      // The player OWNS the crafting actor, so `owner-required` passes and the source gate is
+      // the only thing left between them and another player's stock.
+      assert.equal(actor.testUserPermission({ id: 'player' }, 'OWNER'), true);
+      const denied = await send('foreign-source', 'player');
+      assert.equal(denied.response.reason, 'source-owner-required');
+      assert.deepEqual(executed, [], 'the refusal reaches no operation');
+
+      // A GM is not bound by source ownership, and the same sender is allowed once they own it.
+      assert.equal((await send('gm-source', 'gm')).response.success, true);
+      vault.owner = 'player';
+      assert.equal((await send('owned-source', 'player')).response.success, true);
+      assert.deepEqual(executed, ['cancel', 'cancel']);
+
+      // A source uuid that cannot be resolved is not an owned one either: the resolver answers
+      // null, which the gate refuses rather than falling back to the crafting actor.
+      globalThis.fromUuid = async () => {
+        throw new Error('uuid store unavailable');
+      };
+      assert.equal(
+        (await send('unresolvable-source', 'player')).response.reason,
+        'source-owner-required'
+      );
+    } finally {
+      globalThis.game = originalGame;
+      globalThis.fromUuid = originalFromUuid;
+    }
+  });
+
   async function assertAuthoritativeRouteSnapshot(clientSnapshot) {
     // Execute the actual composition-edge declarations without importing main's
     // Foundry boot side effects or maintaining a second copy of its callback.

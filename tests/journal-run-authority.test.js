@@ -1183,4 +1183,68 @@ describe('journal run authority ledger', () => {
     );
     assert.deepEqual(wrongSender, { success: false });
   });
+
+  /**
+   * An execution grant is a bearer token, so the ONLY thing standing between it and an
+   * unrelated privileged call is the per-field binding comparison and the single-use flag.
+   * Both survived the whole corpus (issue 1648, Q-H3/Q-H4): under the first mutation a grant
+   * issued to pause `Actor.a`'s `run-1` redeemed as an execute against `Actor.evil`/`run-999`.
+   */
+  it('redeems an execution grant once, and only for the binding it was issued for', async () => {
+    const world = sharedAuthorityWorld();
+    const authority = world.realm();
+    await authority.setup();
+    const issued = { operation: 'pause', actorUuid: 'Actor.a', runId: 'run-1' };
+    const exact = { ...issued, requestId: 'bound', senderId: 'player' };
+
+    const observed = await authority.run(
+      { requestId: 'bound', senderId: 'player', sessionId: 'one' },
+      async ({ createExecutionGrant }) => {
+        const grant = createExecutionGrant(issued);
+        const forged = {
+          operation: { ...exact, operation: 'execute' },
+          actorUuid: { ...exact, actorUuid: 'Actor.evil' },
+          runId: { ...exact, runId: 'run-999' },
+          requestId: { ...exact, requestId: 'another-request' },
+          senderId: { ...exact, senderId: 'other' },
+          // The `actor` document form of the same field, which resolves through uuid then id.
+          actor: { ...exact, actor: { uuid: 'Actor.evil' } },
+        };
+        return {
+          refused: Object.fromEntries(
+            Object.entries(forged).map(([key, expected]) => [
+              key,
+              authority.consumeExecutionGrant(grant, expected),
+            ])
+          ),
+          unknownGrant: authority.consumeExecutionGrant({ authority: 'forged' }, exact),
+          // A grant carrying the actor as a document, matched by uuid rather than by string.
+          byDocument: authority.consumeExecutionGrant(
+            createExecutionGrant(issued),
+            { ...exact, actor: { uuid: 'Actor.a' } }
+          ),
+          first: authority.consumeExecutionGrant(grant, exact),
+          replay: authority.consumeExecutionGrant(grant, exact),
+          success: true,
+        };
+      }
+    );
+
+    assert.deepEqual(
+      observed.refused,
+      {
+        operation: null,
+        actorUuid: null,
+        runId: null,
+        requestId: null,
+        senderId: null,
+        actor: null,
+      },
+      'every bound field is compared, so no forged field is redeemable'
+    );
+    assert.equal(observed.unknownGrant, null, 'a grant this authority never issued is not a grant');
+    assert.deepEqual(observed.byDocument, {}, 'the matching binding still redeems');
+    assert.deepEqual(observed.first, {}, 'the exact binding redeems');
+    assert.equal(observed.replay, null, 'and a consumed grant is never redeemable again');
+  });
 });
