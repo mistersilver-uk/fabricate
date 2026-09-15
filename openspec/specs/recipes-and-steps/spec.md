@@ -146,7 +146,7 @@ The versioned rules in this section supersede legacy arming and cancellation beh
 
 Public `Fabricate.craft`, the global crafting helper and `/craft` MUST preserve one-call execution when the stage is ready and all choices are supplied.
 New public starts MUST select version 1 and use the same active-GM authority for start and execution; this convenience does not bypass ownership, validation, checks or execution receipts.
-A stage that has not started keeps its choices editable in the Journal and has spent nothing.
+A stage that has not started keeps its choices editable in the Journal and has spent nothing; only a later stage of a multi-step run can be in that state, because run start commits the first one.
 Journal start controls may create a run for later manual completion rather than promising immediate execution.
 
 - A stage with a positive honoured time requirement MUST be STARTED before it can resolve, and that start is a single irreversible commit.
@@ -160,6 +160,10 @@ Every reader of "has this stage started" — the begin operation, the roll-readi
 A started stage's check, resolution and awards read the start snapshot rather than re-resolving inventory the consumption has emptied.
 - A stage check MUST NOT be describable or rollable until every other stage requirement is met, elapsed time included; the projected actions withhold the roll and the engine refuses it.
 - A stage with no honoured time requirement has no waiting window, so beginning and resolving it remain one act that still consumes as part of that act.
+This governs a LATER stage of a multi-step run, which is reached only by resolving the stage before it.
+Run start is different: it CREATES a run, so the first stage commits at run start whether or not it has an honoured time requirement.
+A first stage whose materials cannot be met refuses the start and leaves no run record, rather than creating an active run that has taken nothing and can be started again against the same stock.
+No versioned run may therefore be active with an unstarted first stage.
 - Execution re-resolves the current run, revision, source actors, selected ingredient set, inventory, Tools and requirements under the authoritative operation when the stage did not start separately.
 Fixed ingredients, alternatives and essence carriers share the canonical physical-item allocation, so one unit cannot fund two requirements.
 - A stale route, option or held-item reference MUST remain blocked instead of selecting a surviving alternative implicitly.

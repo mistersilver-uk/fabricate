@@ -623,7 +623,11 @@ test('CraftingEngine versioned start commits the stage: locked plan, spent input
   });
 });
 
-test('CraftingEngine reports a read-only prepared stage as immediately executable', async () => {
+// An untimed first stage COMMITS at run start like every other first stage (issue 1648, M24):
+// the carve-out that returned success without spending is what left the maintainer seven active
+// runs that had taken nothing. The readiness answer must then come from the started stage, not
+// from a second live probe of the inventory that commit just emptied.
+test('CraftingEngine commits an immediate stage at start and reads readiness from the commit', async () => {
   const { engine, recipe, runManager } = setupEngineFixture();
   makeCurrentStageImmediate(recipe);
   const actor = new FakeActor('ready-crafter');
@@ -634,8 +638,11 @@ test('CraftingEngine reports a read-only prepared stage as immediately executabl
     preparations += 1;
     return prepare(args);
   };
-  engine._consumeIngredients = async () => {
-    throw new Error('readiness must not consume ingredients');
+  let consumptions = 0;
+  const consume = engine._consumeIngredients.bind(engine);
+  engine._consumeIngredients = async (plan) => {
+    consumptions += 1;
+    return consume(plan);
   };
 
   const started = await startReadyVersionedRun({ engine, recipe, actor, source });
@@ -643,15 +650,67 @@ test('CraftingEngine reports a read-only prepared stage as immediately executabl
   assert.equal(started.success, true);
   assert.equal(started.waiting, false);
   assert.equal(started.canExecuteImmediately, true);
-  assert.equal(preparations, 1);
+  assert.equal(consumptions, 1, 'the stage is spent ONCE, at its start');
+  assert.equal(preparations, 1, 'readiness reconstructs the started stage instead of re-probing');
   assert.equal(runManager.getActiveRuns(actor).length, 1);
-  assert.equal(runManager.getActiveRun(actor, started.runId).executionJournal, undefined);
+  const persisted = runManager.getActiveRun(actor, started.runId);
+  assert.equal(persisted.executionJournal.status, 'committed');
+  assert.equal(persisted.steps[0].preparedConsumption.selectedIngredientSetId, 'set-1');
+  assert.equal(persisted.steps[0].timeGate, undefined, 'an untimed stage arms no gate');
+  assert.notEqual(persisted.status, 'waitingTime');
 });
 
-test('CraftingEngine keeps immediate execution false for unresolved stage inputs', async () => {
+// M24: an unresolved stage input must not produce an ACTIVE run that has taken nothing. Each
+// blocker is pinned to the outcome it now reaches — a refusal that creates no run, or a run whose
+// stage is committed — because a test that accepted either would pass on the defect it replaces.
+// The maintainer reached SEVEN active `Smelt Iron from Raw Ore` runs, every one reporting
+// `Needs materials`, by pressing craft repeatedly on a single-step recipe with no honoured time
+// requirement: each press created a run, consumed nothing, and probed the same untouched stock
+// (issue 1648, M24). Starting the same craft twice against stock for one is the exact shape.
+test('CraftingEngine refuses a second start against stock only one craft can have', async () => {
+  const { engine, recipe, recipeManager, runManager } = setupEngineFixture();
+  const set = new IngredientSet({ id: 'set-1', ingredientGroups: [
+    { id: 'ore', options: [{ quantity: 1, match: { type: 'component', componentId: 'ore' } }] },
+  ] });
+  // Single step, NO time requirement: the shape the removed carve-out short-circuited on.
+  recipe.getExecutionSteps = () => [
+    { id: 'step-1', name: 'Smelt', ingredientSets: [set], resultGroups: [], toolIds: [] },
+  ];
+  recipeManager.ingredientMatchesItem = (_recipe, option, item) => option.match.componentId === item.id;
+  const actor = new FakeActor('smelter');
+  const source = new FakeActor('ore-stock');
+  source.items = [{
+    id: 'ore', uuid: `${source.uuid}.Item.ore`, parent: source, system: { quantity: 1 },
+    async delete() { source.items = source.items.filter((item) => item !== this); return this; },
+  }];
+  const start = () => startReadyVersionedRun({ engine, recipe, actor, source,
+    selectionPlan: { selectedIngredientSetId: set.id } });
+
+  const first = await start();
+  assert.equal(first.success, true);
+  assert.equal(source.items.length, 0, 'the first start TOOK the ore');
+  assert.equal(
+    first.canExecuteImmediately,
+    true,
+    'and stays resolvable on what it holds, rather than re-probing the stock it just spent'
+  );
+
+  const second = await start();
+
+  assert.equal(second.success, false, 'the second start is refused');
+  assert.equal(second.runId, undefined);
+  runManager.invalidateCache(actor.id);
+  const active = runManager.getActiveRuns(actor);
+  assert.equal(active.length, 1, 'the refused start leaves no run record behind');
+  assert.equal(active[0].id, first.runId);
+  assert.ok(active[0].steps[0].preparedConsumption, 'and the one run that exists has paid');
+});
+
+test('CraftingEngine never leaves an uncommitted active run for an unresolved stage input', async () => {
   const blockers = [
     {
       name: 'materials',
+      refuses: true,
       configure({ recipeManager }) {
         recipeManager.canCraft = () => ({
           canCraft: false,
@@ -661,6 +720,7 @@ test('CraftingEngine keeps immediate execution false for unresolved stage inputs
     },
     {
       name: 'choice',
+      refuses: true,
       configure({ ingredientSet }) {
         ingredientSet.ingredientGroups = [
           { id: 'brew-base', options: [{ match: { type: 'component' } }, { match: { type: 'tag' } }] },
@@ -669,6 +729,7 @@ test('CraftingEngine keeps immediate execution false for unresolved stage inputs
     },
     {
       name: 'essence',
+      refuses: true,
       configure({ ingredientSet }) {
         ingredientSet.ingredientGroups = [
           { id: 'solar-carrier', options: [{ match: { type: 'essence', essenceId: 'solar' } }] },
@@ -677,6 +738,7 @@ test('CraftingEngine keeps immediate execution false for unresolved stage inputs
     },
     {
       name: 'currency',
+      refuses: true,
       configure({ engine, recipe }) {
         recipe.currencyCost = { currencies: [{ name: 'gp', cost: 5 }] };
         engine.itemPilesIntegration = {
@@ -693,13 +755,17 @@ test('CraftingEngine keeps immediate execution false for unresolved stage inputs
     },
     {
       name: 'tool',
+      refuses: true,
       configure({ recipeManager }) {
         recipeManager.getToolsForSet = () => [{ id: 'mortar', componentId: 'mortar' }];
         recipeManager.toolMatchesItem = () => false;
       },
     },
     {
+      // A GM misconfiguration, not a shortfall the actor can answer: the craft starts and
+      // spends, and the stage waits for a usable check exactly as a timed stage would.
       name: 'required check configuration',
+      refuses: false,
       configure() {
         game.fabricate.getCraftingSystemManager = () => ({
           getSystem: () => ({
@@ -725,9 +791,16 @@ test('CraftingEngine keeps immediate execution false for unresolved stage inputs
       source,
     });
 
-    assert.equal(started.success, true, blocker.name);
-    assert.equal(started.canExecuteImmediately, false, blocker.name);
-    assert.equal(fixture.runManager.getActiveRuns(actor).length, 1, blocker.name);
+    const runs = fixture.runManager.getActiveRuns(actor);
+    assert.notEqual(started.canExecuteImmediately, true, blocker.name);
+    assert.equal(started.success, !blocker.refuses, blocker.name);
+    assert.equal(runs.length, blocker.refuses ? 0 : 1, blocker.name);
+    for (const run of runs) {
+      assert.ok(
+        run.steps?.[0]?.preparedConsumption,
+        `${blocker.name}: an active run has always taken its materials`
+      );
+    }
   }
 });
 
@@ -1007,7 +1080,14 @@ test('CraftingEngine refuses stale route and singleton intent until both materia
   const set = new IngredientSet({ id: 'set-1', ingredientGroups: ['a', 'b'].map((id) => ({
     id, options: [{ quantity: 1, match: { type: 'component', componentId: id } }],
   })) });
-  recipe.getExecutionSteps = () => [{ id: 'step-1', ingredientSets: [set], resultGroups: [], toolIds: [] }];
+  // A run's FIRST stage commits at start (M24), so an unstarted stage whose selections can still
+  // be repaired is a LATER stage of a multi-step recipe. The opener takes nothing and resolves
+  // immediately, leaving the stale-route stage current, unstarted and editable.
+  const opener = new IngredientSet({ id: 'set-0', ingredientGroups: [] });
+  recipe.getExecutionSteps = () => [
+    { id: 'step-0', ingredientSets: [opener], resultGroups: [], toolIds: [] },
+    { id: 'step-1', ingredientSets: [set], resultGroups: [], toolIds: [] },
+  ];
   recipeManager.ingredientMatchesItem = (_recipe, option, item) => option.match.componentId === item.id;
   const actor = new FakeActor('repair-crafter');
   const source = new FakeActor('repair-stock');
@@ -1018,12 +1098,25 @@ test('CraftingEngine refuses stale route and singleton intent until both materia
   const plan = { selectedIngredientSetId: set.id, ingredientOptionOverrides: {
     a: { optionIndex: 1 }, b: { optionIndex: 1 },
   } };
-  const started = await startReadyVersionedRun({ engine, recipe, actor, source, selectionPlan: plan });
-  assert.equal(started.canExecuteImmediately, false);
+  const started = await startReadyVersionedRun({ engine, recipe, actor, source,
+    selectionPlan: { selectedIngredientSetId: opener.id } });
+  assert.equal(started.success, true);
   engine.installVersionedRunAuthority({ consumeExecutionGrant: async () => ({
     operationId: 'repaired-execution',
     resolvedCheckResult: { success: true, outcome: null, value: null, data: {} },
   }) });
+  await engine.executeVersionedStage({
+    actor, componentSourceActors: [source], runId: started.runId,
+    expectedRevision: runManager.getActiveRun(actor, started.runId).runRevision,
+    executionGrant: 'grant', requestId: 'open-execute',
+  });
+  const stageIndex = runManager.getActiveRun(actor, started.runId).currentStepIndex;
+  assert.equal(stageIndex, 1, 'the stale-route stage is current');
+  const routeSnapshot = () => structuredClone(set.toJSON?.() ?? set);
+  await runManager.setStepSelectionPlan(actor, started.runId, stageIndex,
+    { ...plan, selectedRequirementSnapshot: routeSnapshot() },
+    { expectedRevision: runManager.getActiveRun(actor, started.runId).runRevision });
+  spends = 0;
   const execute = (selectionPlan) => engine.executeVersionedStage({
     actor, componentSourceActors: [source], runId: started.runId,
     expectedRevision: runManager.getActiveRun(actor, started.runId).runRevision,
@@ -1040,11 +1133,12 @@ test('CraftingEngine refuses stale route and singleton intent until both materia
   const repair = async (groupId) => {
     plan.ingredientOptionOverrides[groupId] = { optionIndex: 0 };
     const current = runManager.getActiveRun(actor, started.runId);
-    await runManager.setStepSelectionPlan(actor, started.runId, 0, plan, { expectedRevision: current.runRevision });
+    await runManager.setStepSelectionPlan(actor, started.runId, stageIndex,
+      { ...plan, selectedRequirementSnapshot: routeSnapshot() }, { expectedRevision: current.runRevision });
   };
   await repair('a');
   await assertRefused();
-  assert.deepEqual(runManager.getActiveRun(actor, started.runId).steps[0].selectionPlan.ingredientOptionOverrides.b, { optionIndex: 1 });
+  assert.deepEqual(runManager.getActiveRun(actor, started.runId).steps[stageIndex].selectionPlan.ingredientOptionOverrides.b, { optionIndex: 1 });
   await repair('b');
   await assertRefused({ ...plan, selectedIngredientSetId: 'removed' });
   for (const optionIndex of [null, false, '', ' ', -1, 0.5, 2]) {
@@ -1093,22 +1187,30 @@ for (const scenario of ['delete-veto', 'update-refusal', 'prefix-then-veto', 'do
     }));
     let awards = 0;
     engine._createResultItems = async () => { awards += 1; return { items: [], resolutionMeta: null }; };
-    const started = await startReadyVersionedRun({ engine, recipe, actor, source,
+    // The stage is UNTIMED and consumption now happens at its START (D-026/D-028, M24), so the
+    // vetoed write is reached by the start call rather than by a later execute.
+    const start = () => startReadyVersionedRun({ engine, recipe, actor, source,
       selectionPlan: { selectedIngredientSetId: set.id } });
-    engine.installVersionedRunAuthority({ consumeExecutionGrant: async () => ({
-      operationId: 'confirmed-execution', resolvedCheckResult: { success: true, data: {} },
-    }) });
-    const execute = () => engine.executeVersionedStage({ actor, componentSourceActors: [source],
-      runId: started.runId, expectedRevision: runManager.getRun(actor, started.runId).runRevision,
+    const resolvingAuthority = () => engine.installVersionedRunAuthority({
+      consumeExecutionGrant: async () => ({
+        operationId: 'confirmed-execution', resolvedCheckResult: { success: true, data: {} },
+      }),
+    });
+    const executeRun = (runId) => engine.executeVersionedStage({ actor, componentSourceActors: [source],
+      runId, expectedRevision: runManager.getRun(actor, runId).runRevision,
       executionGrant: 'grant', requestId: 'confirm-execute' });
     if (scenario.endsWith('document-return')) {
-      assert.equal((await execute()).success, true);
+      const started = await start();
+      assert.equal(started.success, true);
+      assert.equal(source.items.length, scenario.startsWith('update-') ? 1 : 0, 'spent at start');
+      resolvingAuthority();
+      assert.equal((await executeRun(started.runId)).success, true);
       assert.equal(awards, 1);
       assert.equal(source.items.length, scenario.startsWith('update-') ? 1 : 0);
       assert.equal(runManager.getRunHistory(actor)[0].steps[0].consumedIngredients[0].quantity, 1);
     } else {
-      await assert.rejects(execute, (error) => error.code === 'RECOVERY_REQUIRED');
-      const reloaded = new CraftingRunManager().getRun(actor, started.runId);
+      await assert.rejects(start, (error) => error.code === 'RECOVERY_REQUIRED');
+      const reloaded = new CraftingRunManager().getActiveRuns(actor)[0];
       assert.equal(reloaded.executionJournal.status, 'recoveryRequired');
       const consumption = reloaded.executionJournal.effects.find((effect) => effect.effectId === 'consume-ingredients');
       assert.notEqual(consumption.phase, 'applied');
@@ -1116,7 +1218,9 @@ for (const scenario of ['delete-veto', 'update-refusal', 'prefix-then-veto', 'do
       if (scenario === 'prefix-then-veto') assert.equal(consumption.receipt.confirmed[0].quantity, 1);
       assert.equal(awards, 0);
       assert.equal(source.items.length, 1, 'a successful prefix stays spent, the vetoed item remains');
-      try { assert.equal((await execute()).success, false); }
+      assert.equal(reloaded.steps[0].preparedConsumption, undefined, 'an ambiguous start locks nothing');
+      resolvingAuthority();
+      try { assert.equal((await executeRun(reloaded.id)).success, false); }
       catch (error) { assert.equal(error.code, 'RECOVERY_REQUIRED'); }
       assert.deepEqual(writes, ids, 'ambiguous batches never replay');
       assert.equal(awards, 0);

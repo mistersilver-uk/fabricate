@@ -885,21 +885,32 @@ export class CraftingEngine {
 
   /**
    * D-026/D-028: for the first stage, run start IS stage start, so the choice locks and the
-   * materials are spent here rather than deferred to the resolve call. A stage with no time
-   * requirement has no separate start and is left for its one resolving act.
+   * materials are spent here rather than deferred to the resolve call.
+   *
+   * EVERY first stage commits here, the untimed one included. The earlier carve-out returned
+   * success without committing when the stage had no honoured time requirement, on the reasoning
+   * that such a stage begins and resolves in one act. That is true of the ACT and false of the
+   * RUN: the run record is created either way, so a craft whose materials could not be met left a
+   * visible active run that had taken nothing and could be started again against the same stock —
+   * the maintainer reached seven of them on one recipe (issue 1648, M24). The commit is also the
+   * only thing on this path that asks whether the actor can meet the stage at all, so making it
+   * unconditional is what refuses such a craft; `startVersionedRun` discards the run it had
+   * created, leaving no record behind.
+   *
+   * The gate is armed from the EFFECTIVE duration, so a system with time requirements turned off
+   * commits without arming one and the stage stays immediately resolvable.
    * @private
    * @returns {Promise<{success: boolean, run?: object, message?: string}>}
    */
   async _startFirstVersionedStage({ sourceActors, run, recipe, step, ...commit }) {
     const seconds = this._craftingRunManager().durationToSeconds(step.timeRequirement);
-    if (seconds <= 0 || !this._timeRequirementsEnabled(recipe)) return { success: true, run };
     return this._commitVersionedStageStart({
       ...commit,
       componentSourceActors: sourceActors,
       run,
       recipe,
       step,
-      requiredSeconds: seconds,
+      requiredSeconds: this._timeRequirementsEnabled(recipe) ? seconds : 0,
     });
   }
 
@@ -1804,12 +1815,17 @@ export class CraftingEngine {
     const selectionPlan = run?.steps?.[stepIndex]?.selectionPlan ?? {};
     if (!this._versionedSelectionInputsComplete(selectedSet, selectionPlan, step)) return false;
     try {
-      const prepared = await this._prepareVersionedStage({
+      // Asked through the shared phase seam, because run start now COMMITS this stage: a
+      // started stage holds what it needs and re-probing the inventory its own consumption
+      // emptied would answer "cannot execute" for every craft that had just paid (M24).
+      const prepared = await this._versionedStagePreparation({
+        started: this._versionedStageStarted(run, stepIndex),
         run,
         actor,
         componentSourceActors,
         recipe,
         step,
+        stepIndex,
         selectedSet,
         selectionPlan,
       });
