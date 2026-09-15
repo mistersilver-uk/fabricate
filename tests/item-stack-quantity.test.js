@@ -42,7 +42,10 @@ import {
   updateStackQuantity,
 } from '../src/systems/itemStackQuantity.js';
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
-import { writeItemAward } from '../src/systems/runHistoryEvidence.js';
+import {
+  createItemReceiptCollector,
+  writeItemAward,
+} from '../src/systems/runHistoryEvidence.js';
 
 /** Capture `console.warn` for the duration of one test. */
 function captureWarnings(t) {
@@ -1516,6 +1519,96 @@ describe('a refused write is distinguishable from an unacknowledged one', () => 
     await assert.rejects(
       () => engine._consumeIngredients([{ item, quantity: 1, ingredient: null }]),
       (error) => error.code === 'HISTORY_EFFECT_UNCERTAIN'
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AN ACKNOWLEDGED SHORT WRITE IS NOT A COMPLETE ONE (#1648 Q-M1).
+//
+// Both short-write guards in `writeItemAward` were deletable with the whole corpus green: the
+// corpus covers UNACKNOWLEDGED writes well and never an acknowledged one that moved the stack
+// by less than it was asked to. That is the case whose receipt is real but partial, so the run
+// owes `historySettlement: uncertain` and would otherwise record `complete` — a persisted shape.
+// ---------------------------------------------------------------------------
+
+describe('an acknowledged write that landed short still demands reconciliation', () => {
+  /** A document that acknowledges its own update but only moves the stack by `moved`. */
+  function shortItem(before, moved) {
+    return {
+      name: 'Iron Ingot',
+      uuid: 'Actor.a.Item.ingot',
+      system: { quantity: before },
+      _source: { system: { quantity: before } },
+      async update() {
+        this._source.system.quantity = before + moved;
+        this.system.quantity = before + moved;
+        return this;
+      },
+    };
+  }
+
+  /** An actor that acknowledges the creation but with `created` in the stack, not what was asked. */
+  function shortActor(created) {
+    const actor = { uuid: 'Actor.a' };
+    actor.createEmbeddedDocuments = async (_type, [data]) => [
+      {
+        ...data,
+        uuid: `${actor.uuid}.Item.ingot`,
+        parent: actor,
+        system: { quantity: created },
+        _source: { system: { quantity: created } },
+      },
+    ];
+    return actor;
+  }
+
+  const uncertain = (error) => {
+    assert.equal(error.code, 'HISTORY_EFFECT_UNCERTAIN');
+    return true;
+  };
+
+  it('refuses an increment the document acknowledged but applied short', async (t) => {
+    t.after(resetItemStackQuantityPath);
+    configureItemStackQuantityPath('system.quantity');
+    const receiptCollector = createItemReceiptCollector();
+
+    // The control: the full delta lands, so the award settles and its receipt is the whole of it.
+    const exact = shortItem(2, 5);
+    assert.equal(await writeItemAward({ existing: exact, quantity: 5, receiptCollector }), exact);
+    assert.deepEqual(
+      receiptCollector.snapshot().map((receipt) => receipt.quantity),
+      [5]
+    );
+
+    await assert.rejects(
+      () => writeItemAward({ existing: shortItem(2, 1), quantity: 5, receiptCollector }),
+      uncertain
+    );
+    // The partial delta is RETAINED, because reconciliation needs to know what really landed.
+    assert.deepEqual(
+      receiptCollector.snapshot().map((receipt) => receipt.quantity),
+      [5, 1]
+    );
+  });
+
+  it('refuses a creation the actor acknowledged with a smaller stack than requested', async (t) => {
+    t.after(resetItemStackQuantityPath);
+    configureItemStackQuantityPath('system.quantity');
+    const receiptCollector = createItemReceiptCollector();
+    const award = (actor, quantity) =>
+      writeItemAward({
+        actor,
+        itemData: { name: 'Iron Ingot', system: { quantity } },
+        quantity,
+        receiptCollector,
+      });
+
+    assert.equal((await award(shortActor(4), 4)).uuid, 'Actor.a.Item.ingot');
+    await assert.rejects(() => award(shortActor(1), 4), uncertain);
+    assert.deepEqual(
+      receiptCollector.snapshot().map((receipt) => receipt.quantity),
+      [4, 1]
     );
   });
 });

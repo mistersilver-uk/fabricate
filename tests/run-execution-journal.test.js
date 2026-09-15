@@ -164,3 +164,62 @@ test('current-only lifecycle operations expose a stable lifecycle error', () => 
   assert.equal(error.name, 'RunLifecycleError');
   assert.equal(error.code, 'UNSUPPORTED_LIFECYCLE_VERSION');
 });
+
+/**
+ * Both guards below were deletable with every suite green (issue 1648, Q-M2). The existing
+ * applying-order case is caught by the one-applying-effect rule rather than by the ORDER rule,
+ * and nothing read a persisted journal whose applied effect carries no receipt at all.
+ */
+test('an effect may only start applying at the head of the planned remainder', () => {
+  const planned = transitionExecutionJournal(null, { type: 'plan', plan });
+  const start = (journal, effectId) =>
+    transitionExecutionJournal(journal, { type: 'effectApplying', effectId });
+  const refusedTransition = (error) =>
+    error instanceof RunExecutionJournalError && error.code === 'INVALID_EFFECT_TRANSITION';
+
+  // Skipping the head. Distinct from the corrupt-journal code an out-of-order PERSISTED record
+  // earns: this is a valid journal refusing an invalid transition.
+  assert.throws(() => start(planned, 'award'), refusedTransition);
+  // An effect id the plan never named is the same refusal.
+  assert.throws(() => start(planned, 'absent'), refusedTransition);
+  assert.deepEqual(
+    planned.effects.map((effect) => effect.phase),
+    ['planned', 'planned'],
+    'a refused transition records nothing'
+  );
+
+  const applied = transitionExecutionJournal(start(planned, 'consume'), {
+    type: 'effectApplied',
+    effectId: 'consume',
+    receipt: { quantity: 1 },
+  });
+  // The head has moved on, so the effect that was head-of-plan is now the one refused.
+  assert.throws(() => start(applied, 'consume'), refusedTransition);
+  assert.equal(start(applied, 'award').effects[1].phase, 'applying');
+});
+
+test('a persisted applied effect with no receipt is refused rather than observed', () => {
+  const persisted = {
+    ...plan,
+    status: 'planned',
+    effects: [
+      { ...plan.effects[0], phase: 'applied', receipt: null },
+      { ...plan.effects[1], phase: 'planned' },
+    ],
+  };
+  // An explicitly null receipt is evidence; the KEY is what the guard requires.
+  assert.equal(observeExecutionJournal(persisted).effects[0].receipt, null);
+
+  delete persisted.effects[0].receipt;
+  assert.throws(
+    () => observeExecutionJournal(persisted),
+    (error) =>
+      error instanceof RunExecutionJournalError && error.code === 'INVALID_EXECUTION_JOURNAL'
+  );
+  // And the same record cannot be transitioned or read for its outcome either.
+  assert.throws(() => getCommittedExecutionOutcome(persisted, 'request-1'), RunExecutionJournalError);
+  assert.throws(
+    () => transitionExecutionJournal(persisted, { type: 'effectApplying', effectId: 'award' }),
+    RunExecutionJournalError
+  );
+});
