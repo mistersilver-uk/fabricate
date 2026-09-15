@@ -2355,7 +2355,7 @@
      to exactly the same box — measured at 600/600px — leaving a 48px input marooned in the
      middle of a stretched border and the control 8px shorter than its siblings. 160px is
      the width the `fill` variant was measured against (the pinned operand slot at
-     `styles/fabricate.css:2150`) and leaves a 106px typeable field. Taking a SIZE from the
+     `styles/fabricate.css:3156`) and leaves a 106px typeable field. Taking a SIZE from the
      layout context is permitted; restyling the primitive is not. */
   /* `:global(...)`, chained with `.manager-field`: this class now sits on a `<Field>`, and a
      scoped rule cannot reach a class the component hands to a child (see `Field.svelte`). The

@@ -17,7 +17,7 @@
   == THE TWO-TRACK LAYOUT IS REDECLARED, BECAUSE THE SPAN HAD NOTHING TO SPAN ==============
   An earlier revision spanned rows instead of redeclaring, on the premise that
   `styles/fabricate.css` gives every `.manager-main` `grid-template-rows: auto auto 1fr`.
-  That is true of the shared rule and FALSE of this view: `styles/fabricate.css:9588-9601`
+  That is true of the shared rule and FALSE of this view: `styles/fabricate.css:7254-7267`
   overrides every world-scope view to `grid-template-rows: minmax(0, 1fr)` — ONE track. Against
   one track the card took the `1fr`, the list opened an implicit second row that claimed the
   height, the `1fr` resolved to 0px, and the card rendered its own head, segments and note

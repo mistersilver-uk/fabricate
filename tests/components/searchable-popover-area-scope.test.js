@@ -571,7 +571,7 @@ const PRIMITIVES = Object.freeze([
     name: 'ManagerToolbar',
     components: Object.freeze(['src/ui/svelte/components/ManagerToolbar.svelte']),
     roots: Object.freeze(['fabricate-filter-bar']),
-    // One exact class name. `manager-toolbar-pills` (`fabricate.css:5553`) and
+    // One exact class name. `manager-toolbar-pills` (`fabricate.css:4194`) and
     // `manager-toolbar-primary` are CALLER classes: `pickerSelectors` anchors on
     // `\.manager-toolbar(?![\w-])`, so neither enters this family.
     family: 'manager-toolbar',
@@ -585,7 +585,7 @@ const PRIMITIVES = Object.freeze([
     // `@container fabricate-manager`, and the world-vocabulary sort select). FIVE are re-rooted:
     // the 3 owned plus the two `:not(:has(…))` branches, which paint every shipped bar and would
     // leave a bare-host bar `display: grid` if they stayed behind. The SIXTH caller-class
-    // compound, `fabricate.css:9852`, is the family's one NAMED RESIDUE: its family compound
+    // compound, `fabricate.css:7423`, is the family's one NAMED RESIDUE: its family compound
     // stands third behind an attribute ancestor that is not the application root, so neither
     // re-rooting form exists for it. It is caller-owned, so neither `gated` nor `rootless`
     // below sees it, and the reason is recorded beside the rule in the sheet.

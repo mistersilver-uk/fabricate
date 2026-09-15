@@ -450,6 +450,9 @@ That is the same `reuse, then extend, then add` order this capability already st
 A property the primitive does NOT declare is unaffected and the module sheet remains its home: a host's row metrics, its layout context and its surface are layered against nothing.
 Markup is not a cascade question at all, so an element the primitive renders unconditionally can only be removed by a prop.
 
+Where the module sheet must supply a BASELINE for a bare element a component may re-declare, it is written at a specificity deliberately BELOW a Svelte scoped compound's (0,2,0), so the sheet is a floor components override rather than a rule that overrides them; `:where()` is how the scoping is bought without paying specificity for it.
+The same arithmetic runs in the other direction for a module-root rule that must NOT be beaten: a flat `.fabricate a:focus` list is (0,2,1), while the `:is()` form of the same list takes its most specific argument — `[tabindex]`, at (0,3,0) — and would newly outrank every per-component ring in the sheet, so the flat spelling is prescribed rather than stylistic.
+
 Two corollaries a reader will otherwise get wrong.
 Svelte emits some scope hashes as `:where(.svelte-<hash>)`, which contributes ZERO specificity, so a compound that looks like it gained a class may not have; and changing whether a selector's compounds sit inside `:global()` changes which form Svelte emits, which moves specificity silently while looking like a repair.
 Neither is answerable by reading the source, so the method that settles both is to compile the component with `css: 'external'` and read the emitted selector.
@@ -624,6 +627,9 @@ The licence extends to COPIES and not to VARIANTS.
 Where an area rule declares a DIFFERENT treatment it is not a copy and it survives: the roll-prompt dialog keeps a `:focus-visible` ring of its own on `select`, painting an inset `box-shadow` where the module ring paints an outset `outline`, because an outset ring on a `<select>` flush to that dialog's overflow-clipped edge is clipped and reads as a one-sided flash.
 So the dialog left the reset exemption and stayed in the ring population in the same commit, and the ratchet cannot tell the two cases apart on its own — its population is keyed on ELEMENTS, which is the part a variant shares with the rule it varies from, so membership is never a licence to delete.
 Readonly is DISTINCT from disabled: a readonly control takes focus and refuses edit, while a disabled control does not take focus.
+A focus SUPPRESSION and the ring that replaces it are a PAIR, and their element lists MUST stay identical, or an element type is stripped of a ring by the first half and given none by the second.
+Foundry core also rings the STATE class `.active` exactly as it rings `:focus`, so a module that uses `.active` as its own selected marker MUST normalise that class alongside the focus reset and at the same rank — otherwise core's ring rides along with selection and merely hides while the element is focused, appearing the moment focus moves elsewhere.
+A programmatic `.focus()` that follows a pointer activation matches `:focus` and NOT `:focus-visible`, so the pair has a hole: a control focused that way is stripped by the suppressing half and supplied by neither, and the surface that moves focus programmatically MUST stamp its own marker attribute for a third rule to paint.
 
 A loading control MUST set `aria-busy` and change its label or text.
 A spinner alone is insufficient because Foundry's bundled Font Awesome disables `fa-spin` under `prefers-reduced-motion` and every shipped spinner is `aria-hidden`, so a motion-only busy state is conveyed to a reduced-motion user by nothing at all.
@@ -687,6 +693,10 @@ A count pip on such an item sits on the OUTER CORNER of that well with a ground-
 ### Requirement: The Foundry contract binds every primitive
 
 Every primitive renders inside a Foundry ApplicationV2 window, inside Foundry's own CSS and event handling, and MUST satisfy the following.
+
+Core's own neutralisers for its own element rules are frequently scoped to the ApplicationV1 `.app` root, so a V2 window inherits the RAW core declaration and the module sheet MUST ship the V2 counterpart itself: core colours and re-faces bare `h1`-`h6` and cancels it only for `.app`, and core's `ul li { margin-bottom: 0.25rem }` is likewise cancelled only there — where, under `align-items: stretch`, the one child core exempts takes that margin as extra border-box height and renders taller than its siblings.
+A rule that exists to beat Foundry's host CSS belongs in the global sheet rather than in a component's scoped block, which is one of the two standing exceptions to co-located primitive CSS.
+An application root MUST also declare `color-scheme`, because browser-drawn chrome a stylesheet cannot reach — the native `<select>` option popup above all — otherwise paints in the UA's own scheme rather than the theme's.
 
 Breakpoints MUST be `@container` queries and never viewport media queries, because an ApplicationV2 window resizes independently of the viewport.
 `tests/components/design-system-debt-ratchets.test.js` fails any `@media` whose query is not a user preference — `prefers-reduced-motion`, `prefers-contrast` or `forced-colors` — since those ask about the reader rather than about the window.
