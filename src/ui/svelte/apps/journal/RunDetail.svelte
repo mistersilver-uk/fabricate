@@ -135,10 +135,14 @@
   // A STAGE THAT HAS NOT BEGUN HAS NOT RUN OUT OF TIME (issue 1648, U3). Before a stage is
   // started it holds no `timeGate`, so `availableAt` is NaN and this row fell through to
   // `Summary.None` — the exact string a MATURED wait prints — while the button beside it
-  // offered to start the clock. `atStageStart` is the projection's own name for that boundary.
-  // D-025 governs the FORMAT of a duration shown, not which duration is shown, so no accepted
-  // ruling reaches this branch.
-  const notStarted = $derived(viewedIsCurrent && run?.actions?.atStageStart === true);
+  // offered to start the clock. D-025 governs the FORMAT of a duration shown, not which duration
+  // is shown, so no accepted ruling reaches this branch.
+  //
+  // It reads `run.stageStart`, the projection's STAGE fact. `actions.atStageStart` also requires
+  // that this viewer may act, so keying on it lost the row to a held claim, a non-owner viewer or
+  // a run awaiting recovery (UX2-2). Whether a stage has begun does not depend on a GM being
+  // online.
+  const notStarted = $derived(viewedIsCurrent && run?.stageStart?.required === true);
   const remainingTime = $derived.by(() => {
     const pausedRemaining = viewedIsCurrent
       ? numberOrNaN(run?.pauseState?.remainingSeconds)

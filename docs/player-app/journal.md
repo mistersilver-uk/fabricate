@@ -54,10 +54,11 @@ The status badge tells you where a run stands:
 - **Paused** means the run's remaining wait is frozen until you resume it.
 
 A multi-step run keeps a progress bar between its stages, so you can see how far through it is even when no countdown is running.
+A single-stage run has no such bar: a lone track has nothing to compare against.
 
 Where a run needs something from **you**, a second badge sits beside the status and says what:
 
-- **Ready to begin**.
+- **Needs your go-ahead**.
   Nothing is missing, and the run is waiting for you to start its next stage.
 - **Needs your choice**.
   A route, an option, or an essence allocation has not been made yet.

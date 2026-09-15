@@ -25,6 +25,23 @@ export function presentMaterials(items, localize) {
   }));
 }
 
+/**
+ * The settled currency spends of one stage, as label/value rows. A currency-only ingredient set
+ * is authorable (D-031), so this is the third receipt field — beside materials and essence — that
+ * the live and terminal readings of one record MUST render identically.
+ *
+ * A non-positive or unnamed amount is dropped: a record that settled nothing is not a payment.
+ */
+export function presentCurrencySpends(spends, localize) {
+  return list(spends)
+    .filter((spend) => finite(spend?.amount) && Number(spend.amount) > 0 && named(spend?.unit))
+    .map((spend, index) => ({
+      id: `currency-${index}`,
+      label: localize(`${prefix}CurrencySpent`),
+      value: `${spend.amount} ${spend.unit}`,
+    }));
+}
+
 function checkText(check, localize) {
   if (!check) return '';
   const total = finite(check.total) ? check.total : check.value;

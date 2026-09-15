@@ -8,7 +8,11 @@
   import Chip from '../../components/Chip.svelte';
   import Kicker from '../../components/Kicker.svelte';
   import JournalFactRow from './JournalFactRow.svelte';
-  import { presentEssenceSpend, presentMaterials } from './historyPresentation.js';
+  import {
+    presentCurrencySpends,
+    presentEssenceSpend,
+    presentMaterials,
+  } from './historyPresentation.js';
 
   let { step = null, run = null, journal = null, editable = false } = $props();
   let openSlot = $state('');
@@ -33,6 +37,17 @@
   // record reads identically before and after the run ends. Nothing here is derived from
   // the requirement snapshot: an unrecorded quantity stays unrecorded.
   const record = $derived(step?.consumptionRecord ?? null);
+  const consumedCurrency = $derived(presentCurrencySpends(record?.currencySpends, localize));
+  // A stage that consumed no items, paid nothing and spent no essence is a DIFFERENT state from
+  // one whose record is withheld or absent — that one renders no receipt at all, because
+  // `consumptionRecord` is null and the requirement rail takes the branch. This one has a record
+  // saying it took nothing, and says so rather than leaving a blank band (D-031).
+  const spentNothing = $derived(
+    started &&
+      consumedMaterials.length === 0 &&
+      consumedCurrency.length === 0 &&
+      !consumedEssence?.carriers?.length
+  );
   // The record is projected for the CURRENT stage and only once it has started, so its presence
   // is the stage-started fact, and it is what decides this surface. `availability.locked` is
   // the NARROWER one: a started stage whose authored route was deleted reports a stale route
@@ -371,14 +386,16 @@
       </p>{/if}
   {/if}
   {#if started}
-    <!-- A started stage reports its RECEIPT, never the requirement rail: the rail probes a
-         live inventory this stage already emptied (issue 1648, M21). -->
-    {#if consumedMaterials.length > 0}
-      <section class="journal-stage-consumed" data-journal-stage-consumed>
-        <div class="journal-stage-consumed-heading">
-          <Kicker as="span">{localize('FABRICATE.App.Journal.Stage.Consumed')}</Kicker>
-          <span class="journal-stage-consumed-hint">{requirementsHint}</span>
-        </div>
+    <!-- A started stage reports its RECEIPT, never the requirement rail: the rail probes a live
+         inventory this stage already emptied (issue 1648, M21). The heading is UNCONDITIONAL, so
+         a stage whose receipt is empty — a currency-only or zero-requirement one — still says it
+         spent at start rather than rendering nothing at all (QE2-3, UX2-4). -->
+    <section class="journal-stage-consumed" data-journal-stage-consumed>
+      <div class="journal-stage-consumed-heading">
+        <Kicker as="span">{localize('FABRICATE.App.Journal.Stage.Consumed')}</Kicker>
+        <span class="journal-stage-consumed-hint">{requirementsHint}</span>
+      </div>
+      {#if consumedMaterials.length > 0}
         <div class="journal-stage-consumed-items">
           {#each consumedMaterials as item (item.id)}
             <ListRow
@@ -389,9 +406,23 @@
             />
           {/each}
         </div>
-      </section>
-    {/if}
-    {#if consumedEssence}
+      {/if}
+      {#each consumedCurrency as spend (spend.id)}
+        <JournalFactRow icon="fa-coins" label={spend.label} value={spend.value} />
+      {/each}
+      {#if spentNothing}
+        <JournalFactRow
+          icon="fa-circle-minus"
+          label={localize('FABRICATE.App.Journal.Stage.Consumed')}
+          value={localize('FABRICATE.App.Journal.Stage.ConsumedNothing')}
+        />
+      {/if}
+    </section>
+    <!-- Carriers, not the seeded envelope. Every stage with a resolution snapshot persists an
+         `essenceSpend: {labels:{}, carriers:[]}`, which `presentEssenceSpend` answers truthy, so a
+         recipe needing no essence drew an empty band. Same filter the terminal screen applies
+         (issue 1648, M20 then UX2-4). -->
+    {#if consumedEssence?.carriers?.length > 0}
       <EssencePool
         history={consumedEssence}
         label={localize('FABRICATE.App.Journal.History.EssenceSpent')}
@@ -518,8 +549,11 @@
     font-size: 10.5px;
   }
 
-  /* The accepted four-column truncated-name image card the history sections use, so a
-     stage's consumed materials read the same before and after the run finishes. */
+  /* The accepted four-column truncated-name image card the history sections use, so a stage's
+     consumed materials read the same before and after the run finishes. `StageCard` owns the same
+     meaning in `.fab-stage-card-items.is-grid`, but that rule is Svelte-SCOPED to a component this
+     surface does not render, so reaching it from here needs a design-system primitive rather than
+     a selector (issue 1648, UX2 nit). */
   .journal-stage-consumed-items {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));

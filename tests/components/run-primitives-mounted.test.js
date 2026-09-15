@@ -292,6 +292,38 @@ describe('run primitives mounted behavior', () => {
     ]);
   });
 
+  /**
+   * UX2-7. Arming UNMOUNTS the control that was activated and replaces the whole row, so a
+   * keyboard user was dropped onto `<body>` and a screen-reader user was told nothing. Focus
+   * lands on the NON-destructive default, the pair announces itself, and `Escape` disarms.
+   */
+  it('moves focus to the safe default on arming, announces the pair, and disarms on Escape', async () => {
+    const target = await runActionHarness.mount({
+      run: { id: 'run-1' },
+      runLabel: 'Minor Elixir of Mending',
+      primary: { label: 'Roll check', enabled: true },
+      cancel: { confirmLabel: 'Yes, cancel', keepLabel: 'Keep crafting' },
+    });
+    target.querySelector('[data-run-action="cancel-arm"]').click();
+    await flushRender();
+
+    const decision = target.querySelector('[data-run-cancel-decision]');
+    const keep = target.querySelector('[data-run-action="cancel-keep"]');
+    assert.equal(decision.getAttribute('role'), 'group', 'the confirmation announces itself');
+    assert.equal(decision.getAttribute('aria-label'), 'Yes, cancel');
+    assert.equal(
+      target.ownerDocument.activeElement,
+      keep,
+      'and focus is on the non-destructive default, never on the body'
+    );
+
+    const view = target.ownerDocument.defaultView;
+    keep.dispatchEvent(new view.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await flushRender();
+    assert.ok(!target.querySelector('[data-run-cancel-decision]'), 'Escape disarms the confirmation');
+    assert.ok(target.querySelector('[data-run-action="cancel-arm"]'), 'and the row comes back');
+  });
+
   it('renders the armed cancel prompt beneath its controls, not inside the decision', async () => {
     // Issue 1648 (M26), the cancel sibling of M16 and reported from a frame: the sentence
     // rendered on its own line ABOVE `Yes, cancel` / `Keep crafting`, with both buttons

@@ -62,7 +62,6 @@
     return Math.max(0, Math.min(1, (requiredSeconds - remainingSeconds) / requiredSeconds));
   });
   const progressPercent = $derived(progress === null ? 0 : Math.round(progress * 100));
-
   // THE RAIL SURVIVES A STAGE THAT HAS NOT BEGUN (issue 1648, M18). A multi-step run between
   // its stages has no `timeGate`, and suppressing the whole timing block on that predicate took
   // the bar away with the countdown — so the one thing on the card that says how far through
@@ -71,13 +70,31 @@
   // gives: `RunProgress` fills every track before `current`, and the current stage's own track
   // is the fraction of its clock, which for an unbegun stage is honestly zero.
   //
-  // Scoped to runs that HAVE a stage sequence. Gathering and salvage project `steps: []`, where
-  // a lone empty track would assert a shape the run does not have.
+  // Scoped to runs that have a stage SEQUENCE. Gathering and salvage project `steps: []`, and a
+  // single-stage craft is the same lone empty track asserting 0% where progress has no meaning —
+  // M18 asked for the multi-step rail only (issue 1648, UX2-6).
   const stages = $derived(Array.isArray(run?.steps) ? run.steps : []);
-  const showsStageRail = $derived(!hasGate && stages.length > 0);
+  const showsStageRail = $derived(!hasGate && stages.length > 1);
+  // WHAT THE TRACKS DRAW, in one number. With no gate `progress` is null, so the progressbar
+  // published 0 beside three filled tracks and told a screen-reader user "Progress, 0" (issue
+  // 1648, UX2-5). The stage rail reports COMPLETED STAGES OVER TOTAL — the reading `RunProgress`
+  // renders — and a gated run keeps its clock fraction.
+  const currentStageIndex = $derived(Math.max(0, Number(run?.stepIndex) || 0));
+  const filledStages = $derived(
+    stages.filter(
+      (stage, index) =>
+        index < currentStageIndex || ['done', 'succeeded'].includes(stage?.status ?? '')
+    ).length
+  );
+  const accessiblePercent = $derived(
+    showsStageRail && stages.length > 0
+      ? Math.round((filledStages / stages.length) * 100)
+      : progressPercent
+  );
+
   // A countdown needs a deadline. An unbegun stage has none, and `Left: None` is the string a
   // MATURED wait prints, so the row shows its rail and says nothing about time (U3's defect on
-  // the Active surface). What it is waiting for is the `Ready to begin` attention chip's job.
+  // the Active surface). What it is waiting for is the attention chip's job.
   const showsTiming = $derived(hasGate || showsStageRail);
 
   function activate() {
@@ -153,12 +170,12 @@
           aria-label={localize('FABRICATE.App.Journal.Progress.Label')}
           aria-valuemin="0"
           aria-valuemax="100"
-          aria-valuenow={progressPercent}
-          data-run-progress={progressPercent}
+          aria-valuenow={accessiblePercent}
+          data-run-progress={accessiblePercent}
         >
           <RunProgress
             stages={stages.length > 0 ? stages : [{}]}
-            current={Math.max(0, Number(run?.stepIndex) || 0)}
+            current={currentStageIndex}
             progress={progressPercent}
           />
         </div>

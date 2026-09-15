@@ -941,7 +941,7 @@
           "cancelled": "Cancelled",
           "unknown": "Outcome unknown",
           "awaitingChoice": "Needs your choice",
-          "readyToBegin": "Ready to begin",
+          "readyToBegin": "Needs your go-ahead",
           "needsMaterials": "Needs materials",
           "needsEssences": "Needs essences",
           "needsCurrency": "Needs payment",
@@ -1245,6 +1245,7 @@
           "StaleSelection": "A selected material is no longer available. Choose a replacement explicitly.",
           "RouteUnchosen": "This stage has not been given a route yet. Choose one to carry on.",
           "Consumed": "Consumed when this stage started",
+          "ConsumedNothing": "This stage needed nothing",
           "SpentAtStart": "These materials were consumed and this choice was locked when the stage started.",
           "State": {
             "paused": "Paused"
@@ -1375,6 +1376,7 @@
           "CurrencyRequired": "This stage costs more than you can pay.",
           "ToolRequired": "This stage needs a tool you do not hold.",
           "RouteUnavailable": "This stage's ingredient requirements are no longer part of the recipe. Ask your GM to restore them, or cancel the run.",
+          "SourcesUnavailable": "The actors this run draws components from can no longer be found, so what it still needs cannot be judged. Ask your GM to restore them, or cancel the run.",
           "ChoiceRequired": "Make this stage's choices before it can begin: an option for each requirement that offers one, and an allocation for each essence it needs.",
           "RouteRequired": "Choose this stage's route before it can begin.",
           "StageNotStarted": "Begin this stage before its check can be rolled.",

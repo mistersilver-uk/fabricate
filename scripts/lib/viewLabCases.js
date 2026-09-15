@@ -1620,6 +1620,7 @@ function journalLifecycleCases() {
     'stage-not-started',
     'awaiting-choice',
     'stage-consumed',
+    'stage-paid',
     'material-shortage',
     'ingredient-route',
     'check-route',
@@ -1715,6 +1716,7 @@ function journalLifecycleCases() {
         'Wax a Hemp Cord',
         ['ready-single', 'legacy-armed', 'history-just-resolved', 'history-cancelled-before'],
       ],
+      ['File a Guild Permit', ['stage-paid']],
       ['Bind a Shield Boss', ['ingredient-route', 'material-shortage']],
       ['Whet a Keen Edge', ['check-route']],
       ['Inscribe a Prismatic Sigil', ['essence-shared', 'essence-overshoot']],
@@ -1932,6 +1934,21 @@ function journalLifecycleCases() {
         '[data-journal-stage-details][data-editable="true"]',
         '[data-run-action="begin"]',
         '[data-slot-row]'
+      ),
+    // A currency-only ingredient set is valid and authorable (D-031), so a started stage whose
+    // whole requirement was a price is a reachable state. Its receipt is a PAYMENT and no item
+    // rows at all — the shape that used to render the started branch wholly blank, because both
+    // of its inner blocks were empty and the requirement rail is their `{:else}`.
+    'stage-paid':
+      detail +
+      has('[data-journal-stage-consumed] [data-journal-fact]') +
+      lacks(
+        // The item-row GRID, as one compound selector: a DESCENDANT inside a negated `:has()`
+        // is evaluated unfaithfully by happy-dom, so the mounted walk would pass it open.
+        '.journal-stage-consumed-items',
+        '[data-essence-history]',
+        '[data-slot-row]',
+        '[data-run-action="begin"]'
       ),
     // A stage short of its materials has NOT begun — starting is what spends them (D-026) —
     // so the control it offers is the begin decision, refused and reasoned (issue 1648).

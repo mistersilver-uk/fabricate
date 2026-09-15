@@ -12,7 +12,7 @@
   import YieldScale from '../../components/YieldScale.svelte';
   import JournalFactRow from './JournalFactRow.svelte';
   import ThisRun from './ThisRun.svelte';
-  import { presentHistory } from './historyPresentation.js';
+  import { presentCurrencySpends, presentHistory } from './historyPresentation.js';
 
   let { run, services = null, transient = false } = $props();
   const account = $derived(presentHistory(run, localize));
@@ -64,11 +64,7 @@
         value: stage.resolution,
       },
       ...(stage.route ? [{ id: 'route', label: text('ChosenRoute'), value: stage.route }] : []),
-      ...(stage.currencySpends ?? []).map((spend, index) => ({
-        id: `currency-${index}`,
-        label: text('CurrencySpent'),
-        value: `${spend.amount} ${spend.unit}`,
-      })),
+      ...presentCurrencySpends(stage.currencySpends, localize),
     ];
   }
   // The transient banner's evidence rows, and WHETHER THERE ARE ANY (issue 1648, M22).
@@ -198,10 +194,9 @@
         'consumed'
       )}
       {#if single?.route}<JournalFactRow label={text('ChosenRoute')} value={single.route} />{/if}
-      {#each single?.currencySpends ?? [] as spend, index (index)}<JournalFactRow
-          label={text('CurrencySpent')}
-          value={`${spend.amount} ${spend.unit}`}
-        />{/each}
+      {#each presentCurrencySpends(single?.currencySpends, localize) as spend (spend.id)}
+        <JournalFactRow label={spend.label} value={spend.value} />
+      {/each}
       {@render essenceRecaps()}
       {@render items(resultHeading, account.results, 'produced')}
       {#if (single?.historySettlement ?? run.historySettlement)?.consumption === 'notApplicable'}

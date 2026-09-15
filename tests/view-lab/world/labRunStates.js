@@ -76,6 +76,7 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'waiting-auto-eligible': 'lab-v1-waiting-auto-eligible',
   'waiting-open-choice': 'lab-v1-waiting-open-choice',
   'stage-not-started': 'lab-v1-stage-not-started',
+  'stage-paid': 'lab-v1-stage-paid',
   'awaiting-choice': 'lab-v1-awaiting-choice',
   'stage-consumed': 'lab-v1-stage-consumed',
   'material-shortage': 'lab-v1-material-shortage',
@@ -1156,6 +1157,20 @@ function prototypeSpecial(context, state, id, containers) {
   // once beginning it locked the choice and consumed them.
   // `current-choice-closed` joins them because a choice SLOT exists only before a stage starts:
   // once it has, its materials are a receipt and there is no tile left to reach for (M21).
+  // A started stage whose ingredient set was nothing but a price (D-031). Its receipt records a
+  // PAYMENT and no items, which no other fixture in the world produces — every one of them
+  // carries `currencySpends: []`, which is why the empty-region defect could not be seen.
+  if (state === 'stage-paid') {
+    const run = prototypeCraft(context, 'permit', id);
+    const current = run.steps[run.currentStepIndex];
+    current.preparedConsumption = {
+      ...current.preparedConsumption,
+      consumedSummary: [],
+      currencySpends: [{ unit: 'gp', amount: 50 }],
+    };
+    replacePrototypeFocus(containers.craftingRuns, run, false);
+    return true;
+  }
   if (['stage-not-started', 'stage-consumed', 'current-choice-closed'].includes(state)) {
     const run = prototypeCraft(context, 'rivets', id);
     const current = run.steps[run.currentStepIndex];

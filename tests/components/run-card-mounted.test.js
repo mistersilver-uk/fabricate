@@ -232,7 +232,11 @@ describe('RunCard mounted behavior', () => {
     const target = await harness.mount({ run, now: 0 });
     const progress = target.querySelector('[data-run-progress]');
     assert.ok(progress, 'the bar survives a stage with no clock');
-    assert.equal(progress.getAttribute('aria-valuenow'), '0', 'the current stage has made no progress');
+    // Issue 1648, UX2-5. The accessible value states what the TRACKS draw. `progress` is null
+    // with no gate, so publishing the clock fraction told a screen-reader user "Progress, 0"
+    // beside a filled track; `.fab-run-progress-tracks` is `aria-hidden`, so there was no second
+    // reading to correct it.
+    assert.equal(progress.getAttribute('aria-valuenow'), '50', 'one of two stages is complete');
     const tracks = [...target.querySelectorAll('[data-run-progress-track]')];
     assert.equal(tracks.length, 2, 'one track per authored stage');
     assert.deepEqual(
@@ -254,6 +258,37 @@ describe('RunCard mounted behavior', () => {
     });
     assert.ok(!target.querySelector('[data-run-progress]'));
     assert.ok(!target.querySelector('.journal-run-card-timing'));
+  });
+
+  // Issue 1648, UX2-6. M18 asked for the rail BETWEEN the stages of a multi-step run, and the
+  // predicate's own comment scopes the no-sequence case correctly. A single-stage craft is the
+  // same lone empty track, asserting a 0% where progress has no meaning: the maintainer's own
+  // unstarted single-step runs are exactly this shape.
+  it('draws no stage rail for an unstarted SINGLE-stage run', async () => {
+    const base = makeCraftingRun();
+    const target = await harness.mount({
+      run: {
+        ...base,
+        derivedStatus: 'inProgress',
+        timeGate: null,
+        stepIndex: 0,
+        steps: [{ ...base.steps[0], status: 'inProgress', timeGate: null }],
+        currentStep: null
+      },
+      now: 0
+    });
+    assert.ok(!target.querySelector('[data-run-progress]'), 'no lone empty track');
+    assert.ok(!target.querySelector('.journal-run-card-timing'), 'and no timing block around it');
+  });
+
+  // The gated single-stage run keeps its bar: there the fraction is a CLOCK reading, which is
+  // meaningful whatever the stage count. Without this the fix above would take the countdown's
+  // own bar away with it.
+  it('keeps the clock bar on a single-stage run that IS counting down', async () => {
+    const target = await harness.mount({ run: makeCraftingRun(), now: 500 });
+    const progress = target.querySelector('[data-run-progress]');
+    assert.ok(progress, 'a gated run still reports its clock');
+    assert.equal(progress.getAttribute('aria-valuenow'), '50');
   });
 
   it('marks the selected card with aria-pressed and the selection class', async () => {

@@ -1038,6 +1038,8 @@ A check is usable iff its mode carries an authored `rollFormula`; the legacy che
 - The simple-mode dynamic-DC macro (`craftingCheck.simple.macroUuid`) — the one surviving check-adjacent macro (it only computes the DC)
 - Failure consumption policy — two live-persisting toggles on the **On failure** section of the non-alchemy `checks-crafting` route, editing `craftingCheck.consumption.consumeIngredientsOnFail` (default `true`; whether a recipe's ingredients are consumed on a failed crafting check) and `craftingCheck.consumption.breakToolsOnFail` (default `false`; whether required tools break on a failed check — the 1.7.0 rename of `consumeCatalystsOnFail`).
   The engine applies this policy on every failed crafting check; it is NOT shown in alchemy mode, where consumption is governed by the distinct `alchemy.consumeOnFail` flag.
+  A versioned stage spends its materials when it STARTS, so `consumeIngredientsOnFail: false` is honoured there by returning what the stage spent — its ingredients and its settled currency — when the check fails.
+  Whether materials are spent at stage start and whether a failed check keeps them are separate rules, and the second one is this control's.
   Salvage failure consumption is a separate, independently-defaulted policy read from `salvageCraftingCheck.consumption` (`consumeComponentOnFail`, default `true`; `breakToolsOnFail`, default `false`) that this crafting control does not change.
 - Optional routed outcomes reference list (for GM guidance only; not a routing map)
 - Progressive settings (`awardMode`) (progressive only)
@@ -4877,7 +4879,8 @@ Scope:
 Active rows retain title, run type, status pill, crafting progress and a time-remaining/countdown where a `timeGate` exists.
 The crafting progress reading MUST NOT be conditioned on that gate: a run whose current stage has not begun holds no gate, and its rail reads completed stages over total with the current stage at zero, because between the stages of a multi-step run the rail is the only thing on the row that says how far through the run is.
 A countdown MUST NOT be shown for a stage with no deadline, because the matured-wait wording would then describe a clock that has not started.
-A run with no stage sequence at all — gathering and salvage, which project no steps — renders no rail.
+A run with fewer than two stages renders no rail: gathering and salvage project no steps at all, and a lone track on a single-stage craft asserts a 0% where progress has no meaning.
+The rail's accessible value MUST state what its tracks DRAW — completed stages over total where it is the stage rail, the clock fraction where a gate runs — never a clock fraction of zero beside filled tracks.
 - Active status pills reflect the projection's `derivedStatus`, with pause taking precedence over time-gate readiness (see `data-models/spec.md`).
 The player-facing badge vocabulary is `Ready`, `In progress` and `Paused`: `waiting` and `inProgress` present as ONE badge, `In progress`, with one word, one tone and one glyph, because an unpaused active craft is in progress whether it is counting world time down or sitting between stages.
 `derivedStatus` keeps both values, because the projection still distinguishes where the clock is; what merges is what the player is shown.

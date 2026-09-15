@@ -40,16 +40,36 @@
     onCancel();
     armed = false;
   }
+
+  // Arming REPLACES the control row, so a keyboard user was dropped onto `<body>` and a screen
+  // reader was told nothing (issue 1648, UX2-7). Focus lands on the NON-destructive default and
+  // the pair announces itself as a group; `Escape` disarms, as it does for any confirmation. The
+  // handler is on the two BUTTONS rather than on the group: focus is always on one of them while
+  // the confirmation is up, and a keydown listener on a non-interactive div is an a11y defect.
+  let keepControl = $state(null);
+  $effect(() => {
+    if (armed) keepControl?.focus?.();
+  });
+  function disarmOnEscape(event) {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    armed = false;
+  }
 </script>
 
 <div class="fab-run-action-bar" data-run-action-bar aria-busy={busy || undefined}>
   {#if armed}
-    <div class="fab-run-cancel-decision" data-run-cancel-decision>
+    <div
+      class="fab-run-cancel-decision"
+      data-run-cancel-decision
+      role="group"
+      aria-label={cancel.confirmLabel}
+    >
       <ManagerButton
         role="danger"
         class="fab-run-action-control"
         data-run-action="cancel-confirm"
-        title={cancel.confirmTitle || undefined}
+        onkeydown={disarmOnEscape}
         onclick={confirmCancel}
       >
         <i class={cancel.icon || 'fas fa-ban'} aria-hidden="true"></i>
@@ -58,7 +78,8 @@
       <ManagerButton
         class="fab-run-action-control"
         data-run-action="cancel-keep"
-        aria-label={cancel.keepAriaLabel || undefined}
+        bind:element={keepControl}
+        onkeydown={disarmOnEscape}
         onclick={() => (armed = false)}>{cancel.keepLabel}</ManagerButton
       >
     </div>

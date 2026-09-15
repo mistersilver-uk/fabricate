@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { after, afterEach, before, describe, it } from 'node:test';
+import { chromium } from 'playwright';
 
 import { flushSync } from '../../node_modules/svelte/src/index-client.js';
 import { getItemSourceReferences } from '../../src/utils/sourceUuid.js';
@@ -425,6 +426,79 @@ async function mountState(state, { prepare = null, initialLoad = true, builderOp
     },
   });
   return { ...runtime, store, target };
+}
+
+/**
+ * The mounted detail card's REAL layout, measured in Chromium.
+ *
+ * happy-dom computes no cascade, so every earlier pin on this header could only read source
+ * text. The markup and the injected component CSS are both taken from the mount, so the scope
+ * hashes agree by construction rather than by a second compile that might not (issue 1648,
+ * UX2-1).
+ */
+async function measureDetailLayout(target, { width = 1240 } = {}) {
+  const styles = [...globalThis.document.head.querySelectorAll('style')]
+    .map((node) => node.textContent)
+    .join('\n');
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width, height: 900 } });
+    // The WHOLE app, at the window width the frame was taken at. Measuring the detail card on
+    // its own gives it the full window and hides the defect: the header only wraps — and a
+    // shrink-to-fit actions block only left-aligns — at the width the detail PANE really has
+    // beside the run list.
+    await page.setContent(`<!doctype html><html><head><meta charset="utf-8">
+      <style>${readFileSync(resolve(repoRoot, 'styles/fabricate.css'), 'utf8')}</style>
+      <style>${styles}</style>
+      <style>
+        :root { --font-primary: Arial, sans-serif; }
+        html, body { margin: 0; padding: 0; width: ${width}px; }
+      </style></head>
+      <body><div class="fabricate fabricate-app" data-fabricate-theme="dark">
+        ${target.innerHTML}
+      </div></body></html>`);
+    // `await`ed inside the try: a bare `return` of the promise lets `finally` close the browser
+    // before it settles.
+    return await page.evaluate(() => {
+      const box = (selector) => {
+        const node = document.querySelector(selector);
+        return node ? node.getBoundingClientRect() : null;
+      };
+      const detail = document.querySelector('[data-journal-detail]');
+      const style = getComputedStyle(detail);
+      const rect = detail.getBoundingClientRect();
+      return {
+        contentRight: rect.right - parseFloat(style.paddingRight) - parseFloat(style.borderRightWidth),
+        cancelRight: box('[data-run-cancel-decision]')?.right ?? null,
+        beginRight: box('[data-run-begin]')?.right ?? null,
+        actionsRight: box('[data-journal-actions]')?.right ?? null,
+      };
+    });
+  } finally {
+    await browser.close();
+  }
+}
+
+/**
+ * A prototype-cohort case, mounted in the same world its frame is captured from rather than
+ * against a hand-built double, with its run selected.
+ */
+async function mountPrototypeState(state, builderOptions = {}) {
+  const content = buildLabContent({ journalCaseState: state });
+  const actor = buildLabActors(content)[0];
+  await stockJournalPrototype(actor, content, state);
+  const mounted = await mountState(state, {
+    builderOptions: {
+      content,
+      actor,
+      recipes: labRecipes(content),
+      viewer: { id: 'user-lab-player', isGM: false },
+      ...builderOptions,
+    },
+  });
+  mounted.store.select(mounted.store.activeRuns.find((entry) => entry.id === `lab-v1-${state}`));
+  flushSync();
+  return mounted;
 }
 
 async function settleAction() {
@@ -863,6 +937,70 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.ok(!gathering.target.querySelector('[data-journal-record]'));
   });
 
+  /**
+   * UX2-1. `.journal-actions` carried NO rule at all, so it was a shrink-to-fit flex item and
+   * `margin-left: auto` inside the bar pushed to that block's own edge rather than the card's.
+   * Both sides were flush right only when their content happened to saturate the line, which the
+   * long begin prompt does and the shorter cancel prompt does not. Measured in a real browser, at
+   * the width the reviewer's frame was taken at, because the broken element is OUTSIDE the
+   * `RunActionBar` the earlier pins mount.
+   */
+  it('keeps both the begin and the cancel decision on the card edge, at a real width', async () => {
+    const begun = await mountPrototypeState('stage-not-started');
+    const begin = await measureDetailLayout(begun.target);
+    assert.notEqual(begin.beginRight, null, 'the begin decision renders');
+    assert.ok(
+      Math.abs(begin.beginRight - begin.contentRight) <= 1,
+      `the begin decision ends on the card's content edge: ${begin.beginRight} vs ${begin.contentRight}`
+    );
+
+    await harness.remount();
+    const { target } = await mountState('cancel-confirmation');
+    target.querySelector('[data-run-action="cancel-arm"]').click();
+    flushSync();
+    const armed = await measureDetailLayout(target);
+    assert.notEqual(armed.cancelRight, null, 'the armed cancel decision renders');
+    assert.ok(
+      Math.abs(armed.cancelRight - armed.contentRight) <= 1,
+      `and so does the cancel decision: ${armed.cancelRight} vs ${armed.contentRight}`
+    );
+    assert.ok(
+      Math.abs(armed.actionsRight - armed.contentRight) <= 1,
+      'because the actions block reaches the edge rather than shrinking to its own content'
+    );
+  });
+
+  /**
+   * UX2-2. Whether a stage has BEGUN is a fact about the stage. Keying the TIME card on
+   * `actions.atStageStart` also required the viewer to be able to act, so a held claim, a
+   * non-owner viewer or a run awaiting recovery printed `Left: None` — the string a MATURED wait
+   * prints — against a stage whose clock had never started.
+   */
+  it('says a stage has not started even when the authority refuses every control', async () => {
+    const mounted = await mountPrototypeState('stage-not-started', {
+      authority: { available: false, reason: 'claim-held' },
+    });
+    const run = mounted.store.selectedRun;
+    assert.equal(run.actions.atStageStart, false, 'no control is offered while the claim is held');
+    assert.equal(run.stageStart.required, true, 'but the stage still has not begun');
+    const facts = [
+      ...mounted.target.querySelectorAll('[data-journal-summary-card="time"] [data-journal-fact]'),
+    ];
+    const left = facts.find((row) =>
+      row.textContent.includes(english.FABRICATE.App.Journal.Summary.Left)
+    );
+    assert.ok(left, 'the TIME card still reports a Left row');
+    assert.match(
+      left.textContent,
+      new RegExp(english.FABRICATE.App.Journal.Summary.NotStarted, 'u')
+    );
+    assert.doesNotMatch(
+      left.textContent,
+      new RegExp(`\\b${english.FABRICATE.App.Journal.Summary.None}\\b`, 'u'),
+      'never the matured-wait word'
+    );
+  });
+
   it('combines timing and history advice with guidance for the actual run state', async () => {
     for (const [state, expected] of [
       ['ready-single', /finish crafting/i],
@@ -1145,6 +1283,57 @@ describe('Journal versioned lifecycle (mounted)', () => {
       'and names the carrier that gave it'
     );
     assert.ok(!mounted.target.querySelector('[data-essence-history] button'), 'nothing here is editable');
+  });
+
+  /**
+   * QE2-3 and UX2-4, one defect on two inputs. The receipt dropped `currencySpends` entirely,
+   * and both inner blocks being empty made the whole `{#if started}` branch render NOTHING —
+   * the requirement rail is its `{:else}`. A currency-only or zero-requirement stage therefore
+   * showed a started stage as a blank region. Every fixture in the repo used `currencySpends: []`,
+   * so nothing could see it.
+   */
+  it('reports a started stage that spent only currency, instead of rendering nothing', async () => {
+    const paid = ingredientSet('paid', [
+      { id: 'fee', name: 'Fee', options: [{ id: 'gp', quantity: 1, match: { type: 'currency', unit: 'gp', amount: 50 } }] },
+    ]);
+    const mounted = await mountState('ready-single', {
+      ...selectionFixture([paid], { selectedIngredientSetId: paid.id }),
+      prepare(runtime) {
+        selectionFixture([paid], { selectedIngredientSetId: paid.id }).prepare(runtime);
+        const step = runtime.containers.craftingRuns.active['lab-v1-ready-single'].steps[0];
+        step.status = 'waitingTime';
+        step.timeGate = { requiredSeconds: 3600, initiatedAt: 0, availableAt: 1 };
+        step.selectedRequirementSnapshot = paid.toJSON();
+        step.preparedConsumption = {
+          selectedIngredientSetId: paid.id,
+          currencySpends: [{ unit: 'gp', amount: 50 }],
+          resolvedEssences: {},
+          essenceEnabled: {},
+          consumedSummary: [],
+          // The envelope EVERY stage with a resolution snapshot persists. It has no carriers,
+          // so it is not a band to draw (M20's defect, back on the new surface).
+          essenceSpend: { labels: {}, carriers: [] },
+        };
+      },
+    });
+
+    const record = mounted.store.selectedRun.currentStep.consumptionRecord;
+    assert.deepEqual(record.currencySpends, [{ unit: 'gp', amount: 50 }], 'the receipt carries it');
+    const consumed = mounted.target.querySelector('[data-journal-stage-consumed]');
+    assert.ok(consumed, 'and the started stage renders a region rather than nothing');
+    assert.ok(
+      consumed.textContent.includes(english.FABRICATE.App.Journal.Stage.SpentAtStart),
+      'saying what it spent at start'
+    );
+    assert.match(consumed.textContent, /50 gp/u, `and naming the price: ${consumed.textContent}`);
+    assert.ok(
+      !mounted.target.querySelector('[data-slot-row]'),
+      'never the live held/needed rail, which this stage has already paid'
+    );
+    assert.ok(
+      !mounted.target.querySelector('[data-essence-history]'),
+      'and never an essence band with no carriers in it'
+    );
   });
 
   // The same rule on the OTHER started-stage path. A started stage whose authored route was
@@ -1478,6 +1667,23 @@ describe('Journal versioned lifecycle (mounted)', () => {
         assert.equal(cards.length, 2);
         assert.ok([...cards].every((card) => card.querySelector('[data-list-row]')));
         assert.match(cards[1].textContent, /Missing requirements: 1/);
+      }
+      // D-031, and the same happy-dom caveat as M10 below: the capture's positive `:has()` reads
+      // the fact row through a DESCENDANT, which passes open here, so the payment is asserted
+      // with a plain query as well.
+      if (state === 'stage-paid') {
+        const receipt = mounted.target.querySelector('[data-journal-stage-consumed]');
+        assert.ok(receipt, 'a currency-only started stage renders its receipt');
+        const facts = [...receipt.querySelectorAll('[data-journal-fact]')].map(
+          (row) => row.textContent
+        );
+        assert.equal(facts.length, 1, `one row, the payment: ${JSON.stringify(facts)}`);
+        assert.match(facts[0], /50 gp/u);
+        assert.equal(
+          receipt.querySelectorAll('[data-list-row]').length,
+          0,
+          'and no item rows, because it consumed none'
+        );
       }
       // Issue 1648, M10. The capture selector reads the row chip through a DESCENDANT inside
       // `:has()`, which happy-dom evaluates unfaithfully and passes open — so the row, the
@@ -2085,23 +2291,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
   // the same predicate: an unstarted stage holds no `timeGate`, so the detail's `availableAt`
   // was NaN and the Active row's whole timing block was suppressed.
   it('tells an unstarted stage its clock has not started, on the card that answers the clock question', async () => {
-    // The unbegun stage lives on the prototype cohort, so this mounts the same world its frame
-    // is captured from rather than a hand-built double.
-    const content = buildLabContent({ journalCaseState: 'stage-not-started' });
-    const actor = buildLabActors(content)[0];
-    await stockJournalPrototype(actor, content, 'stage-not-started');
-    const mounted = await mountState('stage-not-started', {
-      builderOptions: {
-        content,
-        actor,
-        recipes: labRecipes(content),
-        viewer: { id: 'user-lab-player', isGM: false },
-      },
-    });
-    mounted.store.select(
-      mounted.store.activeRuns.find((entry) => entry.id === 'lab-v1-stage-not-started')
-    );
-    flushSync();
+    const mounted = await mountPrototypeState('stage-not-started');
     const run = mounted.store.selectedRun;
     assert.equal(run.actions.atStageStart, true, 'the fixture really is at a stage start');
     assert.equal(run.timeGate, null, 'which is to say it holds no gate at all');

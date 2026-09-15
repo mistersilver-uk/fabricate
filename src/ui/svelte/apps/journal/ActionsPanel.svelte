@@ -159,3 +159,14 @@
     bind:armed={cancelArmed}
   />
 </div>
+
+<style>
+  /* The action bar's `margin-left: auto` right-aligns within THIS block, so this block must reach
+     the card's edge. Left at the flex default it shrank to its content, and a decision sat flush
+     right only when its own max-content happened to saturate the line - true of the long begin
+     prompt, false of the shorter cancel one (issue 1648, M16/M26, UX2-1). */
+  .journal-actions {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+</style>

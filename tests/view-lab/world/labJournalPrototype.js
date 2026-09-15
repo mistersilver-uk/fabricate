@@ -4,6 +4,7 @@
  * Local and CI runs require no prototype file, decoded script or image.
  */
 const fixed = (id, quantity = 1) => ({ id, quantity });
+const price = (unit, amount) => ({ currency: unit, amount });
 const choice = (...options) => ({ options });
 const essence = (id, amount) => ({ essence: id, amount });
 const stage = (name, hours, requirements, output = null) => ({ name, hours, requirements, output });
@@ -123,6 +124,18 @@ export const JOURNAL_PROTOTYPE_RECIPES = Object.freeze({
         ['prismatic_sigil', 1]
       ),
     ],
+  },
+  // CANONICAL EXTENSION, not a prototype account: a currency-only ingredient set, which D-031
+  // rules is valid and authorable. It is the one shape whose start receipt records a payment and
+  // no items at all, and no prototype account has it — so without this the surface that renders
+  // that receipt has no frame.
+  permit: {
+    name: 'File a Guild Permit',
+    mode: 'simple',
+    current: 0,
+    left: 2,
+    description: 'The registry takes its fee up front and nothing else.',
+    steps: [stage('Pay the registry fee', 4, [price('gp', 50)], ['waxed_cord', 1])],
   },
   poultice: {
     name: 'Steep a Bitter Poultice',
@@ -264,6 +277,7 @@ const WORKSHOPS = {
   tonic: 'Philosopher’s Crucible',
   poultice: 'Philosopher’s Crucible',
   sigil: 'Hedge Witchery',
+  permit: 'Guild Registry',
   draught: 'Philosopher’s Crucible',
 };
 
@@ -276,6 +290,7 @@ export const JOURNAL_PROTOTYPE_BINDINGS = Object.freeze({
   'stage-not-started': 'rivets',
   'awaiting-choice': 'buckler',
   'stage-consumed': 'rivets',
+  'stage-paid': 'canonical/currency-only-requirement',
   'current-choice-closed': 'rivets',
   'material-shortage': 'boss',
   'ingredient-route': 'boss',
@@ -333,14 +348,23 @@ function requirements(id, entries) {
     id,
     ingredientGroups: entries.map((entry, index) => ({
       id: `${id}-g${index + 1}`,
-      options: entry.essence
-        ? [{ match: { type: 'essence', essenceId: entry.essence, amount: entry.amount } }]
-        : (entry.options ?? [entry.id]).map((key) => ({
-            match: { type: 'component', componentId: componentId(key) },
-            quantity: entry.quantity ?? 1,
-          })),
+      options: currencyOrItemOptions(entry),
     })),
   };
+}
+
+/** One group's options: a price, an essence draw, or one or more component picks. */
+function currencyOrItemOptions(entry) {
+  if (entry.currency) {
+    return [{ match: { type: 'currency', unit: entry.currency, amount: entry.amount } }];
+  }
+  if (entry.essence) {
+    return [{ match: { type: 'essence', essenceId: entry.essence, amount: entry.amount } }];
+  }
+  return (entry.options ?? [entry.id]).map((key) => ({
+    match: { type: 'component', componentId: componentId(key) },
+    quantity: entry.quantity ?? 1,
+  }));
 }
 
 function authoredStep(id, spec) {
