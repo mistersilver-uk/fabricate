@@ -172,10 +172,12 @@ export default [
   //
   //    The scratch entries matter because the gate is a GLOB now (issue #1660). While `lint` named
   //    every file it covered, an untracked tree was unreachable by construction; `eslint .` reaches
-  //    anything on disk, and `.worktrees/` holds entire checkouts of this repository — so without
-  //    this a developer's agent worktrees are linted as if they were the project, and the gate's
-  //    result depends on what happens to be lying around. `.foundry-e2e/` is the same shape for a
-  //    different reason: it holds downloaded game systems and Foundry's own JavaScript.
+  //    anything on disk, and both `.worktrees/` and `.claude/worktrees/` hold entire checkouts of
+  //    this repository — so without these a developer's agent worktrees are linted as if they
+  //    were the project, and the gate's result depends on what happens to be lying around.
+  //    `.claude/worktrees/` is the path the agent worktree lifecycle actually uses; listing only
+  //    `.worktrees/` was issue #1748. `.foundry-e2e/` is the same shape for a different reason:
+  //    it holds downloaded game systems and Foundry's own JavaScript.
   //
   //    These mirror `.gitignore` by hand rather than being derived from it. ESLint's `ignores` are
   //    minimatch patterns and `.gitignore` lines are not — anchoring, negation and directory rules
@@ -191,6 +193,7 @@ export default [
       'docs/',
       'coverage/',
       '.worktrees/',
+      '.claude/worktrees/',
       '.foundry-e2e/',
       '.foundry-chrome/',
       '.foundry-perf/',
