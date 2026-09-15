@@ -4996,6 +4996,21 @@ An unmapped reason MUST fall through to that generic rather than render its own 
 Every surface that can mint a refusal reason keeps that vocabulary as its single home, including the module edges that report an absent command service, so the drift guard that re-derives the vocabulary can see every code a player may read.
 An AVAILABILITY answer MUST fail CLOSED on a code it cannot word: `available: false` means the operation will be refused whatever the code says, so an unmappable reason renders the generic sentence and never restores an available presentation.
 
+#### A failed check is an outcome, not a refusal
+
+A `success: false` result is one of two different things, and no player surface may conflate them.
+A REFUSAL is the authority declining to act: no check ran, nothing was spent, and it takes the refusal chain above.
+A resolved FAILURE is the stage having run to a failed check, which is the system working as designed.
+The two are told apart by the `disposition` the stage's own outcome mints — `failed` or `produced-on-failure` — because only a stage that ran can carry one; a run's `status` MUST NOT be used, since a refusal about an already-failed run carries the same word.
+
+A resolved failure MUST be reported in its own words, which state that the check failed and assert NOTHING about what the attempt consumed.
+The generic craft-failure text promises that nothing was consumed, and that promise is false whenever the recipe's `consumeIngredientsOnFail` or `breakToolsOnFail` policy spent something; the chat card is the surface that itemises it.
+It MUST NOT be recorded as a command error on the Journal run, whose own history already records the outcome.
+The Alchemy workbench banner MUST give it a distinct non-success state rather than the no-reaction fizzle, because the bench did react.
+
+The player Crafting tab MUST refresh its listing after a resolved failure and record the outcome for the run summary, exactly as it does after a success.
+A failed check can move the actor's inventory and the recipe's craftability, so returning early left both stale on screen and dropped the only record the run summary renders.
+
 Any surface that offers to start or change a versioned run MUST NOT present it as available while the authority is unavailable.
 In particular the player Crafting detail header MUST NOT read Ready to craft when the authority refuses; it shows the authority's reason in the recipe's own blocking callout and withholds the status chip.
 The recipe's OWN blocking reason leads that callout and the authority's follows it, because the recipe's is the cause the player can act on while a transient authority state usually is not.

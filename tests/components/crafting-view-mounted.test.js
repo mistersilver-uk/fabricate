@@ -118,6 +118,41 @@ describe('CraftingView mounted behavior', () => {
     assert.equal(target.querySelector('[data-crafting-shopping]'), null, 'shopping list hidden while the run summary is shown');
   });
 
+  // Issue 1648: a failed CHECK now records an outcome too, so the same swap happens and the
+  // box must paint the FAILURE tone rather than the success one. happy-dom cannot compute the
+  // cascade, so this reads the rendered hooks the CSS keys off directly.
+  it('paints the run summary as a failure when the recorded outcome is a failed check', async () => {
+    const built = recipe();
+    const store = fakeCraftingStore({
+      recipes: [built],
+      lastRollResult: {
+        'recipe-1': {
+          success: false,
+          status: 'failed',
+          disposition: 'failed',
+          message: 'Your crafting check failed. The chat card has the full outcome.'
+        }
+      }
+    });
+    const target = await harness.mount({ services: services(store) });
+    const box = target.querySelector('[data-recipe-section="roll-result"][data-roll-success="false"]');
+    assert.ok(Boolean(box), 'the roll box renders in its failure state');
+    assert.ok(
+      box.classList.contains('is-failure') && !box.classList.contains('is-success'),
+      'and takes the failure class, never the success one'
+    );
+    assert.match(
+      box.textContent,
+      /check failed/i,
+      'the box states the failed check rather than standing empty'
+    );
+    assert.equal(
+      /consumed/i.test(box.textContent),
+      false,
+      'and claims nothing about what the failure policy spent'
+    );
+  });
+
   it('disables the run summary "Craft another" when the selection is no longer craftable (non-progressive)', async () => {
     const built = recipe({
       ingredientSets: [{ id: 'set-a', label: 'Option A', craftability: craftability({ canCraft: false }) }]

@@ -50,7 +50,11 @@
  */
 
 import { aggregateShoppingList } from '../util/shoppingListAggregator.js';
-import { journalRefusalMessage } from '../util/journalRunReasons.js';
+import {
+  isResolvedFailureOutcome,
+  journalRefusalMessage,
+  resolvedFailureMessage,
+} from '../util/journalRunReasons.js';
 import {
   CLOSED_SLOT_ID,
   buildRequirementSlots,
@@ -802,10 +806,10 @@ export function createCraftingStore({ services } = {}) {
   }
 
   /**
-   * Craft a recipe. Guards against re-entrancy via `craftInFlight`; on a
-   * `{ success: false }` result it surfaces the message through `services.notify`
-   * and leaves the listing untouched; on success it records the roll outcome and
-   * quietly refreshes the listing.
+   * Craft a recipe. Guards against re-entrancy via `craftInFlight`. A REFUSAL
+   * (`success: false` with no resolved disposition) is surfaced through
+   * `services.notify` and leaves the listing untouched; a success OR a resolved
+   * failed check records the roll outcome and quietly refreshes the listing.
    *
    * The `services.craftRecipe` call is wrapped: the underlying crafting engine can
    * throw (e.g. on the currency-payment macro path), so a thrown error is caught
@@ -874,13 +878,21 @@ export function createCraftingStore({ services } = {}) {
       }
       // A versioned-run authority refusal carries `reason` and NO `message`, so
       // notifying `result.message` alone showed the literal text "undefined".
-      if (result && result.success === false) {
+      if (result && result.success === false && !isResolvedFailureOutcome(result)) {
         services?.notify?.(
           journalRefusalMessage(result, services?.localize, services?.craftErrorMessage?.())
         );
         return result;
       }
-      lastRollResult = { ...lastRollResult, [recipeId]: result ?? null };
+      // A resolved failure falls THROUGH to the success tail on purpose: the check ran, the
+      // attempt may have spent materials under the failure policy, and the listing is stale.
+      const failed = result?.success === false;
+      const notice = failed ? resolvedFailureMessage(services?.localize) : '';
+      if (notice) services?.notify?.(notice);
+      lastRollResult = {
+        ...lastRollResult,
+        [recipeId]: failed ? { ...result, message: notice } : (result ?? null),
+      };
       await load(true);
       return result ?? null;
     } catch (err) {

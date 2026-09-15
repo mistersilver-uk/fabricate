@@ -13842,8 +13842,9 @@ export const VIEW_LAB_CASES = Object.freeze([
     smokeLabels: ['player-crafting-run-summary'],
     // The counterpart's condition is the right column having SWAPPED to the run summary —
     // `[data-crafting-run-summary]`, which `CraftingView` renders only once `lastRollResult`
-    // carries an entry for the selected recipe. A craft that returns `success: false` notifies and
-    // records nothing, so the frame is reached by a craft that actually completes.
+    // carries an entry for the selected recipe. A REFUSAL notifies and records nothing; since
+    // issue 1648 a resolved failed check records its outcome too, so the summary is reached by
+    // any craft that RAN — and this case reaches it with one that completes successfully.
     //
     // Smelt Iron Ingot, and a CHECKED recipe on purpose: this craft now ROLLS. The shim used to
     // install `Roll` as a plain object, so `evaluateCheckRoll` short-circuited on its own

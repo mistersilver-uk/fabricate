@@ -907,7 +907,8 @@
           "MissingMaterials": "You're missing some required materials."
         },
         "Notify": {
-          "CraftFailed": "Something went wrong while crafting. Nothing was consumed."
+          "CraftFailed": "Something went wrong while crafting. Nothing was consumed.",
+          "CheckFailed": "Your crafting check failed. The chat card has the full outcome."
         },
         "Sources": {
           "Label": "Component sources",
@@ -1559,6 +1560,8 @@
           "DiscoveredOnFailure": "Learned {name} — the brew failed and yielded the failure result.",
           "Brewing": "The mixture is set to work. Finish it from your Journal once enough time has passed.",
           "DiscoveredBrewing": "Discovered {name}! The mixture is set to work — finish it from your Journal once enough time has passed.",
+          "CheckFailed": "The brew failed its check. The chat card has the full outcome.",
+          "DiscoveredCheckFailed": "Learned {name} — the brew failed its check. The chat card has the full outcome.",
           "Fizzled": "The mixture fizzles — no reaction."
         },
         "Workbench": "Workbench",

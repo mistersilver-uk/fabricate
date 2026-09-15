@@ -28,7 +28,7 @@
  */
 
 import { canonicalSignatureKey } from '../../../utils/alchemySignatureKey.js';
-import { journalRefusalMessage } from '../util/journalRunReasons.js';
+import { isResolvedFailureOutcome, journalRefusalMessage } from '../util/journalRunReasons.js';
 
 export function createAlchemyStore({ services } = {}) {
   let listing = $state(null);
@@ -517,6 +517,8 @@ export function createAlchemyStore({ services } = {}) {
       //  brewing           — a time-gated brew was STARTED: the signature matched, the
       //                      inputs are consumed and the run is live in the Journal
       //                      awaiting world time. Not a failure (issue 966);
+      //  check-failed      — the stage RAN and its check failed. An outcome, never a
+      //                      fizzle and never an error; the card itemises what it cost;
       //  no-match-fizzle   — no reaction (or a Tiered fail / misconfiguration);
       //  refused           — the versioned-run authority REFUSED the brew before any
       //                      reaction was attempted (`{success:false, reason}`, no
@@ -538,6 +540,11 @@ export function createAlchemyStore({ services } = {}) {
           discovered: discoveredName,
           message: result.message ?? '',
         };
+      } else if (isResolvedFailureOutcome(result)) {
+        // The check RAN and failed. That is an outcome, not "no reaction" — the bench
+        // reacted, and what the attempt cost is the system's failure policy to decide and
+        // the chat card's to itemise, so the banner says neither.
+        lastBrew = { status: 'check-failed', discovered: discoveredName, message: '' };
       } else if (result?.disposition === 'timed-start') {
         // The engine's message is an untranslated developer string ("Step … is still
         // in progress (Ns remaining)"), so the banner carries the localized copy and

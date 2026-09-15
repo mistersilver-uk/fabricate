@@ -496,6 +496,57 @@ describe('alchemyStore', () => {
     assert.deepEqual(harness.calls.notify, [expected], 'a refused brew is never silent');
   });
 
+  // Issue 1648: a failed CHECK is an outcome, not "no reaction" and not an error. The
+  // versioned stage mints `disposition: 'failed'`; the banner must say the check failed
+  // and claim nothing about what the failure policy spent.
+  it('banners a resolved failed check as its own outcome rather than a fizzle', async () => {
+    const harness = makeServices({
+      submitAlchemyAttempt: async () => ({
+        success: false,
+        runId: 'run-1',
+        status: 'failed',
+        runRevision: 2,
+        reason: null,
+        message: null,
+        disposition: 'failed',
+        terminal: true,
+      }),
+    });
+    const store = createAlchemyStore({ services: harness.services });
+    await store.load();
+    flushSync();
+    store.add('ashsalt');
+    flushSync();
+    await store.brew();
+    flushSync();
+
+    assert.equal(store.lastBrew.status, 'check-failed', 'the bench reacted; the check failed');
+    assert.notEqual(store.lastBrew.status, 'no-match-fizzle');
+    assert.notEqual(store.lastBrew.status, 'refused', 'and it is not a refusal either');
+    assert.equal(store.lastBrew.message, '', 'the banner words itself from the status');
+    assert.deepEqual(harness.calls.notify, [], 'an outcome with a banner needs no error toast');
+  });
+
+  it('keeps a failure that AWARDED its reserved results on the produced-on-failure banner', async () => {
+    const harness = makeServices({
+      submitAlchemyAttempt: async () => ({
+        success: false,
+        results: [{ name: 'Sludge' }],
+        message: 'FABRICATE.Alchemy.FailureResult',
+        disposition: 'produced-on-failure',
+      }),
+    });
+    const store = createAlchemyStore({ services: harness.services });
+    await store.load();
+    flushSync();
+    store.add('ashsalt');
+    flushSync();
+    await store.brew();
+    flushSync();
+
+    assert.equal(store.lastBrew.status, 'produced-on-failure', 'the earlier ruling is preserved');
+  });
+
   it('never passes a non-string to notify on a refused or failed brew', async () => {
     const shapes = [
       { success: false, reason: 'command-timeout' },

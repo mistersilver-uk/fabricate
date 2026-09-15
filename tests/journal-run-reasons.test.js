@@ -16,8 +16,10 @@ import { fileURLToPath } from 'node:url';
 
 import {
   JOURNAL_RUN_REASON_KEYS,
+  isResolvedFailureOutcome,
   journalRefusalMessage,
   journalRunReasonMessage,
+  resolvedFailureMessage,
 } from '../src/ui/svelte/util/journalRunReasons.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -173,5 +175,72 @@ describe('journalRefusalMessage chain', () => {
       assert.notEqual(answer, 'undefined');
     }
     assert.equal(typeof journalRefusalMessage({ reason: 'ledger-missing' }, null, null), 'string');
+  });
+});
+
+// ── Issue 1648: a failed CHECK is an outcome, and reporting it as a refusal told the
+// player "Something went wrong while crafting. Nothing was consumed." while the chat
+// card itemised what the failure policy had just consumed.
+describe('isResolvedFailureOutcome', () => {
+  it('answers true only for a disposition a stage that RAN can mint', () => {
+    assert.equal(isResolvedFailureOutcome({ success: false, disposition: 'failed' }), true);
+    assert.equal(
+      isResolvedFailureOutcome({ success: false, disposition: 'produced-on-failure' }),
+      true
+    );
+    // Every refusal shape a player surface can receive. None reached a check.
+    for (const refusal of [
+      null,
+      undefined,
+      {},
+      { success: false },
+      { success: false, reason: 'ledger-missing' },
+      { success: false, reason: 'claim-held', status: 'failed' },
+      { success: false, message: 'There is no in-progress craft to execute.' },
+      { success: false, disposition: 'error' },
+      { success: false, disposition: 'no-match' },
+      { success: true, disposition: 'started' },
+      { success: true, disposition: 'time-armed' },
+    ]) {
+      assert.equal(
+        isResolvedFailureOutcome(refusal),
+        false,
+        `a refusal is not an outcome: ${JSON.stringify(refusal)}`
+      );
+    }
+  });
+
+  it('does not key on `status`, which a refusal about a failed run can also carry', () => {
+    assert.equal(
+      isResolvedFailureOutcome({ success: false, reason: 'stale-run', status: 'failed' }),
+      false,
+      'the run document being in a failed state says nothing about THIS attempt'
+    );
+  });
+});
+
+describe('resolvedFailureMessage', () => {
+  it('states the failed check and claims nothing about consumption', () => {
+    const text = resolvedFailureMessage(localizeFromLang);
+    assert.equal(text, langLeaf('FABRICATE.App.Crafting.Notify.CheckFailed'));
+    assert.ok(text.length > 0, 'the key resolves to a real shipped leaf');
+    assert.equal(
+      text.toLowerCase().includes('consumed'),
+      false,
+      'the store cannot know what the failure policy consumed, so it must not say'
+    );
+    assert.notEqual(
+      text,
+      langLeaf('FABRICATE.App.Crafting.Notify.CraftFailed'),
+      'the generic thrown-error text is a different sentence and stays that way'
+    );
+  });
+
+  it('always answers a string', () => {
+    for (const localize of [null, undefined, 'nope', () => 42, () => undefined, () => '  ']) {
+      const answer = resolvedFailureMessage(localize);
+      assert.equal(typeof answer, 'string', `a string for ${String(localize)}`);
+      assert.notEqual(answer, 'undefined');
+    }
   });
 });

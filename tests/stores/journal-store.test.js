@@ -702,6 +702,41 @@ describe('journalStore', () => {
     }
   });
 
+  // Issue 1648: finishing a timed run from the Journal whose CHECK fails is an outcome the
+  // run's own history records, not a command error. It used to fall through the refusal
+  // chain to the generic "Something went wrong while crafting. Nothing was consumed." and
+  // park a persistent error notice on the row.
+  it('reports a resolved failed check as an outcome, not as a command error', async () => {
+    const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
+    const setup = makeServices({
+      listing: baseListing({ activeRuns: [current], history: [] }),
+      commandResult: {
+        success: false,
+        runId: current.id,
+        status: 'failed',
+        runRevision: 4,
+        reason: null,
+        message: null,
+        disposition: 'failed',
+        terminal: true,
+      },
+    });
+    const store = await loadedStore(setup);
+    store.select(current);
+
+    await store.pause(current);
+    flushSync();
+
+    const expected = langLeaf('FABRICATE.App.Crafting.Notify.CheckFailed');
+    assert.deepEqual(setup.calls.notify, [expected], 'the player is told the check failed');
+    assert.notEqual(
+      setup.calls.notify[0],
+      langLeaf('FABRICATE.App.Crafting.Notify.CraftFailed'),
+      'never the generic error and its "Nothing was consumed" promise'
+    );
+    assert.equal(store.commandError, null, 'an outcome leaves no retry notice on the row');
+  });
+
   it('treats a cancelled versioned command as a silent retryable-state clear', async () => {
     const current = run({ ...ACTIVE[0], lifecycleContract: 'current', lifecycleVersion: 1 });
     const setup = makeServices({

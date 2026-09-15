@@ -260,6 +260,7 @@ describe('Workbench (mounted)', () => {
       { status: 'success', tone: 'success', glyph: 'fa-circle-check' },
       { status: 'tiered-tier', tone: 'success', glyph: 'fa-circle-check' },
       { status: 'produced-on-failure', tone: 'warning', glyph: 'fa-triangle-exclamation' },
+      { status: 'check-failed', tone: 'warning', glyph: 'fa-triangle-exclamation' },
       { status: 'brewing', tone: 'info', glyph: 'fa-hourglass-half' },
       { status: 'no-match-fizzle', tone: 'danger', glyph: 'fa-circle-xmark' }
     ];

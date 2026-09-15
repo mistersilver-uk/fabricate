@@ -119,3 +119,36 @@ export function journalRefusalMessage(result, localize, generic) {
   if (reasonText) return reasonText;
   return typeof generic === 'string' ? generic.trim() : '';
 }
+
+/**
+ * Dispositions minted ONLY by a stage that ran to a resolved failure — the crafting
+ * engine's stage-execution outcome is their single source. A refusal never reaches a
+ * check, so it can never carry one, which is what makes this the honest split.
+ */
+const RESOLVED_FAILURE_DISPOSITIONS = Object.freeze(['failed', 'produced-on-failure']);
+
+/**
+ * Whether a `success: false` result is a resolved failure OUTCOME rather than a refusal.
+ * A failed check is the system working; only a refusal is something going wrong.
+ *
+ * @param {{disposition?: unknown}|null|undefined} result
+ * @returns {boolean}
+ */
+export function isResolvedFailureOutcome(result) {
+  return RESOLVED_FAILURE_DISPOSITIONS.includes(result?.disposition);
+}
+
+/**
+ * The one sentence every surface shows for a resolved failed check. It says the check
+ * failed and NOTHING about what was consumed: the system's failure policy decides that
+ * and the chat card itemises it, so the generic craft error — which promises "Nothing
+ * was consumed" — is the wrong text here.
+ *
+ * @param {(key: string) => string} localize
+ * @returns {string} Always a string, so a notification never renders `undefined`.
+ */
+export function resolvedFailureMessage(localize) {
+  const text =
+    typeof localize === 'function' ? localize('FABRICATE.App.Crafting.Notify.CheckFailed') : '';
+  return typeof text === 'string' ? text.trim() : '';
+}

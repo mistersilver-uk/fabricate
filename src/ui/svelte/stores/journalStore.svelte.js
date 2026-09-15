@@ -1,4 +1,8 @@
-import { journalRefusalMessage } from '../util/journalRunReasons.js';
+import {
+  isResolvedFailureOutcome,
+  journalRefusalMessage,
+  resolvedFailureMessage,
+} from '../util/journalRunReasons.js';
 
 const PAGE_SIZES = Object.freeze([4, 6, 12, 25]);
 const RECENT_TERMINAL_LIMIT = 3;
@@ -282,13 +286,19 @@ export function createJournalStore({ services } = {}) {
         payload: payload ?? {},
       });
       if (result?.cancelled === true) return;
-      // A refusal from the versioned-run authority carries `reason` and no
-      // `message`, which recorded an EMPTY command error and toasted nothing.
-      const message =
-        result?.success === false
-          ? journalRefusalMessage(result, services?.localize, services?.craftErrorMessage?.())
-          : safeCommandMessage(result?.message);
-      if (result?.success === false) setCommandError(request, message);
+      // Two different `success: false` results. A REFUSAL carries `reason` and no `message`
+      // (which recorded an EMPTY command error and toasted nothing); a resolved failed check
+      // is an OUTCOME the run's own history records, so it raises no command error and never
+      // takes the generic craft error's "Nothing was consumed" promise.
+      const outcome = isResolvedFailureOutcome(result);
+      const refused = result?.success === false && !outcome;
+      let message = safeCommandMessage(result?.message);
+      if (outcome) message = resolvedFailureMessage(services?.localize);
+      if (refused) {
+        const generic = services?.craftErrorMessage?.();
+        message = journalRefusalMessage(result, services?.localize, generic);
+        setCommandError(request, message);
+      }
       if (message) services?.notify?.(message);
       await load(true);
       if (
