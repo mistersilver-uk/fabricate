@@ -1,85 +1,50 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  A labelled status card carrying an on/off switch: icon · title + sub-line · toggle.
+  A labelled status card carrying an on/off switch: icon · title + sub-line · toggle. Its five
+  classes' rules are rooted at `fabricate-toggle-card`, the class the root writes ahead of them, so
+  the card paints the same in a bare `<div>` as in the manager; three CALLERS restate its metrics
+  inside their own containers and stay application-rooted, because those rules are theirs. String
+  props are PRE-LOCALIZED, which keeps this a presentational leaf.
 
-  THE LOCATION DECISION IS REVERSED, BY ITS OWN PREMISE (2026-09-07, issue 1509). It read:
-  "LOCATION IS DELIBERATE (issue 651). This lives under `apps/manager/`, NOT under
-  `components/`, because it is NOT theme-agnostic: it wears `manager-recipe-status-card`
-  classes that are styled only under `.fabricate-manager`. Dropped into `.fabricate-app` it
-  renders as an unstyled div." That premise is what this commit retired: the ten rules the
-  gate owns for the five `manager-recipe-status-{card,icon,copy,title,sub}` classes are now
-  rooted at `fabricate-toggle-card`, the class the root element below writes ahead of them,
-  so the card paints the same in a bare `<div>` as it does in the manager. A recorded
-  decision to stay here rested on a coupling that no longer exists, so the file MOVED to
-  `components/` — where you are reading it — rather than keeping a location whose stated
-  reason has gone.
+  Props:
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `variant` | class string | `''` | A visual variant appended to the card class, toning it when on. |
+  | `icon` | Font Awesome classes | `'fas fa-circle'` | `''` renders NO glyph slot at all rather than an empty one: a slot holding an empty `<i>` still reserves its column and left-indents the copy away from the cards above and below it. |
+  | `title` / `sub` | pre-localized strings | `''` | The heading and its second line. |
+  | `on` / `disabled` | booleans | `false` | The switch's state and whether it is operable. |
+  | `toggleLabel` | pre-localized string | `''` | The switch's accessible name; falls back to the visible title. |
+  | `toggleTitle` | pre-localized string | `''` | A tooltip for the SWITCH rather than the card — named so because `title` is already the card heading. It exists for the card whose conditional tooltip is the ONLY explanation a reader gets for why the switch is disabled. Emitted as `\|\| undefined`, because an empty string renders a present-but-blank tooltip. |
+  | `section` / `field` / `subAttr` / `toggleAttr` | attribute names | `''` | Hooks on the card, the switch's field name, the sub-line and the switch itself. `field` stamps the recipe editor's own vocabulary, so a caller outside that editor names its switch through `toggleAttr` in its own. Each is absent when unset. |
+  | `onToggle()` | function | no-op | The caller owns `on`. |
 
-  WHAT DID NOT TRAVEL, so the claim is a measurement rather than a slogan: the twelve rules
-  under `.manager-checks-flag-list`, `.manager-checks-trigger-body` and
-  `.manager-tool-system-enabled` are three CALLERS restating this card's metrics inside
-  their own containers, and they stay application-rooted because they are the callers' and
-  not this component's. In a bare host the card draws its own box, glyph column, copy and
-  state tones; what it does not draw is the Checks Studio's 28px tile or the Tool editor's
-  collapsed glyph column, neither of which is this component's to promise. Issue 1507 owns
-  the `manager-*` names themselves, and issue 1518 turns this capability into a fact.
-
-  The markup is a BYTE-FAITHFUL extraction of `RecipeOverviewTab`'s Enabled/Locked status
-  cards (same element tree, same class names, same aria shape) so that retrofitting those
-  two cards onto this component (issue 658) is a no-op DOM diff. If you change the
-  structure here, that retrofit stops being a no-op and this becomes a third source of
-  truth rather than the second being retired. `aria-pressed` on a plain `<button>` is the
-  house pattern — the repo uses no `role="switch"` anywhere; do not introduce one here.
-
-  THE SWITCH ITSELF IS NOW `<StatusToggle>` (issue 1040), and that is a COMPOSITION rather
-  than a competing primitive: this card owns icon, title, sub-line and the card's own state
-  class, and the shared switch owns the track, the knob and the reading. The extraction is
-  byte-faithful in the direction that matters here — the primitive emits the identical
-  element tree, the identical class string (`manager-status-toggle is-on|is-off`, in that
-  order) and the identical `aria-pressed`, so the issue-658 retrofit is still a no-op DOM
-  diff. The one thing that differs is a comment anchor for the primitive's conditional
-  reading, which this card never passes and which renders nothing.
-
-  String props are PRE-LOCALIZED by the caller (no `localize` import): the caller owns the
-  i18n keys and their fallbacks, which keeps this component a presentational leaf.
+  Invariants:
+  - THE MARKUP IS A BYTE-FAITHFUL EXTRACTION of the two shipped status cards — same element tree,
+    same class names, same ARIA — so retrofitting those cards onto this component is a no-op DOM
+    diff. Change the structure and that retrofit stops being a no-op, and this becomes a THIRD
+    source of truth rather than the second being retired.
+  - `aria-pressed` ON A PLAIN `<button>` IS THE HOUSE PATTERN. The repo uses `role="switch"`
+    nowhere; do not introduce one here.
+  - THE SWITCH ITSELF IS `<StatusToggle>`, a COMPOSITION rather than a competing primitive: this
+    card owns icon, title, sub-line and the card's own state class, and the shared switch owns the
+    track, the knob and the reading. It emits the identical tree, class string and `aria-pressed`;
+    the one thing that differs is a comment anchor for its conditional reading, which this card
+    never passes and which renders nothing.
 -->
 <script>
   import StatusToggle from './StatusToggle.svelte';
 
   let {
-    // Visual variant appended to the card class (e.g. 'is-info'), toning it when on.
     variant = '',
-    // The leading glyph. `''` renders NO glyph slot at all rather than an empty one, which is
-    // what the essence rules editor's `Enabled in <system>` card needs: the reference draws that
-    // card as a bold title over one line with the switch on the right and no icon, and a slot
-    // holding an empty `<i>` still reserves its column and left-indents the copy away from the
-    // cards above and below it. Every shipped caller passes a real glyph, so nothing moves.
     icon = 'fas fa-circle',
     title = '',
     sub = '',
     on = false,
     disabled = false,
-    // Pre-localized accessible name for the switch; falls back to the visible title.
     toggleLabel = '',
-    // Pre-localized tooltip for the SWITCH (not the card). Named `toggleTitle` because
-    // `title` above is already the card heading. This exists for the Overview Enabled
-    // card, whose conditional tooltip is the ONLY explanation a GM gets for why the
-    // switch is disabled when validation blocks enabling — without a prop for it, the
-    // issue-658 retrofit would have to drop a real affordance on a disabled control.
-    // Emitted as `|| undefined` to reproduce that card's existing undefined branch: an
-    // empty string would render a present-but-blank tooltip.
     toggleTitle = '',
-    // Test/automation hook, mirroring the Overview cards' `data-recipe-section`.
     section = '',
     field = '',
-    // Attribute hook for the sub-line, mirroring the Overview Locked card's
-    // `data-recipe-locked-state`. Without it the retrofit hits the same wall on the
-    // second card that `toggleTitle` clears on the first.
     subAttr = '',
-    // Attribute hook for the SWITCH, the exact counterpart of `subAttr` above and present for
-    // the same reason. `field` already stamps `data-recipe-field`, which reads as the recipe
-    // editor's own vocabulary; a caller outside that editor — the Checks Studio's per-trigger
-    // break-tools card (issue 1096) — needs to name its switch in its own. Absent when unset,
-    // so no existing consumer's markup moves.
     toggleAttr = '',
     onToggle = () => {},
   } = $props();
@@ -94,9 +59,8 @@
   {/if}
   <div class="manager-recipe-status-copy">
     <p class="manager-recipe-status-title">{title}</p>
-    <!-- `''` not `true`: a bare attribute renders `=""`, which is the byte the Overview
-         cards emit today. Every consumer form is insensitive, but the issue 658 retrofit
-         is a no-op DOM diff only if this matches exactly. -->
+    <!-- `''` not `true`: a bare attribute renders `=""`, which is the byte the shipped cards
+         emit today, and the retrofit is a no-op DOM diff only if this matches exactly. -->
     <p class="manager-recipe-status-sub manager-muted" {...subAttr ? { [subAttr]: '' } : {}}>
       {sub}
     </p>

@@ -1,4 +1,3 @@
-<!-- Svelte 5 runes mode -->
 <script>
   import { localize } from '../util/foundryBridge.js';
 
@@ -33,7 +32,7 @@
         onChange(nextPath);
       }
     } catch {
-      // A failed picker leaves the manual text entry untouched.
+      // A failed picker leaves the manual text entry untouched; an empty catch fails lint:svelte.
     } finally {
       picking = false;
     }

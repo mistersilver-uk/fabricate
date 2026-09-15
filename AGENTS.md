@@ -21,19 +21,38 @@ See `openspec/README.md` for the block format and rules.
 - Non-trivial UI plans include a `Reference surfaces / reuse inventory` and follow `.agents/skills/fabricate-ux-designer/references/visual-evidence-and-reuse.md`.
 - **Batch siblings that share an exact-count ledger.** Two issues whose planned path sets both touch the same pinned ledger — `tests/components/design-system-known-debt.json`, `tests/components/selector-repetition-baseline.json`, `tests/components/spacing-known-literals.json`, `tests/components/control-height-known-literals.js`, or the View Lab registry-total prose that `tests/view-lab-cases.test.js` pins — are planned as ONE delta and delivered as one PR chain, with the phases ordered so each commit boundary re-derives the pins once.
 Planned separately, every one of those PRs restacks onto the other's merge and re-derives the same pins again, which is pure overhead with no review value.
+The four ratchet ledgers issue #1656 added are covered by the same rule: `tests/comment-share-ledger.txt`, `tests/file-size-ledger.txt`, `tests/source-pin-ledger.txt` and `tests/foundry-global-reads-ledger.txt`.
+`tests/comment-share-ledger.txt` collides the most widely because it buckets per directory rather than per file, so two lanes touching comments in unrelated trees still rewrite the same rows — a lane that edited only `tests/` moved two of them.
+
+### OpenSpec
+
+For non-trivial work, use the OpenSpec workflow:
+
+- canonical specs: `openspec/specs/*/spec.md` — the only versioned spec source of truth
+- per-change delta: a managed `openspec-delta` block in the work's GitHub issue (proposal, design, tasks, spec deltas, roster, acceptance), not versioned files.
+  Append it to an existing issue (preserving the reporter's text) or create one from the `OpenSpec Change Delta` issue template for prompt-driven work.
+See `openspec/README.md`.
+- implementation makes the canonical spec changes the delta requires under `openspec/specs/`;
+  post-implementation and docs reviewers reconcile the `openspec/specs/` diff against the issue delta.
 
 ## Default Agentic Workflow
 
 Non-trivial work runs as a `plan → plan-review → implement → review → docs` state machine, with iteration until each gate accepts.
+For non-trivial work, run the **Default Agentic Workflow** in `AGENTS.md` — the `plan → plan-review → implement → review → docs` state machine — without waiting to be asked.
 Stages auto-spawn role-specific subagents based on the change signals below — agents do not need to be requested by name.
+At each gate, spawn the roles matched by that file's auto-spawn routing table using the Agent tool: the `subagent_type` for each binding is listed in the **Agent Roles & Bindings** table in `AGENTS.md`.
 Subagents not matched by the routing table only run when explicitly requested.
 
 The routing tokens below (`fabricate_orchestrator`, etc.) are provider-neutral role identifiers.
 A routing token names a role **family**, not a binding, so it does not always resolve directly to one.
+A routing token names a role family, so the join runs one of two ways.
 An untiered family resolves directly to a registered agent in **both** providers — `.codex/agents/*.toml` for Codex and `.claude/agents/*.md` for Claude (spawned via the Agent tool using the `subagent_type` in [Agent Roles & Bindings](#agent-roles--bindings)).
+An untiered family resolves directly, as in `fabricate_orchestrator` → `fabricate-orchestrator`.
 A model-tiered family resolves through per-spawn model-tier selection (see [Model tier routing](#model-tier-routing)) to exactly one model-tiered binding in each active provider, found through the `Family` table in [Agent Roles & Bindings](#agent-roles--bindings).
+A model-tiered family resolves through the **Model tier routing** ladder in `AGENTS.md` — which picks one of `small` / `medium` / `large` per spawn, from the `(family token, stage, revision)` triple — and then through the **Family to model tiers** table, as in `fabricate_implementer` at `small` → `fabricate_implementer_small` → `fabricate-implementer-small`.
 Either way the auto-spawn workflow behaves the same regardless of which assistant is driving.
 The one exception is the read-only `fabricate_pr_explorer` mapping role: Claude uses its built-in `Explore` agent rather than a dedicated binding (see the table below).
+These subagents are registered in `.claude/agents/`; for the read-only `fabricate_pr_explorer` role, use the built-in `Explore` agent.
 
 **Workflow driver.** The top-level loop — Codex's depth-0 prompt agent or Claude's main loop — is the *workflow driver*.
 It enacts the orchestrator role: it owns routing and the iteration loops and performs **all** agent spawning.
@@ -48,11 +67,14 @@ A reviewer repeats only when its owned concern materially changed or an unresolv
 The driver front-loads cheap checks for branch and base freshness, affected paths and roster, PR title and commitlint, existing CI state, and screenshot scope.
 The driver timeboxes delegated lanes: after about 60 seconds without observable progress it requests status once, and after another about 60 seconds it interrupts and reassigns the work or continues locally within driver authority.
 **Parallel lanes only where the path sets are disjoint.** The driver runs two changes as parallel lanes or teams only when neither touches the other's pinned ledgers, shared stylesheet regions, or registry-total prose; changes that share any of those run on one rail, sequenced, because each concurrent PR costs a restack with conflict resolution and pin re-derivation at the tip, and that restack has cost more than the parallelism saved.
+Prune a path-signal role whose row fired on prose alone at the post-implementation review and docs stages, batch issues that share an exact-count ledger into one delta, and serialise lanes whose path sets are not disjoint, as `AGENTS.md` directs.
 
 ### Isolated worktree execution
 
 Every spawned role works in its own Git worktree by default so independent workstreams do not share a mutable checkout.
+The main loop is the workflow driver and creates a unique isolated worktree for every spawned role by default; mutable roles use exclusive lane branches and read-only roles use fresh detached snapshots for each reviewed commit.
 The workflow driver owns the clean coordinator checkout and integration branch, GitHub and remote mutations, lane lifecycle, integration, authoritative gates, and guarded cleanup.
+The driver alone mutates the coordinator checkout, GitHub or remote state, integrates local lane commits, runs authoritative gates, and performs guarded cleanup.
 That coordinator checkout is itself a worktree created for the task — never the maintainer's primary clone — so integration, authoritative gates, and delivery all run from it and it is disposed under the same guarded cleanup as any lane.
 A maintainer's own checkout is never checked out to a task branch and is left as they left it.
 The one exception is an explicit maintainer instruction to work in their checkout, usually so they can watch the change in a running app or drive manual testing themselves; no agent may assume or grant itself that instruction.
@@ -63,6 +85,7 @@ Parallel mutable lanes require disjoint owned paths and no dependency on uninteg
 The driver serializes dependency installation and complete test, build, lint, Foundry/Docker, and screenshot gates from the fully integrated coordinator branch.
 Follow the canonical mechanics in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for assignment briefs, review artifacts, integration mapping, feedback revisions, conflicts, and cleanup.
 That lifecycle also owns manual-test candidate visibility, unrelated dirty-state preservation, and explicit maintainer feedback batching.
+Use the provider-neutral lifecycle in `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md`; do not create a Claude-specific worktree convention.
 
 ### Auto-spawn routing
 
@@ -257,6 +280,7 @@ The override is applied by the driver on top of the mechanical ladder; `selectMo
 #### `ESCALATE_TIER`
 
 An agent of a model-tiered family that finds its assignment exceeds its model tier returns `ESCALATE_TIER: <reason>` on its first line rather than guessing.
+An agent of a model-tiered family may return `ESCALATE_TIER: <reason>` on its first line before its first edit; that is not a verdict, does not consume a revision, and is bounded at one escalation per family, stage, and revision.
 It is named `ESCALATE_TIER`, not `ESCALATE`, because this file and two canonical skills already use "escalating to the user" for the 3-revision cap, which is the opposite direction of travel.
 
 - **It is available only to the six model-tiered families.**
@@ -278,6 +302,7 @@ When a `small` spawn escalates on a recurring assignment shape, move that shape 
 
 Because an escalation does not consume a revision, a family-named lane would collide with itself at the same revision, so the model-tiered token appears in the lane **branch** and the lane **directory** name alike — including for detached read-only lanes, which have no branch to disambiguate them.
 The assignment brief records the resolved model tier and the facts it was resolved from.
+Record the resolved model tier and the facts it was resolved from in the lane's assignment brief.
 See `.agents/skills/fabricate-orchestrator/references/worktree-lifecycle.md` for the lane mechanics.
 
 An escalation is pure waste, not partial progress — the second spawn repeats the full orientation cost.
@@ -292,6 +317,7 @@ A role whose round-one findings were all `LOW`, or none, is not re-spawned; the 
 Findings carry a severity — `HIGH` (the change would ship a defect or red a gate), `MEDIUM` (a decision is wrong or unjustified), `LOW` (wording, an anchor, a count) — and every review role grades by that scale; the quality engineer's severity guide in `.agents/skills/fabricate-quality-engineer/SKILL.md` is the same three rungs applied to defects.
 A loop's acceptance condition is therefore that every finding is applied or dispositioned, not that a fresh `APPROVED` exists for the final artifact; the approval of record at [Final maintainer handoff](#final-maintainer-handoff) is the last round's verdict plus the driver's recorded disposition of the findings it applied, and a `BLOCKED` verdict is never self-cleared.
 Rounds two and three therefore exist for disputed or non-mechanical findings, not as a second reading of the whole plan or diff, and the three-revision cap is the stop condition rather than the expected path.
+Run plan-review reviewers in parallel ONCE; apply the mechanical findings yourself; spawn a further round only as a disposition-only confirmation round at model tier `medium`, per the **Iteration cycles** and the confirmation-round override in `AGENTS.md`; honor the 3-revision caps as stop conditions; and surface any `BLOCKED` verdict to the user.
 
 In every loop, reviewers return their verdicts to the driver, which acts on them and summarizes outcomes to the user.
 Reviewers do not post verdicts (or other workflow notes) as GitHub issue or PR comments.
@@ -315,13 +341,17 @@ Loop until both approve.
 ### Final maintainer handoff
 
 Before asking the maintainer to review a PR, the workflow driver completes a final delivery loop from the coordinator checkout.
+Before maintainer handoff, the driver finalizes PR metadata, rebases onto fetched `origin/main`, reruns authoritative gates and commitlint, preserves valid approval across a patch-equivalent rebase or obtains fresh detached exact-target review when the owned concern materially changed or a finding remains unresolved, pushes only with an explicit expected-head lease, marks the PR ready, and requires all post-undraft exact-head checks including both SonarCloud checks.
 Draft-head checks are preflight evidence only because some CI workflows may run only on the `ready_for_review` event.
+Draft checks are preflight only; on failure or a moved main/head, return the PR to draft and repeat the delivery loop.
 
 **The driver runs this loop, including the ready transition, on its own initiative.**
 Marking a PR ready is a step the driver owns outright, not a decision to refer upward, so the driver never waits to be told to undraft.
 Delivery is only complete when the PR is ready and its exact-head checks are green; a green PR left in draft is unfinished work, not a cautious pause, because draft checks prove nothing about the workflows that run only on `ready_for_review`.
 The maintainer's decision point is reviewing and merging the ready PR, and asking them to authorise the transition into that state only moves work back to the person the loop exists to serve.
+The ready transition is the driver's own step, so run it without asking: a green PR still sitting in draft has not had its deciding checks run, so it is unfinished, not safely parked.
 Ask first only when the user has said to hold, when the change is one the user asked to inspect before it goes out, or when a delivery precondition below cannot be met.
+Hold at draft only when the user asked to hold or a delivery precondition is unmet, and say which.
 
 1. Finalize the PR title, body, issue linkage, screenshots, and other metadata before the final run.
 2. Fetch `origin/main`, capture the expected remote PR-head SHA, and require a clean coordinator checkout with no active mutable lane.
@@ -619,7 +649,9 @@ Bundling is acceptable when changes overlap on the same files such that hunk-spl
 ## Agent Roles & Bindings
 
 Each role is defined **once** in its shared `.agents/skills/<role>/SKILL.md` (the canonical persona and Codex repository-discovery location).
+Shared project skills live in `.agents/skills/` (the canonical persona definition for each role lives in `.agents/skills/<role>/SKILL.md`).
 Both provider agents are **thin bindings** that point at that skill — change behavior in the skill, not in the bindings.
+Use those shared skills instead of creating provider-local copies or provider-specific mirrors; see the bindings table in `AGENTS.md`.
 The default workflow above auto-spawns these roles based on change signals; explicit requests are only required for roles the routing table does not cover.
 
 Each row below is one **binding**, so a model-tiered family occupies three rows that share one canonical skill and differ only by model pin.

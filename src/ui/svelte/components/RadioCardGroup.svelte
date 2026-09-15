@@ -1,78 +1,40 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  ── A RECORDED DEVIATION FROM THE PROTOTYPE, AND THE RULING THAT SETTLED IT ─────────────
-  The GM Component Catalogue prototype draws its own radio card at `padding: 12px 13px;
-  gap: 11px; border-radius: 11px`, with a 28px leading glyph tile and `600 11.5px` labels
-  (`proto:2120` for the Tool breakage-mode trio and `proto:4596` for the shared `radioCard`
-  helper every one of its groups is built from). This primitive does not match those numbers
-  and is NOT going to be changed to.
+  A fieldset of radio CARDS for a closed mode set: one card per option, with an optional inline
+  second datum and a sentence line beneath the name. Nine callers, all closed mode sets.
 
-  MAINTAINER RULING (issue 1373, round 2, plan ruling 4): control heights, radii and spacing
-  stay on Fabricate's shipped scale; TYPE and COLOUR come from the prototype. So a per-4px
-  difference in a card's padding or a 1px difference in its radius is a deliberate hold, not
-  drift — and the primitive is not to be route-scoped to give one caller the prototype's
-  geometry either, because a shipped primitive that varies by caller is the union of its
-  callers.
-
-  This note exists because the deviation is otherwise invisible: measured against the design's
-  markup it looks exactly like a defect, has been reported as one, and would be rediscovered
-  on every audit that reads the prototype rather than this file.
-
-  ── `option.meta`: A SECOND DATUM ON THE NAME LINE (issue 1373, maintainer round 3) ─────
-  The Tool Requirements bonus list draws one row per WORLD MODIFIER, and the design puts that
-  entry's roll expression on the label's own line rather than beneath it: `proto:2363` writes
-  the label at `600 11.5px var(--sans)` and, in the same flex row at `gap: 8px`, the expression
-  at `600 10px var(--mono)` in `--subtle`. `option.description` is the wrong slot for it — that
-  is the sentence line under the name, in the body face — so the primitive gains an OPTIONAL
-  inline datum instead of a second component owning half of an option row.
-
-  It is DEFAULT ABSENT, so all nine shipped callers render byte for byte as before, and it is
-  typed here rather than in the sheet: `styles/fabricate.css` is imported at `layer(modules)`
-  while a Svelte scoped block is injected unlayered, so a property this component declares in
-  its own block cannot be overridden from that sheet at all. The rest of the row's appearance
-  stays in the sheet, where it already lives, because none of it moves.
-
-  ── AND `option.meta` NOW HAS NO CALLER (issue 1373, maintainer round 4) ────────────────
-  Round 4 ruled the Tool bonus list off this primitive entirely — the world modifier library is
-  presented as the Checks Studio's compact ROWS (`ModifierLibraryRow.svelte`), and this group is
-  reserved for closed mode sets, which is what its nine remaining callers all are. `meta` was
-  added for that one caller and is now unused.
-
-  IT IS LEFT IN PLACE DELIBERATELY, not overlooked. Deleting a shipped primitive's prop is a
-  change to a shared surface with its own reviewers, and it does not belong inside the diff that
-  orphaned it; it is recorded here so the next reader finds a decision rather than dead code, and
-  it is owed a follow-up that removes the prop, its markup branch and its rule together.
-
-  ── THE FAMILY IS ROOTED AT `fabricate-option-cards` (issue 1509) ──────────────────
-  Every `manager-resolution-*` rule this component needs used to begin `.fabricate-manager`, so
-  the group drew unstyled anywhere outside the manager window. The root leads the `class` template
-  below, which `Field` appends to its own `fabricate-field manager-field` — so the rendered
-  fieldset carries TWO namespace roots, `Field`'s and this one's, on one element.
-
-  That co-rooting is why this family declares NO font floor of its own. `Field`'s
-  `.fabricate-field :is(input, select, textarea)` at (0,1,1) already reaches every radio inside
-  this group in every host, so a second floor would restate the same property at the same rank
-  rather than establish one. The two families are measurably DISJOINT — no selector in
-  `styles/fabricate.css` names a `manager-field`/`fabricate-field` class together with a
-  `manager-resolution-*` one — which is what keeps each root from reading as an application root
-  to the other's area-scope entry. Both facts are asserted in
-  `tests/components/searchable-popover-area-scope.test.js`.
-
-  The `class` template is read by the area-scope gate's markup extractor, and the root is a
-  LITERAL at its head for that reason. The entry deliberately declares no `classProps`: a
-  `classProps: ['class']` entry's reader matches EVERY class attribute in this markup — twelve of
-  them — against a floor of one. What that would have bought is bought instead by the mounted
-  root-emission assertion in `tests/components/field-mounted.test.js`, which reads the RENDERED
-  `className` off the fieldset.
-
-  ── AND THE `ResolutionModeCard` SHIM IS GONE (issue 1509) ────────────────────────
-  Its four call sites render this component directly. It mapped three names — `legendFallback`,
-  `hintFallback` and `variant === 'config-card'` — and NO alias prop is kept for any of them,
-  because a permanent duplicate prop name on a shared primitive costs more than four call-site
-  edits. `configCards` is stated EXPLICITLY at every one of those sites, in both directions: the
-  shim derived it from `variant` and defaulted to FALSE, while this component defaults to TRUE, so
-  a site that merely dropped `variant` would flip from the compact single-column face to the
-  two-column config-card face.
+  Invariants:
+  - A RECORDED DEVIATION FROM THE PROTOTYPE, WHICH IS NOT GOING TO BE CORRECTED. MAINTAINER RULING:
+    control heights, radii and spacing stay on Fabricate's shipped scale, while TYPE and COLOUR
+    come from the prototype — so a per-4px difference in a card's padding or a 1px difference in
+    its radius is a deliberate HOLD, not drift, and the primitive is not to be route-scoped to give
+    one caller the prototype's geometry either, because a shipped primitive that varies by caller
+    is the union of its callers. Written down because the deviation is otherwise invisible: it
+    looks exactly like a defect, has been reported as one, and would be rediscovered on every
+    audit that reads the prototype rather than this file.
+  - `option.meta` IS AN OPTIONAL INLINE DATUM ON THE NAME LINE, typed in this component's own
+    scoped block rather than in the sheet: `styles/fabricate.css` is imported at `layer(modules)`
+    while a scoped block is injected UNLAYERED, so a property declared here cannot be overridden
+    from that sheet at all. The rest of the row's appearance stays in the sheet, because none of
+    it moves. `option.description` is the wrong slot for the same datum — that is the sentence
+    line under the name, in the body face.
+  - `option.meta` HAS NO CALLER TODAY, AND IS LEFT IN PLACE DELIBERATELY rather than overlooked:
+    the one caller it was added for was ruled off this primitive entirely. Deleting a shipped
+    primitive's prop is a change to a shared surface with its own reviewers, and it is owed a
+    follow-up that removes the prop, its markup branch and its rule together.
+  - THIS FAMILY DECLARES NO FONT FLOOR OF ITS OWN, because the rendered fieldset carries TWO
+    namespace roots on one element and `Field`'s own floor at (0,1,1) already reaches every radio
+    in every host, so a second would restate the same property at the same rank. The two families
+    are measurably DISJOINT — no selector names a class of one together with a class of the other
+    — which is what keeps each root from reading as an application root to the other's area-scope
+    entry. Both facts are asserted in `searchable-popover-area-scope.test.js`.
+  - THE AREA-SCOPE ENTRY DELIBERATELY DECLARES NO `classProps`. A `classProps: ['class']` reader
+    matches EVERY class attribute in this markup — twelve of them — against a floor of one. What
+    that would have bought is bought instead by the mounted root-emission assertion in
+    `tests/components/field-mounted.test.js`, which reads the RENDERED `className` off the
+    fieldset.
+  - `configCards` IS STATED EXPLICITLY AT EVERY CALL SITE, in both directions: the retired shim
+    defaulted it to FALSE where this component defaults to TRUE, so a site that merely dropped the
+    shim's `variant` would flip face. No alias prop is kept for any of that shim's renamed props.
 -->
 <script>
   import Field from './Field.svelte';
@@ -82,12 +44,10 @@
     cardId = undefined,
     legend = '',
     legendKey = '',
-    // Whether the fieldset's own `<legend>` is VISIBLE. The `is-config-cards` face hides every
-    // legend, which is right for a group that already sits under a kicker naming it and wrong
-    // for one that does not: the Tool Requirements gate-mode pair was the only group on its
-    // screen with no visible heading at all (issue 1373). Opt-in and DEFAULT OFF, so every
-    // shipped group renders unchanged, and it un-hides the group's own accessible name rather
-    // than adding a second heading a screen reader would announce twice.
+    // Whether the fieldset's own `<legend>` is VISIBLE. The config-cards face hides every legend,
+    // which is right for a group already sitting under a kicker naming it and wrong for one that
+    // is not. Opt-in and DEFAULT OFF, and it un-hides the group's own accessible name rather than
+    // adding a second heading a screen reader would announce twice.
     legendVisible = false,
     hint = '',
     hintKey = '',
@@ -178,14 +138,11 @@
 </Field>
 
 <style>
-  /* THE INLINE SECOND DATUM (issue 1373, maintainer round 3). `proto:2363` draws it beside the
-     label at `600 10px var(--mono)` in `--subtle`, `gap: 8px` — so the FACE, the weight and the
-     colour are the design's exactly and only the size is ours, because the label it sits beside
-     is the primitive's shipped `0.82rem` rather than the design's 11.5px and a 10px sibling
-     would read smaller against it than the design draws. `0.72rem` is the size the Checks
-     Studio's read-only row already types the SAME datum at
-     (`.manager-modifier-readonly-expression`, 11.5px), so one datum has one type across the two
-     screens that render it. `--fab-space-2` is the design's 8px gap, on the token.
+  /* THE INLINE SECOND DATUM. The FACE, the weight and the colour are the design's exactly; only
+     the SIZE is ours, because the label it sits beside is the primitive's shipped size rather
+     than the design's and a 10px sibling would read smaller against it than the design draws.
+     `0.72rem` is what the Checks Studio's read-only row already types the SAME datum at, so one
+     datum has one type across the two screens that render it.
 
      `background: none` because Foundry's core sheet fills a bare `<code>`. */
   .manager-resolution-option-meta {

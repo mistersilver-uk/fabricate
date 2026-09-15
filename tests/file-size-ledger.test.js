@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 
-import { byCodePoint, ledgerGate } from './helpers/ratchetBaseline.js';
+import { byCodePoint, pinnedLedgerGate } from './helpers/ratchetBaseline.js';
 import { collectSources, repoRoot } from './helpers/sourceScan.js';
 import {
   FILE_THRESHOLDS,
@@ -66,25 +66,22 @@ function buildLedger() {
   return Object.fromEntries(entries.sort(([left], [right]) => byCodePoint(left, right)));
 }
 
-const gate = ledgerGate({
+const gate = pinnedLedgerGate({
+  test,
+  assert,
+  title: 'the file-size ledger matches the pinned baseline exactly',
   ledgerPath: LEDGER_PATH,
   regenerateEnv: 'UPDATE_FILE_SIZE_LEDGER',
   build: buildLedger,
-  wording: {
-    subject: 'oversized files and functions',
-    regenerate: REGENERATE,
-    structuralHint:
-      'A unit appears when it crosses its threshold and vanishes when it falls below; an ' +
-      'extraction is expected to remove entries, and adding one needs a reason. A `#N` suffix ' +
-      'is positional among same-named functions, so an added or removed sibling renumbers those ' +
-      'after it: a matched added/removed pair at the same line count is that renumber, not debt.',
-    roseHint: 'means a unit this epic exists to shrink has grown instead',
-    fellHint: 'needs the ledger lowered to bank the extraction',
-  },
-});
-
-test('the file-size ledger matches the pinned baseline exactly', () => {
-  gate.check(assert);
+  subject: 'oversized files and functions',
+  regenerate: REGENERATE,
+  structuralHint:
+    'A unit appears when it crosses its threshold and vanishes when it falls below; an ' +
+    'extraction is expected to remove entries, and adding one needs a reason. A `#N` suffix ' +
+    'is positional among same-named functions, so an added or removed sibling renumbers those ' +
+    'after it: a matched added/removed pair at the same line count is that renumber, not debt.',
+  roseHint: 'means a unit this epic exists to shrink has grown instead',
+  fellHint: 'needs the ledger lowered to bank the extraction',
 });
 
 test('the thresholds are the two the issue states, and exclusive', () => {
@@ -251,6 +248,9 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // own, which the block cannot have while it is one branch inside a larger file. Not bundled
   // here, because a blocked maintainer is waiting on the defect this commit fixes, and a new
   // `.svelte` child additionally has to join `writeCompiledSvelte` and four mount harnesses.
-  assert.equal(files, 128, 'oversized files');
+  // 126 after merging origin/main, which condensed 38 component headers and took Chip and
+  // IconButton back under the .svelte threshold -- two of this branch's entries removed by
+  // someone else's work rather than by ours.
+  assert.equal(files, 126, 'oversized files');
   assert.equal(keys.length - files, 124, 'oversized functions');
 });

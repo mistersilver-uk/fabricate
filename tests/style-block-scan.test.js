@@ -333,8 +333,8 @@ test('a <style> opener must be the whole line, and prose naming one opens nothin
 
 test('the ManagerButton prose trap stays shut', () => {
   // A PINNED proof against the real tree rather than a fixture of it. This file mentions
-  // `<style>` twice in docblock prose — explaining that it has none — and carries no closing tag
-  // anywhere in its 268 lines, so a naive `indexOf('<style')` reads from line 70 to EOF as CSS.
+  // `<style>` in docblock prose — explaining that it has none — and carries no closing tag
+  // anywhere in its 190 lines, so a naive `indexOf('<style')` reads from line 67 to EOF as CSS.
   // It is inert today only because that prose happens to hold no CSS-shaped text, which is
   // exactly why it needs a test rather than luck.
   const file = 'src/ui/svelte/components/ManagerButton.svelte';
