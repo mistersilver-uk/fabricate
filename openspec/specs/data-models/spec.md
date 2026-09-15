@@ -3072,6 +3072,11 @@ Past it the active GM MUST release a claim whose request is `settled`, `abandone
 Every other case MUST retain the claim and MUST keep requiring `reconcileJournalRunAuthority` — an uncertain effect, an unreadable acquisition stamp, an unknown status, and in particular a still-`processing` request whose holding session can no longer be running it, whose effect may be half applied.
 Only the elected GM releases; another realm judges the same claim for its own availability and writes nothing.
 An automatic release MUST be confined to the provably-leaked case, because releasing a claim that should have been kept is a data-integrity failure and is worse than the block it removes.
+
+Releasing a claim MUST confirm it server-side before dispatching the delete, through the same authoritative read the ledger arbitration uses, scoped to the one ledger.
+The embedded page collection is broadcast-fed and can still show a claim the server has already removed, and a delete naming an absent ID raises a user-visible Foundry notification that no caller can suppress, because the socket layer reports the error before it rejects the promise.
+A claim the server no longer holds MUST be reported as released rather than refused, which is what reconciliation already reports for that same state, while a claim that survived its delete MUST still report failure and a page another claim ID holds MUST NOT be deleted by any caller.
+The acquire keeps the duplicate embedded-`_id` rejection, which alone resolves the simultaneous-acquire race atomically, because ordinary contention never reaches it: a live claim is refused as `claim-held` before any create is dispatched.
 This arbitration and the execution journal are not a transaction across Foundry document writes, macros and publications, and MUST NOT be described as atomic execution or automatic rollback.
 
 Boot reconstruction MAY scan orphaned execution journals only under an exclusively acquired claim when no prior claim exists.

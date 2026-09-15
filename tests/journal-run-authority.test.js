@@ -18,15 +18,28 @@ import { JOURNAL_RUN_COMMAND_TIMEOUT_MS } from '../src/systems/journalRunCommand
 function foundryAuthorityFixture(crypto) {
   const journal = [];
   const claimCalls = [];
+  // Every message the real `SocketInterface.#handleError` would have shown the user. It raises
+  // `ui.notifications.error` UNCONDITIONALLY before returning the error for rejection, so a
+  // server rejection IS a toast and no `catch` in the adapter can take it back. Counting them is
+  // the only way to assert the maintainer's requirement: that the user sees nothing.
+  const serverRejections = [];
+  const getCalls = [];
   let generatedPageIds = 0;
+  let ledgerSeq = 0;
   const makeEntry = (source) => {
     let state = source.flags.fabricate.journalRunAuthorityState;
+    // The SERVER's pages, and the broadcast-fed LOCAL mirror of them, kept as two collections so
+    // a test can drive them apart the way a missed delete broadcast does in a real world.
+    const serverPages = new Map();
     const pages = new Map();
+    ledgerSeq += 1;
+    const entryId = ledgerSeq === 1 ? 'ledger' : `ledger-${ledgerSeq}`;
     return {
-      id: 'ledger',
-      _id: 'ledger',
+      id: entryId,
+      _id: entryId,
       _stats: { createdTime: 5000 },
       pages,
+      serverPages,
       getFlag: (scope, key) =>
         scope === 'fabricate' && key === 'journalRunAuthorityState'
           ? state
@@ -42,20 +55,49 @@ function foundryAuthorityFixture(crypto) {
         generatedPageIds += 1;
         const id =
           options.keepId && pageSource._id ? pageSource._id : `generated-${generatedPageIds}`;
-        if (pages.has(id)) {
-          throw new Error(`The _id [${id}] already exists within the parent collection`);
+        if (serverPages.has(id)) {
+          // `_createDocuments` throws this inside the database semaphore, which is what makes
+          // the fixed-`_id` claim an atomic compare-and-set.
+          const message = `The _id [${id}] already exists within the parent collection`;
+          serverRejections.push(message);
+          throw new Error(message);
         }
         const page = { id, getFlag: (scope, key) => pageSource.flags?.[scope]?.[key] };
+        serverPages.set(page.id, page);
         pages.set(page.id, page);
         return [page];
       },
       // Core resolves the DELETED DOCUMENTS, not their ids. A looser double answering ids kept
       // the adapter's `item === page.id` fallback alive and hid the fall-open branch beside it.
-      deleteEmbeddedDocuments: async (_type, ids) => {
-        const removed = ids.map((id) => pages.get(id)).filter(Boolean);
-        for (const id of ids) pages.delete(id);
+      //
+      // It also never REFUSED, which is how a vacuous absence guard came to ship beside it. Real
+      // `deleteEmbeddedDocuments` rejects twice over: `#preDeleteDocumentArray` resolves each id
+      // through `collection.get(id, {strict: true})` against the LOCAL collection before
+      // dispatching, and `_deleteDocuments` then throws `<Type> "<id>" does not exist!` for an id
+      // the SERVER has not got. Only the second is a toast, and only a SUCCESSFUL response prunes
+      // the local collection, so a rejected delete leaves `pages` exactly as it was.
+      deleteEmbeddedDocuments: async (type, ids) => {
+        for (const id of ids) {
+          if (!pages.has(id)) {
+            throw new Error(`${type} id [${id}] does not exist in the EmbeddedCollection`);
+          }
+        }
+        for (const id of ids) {
+          if (!serverPages.has(id)) {
+            const message = `${type} "${id}" does not exist!`;
+            serverRejections.push(message);
+            throw new Error(message);
+          }
+        }
+        const removed = ids.map((id) => serverPages.get(id));
+        for (const id of ids) {
+          serverPages.delete(id);
+          pages.delete(id);
+        }
         return removed;
       },
+      /** Another realm's delete, whose broadcast this client never received. */
+      dropServerPage: (id) => serverPages.delete(id),
     };
   };
   const game = {
@@ -70,10 +112,27 @@ function foundryAuthorityFixture(crypto) {
       return entry;
     },
   };
-  // The authoritative server read the provisioner requires. `CONFIG.DatabaseBackend.get` is
-  // public on V13.351 and V14.365, and an adapter that CANNOT perform it now reports unsettled
-  // rather than "no ledger exists" — so a fixture without it would model a dead runtime.
-  const CONFIG = { DatabaseBackend: { get: async () => [...journal] } };
+  // The authoritative server read the provisioner and the claim release both rest on.
+  // `CONFIG.DatabaseBackend.get` is public on V13.351 and V14.365, and an adapter that CANNOT
+  // perform it now reports unsettled rather than "no ledger exists" — so a fixture without it
+  // would model a dead runtime. It answers from `serverPages`, never from the local mirror, and
+  // honours the `_id` query the release scopes its read with.
+  const CONFIG = {
+    DatabaseBackend: {
+      get: async (_documentClass, { query = {} } = {}) => {
+        getCalls.push(query);
+        return journal
+          .filter((entry) => Object.entries(query).every(([key, value]) => entry[key] === value))
+          .map((entry) => ({
+            _id: entry._id,
+            id: entry.id,
+            _stats: entry._stats,
+            pages: new Map(entry.serverPages),
+            getFlag: entry.getFlag,
+          }));
+      },
+    },
+  };
   const authority = createFoundryJournalRunAuthority({
     game,
     JournalEntry,
@@ -81,7 +140,28 @@ function foundryAuthorityFixture(crypto) {
     crypto,
     reconstructExecutions: async () => ({ success: true, reconstructed: 0 }),
   });
-  return Object.assign(authority, { claimCalls, journal, makeEntry });
+  return Object.assign(authority, { claimCalls, journal, makeEntry, serverRejections, getCalls });
+}
+
+/**
+ * Seat a claim page belonging to ANOTHER realm on one ledger, server copy and local mirror alike,
+ * exactly as the create broadcast would have delivered it.
+ */
+function seatForeignClaim(entry, claimId, acquiredAt = Date.now()) {
+  const flags = {
+    fabricate: {
+      journalRunClaimId: claimId,
+      journalRunRequestId: 'req-elsewhere',
+      journalRunClaimedAt: acquiredAt,
+    },
+  };
+  const page = {
+    id: JOURNAL_RUN_CLAIM_PAGE_ID,
+    getFlag: (scope, key) => flags[scope]?.[key],
+  };
+  entry.serverPages.set(page.id, page);
+  entry.pages.set(page.id, page);
+  return page;
 }
 
 function sharedAuthorityWorld() {
@@ -267,6 +347,174 @@ describe('journal run authority ledger', () => {
     ]);
     assert.notEqual(first.id, JOURNAL_RUN_CLAIM_PAGE_ID);
     assert.notEqual(first.id, second.id);
+  });
+
+  it('releases a claim the server already lost, without a delete it would reject', async () => {
+    // The maintainer's own world, reproduced. `entry.pages` is the BROADCAST-FED local copy, so
+    // it can still show a claim page another realm's reaper has already deleted. The release
+    // used to dispatch a delete naming that id, and the server answered
+    // `JournalEntryPage "FabRunAuthority1" does not exist!` — a message `SocketInterface`
+    // raises as a toast BEFORE rejecting, so catching the rejection never hid it, and the
+    // absence re-read beside the catch could never answer true because a rejected delete does
+    // not prune the local collection. The claim then read as unreleased and the run was left
+    // behind a blocking `claim-release-failed` recovery notice.
+    const authority = foundryAuthorityFixture({ randomUUID: () => 'secure-uuid' });
+    assert.equal((await authority.setup()).success, true);
+    const ledger = authority.journal.at(0);
+
+    const response = await authority.run(
+      { requestId: 'reaped-claim', senderId: 'player', sessionId: 'one' },
+      async () => {
+        ledger.dropServerPage(JOURNAL_RUN_CLAIM_PAGE_ID);
+        assert.equal(
+          ledger.pages.has(JOURNAL_RUN_CLAIM_PAGE_ID),
+          true,
+          'the local copy still shows the page, which is the whole problem'
+        );
+        return { success: true };
+      }
+    );
+
+    assert.deepEqual(response, { success: true });
+    assert.deepEqual(
+      authority.serverRejections,
+      [],
+      'nothing was dispatched that the server would refuse, so the user saw no toast'
+    );
+    assert.deepEqual(
+      authority.availability(),
+      { available: true, reason: null },
+      'and absence is the goal state, so the run is not left behind a recovery notice'
+    );
+  });
+
+  it('still fails the release when the claim survives the attempt', async () => {
+    // The tolerance is not a blanket yes: a delete that failed with the claim STILL on the
+    // server is a real failure, and the answer comes from asking the server again rather than
+    // from `entry.pages`, which a rejected delete leaves untouched.
+    const authority = foundryAuthorityFixture({ randomUUID: () => 'secure-uuid' });
+    assert.equal((await authority.setup()).success, true);
+    const ledger = authority.journal.at(0);
+    const dispatch = ledger.deleteEmbeddedDocuments;
+
+    const response = await authority.run(
+      { requestId: 'refused-delete', senderId: 'player', sessionId: 'one' },
+      async () => {
+        ledger.deleteEmbeddedDocuments = async () => {
+          throw new Error('User lacks permission to delete this JournalEntryPage');
+        };
+        return { success: true };
+      }
+    );
+    ledger.deleteEmbeddedDocuments = dispatch;
+
+    assert.deepEqual(response, { success: true });
+    assert.deepEqual(authority.availability(), {
+      available: false,
+      reason: 'claim-release-failed',
+    });
+    assert.equal(
+      ledger.serverPages.has(JOURNAL_RUN_CLAIM_PAGE_ID),
+      true,
+      'the claim really did survive, which is why the release reports failure'
+    );
+  });
+
+  it('never deletes a claim page a different claim holds', async () => {
+    const authority = foundryAuthorityFixture({ randomUUID: () => 'secure-uuid' });
+    assert.equal((await authority.setup()).success, true);
+    const ledger = authority.journal.at(0);
+
+    await authority.run(
+      { requestId: 'stolen-claim', senderId: 'player', sessionId: 'one' },
+      async () => {
+        ledger.dropServerPage(JOURNAL_RUN_CLAIM_PAGE_ID);
+        ledger.pages.delete(JOURNAL_RUN_CLAIM_PAGE_ID);
+        seatForeignClaim(ledger, 'someone-elses');
+        return { success: true };
+      }
+    );
+
+    assert.equal(
+      ledger.serverPages.get(JOURNAL_RUN_CLAIM_PAGE_ID)?.getFlag('fabricate', 'journalRunClaimId'),
+      'someone-elses',
+      "another holder's claim is left exactly where it was"
+    );
+    assert.deepEqual(authority.availability(), {
+      available: false,
+      reason: 'claim-release-failed',
+    });
+    assert.deepEqual(authority.serverRejections, []);
+  });
+
+  it('refuses a contended acquire before any create is dispatched', async () => {
+    // Why `claimOn` KEEPS its rejection. The create's duplicate-`_id` refusal is the atomic
+    // compare-and-set the whole lock is made of, and it is not the everyday error the release
+    // was, because ordinary contention never reaches it: `ledgerResult` reads the claim and
+    // answers `claim-held` for a LIVE claim before `acquire` ever calls `claimOn`. Only two
+    // realms that both saw the claim free can collide at the server, which is the knife-edge the
+    // atomicity exists for and the one case asking first could not resolve either.
+    const authority = foundryAuthorityFixture({ randomUUID: () => 'secure-uuid' });
+    assert.equal((await authority.setup()).success, true);
+    const ledger = authority.journal.at(0);
+    seatForeignClaim(ledger, 'held-elsewhere');
+    const dispatchedCreates = authority.claimCalls.length;
+
+    const response = await authority.run(
+      { requestId: 'contended', senderId: 'player', sessionId: 'one' },
+      async () => ({ success: true, handlerRan: true })
+    );
+
+    assert.deepEqual(response, { success: false, reason: 'claim-held' });
+    assert.equal(
+      authority.claimCalls.length,
+      dispatchedCreates,
+      'no create was dispatched, so there was no duplicate-id rejection to toast'
+    );
+    assert.deepEqual(authority.serverRejections, []);
+    assert.equal(
+      ledger.serverPages.get(JOURNAL_RUN_CLAIM_PAGE_ID)?.getFlag('fabricate', 'journalRunClaimId'),
+      'held-elsewhere',
+      'and the incumbent claim is untouched'
+    );
+  });
+
+  it('reaps a stale local claim the server already lost and carries on', async () => {
+    // The same drift reached through the reaper rather than the release. A claim page left in
+    // the local copy after the server lost it is judged LEAKED once it outlives the live window,
+    // and reaping it used to dispatch the delete the server refuses — so the Journal answered
+    // `claim-held` and toasted, every command, indefinitely. Absence is the goal state, so the
+    // reap now succeeds and the command runs.
+    const authority = foundryAuthorityFixture({ randomUUID: () => 'secure-uuid' });
+    assert.equal((await authority.setup()).success, true);
+    const ledger = authority.journal.at(0);
+    seatForeignClaim(ledger, 'stale-local-only', Date.now() - JOURNAL_RUN_CLAIM_LIVE_WINDOW_MS - 1);
+    ledger.dropServerPage(JOURNAL_RUN_CLAIM_PAGE_ID);
+
+    const response = await authority.run(
+      { requestId: 'after-stale-reap', senderId: 'player', sessionId: 'one' },
+      async () => ({ success: true })
+    );
+
+    assert.deepEqual(response, { success: true });
+    assert.deepEqual(authority.serverRejections, []);
+    assert.deepEqual(authority.availability(), { available: true, reason: null });
+  });
+
+  it('scopes the release read to one ledger rather than the whole journal', async () => {
+    // The provisioner's duplicate hunt must read every entry; a release must not. `find` matches
+    // the `_id` query server-side, so an ordinary release ships one entry.
+    const authority = foundryAuthorityFixture({ randomUUID: () => 'secure-uuid' });
+    assert.equal((await authority.setup()).success, true);
+    assert.deepEqual(
+      authority.getCalls.filter((query) => Object.keys(query).length > 0),
+      [{ _id: 'ledger' }],
+      'the only narrowed read is the one the release makes'
+    );
+    assert.ok(
+      authority.getCalls.some((query) => Object.keys(query).length === 0),
+      'and the provisioner still reads every entry, because a duplicate could be any of them'
+    );
   });
 
   it('uses Web Crypto UUIDs for authority claims and prepare tokens', async () => {

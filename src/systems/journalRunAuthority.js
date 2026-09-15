@@ -719,18 +719,41 @@ export function createFoundryJournalRunAuthority({
   // `game.journal` is broadcast-fed, so a post-create relist of it can still miss a racing
   // session's ledger. This `get` round-trips to the server, but is NOT permission-filtered for
   // world documents, so it stays behind the GM check. Its documents are detached `fromSource`
-  // copies: rank on them, then act by id against `game.journal`.
-  // `null` means the authoritative read could not be performed, which the provisioner treats as
-  // unsettled — never as "no ledger exists", which would authorise a duplicate.
-  const listLedgerRecords = async () => {
+  // copies WITH their embedded pages expanded (the server answers a non-index get through
+  // `find`, which runs `expandEmbedded` on every matched record), so a claim page can be read
+  // from one. Rank on them, then act by id against `game.journal`.
+  // `null` means the read could not be performed, which every caller treats as unsettled — never
+  // as "the server has nothing", which would authorise a duplicate ledger or call a held claim
+  // released.
+  const authoritativeEntries = async (query) => {
     if (game?.user?.isGM !== true || typeof CONFIG?.DatabaseBackend?.get !== 'function') {
       return null;
     }
-    const entries = (await CONFIG.DatabaseBackend.get(JournalEntry, { query: {} })) ?? [];
-    return [...entries].filter(isLedger).map((entry) => ({
+    return [...((await CONFIG.DatabaseBackend.get(JournalEntry, { query })) ?? [])];
+  };
+  const listLedgerRecords = async () => {
+    const entries = await authoritativeEntries({});
+    if (entries === null) return null;
+    return entries.filter(isLedger).map((entry) => ({
       id: entry._id ?? entry.id,
       createdTime: Number(entry._stats?.createdTime) || 0,
     }));
+  };
+  /**
+   * Read ONE ledger's claim page from the SERVER, not from the broadcast-fed local copy. Scoped
+   * by `_id` so an ordinary release ships one entry rather than the whole journal, and re-checked
+   * below, so the narrowing stays an optimisation rather than a correctness assumption.
+   * @returns {Promise<{present: boolean, claimId: ?string}|null>} `null` when unreadable.
+   */
+  const readServerClaim = async (ledgerId) => {
+    if (!ledgerId) return null;
+    const entries = await authoritativeEntries({ _id: ledgerId });
+    if (entries === null) return null;
+    const entry = entries.find((candidate) => (candidate?._id ?? candidate?.id) === ledgerId);
+    // A ledger the server no longer has holds no claim either: absent, not unreadable.
+    const page = entry?.pages?.get?.(JOURNAL_RUN_CLAIM_PAGE_ID) ?? null;
+    if (!page) return { present: false, claimId: null };
+    return { present: true, claimId: page.getFlag?.('fabricate', 'journalRunClaimId') ?? null };
   };
   return createJournalRunAuthority({
     currentUser: () => game?.user ?? null,
@@ -756,6 +779,12 @@ export function createFoundryJournalRunAuthority({
     readState: async (entry) => entry?.getFlag?.('fabricate', AUTHORITY_STATE_FLAG),
     writeState: async (entry, state) =>
       entry.update({ [`flags.fabricate.${AUTHORITY_STATE_FLAG}`]: state }),
+    // This create KEEPS its duplicate-`_id` rejection, unlike the release below. It is the
+    // compare-and-set the lock is made of — `_createDocuments` runs inside the database semaphore
+    // — and asking first could not replace it, because "free when asked" is what both racers
+    // would be told. It is not an everyday error either: `ledgerResult` answers `claim-held` for
+    // a LIVE claim before `acquire` reaches `claimOn`, so ordinary contention is refused locally
+    // and dispatches nothing. Only two realms that BOTH saw the claim free collide here.
     createClaim: async (entry, source) => {
       const created = await entry.createEmbeddedDocuments(
         'JournalEntryPage',
@@ -792,26 +821,39 @@ export function createFoundryJournalRunAuthority({
     // `deleteEmbeddedDocuments` resolves the DELETED DOCUMENTS, so document identity is the
     // whole answer. It used to fall open to `true` for any non-array, which only a test double
     // produces and which reports a claim as released when nothing was.
+    //
+    // ASK THE SERVER FIRST. `pages` is the BROADCAST-FED local copy, so it can still show a page
+    // the server has already removed, and deleting by that id makes the server throw
+    // `JournalEntryPage "FabRunAuthority1" does not exist!` — what stranded the maintainer's run.
+    // That cannot be swallowed: `SocketInterface.#handleError` calls `ui.notifications.error`
+    // UNCONDITIONALLY and only then returns the error for rejection, so a `catch` suppresses the
+    // exception and never the toast. Routing an EXPECTED outcome through a server rejection is a
+    // user-visible error by construction; confirming beforehand is what removes it.
     deleteClaim: async (entry, claimId) => {
-      const page = entry?.pages?.get?.(JOURNAL_RUN_CLAIM_PAGE_ID) ?? null;
-      if (!page || page.getFlag?.('fabricate', 'journalRunClaimId') !== claimId) return false;
-      // `pages` is the BROADCAST-FED local copy, so it can still show a page the server has
-      // already deleted — another realm's reaper, or a release this client has not heard about
-      // yet. `deleteEmbeddedDocuments` THROWS for an absent id rather than reporting it, and an
-      // escaping throw stranded the maintainer's run: the release button reported
-      // `JournalEntryPage "FabRunAuthority1" does not exist!` and left the claim un-cleared.
-      //
-      // Absence is the goal state, so re-read after a failed attempt and report released when
-      // the page is genuinely gone. A delete that failed with the page STILL present is a real
-      // failure and still answers false.
-      try {
-        const deleted = await entry.deleteEmbeddedDocuments('JournalEntryPage', [page.id]);
-        if (Array.isArray(deleted) && deleted.some((document) => document?.id === page.id))
-          return true;
-      } catch {
-        // fall through to the absence re-read
+      const local = entry?.pages?.get?.(JOURNAL_RUN_CLAIM_PAGE_ID) ?? null;
+      // A page some OTHER claim holds is never this caller's to delete, whoever asks.
+      if (local && local.getFlag?.('fabricate', 'journalRunClaimId') !== claimId) return false;
+      const server = await readServerClaim(entry?.id ?? entry?._id);
+      if (server) {
+        // Absence is the goal state this release exists to reach, so reaching it already is a
+        // success — the same answer `reconcile` gives the identical state.
+        if (!server.present) return true;
+        if (server.claimId !== claimId) return false;
       }
-      return !entry?.pages?.get?.(JOURNAL_RUN_CLAIM_PAGE_ID);
+      // Core resolves each id through `collection.get(id, {strict: true})` BEFORE dispatching,
+      // so a page this realm has not got cannot be deleted from here at all.
+      if (!local) return false;
+      try {
+        const deleted = await entry.deleteEmbeddedDocuments('JournalEntryPage', [local.id]);
+        return Array.isArray(deleted) && deleted.some((document) => document?.id === local.id);
+      } catch {
+        // Confirmation narrows the window to one round trip; it cannot close it. This catch
+        // keeps a residual rejection from escaping the release, and does NOT hide its toast. A
+        // rejected delete never prunes the local collection — the client removes documents only
+        // on a SUCCESSFUL response — so ask the server again rather than reading `entry.pages`.
+        const after = await readServerClaim(entry?.id ?? entry?._id);
+        return after !== null && !after.present;
+      }
     },
     reconstructExecutions,
     randomId,
