@@ -44,7 +44,7 @@ src/ui/svelte/apps/manager/scoped	9061
 src/ui/svelte/apps/manager/system	75
 src/ui/svelte/apps/manager/tools	1852
 src/ui/svelte/apps/manager/world	352
-src/ui/svelte/components	6918
+src/ui/svelte/components	6929
 src/ui/svelte/stores	6966
 src/ui/svelte/util	3453
 src/utils	7546
@@ -53,7 +53,7 @@ tests	40420
 tests/actions	155
 tests/canvas	622
 tests/canvas/regions	292
-tests/components	36363
+tests/components	36374
 tests/fixtures	72
 tests/fixtures/chip	44
 tests/fixtures/manager-select	51
