@@ -3576,6 +3576,8 @@ StepModel = {
    A terminal `status` (`succeeded`, `failed`, `cancelled`) passes through to `derivedStatus` unchanged.
    For a non-terminal run, a persisted pause takes precedence and projects `paused`; remaining time and progress use its frozen remainder even after the former gate deadline.
    Otherwise readiness is derived from the active readiness gate's `availableAt`: `ready` when `availableAt <= worldTime`, otherwise `waiting`.
+   Progress on an unpaused gate is `requiredSeconds - (availableAt - worldTime)` over `requiredSeconds`, never elapsed wall time from `initiatedAt`.
+   Resuming re-anchors `availableAt` alone and leaves `requiredSeconds` and `initiatedAt` as authored, so only the deadline form carries the paused span; measuring from `initiatedAt` banks every paused second as work and reports a full bar beside a remaining-time label still counting down.
    A non-terminal run with no armed gate is `inProgress`.
    Apart from terminal and pause precedence, the persisted `status` (e.g. a `waitingTime` that `processWorldTime` flips asynchronously) does not override the active gate's readiness.
    The `processWorldTime` write side (the salvage/crafting timed resume and its `_persist`/`setFlag` broadcast write) is **primary-GM-gated** (`game.users.activeGM?.id === game.user?.id`) so it fires exactly once even though `updateWorldTime` is a synced hook on every client — mirroring the gathering matured-run publication gate; a resume deferred while no GM is connected is caught up by the primary GM's startup `processWorldTime` pass.
