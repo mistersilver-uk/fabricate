@@ -86,6 +86,7 @@ export const JOURNAL_RUN_REASON_KEYS = Object.freeze({
   currencyRequired: 'FABRICATE.App.Journal.Actions.CurrencyRequired',
   toolRequired: 'FABRICATE.App.Journal.Actions.ToolRequired',
   routeUnavailable: 'FABRICATE.App.Journal.Actions.RouteUnavailable',
+  sourcesUnavailable: 'FABRICATE.App.Journal.Actions.SourcesUnavailable',
   choiceRequired: 'FABRICATE.App.Journal.Actions.ChoiceRequired',
   routeRequired: 'FABRICATE.App.Journal.Actions.RouteRequired',
   stageNotStarted: 'FABRICATE.App.Journal.Actions.StageNotStarted',

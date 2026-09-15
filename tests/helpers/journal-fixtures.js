@@ -166,11 +166,25 @@ export async function createPersistedCraftingHistory({
   failLast = false, cancelAfter = null, armNext = false, opaque = false,
   resumePrefix = false, stageCount = 2, mode = 'simple', checked = true, awardQuantity = undefined, previewOnly = false, transformBeforeResume = null,
   legacy = false, timed = true, refuseConsumeAt = null, refuseSettlement = false, drive = null,
+  // The 99gp plan and the canned 2gp settlement below exist so a history-capture fixture has
+  // currency EVIDENCE to project. A DRIVEN fixture asserts that the engine and the projection
+  // agree, and cannot do that while the engine's settlement is stubbed away, so it settles for
+  // real against the ladder this fixture configures (issue 1648, QE2-5).
+  stubCurrencySettlement = drive === null,
 } = {}) {
   const { CraftingEngine } = await import('../../src/systems/CraftingEngine.js');
   const { CraftingRunManager } = await import('../../src/systems/CraftingRunManager.js');
   const { RunJournalBuilder } = await import('../../src/systems/RunJournalBuilder.js');
   const { IngredientSet } = await import('../../src/models/IngredientSet.js');
+  const { makeWorldCurrencyConfig } = await import('./currency-spend-fixtures.js');
+  const { ActorPropertyCoinSpender } = await import('../../src/systems/CoinSpenders.js');
+  const { affordsCurrencySpends, buildCurrencyAffordProbe } = await import(
+    '../../src/systems/currencyAffordance.js'
+  );
+  const { findMatchingComponent, resolveItemEssences } = await import(
+    '../../src/utils/essenceResolver.js'
+  );
+  const { resolvedComponentsFor } = await import('../../src/systems/scopedEntityReads.js');
   const saved = { game: globalThis.game, foundry: globalThis.foundry, Roll: globalThis.Roll };
   let sequence = 0;
   const viewer = { id: 'history-player', isGM: false };
@@ -187,6 +201,7 @@ export async function createPersistedCraftingHistory({
   const system = {
     id: 'history-system', name: 'Recorded crafting', resolutionMode: mode,
     features: { multiStepRecipes: true, essences: true, craftingChecks: checked },
+    requirements: { currency: { enabled: true } },
     craftingCheck: { simple: { rollFormula: checked ? '1d20' : '' } },
     essenceDefinitions: [{ id: 'sun', name: 'Sun' }, { id: 'moon', name: 'Moon' }],
     components: Array.from({ length: stageCount }, (_, index) => ({ id: `award-stage-${index}`, name: `Award stage-${index}`, img: 'icons/commodities/gems/gem-faceted-round-blue.webp' })),
@@ -217,23 +232,35 @@ export async function createPersistedCraftingHistory({
   };
   let manager = new CraftingRunManager();
   const recipeManager = { getRecipe: () => recipe, canCraft: () => ({ canCraft: true }), getToolsForSet: () => [] };
+  // A REAL ladder and a REAL spender, so the projection's currency answer and the engine's come
+  // from the same place production reads them from (issue 1648, QE2-5).
+  const currencyConfigStore = { get: () => makeWorldCurrencyConfig() };
+  const currencySeams = {
+    actorPropertyCoinSpender: new ActorPropertyCoinSpender(),
+    getCurrencyConfig: () => currencyConfigStore.get(),
+  };
   const configure = () => {
-    const engine = new CraftingEngine(recipeManager, manager);
+    const engine = new CraftingEngine(recipeManager, manager, null, null, null, null,
+      currencySeams.actorPropertyCoinSpender, { currencyConfigStore });
     engine.installVersionedRunAuthority({ consumeExecutionGrant: async (_grant, context) => ({
       operationId: `operation-${context.requestId}`,
       resolvedCheckResult: { success: !(failLast && manager.getActiveRuns(actor)[0]?.currentStepIndex === stageCount - 1),
         value: checked ? 17 : null, data: checked ? { formula: '1d20', total: 17, dc: 12 } : {} },
     }) });
-    const prepare = engine._prepareVersionedStage.bind(engine);
-    engine._prepareVersionedStage = async (args) => {
-      const prepared = await prepare(args);
-      if (prepared.valid) {
-        prepared.currencySpends = [{ unit: 'gp', amount: 99 }];
-        prepared.plan.currencySpends = prepared.currencySpends;
-      }
-      return prepared;
-    };
-    engine._spendCraftCurrencyVersioned = async () => ({ settledSpends: [{ unit: 'gp', amount: 2 }] });
+    if (stubCurrencySettlement) {
+      const prepare = engine._prepareVersionedStage.bind(engine);
+      engine._prepareVersionedStage = async (args) => {
+        const prepared = await prepare(args);
+        if (prepared.valid) {
+          prepared.currencySpends = [{ unit: 'gp', amount: 99 }];
+          prepared.plan.currencySpends = prepared.currencySpends;
+        }
+        return prepared;
+      };
+      engine._spendCraftCurrencyVersioned = async () => ({
+        settledSpends: [{ unit: 'gp', amount: 2 }],
+      });
+    }
     engine._versionedFailureAwardAllowed = () => true;
     return engine;
   };
@@ -245,6 +272,7 @@ export async function createPersistedCraftingHistory({
         getCraftingSystemManager: () => ({ getSystem: () => system }),
         getRecipeVisibilityService: () => visibility,
       } };
+    game.fabricate.getCurrencyConfigStore = () => currencyConfigStore;
     let engine = configure();
     if (legacy) {
       const { stubRoll } = await import('./gathering.js');
@@ -292,6 +320,20 @@ export async function createPersistedCraftingHistory({
         getResultItem: () => null, getComponent: () => null,
         nowWorldTime: () => Number(game.time?.worldTime ?? 0),
         getComponentSourceActors: () => sources,
+        // The three resolution seams `main.js` wires. Without them the projection is currency-
+        // and essence-BLIND rather than currency- and essence-correct, so an agreement assertion
+        // passes in a configuration production never runs (issue 1648, QE2-5).
+        resolveItemEssences: ({ item, recipe: view }) =>
+          resolveItemEssences(
+            item,
+            resolvedComponentsFor(system),
+            view?.craftingSystemId,
+            findMatchingComponent
+          ),
+        affordCurrency: ({ actor: holder, recipe: view, match }) =>
+          buildCurrencyAffordProbe(holder, view, currencySeams)(match),
+        affordCurrencySpends: ({ actor: holder, recipe: view, currencySpends }) =>
+          affordsCurrencySpends(holder, view, currencySpends, currencySeams),
       }).buildListing({ actor, viewer: candidate });
       const driven = await drive({ engine, actor, sources, recipe, steps, set, system, gm, viewer,
         runId: started.runId, started, project, manager: () => manager,

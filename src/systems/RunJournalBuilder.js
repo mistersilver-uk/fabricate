@@ -30,6 +30,7 @@ import {
   missingGroupBlocker,
   resolveStageToolStates,
   scopedEssenceAllocation,
+  selectedIngredientItems,
   stageSelectionInputsComplete,
   unfundedEssenceGroupIds,
 } from './stageReadiness.js';
@@ -120,6 +121,7 @@ const SAFE_EXECUTION_EFFECT_KINDS = new Set([
   'recordAlchemyDeadEnd',
   'consumeAlchemyItems',
   'createGatheredResults',
+  'refundStageConsumption',
 ]);
 
 /**
@@ -248,6 +250,7 @@ export class RunJournalBuilder {
    * @param {Function} [deps.getComponentSourceActors] `({actor, run}) => object[]`.
    * @param {Function} [deps.resolveItemEssences] `({item, recipe}) => Record<string, number>`.
    * @param {Function} [deps.affordCurrency] `({actor, recipe, match}) => boolean`.
+   * @param {Function} [deps.affordCurrencySpends] `({actor, recipe, currencySpends}) => boolean`.
    */
   constructor({
     craftingRunManager = null,
@@ -272,6 +275,7 @@ export class RunJournalBuilder {
     getComponentSourceActors = null,
     resolveItemEssences = null,
     affordCurrency = null,
+    affordCurrencySpends = null,
   } = {}) {
     this._craftingRunManager = craftingRunManager;
     this._salvageRunManager = salvageRunManager;
@@ -304,6 +308,8 @@ export class RunJournalBuilder {
     this._resolveItemEssences =
       typeof resolveItemEssences === 'function' ? resolveItemEssences : undefined;
     this._affordCurrency = typeof affordCurrency === 'function' ? affordCurrency : undefined;
+    this._affordCurrencySpends =
+      typeof affordCurrencySpends === 'function' ? affordCurrencySpends : null;
   }
 
   /**
@@ -841,27 +847,41 @@ export class RunJournalBuilder {
     entitledHistory = [],
   }) {
     const evidence = historyEntitled ? craftingStepHistoryEvidence(runStep) : {};
-    const toolStates = isCurrent
-      ? resolveStageToolStates({
-          recipeManager: this._recipeManager,
-          recipe,
+    // The engine's own order: resolve the selection, THEN ask about tools excluding the items that
+    // selection will spend, because one Item cannot be both (issue 1648, F4). `probeTools` is
+    // called synchronously from inside `_selectionAvailability`, so its answer is readable here.
+    let toolStates = null;
+    const probeTools = ({ ingredientSet = null, excludedItems = null } = {}) => {
+      toolStates = resolveStageToolStates({
+        recipeManager: this._recipeManager,
+        recipe,
+        recipeStep,
+        ingredientSet: ingredientSet ?? this._selectedCraftingIngredientSet(runStep, recipeStep),
+        sourceActors: availability?.sourceActors ?? [],
+        primaryActor: actor,
+        excludedItems,
+      });
+      return toolStates;
+    };
+    const selectionAvailability = isCurrent
+      ? this._selectionAvailability({
+          runStep,
           recipeStep,
-          ingredientSet: this._selectedCraftingIngredientSet(runStep, recipeStep),
-          sourceActors: availability?.sourceActors ?? [],
-          primaryActor: actor,
+          recipe,
+          actor,
+          snapshot: availability?.snapshot ?? null,
+          sourcesUnresolvable: availability?.sourcesUnresolvable === true,
+          probeTools,
         })
       : null;
-    const consumed = historyEntitled
-      ? enrichHistoricalConsumption(runStep, {
-          earlierItems: historicalItemSources(
-            entitledHistory,
-            runStep?.startedAt ?? run?.startedAt ?? runStep?.completedAt ?? run?.finishedAt,
-            { sameTimeIsEarlier: true }
-          ),
-          liveItem: this._getResultItem,
-          component: (id) => this._getComponent(systemId, id),
-        })
-      : normalizeList(runStep?.consumedIngredients);
+    if (isCurrent && toolStates === null) probeTools();
+    const consumed = this._stageConsumedIngredients({
+      runStep,
+      run,
+      systemId,
+      historyEntitled,
+      entitledHistory,
+    });
     return {
       stepId: stringOrNull(runStep?.stepId),
       stepName: stringOrEmpty(runStep?.stepName),
@@ -938,18 +958,22 @@ export class RunJournalBuilder {
         index > run.currentStepIndex
           ? this._futureCraftingInputs({ recipeStep, system, recipe, index })
           : null,
-      selectionAvailability: isCurrent
-        ? this._selectionAvailability({
-            runStep,
-            recipeStep,
-            recipe,
-            actor,
-            run,
-            snapshot: availability?.snapshot ?? null,
-            toolStates,
-          })
-        : null,
+      selectionAvailability,
     };
+  }
+
+  /** A stage's recorded consumption, enriched from earlier terminal evidence when entitled. */
+  _stageConsumedIngredients({ runStep, run, systemId, historyEntitled, entitledHistory }) {
+    if (!historyEntitled) return normalizeList(runStep?.consumedIngredients);
+    return enrichHistoricalConsumption(runStep, {
+      earlierItems: historicalItemSources(
+        entitledHistory,
+        runStep?.startedAt ?? run?.startedAt ?? runStep?.completedAt ?? run?.finishedAt,
+        { sameTimeIsEarlier: true }
+      ),
+      liveItem: this._getResultItem,
+      component: (id) => this._getComponent(systemId, id),
+    });
   }
 
   /**
@@ -975,8 +999,19 @@ export class RunJournalBuilder {
    * that rule.
    *
    * @private
-   * @returns {{materials: object[], essence: object|null}|null} `null` unless this is the
-   *   current stage of a live run and that stage has started.
+   * `currencySpends` rides with them: a stage whose only requirement was a price recorded its
+   * settlement here and nowhere the live view read, so the whole started branch rendered blank
+   * (issue 1648, QE2-3).
+   *
+   * The catalogue fallback is NOT gated on history entitlement, and that is deliberate rather than
+   * an omission (issue 1648, QE2-7). `consumedIngredients` passes `!historyEntitled` as
+   * `resolveMetadata` because an ENTITLED viewer's rows are enriched separately, from earlier
+   * terminal evidence; this record has no such enrichment, so the same argument would strip an
+   * entitled viewer's own receipt of names it is plainly entitled to.
+   *
+   * @private
+   * @returns {{materials: object[], essence: object|null, currencySpends: object[]}|null} `null`
+   *   unless this is the current stage of a live run and that stage has started.
    */
   _stageConsumptionRecord({ runStep, systemId, isCurrent }) {
     const prepared = isCurrent ? plainObjectOrNull(runStep?.preparedConsumption) : null;
@@ -986,6 +1021,10 @@ export class RunJournalBuilder {
         this._mapResult(entry, systemId)
       ),
       essence: craftingStepHistoryEvidence(prepared).essenceSpend ?? null,
+      currencySpends: normalizeList(prepared.currencySpends).map((spend) => ({
+        unit: stringOrEmpty(spend?.unit),
+        amount: numberOrNull(spend?.amount),
+      })),
     };
   }
 
@@ -1256,8 +1295,22 @@ export class RunJournalBuilder {
     } catch {
       sourceActors = [];
     }
-    if (sourceActors.length === 0)
-      return { snapshot: fallback, sourceActors: actor ? [actor] : [] };
+    // A RECORDED source the world no longer holds means this stage is being judged against an
+    // inventory that is not its own, and the engine refuses it outright ("The crafting component
+    // sources changed after the run started"). The resolver falls back to the crafting actor, so
+    // an absent source is invisible in the resolved list and has to be found by comparing what the
+    // run RECORDED against what resolved (issue 1648, F5).
+    const resolved = new Set(
+      (sourceActors.length > 0 ? sourceActors : actor ? [actor] : []).map((source) =>
+        stringOrNull(source?.uuid)
+      )
+    );
+    const sourcesUnresolvable = normalizeList(run?.componentSourceActorUuids).some(
+      (uuid) => !resolved.has(stringOrNull(uuid))
+    );
+    if (sourceActors.length === 0) {
+      return { snapshot: fallback, sourceActors: actor ? [actor] : [], sourcesUnresolvable };
+    }
     return {
       snapshot: buildPassInventorySnapshot({
         craftingActor: actor,
@@ -1266,10 +1319,19 @@ export class RunJournalBuilder {
         resolveComponent: this._resolveComponentForItem,
       }),
       sourceActors,
+      sourcesUnresolvable,
     };
   }
 
-  _selectionAvailability({ runStep, recipeStep, recipe, actor, snapshot, toolStates = null }) {
+  _selectionAvailability({
+    runStep,
+    recipeStep,
+    recipe,
+    actor,
+    snapshot,
+    sourcesUnresolvable = false,
+    probeTools = () => null,
+  }) {
     const plan = runStep?.selectionPlan;
     const sets = normalizeList(recipeStep?.ingredientSets);
     // One authored route is not a choice, so a stage that has not chosen yet still reads as
@@ -1285,7 +1347,12 @@ export class RunJournalBuilder {
     // A started stage already holds what it needs: it is reported as SPENT rather than
     // probed against an inventory the consumption has emptied, which would otherwise read
     // back as a material shortfall and block the run it already paid for.
+    const held = snapshot ? snapshot.heldItems().map((entry) => entry.item) : [];
     if (runStep?.preparedConsumption && ingredientSet) {
+      // What a tool probe must exclude here is whatever of the spent inputs is still physically
+      // present: a partially consumed stack stays in inventory after the start commit.
+      const excludedItems = startedStageItems(runStep, held);
+      const toolStates = probeTools({ ingredientSet, excludedItems });
       return this._lockedSelectionAvailability({
         runStep,
         ingredientSet,
@@ -1302,7 +1369,7 @@ export class RunJournalBuilder {
     if (typeof ingredientSet.resolveIngredientSelection !== 'function' || !snapshot) {
       return null;
     }
-    const items = snapshot.heldItems().map((entry) => entry.item);
+    const items = held;
     const optionOverrides = plainObjectOrNull(plan?.ingredientOptionOverrides) ?? {};
     const essenceAllocation = this._scopedEssenceAllocation(plan, runStep, ingredientSet);
     const selection = this._resolveIngredientSelection({
@@ -1329,37 +1396,33 @@ export class RunJournalBuilder {
     );
     const choicesByGroup = new Map(choices.map((choice) => [choice.groupId, choice]));
     if (routes.length > 1) {
-      for (const route of routes) {
-        const set = sets.find((candidate) => candidate.id === route.id);
-        const probe =
-          route.id === setId
-            ? selection
-            : this._resolveIngredientSelection({
-                ingredientSet: set,
-                recipe,
-                actor,
-                items,
-                optionOverrides: {},
-                essenceAllocation: null,
-              });
-        route.shortfallCount = acquisitionShortfallCount(probe);
-        route.needsSelection = probe?.success !== true && route.shortfallCount === 0;
-        route.entries =
-          this._craftingYieldPreview({
-            runStep: { selectedIngredientSetId: route.id },
-            recipeStep,
-            recipe,
-            system,
-            index: 0,
-          })?.entries ?? [];
-      }
+      this._describeRoutes({
+        routes,
+        sets,
+        setId,
+        selection,
+        recipe,
+        recipeStep,
+        actor,
+        items,
+        system,
+      });
     }
+    const toolStates = probeTools({
+      ingredientSet,
+      excludedItems: selectedIngredientItems(selection),
+    });
     // ONE readiness verdict, from the predicate the engine's own stage commands consult.
-    const { blocker } = classifyStageReadiness({
+    const readiness = classifyStageReadiness({
       selection,
       inputsComplete: stageSelectionInputsComplete(ingredientSet, plan, runStep?.stepId),
       toolsAvailable: normalizeList(toolStates).every((tool) => tool?.available === true),
+      currencyAffordable: this._affordsCurrencySpends({ actor, recipe, selection }),
     });
+    // An unresolvable source set means every verdict above was reached against the wrong
+    // inventory, so it reports itself rather than whichever shortfall that inventory happened to
+    // show (issue 1648, F5).
+    const blocker = sourcesUnresolvable ? 'sourcesUnavailable' : readiness.blocker;
     return {
       selectedIngredientSetId: setId,
       routes,
@@ -1383,6 +1446,51 @@ export class RunJournalBuilder {
       ),
       essencePool: this._safeEssencePool(selection?.essencePool, system),
     };
+  }
+
+  /** Each alternative route's shortfall, unmade-pick state and yield, described in place. */
+  _describeRoutes({ routes, sets, setId, selection, recipe, recipeStep, actor, items, system }) {
+    for (const route of routes) {
+      const set = sets.find((candidate) => candidate.id === route.id);
+      const probe =
+        route.id === setId
+          ? selection
+          : this._resolveIngredientSelection({
+              ingredientSet: set,
+              recipe,
+              actor,
+              items,
+              optionOverrides: {},
+              essenceAllocation: null,
+            });
+      route.shortfallCount = acquisitionShortfallCount(probe);
+      route.needsSelection = probe?.success !== true && route.shortfallCount === 0;
+      route.entries =
+        this._craftingYieldPreview({
+          runStep: { selectedIngredientSetId: route.id },
+          recipeStep,
+          recipe,
+          system,
+          index: 0,
+        })?.entries ?? [];
+    }
+  }
+
+  /**
+   * Whether the actor can afford the selection's currency AS A SET. The resolver's own probe is
+   * PER OPTION, so two currency ingredients each affordable alone but not together resolved as
+   * success and were then refused by the engine's aggregate gate (issue 1648, F2). `true` when
+   * nothing can answer, which is the predicate's stated meaning for an unanswerable input.
+   * @private
+   */
+  _affordsCurrencySpends({ actor, recipe, selection }) {
+    const currencySpends = normalizeList(selection?.currencySpends);
+    if (currencySpends.length === 0 || !this._affordCurrencySpends) return true;
+    try {
+      return this._affordCurrencySpends({ actor, recipe, currencySpends }) !== false;
+    } catch {
+      return true;
+    }
   }
 
   _resolveIngredientSelection({
@@ -2433,6 +2541,7 @@ export class RunJournalBuilder {
       ...runIdentityFields({ run, runType, actorUuid, activityKind, lifecycleContract }),
       recoveryEvidence,
       awaitingChoice: choiceRequired,
+      stageStart: projectedStageStart(stageStart),
       actions: this._runActions({
         run,
         runType,
@@ -2779,6 +2888,26 @@ function runIdentityFields({ run, runType, actorUuid, activityKind, lifecycleCon
  * is the one cause the "choose this stage's route" sentence was ever right about (issue 1648,
  * F5) — while a started one has no pick left to make and reports the recipe edit instead.
  */
+/**
+ * Whether the current stage has begun, independently of whether this viewer may act on it. A
+ * surface that reads `actions.atStageStart` for the FACT loses it whenever the authority is
+ * refusing, the viewer is not the owner, or the run needs recovery (issue 1648, UX2-2).
+ */
+function projectedStageStart(stageStart) {
+  if (stageStart === null || stageStart === undefined) return null;
+  return { required: stageStart.required === true, started: stageStart.started === true };
+}
+
+/** The consumed items a started stage has not fully removed, for the tool exclusion. */
+function startedStageItems(runStep, items) {
+  const uuids = new Set(
+    normalizeList(runStep?.preparedConsumption?.consumedSummary)
+      .map((entry) => stringOrNull(entry?.itemUuid))
+      .filter(Boolean)
+  );
+  return new Set(items.filter((item) => uuids.has(stringOrNull(item?.uuid))));
+}
+
 function unchosenRouteAvailability(setId, routes, started = false) {
   return {
     success: false,

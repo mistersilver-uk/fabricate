@@ -260,6 +260,7 @@ const CREDIT_CURRENCY_GATE_KEYS = Object.freeze({
  * home of a member's words, and the gate now answers `{ actors, outcome, messageData }`.
  */
 import {
+  affordsCurrencySpends,
   buildCurrencyAffordProbe,
   checkWorldCurrencyAffordability,
   creditWorldCurrency,
@@ -4993,6 +4994,15 @@ class Fabricate {
             recipe,
             this.craftingEngine?._currencySeams?.() ?? {}
           )(match),
+        // The AGGREGATE answer the per-option probe above cannot give: two currency ingredients
+        // each affordable alone but not together (issue 1648, F2).
+        affordCurrencySpends: ({ actor, recipe, currencySpends }) =>
+          affordsCurrencySpends(
+            actor,
+            recipe,
+            currencySpends,
+            this.craftingEngine?._currencySeams?.() ?? {}
+          ),
         getDismissedRunKeys: ({ actorUuid, viewerId }) =>
           this.getDismissedJournalRunKeys({ actorUuid, viewerId }),
         getJournalActionAvailability: () => this.getJournalRunAuthorityAvailability(),

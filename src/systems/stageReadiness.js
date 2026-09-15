@@ -43,6 +43,23 @@ const SHORTFALL_ORDER = Object.freeze([
   STAGE_BLOCKERS.currency,
 ]);
 
+/**
+ * The concrete owned Items a resolved selection will consume. A physical Item cannot be both
+ * spent as an ingredient and held as a reusable Tool in one attempt, so every tool probe excludes
+ * them. Declared here, on the shared readiness seam, so the projection and the engine exclude the
+ * same set (issue 1648, F4).
+ *
+ * @param {object|null} selection
+ * @returns {Set<object>}
+ */
+export function selectedIngredientItems(selection) {
+  return new Set(
+    (Array.isArray(selection?.plan) ? selection.plan : [])
+      .map((entry) => entry?.item)
+      .filter(Boolean)
+  );
+}
+
 /** The ingredient family a resolved option belongs to. */
 export function ingredientKind(option) {
   if (option?.itemUuid) return 'item';
@@ -168,8 +185,8 @@ export function classifyStageReadiness({
 
 /**
  * Every tool the stage requires, with whether the actor holds it, through the SAME recipe-manager
- * seam `CraftingEngine._validateTools` uses, so a tool the command refuses on is one this reports
- * as missing. `null` when nothing can answer.
+ * seam `CraftingEngine._validateTools` uses — `excludedItems` included, so an item the selection
+ * will spend cannot also satisfy a tool here and be refused there. `null` when nothing can answer.
  * @returns {Array<{id, name, img, available, needsRepair}>|null}
  */
 export function resolveStageToolStates({
@@ -179,6 +196,7 @@ export function resolveStageToolStates({
   ingredientSet,
   sourceActors = [],
   primaryActor = null,
+  excludedItems = null,
 }) {
   if (typeof recipeManager?.getToolsForSet !== 'function') return null;
   if (typeof recipeManager?.resolveToolStates !== 'function') return null;
@@ -186,7 +204,14 @@ export function resolveStageToolStates({
   try {
     const tools = recipeManager.getToolsForSet(view, ingredientSet);
     if (!Array.isArray(tools) || tools.length === 0) return [];
-    const states = recipeManager.resolveToolStates(view, tools, sourceActors, { primaryActor });
+    const states = recipeManager.resolveToolStates(view, tools, sourceActors, {
+      primaryActor,
+      excludedItems,
+    });
+    // `resolveToolStates` is synchronous, and this reads its answer positionally. A refactor of it
+    // to async would make every entry `undefined` and silently block every stage, so the probe
+    // refuses an answer it cannot index rather than reporting one.
+    if (!Array.isArray(states) || states.length !== tools.length) return null;
     return tools.map((tool, index) => ({
       id: String(tool?.id ?? '').trim() || null,
       name: String(states?.[index]?.name ?? tool?.label ?? tool?.name ?? ''),

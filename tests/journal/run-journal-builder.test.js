@@ -169,7 +169,10 @@ function activeCraftingRun(overrides = {}) {
     startedAt: 100,
     updatedAt: 150,
     currentStepIndex: 1,
-    componentSourceActorUuids: ['Actor.x'],
+    // The crafting actor's OWN uuid. A run that records a source the world cannot resolve is a
+    // different state — the projection reports `sourcesUnavailable` for it (issue 1648, F5) —
+    // and naming a stranger here made every case in this file depict that state by accident.
+    componentSourceActorUuids: [ACTOR.uuid],
     steps: [
       {
         stepId: 's0',
@@ -2588,6 +2591,77 @@ test('a started stage projects what it consumed, never the requirement it was me
   assert.equal(started.steps[0].consumptionRecord, null,
     'stage one is finished and is not the current stage, so it projects no live receipt');
   assert.equal(started.steps[0].stageStarted, true, 'though it certainly did start');
+});
+
+/**
+ * D-031: a currency-only ingredient set is authorable, so the live receipt's THIRD field is the
+ * payment — projected beside the materials and the essence recap, and read by the same helper the
+ * terminal screen reads.
+ *
+ * The second half disposes of QE2-7, which read `_stageConsumptionRecord`'s missing
+ * `!historyEntitled` argument as a redaction its neighbours apply. That argument is
+ * `resolveMetadata`, and it is passed INVERTED to entitlement on purpose: an entitled viewer's
+ * `consumedIngredients` rows are enriched separately from earlier terminal evidence, so the
+ * catalogue fallback is switched OFF for them and ON for everyone else. Copying it here would
+ * take an entitled viewer's own receipt names away, which is the opposite of a redaction.
+ */
+test('the live receipt carries currency, and its catalogue fallback is not a disclosure', () => {
+  const recorded = {
+    selectedIngredientSetId: 'route-iron',
+    currencySpends: [{ unit: 'gp', amount: 50 }],
+    consumedSummary: [
+      { actorUuid: 'Actor.actor-1', itemUuid: 'Actor.actor-1.Item.bare', componentId: 'iron',
+        quantity: 1 },
+    ],
+  };
+  const project = (recipeVisibility) =>
+    projectChoiceRun({
+      executionSteps: [
+        { id: 's0', toolIds: [], timeRequirement: { hours: 1 }, ingredientSets: [ironRoute()] },
+        { id: 's1', toolIds: [], timeRequirement: { hours: 1 }, ingredientSets: [ironRoute()] },
+      ],
+      currentStepIndex: 1,
+      runSteps: [
+        { stepId: 's0', stepName: 'Forge', index: 0, status: 'succeeded',
+          preparedConsumption: { consumedSummary: [] }, createdResults: [] },
+        { stepId: 's1', stepName: 'Temper', index: 1, status: 'inProgress',
+          selectionPlan: { selectedIngredientSetId: 'route-iron' },
+          preparedConsumption: recorded,
+          // The NEIGHBOUR field, given the same id-only row so the two are comparable.
+          consumedIngredients: recorded.consumedSummary,
+          timeGate: { requiredSeconds: 3600, initiatedAt: 150, availableAt: 3750 } },
+      ],
+      dependencies: {
+        recipeVisibility,
+        getComponent: () => ({ id: 'iron', name: 'Catalogue Iron', img: 'icons/iron.webp' }),
+      },
+    });
+
+  const disclosed = project({ evaluateRecipeAccess: () => ({ visible: true }) });
+  assert.deepEqual(
+    disclosed.currentStep.consumptionRecord.currencySpends,
+    [{ unit: 'gp', amount: 50 }],
+    'what the stage PAID at start, which no other projected field carried'
+  );
+  assert.equal(
+    disclosed.currentStep.consumptionRecord.materials[0].name,
+    'Catalogue Iron',
+    'and a row the record named by id alone still reads, for the viewer it belongs to'
+  );
+
+  // Access ANSWERS NOTHING: the run is not redacted — its steps are still projected — and the
+  // viewer is not history-entitled either. The receipt discloses no more than its neighbour.
+  const withheld = project({ evaluateRecipeAccess: () => null });
+  assert.equal(
+    withheld.currentStep.consumedIngredients[0].name,
+    'Catalogue Iron',
+    'the neighbour resolves the catalogue for exactly this viewer'
+  );
+  assert.equal(
+    withheld.currentStep.consumptionRecord.materials[0].name,
+    'Catalogue Iron',
+    'so the receipt is not the field that discloses; the two agree'
+  );
 });
 
 test('a started stage whose locked route is deleted reports the edit, not an impossible choice', () => {

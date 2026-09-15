@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 
 import { createPersistedCraftingHistory, historyItem } from './helpers/journal-fixtures.js';
 import { IngredientSet } from '../src/models/IngredientSet.js';
+import { RunJournalBuilder } from '../src/systems/RunJournalBuilder.js';
 
 let requests = 0;
 const grant = () => ({ requestId: `readiness-${++requests}`, executionGrant: 'grant' });
@@ -217,6 +218,147 @@ test('QE-2: a tool sold while a started stage waits refuses its primary, so it i
   assert.match(fixture.refused.message, /Missing required tool/);
   assert.equal(fixture.model.actions.execute, false, 'the started stage withholds its primary');
   assert.equal(fixture.model.actions.disabledReason, 'toolRequired');
+});
+
+/**
+ * F2/QE2-4. The resolver's currency probe is PER OPTION, so two prices each affordable alone
+ * resolved as success and the engine's aggregate gate then refused the begin the projection had
+ * offered. 50 gp held against 30 + 30 required is the reviewer's own executed disagreement.
+ */
+test('QE-2: two prices affordable alone but not together refuse begin, so it is not offered', async () => {
+  const fixture = await createPersistedCraftingHistory({
+    stageCount: 2,
+    drive: async (context) => {
+      context.actor.system = { currency: { gp: 50, sp: 0 } };
+      await reachUnbegunStage(context, {
+        ingredientSets: route([
+          { id: 'fee-a', name: 'Permit', options: [{ match: { type: 'currency', unit: 'gp', amount: 30 } }] },
+          { id: 'fee-b', name: 'Bribe', options: [{ match: { type: 'currency', unit: 'gp', amount: 30 } }] },
+        ]),
+      });
+      const model = context.project().activeRuns[0];
+      return { model, refused: await beginCall(context) };
+    },
+  });
+
+  assert.equal(fixture.refused.success, false, 'the engine refuses the aggregate');
+  assert.match(fixture.refused.message, /currency|Insufficient/i, fixture.refused.message);
+  assert.equal(fixture.model.actions.beginStep, false, 'so the projection must not offer it');
+  assert.equal(fixture.model.actions.disabledReason, 'currencyRequired');
+  assert.equal(fixture.model.awaitingChoice, false, 'a price is not a choice');
+});
+
+/** The same fixture, affordable: the aggregate gate is a gate, not a constant refusal. */
+test('QE-2: two prices the actor CAN afford together offer begin, and it commits', async () => {
+  const fixture = await createPersistedCraftingHistory({
+    stageCount: 2,
+    drive: async (context) => {
+      context.actor.system = { currency: { gp: 80, sp: 0 } };
+      context.actor.update = async (updates) => {
+        for (const [path, value] of Object.entries(updates)) {
+          const parts = path.split('.');
+          let target = context.actor;
+          for (const part of parts.slice(0, -1)) target = target[part];
+          target[parts.at(-1)] = value;
+        }
+        return context.actor;
+      };
+      await reachUnbegunStage(context, {
+        ingredientSets: route([
+          { id: 'fee-a', name: 'Permit', options: [{ match: { type: 'currency', unit: 'gp', amount: 30 } }] },
+          { id: 'fee-b', name: 'Bribe', options: [{ match: { type: 'currency', unit: 'gp', amount: 30 } }] },
+        ]),
+      });
+      const model = context.project().activeRuns[0];
+      return { model, began: await beginCall(context), gp: context.actor.system.currency.gp };
+    },
+  });
+
+  assert.equal(fixture.model.actions.beginStep, true, 'the control is offered');
+  assert.equal(fixture.model.actions.disabledReason, 'stageNotStarted',
+    'the only thing outstanding is the click itself');
+  assert.equal(fixture.began.success, true, JSON.stringify(fixture.began));
+  assert.equal(fixture.gp, 20, 'and both prices were actually paid');
+});
+
+/**
+ * F4/FI6. An item matched as BOTH a required tool and a selected ingredient is available to the
+ * engine's tool validation only because that validation excludes the selection's items. The
+ * projection's tool probe must exclude the same set, or it reads available where the command
+ * reads missing.
+ */
+test('QE-2: an item that is both the selection and the tool is excluded from both probes alike', async () => {
+  const fixture = await createPersistedCraftingHistory({
+    stageCount: 2,
+    drive: async (context) => {
+      await reachUnbegunStage(context, {
+        toolIds: ['hammer'],
+        ingredientSets: route([
+          { id: 'metal', name: 'Metal', options: [{ quantity: 1, match: { type: 'component', componentId: 'iron' } }] },
+        ]),
+      });
+      // ONE physical item in the whole candidate set - the earlier stage's award included - so
+      // the selection and the tool probe cannot reach for different copies and the exclusion is
+      // what decides.
+      for (const source of [...context.sources, context.actor]) source.items = [];
+      const held = historyItem(context.sources[0], 0);
+      context.engine.recipeManager.ingredientMatchesItem = () => true;
+      context.engine.recipeManager.getToolsForSet = () => [{ id: 'hammer', name: 'Hammer', enabled: true }];
+      // The SAME physical item satisfies the tool, and only while it is not excluded.
+      context.engine.recipeManager.resolveToolStates = (_view, tools, actors, options) => {
+        const excluded = options?.excludedItems ?? new Set();
+        const candidates = actors.flatMap((entry) => [...(entry?.items ?? [])])
+          .filter((item) => !excluded.has(item));
+        return tools.map(() => ({ name: 'Hammer', img: null,
+          available: candidates.some((item) => item.uuid === held.uuid), needsRepair: false }));
+      };
+      const model = context.project().activeRuns[0];
+      return { model, refused: await beginCall(context) };
+    },
+  });
+
+  assert.equal(fixture.refused.success, false, 'the engine refuses: the item is spent, not held');
+  assert.match(fixture.refused.message, /Missing required tool/);
+  assert.equal(fixture.model.actions.beginStep, false, 'so the projection must not offer begin');
+  assert.equal(fixture.model.actions.disabledReason, 'toolRequired');
+});
+
+/**
+ * F5/FI4. A run whose recorded source actors have gone is judged against an inventory that is not
+ * its own, and the engine refuses it outright. The projection says so rather than reporting
+ * whatever shortfall the crafting actor's own inventory happens to show.
+ */
+test('QE-2: a run whose source actors are gone reports that, not a material shortfall', async () => {
+  const fixture = await createPersistedCraftingHistory({
+    stageCount: 2,
+    drive: async (context) => {
+      await reachUnbegunStage(context, {
+        ingredientSets: route([
+          { id: 'metal', name: 'Metal', options: [{ quantity: 1, match: { type: 'component', componentId: 'iron' } }] },
+        ]),
+      });
+      const orphaned = new RunJournalBuilder({
+        craftingRunManager: context.manager(),
+        recipeManager: context.engine.recipeManager,
+        getSystem: () => context.system,
+        nowWorldTime: () => Number(game.time?.worldTime ?? 0),
+        getComponentSourceActors: () => [],
+      }).buildListing({ actor: context.actor, viewer: context.gm });
+      return {
+        model: orphaned.activeRuns[0],
+        refused: await context.engine.beginVersionedStage({
+          viewer: context.gm, actor: context.actor, componentSourceActors: [],
+          runId: context.runId, expectedRevision: revision(context), ...grant(),
+        }),
+      };
+    },
+  });
+
+  assert.equal(fixture.refused.success, false);
+  assert.match(fixture.refused.message, /component sources changed/);
+  assert.equal(fixture.model.actions.beginStep, false);
+  assert.equal(fixture.model.actions.disabledReason, 'sourcesUnavailable');
+  assert.equal(fixture.model.awaitingChoice, false, 'a vanished stash is not a choice');
 });
 
 /**
