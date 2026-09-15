@@ -258,10 +258,40 @@ describe('run primitives mounted behavior', () => {
     // Issue 1648 (M16): an unbounded prompt sentence was sizing the header as a
     // `flex: 0 1 auto` item, pushing the Begin/Cancel button off the card's right edge. Taking
     // its own line keeps the buttons — not the prose — in control of the bar's width.
-    expectGeometry(
-      'RunActionBar',
-      '.fab-run-begin-prompt,\n  .fab-run-cancel-prompt',
-      [/flex:\s*1 1 100%/u]
+    expectGeometry('RunActionBar', '.fab-run-cancel-prompt', [/flex:\s*1 1 100%/u]);
+    // The begin prompt is a CALLOUT under a single line of controls rather than a bare span
+    // beside them, and the decision itself is pushed to the far right. Both are load-bearing:
+    // without the auto margin the controls bunch at the left, and without the full basis the
+    // sentence rejoins the control row at a wide enough window.
+    expectGeometry('RunActionBar', '.fab-run-begin-decision', [/margin-left:\s*auto/u]);
+    expectGeometry('RunActionBar', '.fab-run-begin-prompt', [
+      /flex:\s*1 1 100%/u,
+      /border:\s*1px solid var\(--fab-border\)/u,
+      /background:\s*var\(--fab-bg-1\)/u,
+    ]);
+  });
+
+  it('renders the begin prompt beneath the controls, not inside the decision', async () => {
+    // Issue 1648 (M16), reported twice. The first fix gave the prompt its own line but left it
+    // INSIDE `.fab-run-begin-decision`, so it wrapped ABOVE the button and the controls stayed
+    // bunched left. DOM order is the fix, so DOM order is what this asserts — a geometry pin
+    // alone would have passed on the shape the maintainer rejected.
+    const target = await runActionHarness.mount({
+      run: { id: 'run-1' },
+      runLabel: 'Minor Elixir of Mending',
+      primary: { label: 'Roll check', enabled: false },
+      begin: { label: 'Begin step', enabled: true, prompt: 'Begins the step now.' },
+    });
+    const decision = target.querySelector('[data-run-begin]');
+    const prompt = target.querySelector('[data-run-begin-prompt]');
+    assert.ok(decision, 'the begin decision renders');
+    assert.ok(prompt, 'the prompt renders');
+    assert.equal(decision.contains(prompt), false, 'the prompt is not inside the decision');
+    const bar = target.querySelector('[data-run-action-bar]');
+    const order = [...bar.children];
+    assert.ok(
+      order.indexOf(prompt) > order.indexOf(decision),
+      'and it follows the decision, so it reads as a callout beneath the controls'
     );
   });
 

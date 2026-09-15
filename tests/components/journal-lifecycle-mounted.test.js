@@ -1044,8 +1044,11 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(begin.textContent.trim(), english.FABRICATE.App.Journal.Actions.BeginStep);
     assert.ok(
       mounted.target
-        .querySelector('[data-run-begin]')
-        .textContent.includes(english.FABRICATE.App.Journal.Actions.BeginStepPrompt),
+        .querySelector('[data-run-begin-prompt]')
+        ?.textContent.includes(english.FABRICATE.App.Journal.Actions.BeginStepPrompt),
+      // The sentence is a callout BENEATH the control rather than a span inside it (M16,
+      // reported twice), so this reads the callout. What it asserts is unchanged: the
+      // irreversible act says what it will do, in visible text, before it is clicked.
       'the control states the irreversible thing it is about to do'
     );
     assert.ok(

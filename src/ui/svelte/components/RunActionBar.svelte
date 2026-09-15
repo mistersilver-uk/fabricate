@@ -116,7 +116,6 @@
 
       {#if begin}
         <div class="fab-run-begin-decision" data-run-begin>
-          {#if begin.prompt}<span class="fab-run-begin-prompt">{begin.prompt}</span>{/if}
           <ManagerButton
             role={beginEnabled ? 'primary' : 'neutral'}
             class="fab-run-action-control fab-run-action-primary"
@@ -130,6 +129,13 @@
             {busy ? begin.busyLabel || begin.label : begin.label}
           </ManagerButton>
         </div>
+        <!-- The prompt is a SIBLING of the decision, not a child of it. Inside the decision it
+             wrapped above the button and left the controls bunched at the left; as its own
+             full-width row it reads as a callout under a single line of controls, which is
+             where an irreversible act should explain itself (issue 1648, M16). -->
+        {#if begin.prompt}
+          <p class="fab-run-begin-prompt" data-run-begin-prompt>{begin.prompt}</p>
+        {/if}
       {:else}
         <ManagerButton
           role={primaryEnabled ? 'primary' : 'neutral'}
@@ -212,7 +218,29 @@
     padding-block: 0;
   }
 
-  .fab-run-begin-prompt,
+  /* The begin control sits at the FAR RIGHT of the single control line: the run's other controls
+     read left to right and the irreversible one is the end of that sentence. `margin-left: auto`
+     eats the free space rather than a spacer element, so the row still collapses correctly when
+     the bar is narrow. */
+  .fab-run-begin-decision {
+    margin-left: auto;
+  }
+
+  /* A callout UNDER the controls. It carries a long, localizable sentence, so it must never
+     participate in sizing the control row — `flex-basis: 100%` puts it on its own line at every
+     width, and a translation 1.4x longer cannot push the buttons around. */
+  .fab-run-begin-prompt {
+    box-sizing: border-box;
+    flex: 1 1 100%;
+    margin: 0;
+    padding: var(--fab-space-2);
+    border: 1px solid var(--fab-border);
+    border-radius: 9px;
+    background: var(--fab-bg-1);
+    color: var(--fab-text-subtle);
+    font-size: 10.5px;
+  }
+
   .fab-run-cancel-prompt {
     flex: 1 1 100%;
     color: var(--fab-text-subtle);
