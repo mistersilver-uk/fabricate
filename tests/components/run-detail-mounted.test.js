@@ -320,6 +320,24 @@ describe('RunDetail mounted behavior', () => {
     assert.ok(!reselected.querySelector(forbiddenHistory));
   });
 
+  it('spans the run-completed evidence across the notice rather than indenting it by the glyph', async () => {
+    // Issue 1648: the consumed/produced grid rendered inside `.fab-notice-body`, so it began
+    // after the notice's 13px glyph column and its gap — the card's own rows sat further right
+    // than the identical rows the stage card draws. It is a sibling band now, at the notice's
+    // own padding box. happy-dom cannot compute the cascade, so this reads the DOM.
+    const { model } = await createPersistedCraftingHistory({ stageCount: 1 });
+    const target = await harness.mount({ run: model, journal: { commandResult: { runKey: model.key } } });
+    const notice = target.querySelector('[data-journal-verdict]');
+    assert.ok(Boolean(notice), 'the run-completed card is the notice under test');
+    const band = notice.querySelector('.fab-notice-evidence');
+    assert.ok(Boolean(band), 'the evidence renders');
+    assert.ok(band.parentElement === notice, 'the band is the notice\'s own child, not the body column\'s');
+    assert.ok(!notice.querySelector('.fab-notice-body .fab-notice-evidence'), 'nothing is left inset behind the glyph');
+    assert.ok(Boolean(band.querySelector('[data-history-items="transient-produced"]')), 'the produced grid rides the band');
+    const body = notice.querySelector('.fab-notice-body');
+    assert.ok(Boolean(body.querySelector('.fab-notice-title')), 'the title still sits beside the glyph');
+  });
+
   it('orders current purpose and produces above consumes, and names the check action', async () => {
     const base = makeCraftingRun();
     const step = { ...base.steps[0], presentationSnapshot: { name: 'Recorded stage', description: 'Recorded purpose' } };

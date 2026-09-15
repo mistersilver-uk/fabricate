@@ -88,6 +88,10 @@
      exactly the drift this component removes.
    - title: the sentence that names what happened. Already localized by the caller.
    - detail: the optional second line, which says what to do next.
+   - evidence: an optional snippet naming what the notice is reporting ON — the rows a finished
+     run consumed and produced. It is a BAND across the notice's own padding box, not a third
+     line of the body column: its content is tabular, so an indent by the glyph column would
+     make it disagree with the same rows drawn by the card beside it.
    - icon: optional Font Awesome classes; a per-tone default is used when it is unset.
    - action: `{ label, onClick }`, rendered as one button. The handler is called with
      the click event.
@@ -182,7 +186,6 @@
     <div class="fab-notice-body">
       <div class="fab-notice-title">{title}</div>
       {#if detail}<div class="fab-notice-detail">{detail}</div>{/if}
-      {#if evidence}<div class="fab-notice-evidence">{@render evidence()}</div>{/if}
     </div>
     {#if action}
       <button
@@ -205,14 +208,22 @@
         <i class="fas fa-xmark" aria-hidden="true"></i>
       </button>
     {/if}
+    {#if evidence}<div class="fab-notice-evidence">{@render evidence()}</div>{/if}
   </div>
 {/if}
 
 <style>
+  /* A BAND, NOT A COLUMN (issue 1648). Evidence is a grid of rows, and inside
+     `.fab-notice-body` it began after the glyph column and its `var(--fab-space-3)` gap, so a
+     "Run completed" card indented its consumed/produced lists while the stage card beside it
+     did not. It is a flex sibling now, with a 100% basis that wraps it onto its own line at the
+     notice's own padding box. The title and the detail keep their place beside the glyph, and a
+     notice with no evidence still lays out on one line, where a row gap does not apply. */
   .fab-notice-evidence {
     display: grid;
+    flex: 1 1 100%;
+    min-width: 0;
     gap: var(--fab-space-2);
-    margin-top: var(--fab-space-2);
     font-family: var(--fab-font-mono);
     font-size: 11px;
     color: var(--fab-text-secondary);
@@ -230,7 +241,14 @@
     display: flex;
     /* DECLARED, not inherited from the specimen — see the header. */
     align-items: flex-start;
+    /* Wrapping carries the evidence band only: the glyph is `flex: none`, the body is
+       `flex: 1` (basis 0), and the controls are `flex: none`, so line breaking sees a row that
+       fits until it genuinely cannot — where it used to overflow instead. */
+    flex-wrap: wrap;
     gap: var(--fab-space-3);
+    /* The specimen's gap is BETWEEN THE COLUMNS. The evidence band keeps the
+       `var(--fab-space-2)` it shipped with, so this change moves its left edge and nothing else. */
+    row-gap: var(--fab-space-2);
     min-width: 0;
     /* The specimen declares no margin, and neither does this: separation from what sits
        beneath a notice is the caller's layout, not the notice's geometry. */
