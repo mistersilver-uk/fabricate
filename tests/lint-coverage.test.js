@@ -520,6 +520,7 @@ test('the global ignores are pinned, so a new exclusion is a visible edit', asyn
     '.foundry-perf/',
     '.benchmarks/',
     'test-results/',
+    'tmp/',
     'ui-screenshot-artifact/',
     'content-packs/',
     '.air/',
