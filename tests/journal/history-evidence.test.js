@@ -123,6 +123,79 @@ test('unknown, zero and physical actor conflicts retain independent row evidence
   assert.equal(gatheringHistoryEvidence(data).entries[0].qty, null);
 });
 
+/**
+ * The three identity disqualifiers below were each replaceable with an unconditional pass while
+ * the whole corpus stayed green (issue 1648, Q-H6/Q-H7/Q-M4). The tests named for the first two
+ * passed for a neighbouring reason — a fixture whose award carries no `actorUuid` makes the actor
+ * rule vacuous, and a pair of conflicting prepared rows produces the same `null` — so each fixture
+ * here is built to REACH the disqualifier and to match without it.
+ */
+test('a row whose recorded actor contradicts its own item uuid attributes no receipt', () => {
+  const inconsistent = (fields) => ({
+    id: 'ore',
+    componentId: 'ore',
+    itemUuid: 'Actor.a.Item.ore',
+    dropped: true,
+    roll: 12,
+    ...fields,
+  });
+  const award = { componentId: 'ore', itemUuid: 'Actor.a.Item.ore', quantity: 2 };
+  const evidence = (row, receipt = award) =>
+    gatheringHistoryEvidence({
+      result: { provider: 'd100', items: [row] },
+      awards: [receipt],
+      systemId: 'mining',
+      components: [{ id: 'ore' }],
+    });
+
+  // The control: a row and an award that agree about the owning actor attribute normally.
+  assert.deepEqual(evidence(inconsistent({ actorUuid: 'Actor.a' })).entries[0].qty, 2);
+  // The row names one actor and its item uuid another, so it identifies nothing.
+  const conflicted = evidence(inconsistent({ actorUuid: 'Actor.b' }));
+  assert.equal(conflicted.entries[0].qty, null, 'a self-contradicting row attributes nothing');
+  assert.deepEqual(conflicted.unattributedAwardIndexes, [0], 'and its receipt stays unattributed');
+  // The same rule on the RECEIPT: an award naming an actor its own item uuid denies.
+  const forged = evidence(inconsistent({ actorUuid: 'Actor.a' }), { ...award, actorUuid: 'Actor.b' });
+  assert.equal(forged.entries[0].qty, null);
+  assert.deepEqual(forged.unattributedAwardIndexes, [0]);
+});
+
+test('a shared component id attributes nothing when the record names no crafting system', () => {
+  const evidence = (systemId) =>
+    gatheringHistoryEvidence({
+      result: { provider: 'd100', items: [{ id: 'ore', componentId: 'ore', dropped: true }] },
+      // No item uuid on either side, so the component id is the ONLY thing they share.
+      awards: [{ componentId: 'ore', quantity: 2 }],
+      systemId,
+      components: [],
+    });
+
+  assert.equal(evidence('mining').entries[0].qty, 2, 'a scoped component id identifies a receipt');
+  // Component ids are not globally unique, and a legacy record's `craftingSystemId` is null, so
+  // the same id in an unscoped record cannot be assumed to name the same component.
+  for (const unscoped of [null, undefined, '', '   ']) {
+    const unknown = evidence(unscoped);
+    assert.equal(unknown.entries[0].qty, null, String(unscoped));
+    assert.deepEqual(unknown.unattributedAwardIndexes, [0], String(unscoped));
+  }
+});
+
+test('consumption metadata never crosses a row whose actor contradicts its item uuid', () => {
+  const single = [physical({ name: 'Wrong' })];
+  // The CONSUMED row is self-contradicting, so nothing keyed on its item uuid describes it.
+  assert.equal(
+    enrichHistoricalConsumption(stage([physical({ actorUuid: 'Actor.b' })], single))[0].name,
+    null
+  );
+  // And the same rule on the evidence side: an inconsistent prepared row describes nothing.
+  assert.equal(
+    enrichHistoricalConsumption(stage([physical()], [physical({ actorUuid: 'Actor.b', name: 'Wrong' })]))[0].name,
+    null
+  );
+  // The control, so the fixture is proven able to carry the name across at all.
+  assert.equal(enrichHistoricalConsumption(stage([physical()], single))[0].name, 'Wrong');
+});
+
 test('builder uses full scoped definitions while display callbacks remain name/image only', () => {
   const data = legacyGather();
   const run = { id: 'legacy', status: 'succeeded', craftingSystemId: data.systemId, taskId: 'mine', checkResult: data.result, createdResults: data.awards };
