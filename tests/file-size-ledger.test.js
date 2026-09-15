@@ -240,6 +240,17 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // which is where the knowledge that a claim is an embedded page with a fixed `_id` belongs;
   // that is a pure move and it takes the file back under. It is deliberately NOT bundled into
   // the defect fix a blocked maintainer was waiting on.
-  assert.equal(files, 127, 'oversized files');
+  // 128 as of the consumption-record repair: `src/ui/svelte/apps/journal/StepDetails.svelte`
+  // crossed at 535. A started stage now renders its recorded RECEIPT where it used to render a
+  // live held-against-needed probe of an inventory the stage had already emptied, so the file
+  // carries both surfaces and the rule that picks between them.
+  //
+  // Recorded as debt rather than absorbed, and the remedy is the seam the change already drew:
+  // the receipt is a self-contained surface reading `consumptionRecord` alone, so it lifts into
+  // its own component without a prop thread back. That move also gains it a mount test of its
+  // own, which the block cannot have while it is one branch inside a larger file. Not bundled
+  // here, because a blocked maintainer is waiting on the defect this commit fixes, and a new
+  // `.svelte` child additionally has to join `writeCompiledSvelte` and four mount harnesses.
+  assert.equal(files, 128, 'oversized files');
   assert.equal(keys.length - files, 124, 'oversized functions');
 });
