@@ -145,7 +145,7 @@ src/ui/svelte/apps/inventory/InventoryItemCard.svelte	550
 src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte	852
 src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte	705
 src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte	793
-src/ui/svelte/apps/journal/RunDetail.svelte	791
+src/ui/svelte/apps/journal/RunDetail.svelte	796
 src/ui/svelte/apps/manager/BooksScrollsView.svelte	753
 src/ui/svelte/apps/manager/BulkEditPanelShell.svelte	564
 src/ui/svelte/apps/manager/BulkStagingInset.svelte	599
