@@ -228,6 +228,18 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   if (gate.regenerated()) return t.skip('this run rewrote the ledger');
   const keys = Object.keys(gate.pinned());
   const files = keys.filter((key) => !key.includes('::')).length;
-  assert.equal(files, 126, 'oversized files');
-  assert.equal(keys.length - files, 123, 'oversized functions');
+  // 127/124 as of issue 1648. `src/systems/journalRunAuthority.js` crossed the 800-line file
+  // threshold at 820, and `createFoundryJournalRunAuthority` crossed the 100-line function
+  // threshold at 113, when the claim-release repair taught `deleteClaim` to tolerate a page the
+  // server has already removed — `entry.pages` is broadcast-fed, so a stale local copy made
+  // `deleteEmbeddedDocuments` throw and stranded a run.
+  //
+  // Recorded as debt rather than absorbed: the epic tracks these two figures so a rise is
+  // visible, and this one is. The obvious remedy is to re-home the three claim-PAGE adapters
+  // (`createClaim`/`readClaim`/`deleteClaim`) beside arbitration in `journalRunLedger.js`,
+  // which is where the knowledge that a claim is an embedded page with a fixed `_id` belongs;
+  // that is a pure move and it takes the file back under. It is deliberately NOT bundled into
+  // the defect fix a blocked maintainer was waiting on.
+  assert.equal(files, 127, 'oversized files');
+  assert.equal(keys.length - files, 124, 'oversized functions');
 });
