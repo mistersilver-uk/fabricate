@@ -44,7 +44,7 @@ src/ui/svelte/apps/manager/scoped	9061
 src/ui/svelte/apps/manager/system	75
 src/ui/svelte/apps/manager/tools	1852
 src/ui/svelte/apps/manager/world	352
-src/ui/svelte/components	6210
+src/ui/svelte/components	2400
 src/ui/svelte/stores	7008
 src/ui/svelte/util	3353
 src/utils	7546

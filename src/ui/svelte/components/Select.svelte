@@ -1,171 +1,59 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  THE APP'S ONE SELECT (issue 1504).
+  THE APP'S ONE SELECT, which the design system's specimen states in one line: "Every select in the
+  app renders this list". A native `<select>` popup is drawn by the OPERATING SYSTEM, so it ignores
+  the theme, differs between browsers and cannot carry a tick, a group heading, a description, a
+  badge or a reason for being unavailable. It is a THIN COMPOSITION over `SearchablePopover` with
+  the query field suppressed; what it owns is the SELECT'S OWN vocabulary — a
+  `{value, label, hint, badge, group}` option shape, three published size rungs, the tick column and
+  the `<Field as="div">` labelled form.
 
-  `openspec/specs/design-system/library.html`'s `<Field> <Select> <Search>` specimen states it in
-  one line: "Every select in the app renders this list". A native `<select>` popup is drawn by the
-  OPERATING SYSTEM, so it ignores the theme, differs between browsers and platforms, and cannot
-  carry a tick, a group heading, a description, a badge or a reason for being unavailable. This is
-  the control that replaces it.
+  Props:
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `value` | string \| number \| null | `null` | The chosen option's `value`. `null` shows `placeholder`. BOTH SIDES OF THE SELECTION TEST MUST BE STRINGIFIED: the primitive writes `aria-selected={option.id === value}`, a STRICT equality, so forwarding a numeric `value` beside `id: String(option.value)` leaves `'25' === 25` false and NO row marked selected. `valueForId` maps back, so `onChange` hands the caller the value it passed in. |
+  | `onChange(value)` | function | no-op | REQUIRED. Called with the option's own `value`, typed as the caller passed it. |
+  | `options` | `[{ value, label, hint?, badge?, disabled?, disabledReason?, group? }]` | `[]` | `hint` is a second line, `badge` a trailing pill, `group` a heading whose VALUE is both the bucket id and the heading TEXT — so it is LOCALIZED COPY, and nothing may key off `data-popover-group` for a grouped `<Select>`. `disabled` is a RECORDED DIVERGENCE from the specimen's shape, which lists `disabledReason` without it: a reason cannot be drawn without a state to draw it for. An empty-string `value` takes `UNCHANGED_OPTION_ID` as its hook, because the primitive omits `data-popover-option` for an empty `dataId` and `''` is exactly what a bulk-edit panel's leading "Leave unchanged" row uses as its sentinel — the panel's default and its only affordance for unstaging an axis. That literal is a hand-maintained mirror guarded by `tests/components/select-mounted.test.js`. |
+  | `size` | `'form'` \| `'inline'` \| `'toolbar'` | `'form'` | 38px/radius 9/12.5px/`--fab-surface-soft`, 30px/radius 7/11.5px/`--fab-bg-2`, 34px/radius 9/`0.72rem`/`--fab-bg-1`. It names a height, a corner, a type size AND a fill, because the fill is its own axis rather than a consequence of the geometry. A call site needing a different fill states it in a descendant rule of its own wrapper class; there is deliberately NO trigger-box prop, because the trigger's width and fill are per-site skin rather than primitive appearance. |
+  | `showTick` | boolean | `true` | The selected column, a property of the LIST rather than of an option. `spec.md` earns it "where options are close cousins and a reader must confirm which is live" and drops it "where the trigger already states the value"; both polarities have callers. |
+  | `placeholder` | string | `''` | The trigger's text while `value` is null. |
+  | `minWidth` / `maxWidth` | px | `0` | The PANEL's width band; `0` takes the rung's own. Either DECIDES a measured panel's box, because `anchoredPopover` resolves the band into one width and writes it as that width and as both bounds. `SIZES` is the single source of the numbers and a mounted case pins the sheet's per-rung fallback against it. |
+  | `triggerData` | `{ 'data-x': 'value' }` | `{}` | Stamped verbatim on the trigger button, which is where a converted call site's stable hook goes. It CANNOT carry a NAME or a TOOLTIP: `SearchablePopover` spreads it FIRST and then writes `title`, `aria-label` and `aria-labelledby` from its own props, so any of the three placed here is deleted. |
+  | `triggerTitle` | string | `''` | A native `title` on the trigger, and the only route to one. |
+  | `label` / `hint` / `error` | strings | `''` | Any of the three renders the whole control inside `<Field as="div">`, with a caption span before the trigger and the note span after it. |
+  | `ariaLabel` / `ariaLabelledBy` | string / id list | `''` | The accessible name when there is no `label`. ONE OF THE THREE IS REQUIRED, AND `ariaLabel` IS NEVER PASSED BESIDE `ariaLabelledBy`: a labelledby WINS wherever both are present, so the string would be dead text free to drift from the caption it duplicates. ALL THREE NAME THE OPEN PANEL as well as the trigger — `label`/`ariaLabel` as the primitive's `dialogAriaLabel` and `ariaLabelledBy` as its `dialogAriaLabelledBy` — so a control given only a `hint` or an `error` satisfies neither and would open an unnamed dialog wrapping an unnamed list. |
+  | `ariaDescribedBy` | id list | `''` | The trigger's description, for a caller that renders its own hint or error beside the control. Overrides this component's own note span. Never routed through `triggerData`. |
+  | `id` / `name` | strings | `''` | Forwarded to the trigger button. Neither is required, because the labelled form names its trigger with `aria-labelledby` and there is no `for`/`id` pair to complete. |
+  | `readonly` | boolean | `false` | Takes focus and REFUSES to open. Mapped to the primitive's `triggerAriaDisabled`, NOT to `disabled`: a `disabled` button does not take focus at all, so "takes focus and refuses" could not be built on it. |
+  | `disabled` | boolean | `false` | The whole control off. |
+  | `invalid` | boolean | `false` | `aria-invalid` on the trigger and the danger border. |
+  | `mono` | boolean | `false` | The value in the mono face with tabular figures. |
+  | `icon` | Font Awesome classes | `''` | A leading glyph on the trigger. |
+  | `class` | class string | `''` | An extra class on the picker ROOT, so a call site can reach the trigger's own box with a descendant rule. |
 
-  ── WHAT THIS COMPONENT IS, AND WHAT IT IS NOT ──────────────────────────────────────────────
-  It is a THIN COMPOSITION over `SearchablePopover` with the query field suppressed, and that is
-  the whole design: the panel, the positioning, the portal, the outside-click dismissal, the
-  listbox focus model (`aria-activedescendant` on one holder, rows that never take DOM focus), the
-  option ids, the group buckets, the gated row, the arrow arithmetic and the type-ahead are ALL
-  already shipped by that primitive and by `util/listboxNavigation.js`. Nothing here rebuilds any
-  of it. What this component owns is the SELECT'S OWN vocabulary — a `{value, label, hint, badge,
-  group}` option shape rather than the primitive's `{id, dataId}` one, three published size rungs,
-  the tick column, and the `<Field as="div">` labelled form.
+  Rest spread:
+  - `{...rest}` lands on the `<Field>` root in the LABELLED form only. The bare form's root is the
+    picker root, which `SearchablePopover` writes and which takes no spread, so a rest attribute
+    there is refused loudly rather than dropped silently; `triggerData` is the route.
 
-  It uses the primitive's OWN trigger rather than supplying a `trigger` snippet, which is what
-  makes the combobox contract free: with `showSearch={false}` the primitive already puts
-  `role="combobox"`, `aria-controls`, `aria-expanded`, `aria-activedescendant` and
-  `data-keyboard-focus="true"` on the button. A snippet would have made this component responsible
-  for all five.
-
-  ── THE OPTION SHAPE, AND THE TWO STRINGIFICATIONS IT NEEDS ─────────────────────────────────
-  Callers speak `option.value`, which may be a NUMBER (a page-size control's options are 10, 25,
-  50). The primitive keys on `option.id`, a string, and stamps `data-popover-option` from
-  `option.dataId`. Two facts follow, and both are defects if they are left to discovery.
-
-  FIRST, both sides of the selection test must be stringified. The primitive writes
-  `aria-selected={option.id === value}` — a STRICT equality — so forwarding a numeric `value`
-  beside `id: String(option.value)` leaves `'25' === 25` false and NO row marked selected. So
-  `String(value)` is forwarded, and the map back to the caller's own typed value is
-  {@link valueForId}: `onChange` hands back the value the caller passed in, not a string of it.
-
-  SECOND, the hook has to be non-empty on EVERY row. The primitive writes
-  `data-popover-option={option.dataId || undefined}`, so a `dataId` of `''` OMITS the attribute —
-  and an empty string is exactly what a bulk-edit panel's leading "Leave unchanged" row uses as
-  its sentinel. That row is the panel's DEFAULT and its only affordance for unstaging an axis, so
-  the one row a capture walk and a mounted test most need to address would have been the one row
-  with no handle at all. {@link UNCHANGED_OPTION_ID} is the declared token that closes it.
-
-  ── SIZE IS THREE THINGS, NOT ONE ───────────────────────────────────────────────────────────
-  `size` names a height, a corner, a type size AND a fill, because the fill is genuinely its own
-  axis rather than a consequence of the geometry: the specimen paints the 38px form control on
-  `--fab-surface-soft` "in cards" and the 30px inline control on `--fab-bg-2` "inside bg-1 rows",
-  and the third rung is the scoped-catalogue toolbar's documented 34px line on `--fab-bg-1`. A
-  call site that needs a different fill states it in a descendant rule of its own wrapper class;
-  there is deliberately NO trigger-box prop, because the trigger's width and fill are per-site
-  skin rather than primitive appearance.
-
-  The `toolbar` rung's type is written as the LITERAL `0.72rem` rather than as a read of
-  `--fab-recipe-control-font`, and that is forced rather than stylistic. That property has
-  exactly one declaration site, inside the `.fabricate-manager` block, so it is AREA-SCOPED: read
-  from outside the manager it is undefined, the declaration is invalid at computed-value time, and
-  the size silently falls back to inheritance. `tests/token-generation-gate.test.js` ratchets that
-  read out of Svelte scoped styles for precisely this reason. The literal is the same number in
-  both areas, which is what the real-browser clause in `tests/components/manager-layout.test.js`
-  measures. Its WEIGHT is a published ramp numeral (500) rather than the `normal` the shipped
-  toolbar select computes today, because `normal` is off-ramp.
-
-  ── WHERE THE APPEARANCE LIVES ──────────────────────────────────────────────────────────────
-  In `styles/fabricate.css`, under the `.fabricate-select*` family, and NOT in a scoped `<style>`
-  block here. This component has NO `<style>` at all, and that is the design rather than an
-  omission. `openspec/specs/design-system/spec.md` roots a shared primitive's family at the
-  primitive; `searchable-popover-area-scope.test.js` reads the SHEET, so a scoped-style family
-  gives the one gate that proves a family is not app-rooted nothing to quantify over; and
-  `tests/helpers/scoped-component-css.js` records that a scoped rule compiles to two classes and
-  is injected AFTER the sheet, UNLAYERED — which would let this component silently out-rank every
-  global rule at any specificity. That is a hazard the programme is removing, not a mechanism to
-  build a primitive on. (The one licensed exception is a CALL SITE stating its own per-site skin:
-  the five player pagers reach this trigger from their own `:global(…)` blocks, and they win on
-  that same unlayered axis deliberately.)
-
-  The consequence, since the sheet imports at `layer(modules)`: every rule this component
-  inherits from `.fabricate-picker*` and `.manager-travel-*` is an ORDINARY same-layer contest,
-  won on specificity or on source order. The sheet's own family block records which, rule by
-  rule, from a mechanical enumeration rather than from prose — and
-  `tests/components/manager-layout.test.js` measures the resulting paint in a real browser.
-
-  ── PROPS ───────────────────────────────────────────────────────────────────────────────────
-    value      — the chosen option's `value`: string, number or null. `null` shows `placeholder`.
-    onChange   — REQUIRED. Called with the option's own `value`, typed as the caller passed it.
-    options    — [{ value, label, hint?, badge?, disabled?, disabledReason?, group? }]
-                 `hint` is a second line under the label, `badge` a trailing pill, `group` a
-                 heading (see below), and `disabled` gates the row with `disabledReason` as its
-                 announced reason. `disabled` is a RECORDED DIVERGENCE from the specimen's option
-                 shape, which lists `disabledReason` without it: a reason cannot be drawn without
-                 a state to draw it for, and a snippet alone cannot make a row refuse a click.
-    size       — `'form'` (default) 38px / radius 9 / 12.5px / `--fab-surface-soft`
-                 `'inline'` 30px / radius 7 / 11.5px / `--fab-bg-2`
-                 `'toolbar'` 34px / radius 9 / `0.72rem` / `--fab-bg-1`
-    showTick   — the selected column in the option list. DEFAULT TRUE, and it is a property of the
-                 LIST rather than of an option: `spec.md` earns it "where options are close
-                 cousins and a reader must confirm which is live" and drops it "where the trigger
-                 already states the value". Both polarities have callers, which is why it is a
-                 prop and not a constant.
-    placeholder — the trigger's text while `value` is null.
-    minWidth / maxWidth — the PANEL's width band in px, `0` for the rung's own default (240/340
-                 form, 96/240 inline, 160/320 toolbar). Either DECIDES a measured panel's box:
-                 `anchoredPopover` resolves the band into one width and writes it as that width
-                 and as both of its bounds, so a caller raising `maxWidth` for a full-width
-                 trigger gets the wider panel. It did not until issue 1520's second review round
-                 — the sheet's own `max-width` clipped the inline width the layout wrote — and
-                 `tests/components/select-popover-width.test.js` measures the result in Chromium.
-                 {@link SIZES} is the single source of the numbers and a mounted case pins the
-                 per-rung fallback rules in the sheet against it.
-                 AN `inline` CALLER STATES `minWidth` WHENEVER ITS WIDEST OPTION LABEL NEEDS MORE
-                 THAN THE PANEL'S RESOLVED WIDTH LESS THE ROW'S CHROME — 52px with a tick, 32px
-                 without, measured — AND THE TRIGGER'S OWN FLOOR IS NOT THAT FIGURE, because the
-                 panel draws its labels at a fixed 12px while the rung's trigger reads at 11.5px
-                 and the row adds a tick gutter the trigger has no counterpart for. A trigger
-                 floor sized to the widest VALUE therefore leaves the widest OPTION ellipsised,
-                 which is the defect issue 1511 shipped and corrected.
-    triggerData — a `data-*` map stamped verbatim on the trigger button, which is where every
-                 converted call site's own stable hook goes. `data-select-size` is added to it.
-                 It cannot carry a `title`, an `aria-label` or an `aria-labelledby`:
-                 `SearchablePopover` spreads it FIRST and then writes all three from its own
-                 props, so any of the three placed here is deleted. `triggerTitle` is the route
-                 for the first, `ariaLabel`/`ariaLabelledBy` for the other two. `aria-describedby`
-                 rides `ariaDescribedBy` for the same reason and not this map.
-    triggerTitle — a native `title` tooltip on the trigger button, forwarded verbatim to
-                 `SearchablePopover`'s own prop of that name. It exists because that is the only
-                 route: a `title` inside `triggerData` is overwritten by the primitive's own
-                 write. It has NO caller on this commit: the two
-                 manager sites whose control carries a tooltip as well as an accessible name
-                 (`recipe/RecipeOverviewTab.svelte` and `recipe/RecipeIngredientOption.svelte`)
-                 convert at issue 1510's second phase. It is not a substitute for either name.
-    label / hint / error — present ⇒ the whole control renders inside `<Field as="div">`, with a
-                 caption span before the trigger and the hint or error span after it. The caption is
-                 given an id and pointed at with `aria-labelledby` because there is no `id`-bearing
-                 labelable element for a `for` to address, NOT because a `<label>` cannot name a
-                 `<button>` — it can, and this form relied on exactly that containment until issue
-                 1510. The host is a `<div>` because a `<label>` ALSO forwards a caption click into
-                 the control, which cannot close a list dismissed on `mousedown`; see the note on
-                 the markup below. That is why the labelled form does not also need an `ariaLabel`.
-    ariaLabel / ariaLabelledBy — the accessible name when there is no `label`. One of the three is
-                 required. Never pass `ariaLabel` beside `ariaLabelledBy`: a labelledby WINS over
-                 a label wherever both are present, so the string would be dead text free to drift
-                 from the caption it duplicates. ALL THREE NAME THE OPEN PANEL as well as the
-                 trigger: `label`/`ariaLabel` reach it as the primitive's `dialogAriaLabel` and
-                 `ariaLabelledBy` as its `dialogAriaLabelledBy`, so a control named by a caption
-                 it already renders no longer opens a dialog and a listbox with no name at all.
-    ariaDescribedBy — the trigger's `aria-describedby`, for a CALLER that renders its own hint or
-                 error beside the control. It overrides the default, which is this component's own
-                 `hint`/`error` span in the labelled form: that span is drawn AFTER the trigger and
-                 the trigger is a `<button>` with no containment, so without a describedby the
-                 hint was on screen and announced by nothing. A caller passing this points at its
-                 own element instead — the currency card's spend-strategy hint, which the caller
-                 draws because it is conditional on the chosen strategy. Never routed through
-                 `triggerData`; see the note there.
-    id / name  — the specimen marks both required because a `<label for>` and an error message
-                 reference them. Neither is required here and the reason is structural: the
-                 labelled form names its trigger with `aria-labelledby`, so there is no `for`/`id`
-                 pair to complete. Both are forwarded to the trigger button when supplied.
-    readonly   — takes focus and REFUSES to open. Mapped to the primitive's `triggerAriaDisabled`
-                 rather than to `disabled`, because a `disabled` button does not take focus at all
-                 and "takes focus and refuses" could not have been built on it.
-    disabled   — the whole control off.
-    invalid    — `aria-invalid` on the trigger and the danger border.
-    mono       — the value in the mono face with tabular figures.
-    icon       — a leading Font Awesome glyph class on the trigger.
-    class      — an extra class on the picker ROOT, so a call site can reach the trigger's own box
-                 with a descendant rule.
-    ...rest    — forwarded to the `<Field>` root in the labelled form. See the note at
-                 {@link restTarget} for why the bare form has no home for it yet.
+  Invariants:
+  - THIS COMPONENT HAS NO `<style>` AT ALL, and the `.fabricate-select*` family lives in
+    `styles/fabricate.css`: `searchable-popover-area-scope.test.js` reads the SHEET, so a
+    scoped-style family gives the one gate that proves a family is not app-rooted nothing to
+    quantify over, and a scoped rule is injected UNLAYERED, which would let this component out-rank
+    every global rule at any specificity. The one licensed exception is a CALL SITE stating its own
+    per-site skin, which wins on that same unlayered axis deliberately.
+  - THE `toolbar` RUNG'S TYPE IS THE LITERAL `0.72rem`, never a read of `--fab-recipe-control-font`.
+    That property is declared only inside `.fabricate-manager`, so read from outside the manager it
+    is undefined, the declaration is invalid at computed-value time and the size silently falls
+    back to inheritance; `tests/token-generation-gate.test.js` ratchets that read out of scoped
+    styles. Its WEIGHT is a published ramp numeral rather than the off-ramp `normal`.
+  - THE LABELLED FORM'S HOST IS A `<div>`, NEVER A `<label>`. A `<label>` also FORWARDS a caption
+    click into the control it wraps, and this control toggles a portaled panel dismissed on
+    `mousedown` in the capture phase — so from open, the caption's mousedown dismissed the list
+    and the forwarded click re-opened it, and the list could never be closed from its own caption.
+    The caption is named by `aria-labelledby` because there is no `id`-bearing labelable element
+    for a `for` to address, NOT because a `<label>` cannot name a `<button>`. The ACCEPTED COST is
+    that the caption stops being a hit target.
 -->
 <script>
   import Chip from './Chip.svelte';
@@ -173,41 +61,20 @@
   import SearchablePopover from './SearchablePopover.svelte';
 
   /**
-   * THE NON-EMPTY HOOK FOR AN EMPTY-STRING VALUE, declared once and nowhere else.
-   *
-   * `SearchablePopover` writes `data-popover-option={option.dataId || undefined}`, so a `dataId`
-   * of `''` omits the attribute entirely. Both bulk-edit selects this component converts lead
-   * with an empty-string sentinel — the "Leave unchanged" row, which is both the panel's
-   * default and the only way to UNSTAGE an axis — so `String(option.value)` would leave exactly
-   * that row unaddressable by the capture registry's `data-popover-option` idiom, by any mounted
-   * test and by the Foundry smoke, while every other row resolved.
-   *
-   * It is a HAND-MAINTAINED MIRROR: the literal is spelled here, in the mounted suite, and in any
-   * capture step or smoke step that clicks the default row. Nothing in `npm test` would red if
-   * this spelling drifted — the only symptom would be a click timeout in a capture run — so
-   * `tests/components/select-mounted.test.js` reads this literal out of this file's SOURCE and
-   * compares it against the value its own cases use.
+   * THE NON-EMPTY HOOK FOR AN EMPTY-STRING VALUE, declared once and nowhere else; see the
+   * header. It is a HAND-MAINTAINED MIRROR — the literal is spelled here, in the mounted suite
+   * and in any capture or smoke step that clicks the default row, and nothing in `npm test`
+   * would red if it drifted, so `tests/components/select-mounted.test.js` reads this literal out
+   * of this file's SOURCE and compares it against the value its own cases use.
    */
   const UNCHANGED_OPTION_ID = '__unchanged__';
 
   /**
-   * The three published rungs, and the PANEL band each one opens at.
-   *
-   * The band is here rather than only in the CSS because `SearchablePopover` needs it as PROPS:
-   * `actions/anchoredPopover.js` resolves the panel's width inside `[minWidth, maxWidth]` and
-   * writes it as a width AND as both of its bounds, so THIS table is what decides a measured
-   * panel's box. The sheet's per-rung rules mirror it for the unmeasured fallback alone, and a
-   * mounted case pins the two copies equal rather than leaving the second free to drift.
-   *
-   * A CALLER'S OWN `maxWidth` THEREFORE WINS OUTRIGHT (issue 1520 review round 2). It did not
-   * until the action wrote the ceiling: three windows raised it past 340 for a full-width
-   * trigger, the prop reached the element as a bare inline `width`, and the sheet's `max-width`
-   * clipped it back to 340 — a `max-width` constrains a used width whatever its origin, so that
-   * was never a contest an inline width could win.
-   *
-   * The numbers are starting values derived from the widest rendered option label at each
-   * converting site: two-digit page sizes and a three-word category for `inline`, a lane-filter
-   * value or a sort key for `toolbar`, and the primitive's own untouched band for `form`.
+   * The three published rungs, and the PANEL band each one opens at. The band is here rather than
+   * only in the CSS because `SearchablePopover` needs it as PROPS, and `anchoredPopover` writes
+   * the resolved width as a width AND as both bounds — so THIS table decides a measured panel's
+   * box and a caller's own `maxWidth` wins outright. The sheet's per-rung rules mirror it for the
+   * unmeasured fallback alone, and a mounted case pins the two copies equal.
    */
   const SIZES = Object.freeze({
     form: Object.freeze({ minWidth: 240, maxWidth: 340 }),
@@ -245,9 +112,8 @@
     ...rest
   } = $props();
 
-  // The caption's id, per instance. `$props.id()` is Svelte's own answer to "this element needs a
-  // document-unique id": two `<Select>`s with the same label on one screen must not both point
-  // their trigger at the same caption.
+  // Per instance: two `<Select>`s with the same label on one screen must not both point their
+  // trigger at the same caption.
   const instanceId = $props.id();
   const captionId = `${instanceId}-caption`;
   const noteId = `${instanceId}-note`;
@@ -255,39 +121,27 @@
   const rung = $derived(Object.hasOwn(SIZES, size) ? size : FALLBACK_SIZE);
   const band = $derived(SIZES[rung]);
 
-  // THE LABELLED FORM IS DECIDED BY THE CONTENT, not by a prop. `<Field>` is a COLUMN — a caption
-  // above the control and a hint below it — so a call site with an INLINE caption beside the
-  // control (a pager's "Per page", a toolbar's "SORT BY") deliberately passes none of the three
-  // and keeps its own layout.
+  // THE LABELLED FORM IS DECIDED BY THE CONTENT, not by a prop. `<Field>` is a COLUMN, so a call
+  // site with an INLINE caption beside the control passes none of the three and keeps its own
+  // layout.
   const labelled = $derived(Boolean(label || hint || error));
 
-  // `aria-labelledby` WINS over `aria-label`, so the two are mutually exclusive rather than
-  // additive: with a caption on screen the caption is the name, and a string beside it would be a
-  // second copy free to drift. The labelled form therefore points at its own caption and passes
-  // no label at all.
   const labelledByTarget = $derived(ariaLabelledBy || (label ? captionId : ''));
   const labelTarget = $derived(labelledByTarget ? '' : ariaLabel);
 
   // THE DESCRIPTION IS THE SPAN THIS COMPONENT ALREADY DRAWS, unless the caller names its own.
-  // The labelled form renders the hint or the error AFTER the trigger with nothing pointing at
-  // it, and a `<button>` has no containment that would announce it — so the note was visible and
-  // silent. A caller's own `ariaDescribedBy` wins because a caller that draws the hint itself
-  // (a conditional one, say) has the id the trigger must point at and this component does not.
+  // The labelled form renders the note AFTER the trigger with nothing pointing at it, and a
+  // `<button>` has no containment that would announce it. A caller that draws the hint itself has
+  // the id the trigger must point at and this component does not.
   const describedByTarget = $derived(
     ariaDescribedBy || (labelled && (error || hint) ? noteId : '')
   );
 
   /**
-   * The primitive's option array, built at the ONE point where the two vocabularies meet.
-   *
-   * `id` and `dataId` are derived from the same `option.value` in the same place, so the strict
-   * equality `aria-selected` performs and the string serialization `data-popover-option` performs
-   * agree by construction rather than by two authors remembering the same rule.
-   *
-   * `hint`, `badge` and `disabledReason` ride along as DATA rather than being mapped onto the
-   * primitive's own `meta`/`trailing` props, because the row's content is drawn by this
-   * component's own `option` snippet below — which is the row's sole content, so the primitive
-   * draws none of its own.
+   * The primitive's option array, built at the ONE point where the two vocabularies meet, so the
+   * strict equality and the string serialization agree by construction. `hint`, `badge` and
+   * `disabledReason` ride along as DATA, because the row's content is drawn by this component's
+   * own `option` snippet — which is the row's sole content.
    */
   const popoverOptions = $derived(
     options.map((option) => ({
@@ -303,25 +157,16 @@
   );
 
   /**
-   * The group headings, DERIVED from the options rather than declared by the caller.
-   *
-   * `SearchablePopover` returns an unbucketed list when `optionGroups` is empty, so `option.group`
-   * alone renders no heading at all — the prop is what makes a group visible. Deriving it means no
-   * caller has to state the same vocabulary twice, and FIRST-APPEARANCE order is what puts the
-   * check-tier list's two instructions above its named tiers without a second prop to order them.
-   *
-   * The group VALUE is both the bucket id and the heading TEXT, so it is localized copy: nothing
-   * may key off `data-popover-group` for a grouped `<Select>`, because that attribute is now
-   * locale-dependent. Options with no `group` fall into the primitive's own trailing,
-   * heading-less bucket.
+   * The group headings, DERIVED from the options rather than declared by the caller, so no caller
+   * states the same vocabulary twice. FIRST-APPEARANCE order is what orders them without a second
+   * prop; options with no `group` fall into the primitive's trailing, heading-less bucket.
    */
   const optionGroups = $derived.by(() => {
     const groups = [];
     for (const option of options) {
       const group = option?.group;
-      // An ARRAY rather than a `Set` because `svelte/prefer-svelte-reactivity` refuses a mutable
-      // built-in `Set` inside a component, and a reactive one would be a store for a value that
-      // lives and dies inside this one derivation. An option list is a handful of rows.
+      // An ARRAY rather than a `Set`: `svelte/prefer-svelte-reactivity` refuses a mutable
+      // built-in `Set` in a component, and an option list is a handful of rows.
       if (!group || groups.some((held) => held.id === group)) continue;
       groups.push({ id: group, label: group });
     }
@@ -333,11 +178,9 @@
   const showingPlaceholder = $derived(!selectedOption && Boolean(placeholder));
 
   /**
-   * The caller's own typed value for a row the primitive identified by string.
-   *
-   * The lookup is over `options` rather than a `Number()` coercion because the API's `value` is
-   * `string | number | null`: a page-size control wants the number 25 back and a category filter
-   * wants the string `consumable`, and only the option that produced the id knows which.
+   * The caller's own typed value for a row the primitive identified by string. The lookup is over
+   * `options` rather than a `Number()` coercion, because only the option that produced the id
+   * knows which type it was.
    *
    * @param {string} chosenId The primitive's own option id.
    * @returns {string|number|null|undefined} The caller's value for that row.
@@ -354,15 +197,8 @@
   }
 
   /**
-   * WHERE `...rest` LANDS, and the one shape that has no home for it yet.
-   *
-   * In the labelled form the root is this component's own `<Field>`, which forwards every
-   * unrecognised attribute. In the BARE form the root is the picker root, which
-   * `SearchablePopover` writes and which takes no attribute spread — so a rest attribute there
-   * would be silently dropped, and silently dropping a `data-*` hook is exactly the failure this
-   * plan's gates exist to prevent. It is therefore refused loudly instead, and the route every
-   * converting call site actually uses is `triggerData`, which stamps the hook on the CONTROL
-   * rather than on a wrapper around it.
+   * WHERE `...rest` LANDS; see the header's rest-spread note for why the bare form refuses it
+   * loudly rather than dropping a `data-*` hook silently.
    */
   const restTarget = $derived(labelled ? rest : {});
 
@@ -383,12 +219,9 @@
           'so the trigger has no accessible name at all.'
       );
     }
-    // THE PANEL IS NAMED SEPARATELY FROM THE TRIGGER, and this is the second clause because the
-    // two resolve from the same three props through DIFFERENT routes: the trigger can be named
-    // by the caption id this component mints for its own `label`, while the portaled panel is
-    // named by the caller's string (`label`/`ariaLabel`) or by the caller's own pointer
-    // (`ariaLabelledBy`). A control given only a `hint` or an `error` therefore satisfies
-    // neither, and used to open an unnamed dialog wrapping an unnamed list in silence.
+    // THE PANEL IS NAMED SEPARATELY FROM THE TRIGGER, because the two resolve from the same
+    // three props through DIFFERENT routes: the trigger can be named by the caption id this
+    // component mints, while the panel needs the caller's own string or pointer.
     if (!label && !ariaLabel && !ariaLabelledBy) {
       console.warn(
         'Fabricate | Select: the panel it opens, and the option list inside it, have no ' +
@@ -428,17 +261,14 @@
 </script>
 
 {#snippet optionRow(option)}
-  <!-- The tick is on EVERY row rather than only on the selected one, so the label column does not
-       go ragged: the specimen draws an unselected row's check at `opacity: 0` for exactly that
-       reason. Which row shows it is decided in CSS from the row's own `aria-selected`, which the
-       primitive owns — so the marker cannot disagree with the announcement. -->
+  <!-- The tick is on EVERY row rather than only the selected one, so the label column does not go
+       ragged; the specimen draws an unselected row's check at `opacity: 0` for that reason. Which
+       row shows it is decided in CSS from the row's own `aria-selected`, which the primitive
+       owns, so the marker cannot disagree with the announcement. -->
   {#if showTick}
     <span class="fabricate-select-tick" aria-hidden="true"><i class="fas fa-check"></i></span>
   {/if}
   {#if option.hint}
-    <!-- The two-line form. The wrapper carries the flex sizing the single-line label carries on
-         its own, so the label keeps ellipsising rather than pushing a trailing badge out of the
-         row. -->
     <span class="fabricate-select-lines">
       <span class="fabricate-select-label">{option.label}</span>
       <span class="fabricate-select-hint">{option.hint}</span>
@@ -449,11 +279,9 @@
   {#if option.badge}
     <Chip class="fabricate-select-badge" data-popover-option-badge="">{option.badge}</Chip>
   {/if}
-  <!-- WHY THE REASON IS DRAWN HERE AND NOT BY THE PRIMITIVE. `SearchablePopover` draws a gated
-       row's reason as a trailing disabled Chip in its OWN row content, and this snippet is the
-       row's sole content — so for a `<Select>` the reason is this component's to draw. It renders
-       LAST so it sits at the row's trailing edge, and INSIDE the button so a screen-reader user
-       is told WHY as well as THAT. -->
+  <!-- THE REASON IS DRAWN HERE, NOT BY THE PRIMITIVE: this snippet is the row's sole content, so
+       for a `<Select>` the reason is this component's to draw. It renders LAST so it sits at the
+       row's trailing edge, and INSIDE the button so the reason is part of the accessible name. -->
   {#if option.disabled && option.disabledReason}
     <Chip tone="disabled" class="fabricate-select-reason" data-popover-option-reason=""
       >{option.disabledReason}</Chip
@@ -493,23 +321,6 @@
 {/snippet}
 
 {#if labelled}
-  <!-- A `<div>` RATHER THAN THE `<label>` THIS WAS (issue 1510, on the maintainer's ruling). The
-       host was `Field as="label"` and the containment named the trigger perfectly well — a
-       `<button>` is labelable — but a `<label>` also FORWARDS a caption click into the control it
-       wraps, and this control is a button toggling a portaled panel whose dismissal listens on
-       `mousedown` in the capture phase while the panel is open. So from open, the caption's own
-       mousedown dismissed the list and the forwarded click re-opened it: the list could never be
-       closed from its own caption, at every one of this form's shipped call sites. Measured on
-       `tests/fixtures/manager-select/`, and it is the same defect the caller-side demotion rule
-       in `openspec/specs/design-system/spec.md` removes at a wrapping `<label>`.
-
-       Nothing else moves. The caption keeps its class, its position and its layout, the trigger
-       is named by the `aria-labelledby` it already carried to that caption's id, and no announced
-       name changes anywhere. The ACCEPTED COST is the same one the caller-side rule accepts: the
-       caption stops being a hit target, so a GM who clicked the caption to open the list now
-       clicks the control. That is accepted because the alternative is a control the caption can
-       never close, and because the trigger is a full-width or rung-floored button rather than a
-       12px checkbox. -->
   <Field as="div" class={`fabricate-select-field ${extraClass}`} {...restTarget}>
     <span class="fabricate-select-caption" id={captionId}>{label}</span>
     {@render control()}

@@ -1,216 +1,68 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  THE manager's search field (issue 1039).
-
-  ── WHY IT IS A SECOND COMPONENT AND NOT PART OF THE BAR ──────────────────────────
-  `library.html:1432` sketches ONE `<FilterBar>` owning `query` and `onQueryChange`, so
-  the obvious extraction is a bar that renders its own field. The corpus says
-  otherwise, and the number is the argument: of the 23 sites writing
-  `class="manager-search"`, THIRTEEN are inside no `.manager-toolbar` at all — the
-  gathering task editor's four, the access and knowledge rosters, both realm-environment
-  columns, the Tool Studio's library card, the vocabulary panel's search row, the world
-  scope's system-rules roster and the manager root's two. A field folded into the bar would have forced a bar around each
-  of them, which is a redesign of nine screens rather than an extraction. The bar had
-  eleven sites and one of them (`BooksScrollsView.svelte`) had no field at all — issue 1515
-  gave it one, which settles the question the census left open rather than changing the
-  argument: a bar without a field is what made a bar that RENDERS one wrong, and it is now
-  twelve bars with twelve fields.
-  Two components with an eleven-and-nineteen split is what the tree contained.
-
-  Before this component the field was a CSS CONVENTION: `class="manager-search"` on a
-  `<label>` wrapping an `<i class="fas fa-search">` and an `<input type="search">`, and
-  `styles/fabricate.css` turns that into the relative box and its `1 1 260px` basis
-  (`:5632`), the 34px pill with its 34px side padding (`:5647`) and the absolutely
-  positioned leading glyph (`:5784`).
-
-  ── THE FAMILY IS ROOTED AT THE CLASS THIS COMPONENT EMITS (issue 1508) ───────────
-  Those three rules are written `.fabricate-search.manager-search…` rather than
-  `.fabricate-manager .manager-search…`, so the pill paints wherever it is rendered
-  instead of only inside the manager. `fabricate-search` is the FIRST literal of the
-  class array below, and that position is a constraint rather than a style note:
-  `tests/components/searchable-popover-area-scope.test.js` reads the composed region up
-  to the first `]`, so a root moved off the head of the array is a root that gate
-  reports as unemitted while every re-rooted rule keeps matching.
-
-  THE FONT FLOOR IS NOT IN THIS FAMILY'S BLOCK. This family's root is not its control —
-  the root is the `<label>` and the control is the bare `<input>` inside it — so the
-  floor is written at the family root PLUS the element it owns, `.fabricate-search input`
-  at (0,1,1), grouped with `Field`'s and `ChanceSlider`'s members immediately below the
-  area's own bare-element baseline (`fabricate.css:1471`). Position is load-bearing:
-  `font` is a shorthand that resets `line-height`, and at (0,1,1) the group ties every
-  LATER same-rank rule in the area, two of which restate a `font` longhand for controls
-  these floors reach. Declared thousands of lines down in this family's own block it
-  would win both and silently re-type every manager textarea and select. The group
-  carries `font: inherit` AND NOTHING ELSE, because at a tie any declaration the baseline
-  does not also carry is a real move inside the manager.
-
-  IT OWNS ITS CONTROL, SO IT DECLARES BOTH HALVES OF THE PAIR: the strip
-  `.fabricate-search input:focus` (`fabricate.css:5665`), which restates verbatim the
-  module reset that removes core's orange outline and 4px glow, and the repaint
-  `.fabricate-search input:focus-visible` (`:5675`), copied verbatim from the module
-  ring. Both are (0,2,1) and the strip is written ABOVE the repaint, because a
-  keyboard-focused input matches both and source order decides the tie. Neither moves
-  anything where a Fabricate root is an ancestor; what they are FOR is the bare host,
-  where a primitive leaning on the module ring would render none.
-
-  TWO FAMILY RULES CANNOT TRAVEL, and they are named rather than silently left behind.
-  `.fabricate-search.manager-search.is-compact { width: 100% }` (`fabricate.css:17387`)
-  and `.fabricate-search.manager-search { flex-basis: 100% }` (`:17391`) are declared
-  inside `@container fabricate-manager (max-width: 680px)` (`:17353`), and that container
-  NAME is established by `.fabricate-manager` itself (`container-name: fabricate-manager`,
-  `:1408`). They re-root for family consistency and move nothing; in a host with no
-  `.fabricate-manager` above them there is no such container to query, so the responsive
-  narrowing simply does not apply. That is a residue of the responsive layer rather than
-  a defect of this change, owned by issue 1518, and
-  `tests/components/re-rooted-controls-host-independence.test.js` excludes exactly these
-  two by count so the host-equality walk is not read as covering them.
-
-  ── ONE HOST, AND THE CENSUS THAT ESTABLISHED IT ──────────────────────────────────
-  All 23 sites are a `<label>`, measured by walking each component's Svelte AST rather
-  than by grep — two of them write `class` on its own line, which a line-based census
-  reports the wrong host for. The set is of size one, so there is no `as` prop, for
-  `InspectorCard.svelte`'s reason.
-
-  The leading glyph is `fas fa-search` at every site this component covers, so it is
-  WRITTEN HERE rather than taken as a prop. The one site in the corpus that swaps it —
-  `GatheringTaskEditView.svelte:1779`, which uses `fa-tags` — is an adjudicated
-  opt-out below, so an icon prop would be a seam against a variation set of one.
-
-  ── THE THREE SITES THIS COMPONENT DELIBERATELY DOES NOT COVER ────────────────────
-  Three of the 23 are COMBOBOXES wearing this class. `GatheringTaskEditView.svelte:1794`
-  and both `CraftingSystemManagerRoot.svelte` sites (`:14150`, `:14564`) render a
-  `.manager-tag-suggestions` typeahead list as a SIBLING of the input, inside the
-  label, and the first also swaps the glyph. They match the CSS and not the meaning:
-  what they are is `SearchablePopover.svelte`'s surface, and absorbing a suggestion
-  list into a plain field would make this primitive own two meanings at once.
-
-  The two root sites carry a second, harder disqualifier that is worth naming because
-  it is structural rather than editorial: both write `bind:this={characterModifierSearchAnchor}`
-  on the label, because the popover positions itself against that element. `bind:this`
-  on a COMPONENT tag binds the component instance, not its host element, so converting
-  either one needs an element-ref seam this primitive does not have and should not grow
-  for two callers.
-
-  ── FOUR HAND-ROLLED TWINS ARE OUT OF SCOPE, RECORDED RATHER THAN CONVERTED ───────
-  `PartyAddMemberPanel.svelte:136` renders a `<div>` with a `fa-magnifying-glass` glyph
-  and a bare `<input>`; `recipe-item/RecipeItemLimitsTab.svelte:531` and `:631` render
-  `class="manager-tag-search"` with `role="combobox"`; and
-  `GatheringEconomyView.svelte:449` is a bare `<input type="search">` with no wrapper
-  and no icon. None of them writes `manager-search`, none is painted by the rules
-  above, and each would be a re-skin rather than a conversion — a change with visible
-  output and its own review. They are named here so their absence is a decision.
-
-  THE FIFTH WAS `GatheringPartiesTab.svelte`, AND ISSUE 1515 IS THE REVIEW THIS CLAUSE
-  ASKED FOR. It is written out rather than deleted, because the clause's own terms are what
-  carried it: the pane's row was a bordered 32px box at an 8px corner on `--fab-bg-0`, a
-  second set of numbers for the shipped pill, so the conversion is visible output — the
-  field is the 34px rung at a 6px corner now — and it came with the two focus rules that
-  row had in `styles/fabricate.css` retired, because this family declares both halves of
-  that pair around the control it owns.
-
-  ── NO SCOPED STYLE, AND WHY ──────────────────────────────────────────────────────
-  Like `ManagerButton`, `IconButton` and `InspectorCard`, this leaf has no scoped
-  `<style>`: the pill is painted by `styles/fabricate.css`, and a scoped block here would
-  be a second source of truth for the same control.
-
-  THE "IT RENDERS UNSTYLED OUTSIDE THE MANAGER" CLAUSE THAT STOOD HERE WAS FALSE, and it
-  contradicted the family-root section above it (corrected in issue 1520). Those rules are
-  written `.fabricate-search.manager-search…`, which is what the section says and what the
-  sheet contains, so the pill paints wherever it is rendered. The two that genuinely cannot
-  travel are the `@container fabricate-manager` pair named a few paragraphs up, and they are
-  the whole of the residue.
-
-  The clause's second half is retired rather than re-dated: the Interactable browser renders
-  this field inside a `.fabricate-app` frame, and its frames show a painted pill with its
-  leading glyph.
-
-  It is an IMPORT-FREE LEAF: props only, no `foundryBridge`, no util imports. Callers
-  pass ALREADY-LOCALIZED `placeholder` and `ariaLabel`.
-
-  ── THE ACCESSIBLE NAME IS A NAMED PROP ───────────────────────────────────────────
-  The `<label>` wraps an icon and an input and NO text, so it contributes no accessible
-  name; every one of the 20 converted sites names the control with an `aria-label` on
-  the input instead. Nothing made them, and an unnamed search box is announced as
-  "search" and nothing else. It is therefore a named prop, and
-  `tests/manager-search-field-source-contract.test.js` asserts every call site passes
-  it — the clause that earns this primitive its own guard file.
+  THE manager's search field: a `<label>` wrapping a leading glyph and an `<input type="search">`.
+  It is a second component rather than part of `ManagerToolbar` because thirteen of the twenty-three
+  sites writing its class are inside no toolbar at all. An IMPORT-FREE LEAF, so callers pass
+  ALREADY-LOCALIZED `placeholder` and `ariaLabel`.
 
   Props:
-   - value: the current query. `$bindable`, because ten of the nineteen sites bound it
-     directly and converting those to a callback would be a behavioural rewrite rather
-     than an extraction.
-   - onInput(next, event): called after `value` is updated, for the nine sites that do
-     something more than store the string — resetting a pager is the common one.
-   - placeholder / ariaLabel: already localized. Both are present at all 19 sites.
-   - compact: emits `is-compact`, the 32px-tall `min(220px, 30%)` density
-     (`fabricate.css:15389`). Three converted sites take it, all in the gathering task
-     editor. A boolean rather than a `density` string because the sheet declares
-     exactly two states and the base one is the absence of the class.
-   - size: the control-height RUNG, as a string naming the rung — `''` (the shipped 34px
-     field) or `'38'` (issue 1371, maintainer ruling M12b). It is a STRING NAMING A NUMBER
-     rather than a boolean, because the ladder
-     (`openspec/specs/design-system/spec.md`: 26 / 28 / 30 / 34 / 38 / 44) has six rungs and a
-     boolean can only ever express the second of them — the next reference that draws a 30px
-     field would add `tall`, then `short`, and the prop would be a bag of adjectives standing
-     in for a published scale. `compact` above is the one that stayed a boolean, and it stayed
-     one because it is not a rung at all: it is a WIDTH (`min(220px, 30%)`) with a height
-     attached, which is a density and not a size.
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `value` | bindable string | `''` | The current query. `$bindable`, because ten of the converted sites bound it directly. |
+  | `onInput(next, event)` | function | `undefined` | Called AFTER `value` is updated, for the sites that do more than store the string. |
+  | `placeholder` / `ariaLabel` | already-localized strings | `undefined` | `ariaLabel` is REQUIRED; see the invariants. |
+  | `compact` | boolean | `false` | Emits `is-compact`, the 32px `min(220px, 30%)` density. A boolean rather than a rung because it is a WIDTH with a height attached, which is a density and not a size. |
+  | `size` | `''` \| `'38'` | `''` | The control-height RUNG, as a string naming the rung; `''` is the shipped 34px field. An unrecognised value resolves to `''` rather than emitting an unstyled `is-size-*`. |
+  | `class` | class string | `''` | An EXTRA class, appended after the primitive's own and after `is-compact` — the order every hand-rolled site already wrote, so a converted site emits a byte-identical `class`. A named prop rather than a rest key, because the spread lands after `class={classes}` and would REPLACE it. |
+  | `inputAttrs` | attribute bag | `undefined` | Attributes for the INPUT rather than for the label, which the rest spread cannot reach. Spread rather than a `*Attr` name prop, because one of the four hooks carries a VALUE rather than the empty string. |
 
-     An unrecognised value resolves to `''` — the shipped field — exactly as `Chip`'s
-     unrecognised tone does, so a typo renders the default rather than emitting an unstyled
-     `is-size-*`. The set is closed at `38` because 38 is the only rung any reference asks this
-     field for; adding the next one is one entry in `SIZE_CLASSES` and one rule in the sheet.
+  Rest spread:
+  - `{...rest}` lands on the `<label>`, carrying its `data-*` hooks and `id`.
 
-     The class it emits is `is-size-38`, in `styles/fabricate.css`'s appended `r8-prim` block
-     (this component has no scoped `<style>` — see below). The token names the axis as well as
-     the rung: a bare `is-38` in a class list beside `is-compact` states a number and not what
-     the number is of.
-   - class: an EXTRA class, appended after the primitive's own and after `is-compact`,
-     which is the order all 22 hand-rolled sites already wrote
-     (`manager-search is-compact manager-task-component-tag-search`,
-     `manager-search manager-access-roster-search`), so every converted site emits a
-     byte-identical `class` attribute. It has to be a named prop rather than a rest
-     key, because the rest spread lands after `class={classes}` and a `class` passed
-     through it would REPLACE the token outright.
-   - inputAttrs: attributes for the INPUT rather than for the label. Four sites hang a
-     `data-*` hook there — `data-access-search`, `data-knowledge-search`,
-     `data-scoped-list-search` and `data-access-roster-search={section.key}` — and the
-     rest spread cannot reach it, because the rest spread belongs to the host. Spread
-     rather than a `*Attr` name prop in `BulkSelectionToolbar`'s style because one of
-     the four carries a VALUE rather than the empty string, which a name prop cannot
-     express.
-
-  Every other attribute — the two label-level `data-*` hooks, `id` — rides the rest
-  spread onto the `<label>`.
-
-  ── ONE TRAP EACH SPREAD CARRIES ──────────────────────────────────────────────────
-  A BARE `data-*` attribute on a COMPONENT tag is the boolean `true`, not the empty
-  string it is on an element, and an `inputAttrs` entry written `{ 'data-x': true }`
-  does the same thing. `<label data-knowledge-search>` renders `data-knowledge-search=""`;
-  the component form renders `="true"` unless the value is spelled `''`. Presence
-  selectors resolve either way, which is why the suites and smoke steps that use them
-  would not have caught it.
+  Invariants:
+  - `ariaLabel` IS REQUIRED. The `<label>` wraps an icon and an input and NO text, so it
+    contributes no accessible name, and an unnamed search box is announced as "search" and nothing
+    else. `tests/manager-search-field-source-contract.test.js` asserts every call site passes it.
+  - A BARE `data-*` ATTRIBUTE ON A COMPONENT TAG IS THE BOOLEAN `true`, not the empty string it is
+    on an element, and an `inputAttrs` entry written `{ 'data-x': true }` does the same. Presence
+    selectors resolve either way, which is why the suites and smoke steps using them cannot catch
+    it: spell the value `''`.
+  - NO SCOPED `<style>`, for the reason `ManagerButton.svelte`'s header states in full: the pill is
+    painted by `styles/fabricate.css` and a scoped block would be a second source of truth.
+  - THE FONT FLOOR IS NOT IN THIS FAMILY'S BLOCK. This family's root is not its control, so the
+    floor is written at the family root PLUS the element it owns, `.fabricate-search input` at
+    (0,1,1), grouped with `Field`'s and `ChanceSlider`'s members immediately below the area's own
+    bare-element baseline. POSITION IS LOAD-BEARING: `font` is a shorthand that resets
+    `line-height`, and at (0,1,1) the group ties every LATER same-rank rule in the area, two of
+    which restate a `font` longhand — declared down in this family's own block it would win both
+    and silently re-type every manager textarea and select. The group carries `font: inherit` AND
+    NOTHING ELSE, because at a tie any declaration the baseline does not also carry is a real move.
+  - IT OWNS ITS CONTROL, SO IT DECLARES BOTH HALVES OF THE PAIR: the strip
+    `.fabricate-search input:focus`, restating verbatim the module reset that removes core's orange
+    outline and glow, and the repaint `.fabricate-search input:focus-visible`, copied verbatim from
+    the module ring. Both are (0,2,1) and THE STRIP IS WRITTEN ABOVE THE REPAINT, because a
+    keyboard-focused input matches both and source order decides the tie. Neither moves anything
+    where a Fabricate root is an ancestor; what they are FOR is the bare host, where a primitive
+    leaning on the module ring would render none.
+  - TWO FAMILY RULES CANNOT TRAVEL, named rather than silently left behind:
+    `.fabricate-search.manager-search.is-compact { width: 100% }` and
+    `.fabricate-search.manager-search { flex-basis: 100% }` are declared inside
+    `@container fabricate-manager (max-width: 680px)`, and that container NAME is established by
+    `.fabricate-manager` itself — so in a host without it there is no such container to query and
+    the responsive narrowing does not apply. `re-rooted-controls-host-independence.test.js`
+    excludes exactly these two by count, so the host-equality walk is not read as covering them.
+  - THE HOST IS ALWAYS A `<label>` AND THE GLYPH IS ALWAYS `fas fa-search`, so neither is a prop:
+    the variation set is of size one. The three combobox sites wearing this class are
+    `SearchablePopover`'s surface rather than this one, and are deliberately not covered.
 -->
 <script>
   let {
-    // The current query. `$bindable` because ten of the nineteen converted sites bound it.
     value = $bindable(''),
-    // Called after `value` has been updated, for the sites that do more than store the string.
     onInput = undefined,
     placeholder = undefined,
-    // The input's accessible name, already localized. The `<label>` wraps an icon and an input
-    // and no text, so it contributes no name of its own.
     ariaLabel = undefined,
-    // `is-compact`: the 32px `min(220px, 30%)` density (`fabricate.css:15389`).
     compact = false,
-    // The control-height RUNG, named after the rung rather than after an adjective. `''` is the
-    // shipped 34px field; see the props block above for why this is a string and `compact` is not.
     size = '',
-    // An EXTRA class, appended after the primitive's own and after `is-compact` — never a
-    // replacement. Named rather than a rest key for the reason `InspectorCard.svelte` records.
     class: extraClass = '',
-    // Attributes for the INPUT. The rest spread belongs to the host `<label>` and cannot
-    // reach it.
     inputAttrs = undefined,
     ...rest
   } = $props();
@@ -218,24 +70,17 @@
   /**
    * The rungs this field can be asked for, and the class each one emits.
    *
-   * A NAMED MAPPING RATHER THAN AN `is-size-${size}` TEMPLATE, for `ManagerButton`'s
-   * `ROLE_CLASSES` reason and for one more of its own. The shared one: the rung set is closed, so
-   * an unrecognised value must render the shipped 34px field rather than emit an unstyled
-   * `is-size-<whatever the caller composed>`. The one that is this file's:
-   * `scripts/lib/stylesheetLiveClasses.js` never widens an `is-`/`has-` class through a
-   * positional wildcard — one `is-${state}` site would otherwise license every `.is-*` rule in a
-   * 26k-line sheet — so a class this component only ever BUILDS is not a class the dead-rule gate
-   * can see a customer for. Written as a literal it is live by that gate's first rule.
-   *
-   * The keys are strings because a rung is a NAME here and not an arithmetic quantity: nothing
-   * adds or compares it, and a numeric prop invites `size={38}` and `size={37}` alike with only
-   * the sheet to say which of the two exists.
+   * A NAMED MAPPING RATHER THAN AN `is-size-${size}` TEMPLATE, for two reasons: the rung set is
+   * closed, so an unrecognised value must render the shipped field rather than an unstyled class
+   * the caller composed; and `scripts/lib/stylesheetLiveClasses.js` never widens an `is-` class
+   * through a positional wildcard, so a class this component only ever BUILDS is not one the
+   * dead-rule gate can see a customer for. The keys are STRINGS because a rung is a name and not
+   * an arithmetic quantity.
    */
   const SIZE_CLASSES = { 38: 'is-size-38' };
 
-  // `Object.hasOwn`, not a plain index, for `ManagerButton`'s reason: a plain read finds
-  // `toString` on `Object.prototype` and the closed-set contract would hold only for values that
-  // are not names on it.
+  // `Object.hasOwn`, not a plain index: a plain read finds `toString` on `Object.prototype` and
+  // the closed-set contract would hold only for values that are not names on it.
   const sizeClass = $derived(
     Object.hasOwn(SIZE_CLASSES, String(size ?? '')) ? SIZE_CLASSES[String(size)] : ''
   );
