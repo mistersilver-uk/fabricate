@@ -99,6 +99,7 @@ import {
   STAGE_BLOCKERS,
   classifyStageReadiness,
   scopedEssenceAllocation,
+  selectedIngredientItems,
   stageSelectionInputsComplete,
 } from './stageReadiness.js';
 import { buildStepRecipeView } from './stepRecipeView.js';
@@ -267,22 +268,6 @@ function salvageRunComplicationRecords(fired) {
     complicationId,
     buckets,
   }));
-}
-
-/**
- * Return the concrete owned Item documents selected for ingredient consumption.
- * Tool validation excludes these documents so a single physical Item cannot be
- * consumed and subsequently mutated as a reusable Tool in the same attempt.
- *
- * @param {object|null} selection
- * @returns {Set<object>}
- */
-function selectedIngredientItems(selection) {
-  return new Set(
-    (Array.isArray(selection?.plan) ? selection.plan : [])
-      .map((entry) => entry?.item)
-      .filter(Boolean)
-  );
 }
 
 /**
@@ -772,16 +757,13 @@ export class CraftingEngine {
     });
     const runManager = this._craftingRunManager();
     const recipe = this.recipeManager?.getRecipe?.(recipeId) ?? null;
-    if (!runManager || !recipe) return versionedFailure('The crafting recipe is unavailable.');
-    if (!actor || !Array.isArray(sourceActors) || sourceActors.length === 0) {
-      return versionedFailure('The crafting actor and component sources are required.');
-    }
     const refusal = this._versionedRunStartRefusal({
       viewer,
       actor,
       sourceActors,
       recipe,
       trusted,
+      runManager,
     });
     if (refusal) return refusal;
 
@@ -789,49 +771,38 @@ export class CraftingEngine {
       lifecycleVersion: 1,
       completionMode,
     });
-    const stepIndex = Number(run.currentStepIndex) || 0;
-    const step = this._executionSteps(recipe)[stepIndex];
-    const selectedSet = this._selectedIngredientSet(step, selectionPlan.selectedIngredientSetId);
-    if (!step || !selectedSet) {
-      await runManager.discardRun(actor, run.id);
-      return versionedFailure('The selected crafting requirements are unavailable.');
-    }
-    const historySnapshots = this._stageHistorySnapshots({
-      recipe,
-      step,
+    const planned = await this._planFirstVersionedStage({
       actor,
       viewer,
       sourceActors,
-    });
-    const stagePlan = {
-      selectedIngredientSetId: selectedSet.id,
-      ingredientOptionOverrides: selectionPlan.ingredientOptionOverrides,
-      ingredientEssenceAllocation: selectionPlan.ingredientEssenceAllocation,
-    };
-    let current = await runManager.setStepSelectionPlan(
-      actor,
-      run.id,
-      stepIndex,
-      {
-        ...stagePlan,
-        selectedRequirementSnapshot: snapshotRequirementSet(selectedSet),
-        ...historySnapshots,
-      },
-      { expectedRevision: run.runRevision }
-    );
-    const opened = await this._startFirstVersionedStage({
-      actor,
-      sourceActors,
-      run: current,
       recipe,
-      step,
-      stepIndex,
-      selectedSet,
-      selectionPlan: stagePlan,
-      historySnapshots,
-      trusted,
-      requestId,
+      run,
+      selectionPlan,
     });
+    if (!planned.valid) return versionedFailure(planned.message);
+    const { stepIndex, step, selectedSet, historySnapshots, stagePlan } = planned;
+    let current = planned.run;
+    let opened;
+    try {
+      opened = await this._startFirstVersionedStage({
+        actor,
+        sourceActors,
+        run: current,
+        recipe,
+        step,
+        stepIndex,
+        selectedSet,
+        selectionPlan: stagePlan,
+        historySnapshots,
+        trusted,
+        requestId,
+      });
+    } catch (error) {
+      // A THROW is a refusal too, and the run this call created must not outlive it. Without the
+      // discard the run stayed active carrying a `recoveryRequired` journal, which makes every
+      // control false — cancel included — so nothing could clear it (issue 1648, F1).
+      return this._discardFailedVersionedStart(actor, run.id, error);
+    }
     if (!opened.success) {
       await runManager.discardRun(actor, run.id);
       return versionedFailure(opened.message);
@@ -854,13 +825,71 @@ export class CraftingEngine {
   }
 
   /**
-   * Why a versioned run may not start: a viewer the recipe is not craftable for, or an
-   * invalid recipe. A grant-attested alchemy match carries its own entitlement and bypasses
-   * the visibility guard. `null` when the run may start.
+   * Resolve the first stage, persist its plan, and answer the run that carries it. A run whose
+   * first stage or requirement set cannot be resolved is discarded here rather than left active.
+   * @private
+   */
+  async _planFirstVersionedStage({ actor, viewer, sourceActors, recipe, run, selectionPlan }) {
+    const runManager = this._craftingRunManager();
+    const stepIndex = Number(run.currentStepIndex) || 0;
+    const step = this._executionSteps(recipe)[stepIndex];
+    const selectedSet = this._selectedIngredientSet(step, selectionPlan.selectedIngredientSetId);
+    if (!step || !selectedSet) {
+      await runManager.discardRun(actor, run.id);
+      return { valid: false, message: 'The selected crafting requirements are unavailable.' };
+    }
+    const historySnapshots = this._stageHistorySnapshots({
+      recipe,
+      step,
+      actor,
+      viewer,
+      sourceActors,
+    });
+    const stagePlan = {
+      selectedIngredientSetId: selectedSet.id,
+      ingredientOptionOverrides: selectionPlan.ingredientOptionOverrides,
+      ingredientEssenceAllocation: selectionPlan.ingredientEssenceAllocation,
+    };
+    const current = await runManager.setStepSelectionPlan(
+      actor,
+      run.id,
+      stepIndex,
+      {
+        ...stagePlan,
+        selectedRequirementSnapshot: snapshotRequirementSet(selectedSet),
+        ...historySnapshots,
+      },
+      { expectedRevision: run.runRevision }
+    );
+    return { valid: true, run: current, stepIndex, step, selectedSet, historySnapshots, stagePlan };
+  }
+
+  /**
+   * Discard the run a failed start created, and answer the refusal its caller returns.
+   *
+   * A start that left NO evidence wrote nothing, so the run goes with the refusal. One that did
+   * keeps its run and rethrows: the journal is then the only record of what the actor spent, and a
+   * GM reconciles it from there. `discardUnappliedRun` owns that test.
+   * @private
+   */
+  async _discardFailedVersionedStart(actor, runId, error) {
+    const discarded = await this._craftingRunManager().discardUnappliedRun(actor, runId);
+    if (!discarded) throw error;
+    return versionedFailure(error?.message || 'The crafting stage could not be started.');
+  }
+
+  /**
+   * Why a versioned run may not start: a missing recipe or actor, a viewer the recipe is not
+   * craftable for, or an invalid recipe. A grant-attested alchemy match carries its own
+   * entitlement and bypasses the visibility guard. `null` when the run may start.
    * @private
    * @returns {object|null}
    */
-  _versionedRunStartRefusal({ viewer, actor, sourceActors, recipe, trusted }) {
+  _versionedRunStartRefusal({ viewer, actor, sourceActors, recipe, trusted, runManager }) {
+    if (!runManager || !recipe) return versionedFailure('The crafting recipe is unavailable.');
+    if (!actor || !Array.isArray(sourceActors) || sourceActors.length === 0) {
+      return versionedFailure('The crafting actor and component sources are required.');
+    }
     const trustedAlchemyMatch =
       trusted?.matched === true &&
       trusted?.activityKind === 'alchemy' &&
@@ -887,15 +916,10 @@ export class CraftingEngine {
    * D-026/D-028: for the first stage, run start IS stage start, so the choice locks and the
    * materials are spent here rather than deferred to the resolve call.
    *
-   * EVERY first stage commits here, the untimed one included. The earlier carve-out returned
-   * success without committing when the stage had no honoured time requirement, on the reasoning
-   * that such a stage begins and resolves in one act. That is true of the ACT and false of the
-   * RUN: the run record is created either way, so a craft whose materials could not be met left a
-   * visible active run that had taken nothing and could be started again against the same stock —
-   * the maintainer reached seven of them on one recipe (issue 1648, M24). The commit is also the
-   * only thing on this path that asks whether the actor can meet the stage at all, so making it
-   * unconditional is what refuses such a craft; `startVersionedRun` discards the run it had
-   * created, leaving no record behind.
+   * Every first stage commits here, the untimed one included: the commit is the only thing on
+   * this path that asks whether the actor can meet the stage at all, and the carve-out that
+   * skipped it left visible active runs that had taken nothing (issue 1648, M24). Either way
+   * `startVersionedRun` discards the run it created, refusal or throw.
    *
    * The gate is armed from the EFFECTIVE duration, so a system with time requirements turned off
    * commits without arming one and the stage stays immediately resolvable.
@@ -2086,64 +2110,20 @@ export class CraftingEngine {
       essenceSpend: historySnapshots.resolutionSnapshot ? { labels: {}, carriers: [] } : undefined,
       toolPairs: [...prepared.toolValidation.tools],
     };
-    const effects = [];
-    // A stage that already spent its inputs at START never re-consumes, re-spends or
-    // refunds here: it resolves against the snapshot the start commit persisted.
+    // A stage that already spent its inputs at START never re-consumes or re-spends here: it
+    // resolves against the snapshot the start commit persisted.
     const spentAtStart = prepared.startedConsumption ?? null;
     if (spentAtStart) seedStartedStageState(state, spentAtStart);
-
-    if (!spentAtStart && shouldConsume) {
-      effects.push({
-        effectId: 'consume-ingredients',
-        kind: 'consumeIngredients',
-        planned: prepared.plan.items,
-        apply: async () => {
-          state.consumedItems = await this._consumeIngredients(prepared.craftSelection.plan);
-          return this._versionedConsumptionReceipt(
-            state,
-            prepared.executionRecipe,
-            prepared.resolveComponent,
-            historySnapshots
-          );
-        },
-      });
-      if (isAlchemy && alchemySubmittedItems.length > 0) {
-        effects.push({
-          effectId: 'consume-alchemy-extras',
-          kind: 'consumeAlchemyExtras',
-          planned: alchemySubmittedItems.map((item) => ({ itemUuid: item.uuid })),
-          apply: async () => {
-            await this._consumeAlchemyExtraItems(state.consumedItems, componentSourceActors, {
-              isAlchemyAttempt: true,
-              alchemySubmittedItems,
-            });
-            return this._versionedConsumptionReceipt(
-              state,
-              prepared.executionRecipe,
-              prepared.resolveComponent,
-              historySnapshots
-            );
-          },
-        });
-      }
-      if (prepared.currencySpends.length > 0) {
-        effects.push({
-          effectId: 'spend-currency',
-          kind: 'spendCurrency',
-          planned: cloneJsonValue(prepared.currencySpends),
-          apply: async () => {
-            state.currencySettlement = cloneJsonValue(
-              await this._spendCraftCurrencyVersioned(
-                actor,
-                prepared.executionRecipe,
-                prepared.currencySpends
-              )
-            );
-            return state.currencySettlement;
-          },
-        });
-      }
-    }
+    const effects = this._versionedStageInputEffects({
+      actor,
+      componentSourceActors,
+      prepared,
+      state,
+      historySnapshots,
+      spentAtStart,
+      shouldConsume,
+      alchemySubmittedItems: isAlchemy ? alchemySubmittedItems : null,
+    });
 
     if (shouldUseTools && prepared.toolValidation.tools.length > 0) {
       effects.push({
@@ -2327,6 +2307,113 @@ export class CraftingEngine {
     };
   }
 
+  /**
+   * The stage's INPUT effects: consume, spend, or - when a stage spent at start and its check
+   * failed under `consumeIngredientsOnFail: false` - return what it spent (issue 1648, F3).
+   * Exactly one of the three shapes applies, so they are built in one place.
+   * @private
+   * @returns {object[]}
+   */
+  _versionedStageInputEffects({
+    actor,
+    componentSourceActors,
+    prepared,
+    state,
+    historySnapshots,
+    spentAtStart,
+    shouldConsume,
+    alchemySubmittedItems,
+  }) {
+    const receipt = () =>
+      this._versionedConsumptionReceipt(
+        state,
+        prepared.executionRecipe,
+        prepared.resolveComponent,
+        historySnapshots
+      );
+    if (spentAtStart) {
+      return shouldConsume ? [] : [this._versionedRefundEffect(actor, prepared, state)];
+    }
+    if (!shouldConsume) return [];
+    const effects = [
+      {
+        effectId: 'consume-ingredients',
+        kind: 'consumeIngredients',
+        planned: prepared.plan.items,
+        apply: async () => {
+          state.consumedItems = await this._consumeIngredients(prepared.craftSelection.plan);
+          return receipt();
+        },
+      },
+    ];
+    if (alchemySubmittedItems?.length > 0) {
+      effects.push({
+        effectId: 'consume-alchemy-extras',
+        kind: 'consumeAlchemyExtras',
+        planned: alchemySubmittedItems.map((item) => ({ itemUuid: item.uuid })),
+        apply: async () => {
+          await this._consumeAlchemyExtraItems(state.consumedItems, componentSourceActors, {
+            isAlchemyAttempt: true,
+            alchemySubmittedItems,
+          });
+          return receipt();
+        },
+      });
+    }
+    if (prepared.currencySpends.length > 0) {
+      effects.push({
+        effectId: 'spend-currency',
+        kind: 'spendCurrency',
+        planned: cloneJsonValue(prepared.currencySpends),
+        apply: async () => {
+          state.currencySettlement = cloneJsonValue(
+            await this._spendCraftCurrencyVersioned(
+              actor,
+              prepared.executionRecipe,
+              prepared.currencySpends
+            )
+          );
+          return state.currencySettlement;
+        },
+      });
+    }
+    return effects;
+  }
+
+  /**
+   * Return a failed stage's START-time spend. D-026 governs WHEN materials are spent, not whether
+   * a failed check keeps them, so `consumeIngredientsOnFail: false` still hands them back - as the
+   * legacy path always has (issue 1648, F3).
+   * @private
+   */
+  _versionedRefundEffect(actor, prepared, state) {
+    const started = prepared.startedConsumption;
+    const items = cloneJsonValue(started.consumedSummary) ?? [];
+    const currencySpends = cloneJsonValue(started.currencySettlement?.settledSpends) ?? [];
+    return {
+      effectId: 'refund-start-consumption',
+      kind: 'refundStageConsumption',
+      planned: { items, currencySpends },
+      apply: async () => {
+        const restore = await this._restoreConsumedIngredients(
+          actor,
+          prepared.executionRecipe?.craftingSystemId ?? null,
+          items
+        );
+        const currency =
+          currencySpends.length > 0
+            ? await this._refundCraftCurrency(actor, prepared.executionRecipe, currencySpends)
+            : null;
+        clearRefundedStageState(state);
+        return {
+          restoredCount: restore.restored.length,
+          restoreFailures: restore.failures,
+          currencyRefunded: currency === null ? null : currency.valid === true,
+        };
+      },
+    };
+  }
+
   _hydrateVersionedStageState(state, receipts) {
     const consumption = receipts['consume-alchemy-extras'] ?? receipts['consume-ingredients'];
     if (consumption) {
@@ -2360,6 +2447,9 @@ export class CraftingEngine {
         fired: cloneJsonValue(receipts['fire-complications'].fired) ?? [],
       };
     }
+    // Last, so it overrides the START seeding: a resumed operation whose refund already applied
+    // must not restate the spend that refund reversed.
+    if (receipts['refund-start-consumption']) clearRefundedStageState(state);
   }
 
   _historicalEssenceSpend(consumedItems, essenceSources, recipe) {
@@ -9746,6 +9836,13 @@ function versionedToolPlan(toolValidation) {
 }
 
 /** Resolve a started stage from what it actually spent, never from live inventory. */
+/** A refunded stage spent nothing, so it records nothing - the legacy failure path's shape. */
+function clearRefundedStageState(state) {
+  state.consumedItems = [];
+  state.currencySettlement = null;
+  if (state.essenceSpend) state.essenceSpend = { labels: {}, carriers: [] };
+}
+
 function seedStartedStageState(state, spentAtStart) {
   state.consumedItems = spentAtStart.consumedItems;
   state.resolvedEssences = spentAtStart.resolvedEssences;
@@ -9768,6 +9865,9 @@ function startedConsumptionState(started) {
     consumedItems: (Array.isArray(started.consumedSnapshots) ? started.consumedSnapshots : []).map(
       rehydrateVersionedConsumedItem
     ),
+    // The RESTORE-shaped copy of the same receipt, identical whichever preparation built it, so a
+    // refund's plan survives the resume comparison.
+    consumedSummary: cloneJsonValue(started.consumedSummary) ?? [],
     resolvedEssences: cloneJsonValue(started.resolvedEssences) ?? {},
     essenceEnabled: cloneJsonValue(started.essenceEnabled) ?? {},
     essenceSpend: craftingStepHistoryEvidence(started).essenceSpend,

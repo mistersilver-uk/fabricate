@@ -443,6 +443,35 @@ export class CraftingRunManager extends RunContainerManagerBase {
   }
 
   /**
+   * Discard a run whose start left NO EVIDENCE: no applied effect and no retained receipt. Such a
+   * start changed nothing, so its journal records an uncertainty that does not exist — and the
+   * `recoveryRequired` that records it refuses every control the run has, cancel included, so a
+   * run left in that state can never be cleared by the player (issue 1648, F1).
+   *
+   * Separate from {@link discardRun}, which refuses a run under reconciliation, because the
+   * evidence test is exactly what makes this one safe.
+   *
+   * @param {Actor} actor
+   * @param {string} runId
+   * @returns {Promise<object|null>} the discarded run, or `null` when it is absent or HAS evidence.
+   */
+  async discardUnappliedRun(actor, runId) {
+    const container = this._getContainer(actor);
+    const run = container.active?.[runId];
+    if (!run) return null;
+    const effects = run.executionJournal?.effects;
+    if (
+      Array.isArray(effects) &&
+      effects.some((effect) => effect?.phase === 'applied' || effect?.receipt != null)
+    ) {
+      return null;
+    }
+    delete container.active[runId];
+    await this._persist(actor, container);
+    return run;
+  }
+
+  /**
    * Record a no-signature alchemy fizzle as a failed, recipe-less run-history
    * entry. A fizzle matches NO enabled recipe, so the entry carries
    * `recipeId: null` and `isFizzle: true` and never enters the `active`

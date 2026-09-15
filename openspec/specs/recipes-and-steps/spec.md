@@ -163,6 +163,8 @@ A started stage's check, resolution and awards read the start snapshot rather th
 This governs a LATER stage of a multi-step run, which is reached only by resolving the stage before it.
 Run start is different: it CREATES a run, so the first stage commits at run start whether or not it has an honoured time requirement.
 A first stage whose materials cannot be met refuses the start and leaves no run record, rather than creating an active run that has taken nothing and can be started again against the same stock.
+A start that THROWS is such a refusal: unless one of its effects applied, the run it created MUST be discarded too, because a run left active carrying uncertain evidence refuses every control it has — cancel included — and so cannot be cleared by the player at all.
+An effect that refused DEFINITELY, establishing that nothing reached the database, MUST NOT record uncertain evidence; its plan is discarded and the operation stays retryable.
 No versioned run may therefore be active with an unstarted first stage.
 - Execution re-resolves the current run, revision, source actors, selected ingredient set, inventory, Tools and requirements under the authoritative operation when the stage did not start separately.
 Fixed ingredients, alternatives and essence carriers share the canonical physical-item allocation, so one unit cannot fund two requirements.

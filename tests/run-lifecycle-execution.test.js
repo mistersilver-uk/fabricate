@@ -1208,14 +1208,15 @@ for (const scenario of ['delete-veto', 'update-refusal', 'prefix-then-veto', 'do
       assert.equal(awards, 1);
       assert.equal(source.items.length, scenario.startsWith('update-') ? 1 : 0);
       assert.equal(runManager.getRunHistory(actor)[0].steps[0].consumedIngredients[0].quantity, 1);
-    } else {
+    } else if (scenario === 'prefix-then-veto') {
+      // A REAL spend happened before the veto, so the run is the only record of it and MUST
+      // survive for a GM to reconcile. The start rethrows rather than discarding.
       await assert.rejects(start, (error) => error.code === 'RECOVERY_REQUIRED');
       const reloaded = new CraftingRunManager().getActiveRuns(actor)[0];
       assert.equal(reloaded.executionJournal.status, 'recoveryRequired');
       const consumption = reloaded.executionJournal.effects.find((effect) => effect.effectId === 'consume-ingredients');
       assert.notEqual(consumption.phase, 'applied');
-      assert.equal(consumption.receipt == null, scenario !== 'prefix-then-veto');
-      if (scenario === 'prefix-then-veto') assert.equal(consumption.receipt.confirmed[0].quantity, 1);
+      assert.equal(consumption.receipt.confirmed[0].quantity, 1);
       assert.equal(awards, 0);
       assert.equal(source.items.length, 1, 'a successful prefix stays spent, the vetoed item remains');
       assert.equal(reloaded.steps[0].preparedConsumption, undefined, 'an ambiguous start locks nothing');
@@ -1224,6 +1225,134 @@ for (const scenario of ['delete-veto', 'update-refusal', 'prefix-then-veto', 'do
       catch (error) { assert.equal(error.code, 'RECOVERY_REQUIRED'); }
       assert.deepEqual(writes, ids, 'ambiguous batches never replay');
       assert.equal(awards, 0);
+    } else {
+      // NOTHING was written — the veto/refusal reached no document and no receipt was retained —
+      // so the run this start created goes with the refusal. Left active it would carry a
+      // `recoveryRequired` journal, which refuses every control including cancel, so the player
+      // could never clear it (issue 1648, F1).
+      const refused = await start();
+      assert.equal(refused.success, false, 'a throw during the start commit is a refusal');
+      assert.ok(refused.message, 'and it says something');
+      assert.deepEqual(new CraftingRunManager().getActiveRuns(actor), [], 'no run is left behind');
+      assert.deepEqual(new CraftingRunManager().getRunHistory(actor), [], 'and none is archived');
+      assert.equal(awards, 0);
+      assert.equal(source.items.length, 1, 'the refused item is still held');
+      assert.deepEqual(writes, ids, 'the vetoed batch is attempted once and never replayed');
+    }
+  });
+}
+
+/**
+ * A stack-path guard refusal reaches no database at all, so it is the one failure the engine
+ * KNOWS wrote nothing. Recording recovery for it strands the run; discarding the plan leaves it
+ * ordinary and retryable (issue 1648, F1).
+ */
+test('a definite write refusal abandons its plan instead of demanding recovery', async () => {
+  const { engine, recipe, recipeManager, runManager } = setupEngineFixture();
+  const actor = new FakeActor('definite');
+  const source = new FakeActor('definite-stock');
+  const set = new IngredientSet({ id: 'set-1', ingredientGroups: [
+    { id: 'only', options: [{ quantity: 1, match: { type: 'component', componentId: 'only' } }] },
+  ] });
+  recipe.getExecutionSteps = () => [{ id: 'step-1', ingredientSets: [set], resultGroups: [], toolIds: [] }];
+  recipeManager.ingredientMatchesItem = (_recipe, option, item) => option.match.componentId === item.id;
+  let writes = 0;
+  source.items = [{ id: 'only', uuid: `${source.uuid}.Item.only`, parent: source,
+    system: { quantity: 2 },
+    async delete() { writes += 1; return this; },
+    async update() {
+      writes += 1;
+      const refusal = new Error('the configured stack-quantity path resolves an object');
+      refusal.code = 'STACK_QUANTITY_PATH_REFUSED';
+      throw refusal;
+    },
+  }];
+
+  const refused = await startReadyVersionedRun({ engine, recipe, actor, source,
+    selectionPlan: { selectedIngredientSetId: set.id } });
+
+  assert.equal(refused.success, false, 'the start refuses rather than throwing recovery');
+  assert.equal(writes, 1, 'the refused write was attempted exactly once');
+  assert.deepEqual(new CraftingRunManager().getActiveRuns(actor), [], 'and left no run behind');
+  assert.equal(source.items[0].system.quantity, 2, 'the stock is untouched');
+  assert.equal(runManager.getRunHistory(actor).length, 0);
+});
+
+test('abandoning a plan is refused once an effect has applied', () => {
+  const planned = transitionExecutionJournal(null, { type: 'plan', plan: {
+    operationId: 'op-1', requestId: 'req-1', baseRunRevision: 0, intent: null,
+    effects: [{ effectId: 'a', kind: 'consumeIngredients', planned: null },
+      { effectId: 'b', kind: 'awardResults', planned: null }],
+  } });
+  assert.equal(transitionExecutionJournal(planned, { type: 'abandonPlan' }), null);
+  const applying = transitionExecutionJournal(planned, { type: 'effectApplying', effectId: 'a' });
+  assert.equal(transitionExecutionJournal(applying, { type: 'abandonPlan' }), null,
+    'an APPLYING effect that wrote nothing is still abandonable');
+  const applied = transitionExecutionJournal(applying, { type: 'effectApplied', effectId: 'a', receipt: null });
+  assert.throws(() => transitionExecutionJournal(applied, { type: 'abandonPlan' }),
+    (error) => error.code === 'INVALID_EFFECT_TRANSITION');
+});
+
+/**
+ * D-026 moved the SPEND to stage start; it did not repeal the GM's `consumeIngredientsOnFail`.
+ * A failed check under that setting hands back what the stage spent, as the legacy path always
+ * has (issue 1648, F3/QE2-1).
+ */
+for (const consumeIngredientsOnFail of [false, true]) {
+  test(`a failed versioned check returns its start-time spend when the policy forbids consumption (policy=${consumeIngredientsOnFail})`, async () => {
+    const { engine, recipe, recipeManager, runManager } = setupEngineFixture();
+    const actor = new FakeActor('refunded');
+    const source = new FakeActor('refund-stock');
+    const set = new IngredientSet({ id: 'set-1', ingredientGroups: [
+      { id: 'only', options: [{ quantity: 1, match: { type: 'component', componentId: 'ore' } }] },
+    ] });
+    recipe.getExecutionSteps = () => [{ id: 'step-1', ingredientSets: [set], resultGroups: [], toolIds: [],
+      timeRequirement: { minutes: 2 } }];
+    recipeManager.ingredientMatchesItem = (_recipe, option, item) => option.match.componentId === item.id;
+    source.items = [{ id: 'ore', uuid: `${source.uuid}.Item.ore`, parent: source, name: 'Sun Ore',
+      img: 'icons/svg/item-bag.svg', system: { quantity: 1 },
+      async delete() { source.items = []; return this; },
+    }];
+    game.fabricate.getCraftingSystemManager = () => ({ getSystem: () => ({
+      id: 'system-1', name: 'Refunds', resolutionMode: 'simple',
+      craftingCheck: { consumption: { consumeIngredientsOnFail, breakToolsOnFail: false } },
+      components: [{ id: 'ore', name: 'Sun Ore', img: 'icons/svg/item-bag.svg' }],
+    }) });
+    const restored = [];
+    actor.createEmbeddedDocuments = async (_type, data) => {
+      restored.push(...data.map((entry) => entry.name));
+      return data.map((entry) => ({ ...entry, id: 'restored', parent: actor }));
+    };
+
+    const started = await startReadyVersionedRun({ engine, recipe, actor, source,
+      selectionPlan: { selectedIngredientSetId: set.id } });
+    assert.equal(started.success, true);
+    assert.deepEqual(source.items, [], 'the stage spent at start, whatever the failure policy is');
+
+    engine.installVersionedRunAuthority({ consumeExecutionGrant: async () => ({
+      operationId: 'fail-execution',
+      resolvedCheckResult: { success: false, message: 'Check failed', data: {} },
+    }) });
+    game.time.worldTime += 600;
+    const resolved = await engine.executeVersionedStage({ actor, componentSourceActors: [source],
+      runId: started.runId, expectedRevision: runManager.getRun(actor, started.runId).runRevision,
+      executionGrant: 'grant', requestId: 'fail-execute' });
+
+    assert.equal(resolved.success, false, 'the check still failed');
+    const history = new CraftingRunManager().getRunHistory(actor)[0];
+    const refund = history.executionJournal.effects.find(
+      (effect) => effect.effectId === 'refund-start-consumption'
+    );
+    if (consumeIngredientsOnFail) {
+      assert.equal(refund, undefined, 'a policy that consumes on failure refunds nothing');
+      assert.deepEqual(restored, [], 'and returns nothing to the actor');
+      assert.equal(history.steps[0].consumedIngredients.length, 1, 'the spend stays recorded');
+    } else {
+      assert.equal(refund?.phase, 'applied', 'the refund is a journalled effect of the failure');
+      assert.equal(refund.receipt.restoredCount, 1);
+      assert.deepEqual(restored, ['Sun Ore'], 'the item is back on the actor');
+      assert.deepEqual(history.steps[0].consumedIngredients, [],
+        'and the failed stage records no consumption, as the legacy path records none');
     }
   });
 }

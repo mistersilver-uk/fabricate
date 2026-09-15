@@ -43,6 +43,7 @@ export function getCommittedExecutionOutcome(journal, requestId) {
 /**
  * Transitions produce evidence only; commit requires every effect applied, with an optional outcome.
  * Interrupted applying effects require recovery, never replay or observing-client reconstruction.
+ * `abandonPlan` answers `null` for a plan no effect of which applied, discarding it.
  * Plans supply operation/request/revision/intent/effects; applying names an ID and applied adds a receipt.
  * @param {object|null} journal Null only when creating the first plan.
  * @param {object} [transition]
@@ -55,6 +56,7 @@ export function transitionExecutionJournal(journal, transition = {}) {
   const current = normalizeJournal(journal);
   if (transition.type === 'reconstructAfterReload') return reconstructAfterReload(current);
   if (transition.type === 'recoveryRequired') return requireRecovery(current);
+  if (transition.type === 'abandonPlan') return abandonPlan(current);
   assertUnsettled(current);
 
   switch (transition.type) {
@@ -86,7 +88,10 @@ export async function persistExecutionJournalTransition(location, transition, op
   location.assertMutation({ ...options, currentOnly: true, allowExecutionJournal: true });
   assertPlanRevision(location.run, transition);
   const nextJournal = transitionExecutionJournal(location.run.executionJournal, transition);
-  if (JSON.stringify(nextJournal) === JSON.stringify(location.run.executionJournal)) {
+  if (
+    nextJournal !== null &&
+    JSON.stringify(nextJournal) === JSON.stringify(location.run.executionJournal)
+  ) {
     return location.run;
   }
   location.run.executionJournal = nextJournal;
@@ -168,6 +173,19 @@ function reconstructAfterReload(journal) {
     journal.status = 'recoveryRequired';
   }
   return normalizeJournal(journal);
+}
+
+/**
+ * Discard a plan no effect of which reached the world: an effect that refused DEFINITELY leaves
+ * the run exactly as it was, so recording recovery would strand it (issue 1648, F1). `null` is
+ * the no-journal state every reader already handles, so the operation may simply be retried.
+ */
+function abandonPlan(journal) {
+  assertUnsettled(journal);
+  if (journal.effects.some((effect) => effect.phase === 'applied')) {
+    throw journalError('An applied effect cannot be abandoned', 'INVALID_EFFECT_TRANSITION');
+  }
+  return null;
 }
 
 function requireRecovery(journal) {

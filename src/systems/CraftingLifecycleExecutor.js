@@ -107,12 +107,7 @@ export class CraftingLifecycleExecutor {
       try {
         receipt = await effect.apply({ actor, run: current, trusted, receipts: { ...receipts } });
       } catch (error) {
-        await this._markRecoveryRequired(actor, current);
-        throw new CraftingLifecycleExecutionError(
-          `Crafting effect "${effect.effectId}" requires recovery`,
-          'RECOVERY_REQUIRED',
-          error
-        );
+        throw await this._effectFailure(actor, current, effect.effectId, error);
       }
       receipts[effect.effectId] = receipt ?? null;
       current = this._currentRunAnyStatus(actor, runId);
@@ -200,6 +195,39 @@ export class CraftingLifecycleExecutor {
     });
   }
 
+  /**
+   * Settle a failed effect. A DEFINITE refusal that has written nothing at all discards the plan
+   * instead of demanding recovery, so a run no effect touched stays ordinary and retryable rather
+   * than becoming permanently unclearable (issue 1648, F1).
+   * @private
+   * @returns {Promise<Error>} The error to throw.
+   */
+  async _effectFailure(actor, run, effectId, error) {
+    const applied = observeExecutionJournal(run.executionJournal).effects.some(
+      (entry) => entry.phase === 'applied'
+    );
+    if (!applied && isDefiniteRefusal(error)) {
+      await this._abandonPlan(actor, run);
+      return error;
+    }
+    await this._markRecoveryRequired(actor, run);
+    return new CraftingLifecycleExecutionError(
+      `Crafting effect "${effectId}" requires recovery`,
+      'RECOVERY_REQUIRED',
+      error
+    );
+  }
+
+  async _abandonPlan(actor, run) {
+    try {
+      const current = this._currentRunAnyStatus(actor, run.id);
+      await this._transition(actor, current, { type: 'abandonPlan' });
+    } catch {
+      // The plan is evidence of an operation that changed nothing; failing to discard it leaves
+      // a stale plan, which the next attempt reports rather than silently replaying.
+    }
+  }
+
   async _markRecoveryRequired(actor, run) {
     try {
       const current = this._currentRunAnyStatus(actor, run.id);
@@ -209,6 +237,15 @@ export class CraftingLifecycleExecutor {
       // cannot be repaired here and must not obscure the original ambiguous effect.
     }
   }
+}
+
+/**
+ * Whether an effect's failure established that NOTHING reached the database. Only the stack-path
+ * guard answers this today: it refuses before dispatching, which is the distinction
+ * `StackQuantityPathRefusal` exists to carry and which recovery must not swallow.
+ */
+function isDefiniteRefusal(error) {
+  return error?.code === 'STACK_QUANTITY_PATH_REFUSED';
 }
 
 function assertResumableOperation(journal, executable, operationId, requestId) {
