@@ -102,11 +102,11 @@ src/ui/SvelteCraftingSystemManagerApp.svelte.js	1614
 src/ui/SvelteCraftingSystemManagerApp.svelte.js::_buildServices	494
 src/ui/SvelteCraftingSystemManagerApp.svelte.js::_buildServices>renderSystemImportDialog	111
 src/ui/SvelteCraftingSystemManagerApp.svelte.js::_prepareSvelteProps	412
-src/ui/SvelteFabricateApp.svelte.js::_buildServices	180
-src/ui/extensionRegistry.js::createExtensionRegistry	179
-src/ui/navTabBadgeStore.js::createNavTabBadgeStore	123
+src/ui/SvelteFabricateApp.svelte.js::_buildServices	130
+src/ui/extensionRegistry.js::createExtensionRegistry	142
+src/ui/navTabBadgeStore.js::createNavTabBadgeStore	114
 src/ui/svelte/SvelteApplicationMixinCore.js::createSvelteApplicationMixin	111
-src/ui/svelte/actions/anchoredPopover.js::anchoredPopover	197
+src/ui/svelte/actions/anchoredPopover.js::anchoredPopover	188
 src/ui/svelte/apps/ActorSelectTopBar.svelte	518
 src/ui/svelte/apps/FabricateAppRoot.svelte	766
 src/ui/svelte/apps/InteractableBrowserRoot.svelte	668
@@ -219,9 +219,7 @@ src/ui/svelte/stores/worldScopeActions.js	881
 src/ui/svelte/stores/worldScopeActions.js::createWorldScopeEntityActions	467
 src/ui/svelte/stores/worldScopeActions.js::createWorldVocabularyActions	128
 src/ui/svelte/stores/worldScopeProjection.js	924
-src/ui/svelte/util/foundryBridge.js	892
 src/ui/svelte/util/foundryIconCatalogue.js	1553
-src/ui/svelte/util/recipeGraphBuilder.js	936
-src/ui/svelte/util/shoppingListAggregator.js::aggregateShoppingList	179
+src/ui/svelte/util/shoppingListAggregator.js::aggregateShoppingList	163
 src/utils/rollExpressionAverage.js::createReader	201
 src/utils/scopedEntityListModel.js::createScopedEntityListModel	157
