@@ -57,9 +57,12 @@ A multi-step run keeps a progress bar between its stages, so you can see how far
 
 Where a run needs something from **you**, a second badge sits beside the status and says what:
 
-- **Ready to begin** — nothing is missing; the run is waiting for you to start its next stage.
-- **Needs your choice** — a route, an option, or an essence allocation has not been made yet.
-- **Needs materials**, **Needs essences**, **Needs payment**, **Needs tools** — the stage is short of something you have to acquire.
+- **Ready to begin**.
+  Nothing is missing, and the run is waiting for you to start its next stage.
+- **Needs your choice**.
+  A route, an option, or an essence allocation has not been made yet.
+- **Needs materials**, **Needs essences**, **Needs payment**, **Needs tools**.
+  The stage is short of something you have to acquire.
 
 You can sort the active list by **Soonest Ready** or by **Newest**.
 Soonest Ready puts the runs you can act on first, then the ones that will be ready soonest.
@@ -89,7 +92,9 @@ It does not carry into other worlds, and active runs cannot be dismissed.
 ## Run detail
 
 An active run opens with its identity, available actions, and relevant notices.
-For the current crafting stage, progress and stage navigation lead into the stage's purpose, **Produces**, and **Consumes**.
+For the current crafting stage, progress and stage navigation lead into the stage's purpose, **Produces**, and its materials.
+Before you begin the stage, the materials section reads **This run consumes** and is where you make your choices.
+Once you begin the stage, that section becomes **Consumed**, a record of what was actually taken rather than a control you can still edit.
 The current stage's **Time** and **Check** summaries follow.
 Protected or unknown check details are not described as **No check**.
 
@@ -108,14 +113,15 @@ Upcoming stages pair **Will consume** and **Will produce** previews, including t
 These views are read-only and omit the current stage's countdown and separate Time and Check summaries.
 Previewing an option does not select it or reserve materials.
 Its choices become available when that stage becomes current.
-Only the current stage can offer editable material controls, and only while the run permits changes.
+Only the current stage can offer editable material controls, and only before you begin it.
+Beginning the stage locks its route, ingredient, and essence choices for good, so there is nothing left to edit once its countdown or its resolution is underway.
 A single-stage recipe omits the redundant stage navigator.
 
 Where a recipe offers an **Ingredient route**, select the route you want to use.
 Changing route replaces the previous route's ingredient choices and shared essence allocation.
 Open an ingredient choice to compare each candidate's held, needed, and spare amounts.
 A missing or stale choice needs an explicit replacement, even if only one option remains.
-You can repair several choices one at a time, but the whole stage must be valid before execution.
+You can repair several choices one at a time, but the whole stage must be valid before you begin it.
 
 **Shared essence allocation** counts physical units of carrier items.
 One carrier unit can contribute every applicable essence it carries while being spent only once.
@@ -193,17 +199,20 @@ It does not invite another execution of the finished run.
 ## Continue, pause, or cancel
 
 New crafting, alchemy, and gathering runs use the current run lifecycle.
-When ready, use **Complete stage**, **Complete**, **Brew**, or **Collect**, as appropriate to the selected run.
+A crafting stage locks its choices and consumes its materials the moment it begins, whether that is the recipe's first stage, started from its own activity tab, or a later stage of a multi-stage craft, begun here.
+For a later stage, make its route, option, and essence choices, then use **Begin step** to commit to them.
+**Begin step** locks those choices, consumes the materials it lists, and starts the stage's clock, in one action that cannot be undone.
+A stage with no time requirement begins and resolves together, so completing it does both in the same click, with no separate **Begin step**.
+Beginning a stage only succeeds once you hold everything it needs, so nothing is taken from you while a choice, a material, an essence, a cost, or a tool is still missing.
+When a stage is underway or ready, use **Complete stage**, **Complete**, **Brew**, or **Collect** to resolve it, as appropriate to the selected run.
 An available check action says **Roll check**, while d100 gathering says **Roll a d100**.
+A check cannot be rolled until every other requirement for the stage is met, including its elapsed time.
 Any required player check stays manual.
 The action explains why it is unavailable when the run cannot proceed.
 You must own the crafting character and its material-source characters, or ask your GM to act.
 When a crafting stage is already ready and all its choices are supplied, the starting action can execute it immediately through the same active-GM authority.
 Manual completion does not require an extra Journal visit for that fully supplied case.
 
-Starting a timed craft records the wait and your selections without spending editable ingredients or currency.
-They are rechecked and spent only when the ready stage executes.
-Starting or editing a selection is not a reservation that guarantees the stock will still be there later.
 Gathering keeps its existing start-time costs and reservations, including stamina and node use, so waiting to collect does not postpone those costs.
 
 Use **Pause** on an eligible waiting run to freeze its remaining world time.
@@ -214,8 +223,9 @@ A paused run cannot execute or complete automatically, but it can still be cance
 The cancel control opens a confirmation in the action bar.
 Read the consequence, then choose **Yes, cancel** or **Keep crafting**.
 While that decision is open, the other actions are replaced by those confirmation controls.
-For a current-lifecycle run, cancellation forfeits elapsed time and keeps costs already incurred and awards already delivered.
-It does not spend current or future unconsumed materials or refund earlier spending.
+The confirmation states whether cancelling returns what the run has already consumed, which depends on your GM's crafting system settings.
+For a current-lifecycle run, cancellation always forfeits elapsed time and keeps awards already delivered.
+A stage you have not yet begun has nothing consumed to return.
 
 ### When ready
 
@@ -225,7 +235,7 @@ During an active countdown without a player check, **When ready** offers **Ask m
 
 The preference may be visible even while materials or choices remain unresolved.
 Its visibility does not mean the run is eligible to execute automatically.
-Automatic crafting stops without spending when a stage needs materials, an ingredient choice, currency, essence allocation, a Tool, or a player check, or when validation fails.
+Automatic crafting does not begin a stage, and so does not spend anything, when the stage needs materials, an ingredient choice, currency, essence allocation, a Tool, or a player check, or when validation fails.
 Choosing materials in advance does not authorize automatic material spending.
 The preference is retained when blocked, and eligible stages needing no further input can complete automatically.
 
@@ -236,7 +246,7 @@ Fabricate creates that ledger for you.
 The active GM's client provisions it on load and again before the first run change, so there is no setup step and nothing to click.
 If two GM sessions start at the same moment, Fabricate keeps one ledger and removes the unused duplicate.
 Two ledgers that both hold records are left alone and reported, because only a person can decide which one to keep.
-While the authority is unavailable for any other reason — no GM online, an interrupted operation, or a held execution claim — the Journal and the Crafting tab state that reason instead of offering an action.
+While the authority is unavailable for any other reason, such as no GM online, an interrupted operation, or a held execution claim, the Journal and the Crafting tab state that reason instead of offering an action.
 
 If an operation stops after an effect may have happened, the Journal can show **This run needs GM attention**.
 Its evidence distinguishes confirmed effects with recorded receipts, an uncertain effect that must not be repeated, and effects not started.
@@ -245,10 +255,15 @@ Ordinary execution and cancellation remain unavailable for a run requiring recov
 
 An unresolved execution claim can also block other current-lifecycle runs.
 The active GM must inspect the recorded receipts and the uncertain boundary, then manually record a reconciliation or abandonment.
-Reconciliation is a separate procedure and is deliberately manual; no part of it happens automatically.
+Reconciliation is a separate procedure and is deliberately manual.
+No part of it happens automatically.
 That releases the matching claim only.
 It never retries the uncertain effect, makes the old request replayable, or automatically rolls anything back.
 The uncertain run remains marked as requiring recovery.
+
+When a GM can see that a claim is no longer live, meaning no other operation is still working, Fabricate offers **Release claim…** on any run the claim is blocking, not only the run that originally ran into it.
+The prompt explains what releasing it does and does not do, then asks the GM to record whether they checked the actor's items and currency first or are abandoning that check, before releasing the claim.
+While a claim is still live, meaning another operation is genuinely in progress, the Journal asks you to wait instead of offering the control.
 
 ### Hidden identity and private checks
 
