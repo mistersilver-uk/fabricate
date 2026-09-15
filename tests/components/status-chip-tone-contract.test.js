@@ -77,8 +77,11 @@ const MAP_READERS = COMPONENTS.filter(({ source }) => source.includes(MAP_MODULE
  * this corpus binds a tone the map never sees" is satisfied by a corpus with no dynamic chips in
  * it at all, which is exactly what a regression that reverted the conversion would produce.
  */
-// #1648 replaces HistoryRow's mapped status chip with a labeled outcome glyph.
-const MAPPED_TONE_SITES = 23;
+// #1648 replaces HistoryRow's mapped status chip with a labeled outcome glyph, and adds the
+// run-attention chip (M10) beside the status chip in BOTH journal run surfaces — the Active
+// list row and the run header. Both route through the map, so the floor rises by two rather
+// than the negative clause above quantifying over a corpus that quietly lost them.
+const MAPPED_TONE_SITES = 25;
 
 /** The one shipped chip that asks for the flat plate. */
 const OUTLINED_CHIP = 'src/ui/svelte/apps/manager/component/ComponentIdentityStrip.svelte';
@@ -196,13 +199,21 @@ describe('1506 the journal run chip — its shrink protection is restated per ca
         `Found: ${callers.map(({ path }) => path).join(', ')}`
     );
 
+    // Read RULE BLOCKS rather than matching the class immediately before a brace. A caller
+    // that groups the row's two chips into one selector list — `:global(.a), :global(.b) {` —
+    // satisfies this requirement exactly, and a regex anchored on `)` `{` would call that a
+    // missing declaration. The block's selector list is what has to name the chip; its body is
+    // what has to carry the property.
+    const declaresShrinkProtection = (source) =>
+      source
+        .split('}')
+        .some(
+          (block) =>
+            block.includes(`:global(.${RUN_CHIP_CLASS})`) &&
+            /flex:\s*0 0 auto;/.test(block.slice(block.indexOf('{') + 1))
+        );
     const missing = callers
-      .filter(
-        ({ source }) =>
-          !new RegExp(
-            String.raw`:global\(\.${RUN_CHIP_CLASS}\)\s*\{[^}]*flex:\s*0 0 auto;`
-          ).test(source)
-      )
+      .filter(({ source }) => !declaresShrinkProtection(source))
       .map(({ path }) => path);
     assert.deepEqual(
       missing,
