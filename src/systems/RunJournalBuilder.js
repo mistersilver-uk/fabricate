@@ -209,6 +209,11 @@ export class RunJournalBuilder {
    *   — reads the GM-owned blind-run store (issue 901). Present only so a GM's
    *   journal can preview the task an in-flight blind run will yield; the
    *   projection ignores it for every non-GM viewer.
+   * @param {Function} [deps.isGatheringIdentityHidden] `({actor, viewer, environmentId, taskId})
+   *   => boolean` — D-027: whether run history must still name a blind gathering task
+   *   generically. Answered from the environment's reveal policy and the PERSISTED reveal
+   *   state, never from actor ownership; unwired it discloses, because a builder with no
+   *   reveal source cannot tell a blind environment from a plain one.
    * @param {Function} [deps.getGatheringTask] `(environmentId, taskId) => { name, img }|null`
    *   — resolves a gathering run's task to its authored name/image (from the COMPOSED
    *   environment), mirroring how `getRecipe` resolves a crafting run's name/image.
@@ -244,6 +249,7 @@ export class RunJournalBuilder {
     getTool = null,
     getGatheringTask = null,
     getGatheringBlindSecret = null,
+    isGatheringIdentityHidden = null,
     getResultItem = null,
     getComponent = null,
     getViewer = null,
@@ -267,6 +273,8 @@ export class RunJournalBuilder {
     this._getGatheringTask = typeof getGatheringTask === 'function' ? getGatheringTask : () => null;
     this._getGatheringBlindSecret =
       typeof getGatheringBlindSecret === 'function' ? getGatheringBlindSecret : null;
+    this._isGatheringIdentityHidden =
+      typeof isGatheringIdentityHidden === 'function' ? isGatheringIdentityHidden : () => false;
     this._getResultItem = typeof getResultItem === 'function' ? getResultItem : () => null;
     this._getComponent = typeof getComponent === 'function' ? getComponent : () => null;
     this._getViewer = typeof getViewer === 'function' ? getViewer : () => null;
@@ -1746,10 +1754,12 @@ export class RunJournalBuilder {
         : numberOrNull(run.finishedAt);
 
     const gatheringContext =
-      runType === 'gathering' ? this._gatheringRunDisplayTask({ run, viewer }) : null;
+      runType === 'gathering' ? this._gatheringRunDisplayTask({ run, viewer, actor }) : null;
     const resultRun =
       runType === 'gathering' ? { ...run, createdResults: gatheringActualAwards(run) } : run;
-    const withheld = Boolean(run.resolutionSnapshot || run.historySettlement) && !historyEntitled;
+    const withheld =
+      gatheringContext?.identityHidden === true ||
+      (Boolean(run.resolutionSnapshot || run.historySettlement) && !historyEntitled);
     const createdResults = withheld ? null : resultRun.createdResults;
     const { title, img, blindSecretPreview } = this._passthroughRunIdentity({
       run,
@@ -1882,6 +1892,16 @@ export class RunJournalBuilder {
     };
   }
 
+  /** Fails CLOSED: a reveal source that throws hides the task rather than guessing. */
+  _identityHidden({ actor, viewer, environmentId, taskId }) {
+    if (viewer?.isGM === true || !environmentId) return false;
+    try {
+      return this._isGatheringIdentityHidden({ actor, viewer, environmentId, taskId }) === true;
+    } catch {
+      return true;
+    }
+  }
+
   _gatheringRunHasPlayerCheck({ task } = {}) {
     const resolutionMode = stringOrNull(task?.resolutionMode) || 'd100';
     return resolutionMode !== 'straight';
@@ -1894,10 +1914,19 @@ export class RunJournalBuilder {
    * @returns {{blind: boolean, secret: boolean, task: object|null}}
    * @private
    */
-  _gatheringRunDisplayTask({ run, viewer }) {
+  _gatheringRunDisplayTask({ run, viewer, actor = null }) {
     const environmentId = stringOrNull(run.environmentId);
     const blind = isBlindWaitingTaskId(run.taskId) || run.taskId === 'blind';
     if (!blind) {
+      // D-027. A GM-executed blind run persists the REAL task id, so the marker above cannot
+      // answer whether this viewer may be told it; the reveal policy does, and owning the actor
+      // entitles nobody. `identityHidden` withholds the whole row, because — unlike a marked
+      // record, which redacted itself at write time — this one names the task throughout.
+      if (
+        this._identityHidden({ actor, viewer, environmentId, taskId: stringOrNull(run.taskId) })
+      ) {
+        return { blind: true, secret: false, task: null, identityHidden: true };
+      }
       return {
         blind: false,
         secret: false,

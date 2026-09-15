@@ -4933,6 +4933,10 @@ class Fabricate {
         // The builder consults it only for a GM viewer; a player's journal shows the
         // generic blind label, which is what the run record itself now carries.
         getGatheringBlindSecret: (runId) => this.gatheringBlindRunStore?.get(runId) ?? null,
+        // D-027: history names a blind task only once the reveal policy has disclosed it, never
+        // because the viewer owns the actor. The engine owns the chat card's identical decision.
+        isGatheringIdentityHidden: (args) =>
+          gatheringEngine?.isHistoricalBlindIdentityHidden?.(args) === true,
         getResultItem: (itemUuid) => this._resolveJournalResultItem(itemUuid),
         getComponent: (systemId, componentId) =>
           this._resolveJournalComponent(systemId, componentId),

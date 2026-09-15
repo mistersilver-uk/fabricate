@@ -5,11 +5,29 @@
 import { mergeHistoryFlag } from './journal-fixtures.js';
 
 export class FakeActor {
-  constructor(name = 'Shared') {
+  /** `ownerIds` hold Foundry OWNER; the default none is `ownership.default: NONE` — GM only. */
+  constructor(name = 'Shared', { ownerIds = [] } = {}) {
     this.id = name.replace(/\s+/g, '-').toLowerCase();
     this.name = name;
     this.uuid = `Actor.${this.id}`;
     this._flags = {};
+    this._ownerIds = new Set(ownerIds.map((ownerId) => String(ownerId)));
+  }
+
+  /**
+   * EVERY real Foundry Actor has this, so omitting it sends production down a fallback branch
+   * production never reaches — how issue 1648's blind-history leak shipped reading green.
+   * Mirrors `tests/helpers/gathering-blind-runs.js`: a GM passes every level.
+   */
+  testUserPermission(user, level) {
+    if (!user) return false;
+    if (user.isGM === true) return true;
+    return level === 'OWNER' && this._ownerIds.has(String(user.id ?? ''));
+  }
+
+  /** Foundry's `isOwner` is ownership relative to the AMBIENT user, never a fixed flag. */
+  get isOwner() {
+    return this.testUserPermission(globalThis.game?.user ?? null, 'OWNER');
   }
 
   getFlag(namespace, key) {

@@ -2549,6 +2549,22 @@ export class GatheringEngine {
    * @param {?object} args.task Resolved task.
    * @returns {boolean} True when the real task identity must not be disclosed.
    */
+  /**
+   * Whether run HISTORY must still name this run's task generically for this viewer (D-027).
+   *
+   * Owning the actor never discloses a blind task, and a run the GM executed persists the REAL
+   * task id, so the record's marker cannot answer it — the environment plus the recorded reveal
+   * can, which is exactly what {@link GatheringEngine#_isBlindIdentityHidden} answers for the card.
+   *
+   * @param {{actor: ?object, viewer: ?object, environmentId: ?string, taskId: ?string}} args
+   * @returns {boolean} True when history must show the generic blind label.
+   */
+  isHistoricalBlindIdentityHidden({ actor = null, viewer = null, environmentId, taskId } = {}) {
+    const environment = this._findEnvironment(environmentId);
+    const task = { id: stringOrNull(taskId) };
+    return environment ? this._isBlindIdentityHidden({ environment, viewer, actor, task }) : false;
+  }
+
   _isBlindIdentityHidden({ environment, viewer, actor, task }) {
     if (!this._isOpaqueBlindTask({ environment, viewer })) return false;
     const taskId = stringOrNull(task?.id);

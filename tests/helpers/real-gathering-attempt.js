@@ -18,10 +18,10 @@ import { FakeActor } from './run-manager-fakes.js';
  * embedded Item creation, so award writers reach a real create/update boundary.
  */
 export class GatheringDocumentActor extends FakeActor {
-  constructor(name = 'Gatherer') {
-    super(name);
+  /** `ownerIds` reaches `FakeActor#testUserPermission`, which drives the inherited `isOwner`. */
+  constructor(name = 'Gatherer', { ownerIds = [] } = {}) {
+    super(name, { ownerIds });
     this.documentName = 'Actor';
-    this.isOwner = true;
     this.items = [];
   }
 
@@ -66,8 +66,11 @@ function buildEngine({ system, store, actor, viewer, runManager, publications, n
   return new GatheringEngine({
     environmentStore: store,
     runManager,
+    // `revealTask`/`listRevealedTaskIds` are bound so the reveal POLICY really runs: without
+    // them a blind attempt records no reveal and every reveal-gated read answers "hidden"
+    // whatever the policy says, which cannot tell a working gate from an absent one.
     richState: Object.fromEntries(
-      ['resolveD100Attempt', 'resolveEnvironmentalEvents', 'commitAcceptedAttempt'].map((name) => [name, rich[name].bind(rich)])
+      ['resolveD100Attempt', 'resolveEnvironmentalEvents', 'commitAcceptedAttempt', 'revealTask', 'listRevealedTaskIds'].map((name) => [name, rich[name].bind(rich)])
     ),
     getSystems: () => [system],
     getSelectableActors: () => [actor],
@@ -96,8 +99,10 @@ export async function runRealGatheringAttempt({
   system,
   environment,
   taskId = null,
-  actor = new GatheringDocumentActor(),
   viewer = { id: 'user-gathering', isGM: false },
+  // The ordinary case: a player OWNS the character they gather with. Hard-coding no owner
+  // would hide every ownership-sensitive branch behind a permission nobody holds.
+  actor = new GatheringDocumentActor('Gatherer', { ownerIds: [viewer.id] }),
   rolls = [1],
   sources = {},
   versioned = false,
@@ -168,6 +173,8 @@ export async function runRealGatheringAttempt({
           gatheringRunSource: fresh,
           getSystem: () => system,
           getGatheringTask: (_environmentId, id) => environment.tasks.find((task) => task.id === id) ?? null,
+          // The SAME decision the chat card takes, from the engine that wrote the record.
+          isGatheringIdentityHidden: (args) => engine.isHistoricalBlindIdentityHidden(args),
           getResultItem: () => null,
           getComponent: () => null,
           localize: (key) => key,

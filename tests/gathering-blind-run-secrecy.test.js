@@ -27,6 +27,7 @@ import {
   makeBlindWorld,
 } from './helpers/gathering-blind-runs.js';
 import {
+  GatheringDocumentActor,
   compendiumSourceItem,
   gatheringFixture,
   runRealGatheringAttempt,
@@ -477,5 +478,90 @@ test('a THROWING blind-secret source is never consulted for a protected viewer',
     },
   });
   assert.equal(projected.names.title, 'FABRICATE.Gathering.BlindTaskLabel');
+  assert.deepEqual(leaks(projected), []);
+});
+
+/**
+ * ## D-027 — the reveal policy governs a blind task's identity in history, and only it
+ *
+ * Maintainer ruling, verbatim: "No, only if the reveal policy reveals the task name instead of
+ * keeping it hidden. if hidden on a successful gather it should not be shown".
+ *
+ * The fixture actor answers `testUserPermission` as every real Foundry Actor does, so
+ * `_nativeHistoryEntitled` takes its PRODUCTION branch rather than the `viewer.id === run.userId`
+ * fallback the corpus fell through to. The player owns the character and is still not told.
+ */
+function ownedByPlayer() {
+  return new GatheringDocumentActor('Gatherer', { ownerIds: [BLIND_PLAYER.id] });
+}
+
+function revealing(policy) {
+  const fixture = secretGather();
+  fixture.environment.rules = { ...fixture.environment.rules, revealPolicy: policy };
+  return fixture;
+}
+
+test('the ownership double answers testUserPermission, so the production branch is under test', async () => {
+  const attempt = await runRealGatheringAttempt({
+    ...secretGather(),
+    viewer: BLIND_PLAYER,
+    actor: ownedByPlayer(),
+  });
+
+  assert.equal(typeof attempt.actor.testUserPermission, 'function');
+  assert.equal(attempt.actor.testUserPermission(BLIND_PLAYER, 'OWNER'), true);
+  assert.equal(attempt.actor.testUserPermission(BLIND_GM, 'OWNER'), true, 'a GM passes every level');
+  assert.equal(attempt.actor.testUserPermission({ id: 'someone-else' }, 'OWNER'), false);
+  assert.equal(attempt.actor.testUserPermission(BLIND_PLAYER, 'OBSERVER'), false);
+});
+
+test('owning the actor does not disclose a blind task the reveal policy keeps hidden', async () => {
+  // The GM executes it, so the RECORD names the real task — the marker cannot redact this one,
+  // and a successful gather under the default `never` policy is the ruling's literal case.
+  const attempt = await runRealGatheringAttempt({
+    ...secretGather(),
+    viewer: BLIND_GM,
+    actor: ownedByPlayer(),
+  });
+  assert.equal(attempt.record.status, 'succeeded');
+  assert.equal(attempt.record.taskId, 'task-fixture', 'the GM-written record is not opaque');
+
+  const projected = attempt.project({ projectionViewer: BLIND_PLAYER });
+  assert.equal(attempt.actor.testUserPermission(BLIND_PLAYER, 'OWNER'), true, 'and they own it');
+  assert.equal(projected.names.title, 'FABRICATE.App.Journal.Redacted.Title');
+  assert.equal(projected.taskId, null);
+  assert.equal(projected.environmentId, null);
+  assert.equal(projected.gatheringYield, null);
+  assert.deepEqual(projected.createdResults, []);
+  assert.deepEqual(leaks(projected), []);
+});
+
+test('a reveal the policy really recorded names the task for the same owning viewer', async () => {
+  const attempt = await runRealGatheringAttempt({
+    ...revealing('onAttempt'),
+    viewer: BLIND_GM,
+    actor: ownedByPlayer(),
+  });
+
+  const projected = attempt.project({ projectionViewer: BLIND_PLAYER });
+  assert.equal(projected.names.title, 'Moonsilver Lode', 'the policy disclosed it, so history does');
+  assert.equal(projected.taskId, 'task-fixture');
+  assert.equal(projected.redacted, false);
+});
+
+test('an unreachable reveal source hides the task rather than guessing it', async () => {
+  const attempt = await runRealGatheringAttempt({
+    ...revealing('onAttempt'),
+    viewer: BLIND_GM,
+    actor: ownedByPlayer(),
+  });
+
+  const projected = attempt.project({
+    projectionViewer: BLIND_PLAYER,
+    isGatheringIdentityHidden: () => {
+      throw new Error('reveal state unavailable');
+    },
+  });
+  assert.equal(projected.names.title, 'FABRICATE.App.Journal.Redacted.Title');
   assert.deepEqual(leaks(projected), []);
 });
