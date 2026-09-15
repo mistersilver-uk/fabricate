@@ -61,7 +61,7 @@ tests/components/interactable-config-app.test.js	141
 tests/components/interactables-manager-app.test.js	57
 tests/components/inventory-view-salvage-reload.test.js	3
 tests/components/inventory-view.test.js	24
-tests/components/journal-source.test.js	62
+tests/components/journal-source.test.js	64
 tests/components/knowledge-view-mounted.test.js	7
 tests/components/manager-browse-views-are-lists.test.js	10
 tests/components/manager-button-cascade-inventory.test.js	5
