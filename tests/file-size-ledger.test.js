@@ -221,10 +221,10 @@ test('an inline handler in the markup is measured, not only the script blocks', 
 });
 
 test('the ledger reports the two figures epic 1656 tracks', (t) => {
-  // The one pair a reviewer can check against the issue without reading 229 rows.
+  // The one pair a reviewer can check against the issue without reading 225 rows.
   if (gate.regenerated()) return t.skip('this run rewrote the ledger');
   const keys = Object.keys(gate.pinned());
   const files = keys.filter((key) => !key.includes('::')).length;
-  assert.equal(files, 120, 'oversized files');
-  assert.equal(keys.length - files, 107, 'oversized functions');
+  assert.equal(files, 119, 'oversized files');
+  assert.equal(keys.length - files, 106, 'oversized functions');
 });

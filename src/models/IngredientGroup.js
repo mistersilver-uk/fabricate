@@ -12,14 +12,7 @@ export class IngredientGroup {
     );
   }
 
-  /**
-   * Validate this ingredient group.
-   * @param {{requireComplete?: boolean}} [options] - When `requireComplete` is
-   *   false, the completeness check (must include at least one option) is waived so
-   *   a freshly added, still-empty group persists; each option's structural checks
-   *   still fire.
-   * @returns {{valid: boolean, errors: string[]}}
-   */
+  /** Validate this ingredient group. */
   validate({ requireComplete = true } = {}) {
     const errors = [];
 
