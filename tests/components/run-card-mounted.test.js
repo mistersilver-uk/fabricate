@@ -66,9 +66,40 @@ describe('RunCard mounted behavior', () => {
     // copy of the tone in a `data-*` attribute of its own.
     const chip = card.querySelector('.journal-run-status');
     assert.equal(chip.getAttribute('data-run-status'), 'waiting', 'chip carries the run status');
-    assert.ok(chip.textContent.includes('Status.waiting'), 'chip renders the localized label');
-    assert.equal(chipToneOf(chip), 'warning', 'a waiting run is amber');
+    // Issue 1648, D-029: the WORD is `In progress`, not `Waiting`. The projected status is still
+    // carried on the hook, because the filter and the frames select on it — what merged is the
+    // player-facing vocabulary, not the projection.
+    assert.ok(chip.textContent.includes('Status.inProgress'), 'chip renders the merged label');
+    assert.equal(chipToneOf(chip), 'info', 'an unpaused active run wears the in-progress chip');
     assert.ok(chip.classList.contains('is-list'), 'the row pill takes the list density');
+  });
+
+  // Issue 1648, D-029/M19. The maintainer's ruling: an unpaused active craft reads `In progress`
+  // whether it is counting the world clock down or sitting between stages. The two badges were
+  // interchangeable to read, so they become ONE badge — identical word AND identical tone AND
+  // identical glyph, because two chips that merely resemble each other have not merged.
+  it('gives a waiting run and an in-progress run the one merged badge', async () => {
+    const seen = [];
+    for (const derivedStatus of ['waiting', 'inProgress']) {
+      const target = await harness.mount({ run: { ...makeCraftingRun(), derivedStatus }, now: 0 });
+      const chip = target.querySelector('.journal-run-status');
+      seen.push({
+        status: chip.getAttribute('data-run-status'),
+        text: chip.textContent.trim(),
+        tone: chipToneOf(chip),
+        icon: chip.querySelector('i')?.className
+      });
+      harness.remount();
+    }
+    assert.equal(seen[0].text, seen[1].text, 'one word for both');
+    assert.equal(seen[0].tone, seen[1].tone, 'one tone for both');
+    assert.equal(seen[0].icon, seen[1].icon, 'one glyph for both');
+    assert.ok(seen[0].text.includes('Status.inProgress'), 'and the surviving word is In progress');
+    assert.deepEqual(
+      seen.map((entry) => entry.status),
+      ['waiting', 'inProgress'],
+      'the projection still distinguishes what the player is shown as one state'
+    );
   });
 
   it('routes the vocabulary tones the chip does NOT share through the map', async () => {
@@ -80,6 +111,7 @@ describe('RunCard mounted behavior', () => {
       ['succeeded', 'positive'],
       ['cancelled', 'neutral'],
       ['inProgress', 'info'],
+      ['waiting', 'info'],
       ['failed', 'danger']
     ]) {
       const target = await harness.mount({ run: { ...makeCraftingRun(), derivedStatus }, now: 0 });
@@ -111,6 +143,41 @@ describe('RunCard mounted behavior', () => {
     });
   }
 
+  // Issue 1648, U2. The one state that needs an irreversible click had no Active-row signal at
+  // all: a timed stage with every requirement met and its start untaken projects `inProgress`
+  // with no gate, no attention and no notice, so under the merged badge it reads exactly like a
+  // run counting down. In a list of six runs nobody could see which one was waiting for them.
+  it('marks an Active row that is waiting for the player to begin it', async () => {
+    const base = makeCraftingRun();
+    const run = {
+      ...base,
+      derivedStatus: 'inProgress',
+      timeGate: null,
+      actions: { ...base.actions, atStageStart: true, beginStep: true, disabledReason: 'stageNotStarted' }
+    };
+    const target = await harness.mount({ run, now: 0 });
+    const chip = target.querySelector('[data-run-attention]');
+    assert.equal(chip.getAttribute('data-run-attention'), 'start');
+    assert.equal(chipToneOf(chip), 'accent', 'the "your move" family, not the blocked one');
+    assert.ok(chip.textContent.includes('readyToBegin'));
+    assert.ok(target.querySelector('.journal-run-status'), 'beside the status, never instead of it');
+  });
+
+  // The chip reads the projection's own "`beginVersionedStage` would commit this" answer, so it
+  // cannot invite a click the command refuses: a stage still short of its materials keeps the
+  // blocked chip it already had.
+  it('does not invite a begin the command would refuse', async () => {
+    const base = makeCraftingRun();
+    const run = {
+      ...base,
+      derivedStatus: 'inProgress',
+      timeGate: null,
+      actions: { ...base.actions, atStageStart: true, beginStep: false, disabledReason: 'selectionRequired' }
+    };
+    const target = await harness.mount({ run, now: 0 });
+    assert.equal(target.querySelector('[data-run-attention]').dataset.runAttention, 'materials');
+  });
+
   it('claims nothing of the player on a row that is merely counting down', async () => {
     const target = await harness.mount({ run: makeCraftingRun(), now: 0 });
     assert.ok(target.querySelector('.journal-run-status'), 'the row rendered');
@@ -141,6 +208,52 @@ describe('RunCard mounted behavior', () => {
       countdown.textContent.includes('Countdown.ReadyToContinue'),
       'a matured gate reads ready, not a frozen timer'
     );
+  });
+
+  // Issue 1648, M18. Between its stages a multi-step run holds no `timeGate`, and the whole
+  // timing block was suppressed on that predicate — so `Minor Elixir of Mending`, step 2 of 3,
+  // showed nothing where `Build Round Shield` showed a bar. Once both wear one badge (D-029)
+  // the bar is the ONLY thing left on the row separating a run counting down from one waiting
+  // on the player, so it has to survive. It reads completed stages over total, with the current
+  // stage at zero, because that is how far through the run actually is.
+  it('keeps a progress reading on a multi-step run between its stages', async () => {
+    const base = makeCraftingRun();
+    const run = {
+      ...base,
+      derivedStatus: 'inProgress',
+      timeGate: null,
+      stepIndex: 1,
+      steps: [
+        { ...base.steps[0], status: 'succeeded', timeGate: null },
+        { ...base.steps[1], status: 'inProgress' }
+      ],
+      currentStep: null
+    };
+    const target = await harness.mount({ run, now: 0 });
+    const progress = target.querySelector('[data-run-progress]');
+    assert.ok(progress, 'the bar survives a stage with no clock');
+    assert.equal(progress.getAttribute('aria-valuenow'), '0', 'the current stage has made no progress');
+    const tracks = [...target.querySelectorAll('[data-run-progress-track]')];
+    assert.equal(tracks.length, 2, 'one track per authored stage');
+    assert.deepEqual(
+      tracks.map((track) => track.dataset.stageProgressState),
+      ['success', 'accent'],
+      'the finished stage reads done and the unbegun one reads current'
+    );
+    // A countdown needs a deadline and this stage has none. `None` is the string a MATURED wait
+    // prints, so the row says nothing about time rather than something false.
+    assert.ok(!target.querySelector('[data-run-countdown]'), 'and invents no countdown for it');
+  });
+
+  it('draws no stage rail for a run that has no stages at all', async () => {
+    // Gathering and salvage project `steps: []`. A lone empty track would assert a sequence the
+    // run does not have, so the whole timing block stays suppressed for them.
+    const target = await harness.mount({
+      run: { ...makeCraftingRun(), derivedStatus: 'inProgress', timeGate: null, steps: [], currentStep: null },
+      now: 0
+    });
+    assert.ok(!target.querySelector('[data-run-progress]'));
+    assert.ok(!target.querySelector('.journal-run-card-timing'));
   });
 
   it('marks the selected card with aria-pressed and the selection class', async () => {

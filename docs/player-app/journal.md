@@ -33,7 +33,7 @@ In a narrow window they stack in the order Active, Finished, then detail.
 
 Use **Search runs** and **Kind** to filter both lists.
 Kind distinguishes Crafting, Alchemy, Gathering, and Salvage.
-The Active status filter selects one of **All**, **Ready**, **Waiting**, or **Paused**.
+The Active status filter selects one of **All**, **Ready**, **In progress**, or **Paused**.
 Its counts describe the selected kind before search or paging, so a search can show fewer rows than the status count.
 
 Both lists start with four runs per page and have independent page sizes and page controls.
@@ -49,9 +49,17 @@ The status badge tells you where a run stands:
 
 - **Ready** means the time gate has passed.
   Check the action's availability too, because missing materials, a required decision, or unavailable GM authority can still prevent execution.
-- **Waiting** means the run is still counting down and cannot be continued yet.
+- **In progress** means the run is underway and not paused.
+  It covers both a run counting the game clock down and one sitting between its stages with no wait running.
 - **Paused** means the run's remaining wait is frozen until you resume it.
-- **In progress** means the run is underway with no active wait.
+
+A multi-step run keeps a progress bar between its stages, so you can see how far through it is even when no countdown is running.
+
+Where a run needs something from **you**, a second badge sits beside the status and says what:
+
+- **Ready to begin** — nothing is missing; the run is waiting for you to start its next stage.
+- **Needs your choice** — a route, an option, or an essence allocation has not been made yet.
+- **Needs materials**, **Needs essences**, **Needs payment**, **Needs tools** — the stage is short of something you have to acquire.
 
 You can sort the active list by **Soonest Ready** or by **Newest**.
 Soonest Ready puts the runs you can act on first, then the ones that will be ready soonest.

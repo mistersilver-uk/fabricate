@@ -1403,7 +1403,11 @@ describe('Journal versioned lifecycle (mounted)', () => {
         // Issue 1648, M15: the begin control stays present (`atStageStart`) but is itself
         // refused — pressing it while the route is unchosen would reach the engine and be
         // told "The selected crafting requirements are unavailable."
-        assert.equal(mounted.store.selectedRun.actions.disabledReason, 'choiceRequired');
+        // Issue 1648, F5: the ROUTE decision reports in its own words. `choiceRequired` now
+        // names only the option picks and the essence allocation made within a route already
+        // taken, which is not what this stage — advanced into two authored routes with no plan
+        // at all — is waiting for.
+        assert.equal(mounted.store.selectedRun.actions.disabledReason, 'routeRequired');
         assert.equal(mounted.store.selectedRun.actions.atStageStart, true);
         assert.equal(mounted.store.selectedRun.actions.beginStep, false);
         const begin = mounted.target.querySelector('[data-run-action="begin"]');
@@ -1418,7 +1422,11 @@ describe('Journal versioned lifecycle (mounted)', () => {
         assert.match(mounted.target.textContent, /No matching active runs/);
         assert.match(mounted.target.textContent, /No matching finished runs/);
       }
-      if (state === 'waiting-auto-eligible' || state === 'automatic-blocker') {
+      // Issue 1648. `waiting-auto-eligible` is NOT here any more: it is a stage counting its
+      // clock down, so under D-026/D-028 its inputs are spent and its allocation is locked, and
+      // a locked stage publishes no essence pool at all. The carrier controls belong to the
+      // unbegun blocker, which is the one of the two the player can still act on.
+      if (state === 'automatic-blocker') {
         assert.equal(
           mounted.target.querySelectorAll('[data-essence-source]').length,
           2,
@@ -1984,6 +1992,62 @@ describe('Journal versioned lifecycle (mounted)', () => {
     );
   });
 
+  // Issue 1648, U3 and M18, on the two surfaces a player reads a clock from. Both defects are
+  // the same predicate: an unstarted stage holds no `timeGate`, so the detail's `availableAt`
+  // was NaN and the Active row's whole timing block was suppressed.
+  it('tells an unstarted stage its clock has not started, on the card that answers the clock question', async () => {
+    // The unbegun stage lives on the prototype cohort, so this mounts the same world its frame
+    // is captured from rather than a hand-built double.
+    const content = buildLabContent({ journalCaseState: 'stage-not-started' });
+    const actor = buildLabActors(content)[0];
+    await stockJournalPrototype(actor, content, 'stage-not-started');
+    const mounted = await mountState('stage-not-started', {
+      builderOptions: {
+        content,
+        actor,
+        recipes: labRecipes(content),
+        viewer: { id: 'user-lab-player', isGM: false },
+      },
+    });
+    mounted.store.select(
+      mounted.store.activeRuns.find((entry) => entry.id === 'lab-v1-stage-not-started')
+    );
+    flushSync();
+    const run = mounted.store.selectedRun;
+    assert.equal(run.actions.atStageStart, true, 'the fixture really is at a stage start');
+    assert.equal(run.timeGate, null, 'which is to say it holds no gate at all');
+    assert.ok(run.currentStep.detail.requiredSeconds > 0, 'and the stage does need time');
+
+    const facts = [...mounted.target.querySelectorAll('[data-journal-summary-card="time"] [data-journal-fact]')];
+    const left = facts.find((row) => row.textContent.includes(english.FABRICATE.App.Journal.Summary.Left));
+    assert.ok(left, 'the TIME card still reports a Left row');
+    // `None` is the string a MATURED wait prints. Printing it here made an unstarted stage
+    // indistinguishable from one whose clock has run out, beside a button offering to start it.
+    assert.match(left.textContent, new RegExp(english.FABRICATE.App.Journal.Summary.NotStarted, 'u'));
+    assert.doesNotMatch(
+      left.textContent,
+      new RegExp(`\\b${english.FABRICATE.App.Journal.Summary.None}\\b`, 'u'),
+      'never the matured-wait word'
+    );
+    // The row above it is untouched: D-025 governs the FORMAT of the authored duration, and
+    // what the stage NEEDS is still stated in full.
+    const needs = facts.find((row) => row.textContent.includes(english.FABRICATE.App.Journal.Summary.Needs));
+    assert.doesNotMatch(needs.textContent, new RegExp(english.FABRICATE.App.Journal.Summary.NotStarted, 'u'));
+
+    // M18 on the Active row: the bar survives the missing gate, and the countdown does not
+    // pretend to one.
+    const row = mounted.target.querySelector(
+      '[data-journal-list="active"] [data-run-id="lab-v1-stage-not-started"]'
+    );
+    assert.ok(row.querySelector('[data-run-progress]'), 'the row keeps its progress reading');
+    assert.ok(!row.querySelector('[data-run-countdown]'), 'and states no remaining time');
+    // D-029 on the same row: the merged badge, not the retired word.
+    assert.equal(
+      row.querySelector('.journal-run-status').textContent.trim(),
+      english.FABRICATE.App.Journal.Status.inProgress
+    );
+  });
+
   it('keeps paging independent, retains off-page detail, and filters through real controls', async () => {
     const paging = await mountState('active-page-two');
     const firstCard = paging.target.querySelector(
@@ -2021,7 +2085,7 @@ describe('Journal versioned lifecycle (mounted)', () => {
       .querySelector(':scope [data-journal-status-filter] input[value="paused"]')
       .click();
     flushSync();
-    assert.deepEqual(filtered.store.activeCounts, { all: 2, ready: 1, waiting: 0, paused: 1 });
+    assert.deepEqual(filtered.store.activeCounts, { all: 2, ready: 1, inProgress: 0, paused: 1 });
     assert.equal(filtered.target.querySelectorAll('[data-run-id]').length, 1);
     assert.equal(filtered.target.querySelector('[data-run-id]').dataset.runStatus, 'paused');
 

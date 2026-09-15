@@ -132,14 +132,23 @@
     Number(summaryGate?.requiredSeconds ?? viewedStage?.detail?.requiredSeconds) || 0
   );
   const availableAt = $derived(Number(summaryGate?.availableAt));
+  // A STAGE THAT HAS NOT BEGUN HAS NOT RUN OUT OF TIME (issue 1648, U3). Before a stage is
+  // started it holds no `timeGate`, so `availableAt` is NaN and this row fell through to
+  // `Summary.None` — the exact string a MATURED wait prints — while the button beside it
+  // offered to start the clock. `atStageStart` is the projection's own name for that boundary.
+  // D-025 governs the FORMAT of a duration shown, not which duration is shown, so no accepted
+  // ruling reaches this branch.
+  const notStarted = $derived(viewedIsCurrent && run?.actions?.atStageStart === true);
   const remainingTime = $derived.by(() => {
     const pausedRemaining = viewedIsCurrent
       ? numberOrNaN(run?.pauseState?.remainingSeconds)
       : Number.NaN;
     if (Number.isFinite(pausedRemaining)) return formatDurationHMS(pausedRemaining);
-    return Number.isFinite(availableAt) && availableAt > now
-      ? formatDurationHMS(availableAt - now)
-      : localize('FABRICATE.App.Journal.Summary.None');
+    if (Number.isFinite(availableAt) && availableAt > now)
+      return formatDurationHMS(availableAt - now);
+    return localize(
+      notStarted ? 'FABRICATE.App.Journal.Summary.NotStarted' : 'FABRICATE.App.Journal.Summary.None'
+    );
   });
   const readyAtLabel = $derived(
     viewedIsCurrent && run?.pauseState ? '' : calendarLabel(summaryGate?.availableAt)

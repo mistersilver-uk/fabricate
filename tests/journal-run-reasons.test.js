@@ -153,6 +153,46 @@ describe('journal run reason vocabulary', () => {
     assert.notEqual(choiceText, materialsText);
   });
 
+  // Issue 1648, F5. `choiceRequired` fires for an unmade ROUTE, an unmade OPTION pick and an
+  // unmade ESSENCE allocation, and its one sentence named only the first — so a player on a
+  // single-route stage was told to choose a route that has one value while the real gap was an
+  // allocation. The route decision keeps that sentence under its own code; what remains says
+  // what it actually is, and says it without naming a route.
+  it('gives the route decision its own code and stops the other choices naming a route', () => {
+    const routeText = journalRunReasonMessage('routeRequired', localizeFromLang);
+    const choiceText = journalRunReasonMessage('choiceRequired', localizeFromLang);
+    assert.equal(routeText, langLeaf('FABRICATE.App.Journal.Actions.RouteRequired'));
+    assert.match(routeText, /route/i, 'the route decision still says route');
+    assert.notEqual(choiceText, routeText, 'two causes, two sentences');
+    assert.doesNotMatch(
+      choiceText,
+      /\broute\b/i,
+      'an option pick and an essence allocation are not route decisions'
+    );
+  });
+
+  // Issue 1648, U4. `SelectionRequired` is reached only for a physical shortfall, and its old
+  // sentence — "Complete the current stage requirements first." — was an instruction to go and
+  // CHOOSE, which is the one thing that cannot help someone who is short of Iron.
+  it('tells a player short of materials to acquire them, not to make a choice', () => {
+    const materialsText = journalRunReasonMessage('selectionRequired', localizeFromLang);
+    assert.match(materialsText, /acquire/i, 'it names the act that fixes it');
+    assert.doesNotMatch(materialsText, /^Complete the current stage requirements/i);
+  });
+
+  // Issue 1648, D-029/M19. The badge and the filter tab are one vocabulary, and the maintainer's
+  // consequence note is explicit that they must not diverge. `Status.waiting` is gone entirely:
+  // a leaf left behind is a word a later reader can reintroduce.
+  it('keeps the merged badge and the merged filter tab on one word', () => {
+    assert.equal(
+      langLeaf('FABRICATE.App.Journal.Filters.Status.InProgress'),
+      langLeaf('FABRICATE.App.Journal.Status.inProgress')
+    );
+    assert.equal(langLeaf('FABRICATE.App.Journal.Status.inProgress'), 'In progress');
+    assert.equal(langLeaf('FABRICATE.App.Journal.Status.waiting'), undefined, 'the retired badge word is removed');
+    assert.equal(langLeaf('FABRICATE.App.Journal.Filters.Status.Waiting'), undefined, 'and so is the retired tab word');
+  });
+
   it('never lets a raw slug reach a player', () => {
     assert.equal(journalRunReasonMessage('ledger-missing', localizeFromLang).includes('-'), false);
     assert.equal(journalRefusalMessage({ success: false, reason: 'nope' }, localizeFromLang, 'Generic.'), 'Generic.');

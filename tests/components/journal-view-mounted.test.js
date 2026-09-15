@@ -89,7 +89,7 @@ function makeJournal(overrides = {}) {
     activePageItems: [],
     activeRuns: [],
     activeCount: 0,
-    activeCounts: { all: 0, ready: 0, waiting: 0, paused: 0 },
+    activeCounts: { all: 0, ready: 0, inProgress: 0, paused: 0 },
     activePage: 0,
     activePageSize: 4,
     pageSizes: [4, 6, 12, 25],
@@ -259,7 +259,7 @@ describe('JournalView mounted behavior', () => {
     const finished = makeSucceededRun();
     const { store } = makeJournal({
       activePageItems: [active], activeRuns: [active], activeCount: 1,
-      activeCounts: { all: 1, ready: 0, waiting: 1, paused: 0 },
+      activeCounts: { all: 1, ready: 0, inProgress: 1, paused: 0 },
       historyPageItems: [finished], historyCount: 1,
       selectedRun: active, selectedRunKey: active.key, selectedRunId: active.id,
     });
@@ -306,7 +306,7 @@ describe('JournalView mounted behavior', () => {
     const finished = makeSucceededRun();
     const { store, calls } = makeJournal({
       activePageItems: [run], activeRuns: [run], activeCount: 9,
-      activeCounts: { all: 4, ready: 1, waiting: 2, paused: 1 },
+      activeCounts: { all: 4, ready: 1, inProgress: 2, paused: 1 },
       historyPageItems: [finished], historyCount: 9,
     });
     const target = await harness.mount({ services: makeServices(store) });
@@ -333,6 +333,33 @@ describe('JournalView mounted behavior', () => {
     assert.deepEqual(calls.activeSize, [6]);
     assert.deepEqual(calls.historySize, [6]);
     assert.equal(target.querySelector('[data-segment-badge="4"]').textContent, '4');
+  });
+
+  // Issue 1648, D-029/M19. The filter vocabulary must not diverge from the badge vocabulary, and
+  // `Waiting` was the ONLY tab whose word the badge no longer uses. It carries the merged count,
+  // which is what makes a run between stages reachable by a tab at all.
+  it('offers All / Ready / In progress / Paused, with the merged count on the merged tab', async () => {
+    const run = makeCraftingRun();
+    const { store, calls } = makeJournal({
+      activePageItems: [run], activeRuns: [run], activeCount: 6,
+      activeCounts: { all: 6, ready: 1, inProgress: 4, paused: 1 },
+    });
+    const target = await harness.mount({ services: makeServices(store) });
+
+    const inputs = [...target.querySelectorAll('[data-journal-status-filter] input')];
+    assert.deepEqual(
+      inputs.map((input) => input.value),
+      ['all', 'ready', 'inProgress', 'paused'],
+      'no tab names a badge the player is never shown'
+    );
+    const merged = target.querySelector('[data-journal-status-filter] label:has(input[value="inProgress"])');
+    // The harness localizes to the key, so the WORD parity between this tab and the badge is
+    // asserted against `lang/en.json` in `tests/journal-run-reasons.test.js`.
+    assert.match(merged.textContent, /Filters\.Status\.InProgress/, 'the tab is the merged one');
+    assert.match(merged.textContent, /4/, 'and carries the merged count');
+
+    merged.querySelector('input').click();
+    assert.deepEqual(calls.status, ['inProgress']);
   });
 
   it('selects by the full run model so equal ids in different run types stay distinct', async () => {

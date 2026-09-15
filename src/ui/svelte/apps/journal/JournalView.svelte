@@ -37,7 +37,7 @@
     journal?.activeCounts ?? {
       all: journal?.activeCount ?? activeRuns.length,
       ready: 0,
-      waiting: 0,
+      inProgress: 0,
       paused: 0,
     }
   );
@@ -61,9 +61,9 @@
       badge: counts.ready ?? 0,
     },
     {
-      value: 'waiting',
-      fallback: localize('FABRICATE.App.Journal.Filters.Status.Waiting'),
-      badge: counts.waiting ?? 0,
+      value: 'inProgress',
+      fallback: localize('FABRICATE.App.Journal.Filters.Status.InProgress'),
+      badge: counts.inProgress ?? 0,
     },
     {
       value: 'paused',

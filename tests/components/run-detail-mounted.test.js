@@ -142,14 +142,22 @@ describe('RunDetail mounted behavior', () => {
 
   });
 
-  it('claims nothing of the player on an unbegun stage it can already meet', async () => {
-    // The SAME selectors the two states above are found by, so a chip that appeared here would
-    // be the component's answer rather than a selector that never matched anything.
+  it('asks for the one act an unbegun stage it can already meet still needs', async () => {
+    // The SAME selectors the two states above are found by, so what this finds is the
+    // component's answer rather than a selector that never matched anything.
+    //
+    // Issue 1648, U2. This used to assert that NOTHING was claimed here, and that was the
+    // defect: M10 gave the two BLOCKED states a chip each and left the one state requiring an
+    // irreversible click unmarked, so under the merged badge (D-029) a run waiting for the
+    // player to press Begin read exactly like one counting world time down.
     const settled = await harness.mount({ run: stageWaitingOn('iron',
       [{ id: 'iron', uuid: 'Actor.a.Item.iron', name: 'Iron', system: { quantity: 4 } }]) });
     assert.ok(settled.querySelector('[data-journal-detail]'), 'the run rendered');
-    assert.ok(!settled.querySelector('[data-run-attention]'), 'nothing is owed, so nothing is claimed');
+    assert.equal(settled.querySelector('[data-run-attention]').dataset.runAttention, 'start');
+    // It is not a refusal and not a choice: nothing is blocked and nothing is unpicked, so the
+    // guidance notice and the blocker banner both stay away.
     assert.ok(!settled.querySelector('[data-journal-awaiting-choice]'));
+    assert.ok(!settled.querySelector('[data-journal-action-blocker]'));
   });
 
   it('renders the real settled d100 writer output after source/configuration lookup removal', async () => {

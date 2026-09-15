@@ -4875,7 +4875,13 @@ Scope:
 - The view resolves the selected actor through the shared Actor selection top bar and shows a no-actor empty state when none is selected.
 - Active runs and history are shown across all three run types (crafting, gathering, salvage) in one unified surface.
 Active rows retain title, run type, status pill, crafting progress and a time-remaining/countdown where a `timeGate` exists.
+The crafting progress reading MUST NOT be conditioned on that gate: a run whose current stage has not begun holds no gate, and its rail reads completed stages over total with the current stage at zero, because between the stages of a multi-step run the rail is the only thing on the row that says how far through the run is.
+A countdown MUST NOT be shown for a stage with no deadline, because the matured-wait wording would then describe a clock that has not started.
+A run with no stage sequence at all — gathering and salvage, which project no steps — renders no rail.
 - Active status pills reflect the projection's `derivedStatus`, with pause taking precedence over time-gate readiness (see `data-models/spec.md`).
+The player-facing badge vocabulary is `Ready`, `In progress` and `Paused`: `waiting` and `inProgress` present as ONE badge, `In progress`, with one word, one tone and one glyph, because an unpaused active craft is in progress whether it is counting world time down or sitting between stages.
+`derivedStatus` keeps both values, because the projection still distinguishes where the clock is; what merges is what the player is shown.
+The distinction a player can act on is carried BESIDE the badge by the attention vocabulary and BENEATH it by the progress rail, never by the badge itself.
 Finished rows MUST show a labeled right-side outcome icon instead of an aggregate result quantity or below-title status chip.
 Succeeded, failed and cancelled remain distinct; absent or unrecognized terminal status shows localized Outcome unknown, and settlement or recovery evidence takes precedence over a terminal success face.
 - The layout has a browse zone and a selected-detail zone.
@@ -4883,7 +4889,8 @@ Active and Finished lists scroll independently, with their sort controls and pag
 At content widths at or below 960px, stack Active, Finished and detail while preserving access to every control.
 The stacked layout MUST remain usable at the real 1024px minimum application-window width; the container breakpoint describes inner content rather than the outer window.
 - One shared search and kind filter covers crafting, gathering, salvage and alchemy.
-Active status filters are mutually exclusive All, Ready, Waiting and Paused.
+Active status filters are mutually exclusive All, Ready, In progress and Paused, and MUST use the same words as the badges, so that no tab names a badge the player is never shown and no badge names a tab that does not exist.
+The In progress tab selects BOTH merged statuses and counts them together; every active run MUST be reachable from exactly one tab, which a tab vocabulary omitting `inProgress` did not satisfy.
 Status counts use the selected kind cohort before search, active-status filtering, paging or selection.
 - Each list defaults to four rows per page and retains existing page-size and sorting choices.
 Both pagers MUST use the shared compact single-row presentation with independently named region and navigation landmarks, accessible page-size choice and at least 24px interactive targets.
@@ -4926,6 +4933,7 @@ An unavailable authority reason MUST remain visibly adjacent to disabled control
 No check, Nothing to roll and It simply completes require affirmative disclosed no-check configuration; protected or indeterminate configuration MUST say unavailable without removing owner actions.
 A check-driven primary action MUST say Roll check.
 A stage that has not started MUST offer its own begin control instead of the resolve action, stating that beginning locks the choices, consumes the listed materials and starts the clock, and MUST NOT offer the roll at all.
+Its TIME card MUST say that its clock has NOT STARTED rather than fall through to the None used when a wait has MATURED, because those are opposite facts and the control beside them offers to start the clock.
 The begin control MUST stay visible and reasoned even while its route remains unchosen; it MUST render DISABLED with a distinct choice-vs-materials reason rather than vanish and hand back an enabled resolve action the command would refuse, and the same disabled-while-unchosen rule applies to the resolve action itself on an untimed stage, which has no separate start boundary to withhold the begin control instead.
 A started stage's materials surface MUST read as already consumed and MUST NOT be editable.
 A route nobody has chosen yet MUST be asked for rather than reported as a selected material that is no longer available; the repair sentence belongs to a route that vanished.
@@ -4940,6 +4948,8 @@ Past stages use recorded checks and routes; future choices open only when the st
 
 An unstarted stage has no countdown, so its run status alone reads the same whether it needs a choice, needs stock or needs nothing.
 A run whose current stage cannot proceed until the viewer chooses (`awaitingChoice`, see `data-models/spec.md`) MUST therefore be distinguishable at a glance on the Active list row, on the opened run's header, and in the run's single state notice.
+So MUST a stage that is waiting only for the player to BEGIN it: it owes nothing and is refused by nothing, so under the merged badge it otherwise reads exactly like a run counting world time down, while the act it needs is an irreversible click.
+That signal is reported from the projection's own begin predicate (`actions.atStageStart` with `actions.beginStep`), so it can never invite a click the command refuses, and it is ranked UNDER the blocked states, because a stage that cannot be begun must not advertise that it can be.
 That signal is carried BESIDE the run's status rather than in place of it, because what the clock is doing and what the player owes are two different facts.
 Waiting on a choice MUST read as guidance and MUST NOT raise a refusal: an unbegun stage is ordinary play, exactly as `stageNotStarted` is.
 Waiting on MATERIALS MUST read differently from waiting on a choice on every one of those surfaces, because one is fixed by choosing and the other by acquiring.

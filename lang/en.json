@@ -934,7 +934,6 @@
         },
         "Status": {
           "paused": "Paused",
-          "waiting": "Waiting",
           "ready": "Ready",
           "inProgress": "In progress",
           "succeeded": "Succeeded",
@@ -942,6 +941,7 @@
           "cancelled": "Cancelled",
           "unknown": "Outcome unknown",
           "awaitingChoice": "Needs your choice",
+          "readyToBegin": "Ready to begin",
           "needsMaterials": "Needs materials",
           "needsEssences": "Needs essences",
           "needsCurrency": "Needs payment",
@@ -1111,7 +1111,7 @@
             "Label": "Active run status",
             "All": "All",
             "Ready": "Ready",
-            "Waiting": "Waiting",
+            "InProgress": "In progress",
             "Paused": "Paused"
           }
         },
@@ -1132,6 +1132,7 @@
           "Left": "Left",
           "ReadyAt": "Ready at",
           "None": "None",
+          "NotStarted": "Not started",
           "Check": "Check",
           "CheckUnavailable": "Check details are unavailable",
           "NoCheck": "No check",
@@ -1369,12 +1370,13 @@
           "Unavailable": "This run cannot be changed right now. Refresh the Journal for its current state.",
           "RecoveryRequired": "This run needs GM recovery before it can change.",
           "UnsupportedLifecycle": "This run was created by an unsupported Fabricate version and remains available as a record.",
-          "SelectionRequired": "Complete the current stage requirements first.",
+          "SelectionRequired": "You do not hold everything this stage needs. Acquire the missing materials, or choose a route you can meet.",
           "EssenceRequired": "This stage needs essences you do not hold. Acquire them, or choose another route.",
           "CurrencyRequired": "This stage costs more than you can pay.",
           "ToolRequired": "This stage needs a tool you do not hold.",
           "RouteUnavailable": "This stage's ingredient requirements are no longer part of the recipe. Ask your GM to restore them, or cancel the run.",
-          "ChoiceRequired": "Choose this stage's route before it can begin.",
+          "ChoiceRequired": "Make this stage's choices before it can begin: an option for each requirement that offers one, and an allocation for each essence it needs.",
+          "RouteRequired": "Choose this stage's route before it can begin.",
           "StageNotStarted": "Begin this stage before its check can be rolled.",
           "Completion": {
             "Label": "When ready",

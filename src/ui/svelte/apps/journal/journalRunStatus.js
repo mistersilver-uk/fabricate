@@ -4,17 +4,31 @@
 // recovery or inProgress for incomplete evidence rather than assuming success.
 //
 // Tones reuse the existing status palette (no new `--fab-*` tokens) and the
-// RuntimeStatePill vocabulary: paused=neutral+pause; waiting=warning+hourglass; ready=success+play;
+// RuntimeStatePill vocabulary: paused=neutral+pause; ready=success+play;
 // succeeded=success+check; failed=danger+xmark; cancelled (and any un-mapped
 // status, e.g. a step `pending`) = a neutral chip; inProgress=info. Ready never
 // co-occurs with Succeeded (Ready only appears on ACTIVE runs, Succeeded only in
 // HISTORY), so the shared success tone is disambiguated by icon + column context.
+//
+// `waiting` AND `inProgress` PRESENT AS ONE BADGE (issue 1648, D-029/M19). An unpaused active
+// craft reads `In progress` whether it is counting the world clock down or sitting between
+// stages: the two badges were interchangeable to read, and one of them named a state no filter
+// tab selected. `derivedStatus` keeps both values because the projection still distinguishes
+// where the clock is; the PLAYER is shown one word, and the difference they can act on is
+// carried beside it by the attention vocabulary below and beneath it by the progress rail.
 
 /**
  * Presentation descriptor for a run status pill.
  *
  * @typedef {{tone: 'success'|'warning'|'danger'|'info'|'neutral', icon: string, labelKey: string}} RunStatusPresentation
  */
+
+/** The one badge an unpaused active run wears, whatever the clock is doing (D-029). */
+const IN_PROGRESS_PRESENTATION = Object.freeze({
+  tone: 'info',
+  icon: 'fa-gear',
+  labelKey: 'FABRICATE.App.Journal.Status.inProgress',
+});
 
 /** @type {Readonly<Record<string, RunStatusPresentation>>} */
 const STATUS_PRESENTATION = Object.freeze({
@@ -33,21 +47,15 @@ const STATUS_PRESENTATION = Object.freeze({
     icon: 'fa-pause',
     labelKey: 'FABRICATE.App.Journal.Status.paused',
   },
-  waiting: {
-    tone: 'warning',
-    icon: 'fa-hourglass-half',
-    labelKey: 'FABRICATE.App.Journal.Status.waiting',
-  },
+  // ONE object, deliberately shared: the merged badge cannot drift into two that merely read
+  // alike, and the surviving badge is adopted whole rather than a third look invented for it.
+  waiting: IN_PROGRESS_PRESENTATION,
   ready: {
     tone: 'success',
     icon: 'fa-circle-play',
     labelKey: 'FABRICATE.App.Journal.Status.ready',
   },
-  inProgress: {
-    tone: 'info',
-    icon: 'fa-gear',
-    labelKey: 'FABRICATE.App.Journal.Status.inProgress',
-  },
+  inProgress: IN_PROGRESS_PRESENTATION,
   succeeded: {
     tone: 'success',
     icon: 'fa-circle-check',
@@ -99,6 +107,16 @@ const CHOICE_ATTENTION = Object.freeze({
   icon: 'fa-hand-pointer',
   labelKey: 'FABRICATE.App.Journal.Status.awaitingChoice',
 });
+// The third member (issue 1648, U2): a timed stage with every requirement met and its start
+// not yet taken. It needs an irreversible click and nothing else, so under the merged badge it
+// is otherwise indistinguishable from a run counting the world clock down. `accent` is the same
+// "your move" family as a choice, because both are the player's to make rather than a refusal.
+const START_ATTENTION = Object.freeze({
+  kind: 'start',
+  tone: 'accent',
+  icon: 'fa-circle-play',
+  labelKey: 'FABRICATE.App.Journal.Status.readyToBegin',
+});
 const MATERIALS_ATTENTION = Object.freeze({
   kind: 'materials',
   tone: 'warning',
@@ -137,5 +155,11 @@ const ACQUISITION_ATTENTION = Object.freeze({
  */
 export function runAttentionPresentation(run) {
   if (run?.awaitingChoice === true) return CHOICE_ATTENTION;
+  // Ranked under the two BLOCKED states: a stage that can be begun is asked for only once
+  // nothing else is owed, which `beginStep` already answers — it is the projection's own
+  // "`beginVersionedStage` would commit this" predicate, so the chip cannot invite a click the
+  // command refuses.
+  if (run?.actions?.atStageStart === true && run?.actions?.beginStep === true)
+    return START_ATTENTION;
   return ACQUISITION_ATTENTION[run?.actions?.disabledReason] ?? null;
 }

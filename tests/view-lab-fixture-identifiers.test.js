@@ -1110,17 +1110,11 @@ test('Journal error fixture refuses repeated initial loads and retries until exp
   assert.equal(await services.listJournalForActor('actor'), listing);
 });
 
-// Cases whose subject is an editable requirement rail on a counting-down stage, which D-028
-// makes unreachable. They are escalated with issue 1648 and stay pre-commit-shaped meanwhile,
-// because making them unbegun removes a countdown nothing yet replaces (manual finding M18).
+// The only two fixtures allowed to arm a clock without a start receipt, and each is a WITNESS
+// to that exact shape rather than a case that merely needs one. The seven cases that used to
+// shelter here — an editable requirement rail on a counting-down stage — are repaired: four are
+// unbegun and three keep the receipt their clock implies (issue 1648, M18/D-028).
 const EDITABLE_GATED_STATES = new Set([
-  'waiting-auto-eligible',
-  'waiting-open-choice',
-  'ingredient-route',
-  'check-route',
-  'essence-shared',
-  'essence-overshoot',
-  'paused',
   // The deliberate pre-D-026 witness: a run the shipped release armed, which is exactly this
   // shape and is what its frame exists to photograph.
   'legacy-armed',

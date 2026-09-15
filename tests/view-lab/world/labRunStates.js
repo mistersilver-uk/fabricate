@@ -837,7 +837,7 @@ function prototypeContainers(context, state) {
       allocation: {},
     };
   }
-  if (EDITABLE_GATED_CASES.has(state)) reopenEditableStage(selected);
+  if (UNBEGUN_PROTOTYPE_CASES.has(state)) unbeginStage(selected);
   replacePrototypeFocus(containers.craftingRuns, selected, false);
   return containers;
 }
@@ -1342,26 +1342,41 @@ function versionedCraftingRun(context, recipe, overrides = {}) {
 }
 
 /**
- * Re-open a stage the case needs EDITABLE. Post-D-028 a gated stage has locked its choice and
- * spent its inputs, so an open one cannot also be counting down; these cases still depict the
- * pre-commit shape because making them unbegun removes their countdown, and a gateless run has
- * no progress reading at all until manual finding M18 lands. Escalated with issue 1648.
+ * Un-begin the current stage: delete its clock AND its consumption receipt together, because a
+ * start commit writes both or neither. This is the ONLY shape whose route, options and essence
+ * allocation are still editable post-D-028, so it is what a case whose subject is an open
+ * requirement rail must actually be.
+ *
+ * These cases used to keep the clock and drop the receipt alone, which depicted a state the
+ * product cannot create. They could not be repaired while an ungated run had no progress
+ * reading at all — the frames would have published with their countdown and bar deleted and
+ * nothing in their place — and manual finding M18 removed that obstacle by restoring the stage
+ * rail to a card with no gate (issue 1648).
  */
-function reopenEditableStage(run) {
+function unbeginStage(run) {
   const current = run.steps?.[Math.max(0, Number(run.currentStepIndex) || 0)];
-  if (current) delete current.preparedConsumption;
+  if (!current) return run;
+  delete current.timeGate;
+  delete current.preparedConsumption;
+  current.status = 'inProgress';
+  run.status = 'inProgress';
   return run;
 }
 
-/** @see reopenEditableStage */
-const EDITABLE_GATED_CASES = new Set([
-  'waiting-auto-eligible',
+/**
+ * Prototype cases whose SUBJECT is an editable requirement rail, and which are therefore
+ * unbegun. The three former members of this cohort that are NOT here — `waiting-auto-eligible`,
+ * `check-route` and `paused` — were repaired the other way: each photographs something only a
+ * STARTED stage has (a world-time completion preference, an enabled roll, a frozen countdown),
+ * so each keeps the receipt its clock implies and its walk no longer reaches for a control a
+ * locked stage does not offer.
+ * @see unbeginStage
+ */
+const UNBEGUN_PROTOTYPE_CASES = new Set([
   'waiting-open-choice',
   'ingredient-route',
-  'check-route',
   'essence-shared',
   'essence-overshoot',
-  'paused',
 ]);
 
 /**

@@ -63,6 +63,23 @@
   });
   const progressPercent = $derived(progress === null ? 0 : Math.round(progress * 100));
 
+  // THE RAIL SURVIVES A STAGE THAT HAS NOT BEGUN (issue 1648, M18). A multi-step run between
+  // its stages has no `timeGate`, and suppressing the whole timing block on that predicate took
+  // the bar away with the countdown — so the one thing on the card that says how far through
+  // the run is disappeared exactly when the badge stopped distinguishing it from a run counting
+  // down (D-029). The rail reads COMPLETED STAGES OVER TOTAL, which is the reading it already
+  // gives: `RunProgress` fills every track before `current`, and the current stage's own track
+  // is the fraction of its clock, which for an unbegun stage is honestly zero.
+  //
+  // Scoped to runs that HAVE a stage sequence. Gathering and salvage project `steps: []`, where
+  // a lone empty track would assert a shape the run does not have.
+  const stages = $derived(Array.isArray(run?.steps) ? run.steps : []);
+  const showsStageRail = $derived(!hasGate && stages.length > 0);
+  // A countdown needs a deadline. An unbegun stage has none, and `Left: None` is the string a
+  // MATURED wait prints, so the row shows its rail and says nothing about time (U3's defect on
+  // the Active surface). What it is waiting for is the `Ready to begin` attention chip's job.
+  const showsTiming = $derived(hasGate || showsStageRail);
+
   function activate() {
     if (id) onSelect?.(run);
   }
@@ -127,9 +144,9 @@
       {/if}
     </div>
   </div>
-  {#if hasGate}
+  {#if showsTiming}
     <div class="journal-run-card-timing">
-      {#if progress !== null}
+      {#if progress !== null || showsStageRail}
         <div
           class="journal-run-card-progress"
           role="progressbar"
@@ -140,26 +157,29 @@
           data-run-progress={progressPercent}
         >
           <RunProgress
-            stages={Array.isArray(run?.steps) && run.steps.length > 0 ? run.steps : [{}]}
+            stages={stages.length > 0 ? stages : [{}]}
             current={Math.max(0, Number(run?.stepIndex) || 0)}
             progress={progressPercent}
           />
         </div>
       {/if}
-      <div class="journal-run-card-countdown" data-run-countdown>
-        <i class="fas fa-clock" aria-hidden="true"></i>
-        {#if isReady}
-          <span
-            >{localize(
-              isFinalStep
-                ? 'FABRICATE.App.Journal.Countdown.ReadyToFinish'
-                : 'FABRICATE.App.Journal.Countdown.ReadyToContinue'
-            )}</span
-          >
-        {:else}
-          <span>{localize('FABRICATE.App.Journal.Countdown.Remaining', { time: remaining })}</span>
-        {/if}
-      </div>
+      {#if hasGate}
+        <div class="journal-run-card-countdown" data-run-countdown>
+          <i class="fas fa-clock" aria-hidden="true"></i>
+          {#if isReady}
+            <span
+              >{localize(
+                isFinalStep
+                  ? 'FABRICATE.App.Journal.Countdown.ReadyToFinish'
+                  : 'FABRICATE.App.Journal.Countdown.ReadyToContinue'
+              )}</span
+            >
+          {:else}
+            <span>{localize('FABRICATE.App.Journal.Countdown.Remaining', { time: remaining })}</span
+            >
+          {/if}
+        </div>
+      {/if}
     </div>
   {/if}
 </div>

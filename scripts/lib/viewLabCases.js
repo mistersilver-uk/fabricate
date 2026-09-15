@@ -1746,15 +1746,13 @@ function journalLifecycleCases() {
     ];
   };
   const steps = {
-    paused: [
-      { selector: '[data-run-action="pause"]' },
-      { selector: '[data-slot-row] button.fab-slot-tile' },
-    ],
+    // A paused run holds the choices it already made (D-028), so its rail is inert: the walk
+    // pauses the run and stops there rather than reaching for a tile it can no longer open.
+    paused: [{ selector: '[data-run-action="pause"]' }],
     'waiting-open-choice': [{ selector: '[data-slot-row] button.fab-slot-tile' }],
-    'check-route': [
-      { selector: '[data-slot-row] button.fab-slot-tile' },
-      { selector: '[data-choice-id]:not(:disabled)' },
-    ],
+    // Started and matured, which is what an enabled roll requires — and therefore locked, so
+    // there is no open tile or choice option left to walk (issue 1648, D-028).
+    'check-route': [],
     'material-shortage': [
       { selector: '[data-journal-route] input[value="boss-stage-1-verdant"]' },
       { selector: '[data-journal-route] input[value="boss-stage-1-sunward"]' },
@@ -1897,13 +1895,17 @@ function journalLifecycleCases() {
         '[data-journal-summary-card="time"]',
         `${primary}:disabled`
       ),
+    // An open requirement rail belongs to a stage that has NOT begun (D-028), and an unbegun
+    // stage offers the begin decision in place of the resolve action — refused, because the
+    // option pick this case exists to show is exactly what it is still waiting for.
     'waiting-open-choice':
       detail +
       has(
         '[data-choice-options] [data-choice-id]:not(:disabled)',
         '[data-slot-row] button[aria-pressed="true"]',
-        `${primary}:disabled`
-      ),
+        '[data-run-action="begin"]:disabled'
+      ) +
+      lacks(primary),
     // The stage the player has not begun: its own control, stating what beginning commits,
     // and NO roll offered at all until it has started (issue 1648, M13/M15).
     'stage-not-started':

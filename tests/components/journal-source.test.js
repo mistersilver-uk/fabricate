@@ -140,9 +140,14 @@ describe('JournalView layout + effects', () => {
 });
 
 describe('Journal status vocabulary + actions', () => {
-  it('mirrors the RuntimeStatePill vocabulary (ready=green play, waiting=warning hourglass)', () => {
+  it('mirrors the RuntimeStatePill vocabulary (ready=green play, in progress=info gear)', () => {
     assert.ok(statusSource.includes('fa-circle-play'), 'ready uses the play icon');
-    assert.ok(statusSource.includes('fa-hourglass-half'), 'waiting uses the hourglass icon');
+    // Issue 1648, D-029: `waiting` no longer has a look of its own. It shares the `inProgress`
+    // descriptor object outright, so the warning hourglass it used to wear is gone from the map
+    // rather than merely unreferenced.
+    assert.ok(statusSource.includes('fa-gear'), 'the merged active badge uses the gear icon');
+    assert.equal(statusSource.includes('fa-hourglass-half'), false, 'the retired waiting icon is gone');
+    assert.ok(statusSource.includes('waiting: IN_PROGRESS_PRESENTATION'), 'and it is the SAME object, not a copy');
     assert.ok(statusSource.includes('fa-circle-check'), 'succeeded uses the check icon');
     assert.ok(statusSource.includes('fa-circle-xmark'), 'failed uses the xmark icon');
     assert.ok(statusSource.includes("tone: 'success'"), 'ready/succeeded are the success tone');

@@ -26,6 +26,7 @@ import {
   STAGE_BLOCKERS,
   classifyStageReadiness,
   ingredientKind,
+  isChoiceBlocker,
   missingGroupBlocker,
   resolveStageToolStates,
   scopedEssenceAllocation,
@@ -1325,7 +1326,7 @@ export class RunJournalBuilder {
       staleRoute: false,
       success: selection?.success === true,
       blocker,
-      awaitingChoice: blocker === STAGE_BLOCKERS.choice,
+      awaitingChoice: isChoiceBlocker(blocker),
       knownMaterialShortfall: blocker === STAGE_BLOCKERS.material,
       missingGroups: normalizeList(selection?.missingGroups).map(safeMissingGroup),
       choices,
@@ -2360,19 +2361,20 @@ export class RunJournalBuilder {
     const craftingStage = current && live && runType === 'crafting';
     // The one cause this stage is refused for, as the engine's own commands classify it.
     const stageBlocker = craftingStage ? (selectionAvailability?.blocker ?? null) : null;
-    const materialBlocked = stageBlocker !== null && stageBlocker !== STAGE_BLOCKERS.choice;
+    const materialBlocked = stageBlocker !== null && !isChoiceBlocker(stageBlocker);
     // A stage with its own start is not resolvable until the player has begun it: the roll
     // is withheld rather than offered and then refused (M13/M15).
     const awaitingStageStart = current && live && stageStart?.required === true;
-    // Waiting on the player's own pick rather than on the clock or on stock (M10). It is
-    // reported only where they can act on it: their own live current-contract crafting stage,
-    // unpaused and unlocked, because a paused or started stage holds the choices it made.
+    // Waiting on the player's own pick — a route, an option or an essence allocation — rather
+    // than on the clock or on stock (M10). It is reported only where they can act on it: their
+    // own live current-contract crafting stage, unpaused and unlocked, because a paused or
+    // started stage holds the choices it made.
     const choiceRequired =
       mutableCurrent &&
       runType === 'crafting' &&
       !paused &&
       entitled &&
-      stageBlocker === STAGE_BLOCKERS.choice;
+      isChoiceBlocker(stageBlocker);
     const readyToExecute =
       derivedStatus !== 'waiting' &&
       derivedStatus !== 'paused' &&
@@ -2715,13 +2717,14 @@ function runIdentityFields({ run, runType, actorUuid, activityKind, lifecycleCon
 
 /**
  * The stage's answer when its route resolves to no authored set: none has been chosen, or the
- * one that was has gone. An unstarted stage waits on a pick; a started one has no pick left to
- * make and reports the recipe edit instead.
+ * one that was has gone. An unstarted stage waits on a pick — a ROUTE pick specifically, which
+ * is the one cause the "choose this stage's route" sentence was ever right about (issue 1648,
+ * F5) — while a started one has no pick left to make and reports the recipe edit instead.
  */
 function unchosenRouteAvailability(setId, routes, started = false) {
   return {
     success: false,
-    blocker: started ? 'routeUnavailable' : STAGE_BLOCKERS.choice,
+    blocker: started ? 'routeUnavailable' : STAGE_BLOCKERS.route,
     knownMaterialShortfall: false,
     awaitingChoice: !started,
     selectedIngredientSetId: setId,

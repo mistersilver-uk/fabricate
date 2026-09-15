@@ -2286,12 +2286,15 @@ test('absent or uncertain resolver evidence never proves a physical shortfall', 
   assert.equal(absentResolver.actions.execute, true);
   assert.equal(absentResolver.actions.disabledReason, null);
 
-  // A stale route IS an open choice (a route to re-pick), so it is refused the same way.
+  // A stale route IS an open choice (a route to re-pick), so it is refused the same way — and
+  // issue 1648's F5 gives that one cause its own code, because "choose this stage's route" is
+  // the sentence it is the only cause that deserves.
   const stale = materialShortfallFixture([{ id: 'removed' }]);
   stale.plan.selectedIngredientSetId = 'gone';
   assert.equal(stale.project().currentStep.selectionAvailability.staleRoute, true);
   assert.equal(stale.project().actions.execute, false, 'a stale route waits on a replacement pick');
-  assert.equal(stale.project().actions.disabledReason, 'choiceRequired');
+  assert.equal(stale.project().actions.disabledReason, 'routeRequired');
+  assert.equal(stale.project().awaitingChoice, true, 'a route decision is still a decision');
 });
 
 // ── Waiting on the PLAYER's choice (issue 1648, M10) ─────────────────────────────────────────
@@ -2365,7 +2368,10 @@ test('an unbegun stage with no route chosen waits on the player rather than on t
   assert.equal(run.actions.atStageStart, true, 'the begin control still renders instead of the primary');
   assert.equal(run.actions.beginStep, false, 'pressing it would refuse: "requirements are unavailable"');
   assert.equal(run.actions.execute, false);
-  assert.equal(run.actions.disabledReason, 'choiceRequired');
+  // Issue 1648, F5: the ROUTE decision in its own words. The attention chip stays `choice`,
+  // because what the PLAYER owes is one act either way — the code is what stops the sentence
+  // telling a single-route stage to pick a route.
+  assert.equal(run.actions.disabledReason, 'routeRequired');
   assert.equal(runAttentionPresentation(run).kind, 'choice');
   assert.equal(runAttentionPresentation(run).labelKey, 'FABRICATE.App.Journal.Status.awaitingChoice');
   // Guidance, not an alarm: an unbegun stage is ordinary play.
@@ -2379,8 +2385,13 @@ test('an unbegun stage owes the player nothing only once its own pick is persist
   const only = unbegunSecondStage([ironRoute()]);
   assert.equal(only.currentStep.selectionAvailability.success, true);
   assert.equal(only.awaitingChoice, false);
-  assert.equal(runAttentionPresentation(only), null);
-  assert.equal(notice(only), null);
+  // Issue 1648, U2. It owes no CHOICE, but it is not owed nothing: this stage is waiting for an
+  // irreversible click and nothing else, and before this it carried no Active-row signal at all
+  // — one badge and nothing beside it, indistinguishable from a run counting the clock down.
+  assert.equal(runAttentionPresentation(only).kind, 'start');
+  assert.equal(runAttentionPresentation(only).tone, 'accent');
+  assert.equal(runAttentionPresentation(only).labelKey, 'FABRICATE.App.Journal.Status.readyToBegin');
+  assert.equal(notice(only), null, 'and it is still ordinary play, so it raises no notice');
   // A satisfied choice never refuses the begin control: the gate only refuses while
   // `awaitingChoice` is true.
   assert.equal(only.actions.atStageStart, true);
@@ -2399,6 +2410,9 @@ test('an unbegun stage owes the player nothing only once its own pick is persist
   assert.equal(multiOption.actions.beginStep, false, 'and is refused until the pick is persisted');
   assert.equal(multiOption.actions.disabledReason, 'choiceRequired');
   assert.equal(multiOption.actions.setSelection, true, 'the control that makes the pick is offered');
+  // Issue 1648, U2: the unmade pick outranks the start, because a stage that cannot be begun
+  // must not advertise that it can be.
+  assert.equal(runAttentionPresentation(multiOption).kind, 'choice');
 
   // Persisting the pick clears it: the same fixture, one override later, offers begin.
   const picked = unbegunSecondStage([new IngredientSet({ id: 'only',
@@ -2409,6 +2423,7 @@ test('an unbegun stage owes the player nothing only once its own pick is persist
   assert.equal(picked.awaitingChoice, false);
   assert.equal(picked.actions.beginStep, true);
   assert.equal(picked.actions.disabledReason, 'stageNotStarted');
+  assert.equal(runAttentionPresentation(picked).kind, 'start', 'and now it says so on the row');
 });
 
 test('an untimed stage keeps its choices open for its whole life and says so', () => {

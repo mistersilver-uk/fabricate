@@ -11,8 +11,30 @@ export const STAGE_BLOCKERS = Object.freeze({
   essence: 'essenceRequired',
   currency: 'currencyRequired',
   choice: 'choiceRequired',
+  route: 'routeRequired',
   tool: 'toolRequired',
 });
+
+/**
+ * The two codes that report an unmade PICK rather than something to acquire. They are separate
+ * because they ask for different acts: `route` names the one decision a stage with more than one
+ * authored ingredient set opens, and `choice` names the option picks and essence allocation made
+ * WITHIN the route already taken. One sentence for both told a player on a single-route stage to
+ * choose a route that has one value while the real gap was an allocation (issue 1648, F5).
+ */
+const CHOICE_BLOCKER_CODES = Object.freeze([STAGE_BLOCKERS.choice, STAGE_BLOCKERS.route]);
+
+/**
+ * Whether a blocker code reports an unmade pick. Every caller that used to compare against
+ * `STAGE_BLOCKERS.choice` asks this instead, so splitting the code cannot leave one surface
+ * treating a route decision as an acquisition.
+ *
+ * @param {unknown} blocker A `STAGE_BLOCKERS` code, or `null`.
+ * @returns {boolean}
+ */
+export function isChoiceBlocker(blocker) {
+  return CHOICE_BLOCKER_CODES.includes(blocker);
+}
 
 /** Reported before `choice`, because acquiring is what fixes them and choosing cannot. */
 const SHORTFALL_ORDER = Object.freeze([

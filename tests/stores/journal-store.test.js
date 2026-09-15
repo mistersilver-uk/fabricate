@@ -306,11 +306,50 @@ describe('journalStore', () => {
     store.setActiveStatusFilter('paused');
     flushSync();
 
-    assert.deepEqual(store.activeCounts, { all: 3, ready: 1, waiting: 1, paused: 1 });
+    assert.deepEqual(store.activeCounts, { all: 3, ready: 1, inProgress: 1, paused: 1 });
     assert.deepEqual(store.activeRuns.map((entry) => entry.id), ['craft-paused']);
     store.setActiveStatusFilter('ready');
     flushSync();
     assert.deepEqual(store.activeRuns, [], 'search is applied after the pre-filter counts');
+  });
+
+  // Issue 1648, D-029/M19. `Waiting` and `In progress` collapse into one badge, and the filter
+  // vocabulary must not diverge from the badge vocabulary. This is a MERGE rather than a rename:
+  // before it there was no tab for `inProgress` at all, so a run between stages — or any unbegun
+  // stage — matched nothing but `All`, which is why the maintainer's own frame reads
+  // `Active (1)` beside `Ready 0, Waiting 0, Paused 0`.
+  it('selects both merged statuses from the one In progress tab, and counts them together', async () => {
+    const activeRuns = [
+      run({ id: 'craft-ready', derivedStatus: 'ready' }),
+      run({ id: 'craft-wait', derivedStatus: 'waiting' }),
+      run({ id: 'craft-between-stages', derivedStatus: 'inProgress' }),
+      run({ id: 'craft-unbegun', derivedStatus: 'inProgress' }),
+      run({ id: 'craft-paused', derivedStatus: 'paused' }),
+    ];
+    const store = await loadedStore(makeServices({ listing: baseListing({ activeRuns, history: [] }) }));
+    flushSync();
+
+    assert.deepEqual(store.activeCounts, { all: 5, ready: 1, inProgress: 3, paused: 1 });
+    assert.equal(
+      store.activeCounts.ready + store.activeCounts.inProgress + store.activeCounts.paused,
+      store.activeCounts.all,
+      'every active run is reachable from exactly one tab'
+    );
+
+    store.setActiveStatusFilter('inProgress');
+    flushSync();
+    assert.deepEqual(
+      store.activeRuns.map((entry) => entry.id).sort(),
+      ['craft-between-stages', 'craft-unbegun', 'craft-wait'],
+      'the one tab selects the previously-waiting runs AND the previously-unreachable ones'
+    );
+    assert.equal(store.activeStatusFilter, 'inProgress');
+
+    // The retired tab value is not silently honoured: the vocabulary moved, and a stale caller
+    // gets the filter it already had rather than a tab that no longer exists.
+    store.setActiveStatusFilter('waiting');
+    flushSync();
+    assert.equal(store.activeStatusFilter, 'inProgress', 'the retired value is refused');
   });
 
   it('keeps active/history pages independent, accepts 4/6/12/25 sizes, and clamps after filtering or reload deletion', async () => {

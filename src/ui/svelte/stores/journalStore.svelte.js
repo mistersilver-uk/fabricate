@@ -7,7 +7,19 @@ import {
 const PAGE_SIZES = Object.freeze([4, 6, 12, 25]);
 const RECENT_TERMINAL_LIMIT = 3;
 const KIND_FILTERS = new Set(['all', 'crafting', 'alchemy', 'gathering', 'salvage']);
-const ACTIVE_STATUS_FILTERS = new Set(['all', 'ready', 'waiting', 'paused']);
+/**
+ * The player-facing Active status tabs. `inProgress` selects BOTH projected statuses that wear
+ * the merged `In progress` badge (issue 1648, D-029): before the merge there was no tab for
+ * `inProgress` at all, so a run between stages — or any unbegun stage — matched nothing but
+ * `All`, and the tab counts reported `Ready 0, Waiting 0, Paused 0` beside `Active (1)`.
+ */
+const ACTIVE_STATUS_FILTERS = new Set(['all', 'ready', 'inProgress', 'paused']);
+/** The projected `derivedStatus` values each tab selects. */
+const ACTIVE_STATUS_MEMBERS = Object.freeze({
+  ready: ['ready'],
+  inProgress: ['waiting', 'inProgress'],
+  paused: ['paused'],
+});
 
 /**
  * Active and Finished have independent pages and sorts, with shared search/kind filtering.
@@ -586,7 +598,9 @@ function matchesSearch(query) {
 }
 
 function matchesActiveStatus(status) {
-  return (run) => status === 'all' || run?.derivedStatus === status;
+  if (status === 'all') return () => true;
+  const members = ACTIVE_STATUS_MEMBERS[status] ?? [status];
+  return (run) => members.includes(run?.derivedStatus);
 }
 
 function activityKind(run) {
@@ -594,11 +608,11 @@ function activityKind(run) {
 }
 
 function countActiveStatuses(runs) {
-  const counts = { all: runs.length, ready: 0, waiting: 0, paused: 0 };
+  const counts = { all: runs.length, ready: 0, inProgress: 0, paused: 0 };
   for (const run of runs) {
-    if (run?.derivedStatus === 'ready') counts.ready += 1;
-    if (run?.derivedStatus === 'waiting') counts.waiting += 1;
-    if (run?.derivedStatus === 'paused') counts.paused += 1;
+    for (const [tab, members] of Object.entries(ACTIVE_STATUS_MEMBERS)) {
+      if (members.includes(run?.derivedStatus)) counts[tab] += 1;
+    }
   }
   return counts;
 }
