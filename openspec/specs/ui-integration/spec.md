@@ -4936,6 +4936,9 @@ A stage that has not started MUST offer its own begin control instead of the res
 Its TIME card MUST say that its clock has NOT STARTED rather than fall through to the None used when a wait has MATURED, because those are opposite facts and the control beside them offers to start the clock.
 The begin control MUST stay visible and reasoned even while its route remains unchosen; it MUST render DISABLED with a distinct choice-vs-materials reason rather than vanish and hand back an enabled resolve action the command would refuse, and the same disabled-while-unchosen rule applies to the resolve action itself on an untimed stage, which has no separate start boundary to withhold the begin control instead.
 A started stage's materials surface MUST read as already consumed and MUST NOT be editable.
+It MUST render that stage's recorded start-time consumption receipt — the items actually consumed with their recorded quantities, and the recorded per-carrier essence contributions — on one footing, whether a fixed component, a tag match or an essence carrier supplied them.
+It MUST NOT render the live held-against-needed requirement probe there, because the stage has already emptied the inventory that probe reads.
+The receipt MUST NOT be synthesised from the authored requirement snapshot, and a quantity the record does not carry MUST read as not recorded rather than borrow the requirement's own number.
 A route nobody has chosen yet MUST be asked for rather than reported as a selected material that is no longer available; the repair sentence belongs to a route that vanished.
 
 Past/future browsing MUST retain progress/navigation but omit separate TIME/CHECK summaries and current countdowns.
@@ -4984,6 +4987,7 @@ Routed gathering success shows Final check, Brought back and How the check lande
 The full OutcomeLadder remains an active preview; its native selection bands and highest-matching/lowest-relative-fallback rule MUST be stated truthfully rather than adopting prototype low-roll semantics.
 
 A matching just-resolved notice may temporarily own a single-record summary and receipts; reselecting clears it and restores ordinary history.
+Its evidence band MUST be withheld entirely when it owns no rows — a multi-stage run's rows belong to its stage cards — rather than rendered empty, because an empty band still occupies its own line and unbalances the notice it sits in.
 Stage recaps and d100 scales remain visible, and an unrelated notice MUST NOT suppress the selected account.
 Successful positive awards use: "A closed run.
 Its results are already in your inventory; the entry stays here as a record."

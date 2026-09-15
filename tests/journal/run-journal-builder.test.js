@@ -2539,6 +2539,57 @@ test('a started stage and a paused run hold the choices they already made', () =
   assert.equal(notice(paused).dataAttr, 'data-journal-paused');
 });
 
+// Issue 1648, M21. A started stage's materials are gone, so the held/needed probe that
+// describes an open stage describes nothing about a started one — the maintainer read
+// `0/0 Drop essence` against an essence the stage had already spent. The projection carries
+// the START RECEIPT instead, and every assertion below is chosen so it can only pass by
+// reading that receipt: the recorded rows deliberately CONTRADICT the authored requirement.
+test('a started stage projects what it consumed, never the requirement it was measured against', () => {
+  const recorded = {
+    selectedIngredientSetId: 'route-iron',
+    consumedSummary: [
+      { actorUuid: 'Actor.actor-1', itemUuid: 'Actor.actor-1.Item.star', componentId: 'star-iron',
+        name: 'Star Iron', img: 'icons/star.webp', quantity: 3 },
+      { actorUuid: 'Actor.actor-1', itemUuid: 'Actor.actor-1.Item.dust', componentId: 'dust',
+        name: 'Ash Dust', img: null },
+    ],
+    essenceSpend: { labels: { fire: 'Fire' }, carriers: [{ actorUuid: 'Actor.actor-1',
+      itemUuid: 'Actor.actor-1.Item.ember', name: 'Ember', img: null, quantity: 2,
+      contributions: [{ essenceId: 'fire', amount: 4 }] }] },
+  };
+  const started = unbegunSecondStage([ironRoute()], {
+    selectionPlan: { selectedIngredientSetId: 'route-iron' },
+    preparedConsumption: recorded,
+    timeGate: { requiredSeconds: 3600, initiatedAt: 150, availableAt: 3750 },
+  });
+  const record = started.currentStep.consumptionRecord;
+  assert.equal(started.currentStep.selectionAvailability.locked, true);
+  // The route authors ONE `iron` at quantity 1 and no essence at all, so none of these three
+  // readings is derivable from the requirement snapshot.
+  assert.deepEqual(
+    record.materials.map((entry) => [entry.name, entry.quantity]),
+    [['Star Iron', 3], ['Ash Dust', null]],
+    'the receipt is rendered as recorded, and an uncaptured quantity stays uncaptured'
+  );
+  assert.equal(record.essence.carriers[0].contributions[0].amount, 4,
+    'the essence contribution survives as a recorded contribution, not as a live probe');
+  assert.equal(record.essence.labels.fire, 'Fire');
+  // Tag-matched and fixed consumption arrive on the SAME footing: the receipt names items,
+  // so nothing here depends on which kind of requirement matched them.
+  assert.equal(record.materials[1].componentId, 'dust');
+
+  // A stage that has not started has no receipt to show, and neither has a stage that is not
+  // the one being viewed — the latter reads its record through the history entitlement rule.
+  const unbegun = unbegunSecondStage([ironRoute()], {
+    selectionPlan: { selectedIngredientSetId: 'route-iron' },
+  });
+  assert.equal(unbegun.currentStep.consumptionRecord, null);
+  assert.equal(unbegun.currentStep.stageStarted, false);
+  assert.equal(started.steps[0].consumptionRecord, null,
+    'stage one is finished and is not the current stage, so it projects no live receipt');
+  assert.equal(started.steps[0].stageStarted, true, 'though it certainly did start');
+});
+
 test('a started stage whose locked route is deleted reports the edit, not an impossible choice', () => {
   const orphaned = unbegunSecondStage([silverRoute()], {
     selectionPlan: { selectedIngredientSetId: 'route-iron' },

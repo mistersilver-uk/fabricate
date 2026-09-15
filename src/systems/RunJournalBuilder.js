@@ -910,6 +910,9 @@ export class RunJournalBuilder {
       ),
       // A stage that has started spent its inputs and locked its choice (D-026/D-028).
       stageStarted: Boolean(runStep?.preparedConsumption),
+      // ...and what it ACTUALLY spent, so the view never re-probes an inventory the stage
+      // already emptied (issue 1648, M21).
+      consumptionRecord: this._stageConsumptionRecord({ runStep, systemId, isCurrent }),
       selectionPlan: cloneJson(runStep?.selectionPlan) ?? null,
       selectedRequirementSnapshot: historyEntitled
         ? (cloneJson(runStep?.selectedRequirementSnapshot) ?? null)
@@ -946,6 +949,43 @@ export class RunJournalBuilder {
             toolStates,
           })
         : null,
+    };
+  }
+
+  /**
+   * The START-TIME CONSUMPTION RECEIPT of a stage that has begun (issue 1648, M21).
+   *
+   * A started stage's materials are gone, so the live held/needed probe that describes an
+   * OPEN stage describes nothing about a started one — it reported `0/0` against an essence
+   * the stage had already spent. This reads `preparedConsumption` instead, which
+   * `markStepStarted` writes at the moment of the commit, and it is NEVER derived from the
+   * authored requirement snapshot: a synthesised record would restate the intent as though
+   * it were the receipt.
+   *
+   * `consumedSummary` carries every physical item the stage consumed on ONE footing —
+   * fixed components, tag-matched items and essence carriers alike — and `essenceSpend`
+   * carries the per-carrier contributions the terminal screen already renders. A row whose
+   * quantity was never captured keeps a null quantity, which the view reports as unrecorded
+   * rather than filling in from the requirement it was matched against.
+   *
+   * Scoped to the CURRENT stage of a live run, which is the only surface that reads it:
+   * `selectionAvailability` is scoped the same way, and a terminal run's record is already
+   * projected as `consumedIngredients` under the history entitlement rule. Widening it here
+   * would put recorded evidence on terminal steps by a second route that does not consult
+   * that rule.
+   *
+   * @private
+   * @returns {{materials: object[], essence: object|null}|null} `null` unless this is the
+   *   current stage of a live run and that stage has started.
+   */
+  _stageConsumptionRecord({ runStep, systemId, isCurrent }) {
+    const prepared = isCurrent ? plainObjectOrNull(runStep?.preparedConsumption) : null;
+    if (!prepared) return null;
+    return {
+      materials: normalizeList(prepared.consumedSummary).map((entry) =>
+        this._mapResult(entry, systemId)
+      ),
+      essence: craftingStepHistoryEvidence(prepared).essenceSpend ?? null,
     };
   }
 

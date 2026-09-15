@@ -71,6 +71,21 @@
       })),
     ];
   }
+  // The transient banner's evidence rows, and WHETHER THERE ARE ANY (issue 1648, M22).
+  // `Notice` renders its evidence band whenever the prop is supplied, and a supplied snippet
+  // that renders nothing still lays out: the band is `flex: 1 1 100%`, so it wrapped onto its
+  // own line and added a row gap under a notice whose bottom padding then read visibly deeper
+  // than its top. A multi-stage run reaches exactly that state — its rows belong to the stage
+  // cards below, so the banner has nothing of its own to show. The band is now withheld rather
+  // than emptied, the same rule M20 applied to the empty essence section.
+  const transientRows = $derived(showTransient && !account.multi && account.mode !== 'd100');
+  const hasVerdictEvidence = $derived(
+    Boolean(account.verdictCheck) ||
+      (transientRows &&
+        (Boolean(account.summary) ||
+          (single?.consumed ?? []).length > 0 ||
+          account.results.length > 0))
+  );
   function stageIo(stage) {
     return [
       {
@@ -106,6 +121,15 @@
   {/if}
 {/snippet}
 
+{#snippet verdictEvidence()}
+  {#if account.verdictCheck}<span data-history-verdict-check>{account.verdictCheck}</span>{/if}
+  {#if transientRows}
+    {#if account.summary}<span>{account.summary.value}</span>{/if}
+    {@render items(text('Consumed'), single?.consumed ?? [], 'transient-consumed')}
+    {@render items(resultHeading, account.results, 'transient-produced')}
+  {/if}
+{/snippet}
+
 {#snippet essenceRecaps()}
   {#each account.stages.filter((stage) => stage.essence?.carriers?.length > 0) as stage (stage.stepId)}
     <EssencePool
@@ -134,17 +158,8 @@
         detail={account.failed ? account.failureDetail : ''}
         dataAttr="data-journal-verdict"
         dataValue={run.status}
-      >
-        {#snippet evidence()}
-          {#if account.verdictCheck}<span data-history-verdict-check>{account.verdictCheck}</span
-            >{/if}
-          {#if showTransient && !account.multi && account.mode !== 'd100'}
-            {#if account.summary}<span>{account.summary.value}</span>{/if}
-            {@render items(text('Consumed'), single?.consumed ?? [], 'transient-consumed')}
-            {@render items(resultHeading, account.results, 'transient-produced')}
-          {/if}
-        {/snippet}
-      </Notice>
+        evidence={hasVerdictEvidence ? verdictEvidence : null}
+      />
     {/if}
     {#if account.summary && !showTransient}
       <InspectorCard data-history-summary={account.summary.kind}>

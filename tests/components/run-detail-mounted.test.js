@@ -412,6 +412,30 @@ describe('RunDetail mounted behavior', () => {
     assert.ok(Boolean(body.querySelector('.fab-notice-title')), 'the title still sits beside the glyph');
   });
 
+  // Issue 1648, M22. `Notice` renders its evidence band whenever the prop is supplied, and a
+  // band that renders nothing still lays out: it is `flex: 1 1 100%`, so it wrapped onto its own
+  // line under a row gap and the notice's bottom padding read visibly deeper than its top. A
+  // MULTI-stage run is exactly that state — its rows belong to the stage cards below it — so the
+  // band is withheld rather than emptied, the same rule M20 applied to the empty essence section.
+  it('withholds the run-completed evidence band when the banner has no rows of its own', async () => {
+    const many = await createPersistedCraftingHistory({ stageCount: 2 });
+    const multi = await harness.mount({ run: many.model, journal: { commandResult: { runKey: many.model.key } } });
+    const multiNotice = multi.querySelector('[data-journal-verdict]');
+    assert.ok(Boolean(multiNotice), 'the run still reports that it completed');
+    assert.ok(Boolean(multi.querySelector('[data-history-stages]')), 'and its rows are on the stage cards');
+    // `assert.equal` on a happy-dom element OOMs while formatting the diff, so the presence is
+    // reduced to a boolean before it is asserted.
+    assert.ok(!multiNotice.querySelector('.fab-notice-evidence'),
+      'so the banner carries no band at all, rather than an empty one that adds a row gap');
+
+    harness.remount();
+    const one = await createPersistedCraftingHistory({ stageCount: 1 });
+    const single = await harness.mount({ run: one.model, journal: { commandResult: { runKey: one.model.key } } });
+    const band = single.querySelector('[data-journal-verdict] .fab-notice-evidence');
+    assert.ok(Boolean(band), 'a single-stage banner does own rows, and keeps its band');
+    assert.ok(Boolean(band.querySelector('[data-history-items="transient-produced"]')));
+  });
+
   it('orders current purpose and produces above consumes, and names the check action', async () => {
     const base = makeCraftingRun();
     const step = { ...base.steps[0], presentationSnapshot: { name: 'Recorded stage', description: 'Recorded purpose' } };

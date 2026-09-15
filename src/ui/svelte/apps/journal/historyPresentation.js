@@ -12,7 +12,8 @@ export function materialText(item, localize) {
   return `${name} · ${quantity}`;
 }
 
-function materials(items, localize) {
+/** Recorded item rows, with an absent quantity or name stated as unrecorded rather than filled in. */
+export function presentMaterials(items, localize) {
   return list(items).map((item, index) => ({
     ...item,
     id: JSON.stringify([item.actorUuid, item.itemUuid ?? item.componentId, index]),
@@ -38,9 +39,14 @@ function checkText(check, localize) {
   });
 }
 
-function essenceEvidence(stage, localize) {
-  if (!stage.essenceSpend) return null;
-  const carriers = materials(stage.essenceSpend.carriers, localize);
+/**
+ * The recorded essence contribution of one stage: what each carrier gave, and the authored
+ * amounts it was measured against. Shared with the ACTIVE started stage (issue 1648, M21), so
+ * a stage's essence reads the same before and after its run finishes.
+ */
+export function presentEssenceSpend(stage, localize) {
+  if (!stage?.essenceSpend) return null;
+  const carriers = presentMaterials(stage.essenceSpend.carriers, localize);
   const totals = {};
   for (const carrier of carriers) {
     for (const contribution of list(carrier.contributions)) {
@@ -78,10 +84,10 @@ export function presentStage(stage, localize) {
     check,
     resolution,
     route: stage?.selectedRequirementSnapshot?.name || '',
-    consumed: materials(stage?.consumedIngredients, localize),
-    produced: materials(stage?.createdResults, localize),
-    tools: materials(stage?.usedTools, localize),
-    essence: essenceEvidence(stage ?? {}, localize),
+    consumed: presentMaterials(stage?.consumedIngredients, localize),
+    produced: presentMaterials(stage?.createdResults, localize),
+    tools: presentMaterials(stage?.usedTools, localize),
+    essence: presentEssenceSpend(stage ?? {}, localize),
   };
 }
 
@@ -246,7 +252,7 @@ export function presentHistory(run, localize) {
     : list(run?.steps)
         .filter(attempted)
         .map((stage) => presentStage(stage, localize));
-  const results = materials(run?.createdResults, localize);
+  const results = presentMaterials(run?.createdResults, localize);
   const multi = stages.length > 1;
   const mode = run?.gatheringYield?.mode;
   const gathering = run?.runType === 'gathering';
@@ -256,7 +262,7 @@ export function presentHistory(run, localize) {
   const unattributed = unattributedScaleResults(run, results);
   return {
     stages,
-    consumed: materials(run?.consumedIngredients, localize),
+    consumed: presentMaterials(run?.consumedIngredients, localize),
     tools: historyTools(stages, localize),
     results,
     multi,

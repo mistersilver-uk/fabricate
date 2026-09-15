@@ -1065,38 +1065,124 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(mounted.commands.at(-1).action, 'beginStep');
   });
 
-  it('reads a started stage as already consumed and refuses further selection edits', async () => {
+  // Issue 1648, M21. The rail this used to assert is a LIVE held/needed probe, and a started
+  // stage has already emptied the inventory it probes — the maintainer read `0/0 Drop essence`
+  // against an essence the stage had spent. The receipt below deliberately contradicts the
+  // authored requirement (`Iron` x1) in both name and quantity, so every assertion can only
+  // pass by rendering the record rather than the requirement.
+  it('reads a started stage from its consumption receipt, not from a live inventory probe', async () => {
+    // One route with a component requirement AND an essence requirement, which is the shape
+    // M21 was reported against. `selectedRequirementSnapshot` is what the start commit itself
+    // persists, so a started stage always carries it.
+    const startedSet = ingredientSet('started-set', [
+      { id: 'metal', name: 'Metal', options: [componentOption('iron', 'iron')] },
+      { id: 'earth-group', name: 'Earth essence',
+        options: [{ match: { type: 'essence', essenceId: 'earth', amount: 6 } }] },
+    ]);
     const mounted = await mountState('ready-single', {
-      ...selectionFixture([FIXED_SET], { selectedIngredientSetId: FIXED_SET.id }),
+      ...selectionFixture([startedSet], { selectedIngredientSetId: startedSet.id }),
       prepare(runtime) {
-        selectionFixture([FIXED_SET], { selectedIngredientSetId: FIXED_SET.id }).prepare(runtime);
+        selectionFixture([startedSet], { selectedIngredientSetId: startedSet.id }).prepare(runtime);
         const step = runtime.containers.craftingRuns.active['lab-v1-ready-single'].steps[0];
         step.status = 'waitingTime';
         step.timeGate = { requiredSeconds: 3600, initiatedAt: 0, availableAt: 1 };
+        step.selectedRequirementSnapshot = startedSet.toJSON();
         step.preparedConsumption = {
-          selectedIngredientSetId: FIXED_SET.id,
+          selectedIngredientSetId: startedSet.id,
           currencySpends: [],
           resolvedEssences: {},
           essenceEnabled: {},
-          consumedSummary: [{ itemUuid: 'Actor.actor-1.Item.iron', actorUuid: ACTOR_UUID,
-            quantity: 1, name: 'Iron', img: null, componentId: 'iron' }],
+          consumedSummary: [
+            { itemUuid: 'Actor.actor-1.Item.star', actorUuid: ACTOR_UUID,
+              quantity: 3, name: 'Star Iron', img: null, componentId: 'iron' },
+            { itemUuid: 'Actor.actor-1.Item.dust', actorUuid: ACTOR_UUID,
+              name: 'Ash Dust', img: null, componentId: 'iron' },
+          ],
+          essenceSpend: { labels: { earth: 'Earth' }, carriers: [{ actorUuid: ACTOR_UUID,
+            itemUuid: 'Actor.actor-1.Item.ember', name: 'Ember', img: null, quantity: 2,
+            contributions: [{ essenceId: 'earth', amount: 5 }] }] },
         };
       },
     });
     assert.equal(mounted.store.selectedRun.actions.setSelection, false);
     assert.ok(!mounted.target.querySelector('[data-run-action="begin"]'), 'a started stage cannot begin again');
-    const slots = mounted.target.querySelector('[data-slot-row]');
-    assert.ok(slots, 'the consumed requirements still read back');
     assert.ok(
-      slots.textContent.includes(english.FABRICATE.App.Journal.Stage.Consumed),
+      !mounted.target.querySelector('[data-slot-row]'),
+      'the held/needed rail is gone: it probes an inventory this stage already emptied'
+    );
+    const consumed = mounted.target.querySelector('[data-journal-stage-consumed]');
+    assert.ok(consumed, 'the stage shows its consumption record instead');
+    assert.ok(
+      consumed.textContent.includes(english.FABRICATE.App.Journal.Stage.Consumed),
       'the surface says it was consumed, not that it will be'
     );
-    assert.ok(slots.textContent.includes(english.FABRICATE.App.Journal.Stage.SpentAtStart));
+    assert.ok(consumed.textContent.includes(english.FABRICATE.App.Journal.Stage.SpentAtStart));
     assert.ok(
-      !slots.textContent.includes(english.FABRICATE.App.Journal.Stage.Requirements),
+      !consumed.textContent.includes(english.FABRICATE.App.Journal.Stage.Requirements),
       'and never the pre-start "this run consumes" heading'
     );
-    assert.ok(!slots.textContent.includes(english.FABRICATE.App.Journal.Stage.StaleSelection));
+    const rows = [...consumed.querySelectorAll('[data-list-row]')].map((row) => row.textContent);
+    assert.equal(rows.length, 2, 'one row per recorded item');
+    assert.ok(rows[0].includes('Star Iron'), `the recorded item, not the authored one: ${rows[0]}`);
+    assert.ok(rows[0].includes('3'), `the recorded quantity, not the authored one: ${rows[0]}`);
+    // The honest gap: a row whose quantity was never captured says so rather than borrowing
+    // the requirement's number.
+    assert.ok(rows[1].includes('Ash Dust'));
+    assert.ok(
+      rows[1].includes(english.FABRICATE.App.Journal.History.NotRecorded),
+      `an uncaptured quantity is stated, never invented: ${rows[1]}`
+    );
+    // The essence contribution REMAINS, as the recorded contribution it is.
+    const essence = mounted.target.querySelector('[data-essence-history]');
+    assert.ok(essence, 'the recorded essence spend renders on the same stage');
+    assert.equal(
+      essence.querySelector('[data-essence-history-total="earth"]').textContent.trim(),
+      '5 / 6',
+      'contributed against authored, spaced either side of the slash'
+    );
+    assert.ok(
+      mounted.target.querySelector('[data-essence-history-carrier]').textContent.includes('Ember'),
+      'and names the carrier that gave it'
+    );
+    assert.ok(!mounted.target.querySelector('[data-essence-history] button'), 'nothing here is editable');
+  });
+
+  // The same rule on the OTHER started-stage path. A started stage whose authored route was
+  // since deleted reports a stale route rather than a locked selection, and it has still spent
+  // its materials — so reading the locked flag alone sent it to the requirement fallback, which
+  // restates the authored snapshot as though it were the receipt (issue 1648, M21).
+  it('shows the receipt of a started stage whose authored route has since been deleted', async () => {
+    const remaining = ingredientSet('remaining', [
+      { id: 'metal', name: 'Metal', options: [componentOption('iron', 'iron')] },
+    ]);
+    const mounted = await mountState('ready-single', {
+      ...selectionFixture([remaining], { selectedIngredientSetId: 'deleted' }),
+      prepare(runtime) {
+        selectionFixture([remaining], { selectedIngredientSetId: 'deleted' }).prepare(runtime);
+        const step = runtime.containers.craftingRuns.active['lab-v1-ready-single'].steps[0];
+        step.status = 'waitingTime';
+        step.timeGate = { requiredSeconds: 3600, initiatedAt: 0, availableAt: 1 };
+        step.selectedRequirementSnapshot = { id: 'deleted', name: 'Deleted route',
+          ingredientGroups: [{ id: 'metal', name: 'Metal',
+            options: [{ id: 'iron', quantity: 1, match: { type: 'component', componentId: 'iron' } }] }] };
+        step.preparedConsumption = {
+          selectedIngredientSetId: 'deleted',
+          currencySpends: [], resolvedEssences: {}, essenceEnabled: {},
+          consumedSummary: [{ itemUuid: 'Actor.actor-1.Item.star', actorUuid: ACTOR_UUID,
+            quantity: 4, name: 'Star Iron', img: null, componentId: 'iron' }],
+        };
+      },
+    });
+    assert.notEqual(mounted.store.selectedRun.currentStep.selectionAvailability.locked, true,
+      'this stage is started but does NOT take the locked-selection path');
+    assert.equal(mounted.store.selectedRun.currentStep.selectionAvailability.staleRoute, true);
+    const consumed = mounted.target.querySelector('[data-journal-stage-consumed]');
+    assert.ok(consumed, 'it still shows what it spent');
+    assert.ok(consumed.textContent.includes('Star Iron'));
+    assert.ok(
+      !mounted.target.querySelector('[data-journal-stage-requirements]'),
+      'and never the authored requirement restated where the receipt belongs'
+    );
   });
 
   it('requires explicit repair when a removed ingredient route leaves only one route', async () => {

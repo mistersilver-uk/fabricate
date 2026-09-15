@@ -6,7 +6,9 @@
   import RadioCardGroup from '../../components/RadioCardGroup.svelte';
   import ListRow from '../../components/ListRow.svelte';
   import Chip from '../../components/Chip.svelte';
+  import Kicker from '../../components/Kicker.svelte';
   import JournalFactRow from './JournalFactRow.svelte';
+  import { presentEssenceSpend, presentMaterials } from './historyPresentation.js';
 
   let { step = null, run = null, journal = null, editable = false } = $props();
   let openSlot = $state('');
@@ -21,10 +23,33 @@
     Array.isArray(snapshot?.ingredientGroups) ? snapshot.ingredientGroups : []
   );
   const availability = $derived(step?.selectionAvailability ?? null);
-  // A started stage reads as already spent: its choice was locked and its materials
-  // consumed at the moment it began, so nothing here is an intent any more.
-  const locked = $derived(availability?.locked === true);
   const plan = $derived(step?.selectionPlan ?? {});
+
+  // WHAT THE STAGE ACTUALLY SPENT, not what it would need (issue 1648, M21).
+  // A started stage's materials are gone, so the live held/needed probe that describes an
+  // OPEN stage describes nothing about a started one — it read `0/0` against an essence
+  // the stage had already consumed. The builder's start-time receipt is rendered instead,
+  // with the same rows and the same essence recap the finished run already shows, so the
+  // record reads identically before and after the run ends. Nothing here is derived from
+  // the requirement snapshot: an unrecorded quantity stays unrecorded.
+  const record = $derived(step?.consumptionRecord ?? null);
+  // The record is projected for the CURRENT stage and only once it has started, so its presence
+  // is the stage-started fact, and it is what decides this surface. `availability.locked` is
+  // the NARROWER one: a started stage whose authored route was deleted reports a stale route
+  // instead, and it has still spent its materials — reading `locked` there sent it to the
+  // requirement fallback, which restates the authored snapshot as though it were the receipt.
+  const started = $derived(record !== null);
+  const consumedMaterials = $derived(presentMaterials(record?.materials, localize));
+  const consumedEssence = $derived(
+    presentEssenceSpend(
+      {
+        essenceSpend: record?.essence,
+        selectedRequirementSnapshot: snapshot,
+        selectionPlan: plan,
+      },
+      localize
+    )
+  );
   const routes = $derived(availability?.routes ?? []);
   // The route this stage will spend. A stage a multi-step run has just advanced into carries NO
   // persisted plan and no requirement snapshot, so the projection's resolved route is the only
@@ -44,7 +69,7 @@
   }
   const requirementsHint = $derived.by(() => {
     if (busy) return localize('FABRICATE.App.Journal.Actions.Working');
-    if (locked) return localize('FABRICATE.App.Journal.Stage.SpentAtStart');
+    if (started) return localize('FABRICATE.App.Journal.Stage.SpentAtStart');
     if (!editable) return localize('FABRICATE.App.Journal.Stage.Locked');
     if (slots.some((slot) => slot.stale))
       return localize('FABRICATE.App.Journal.Stage.StaleSelection');
@@ -192,8 +217,9 @@
         selected,
         candidates,
         disabled: !editable || busy,
-        stale:
-          !locked && !selected && (requirement?.selectedItemId != null || !requirement?.option),
+        // Only an UNSTARTED stage reaches the requirement rail at all, and only an unstarted
+        // stage has a selection left to repair.
+        stale: !selected && (requirement?.selectedItemId != null || !requirement?.option),
         poolsRequired: essenceRequirements.length,
         poolsMet: essenceRequirements.filter((entry) => entry?.satisfied === true).length,
       };
@@ -344,7 +370,42 @@
         )}
       </p>{/if}
   {/if}
-  {#if slots.length > 0}
+  {#if started}
+    <!-- A started stage reports its RECEIPT, never the requirement rail: the rail probes a
+         live inventory this stage already emptied (issue 1648, M21). -->
+    {#if consumedMaterials.length > 0}
+      <section class="journal-stage-consumed" data-journal-stage-consumed>
+        <div class="journal-stage-consumed-heading">
+          <Kicker as="span">{localize('FABRICATE.App.Journal.Stage.Consumed')}</Kicker>
+          <span class="journal-stage-consumed-hint">{requirementsHint}</span>
+        </div>
+        <div class="journal-stage-consumed-items">
+          {#each consumedMaterials as item (item.id)}
+            <ListRow
+              name={item.name}
+              art={item.img ?? ''}
+              quantity={item.quantityText}
+              truncateName
+            />
+          {/each}
+        </div>
+      </section>
+    {/if}
+    {#if consumedEssence}
+      <EssencePool
+        history={consumedEssence}
+        label={localize('FABRICATE.App.Journal.History.EssenceSpent')}
+        essenceLabel={() => localize('FABRICATE.App.Journal.History.NotRecorded')}
+        sourceReading={(_source, contributions) =>
+          contributions
+            .map(
+              (entry) =>
+                `+${entry.amount} ${consumedEssence.labels[entry.essenceId] || localize('FABRICATE.App.Journal.History.NotRecorded')}`
+            )
+            .join(' · ')}
+      />
+    {/if}
+  {:else if slots.length > 0}
     <SlotRow
       requirements={slots}
       {held}
@@ -352,9 +413,7 @@
       bind:openSlot
       onChoose={choose}
       locked={!editable}
-      label={localize(
-        locked ? 'FABRICATE.App.Journal.Stage.Consumed' : 'FABRICATE.App.Journal.Stage.Requirements'
-      )}
+      label={localize('FABRICATE.App.Journal.Stage.Requirements')}
       hint={requirementsHint}
       slotLabel={(slot) => slot.label}
       choiceLabel={localize('FABRICATE.App.Journal.Stage.Choose')}
@@ -438,9 +497,33 @@
 <style>
   .journal-stage-details,
   .journal-stage-facts,
-  .journal-stage-legacy {
+  .journal-stage-legacy,
+  .journal-stage-consumed {
     display: grid;
     gap: var(--fab-space-3);
+  }
+
+  .journal-stage-consumed {
+    gap: var(--fab-space-2);
+  }
+
+  .journal-stage-consumed-heading {
+    display: flex;
+    align-items: baseline;
+    gap: var(--fab-space-2);
+  }
+
+  .journal-stage-consumed-hint {
+    color: var(--fab-text-subtle);
+    font-size: 10.5px;
+  }
+
+  /* The accepted four-column truncated-name image card the history sections use, so a
+     stage's consumed materials read the same before and after the run finishes. */
+  .journal-stage-consumed-items {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--fab-space-1);
   }
   .journal-stage-legacy h4 {
     margin: 0;

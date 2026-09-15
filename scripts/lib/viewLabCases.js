@@ -1922,12 +1922,17 @@ function journalLifecycleCases() {
         '[data-journal-route] input:not(:disabled)'
       ) +
       lacks('[data-journal-action-blocker]', '[data-run-attention="materials"]'),
-    // The same stage once it started: the materials read as already consumed and nothing
-    // about the choice is editable any more.
+    // The same stage once it started: it shows the RECEIPT of what it consumed rather than
+    // the requirement rail, which probes an inventory the stage already emptied (M21), and
+    // nothing about the choice is editable any more.
     'stage-consumed':
       detail +
-      has('[data-journal-stage-details]', '[data-slot-row]') +
-      lacks('[data-journal-stage-details][data-editable="true"]', '[data-run-action="begin"]'),
+      has('[data-journal-stage-details]', '[data-journal-stage-consumed] [data-list-row]') +
+      lacks(
+        '[data-journal-stage-details][data-editable="true"]',
+        '[data-run-action="begin"]',
+        '[data-slot-row]'
+      ),
     // A stage short of its materials has NOT begun — starting is what spends them (D-026) —
     // so the control it offers is the begin decision, refused and reasoned (issue 1648).
     'material-shortage':
@@ -2079,14 +2084,16 @@ function journalLifecycleCases() {
         `${detail} [data-run-action="cancel-arm"]:not(:disabled)`
       ) +
       lacks('[data-journal-stages]', '[data-yield-entry]', '[data-run-secret-preview]'),
+    // Its stage has STARTED, so its materials surface is the consumption receipt rather than
+    // the held/needed rail the slot id named (M21).
     alchemy:
       detail +
       has(
         '[data-run-action="primary"]:not(:disabled)',
-        '[data-slot-id="s1-g1"]',
+        '[data-journal-stage-consumed] [data-list-row]',
         '.journal-detail-identity img[src$="bottle-bulb-corked-glowing-red.webp"]'
       ) +
-      lacks('[data-journal-verdict]'),
+      lacks('[data-journal-verdict]', '[data-slot-row]'),
     salvage: terminal('succeeded', '[data-history-items="produced"]'),
     legacy:
       '.journal-view-container' +
@@ -2146,10 +2153,13 @@ function journalLifecycleCases() {
       lacks('[data-journal-recovery]', '[data-journal-paused]:not([data-journal-action-blocker])'),
     wide: roomy,
     narrow: roomy,
+    // A choice slot exists only BEFORE the stage starts now (M21), so this state's stage is
+    // unbegun. What it still depicts is unchanged: the tile is pointer-reachable and its
+    // option list is closed until the tile is pressed.
     'current-choice-closed':
       detail +
       has('[data-stage-state="current"] [data-slot-row] button.fab-slot-tile') +
-      lacks('[data-choice-options]'),
+      lacks('[data-choice-options]', '[data-journal-stage-consumed]'),
     'essence-overshoot':
       detail + has('[data-essence-overshoot]', '[data-essence-source$=".Item.jp-duskglass"]'),
     'past-routed-stage':

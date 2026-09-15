@@ -89,6 +89,21 @@
     onStep(source.id, next - previous);
   }
 
+  /**
+   * The recorded reading for one essence: what was contributed, and — when the record also
+   * carries the authored amount — what it was measured against.
+   *
+   * Composed as ONE string rather than as markup around an `{#if}` block (issue 1648, M23).
+   * The block form put the separator's leading whitespace at the start of a text node, where
+   * Svelte trims it, so the reading rendered `3/ 2` with the space on the wrong side of the
+   * slash. The spaces are literal here and cannot be trimmed away.
+   */
+  function historyReading(essence, amount) {
+    const authored = (history?.requirements ?? []).filter((entry) => entry.essenceId === essence);
+    if (authored.length === 0) return `${amount}`;
+    return `${amount} / ${authored.reduce((sum, entry) => sum + Number(entry.amount), 0)}`;
+  }
+
   const overshoots = $derived(
     pools
       .map((threshold) => ({
@@ -113,11 +128,8 @@
         <div class="fab-essence-threshold-heading">
           <Medallion icon="fas fa-droplet" size={26} />
           <span class="fab-essence-name">{history.labels?.[essence] || essenceLabel(essence)}</span>
-          <span class="fab-essence-total"
-            >{amount}{#if history.requirements?.some((entry) => entry.essenceId === essence)}
-              / {history.requirements
-                .filter((entry) => entry.essenceId === essence)
-                .reduce((sum, entry) => sum + Number(entry.amount), 0)}{/if}</span
+          <span class="fab-essence-total" data-essence-history-total={essence}
+            >{historyReading(essence, amount)}</span
           >
         </div>
       {/each}

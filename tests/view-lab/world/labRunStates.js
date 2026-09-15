@@ -1154,27 +1154,15 @@ function prototypeSpecial(context, state, id, containers) {
   // The two states the stage-start commit creates (issue 1648): a stage the player has not
   // begun, whose choices are still open and whose materials are unspent, and the same stage
   // once beginning it locked the choice and consumed them.
-  if (state === 'stage-not-started' || state === 'stage-consumed') {
+  // `current-choice-closed` joins them because a choice SLOT exists only before a stage starts:
+  // once it has, its materials are a receipt and there is no tile left to reach for (M21).
+  if (['stage-not-started', 'stage-consumed', 'current-choice-closed'].includes(state)) {
     const run = prototypeCraft(context, 'rivets', id);
     const current = run.steps[run.currentStepIndex];
-    if (state === 'stage-consumed') {
-      current.preparedConsumption = {
-        selectedIngredientSetId: current.selectedIngredientSetId ?? null,
-        currencySpends: [],
-        resolvedEssences: {},
-        essenceEnabled: {},
-        consumedSummary: (current.selectedRequirementSnapshot?.ingredientGroups ?? []).map(
-          (group, index) => ({
-            itemUuid: `${context.actorUuid}.Item.jp-consumed-${index}`,
-            actorUuid: context.actorUuid,
-            quantity: 1,
-            name: group?.options?.[0]?.name ?? null,
-            img: null,
-            componentId: group?.options?.[0]?.match?.componentId ?? null,
-          })
-        ),
-      };
-    } else {
+    // `stage-consumed` keeps the start receipt `prototypeCraft` already armed the gate with,
+    // so the two states differ ONLY in whether the stage has begun. Restating the receipt here
+    // would let the pair's own fixture drift from every other started stage in the world.
+    if (state !== 'stage-consumed') {
       delete current.timeGate;
       delete current.preparedConsumption;
       current.status = 'inProgress';
@@ -1276,17 +1264,38 @@ function startedStageConsumption(step) {
     currencySpends: [],
     resolvedEssences: {},
     essenceEnabled: {},
-    consumedSummary: normalizeLabList(step.selectedRequirementSnapshot?.ingredientGroups).map(
-      (group, index) => ({
-        itemUuid: `Item.lab-consumed-${step.stepId ?? 'stage'}-${index}`,
-        actorUuid: null,
-        quantity: 1,
-        name: group?.options?.[0]?.name ?? null,
-        img: null,
-        componentId: group?.options?.[0]?.match?.componentId ?? null,
-      })
-    ),
+    consumedSummary: startedStageReceipts(step),
   };
+}
+
+/**
+ * The item rows a start commit records, one per group whose picked option names a PHYSICAL
+ * requirement (issue 1648, M21). The Journal renders this record instead of probing an
+ * inventory the stage already emptied, so the fixture states what the commit would have
+ * written rather than restating the authored group: the row carries the option the plan
+ * actually picked and that option's own quantity.
+ *
+ * An ESSENCE group contributes no row. Real consumption records the CARRIER ITEMS that funded
+ * the essence, which this fixture does not model, and emitting a row named for the essence
+ * requirement itself would photograph a receipt the product never writes.
+ */
+function startedStageReceipts(step) {
+  const overrides = step.selectionPlan?.ingredientOptionOverrides ?? {};
+  return normalizeLabList(step.selectedRequirementSnapshot?.ingredientGroups)
+    .map((group, index) => {
+      const options = normalizeLabList(group?.options);
+      const picked = options[Number(overrides?.[group?.id]?.optionIndex) || 0] ?? options[0];
+      return { group, index, picked };
+    })
+    .filter(({ picked }) => picked && picked.match?.type !== 'essence')
+    .map(({ group, index, picked }) => ({
+      itemUuid: `Item.lab-consumed-${step.stepId ?? 'stage'}-${index}`,
+      actorUuid: null,
+      quantity: Math.max(1, Number(picked.quantity ?? group?.quantity) || 1),
+      name: picked.name ?? null,
+      img: null,
+      componentId: picked.match?.componentId ?? null,
+    }));
 }
 
 function versionedRecipeStep(recipe, index, status, extra = {}) {
