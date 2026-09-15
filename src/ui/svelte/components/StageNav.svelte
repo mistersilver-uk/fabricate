@@ -99,7 +99,14 @@
      already shared; `font-size` was not, so the arrows - which are `IconButton`s, painted by a
      sheet that sets no size on their glyph - inherited the surrounding body type and drew a
      chevron half again as tall as the digits inside identical boxes. */
-  :global(.fab-stage-nav-arrow),
+  /* SPECIFICITY, not just naming. `styles/fabricate.css` carries NO `@layer`, so it competes on
+     specificity alone, and its `.fabricate-icon-button.manager-icon-button` block is (0,2,0)
+     while a bare `:global(.fab-stage-nav-arrow)` is (0,1,0) — the scoping class Svelte adds to
+     an ordinary selector is NOT added inside `:global()`. So the 26px box below never reached
+     the arrows: they stayed content-sized by the global control rule while the numbers took the
+     explicit box, and the pager rendered two sizes. Qualifying with both root classes makes this
+     (0,3,0), which wins outright rather than relying on stylesheet injection order. */
+  :global(.fabricate-icon-button.manager-icon-button.fab-stage-nav-arrow),
   .fab-stage-nav-number {
     box-sizing: border-box;
     width: 26px;
