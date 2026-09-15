@@ -4920,12 +4920,13 @@ The current-stage order MUST be identity/actions and applicable notices, progres
 An ingredient-route comparison MUST use visible RadioCardGroup choices showing each route's output through dense ListRow and its shortage or unresolved-selection consequence, including alternatives not selected.
 A route label MUST be human-readable: an unnamed authored set takes its ordinal position, never its raw id.
 A supplied material MUST NOT be painted short solely because another requirement blocks the whole plan; execution and candidate feasibility still respect the canonical shared-stock ledger.
-Known physical shortage MUST disable execution while keeping permitted selection repair available.
+Known physical shortage MUST disable execution — including the begin control at an unstarted stage's own start boundary — while keeping permitted selection repair available.
 Automatic blockers MUST spend nothing and retain the completion preference.
 An unavailable authority reason MUST remain visibly adjacent to disabled controls, and the stage and guidance MUST NOT invite execution while that reason applies.
 No check, Nothing to roll and It simply completes require affirmative disclosed no-check configuration; protected or indeterminate configuration MUST say unavailable without removing owner actions.
 A check-driven primary action MUST say Roll check.
 A stage that has not started MUST offer its own begin control instead of the resolve action, stating that beginning locks the choices, consumes the listed materials and starts the clock, and MUST NOT offer the roll at all.
+The begin control MUST stay visible and reasoned even while its route remains unchosen; it MUST render DISABLED with a distinct choice-vs-materials reason rather than vanish and hand back an enabled resolve action the command would refuse, and the same disabled-while-unchosen rule applies to the resolve action itself on an untimed stage, which has no separate start boundary to withhold the begin control instead.
 A started stage's materials surface MUST read as already consumed and MUST NOT be editable.
 A route nobody has chosen yet MUST be asked for rather than reported as a selected material that is no longer available; the repair sentence belongs to a route that vanished.
 

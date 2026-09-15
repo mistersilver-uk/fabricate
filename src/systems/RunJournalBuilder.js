@@ -2308,7 +2308,8 @@ export class RunJournalBuilder {
       derivedStatus !== 'waiting' &&
       derivedStatus !== 'paused' &&
       !materialBlocked &&
-      !awaitingStageStart;
+      !awaitingStageStart &&
+      !choiceRequired;
     const legacyExecute =
       lifecycleContract === 'legacy' &&
       live &&
@@ -2341,6 +2342,7 @@ export class RunJournalBuilder {
         readyToExecute,
         materialBlocked,
         awaitingStageStart,
+        choiceRequired,
         blockedReason,
         recoveryClaim,
       }),
@@ -2383,9 +2385,17 @@ export class RunJournalBuilder {
     readyToExecute,
     materialBlocked,
     awaitingStageStart,
+    choiceRequired,
     blockedReason,
     recoveryClaim,
   }) {
+    // The stage-start boundary is a SEPARATE fact from whether the begin control is
+    // enabled (M15). `atStageStart` alone decides which control renders — the begin
+    // decision, not the ordinary primary — so gating `beginStep` on the player's own
+    // unmade choice can never also make the control disappear and hand back an
+    // enabled primary that the command refuses.
+    const atStageStart =
+      mutableCurrent && runType === 'crafting' && !paused && awaitingStageStart && entitled;
     return {
       execute: legacyExecute || (mutableCurrent && !paused && executableType && readyToExecute),
       pause:
@@ -2402,15 +2412,27 @@ export class RunJournalBuilder {
         derivedStatus === 'waiting' &&
         Boolean(timeGate) &&
         !hasPlayerCheck,
-      beginStep:
-        mutableCurrent && runType === 'crafting' && !paused && awaitingStageStart && entitled,
+      atStageStart,
+      // Also in scope (issue 1648): a KNOWN material shortfall refuses `beginStep` too — the
+      // same "offered, then refused" shape as the choice gap, just on the other axis
+      // (`_prepareVersionedStage`'s `canCraft` check answers "Missing required items"). It
+      // is already detected (`materialBlocked` already gates `readyToExecute`) and reported
+      // (`disabledReason` already prefers `selectionRequired` for it below); only the begin
+      // control's own gate was missing it.
+      beginStep: atStageStart && !choiceRequired && !materialBlocked,
       setSelection:
         mutableCurrent && runType === 'crafting' && entitled && stageStart?.locked !== true,
       cancel: legacyCancel || (mutableCurrent && executableType),
       dismiss: terminal,
       disabledReason:
         blockedReason ??
-        (materialBlocked ? 'selectionRequired' : awaitingStageStart ? 'stageNotStarted' : null),
+        (materialBlocked
+          ? 'selectionRequired'
+          : choiceRequired
+            ? 'choiceRequired'
+            : awaitingStageStart
+              ? 'stageNotStarted'
+              : null),
       ...(recoveryClaim && { recoveryClaim }),
     };
   }

@@ -11,9 +11,11 @@ import { journalRefusalMessage, journalRunReasonMessage } from '../../util/journ
 /**
  * Codes that report an ordinary next step rather than a refusal. A stage the player has not
  * begun is the normal state of every timed stage, and it already has its own control, so
- * raising a warning notice for it would put a banner on routine play.
+ * raising a warning notice for it would put a banner on routine play. `choiceRequired` is the
+ * same shape: the unmade pick already has its own `awaitingChoice` guidance notice below, so
+ * this code must not also raise the warning-toned blocker banner for it (issue 1648, M15).
  */
-const NON_BLOCKING_REASONS = new Set(['stageNotStarted']);
+const NON_BLOCKING_REASONS = new Set(['stageNotStarted', 'choiceRequired']);
 
 /** The blocker code, when execution is actually refused. `''` otherwise. */
 export function runBlockerCode(run) {

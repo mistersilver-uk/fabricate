@@ -3473,7 +3473,7 @@ RunModel = {
   completionMode: "manual" | "worldTime",
   pauseState: { pausedAt: number, remainingSeconds: number } | null,
   pausedDurationSeconds: number,
-  actions: { execute, pause, resume, setCompletionMode, setSelection, cancel, dismiss, disabledReason },
+  actions: { execute, pause, resume, setCompletionMode, beginStep, atStageStart, setSelection, cancel, dismiss, disabledReason },
   awaitingChoice: boolean,               // the stage cannot proceed until this viewer chooses
   recoveryEvidence: { status, required?, appliedEffectCount, effectCount, effects, uncertainEffectIndex } | null,
   status: string,                        // the native persisted status, passed through verbatim
@@ -3597,6 +3597,10 @@ StepModel = {
    An essence requirement the carrier ledger can cover is an allocation the player may still redistribute and therefore a choice; one it cannot cover is a shortfall.
    `awaitingChoice` reports the first of those, and only for a viewer who may act on it: an unpaused, unstarted current stage of their own live current-contract crafting run.
    A started stage holds the choice it locked and a paused run holds the choices it already made, so neither is waiting on one.
+   `actions.beginStep` MUST also be refused while `awaitingChoice` is true or while a known material shortfall applies, even at a stage's own start boundary, because beginning is what locks a choice or spends materials that are not yet available.
+   Which control renders — the begin decision in place of the resolve action, or the resolve action itself — is decided by `actions.atStageStart` alone, never by `actions.beginStep` being truthy nor by matching `actions.disabledReason`: an unmade choice at a stage's start boundary MUST keep the (disabled) begin control on screen rather than silently fall back to an enabled resolve action the command would refuse.
+   An untimed stage has no separate start boundary to withhold the begin control instead, so `actions.execute` MUST itself stay refused while `awaitingChoice` is true.
+   `actions.disabledReason` reports `choiceRequired` for an unmade choice and `selectionRequired` for a known physical shortfall; the two MUST NOT be conflated, because one is fixed by choosing and the other by acquiring.
    Alchemy check labels and completion-mode eligibility MUST use the canonical active-check resolver: none has no check, simple reads the simple slot, and tiered reads the routed slot.
 
 3. **Versioned actions are explicit capabilities.**

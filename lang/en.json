@@ -1367,6 +1367,7 @@
           "RecoveryRequired": "This run needs GM recovery before it can change.",
           "UnsupportedLifecycle": "This run was created by an unsupported Fabricate version and remains available as a record.",
           "SelectionRequired": "Complete the current stage requirements first.",
+          "ChoiceRequired": "Choose this stage's route before it can begin.",
           "StageNotStarted": "Begin this stage before its check can be rolled.",
           "Completion": {
             "Label": "When ready",

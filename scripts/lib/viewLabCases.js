@@ -1755,7 +1755,10 @@ function journalLifecycleCases() {
       { selector: '[data-journal-route] input[value="boss-stage-1-verdant"]' },
       { selector: '[data-journal-route] input[value="boss-stage-1-sunward"]' },
     ],
-    'automatic-blocker': [{ selector: '[data-run-action="primary"]' }],
+    // Issue 1648, M15: the primary is refused while the essence pick is unmade, so there is
+    // no further control left to walk into a command refusal — the frame is the blocked
+    // state itself, reached by `selectCaseRun` alone.
+    'automatic-blocker': [],
     'cancel-confirmation': [{ selector: '[data-run-action="cancel-arm"]' }],
     'past-stage': [{ selector: '[data-stage-nav-index="0"]' }],
     'future-stage': [{ selector: '[data-stage-nav-index="2"]' }],
@@ -2031,9 +2034,19 @@ function journalLifecycleCases() {
       'succeeded',
       '[data-history-stages] [data-stage-io="produced"]'
     ),
+    // Issue 1648, M15: the same unmade-choice shape as `awaiting-choice`, on a run armed
+    // before the D-028 lock existed (started, but never locked, so its essence pick is still
+    // live-resolved and still open). The conservative automatic blocker spends nothing
+    // server-side; the primary itself now also stays refused client-side rather than reach a
+    // command refusal, so this no longer depicts a `data-journal-command-error` banner.
     'automatic-blocker':
-      commandError('lab-v1-automatic-blocker') +
-      has('[data-essence-threshold="clarity"] [aria-valuenow="0"]'),
+      detail +
+      has(
+        `${primary}:disabled`,
+        '[data-essence-threshold="clarity"] [aria-valuenow="0"]',
+        '[data-journal-awaiting-choice="true"][data-notice-tone="info"]'
+      ) +
+      lacks('[data-journal-command-error]', '[data-journal-action-blocker]'),
     dismissal:
       '.journal-view-container' +
       has('[data-history-run-id]', detail) +

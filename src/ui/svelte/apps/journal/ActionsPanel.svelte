@@ -32,9 +32,11 @@
   // The stage boundary is its own control: it locks the choice, spends the materials and
   // starts the clock, and it is the ONLY thing that does so.
   const canBegin = $derived(currentContract && actions.beginStep === true);
-  const awaitingStart = $derived(
-    currentContract && (canBegin || actions.disabledReason === 'stageNotStarted')
-  );
+  // Which control renders is `atStageStart` alone, never inferred from whether the begin
+  // control is ENABLED or from a `disabledReason` string: a stage at its start boundary with
+  // an unmade choice must keep showing the (disabled) begin control, not silently swap back
+  // to the ordinary primary the command would refuse (issue 1648, M15).
+  const awaitingStart = $derived(currentContract && actions.atStageStart === true);
   const reason = $derived(reasonFor(actions.disabledReason, gateReady));
   const hasCheck = $derived(
     Boolean(

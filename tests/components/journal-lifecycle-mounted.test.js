@@ -1400,7 +1400,15 @@ describe('Journal versioned lifecycle (mounted)', () => {
         assert.equal(header?.dataset.runAttention, 'choice');
         assert.ok(mounted.target.querySelector('[data-journal-awaiting-choice="true"]'), 'the one notice names the next move');
         assert.ok(!mounted.target.querySelector('[data-journal-action-blocker]'), 'guidance, never a refusal');
-        assert.equal(mounted.store.selectedRun.actions.disabledReason, 'stageNotStarted');
+        // Issue 1648, M15: the begin control stays present (`atStageStart`) but is itself
+        // refused — pressing it while the route is unchosen would reach the engine and be
+        // told "The selected crafting requirements are unavailable."
+        assert.equal(mounted.store.selectedRun.actions.disabledReason, 'choiceRequired');
+        assert.equal(mounted.store.selectedRun.actions.atStageStart, true);
+        assert.equal(mounted.store.selectedRun.actions.beginStep, false);
+        const begin = mounted.target.querySelector('[data-run-action="begin"]');
+        assert.ok(begin, 'the begin control still renders instead of the primary');
+        assert.equal(begin.disabled, true);
       }
       if (state === 'authority-unavailable') {
         assert.match(mounted.target.querySelector('[data-journal-action-blocker]').textContent, /GM must be online/i);
@@ -2122,11 +2130,8 @@ describe('Journal versioned lifecycle (mounted)', () => {
     for (const [state, reason] of [
       ['stale-action', 'stale-run'],
       ['command-timeout', 'command-timeout'],
-      ['automatic-blocker', 'selection-required'],
     ]) {
       harness.remount();
-      // Use the same authored state as the capture walk: automatic-blocker has
-      // available essence carriers but no allocation, not a physical shortage.
       const content = buildLabContent({ journalCaseState: state });
       const actor = buildLabActors(content)[0];
       await stockJournalPrototype(actor, content, state);
@@ -2147,12 +2152,6 @@ describe('Journal versioned lifecycle (mounted)', () => {
       refused.target.querySelector(`[data-run-id="${runId}"]`).click();
       await settleAction();
       assert.equal(refused.store.selectedRun.id, runId);
-      if (state === 'automatic-blocker') {
-        const availability = refused.store.selectedRun.currentStep.selectionAvailability;
-        assert.equal(availability.success, false, 'essence allocation is still required');
-        assert.equal(availability.knownMaterialShortfall, false);
-        assert.ok(availability.essencePool.carriers.length > 0);
-      }
       const primary = refused.target.querySelector('[data-run-action="primary"]');
       assert.ok(primary && !primary.disabled, `${state} reaches its command refusal`);
       primary.click();
@@ -2180,6 +2179,45 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.ok(cancelled.containers.craftingRuns.active[runId]);
     assert.equal(cancelled.store.busyRunKey, '');
     assert.equal(cancelled.notifications.length, 0);
+  });
+
+  // Issue 1648, M15. `automatic-blocker` used to belong in the loop above: it has available
+  // essence carriers but no allocation — not a physical shortage — so a manual press used to
+  // reach the command's own "selection-required" refusal. The primary must now refuse it
+  // BEFORE that: no command is ever issued.
+  it('refuses the manual attempt for an unmade-but-coverable essence choice before any command is issued', async () => {
+    const state = 'automatic-blocker';
+    const content = buildLabContent({ journalCaseState: state });
+    const actor = buildLabActors(content)[0];
+    await stockJournalPrototype(actor, content, state);
+    const refused = await mountState(state, {
+      builderOptions: {
+        content,
+        actor,
+        recipes: labRecipes(content),
+        viewer: { id: 'user-lab-player', isGM: false },
+      },
+    });
+    const runId = LAB_JOURNAL_CASE_STATE_RUN_IDS[state];
+    const rawRun = refused.containers.craftingRuns.active[runId];
+    const search = refused.target.querySelector('[data-journal-search] input');
+    search.value = content.recipes.find((entry) => entry.id === rawRun.recipeId).name;
+    search.dispatchEvent(new window.Event('input', { bubbles: true }));
+    await settleAction();
+    refused.target.querySelector(`[data-run-id="${runId}"]`).click();
+    await settleAction();
+    assert.equal(refused.store.selectedRun.id, runId);
+    const availability = refused.store.selectedRun.currentStep.selectionAvailability;
+    assert.equal(availability.success, false, 'essence allocation is still required');
+    assert.equal(availability.knownMaterialShortfall, false, 'the carrier ledger can cover it');
+    assert.ok(availability.essencePool.carriers.length > 0);
+    assert.equal(refused.store.selectedRun.actions.disabledReason, 'choiceRequired');
+    const primary = refused.target.querySelector('[data-run-action="primary"]');
+    assert.ok(primary && primary.disabled, 'the primary is refused before any command is issued');
+    primary.click();
+    await settleAction();
+    assert.deepEqual(refused.commands, [], 'a disabled control issues nothing to click');
+    assert.equal(refused.notifications.length, 0);
   });
 
   it('guards independent scroll containment and detail action alignment with negative controls', async () => {
