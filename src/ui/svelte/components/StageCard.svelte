@@ -33,7 +33,6 @@
   class:is-inactive={!current && presentation !== 'history'}
   class:is-history={presentation === 'history'}
   class:is-failed={state === 'failed'}
-  class:is-headingless={!showHeading}
   data-stage-card={index}
   data-stage-state={state}
 >
@@ -104,8 +103,18 @@
 </article>
 
 <style>
+  /* ONE content inset and ONE region rhythm, owned by the card (issue 1648). Every region
+     used to hand-roll `0 <right> <bottom> calc(var(--fab-space-6) * 2)`, which left the first
+     region flush against the card's interior top and let the two regions that overrode the
+     shorthand disagree on their left edge and width. The card now owns the vertical inset and
+     the gap between regions; a region owns only its horizontal inset, so a full-bleed
+     separator still reaches both card edges. */
   .fab-stage-card {
+    display: grid;
     overflow: hidden;
+    align-content: start;
+    gap: var(--fab-space-3);
+    padding: var(--fab-space-3) 0;
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     background: var(--fab-bg-2);
@@ -125,7 +134,7 @@
   .fab-stage-card-io {
     display: grid;
     gap: var(--fab-space-3);
-    padding: 0 var(--fab-space-3) var(--fab-space-3) calc(var(--fab-space-6) * 2);
+    padding: 0 var(--fab-space-3);
   }
   .fab-stage-card-io-group {
     display: grid;
@@ -133,7 +142,7 @@
     gap: var(--fab-space-1);
   }
   .fab-stage-card-output {
-    padding: 0 var(--fab-space-3) var(--fab-space-3) calc(var(--fab-space-6) * 2);
+    padding: 0 var(--fab-space-3);
   }
   .fab-stage-card-items {
     display: grid;
@@ -146,7 +155,7 @@
   }
   .fab-stage-card-note {
     margin: 0;
-    padding: 0 var(--fab-space-3) var(--fab-space-3) calc(var(--fab-space-6) * 2);
+    padding: 0 var(--fab-space-3);
     color: var(--fab-text-subtle);
     font-size: 10.5px;
   }
@@ -155,7 +164,7 @@
     display: flex;
     align-items: center;
     gap: var(--fab-space-3);
-    padding: var(--fab-space-2) var(--fab-space-3);
+    padding: 0 var(--fab-space-3);
   }
 
   .fab-stage-card-number {
@@ -220,17 +229,23 @@
   .fab-stage-card-facts {
     display: grid;
     gap: var(--fab-space-3);
-    padding: 0 var(--fab-space-3) var(--fab-space-3) calc(var(--fab-space-6) * 2);
+    padding: 0 var(--fab-space-3);
   }
 
-  .fab-stage-card-body {
-    padding-left: var(--fab-space-3);
+  /* The body and the facts occupy the SAME slot - a current stage renders the body, a browsed
+     one renders the facts - so they take the same full-bleed separator. Without it the fact
+     rows sat one io-group gap below the last io group and read as another io group rather than
+     as their own region (issue 1648). The separator belongs to a region that FOLLOWS something,
+     which `:not(:first-child)` states directly; the card's only other region-order rule used to
+     be `is-headingless`, which also suppressed it after an io region that needs it. */
+  .fab-stage-card-body:not(:first-child),
+  .fab-stage-card-facts:not(:first-child) {
     padding-top: var(--fab-space-3);
     border-top: 1px solid var(--fab-border);
   }
 
-  .fab-stage-card.is-headingless .fab-stage-card-body {
-    padding: var(--fab-space-3);
+  .fab-stage-card-facts:not(:first-child) .fab-stage-card-fact:first-child {
+    padding-top: 0;
     border-top: 0;
   }
 
