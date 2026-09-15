@@ -143,6 +143,16 @@ describe('journal run reason vocabulary', () => {
     assert.equal(journalRunReasonMessage('ledger-missing', null), '', 'no localize means no guess');
   });
 
+  // Issue 1648, M15: the two causes must not be conflated, so each maps to its own distinct
+  // sentence — an unmade choice is not worded as "complete the current stage requirements".
+  it('words an unmade choice apart from a known material shortfall', () => {
+    const choiceText = journalRunReasonMessage('choiceRequired', localizeFromLang);
+    const materialsText = journalRunReasonMessage('selectionRequired', localizeFromLang);
+    assert.equal(choiceText, langLeaf('FABRICATE.App.Journal.Actions.ChoiceRequired'));
+    assert.notEqual(choiceText, '');
+    assert.notEqual(choiceText, materialsText);
+  });
+
   it('never lets a raw slug reach a player', () => {
     assert.equal(journalRunReasonMessage('ledger-missing', localizeFromLang).includes('-'), false);
     assert.equal(journalRefusalMessage({ success: false, reason: 'nope' }, localizeFromLang, 'Generic.'), 'Generic.');
