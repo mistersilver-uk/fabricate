@@ -87,6 +87,24 @@ export function runStateNotice(run, localize) {
     };
   }
 
+  // Waiting on the player's OWN choice. It reads as guidance rather than as a refusal,
+  // because a stage that has not been given its materials yet is ordinary play — the same
+  // reason `stageNotStarted` raises no banner. Ranked under the blockers: a run that is also
+  // refused has a cause the player cannot choose their way out of (issue 1648, M10).
+  if (run?.awaitingChoice === true) {
+    return {
+      tone: 'info',
+      blocking: false,
+      title: text('ChoiceTitle'),
+      detail: text('ChoiceDetail'),
+      dataAttr: 'data-journal-awaiting-choice',
+      dataValue: 'true',
+      ...pausedHook,
+      evidence: false,
+      claim: null,
+    };
+  }
+
   if (paused) {
     return {
       tone: 'warning',

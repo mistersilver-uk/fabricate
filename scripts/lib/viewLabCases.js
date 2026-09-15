@@ -1617,6 +1617,7 @@ function journalLifecycleCases() {
     'waiting-auto-eligible',
     'waiting-open-choice',
     'stage-not-started',
+    'awaiting-choice',
     'stage-consumed',
     'material-shortage',
     'ingredient-route',
@@ -1716,7 +1717,7 @@ function journalLifecycleCases() {
       ['Steep a Bitter Poultice', ['waiting-auto-eligible', 'automatic-blocker']],
       [
         'Assemble a Warded Buckler',
-        ['past-routed-stage', 'future-routed-stage', 'history-cancelled-multi'],
+        ['awaiting-choice', 'past-routed-stage', 'future-routed-stage', 'history-cancelled-multi'],
       ],
       ['Gather Meadow Herbs', ['gathering-straight']],
       ['Quarry Rough Stone', ['gathering-d100', 'history-d100-all-hit', 'history-d100-all-miss']],
@@ -1893,6 +1894,18 @@ function journalLifecycleCases() {
     // and NO roll offered at all until it has started (issue 1648, M13/M15).
     'stage-not-started':
       detail + has('[data-run-action="begin"]:not(:disabled)', '[data-run-begin]') + lacks(primary),
+    // Issue 1648, M10. The frame has to show the state reaching the surfaces a player scans, so
+    // it asserts the Active ROW's chip, the header's chip and the one state notice together —
+    // and that the notice is the info-toned guidance rather than a refusal.
+    'awaiting-choice':
+      '.journal-view-container' +
+      has(
+        '[data-run-id="lab-v1-awaiting-choice"] [data-run-attention="choice"]',
+        `${detail} .journal-detail-meta [data-run-attention="choice"]`,
+        '[data-journal-awaiting-choice="true"][data-notice-tone="info"]',
+        '[data-journal-route] input:not(:disabled)'
+      ) +
+      lacks('[data-journal-action-blocker]', '[data-run-attention="materials"]'),
     // The same stage once it started: the materials read as already consumed and nothing
     // about the choice is editable any more.
     'stage-consumed':
@@ -2204,6 +2217,7 @@ function journalLifecycleCases() {
     paused: '[data-run-action="resume"]',
     'ingredient-route': '[data-journal-route]',
     'stage-not-started': '[data-run-action="begin"]',
+    'awaiting-choice': '[data-journal-route]',
     'check-route': '[data-run-action="primary"]',
     'essence-overshoot': '[data-essence-source$=".Item.jp-sunmote"] [data-stepper-increment]',
     'past-stage': '[data-stage-nav-return]',

@@ -75,6 +75,7 @@ export const LAB_JOURNAL_CASE_STATE_RUN_IDS = Object.freeze({
   'waiting-auto-eligible': 'lab-v1-waiting-auto-eligible',
   'waiting-open-choice': 'lab-v1-waiting-open-choice',
   'stage-not-started': 'lab-v1-stage-not-started',
+  'awaiting-choice': 'lab-v1-awaiting-choice',
   'stage-consumed': 'lab-v1-stage-consumed',
   'material-shortage': 'lab-v1-material-shortage',
   'ingredient-route': 'lab-v1-ingredient-route',
@@ -1095,6 +1096,22 @@ function prototypeSpecial(context, state, id, containers) {
     effect.planned = cloneFixtureValue(run.createdResults);
     delete effect.receipt;
     replacePrototypeFocus(containers.gatheringRuns, run, true);
+    return true;
+  }
+  // The state a multi-step craft ARRIVES in (issue 1648, M10): every earlier stage succeeded,
+  // so `completeStepSuccess` advanced into a stage with two authored routes and no plan at all.
+  // It has a time requirement, so it also has its own start — and it cannot take it until the
+  // player picks a route, which is exactly what nothing on screen used to say.
+  if (state === 'awaiting-choice') {
+    const run = prototypeCraft(context, 'buckler', id);
+    const last = run.steps.length - 1;
+    run.steps.forEach((entry, index) => {
+      if (index < last) recordPrototypeStage(context, 'buckler', entry, index, true);
+    });
+    run.currentStepIndex = last;
+    run.status = 'inProgress';
+    run.steps[last].status = 'inProgress';
+    replacePrototypeFocus(containers.craftingRuns, run, false);
     return true;
   }
   // The two states the stage-start commit creates (issue 1648): a stage the player has not

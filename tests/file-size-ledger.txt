@@ -85,11 +85,11 @@ src/systems/RecipeVisibilityService.js::evaluateRecipeAccess	141
 src/systems/ResolutionModeService.js	1036
 src/systems/ResolutionModeService.js::validateRecipe	158
 src/systems/ResolutionModeService.js::validateSalvage	116
-src/systems/RunJournalBuilder.js	2660
+src/systems/RunJournalBuilder.js	2718
 src/systems/RunJournalBuilder.js::_craftingRunModel	187
 src/systems/RunJournalBuilder.js::_craftingStepModel	104
 src/systems/RunJournalBuilder.js::_passthroughRunModel	113
-src/systems/RunJournalBuilder.js::_selectionAvailability	113
+src/systems/RunJournalBuilder.js::_selectionAvailability	102
 src/systems/checkModifierResolver.js	1246
 src/systems/checkRoll.js	1692
 src/systems/checkRoll.js::evaluateCheckRoll	231
@@ -145,7 +145,7 @@ src/ui/svelte/apps/inventory/InventoryItemCard.svelte	550
 src/ui/svelte/apps/inventory/bulk/InventoryBulkPanel.svelte	852
 src/ui/svelte/apps/inventory/detail/InventoryBookDetail.svelte	705
 src/ui/svelte/apps/inventory/detail/InventoryComponentDetail.svelte	793
-src/ui/svelte/apps/journal/RunDetail.svelte	796
+src/ui/svelte/apps/journal/RunDetail.svelte	805
 src/ui/svelte/apps/manager/BooksScrollsView.svelte	753
 src/ui/svelte/apps/manager/BulkEditPanelShell.svelte	564
 src/ui/svelte/apps/manager/BulkStagingInset.svelte	599

@@ -16,7 +16,7 @@
   import StageCard from '../../components/StageCard.svelte';
   import StageNav from '../../components/StageNav.svelte';
   import YieldScale from '../../components/YieldScale.svelte';
-  import { runStatusPresentation } from './journalRunStatus.js';
+  import { runAttentionPresentation, runStatusPresentation } from './journalRunStatus.js';
   import { runStateNotice } from './runStateNotice.js';
   import { stageHeadingName } from './stageHeading.js';
   import {
@@ -44,6 +44,9 @@
     runStatusPresentation(run?.recoveryEvidence?.status === 'planned' ? 'inProgress' : status)
   );
   const terminal = $derived(['succeeded', 'failed', 'cancelled'].includes(status));
+  // The same "waiting on you" signal the Active row carries, so the opened run agrees with
+  // the list it was opened from (M10).
+  const attention = $derived(runAttentionPresentation(run));
   const stages = $derived(Array.isArray(run?.steps) ? run.steps : []);
   const currentIndex = $derived.by(() => {
     if (!terminal) return Math.max(0, Number(run?.stepIndex) || 0);
@@ -382,6 +385,12 @@
               tone={statusChipTone(statusView.tone)}
               icon={`fas ${statusView.icon}`}>{localize(statusView.labelKey)}</Chip
             >
+            {#if attention}<Chip
+                density="list"
+                tone={statusChipTone(attention.tone)}
+                icon={`fas ${attention.icon}`}
+                data-run-attention={attention.kind}>{localize(attention.labelKey)}</Chip
+              >{/if}
             {#if run?.blindSecretPreview}<Chip density="list" tone="warning" icon="fas fa-eye-slash"
                 >{localize('FABRICATE.App.Journal.BlindSecret.Badge')}</Chip
               >{/if}

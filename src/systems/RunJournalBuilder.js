@@ -616,7 +616,7 @@ export class RunJournalBuilder {
       derivedStatus,
       timeGate: activeStep?.timeGate,
       hasPlayerCheck,
-      knownMaterialShortfall: currentStep?.selectionAvailability?.knownMaterialShortfall === true,
+      selectionAvailability: currentStep?.selectionAvailability ?? null,
       stageStart: this._stageStartState({
         activeStep,
         recipeStep: recipeSteps[currentStepIndex],
@@ -940,6 +940,7 @@ export class RunJournalBuilder {
       routes: [{ id: setId, name: stringOrEmpty(ingredientSet?.name) }],
       staleRoute: false,
       success: true,
+      awaitingChoice: false,
       knownMaterialShortfall: false,
       missingGroups: [],
       choices: [],
@@ -1202,19 +1203,7 @@ export class RunJournalBuilder {
     if (runStep?.preparedConsumption && ingredientSet) {
       return this._lockedSelectionAvailability({ runStep, ingredientSet, recipe, setId });
     }
-    if (!ingredientSet) {
-      return {
-        success: false,
-        knownMaterialShortfall: false,
-        selectedIngredientSetId: setId,
-        routes,
-        staleRoute: true,
-        missingGroups: [],
-        choices: [],
-        requirements: [],
-        essencePool: null,
-      };
-    }
+    if (!ingredientSet) return unchosenRouteAvailability(setId, routes);
     if (typeof ingredientSet.resolveIngredientSelection !== 'function' || !snapshot) {
       return null;
     }
@@ -1277,6 +1266,7 @@ export class RunJournalBuilder {
       routes,
       staleRoute: false,
       success: selection?.success === true,
+      awaitingChoice: awaitsSelectionChoice(selection),
       knownMaterialShortfall:
         selection?.success === false &&
         normalizeList(selection.missingGroups).some(isPhysicalMaterialShortfall),
@@ -2270,7 +2260,7 @@ export class RunJournalBuilder {
     derivedStatus,
     timeGate = null,
     hasPlayerCheck = false,
-    knownMaterialShortfall = false,
+    selectionAvailability = null,
     stageStart = null,
     entitled = true,
     evidenceEntitled = entitled,
@@ -2300,10 +2290,20 @@ export class RunJournalBuilder {
       recoveryEvidence?.required === true || recoveryEvidence?.status === 'planned';
     const mutableCurrent = current && live && owner && authoritative && !executionBlocked;
     const executableType = runType === 'crafting' || runType === 'gathering';
-    const materialBlocked = current && live && runType === 'crafting' && knownMaterialShortfall;
+    const craftingStage = current && live && runType === 'crafting';
+    const materialBlocked = craftingStage && selectionAvailability?.knownMaterialShortfall === true;
     // A stage with its own start is not resolvable until the player has begun it: the roll
     // is withheld rather than offered and then refused (M13/M15).
     const awaitingStageStart = current && live && stageStart?.required === true;
+    // Waiting on the player's own pick rather than on the clock or on stock (M10). It is
+    // reported only where they can act on it: their own live current-contract crafting stage,
+    // unpaused and unlocked, because a paused or started stage holds the choices it made.
+    const choiceRequired =
+      mutableCurrent &&
+      runType === 'crafting' &&
+      !paused &&
+      entitled &&
+      selectionAvailability?.awaitingChoice === true;
     const readyToExecute =
       derivedStatus !== 'waiting' &&
       derivedStatus !== 'paused' &&
@@ -2321,17 +2321,9 @@ export class RunJournalBuilder {
     const recoveryClaim =
       blockedReason === 'recovery-required' ? (authority?.retained ?? null) : null;
     return {
-      key: JSON.stringify([actorUuid, runType, stringOrNull(run?.id)]),
-      actorUuid,
-      activityKind,
-      lifecycleContract,
-      lifecycleVersion:
-        lifecycleContract === 'legacy' ? null : safePrimitive(run?.lifecycleVersion),
-      runRevision: normalizeRevision(run?.runRevision),
-      completionMode: run?.completionMode === 'worldTime' ? 'worldTime' : 'manual',
-      pauseState: normalizePauseState(run?.pauseState),
-      pausedDurationSeconds: Math.max(0, Number(run?.pausedDurationSeconds) || 0),
+      ...runIdentityFields({ run, runType, actorUuid, activityKind, lifecycleContract }),
       recoveryEvidence,
+      awaitingChoice: choiceRequired,
       actions: this._runActions({
         run,
         runType,
@@ -2631,6 +2623,72 @@ function ingredientOptionName({ group, option, kind, match, definition, componen
     return tags.join(match?.tagMatch === 'all' ? ' & ' : ' | ') || stringOrEmpty(group?.name);
   }
   return stringOrEmpty(option?.name) || stringOrEmpty(group?.name);
+}
+
+/**
+ * The run's own persisted lifecycle identity, normalised: who it belongs to, which contract it
+ * was created under, and the pause bookkeeping every surface reads the same way.
+ */
+function runIdentityFields({ run, runType, actorUuid, activityKind, lifecycleContract }) {
+  return {
+    key: JSON.stringify([actorUuid, runType, stringOrNull(run?.id)]),
+    actorUuid,
+    activityKind,
+    lifecycleContract,
+    lifecycleVersion: lifecycleContract === 'legacy' ? null : safePrimitive(run?.lifecycleVersion),
+    runRevision: normalizeRevision(run?.runRevision),
+    completionMode: run?.completionMode === 'worldTime' ? 'worldTime' : 'manual',
+    pauseState: normalizePauseState(run?.pauseState),
+    pausedDurationSeconds: Math.max(0, Number(run?.pausedDurationSeconds) || 0),
+  };
+}
+
+/**
+ * The stage's answer when its route resolves to no authored set: none has been chosen, or the
+ * one that was has gone. Either way it waits on a pick and is short of nothing.
+ */
+function unchosenRouteAvailability(setId, routes) {
+  return {
+    success: false,
+    knownMaterialShortfall: false,
+    awaitingChoice: true,
+    selectedIngredientSetId: setId,
+    routes,
+    staleRoute: true,
+    missingGroups: [],
+    choices: [],
+    requirements: [],
+    essencePool: null,
+  };
+}
+
+/**
+ * Whether a missing group reports stock the player must ACQUIRE rather than a pick they have
+ * yet to make. A finite `have < need` is an acquisition whatever the ingredient kind; an
+ * essence miss is one only when the carrier ledger cannot cover it, because an allocation the
+ * player can still redistribute is a choice.
+ */
+function reportsShortStock(group, uncoveredEssenceGroups) {
+  if (ingredientKind(group?.ingredient) === 'essence') {
+    return uncoveredEssenceGroups.has(missingGroupId(group));
+  }
+  return Number.isFinite(group?.have) && Number.isFinite(group?.need) && group.have < group.need;
+}
+
+/**
+ * Whether the stage is waiting on the player's own CHOICE: its plan does not resolve, and
+ * nothing it names is short. Choosing fixes this; acquiring does not (issue 1648, M10).
+ */
+function awaitsSelectionChoice(selection) {
+  if (selection?.success === true) return false;
+  const uncovered = new Set(
+    normalizeList(selection?.essencePool?.requirements)
+      .filter((entry) => (numberOrNull(entry?.owned) ?? 0) < (numberOrNull(entry?.need) ?? 0))
+      .map((entry) => stringOrNull(entry?.groupId))
+  );
+  return normalizeList(selection?.missingGroups).every(
+    (group) => !reportsShortStock(group, uncovered)
+  );
 }
 
 // Essence have is delivered allocation, not held stock. Classify only physical

@@ -273,6 +273,7 @@ export const JOURNAL_PROTOTYPE_BINDINGS = Object.freeze({
   'waiting-auto-eligible': 'poultice',
   'waiting-open-choice': 'rivets',
   'stage-not-started': 'rivets',
+  'awaiting-choice': 'buckler',
   'stage-consumed': 'rivets',
   'current-choice-closed': 'rivets',
   'material-shortage': 'boss',

@@ -1116,6 +1116,28 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.ok(mounted.target.querySelector('[data-slot-id="metal"]'));
   });
 
+  // Issue 1648, M10. `staleRoute` covers two different facts and used to say only one of them.
+  // Arriving at a stage that has never been given a route is ordinary play; a route that
+  // VANISHED is the error sentence, and reading the second at the first is the failure the
+  // maintainer named.
+  it('tells a route nobody has chosen apart from one that vanished', async () => {
+    const routes = ['iron', 'copper'].map((metal) =>
+      ingredientSet(`${metal}-route`, [{ id: 'metal', options: [componentOption(metal, metal)] }]));
+    const copy = english.FABRICATE.App.Journal.Stage;
+    const unchosen = await mountState('ready-single', selectionFixture(routes, {}, { mode: 'routedByIngredients' }));
+    const details = () => unchosen.target.querySelector('[data-journal-stage-details]').textContent;
+    assert.equal(unchosen.store.selectedRun.currentStep.selectionAvailability.selectedIngredientSetId, null);
+    assert.ok(details().includes(copy.RouteUnchosen), 'the stage asks for a route');
+    assert.ok(!details().includes(copy.StaleSelection), 'nothing was selected, so nothing went stale');
+    assert.equal(unchosen.store.selectedRun.awaitingChoice, true);
+
+    const vanished = await mountState('ready-single',
+      selectionFixture(routes, { selectedIngredientSetId: 'deleted' }, { mode: 'routedByIngredients' }));
+    const gone = vanished.target.querySelector('[data-journal-stage-details]').textContent;
+    assert.ok(gone.includes(copy.StaleSelection), 'a chosen route that is gone keeps the repair sentence');
+    assert.ok(!gone.includes(copy.RouteUnchosen));
+  });
+
   it('repairs two stale singleton choices one at a time and satisfies the stage only after both repairs', async () => {
     const remaining = ingredientSet('remaining', [
       { id: 'metal', options: [componentOption('iron', 'iron')] },
@@ -1367,6 +1389,18 @@ describe('Journal versioned lifecycle (mounted)', () => {
         assert.equal(cards.length, 2);
         assert.ok([...cards].every((card) => card.querySelector('[data-list-row]')));
         assert.match(cards[1].textContent, /Missing requirements: 1/);
+      }
+      // Issue 1648, M10. The capture selector reads the row chip through a DESCENDANT inside
+      // `:has()`, which happy-dom evaluates unfaithfully and passes open — so the row, the
+      // header and the notice are each asserted here with a plain query as well.
+      if (state === 'awaiting-choice') {
+        const row = mounted.target.querySelector('[data-run-id="lab-v1-awaiting-choice"]');
+        assert.equal(row.querySelector('[data-run-attention]')?.dataset.runAttention, 'choice');
+        const header = mounted.target.querySelector('.journal-detail-meta [data-run-attention]');
+        assert.equal(header?.dataset.runAttention, 'choice');
+        assert.ok(mounted.target.querySelector('[data-journal-awaiting-choice="true"]'), 'the one notice names the next move');
+        assert.ok(!mounted.target.querySelector('[data-journal-action-blocker]'), 'guidance, never a refusal');
+        assert.equal(mounted.store.selectedRun.actions.disabledReason, 'stageNotStarted');
       }
       if (state === 'authority-unavailable') {
         assert.match(mounted.target.querySelector('[data-journal-action-blocker]').textContent, /GM must be online/i);

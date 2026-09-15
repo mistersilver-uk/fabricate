@@ -16,7 +16,11 @@ import {
   routedOutcomeBand,
 } from '../../src/systems/runJournalOutcomeBands.js';
 import { IngredientSet } from '../../src/models/IngredientSet.js';
-import { runStatusPresentation } from '../../src/ui/svelte/apps/journal/journalRunStatus.js';
+import {
+  runAttentionPresentation,
+  runStatusPresentation,
+} from '../../src/ui/svelte/apps/journal/journalRunStatus.js';
+import { runStateNotice } from '../../src/ui/svelte/apps/journal/runStateNotice.js';
 
 const ACTOR = { id: 'actor-1', uuid: 'Actor.actor-1', name: 'Akra', img: 'icons/a.webp' };
 const PLAYER = { id: 'user-1', isGM: false };
@@ -2244,6 +2248,208 @@ test('absent or uncertain resolver evidence never proves a physical shortfall', 
   assert.equal(stale.project().actions.execute, true, 'a stale route is not proven stock scarcity');
 });
 
+// ── Waiting on the PLAYER's choice (issue 1648, M10) ─────────────────────────────────────────
+//
+// Post-D-026/D-028 a stage locks its choice and spends its materials when it STARTS, so the only
+// state that can wait on a choice is an UNSTARTED stage whose plan does not resolve. Every
+// fixture below is a real run body projected by the real builder; the flag is derived, never set.
+const CHOICE_ITEMS = [
+  { id: 'iron', uuid: 'Actor.actor-1.Item.iron', name: 'Iron', system: { quantity: 5 } },
+  { id: 'silver', uuid: 'Actor.actor-1.Item.silver', name: 'Silver', system: { quantity: 5 } },
+];
+const CHOICE_OWNER = { ...ACTOR, isOwner: true, items: CHOICE_ITEMS };
+const componentOption = (componentId, quantity = 1) => ({ quantity, match: { type: 'component', componentId } });
+const routeSet = (id, componentId) => new IngredientSet({ id, name: id,
+  ingredientGroups: [{ id: 'metal', name: 'Metal', options: [componentOption(componentId)] }] });
+const ironRoute = () => routeSet('route-iron', 'iron');
+const silverRoute = () => routeSet('route-silver', 'silver');
+const essenceSet = () => new IngredientSet({ id: 'ess', ingredientGroups: [{ id: 'fire',
+  options: [{ match: { type: 'essence', essenceId: 'fire', amount: 2 } }] }] });
+
+function projectChoiceRun({ executionSteps, runSteps, currentStepIndex = 0, actor = CHOICE_OWNER,
+  run = {}, dependencies = {} }) {
+  const recipe = { ...RECIPE, steps: executionSteps.map((entry) => ({ id: entry.id })),
+    getExecutionSteps: () => executionSteps };
+  const raw = { ...activeCraftingRun(), lifecycleVersion: 1, status: 'inProgress',
+    currentStepIndex, steps: runSteps, ...run };
+  return makeBuilder({ active: [raw], recipe,
+    ingredientMatchesItem: (_recipe, ingredient, item) => ingredient.match?.componentId === item.id,
+    ...dependencies }).buildListing({ actor, viewer: PLAYER }).activeRuns[0];
+}
+
+/** Stage 2 of a multi-step craft, advanced into by `completeStepSuccess` and never begun. */
+function unbegunSecondStage(sets, stepOverrides = {}) {
+  return projectChoiceRun({
+    executionSteps: [
+      { id: 's0', toolIds: [], timeRequirement: { hours: 1 }, ingredientSets: [ironRoute()] },
+      { id: 's1', toolIds: [], timeRequirement: { hours: 1 }, ingredientSets: sets },
+    ],
+    currentStepIndex: 1,
+    runSteps: [
+      { stepId: 's0', stepName: 'Forge', index: 0, status: 'succeeded',
+        preparedConsumption: { consumedSummary: [] }, createdResults: [] },
+      { stepId: 's1', stepName: 'Temper', index: 1, status: 'inProgress', ...stepOverrides },
+    ],
+  });
+}
+
+/** The current stage of a recipe with no honoured time requirement: no separate start to take. */
+function untimedStage(sets, stepOverrides = {}, rest = {}) {
+  return projectChoiceRun({
+    executionSteps: [{ id: 's0', toolIds: [], timeRequirement: null, ingredientSets: sets }],
+    runSteps: [{ stepId: 's0', stepName: 'Make', index: 0, status: 'inProgress', ...stepOverrides }],
+    ...rest,
+  });
+}
+
+const notice = (run) => runStateNotice(run, localize);
+
+test('an unbegun stage with no route chosen waits on the player rather than on the clock', () => {
+  const run = unbegunSecondStage([ironRoute(), silverRoute()]);
+  assert.equal(run.currentStep.stageStarted, false);
+  assert.equal(run.currentStep.selectionAvailability.staleRoute, true);
+  assert.equal(run.currentStep.selectionAvailability.knownMaterialShortfall, false);
+  assert.equal(run.awaitingChoice, true, 'the projection reports the state; every surface reads it');
+  // The clock says nothing about it: an unstarted stage has no gate, so the status chip alone
+  // reads exactly as a run that needs nothing from anybody.
+  assert.equal(run.derivedStatus, 'inProgress');
+  assert.equal(run.actions.disabledReason, 'stageNotStarted');
+  assert.equal(runAttentionPresentation(run).kind, 'choice');
+  assert.equal(runAttentionPresentation(run).labelKey, 'FABRICATE.App.Journal.Status.awaitingChoice');
+  // Guidance, not an alarm: an unbegun stage is ordinary play.
+  assert.equal(notice(run).tone, 'info');
+  assert.equal(notice(run).blocking, false);
+  assert.equal(notice(run).dataAttr, 'data-journal-awaiting-choice');
+  assert.equal(notice(run).title, 'FABRICATE.App.Journal.Notice.ChoiceTitle');
+});
+
+test('an unbegun stage the resolver can already meet owes the player nothing', () => {
+  const only = unbegunSecondStage([ironRoute()]);
+  assert.equal(only.currentStep.selectionAvailability.success, true);
+  assert.equal(only.awaitingChoice, false);
+  assert.equal(runAttentionPresentation(only), null);
+  assert.equal(notice(only), null);
+  // A multi-OPTION group is not an open choice either: the greedy resolver already holds a
+  // workable pick, so nothing is waiting on the player.
+  const multiOption = unbegunSecondStage([new IngredientSet({ id: 'only',
+    ingredientGroups: [{ id: 'metal', name: 'Metal',
+      options: [componentOption('iron'), componentOption('silver')] }] })]);
+  assert.equal(multiOption.currentStep.selectionAvailability.success, true);
+  assert.equal(multiOption.awaitingChoice, false);
+});
+
+test('an untimed stage keeps its choices open for its whole life and says so', () => {
+  const carrier = { id: 'coal', uuid: 'Actor.actor-1.Item.coal', name: 'Coal', system: { quantity: 3 } };
+  const run = untimedStage([essenceSet()], { selectionPlan: { selectedIngredientSetId: 'ess',
+    ingredientEssenceAllocation: { stepId: 's0', ingredientSetId: 'ess',
+      allocation: { 'Actor.actor-1.Item.coal': 1 } } } },
+  { actor: { ...ACTOR, isOwner: true, items: [carrier] },
+    dependencies: { resolveItemEssences: () => ({ fire: 1 }) } });
+  assert.equal(run.actions.beginStep, false, 'an untimed stage has no separate start to take');
+  assert.equal(run.actions.setSelection, true);
+  assert.equal(run.currentStep.selectionAvailability.essencePool.requirements[0].owned, 3);
+  assert.equal(run.awaitingChoice, true, 'the pool is coverable; the allocation is what is missing');
+  assert.equal(notice(run).dataAttr, 'data-journal-awaiting-choice');
+});
+
+test('a pre-start plan that went stale waits on a replacement choice', () => {
+  const removedOption = unbegunSecondStage([new IngredientSet({ id: 'only',
+    ingredientGroups: [{ id: 'metal', name: 'Metal', options: [componentOption('iron')] }] })],
+  { selectionPlan: { selectedIngredientSetId: 'only',
+    ingredientOptionOverrides: { metal: { optionIndex: 4 } } } });
+  assert.equal(removedOption.currentStep.selectionAvailability.success, false);
+  assert.equal(removedOption.currentStep.selectionAvailability.knownMaterialShortfall, false);
+  assert.equal(removedOption.awaitingChoice, true);
+  const removedRoute = unbegunSecondStage([ironRoute()],
+    { selectionPlan: { selectedIngredientSetId: 'deleted' } });
+  assert.equal(removedRoute.currentStep.selectionAvailability.staleRoute, true);
+  assert.equal(removedRoute.awaitingChoice, true);
+});
+
+test('a known material shortfall reads as materials, never as a choice', () => {
+  const run = unbegunSecondStage([routeSet('route-gold', 'gold')]);
+  assert.equal(run.currentStep.selectionAvailability.knownMaterialShortfall, true);
+  assert.equal(run.awaitingChoice, false, 'choosing cannot supply stock the actor does not hold');
+  const attention = runAttentionPresentation(run);
+  assert.equal(attention.kind, 'materials');
+  assert.equal(attention.labelKey, 'FABRICATE.App.Journal.Status.needsMaterials');
+  // A different sentence as well as a different chip: one is fixed by choosing, the other by acquiring.
+  assert.equal(run.actions.disabledReason, 'selectionRequired');
+  assert.equal(notice(run).dataAttr, 'data-journal-action-blocker');
+  assert.equal(notice(run).dataValue, 'selectionRequired');
+  assert.equal(notice(run).title, 'FABRICATE.App.Journal.Actions.SelectionRequired');
+});
+
+test('a shortfall choosing cannot repair is never reported as a choice', () => {
+  const thin = { id: 'coal', uuid: 'Actor.actor-1.Item.coal', name: 'Coal', system: { quantity: 1 } };
+  const shortEssence = untimedStage([essenceSet()], { selectionPlan: { selectedIngredientSetId: 'ess' } },
+    { actor: { ...ACTOR, isOwner: true, items: [thin] },
+      dependencies: { resolveItemEssences: () => ({ fire: 1 }) } });
+  assert.equal(shortEssence.currentStep.selectionAvailability.essencePool.requirements[0].owned, 1);
+  assert.equal(shortEssence.awaitingChoice, false, 'the carrier ledger cannot cover the requirement');
+  const currency = new IngredientSet({ id: 'coin', ingredientGroups: [{ id: 'fee',
+    options: [{ match: { type: 'currency', unit: 'gp', amount: 10 } }] }] });
+  const unaffordable = untimedStage([currency], { selectionPlan: { selectedIngredientSetId: 'coin' } },
+    { dependencies: { affordCurrency: () => false } });
+  assert.equal(unaffordable.currentStep.selectionAvailability.success, false);
+  assert.equal(unaffordable.awaitingChoice, false);
+});
+
+test('a started stage and a paused run hold the choices they already made', () => {
+  const started = unbegunSecondStage([ironRoute(), silverRoute()], {
+    selectionPlan: { selectedIngredientSetId: 'route-iron' },
+    preparedConsumption: { consumedSummary: [] },
+    timeGate: { requiredSeconds: 3600, initiatedAt: 150, availableAt: 3750 },
+  });
+  assert.equal(started.currentStep.selectionAvailability.locked, true);
+  assert.equal(started.awaitingChoice, false);
+  assert.equal(runAttentionPresentation(started), null);
+  assert.equal(notice(started), null);
+  const paused = projectChoiceRun({
+    executionSteps: [{ id: 's0', toolIds: [], timeRequirement: { hours: 1 },
+      ingredientSets: [ironRoute(), silverRoute()] }],
+    runSteps: [{ stepId: 's0', stepName: 'Make', index: 0, status: 'inProgress' }],
+    run: { pauseState: { pausedAt: 160, remainingSeconds: 1200 } },
+  });
+  assert.equal(paused.currentStep.selectionAvailability.staleRoute, true, 'the stage plan itself is open');
+  assert.equal(paused.awaitingChoice, false, 'a paused run waits on a resume, not on a pick');
+  assert.equal(runAttentionPresentation(paused), null);
+  assert.equal(notice(paused).dataAttr, 'data-journal-paused');
+});
+
+test('waiting on a choice is reported only to a viewer who can make it', () => {
+  const executionSteps = [{ id: 's0', toolIds: [], timeRequirement: { hours: 1 },
+    ingredientSets: [ironRoute(), silverRoute()] }];
+  const runSteps = [{ stepId: 's0', stepName: 'Make', index: 0, status: 'inProgress' }];
+  const project = (overrides) => projectChoiceRun({ executionSteps, runSteps, ...overrides });
+  assert.equal(project({}).awaitingChoice, true);
+  assert.equal(project({ actor: { ...CHOICE_OWNER, isOwner: false } }).awaitingChoice, false,
+    'a non-owner cannot choose');
+  assert.equal(project({ dependencies: { getJournalActionAvailability: () =>
+    ({ available: false, reason: 'authorityUnavailable' }) } }).awaitingChoice, false,
+  'an unavailable authority refuses the change the guidance would invite');
+  assert.equal(project({ dependencies: { recipeVisibility:
+    { evaluateRecipeAccess: () => ({ visible: false }) } } }).awaitingChoice, false,
+  'a redacted run names no stage to choose for');
+  assert.equal(project({ run: { lifecycleVersion: undefined } }).awaitingChoice, false,
+    'a legacy run has no editable stage plan');
+});
+
+test('gathering and salvage runs never claim to be waiting on a crafting choice', () => {
+  const timeGate = { requiredSeconds: 60, availableAt: 300 };
+  const listing = makeBuilder({
+    gatheringActive: [{ id: 'g1', craftingSystemId: 'sys-1', taskId: 't1', status: 'waitingTime',
+      lifecycleVersion: 1, timeGate }],
+    salvageActive: [{ id: 'sv1', craftingSystemId: 'sys-1', componentId: 'ore', status: 'waitingTime',
+      lifecycleVersion: 1, timeGate }],
+  }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: PLAYER });
+  assert.equal(listing.activeRuns.length, 2);
+  for (const run of listing.activeRuns) {
+    assert.equal(run.awaitingChoice, false, run.runType);
+    assert.equal(runAttentionPresentation(run), null, run.runType);
+  }
+});
+
 test('shortfall preserves authority/recovery precedence and legacy execution', () => {
   const set = new IngredientSet({ id: 'short', ingredientGroups: [{
     id: 'material', options: [{ quantity: 2, match: { type: 'component', componentId: 'ember' } }],
@@ -2646,6 +2852,9 @@ test('current-step availability delegates material choices and shared essence al
   assert.equal(calls[0].options.affordCurrency({ unit: 'gp', amount: 1 }), true);
   const expectedAvailability = {
     success: false,
+    // The fake resolver reports a group short of stock, so the plan waits on acquiring
+    // rather than on a pick even though the miss carries no recognised ingredient kind.
+    awaitingChoice: false,
     knownMaterialShortfall: false,
     missingGroups: [
       {

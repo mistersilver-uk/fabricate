@@ -940,7 +940,9 @@
           "succeeded": "Succeeded",
           "failed": "Failed",
           "cancelled": "Cancelled",
-          "unknown": "Outcome unknown"
+          "unknown": "Outcome unknown",
+          "awaitingChoice": "Needs your choice",
+          "needsMaterials": "Needs materials"
         },
         "Mode": {
           "Standard": "Standard (DC)",
@@ -1182,7 +1184,9 @@
           },
           "RecoveryDetail": "Fabricate recorded {count} completed effects and stopped before it could confirm the rest.",
           "PausedInline": "Run paused — its countdown is frozen until you resume it.",
-          "UnsupportedTitle": "This run is read-only"
+          "UnsupportedTitle": "This run is read-only",
+          "ChoiceTitle": "Waiting on your choice",
+          "ChoiceDetail": "Nothing is counting down: this stage needs you to choose how to meet it before it can go on."
         },
         "Recovery": {
           "Title": "Release the retained execution claim",
@@ -1235,6 +1239,7 @@
           "Return": "Return to current stage {index}",
           "ReturnFinal": "Return to final stage {index}",
           "StaleSelection": "A selected material is no longer available. Choose a replacement explicitly.",
+          "RouteUnchosen": "This stage has not been given a route yet. Choose one to carry on.",
           "Consumed": "Consumed when this stage started",
           "SpentAtStart": "These materials were consumed and this choice was locked when the stage started.",
           "State": {

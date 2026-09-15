@@ -19,6 +19,7 @@ import { RunJournalBuilder } from '../../src/systems/RunJournalBuilder.js';
 import { GatheringRunManager } from '../../src/systems/GatheringRunManager.js';
 import { GatheringEngine } from '../../src/systems/GatheringEngine.js';
 import { CraftingRunManager } from '../../src/systems/CraftingRunManager.js';
+import { IngredientSet } from '../../src/models/IngredientSet.js';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 
@@ -98,6 +99,58 @@ describe('RunDetail mounted behavior', () => {
   before(() => harness.setup());
   afterEach(() => harness.remount());
   after(() => harness.teardown());
+
+  // Issue 1648, M10. An unbegun stage has no clock, so its status chip reads `inProgress`
+  // whether it needs a choice, needs stock or needs nothing. The header says which.
+  const stageWaitingOn = (componentId, held) => {
+    const route = (id, wanted) => new IngredientSet({ id, name: id,
+      ingredientGroups: [{ id: 'metal', name: 'Metal', options: [{ quantity: 1, match: { type: 'component', componentId: wanted } }] }] });
+    const executionSteps = [
+      { id: 's0', toolIds: [], timeRequirement: { hours: 1 }, ingredientSets: [route('route-iron', 'iron')] },
+      { id: 's1', toolIds: [], timeRequirement: { hours: 1 },
+        ingredientSets: componentId ? [route('route-only', componentId)] : [route('route-iron', 'iron'), route('route-silver', 'silver')] },
+    ];
+    const recipe = { id: 'recipe-1', name: 'Iron Sword', craftingSystemId: 'sys-1', checkTierId: null,
+      steps: [{ id: 's0' }, { id: 's1' }], getExecutionSteps: () => executionSteps };
+    const run = { id: 'run-1', craftingSystemId: 'sys-1', recipeId: 'recipe-1', lifecycleVersion: 1,
+      status: 'inProgress', startedAt: 10, updatedAt: 20, currentStepIndex: 1, componentSourceActorUuids: ['Actor.a'],
+      steps: [
+        { stepId: 's0', stepName: 'Forge', index: 0, status: 'succeeded', preparedConsumption: { consumedSummary: [] }, createdResults: [] },
+        { stepId: 's1', stepName: 'Temper', index: 1, status: 'inProgress' },
+      ] };
+    return new RunJournalBuilder({
+      craftingRunManager: { getActiveRuns: () => [run], getRunHistory: () => [] },
+      recipeManager: { getRecipe: () => recipe, ingredientMatchesItem: (_r, ingredient, item) => ingredient.match.componentId === item.id },
+      recipeVisibility: { evaluateRecipeAccess: () => ({ visible: true }) },
+      getSystem: () => ({ id: 'sys-1', name: 'Smithing', resolutionMode: 'simple', features: { multiStepRecipes: true } }),
+      nowWorldTime: () => 100,
+    }).buildListing({ actor: { id: 'a', uuid: 'Actor.a', isOwner: true, items: held }, viewer: { id: 'u', isGM: false } }).activeRuns[0];
+  };
+
+  it('names what an unbegun stage waits on, telling a choice apart from a shortage', async () => {
+    const iron = [{ id: 'iron', uuid: 'Actor.a.Item.iron', name: 'Iron', system: { quantity: 4 } }];
+    const choice = await harness.mount({ run: stageWaitingOn(null, iron) });
+    assert.equal(choice.querySelector('[data-run-attention]').dataset.runAttention, 'choice');
+    assert.ok(choice.querySelector('[data-journal-awaiting-choice="true"]'), 'the one state notice names the next move');
+    assert.equal(choice.querySelector('[data-journal-awaiting-choice]').getAttribute('data-notice-tone'), 'info');
+
+    harness.remount();
+    const shortage = await harness.mount({ run: stageWaitingOn('gold', iron) });
+    assert.equal(shortage.querySelector('[data-run-attention]').dataset.runAttention, 'materials');
+    assert.ok(!shortage.querySelector('[data-journal-awaiting-choice]'), 'a shortage is not a choice');
+    assert.ok(shortage.querySelector('[data-journal-action-blocker="selectionRequired"]'));
+
+  });
+
+  it('claims nothing of the player on an unbegun stage it can already meet', async () => {
+    // The SAME selectors the two states above are found by, so a chip that appeared here would
+    // be the component's answer rather than a selector that never matched anything.
+    const settled = await harness.mount({ run: stageWaitingOn('iron',
+      [{ id: 'iron', uuid: 'Actor.a.Item.iron', name: 'Iron', system: { quantity: 4 } }]) });
+    assert.ok(settled.querySelector('[data-journal-detail]'), 'the run rendered');
+    assert.ok(!settled.querySelector('[data-run-attention]'), 'nothing is owed, so nothing is claimed');
+    assert.ok(!settled.querySelector('[data-journal-awaiting-choice]'));
+  });
 
   it('renders the real settled d100 writer output after source/configuration lookup removal', async () => {
     const fixture = await createPersistedGatheringHistory({ mode: 'd100', versioned: true });

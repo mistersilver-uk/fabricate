@@ -92,6 +92,31 @@ describe('RunCard mounted behavior', () => {
     }
   });
 
+  // Issue 1648, M10. An Active row must say which of the player's runs is waiting on THEM.
+  // The projection's two attention states have their own chip beside the status one, which keeps
+  // the countdown the status chip reports rather than replacing it.
+  for (const [label, run, kind, tone] of [
+    ['a choice', { awaitingChoice: true }, 'choice', 'accent'],
+    ['materials', { actions: { disabledReason: 'selectionRequired' } }, 'materials', 'warning'],
+  ]) {
+    it(`marks an Active row waiting on ${label}`, async () => {
+      const target = await harness.mount({ run: { ...makeCraftingRun(), ...run }, now: 0 });
+      const chip = target.querySelector('[data-run-attention]');
+      assert.equal(chip.getAttribute('data-run-attention'), kind);
+      assert.equal(chipToneOf(chip), tone);
+      assert.ok(chip.textContent.includes(kind === 'choice' ? 'awaitingChoice' : 'needsMaterials'));
+      // The status chip is still there: what the clock is doing and what the player owes are
+      // two different facts, and the row reports both.
+      assert.ok(target.querySelector('.journal-run-status'));
+    });
+  }
+
+  it('claims nothing of the player on a row that is merely counting down', async () => {
+    const target = await harness.mount({ run: makeCraftingRun(), now: 0 });
+    assert.ok(target.querySelector('.journal-run-status'), 'the row rendered');
+    assert.ok(!target.querySelector('[data-run-attention]'), 'the same hook finds nothing here');
+  });
+
   it('shows a remaining countdown while waiting and a progress bar', async () => {
     const target = await harness.mount({ run: makeCraftingRun(), now: 500 });
     const countdown = target.querySelector('[data-run-countdown]');

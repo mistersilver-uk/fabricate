@@ -3474,6 +3474,7 @@ RunModel = {
   pauseState: { pausedAt: number, remainingSeconds: number } | null,
   pausedDurationSeconds: number,
   actions: { execute, pause, resume, setCompletionMode, setSelection, cancel, dismiss, disabledReason },
+  awaitingChoice: boolean,               // the stage cannot proceed until this viewer chooses
   recoveryEvidence: { status, required?, appliedEffectCount, effectCount, effects, uncertainEffectIndex } | null,
   status: string,                        // the native persisted status, passed through verbatim
   derivedStatus: "paused" | "waiting" | "ready" | "inProgress" | "succeeded" | "failed" | "cancelled",
@@ -3592,6 +3593,10 @@ StepModel = {
    Explicit route changes replace scoped option overrides and essence allocation.
    Each candidate MUST carry its own required amount and canonical solver feasibility against the whole stage's shared physical stock, including other fixed, choice and essence claims.
    A stale selection MUST remain explicitly repairable even when only one option survives.
+   Waiting on a CHOICE and waiting on STOCK are separate states and MUST NOT be collapsed: a plan that does not resolve while nothing it names is short is waiting on a pick, and a finite `have < need` is waiting on an acquisition.
+   An essence requirement the carrier ledger can cover is an allocation the player may still redistribute and therefore a choice; one it cannot cover is a shortfall.
+   `awaitingChoice` reports the first of those, and only for a viewer who may act on it: an unpaused, unstarted current stage of their own live current-contract crafting run.
+   A started stage holds the choice it locked and a paused run holds the choices it already made, so neither is waiting on one.
    Alchemy check labels and completion-mode eligibility MUST use the canonical active-check resolver: none has no check, simple reads the simple slot, and tiered reads the routed slot.
 
 3. **Versioned actions are explicit capabilities.**

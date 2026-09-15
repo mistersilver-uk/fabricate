@@ -82,3 +82,37 @@ const NEUTRAL_PRESENTATION = Object.freeze({
 export function runStatusPresentation(status) {
   return STATUS_PRESENTATION[status] ?? NEUTRAL_PRESENTATION;
 }
+
+// WHAT THE RUN IS WAITING ON, WHEN THAT IS THE PLAYER (issue 1648, M10).
+//
+// `derivedStatus` answers where the clock is, and an unstarted stage has no clock: it reads
+// `inProgress` whether the run needs nothing or cannot move until the player picks its
+// materials. So the two states a person has to act on are carried BESIDE the status chip
+// rather than inside it, on every surface a player scans.
+//
+// The two are deliberately separate: one is fixed by choosing and the other by acquiring, and
+// telling a player to choose when nothing they can choose will help is the worse of the two
+// failures. `accent` is the neutral "your move" family; `warning` is the blocked one.
+const CHOICE_ATTENTION = Object.freeze({
+  kind: 'choice',
+  tone: 'accent',
+  icon: 'fa-hand-pointer',
+  labelKey: 'FABRICATE.App.Journal.Status.awaitingChoice',
+});
+const MATERIALS_ATTENTION = Object.freeze({
+  kind: 'materials',
+  tone: 'warning',
+  icon: 'fa-box-open',
+  labelKey: 'FABRICATE.App.Journal.Status.needsMaterials',
+});
+
+/**
+ * What this run needs from the player, or `null` when it needs nothing from them.
+ *
+ * @param {object|null} run A `RunModel`.
+ * @returns {(RunStatusPresentation & {kind: string})|null}
+ */
+export function runAttentionPresentation(run) {
+  if (run?.awaitingChoice === true) return CHOICE_ATTENTION;
+  return run?.actions?.disabledReason === 'selectionRequired' ? MATERIALS_ATTENTION : null;
+}

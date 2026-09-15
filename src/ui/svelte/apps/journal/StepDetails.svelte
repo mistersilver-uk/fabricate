@@ -330,7 +330,11 @@
       {/snippet}
     </RadioCardGroup>
     {#if availability?.staleRoute}<p>
-        {localize('FABRICATE.App.Journal.Stage.StaleSelection')}
+        {localize(
+          availability?.selectedIngredientSetId == null
+            ? 'FABRICATE.App.Journal.Stage.RouteUnchosen'
+            : 'FABRICATE.App.Journal.Stage.StaleSelection'
+        )}
       </p>{/if}
   {/if}
   {#if slots.length > 0}

@@ -17,7 +17,7 @@
   import Chip from '../../components/Chip.svelte';
   import RunProgress from '../../components/RunProgress.svelte';
   import Medallion from '../../components/Medallion.svelte';
-  import { runStatusPresentation } from './journalRunStatus.js';
+  import { runAttentionPresentation, runStatusPresentation } from './journalRunStatus.js';
   import { formatDurationHMS } from '../../util/formatDuration.js';
 
   const DEFAULT_RUN_IMAGE = 'icons/svg/item-bag.svg';
@@ -30,6 +30,9 @@
   const img = $derived(String(run?.img ?? '') || DEFAULT_RUN_IMAGE);
   const status = $derived(String(run?.derivedStatus ?? 'inProgress'));
   const runStatus = $derived(runStatusPresentation(status));
+  // What the run needs from the PLAYER, which its status cannot say: an unstarted stage reads
+  // `inProgress` whether it is ready to begin or waiting on a choice nobody has made (M10).
+  const attention = $derived(runAttentionPresentation(run));
   const stepLabel = $derived(String(run?.stepLabel ?? ''));
   // On the final step the run finishes rather than continuing, so the matured
   // countdown mirrors the detail button's "finish" wording.
@@ -96,6 +99,15 @@
           icon={`fas ${runStatus.icon}`}
           data-run-status={status}>{localize(runStatus.labelKey)}</Chip
         >
+        {#if attention}
+          <Chip
+            class="journal-run-attention"
+            density="list"
+            tone={statusChipTone(attention.tone)}
+            icon={`fas ${attention.icon}`}
+            data-run-attention={attention.kind}>{localize(attention.labelKey)}</Chip
+          >
+        {/if}
         {#if blindSecretPreview}
           <span
             class="journal-run-card-secret"
@@ -229,7 +241,8 @@
      `flex: 0 0 auto` on itself; the shared chip declares no flex at all, because POSITION is the
      caller's and geometry is the primitive's — the rule its own `density` note states. So the one
      property that was doing work here is restated here, where the row that squeezes it lives. */
-  .journal-run-card-heading :global(.journal-run-status) {
+  .journal-run-card-heading :global(.journal-run-status),
+  .journal-run-card-heading :global(.journal-run-attention) {
     flex: 0 0 auto;
   }
 

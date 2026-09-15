@@ -4927,12 +4927,21 @@ No check, Nothing to roll and It simply completes require affirmative disclosed 
 A check-driven primary action MUST say Roll check.
 A stage that has not started MUST offer its own begin control instead of the resolve action, stating that beginning locks the choices, consumes the listed materials and starts the clock, and MUST NOT offer the roll at all.
 A started stage's materials surface MUST read as already consumed and MUST NOT be editable.
+A route nobody has chosen yet MUST be asked for rather than reported as a selected material that is no longer available; the repair sentence belongs to a route that vanished.
 
 Past/future browsing MUST retain progress/navigation but omit separate TIME/CHECK summaries and current countdowns.
 The browsed stage MUST pair its own inert Consumed/Produced or Will consume/Will produce evidence, including route or outcome-ladder output within that pairing, followed by This run and looking-back/ahead guidance.
 Future input previews MUST enumerate every entitled authored requirement kind, option and route without selecting, consuming or persisting intent.
 Future output copy MUST identify a future-stage preview rather than the current stage.
 Past stages use recorded checks and routes; future choices open only when the stage becomes current.
+
+#### Waiting on the player rather than on the clock
+
+An unstarted stage has no countdown, so its run status alone reads the same whether it needs a choice, needs stock or needs nothing.
+A run whose current stage cannot proceed until the viewer chooses (`awaitingChoice`, see `data-models/spec.md`) MUST therefore be distinguishable at a glance on the Active list row, on the opened run's header, and in the run's single state notice.
+That signal is carried BESIDE the run's status rather than in place of it, because what the clock is doing and what the player owes are two different facts.
+Waiting on a choice MUST read as guidance and MUST NOT raise a refusal: an unbegun stage is ordinary play, exactly as `stageNotStarted` is.
+Waiting on MATERIALS MUST read differently from waiting on a choice on every one of those surfaces, because one is fixed by choosing and the other by acquiring.
 
 #### Ordinary closed history
 
