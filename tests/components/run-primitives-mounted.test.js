@@ -71,13 +71,30 @@ function sourceOf(name) {
   return readFileSync(resolve(repoRoot, component(name)), 'utf8').replaceAll('\r\n', '\n').replaceAll(/\/\*[\s\S]*?\*\//gu, '');
 }
 
+/**
+ * The body of the rule whose selector list is EXACTLY `selector`.
+ *
+ * A plain `indexOf` matched the TAIL of a longer list too, so a pin naming two selectors could
+ * silently read a different rule that merely ends with the same two — and then assert against
+ * declarations that rule never carried. Only a match at a rule boundary is a rule.
+ */
+function ruleBody(source, selector) {
+  const needle = `${selector} {`;
+  for (let from = 0; ; ) {
+    const start = source.indexOf(needle, from);
+    if (start === -1) return null;
+    const before = source.slice(0, start).trimEnd();
+    if (before === '' || /[}>]$/u.test(before)) {
+      const open = source.indexOf('{', start);
+      return source.slice(open + 1, source.indexOf('}', open));
+    }
+    from = start + 1;
+  }
+}
+
 function expectGeometry(name, selector, declarations) {
-  const source = sourceOf(name);
-  const start = source.indexOf(`${selector} {`);
-  assert.notEqual(start, -1, `${name} declares ${selector}`);
-  const open = source.indexOf('{', start);
-  const close = source.indexOf('}', open);
-  const body = source.slice(open + 1, close);
+  const body = ruleBody(sourceOf(name), selector);
+  assert.notEqual(body, null, `${name} declares ${selector}`);
   for (const declaration of declarations) {
     assert.match(body, declaration, `${name} ${selector} keeps ${declaration}`);
   }
@@ -255,20 +272,57 @@ describe('run primitives mounted behavior', () => {
       /height:\s*34px/u,
       /border-radius:\s*9px/u,
     ]);
-    // Issue 1648 (M16): an unbounded prompt sentence was sizing the header as a
+    // Issue 1648 (M16 then M26): an unbounded prompt sentence was sizing the header as a
     // `flex: 0 1 auto` item, pushing the Begin/Cancel button off the card's right edge. Taking
     // its own line keeps the buttons — not the prose — in control of the bar's width.
-    expectGeometry('RunActionBar', '.fab-run-cancel-prompt', [/flex:\s*1 1 100%/u]);
-    // The begin prompt is a CALLOUT under a single line of controls rather than a bare span
-    // beside them, and the decision itself is pushed to the far right. Both are load-bearing:
-    // without the auto margin the controls bunch at the left, and without the full basis the
-    // sentence rejoins the control row at a wide enough window.
-    expectGeometry('RunActionBar', '.fab-run-begin-decision', [/margin-left:\s*auto/u]);
-    expectGeometry('RunActionBar', '.fab-run-begin-prompt', [
+    //
+    // Both prompts are a CALLOUT under a single line of controls rather than a bare span beside
+    // them, and both decisions are pushed to the far right. Every part is load-bearing: without
+    // the auto margin the controls bunch at the left, and without the full basis the sentence
+    // rejoins the control row at a wide enough window.
+    expectGeometry(
+      'RunActionBar',
+      '.fab-run-begin-decision,\n  .fab-run-cancel-decision',
+      [/margin-left:\s*auto/u]
+    );
+    expectGeometry('RunActionBar', '.fab-run-begin-prompt,\n  .fab-run-cancel-prompt', [
       /flex:\s*1 1 100%/u,
       /border:\s*1px solid var\(--fab-border\)/u,
       /background:\s*var\(--fab-bg-1\)/u,
     ]);
+  });
+
+  it('renders the armed cancel prompt beneath its controls, not inside the decision', async () => {
+    // Issue 1648 (M26), the cancel sibling of M16 and reported from a frame: the sentence
+    // rendered on its own line ABOVE `Yes, cancel` / `Keep crafting`, with both buttons
+    // left-aligned beneath it. The maintainer: "That should be in the top right!"
+    const target = await runActionHarness.mount({
+      run: { id: 'run-1' },
+      runLabel: 'Minor Elixir of Mending',
+      primary: { label: 'Roll check', enabled: false },
+      cancel: {
+        confirmLabel: 'Yes, cancel',
+        keepLabel: 'Keep crafting',
+        prompt: 'The consumed ingredients and currency will be returned.',
+      },
+      armed: true,
+    });
+    const decision = target.querySelector('[data-run-cancel-decision]');
+    const prompt = target.querySelector('[data-run-cancel-prompt]');
+    assert.ok(decision, 'the cancel decision renders');
+    assert.ok(prompt, 'the prompt renders');
+    assert.equal(decision.contains(prompt), false, 'the prompt is not inside the decision');
+    assert.deepEqual(
+      [...decision.querySelectorAll('[data-run-action]')].map((node) => node.dataset.runAction),
+      ['cancel-confirm', 'cancel-keep'],
+      'so the decision is the two controls and nothing else, on one line'
+    );
+    const bar = target.querySelector('[data-run-action-bar]');
+    const order = [...bar.children];
+    assert.ok(
+      order.indexOf(prompt) > order.indexOf(decision),
+      'and it follows the decision, so it reads as a callout beneath the controls'
+    );
   });
 
   it('renders the begin prompt beneath the controls, not inside the decision', async () => {
@@ -533,7 +587,13 @@ describe('run primitives mounted behavior', () => {
     nav.querySelector('[data-stage-nav-index="4"]').click();
     nav.querySelector('[data-stage-nav-return]').click();
     assert.deepEqual(viewed, [4, 3]);
-    expectGeometry('StageNav', '.fab-stage-nav-number', [/width:\s*26px/u, /height:\s*26px/u, /border-radius:\s*7px/u]);
+    // Named as the WHOLE selector list: `.fab-stage-nav-number` alone is also a rule of its
+    // own, and the size lives on the shared arrow+number rule.
+    expectGeometry(
+      'StageNav',
+      ':global(.fabricate-icon-button.manager-icon-button.fab-stage-nav-arrow),\n  .fab-stage-nav-number',
+      [/width:\s*26px/u, /height:\s*26px/u, /border-radius:\s*7px/u]
+    );
     stageNavHarness.remount();
     const single = await stageNavHarness.mount({ stages: stages.slice(0, 1), current: 0, view: 0 });
     assert.equal(single.querySelector('[data-stage-nav]'), null, 'one stage needs no navigation control');

@@ -45,7 +45,6 @@
 <div class="fab-run-action-bar" data-run-action-bar aria-busy={busy || undefined}>
   {#if armed}
     <div class="fab-run-cancel-decision" data-run-cancel-decision>
-      {#if cancel.prompt}<span class="fab-run-cancel-prompt">{cancel.prompt}</span>{/if}
       <ManagerButton
         role="danger"
         class="fab-run-action-control"
@@ -63,6 +62,13 @@
         onclick={() => (armed = false)}>{cancel.keepLabel}</ManagerButton
       >
     </div>
+    <!-- Same shape as the begin side: the prompt is a SIBLING of the decision, rendered after
+         it. Inside the decision the sentence wrapped ABOVE the two buttons and left them
+         left-aligned under it, which the maintainer rejected on both sides of the bar
+         (issue 1648, M16 then M26). -->
+    {#if cancel.prompt}
+      <p class="fab-run-cancel-prompt" data-run-cancel-prompt>{cancel.prompt}</p>
+    {/if}
   {:else}
     <IconButton
       class="fab-run-action-control fab-run-action-cancel"
@@ -218,18 +224,21 @@
     padding-block: 0;
   }
 
-  /* The begin control sits at the FAR RIGHT of the single control line: the run's other controls
-     read left to right and the irreversible one is the end of that sentence. `margin-left: auto`
-     eats the free space rather than a spacer element, so the row still collapses correctly when
-     the bar is narrow. */
-  .fab-run-begin-decision {
+  /* An irreversible control sits at the FAR RIGHT of the single control line: the run's other
+     controls read left to right and the irreversible one is the end of that sentence.
+     `margin-left: auto` eats the free space rather than a spacer element, so the row still
+     collapses correctly when the bar is narrow. Both decisions take it, so beginning and
+     cancelling read the same way (issue 1648, M16 and M26). */
+  .fab-run-begin-decision,
+  .fab-run-cancel-decision {
     margin-left: auto;
   }
 
   /* A callout UNDER the controls. It carries a long, localizable sentence, so it must never
      participate in sizing the control row — `flex-basis: 100%` puts it on its own line at every
      width, and a translation 1.4x longer cannot push the buttons around. */
-  .fab-run-begin-prompt {
+  .fab-run-begin-prompt,
+  .fab-run-cancel-prompt {
     box-sizing: border-box;
     flex: 1 1 100%;
     margin: 0;
@@ -237,12 +246,6 @@
     border: 1px solid var(--fab-border);
     border-radius: 9px;
     background: var(--fab-bg-1);
-    color: var(--fab-text-subtle);
-    font-size: 10.5px;
-  }
-
-  .fab-run-cancel-prompt {
-    flex: 1 1 100%;
     color: var(--fab-text-subtle);
     font-size: 10.5px;
   }
