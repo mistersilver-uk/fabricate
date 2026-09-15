@@ -1,28 +1,26 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The category-group header of a grouped browser list. A real
-  `<button aria-expanded aria-controls>` — not a clickable `<div>` — so the group
-  is operable and announced by keyboard and screen reader (issue 643 §6: the row
-  ARIA is chosen explicitly rather than inherited).
-
-  Import-free leaf (design-system §7): props only. The caller resolves the group
-  name and the already-localized count text.
+  The category-group header of a grouped browser list: a folder glyph, the group name and a mono
+  count, optionally collapsible. An import-free leaf (design-system §7), so the caller resolves the
+  group name and the already-localized count text.
 
   Props:
-   - name: the group's display name (already localized / cased).
-   - countText: the mono count label (e.g. '4 recipes'), already localized.
-   - expanded: whether the controlled region is open.
-   - controls: the DOM id of the region this header expands (`aria-controls`).
-   - onToggle(): called on activation.
-   - collapsible: whether the group can be collapsed at all (issue 1371, maintainer parity
-     round 4). `true` — the shipped default, byte-identical to what every existing caller
-     renders — draws the disclosure chevron on a real `<button aria-expanded aria-controls>`.
-     `false` draws a NON-INTERACTIVE `<div>` with no chevron, because a header that cannot
-     collapse must not claim it can: `aria-expanded` on a control that never changes state is
-     a lie to a screen reader, and a `<button>` that does nothing is a keyboard stop that
-     leads nowhere. The reference's system Component Rules group band (`proto:1071-1074`) is
-     exactly that band — a folder glyph, the category name and a bare mono count — so the
-     grouped list gets its header from this primitive rather than hand-rolling a second one.
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `name` | already-localized string | `''` | The group's display name. |
+  | `countText` | already-localized string | `''` | The mono count label, e.g. `'4 recipes'`. |
+  | `expanded` | boolean | `false` | Whether the controlled region is open. |
+  | `controls` | element id | `''` | The region this header expands. |
+  | `onToggle()` | function | no-op | Called on activation. |
+  | `collapsible` | boolean | `true` | See the invariant. |
+
+  Invariants:
+  - A COLLAPSIBLE HEADER IS A REAL `<button aria-expanded aria-controls>`, never a clickable
+    `<div>`, so the group is operable and announced by keyboard and screen reader. A
+    NON-COLLAPSIBLE one is a `<div>` with no chevron and neither attribute, because a header that
+    cannot collapse must not claim it can: `aria-expanded` on a control that never changes state
+    is a lie to a screen reader, and a `<button>` that does nothing is a keyboard stop leading
+    nowhere. Both forms keep `data-group-header` and every class, so the sheet, the smoke
+    selectors and the mounted assertions resolve against either.
 -->
 <script>
   let {
@@ -51,9 +49,6 @@
     <span class="fab-group-spacer" aria-hidden="true"></span>
   </button>
 {:else}
-  <!-- No chevron, no `aria-expanded`, no `aria-controls`: nothing here expands. The band keeps
-       `data-group-header` and every class, so the sheet, the smoke selectors and the mounted
-       assertions that already name this header resolve against both forms. -->
   <div class="fab-group-header is-static" data-group-header={name}>
     <i class="fas fa-folder-open fab-group-folder" aria-hidden="true"></i>
     <span class="fab-group-name">{name}</span>
@@ -94,20 +89,11 @@
     outline-offset: 2px;
   }
 
-  /* The non-collapsible band. It is not a control, so it takes neither the pointer cursor nor
-     the hover repaint, and the radius snaps 8 to the 7 rung (`design-system/spec.md:220`) on a
-     32px band.
-
-     PADDING IS THE SCALE, NOT THE REFERENCE'S OWN `7px 11px` (`proto:1071`). Padding, margin and
-     gap must derive from the published spacing scale, whose neighbouring steps here are 6/8 and
-     12; the raw pair was new debt the ratchet reds on. 6 and 12 are each one pixel from the
-     drawn value, which is inside this band's slack — nothing is pinned to its height.
-
-     TYPE IS THE REFERENCE'S, in px, because font sizes are NOT scale members and are written as
-     literals (`design-system/spec.md:218-222`). The collapsible form's 0.72rem/0.66rem resolve
-     to 11.52px and 10.56px against the 16px root, and the reference draws 11px and 10.5px; both
-     are stated on `.is-static` alone so the RecipesBrowserView's collapsible header is
-     untouched. */
+  /* The non-collapsible band: not a control, so no pointer cursor and no hover repaint. PADDING IS
+     THE SCALE, not the reference's own raw pair, because padding, margin and gap must derive from
+     the published spacing scale and the raw values are debt the ratchet reds on; TYPE IS THE
+     REFERENCE'S, in px, because font sizes are NOT scale members. Both are stated on `.is-static`
+     alone, so the collapsible header is untouched. */
   .fab-group-header.is-static {
     padding: var(--fab-space-chip) var(--fab-space-3);
     border-radius: 7px;
@@ -136,13 +122,10 @@
     font-size: 0.7rem;
   }
 
-  /*
-    The header is a tight LEFT CLUSTER — chevron, folder, name, count — with the rest of
-    the bar empty. `flex: 1 1 auto` on the name grew it to fill the row and flung the
-    count to the far right edge, which made the bar read as a table header with a column
-    of counts rather than as a group label. `0 1 auto` lets the name shrink (ellipsising
-    a long category) without ever growing.
-  */
+  /* A tight LEFT CLUSTER, with the rest of the bar empty. `flex: 1 1 auto` on the name grew it to
+     fill the row and flung the count to the far right edge, which made the bar read as a table
+     header with a column of counts rather than as a group label. `0 1 auto` lets the name shrink
+     without ever growing. */
   .fab-group-name {
     flex: 0 1 auto;
     min-width: 0;
@@ -162,7 +145,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Keeps the bar full-bleed while the cluster stays left. */
   .fab-group-spacer {
     flex: 1 1 auto;
     min-width: 0;

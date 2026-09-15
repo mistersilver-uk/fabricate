@@ -1,96 +1,34 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  THE browse-screen pager (issues 675, 1372, 1502).
+  THE browse-screen pager: a range summary, a prev/page/next nav, and a per-page `<Select>`.
+  Area-agnostic — six player-app components render it as well as the manager's browse screens.
 
-  ── THE ROOT CLASS THIS COMPONENT EMITS ───────────────────────────────────────────
-  The root `<section>` carries `fabricate-pagination` ahead of `manager-pagination`, and
-  the sheet's own pager rules are rooted at THAT class rather than at `.fabricate-manager`
-  (issue 1502; `design-system/spec.md` — a shared primitive's class family is rooted at the
-  primitive, not at an app). It is written inline in the markup rather than composed in
-  `<script>` because this component composes nothing: there is no `const classes` array to
-  put it in, as there is on `ManagerButton` and `IconButton`.
+  Props:
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `totalCount` / `pageSize` / `pageIndex` | numbers | `0` / `10` / `0` | The window the caller is showing. |
+  | `pageSizeOptions` | number[] | `[10, 25, 50]` | The sizes offered. |
+  | `onPageChange(index)` / `onPageSizeChange(size)` | functions | no-ops | Both are caller contracts; this component holds no state. |
+  | `persistent` | boolean | `false` | Render the bar ALWAYS, with disabled arrows rather than no nav. For a browse surface whose footer is part of its frame: it states the size of what you are looking at, which a reader wants BEFORE there is enough to page, and a footer that appears past a threshold reads as a layout glitch. |
+  | `showPageSize` | boolean | `true` | Opt-OUT. A page-size choice is a BROWSE-SCREEN control; an INSPECTOR's pager walks a fixed window over one record's rows in a 300px column, and offering one there changes a number nothing else on the screen refers to. A prop rather than a second component, because the summary, the nav, the disabled-arrow rule and the range arithmetic are identical. |
+  | `multiPageOnly` | boolean | `false` | Opt-in THIRD MODE: render only when there is more than one page. The default is neither — `persistent \|\| totalCount > minPageSize` renders the bar for eleven rows on a twenty-five-row page, where the per-page selector is still meaningful. `persistent` WINS if both are set. THE COST, recorded rather than discovered: hiding the bar hides the per-page selector with it, so a reader who chooses a size that fits the whole list cannot choose a smaller one again from this screen. |
+  | `label` / `navLabel` | resolved strings | `''` | The names of the two landmarks this component emits. |
 
-  The `<nav>` is NOT the root. The descendant rules read `.fabricate-pagination
-  .manager-pagination-…`, so they resolve through the `<section>`; a root written on the
-  `<nav>` would leave the summary and the per-page label unpainted.
-
-  ── WHAT THAT RE-ROOTING WIDENED, AND WHY THE SIX PLAYER CALLERS CHANGED WITH IT ──
-  This component is area-agnostic and six player-app components render it — the journal
-  history list, the inventory grid, the recipe browser, and the three gathering panels.
-  Rooting the family at the class this component emits means the sheet's pager rules, and
-  the five `.manager-icon-button` rules the two arrows match, now paint in `.fabricate-app`
-  where they only ever painted in `.fabricate-manager`. TWELVE rules newly match there:
-  seven Pagination rules (the bar, `-summary`, `-nav`, `-page`, `-size`, `-size select`, and
-  the 28px arrow box) and five IconButton rules (the shared base block plus the `font:
-  inherit` issue 1502 adds to it, `:disabled`, `:hover`, the 34px box, and the glyph rule).
-  SIX of the seven Pagination rules remain: `-size select` retired with issue 1504's
-  conversion, and the arrow box GAINED `border-radius: 7px` so the bar's field and its arrows
-  read as one matched pair.
-
-  It also declares its own focus PAIR for the BUTTONS it contains: a `:focus` strip and a
-  `:focus-visible` repaint at `fabricate.css:5731` and `:5749`. Buttons only, deliberately —
-  the sheet comment above those rules says why an `:is(button, select)` form would delete the
-  player app's inset select ring.
-
-  Issue 1502 preserved the frame without adopting the primitive's paint. Issue 1504 is where
-  the per-page control's adoption happened: it is a shared `<Select size="inline">` now, so
-  the bar holds no native `<select>` at all, the sheet's own `.manager-pagination-size select`
-  rule is deleted, and each caller's `:global(… select)` block is retargeted onto the trigger.
-  (Written without a leading hash: `tests/components/theme-colour-contract.test.js` reads a
-  four-digit issue number behind one as an `#RGBA` colour literal.)
-
-  Each caller's own `:global` block is injected UNLAYERED while `styles/fabricate.css` is
-  imported at `layer(modules)`, so every property a caller already declares still wins at
-  any specificity. Only the REMAINDER — the sheet's longhands minus the union of every
-  longhand that caller declares for that element in that state — is newly painted, and each
-  caller restates its remainder at the value it rendered before. That base is mostly
-  FOUNDRY CORE's, not nothing: core's `button` rule (`@layer elements.forms`) supplies
-  `min-height: var(--button-size)` (2em, so 28px at its own 14px) and `font-size:
-  var(--font-size-14)`, and its `select` rule supplies `height`/`line-height:
-  var(--input-height)` (2rem).
-
-  THE REMAINDER, MEASURED PER CALLER. Five callers (`inventory/InventoryGrid`,
-  `crafting/RecipeBrowser`, `gathering/GatheringEnvironmentList`, `…/GatheringTasksPanel`,
-  `…/GatheringEventsPanel`) declare the same block and share one remainder;
-  `journal/HistoryList` declares less and has three more entries.
-
-    element / state         | newly painted longhands        | restated | adopted (inert)
-    ------------------------|--------------------------------|----------|-----------------
-    .manager-pagination     | justify-content, background-*  | bg       | justify-content
-    -summary                | (empty)                        | —        | —
-    -nav                    | (empty)                        | —        | —
-    -page                   | min-width, text-align,         | min-w,   | text-align
-                            | font-weight                    | weight   |
-    -size                   | (empty)                        | —        | —
-    -size select            | RETIRED by issue 1504. The control is a `<Select>`, and each
-                            | caller's block now carries a per-site `background` and nothing
-                            | else — the geometry comes from the `inline` rung.
-    .manager-icon-button    | appearance, -webkit-appearance,| min-h,   | the rest
-                            | box-sizing, gap, min-width,    | font-size|
-                            | min-height, line-height,       |          |
-                            | font-*, padding                |          |
-    …:disabled              | (empty)                        | —        | —
-    …:hover                 | (empty)                        | —        | —
-    .manager-icon-button i  | position, margin               | —        | both (same value)
-
-  `journal/HistoryList` adds `padding-right/-bottom/-left` and `border-top-*` on the bar
-  (it declared only `padding-top` and no rule), and `height` on the select (it declared no
-  select rule at all) — all three restated; the select entry retired with issue 1504. Its arrow also newly takes `flex: 0 0 28px`
-  from the 28px box rule, adopted: its nav is `flex: 0 0 auto` inside a `nowrap` row whose
-  summary absorbs every shrink, so the arrows are never compressed and a `flex-basis` of
-  28px is the width they already had.
-
-  WHY THE ADOPTIONS ARE INERT, once. `justify-content` cannot act because
-  `.manager-pagination-size` carries `margin-left: auto`, and an auto margin takes all the
-  free space before an alignment property sees it (all six render the size label; a future
-  caller passing `showPageSize={false}` would make this live). `text-align` cannot act on a
-  flex item whose box is its own max-content. `gap` cannot act on a button with one rendered
-  child. `min-width: 0` cannot act on an arrow that never shrinks — `min-height: 0` CAN, and
-  is the one that is restated, because it releases core's 2em floor and that floor is what
-  actually sizes the five 26px arrows to 28px today. `padding` and `line-height` cannot move
-  a glyph that `justify-content`/`align-items: center` keeps centred in a fixed box. `appearance` cannot act where the caller already declares border,
-  radius, background and colour. `box-sizing` and the glyph rule are the same value the base
-  already computed.
+  Invariants:
+  - THE ROOT `<section>` CARRIES `fabricate-pagination` AHEAD OF `manager-pagination`, and the
+    sheet's pager rules are rooted at THAT class rather than at `.fabricate-manager`. It is written
+    inline because this component composes nothing. THE `<nav>` IS NOT THE ROOT: the descendant
+    rules resolve through the `<section>`, so a root on the `<nav>` would leave the summary and the
+    per-page label unpainted.
+  - THE FAMILY DECLARES ITS OWN FOCUS PAIR FOR THE BUTTONS IT CONTAINS, a `:focus` strip and a
+    `:focus-visible` repaint. BUTTONS ONLY, deliberately: an `:is(button, select)` form would
+    delete the player app's inset select ring, as the sheet's own comment above those rules says.
+  - THIS COMPONENT EMITS TWO LANDMARKS — a `<section>` with an `aria-label` is a REGION and the
+    `<nav>` inside it is a second — so a screen drawing two bars would publish two identically
+    named entries in the one list a screen-reader user navigates BY. Both names default to `''`
+    with the fallback written at the USE SITE rather than as the prop's default, which is the
+    shape `tests/design-system-required-names.test.js` requires: a hard-coded English default is a
+    name `game.i18n` never sees, and a bare `aria-label={label}` over an empty default suppresses
+    the element's own name. Callers pass a RESOLVED string, not a key.
 -->
 <script>
   import { localize } from '../util/foundryBridge.js';
@@ -104,71 +42,9 @@
     pageSizeOptions = [10, 25, 50],
     onPageChange = () => {},
     onPageSizeChange = () => {},
-    // Issue 675, opt-in and DEFAULT OFF so every manager surface renders unchanged.
-    // The player Inventory's grid is a browse surface whose footer is part of its
-    // frame: it states the size of what you are looking at ("Showing 1–18 of 18"),
-    // which is information a player wants BEFORE there is enough to page, and a footer
-    // that appears only past a threshold reads as a layout glitch rather than a
-    // control. Under it the summary and the per-page selector are always present, and
-    // the nav renders its (disabled) arrows rather than vanishing.
     persistent = false,
-    // Issue 1372, opt-OUT and DEFAULT ON so every shipped surface renders unchanged.
-    //
-    // A page-size choice is a BROWSE-SCREEN control: `design-system/spec.md` puts the pagination
-    // bar at the foot of a browse screen, outside the scroll area, and a GM changing how many
-    // rows they see at once is changing how they read the whole list. An INSPECTOR's pager is a
-    // different control with the same anatomy — it walks a fixed five-row window over one
-    // record's related rows inside a 300px column, and the prototype draws it as summary plus
-    // arrows with no size selector (`essences.png`). Offering one there would put a third
-    // `<select>` in a column that already cannot hold two side by side, to change a number
-    // nothing else on the screen refers to.
-    //
-    // It is a PROP ON THE PRIMITIVE rather than a second pager component: the summary, the nav,
-    // the disabled-arrow rule and the range arithmetic are identical, and this is the one part
-    // that differs.
     showPageSize = true,
-    // Issue 1372, opt-in and DEFAULT OFF so every shipped surface renders unchanged.
-    //
-    // "Render the footer only when there is more than one page" — the maintainer's ruling on the
-    // world catalogues, whose prototype frame draws six rows and NO foot pager (`essences.png`)
-    // while the shipped screen drew a full-width `Showing 1–6 of 6 · Page 1 of 1 · Per page 25`
-    // band under them. A bar that can only ever say `Page 1 of 1` states nothing the list does
-    // not already show.
-    //
-    // It is a THIRD MODE rather than a relaxation of `persistent`, because the default is
-    // neither: `persistent || totalCount > minPageSize` renders the bar for eleven rows on a
-    // twenty-five-row page, which is one page but more items than the smallest offered size — so
-    // the per-page selector is still a meaningful control there. This mode says the stricter
-    // thing, and it is opt-in so that no other surface changes.
-    //
-    // `persistent` WINS if both are set, which is a contradiction rather than a case: they are
-    // mutually exclusive by meaning, and one of them has to be answered first.
-    //
-    // THE COST, RECORDED RATHER THAN DISCOVERED: hiding the bar hides the per-page selector with
-    // it, so a GM who chooses a size that fits the whole list on one page cannot choose a smaller
-    // one again from this screen. It is bounded — the size is component state that resets when
-    // the route unmounts, and it is unreachable at the default size on any list the choice could
-    // matter for — but it is the one thing this mode gives up.
     multiPageOnly = false,
-    // ── THE TWO LANDMARKS THIS COMPONENT EMITS, NAMED BY THE CALLER (issue 1513) ──────────
-    //
-    // The root is a `<section>` with an `aria-label`, which makes it a REGION landmark, and it
-    // contains a `<nav>`, which is a second one. Both took a fixed string, so a screen drawing
-    // two of these bars published two regions called "Pagination" and two navigations called
-    // "Page navigation" — and a landmark list is exactly the surface a screen-reader user
-    // navigates BY, so identical names there make the two indistinguishable in the one place
-    // the distinction is needed. The Access route's grant inspector is the shipped instance:
-    // two rosters, one pager each, in a 300px column.
-    //
-    // BOTH ARE OPTIONAL AND DEFAULT TO TODAY'S STRINGS, so all 25 importers render unchanged;
-    // a caller that draws one bar has nothing to disambiguate and passes neither.
-    //
-    // The default is `''` and the fallback is written at the USE SITE rather than as the prop's
-    // default value, which is the shape `tests/design-system-required-names.test.js` requires of
-    // a name-bearing prop: a hard-coded English default is a name `game.i18n` never sees, and a
-    // bare `aria-label={label}` over an empty default is a label of nothing that suppresses the
-    // element's own name. Callers pass a RESOLVED string rather than a key, because the names
-    // that make two bars tell apart are composed from the caller's own roster title.
     label = '',
     navLabel = '',
   } = $props();
@@ -176,10 +52,9 @@
   const totalPages = $derived(Math.max(1, Math.ceil(totalCount / Math.max(1, pageSize))));
   const firstShown = $derived(totalCount === 0 ? 0 : pageIndex * pageSize + 1);
   const lastShown = $derived(Math.min((pageIndex + 1) * pageSize, totalCount));
-  // Keep the footer (and its per-page selector) visible whenever a page-size choice is
-  // meaningful — i.e. there are more items than the smallest available option. Otherwise
-  // picking a size that fits everything on one page would hide the only control to change
-  // it back. The prev/next nav still only appears when there is more than one page.
+  // The footer stays visible whenever a page-size choice is meaningful — more items than the
+  // smallest available option — so picking a size that fits everything on one page does not hide
+  // the only control to change it back. The nav still appears only past one page.
   const minPageSize = $derived(
     pageSizeOptions.length ? Math.min(pageSize, ...pageSizeOptions) : pageSize
   );
@@ -204,28 +79,18 @@
   }
 
   /**
-   * THE PER-PAGE CONTROL'S ACCESSIBLE NAME IS THE VISIBLE CAPTION ITSELF (issue 1504).
-   *
-   * The `<select>` this replaced read `aria-label="Rows per page"` beside a visible `Per page`,
-   * which fails WCAG 2.5.3 on the reading that matters for speech input: a user says what they
-   * can see, and the name has to BEGIN with it. Two fixes were available — retype the label, or
-   * point at the caption — and pointing at it is the one the two strings cannot drift apart
-   * under, because there is only one string. So the caption span takes a per-instance id and the
-   * trigger takes `aria-labelledby`; the `Rows per page` key retires with the `<select>`.
-   *
-   * `$props.id()` rather than a module counter: two pagers on one screen (an inspector's and the
-   * list's behind it) must not point their triggers at the same caption.
+   * THE PER-PAGE CONTROL'S ACCESSIBLE NAME IS THE VISIBLE CAPTION ITSELF: a name that does not
+   * BEGIN with the visible words fails WCAG 2.5.3 for speech input, and pointing at the caption is
+   * the fix the two strings cannot drift apart under. `$props.id()` rather than a module counter,
+   * so two pagers on one screen do not point their triggers at the same caption.
    */
   const instanceId = $props.id();
   const captionId = `${instanceId}-per-page`;
 
   /**
-   * The page sizes as the shared select's option shape.
-   *
-   * The values stay NUMBERS — `Select` stringifies them for the primitive's own option identity
-   * and hands the caller's typed value back to `onChange` — so `changePageSize`'s `Number()`
-   * coercion has nothing to do and is kept only because `onPageSizeChange` is a caller's
-   * contract rather than this component's.
+   * The page sizes as the shared select's option shape. The values stay NUMBERS — `Select`
+   * stringifies them for the primitive's option identity and hands the caller's typed value back —
+   * so `changePageSize`'s coercion is kept only because `onPageSizeChange` is a caller contract.
    */
   const sizeOptions = $derived(
     pageSizeOptions.map((option) => ({ value: option, label: String(option) }))
@@ -273,20 +138,11 @@
       </nav>
     {/if}
     {#if showPageSize}
-      <!-- A `<span>` RATHER THAN THE `<label>` THIS WAS (issue 1504; its stated reason corrected
-           at issue 1510). The control is a `<button>` now, and the reason for the demotion is the
-           CLICK rather than the name: a `<label>` names a `<button>` by containment perfectly
-           well — `<button>` is a labelable element — but it also FORWARDS a caption click into
-           the control it names, and this control's panel is dismissed on `mousedown` in the
-           capture phase while it is open. So from the closed state a caption click opens the list
-           and it stays open, and from the OPEN state the caption's own mousedown dismisses it and
-           the forwarded click re-opens it — the caption can never close the list. Measured in a
-           real browser at issue 1511 and again at issue 1510, on both this shape and the
-           primitive's own labelled form, which was repaired the same way in the same change.
-           The caption is named through `aria-labelledby` for a different reason again: there is
-           no `id`-bearing labelable element for a `for` to address. The class survives unchanged:
-           it is what the five player pagers' and the journal's own per-site trigger fills hang
-           off, and what the manager's 64px floor is stated through. -->
+      <!-- A `<span>` RATHER THAN A `<label>`, and the reason is the CLICK rather than the name: a
+           `<label>` also FORWARDS a caption click into the control, whose panel is dismissed on
+           `mousedown` in the capture phase while open, so the caption could never CLOSE the list.
+           The caption is named through `aria-labelledby` because there is no `id`-bearing
+           labelable element for a `for` to address. The class survives unchanged. -->
       <span class="manager-pagination-size">
         <span id={captionId}>{text('FABRICATE.Admin.Manager.Pagination.PerPage', 'Per page')}</span>
         <Select

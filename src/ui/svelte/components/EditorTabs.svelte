@@ -1,154 +1,57 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  THE manager's editor tab strip (issue 1362, epic 1357).
-
-  A PROMOTION, not a ninth strip. `environment/EnvironmentEditorTabs` and
-  `system/SystemEditorTabs` already shared byte-identical badge logic, keyboard handling
-  and markup, and `recipe-item/RecipeItemEditorTabs` carries the same props with three
-  additions; `checks/ChecksEditorTabs` and `downtime/WorldDowntimeTabs` already prove that
-  a caller-supplied tab list is a shipped pattern here. All three of those first strips
-  are callers of this component now, and the six scoped-entity editors PRs 6a-c and 7 add
-  consume it rather than authoring a tenth copy.
-
-  ── THE DOM CONTRACT IS A PROP, because the three sites do not share one ────────────────
-
-  A naive extraction of "tabs, activeTab, badges, onSelect" silently drops three
-  externally-consumed contracts, each read by something outside this component:
-
-   - the HOOK ATTRIBUTE NAME, which has no common stem — `data-environment-tab-button`,
-     `data-system-tab`, `data-recipe-item-tab-button` — and is read by the smoke harness,
-     the View Lab registry and ~25 mounted assertions;
-   - the BUTTON `id` and `aria-controls` STEM, whose PANEL ids are rendered by
-     `EnvironmentEditView.svelte`, `SystemEditView.svelte` and `RecipeItemEditor.svelte`.
-     Changing a stem would either dangle every `aria-controls` or drag three more files
-     into the change;
-   - the per-site `aria-label` lang key.
-
-  So each is a prop, and no converted site changes a rendered id, `aria-controls`,
-  `data-*` attribute name or badge class.
-
-  ── THE RAIL MARKER FAMILY IS A CAPABILITY, not a reason for a second strip (issue 1429) ─
-
-  `DOMAIN.md`'s **Rail Marker Family** and design-system spec.md requirement
-  "Near-neighbour primitives are routed by a stated rule" name FOUR marks that MUST NOT be
-  substituted for one another. Which one a strip draws is decided by what the mark MEANS:
-
-   - `count`  a RECORD COUNT — how many records. A bare mono tabular numeral, no fill and
-              no border. `library.html:1081`'s `<TabBar>` specimen already draws two of
-              them (`Tiers 3`, `Businesses 23`) beside one warning badge, so the tab bar
-              carrying both vehicles is specified, not an extension of the specification.
-   - `issue`  an ISSUE SUMMARY — how many things want attention. The filled chip, toned.
-              It is amber because it asks for attention, not because anything is wrong.
-   - `dot`    the family's 6px filled dot, distinguished from the chip by SHAPE as well as
-              colour and therefore REQUIRING a text accessible name; a nameless dot is
-              dropped rather than drawn, on the rule `Chip` drops an unknown tone.
-
-  The fourth, the PREMIUM chip, is deliberately not offered here: canon scopes it to the
-  manager RAIL, where it rides the count vehicle's own box, and a vehicle with no possible
-  caller on this surface would be configuration that cannot be reached.
-
-  A mark that names no vehicle is the ISSUE chip, which is what every caller predating this
-  change passes and therefore renders exactly what it rendered before. The family is CLOSED:
-  a caller names a vehicle and the primitive owns the drawing, so there is no route by which
-  a call site can supply markup, a class or a shape of its own. An unrecognised vehicle name
-  falls back to the chip rather than emitting an unstyled mark.
-
-  ── AND THE MARK CARRIES NO `icon` (issue 1372, maintainer parity round 8) ──────────────
-
-  It briefly did, for one caller: the scoped entry editors' passing Validation badge, drawn as
-  a glyph-only chip because a chip reading `0` would state the opposite of what it means. That
-  was defended as "a property of the chip, not a fourth vehicle", but a call site passing
-  `icon: 'fas fa-check'` IS a call site choosing a shape, which is the one thing the paragraph
-  above says cannot happen.
-
-  It is gone, and the reference is why rather than the principle alone. The prototype's tab badge
-  is ONE pill in two states — `badge: iss.block.length ? String(iss.block.length) : '✓'`
-  (`proto:6221`-`6223`) — a numeral or a tick CHARACTER in the same box, toned danger or
-  recessive. So the pass mark was never a glyph and never a fourth vehicle: it is the issue
-  chip's LABEL, which this primitive already draws and no caller has to be trusted with.
-
-  A tab may carry MORE THAN ONE mark, because a section can be both authored and unready at
-  once — pass an array, and they render in the order the caller listed them.
-
-  Issue 1038 converted three more callers — `recipe/RecipeEditorTabs`,
-  `essences/EssenceEditorTabs` and `tools/ToolEditorTabs` — and every capability those three
-  needed is HERE, on this component, rather than left behind as a hand-rolled strip that
-  happened to render the same classes: a chip accessible name (`name`, because a badge whose
-  whole label is `✓` has no readable name at all without one), a chip modifier class
-  (`class`, because `fabricate.css:17290` writes a real shipped rule against
-  `.manager-tool-editor-tabs > button > span.is-valid`), the `positive` tone spelling, and
-  `hookAttribute=''` for the one caller that renders no tab hook.
+  THE manager's editor tab strip: a `role="tablist"` of buttons, each optionally carrying one or
+  more MARKS, with the ARIA tablist keyboard pattern. Nine hand-rolled strips converged here.
 
   Props:
-   - tabs: `{id, icon, labelKey, label}[]`, in render order. `labelKey` is looked up and
-     `label` is the English fallback, matching the `text()` contract everywhere else.
-   - activeTab / onSelect(tabId).
-   - badges: per tab id, one mark or an array of them. A mark is a plain value, or
-     `{vehicle, label, tone, name, class, suppressZero}` — `vehicle` ∈ count/issue/dot
-     (default `issue`), `tone` ∈ neutral/success/positive/warning/danger and applies to the
-     chip, `name` is the accessible name (REQUIRED by any mark that renders no readable text —
-     the `dot`, and equally a chip whose whole label is a bare character such as `✓`),
-     `class` is one modifier class appended to `badgeClass` on the CHIP only, and
-     `suppressZero` defaults true so a mark reading `0` is omitted rather than stated as zero.
-     A mark carries NO `icon`; see the note above for the caller that wanted one and what the
-     reference says instead. `class` is not that route reopened: it appends a token to a chip
-     this primitive still draws, and cannot change which element or which vehicle is rendered.
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `tabs` | `{ id, icon, labelKey, label }[]` | `[]` | In render order. `labelKey` is looked up and `label` is the English fallback, matching the `text()` contract everywhere else. |
+  | `activeTab` / `onSelect(tabId)` | string / function | `''` / no-op | The strip holds no state. |
+  | `badges` | per tab id: one mark, or an array of them | `{}` | A mark is a plain value, or `{ vehicle, label, tone, name, class, suppressZero }`. `tone` ∈ neutral/success/positive/warning/danger and applies to the CHIP; `name` is the accessible name, REQUIRED by any mark that renders no readable text; `class` is one modifier class appended to `badgeClass` on the chip only; `suppressZero` defaults true, so a mark reading `0` is omitted rather than stated as zero. A tab may carry more than one mark, because a section can be both authored and unready at once. |
+  | `ariaLabelKey` / `ariaLabel` | strings | `''` | The strip's own accessible name. |
+  | `idStem` | string | `'editor'` | Builds `<stem>-tab-<id>` and `aria-controls="<stem>-panel-<id>"`. |
+  | `buttonIdStem` / `panelIdStem` | strings | `''` | Override either half of that pair for a site whose ids do not share the `-tab-`/`-panel-` shape. |
+  | `activePanelOnly` | boolean | `false` | Emit `aria-controls` ONLY on the selected tab. Not cosmetic: a strip rendering one panel at a time otherwise points every unselected tab at an id that is not in the document, which assistive technology reports as a broken relationship rather than as "not currently shown". |
+  | `hookAttribute` / `containerAttribute` / `badgeAttribute` / `countAttribute` / `dotAttribute` | `data-*` names | see source | The per-button, per-tablist and per-vehicle hooks carrying the tab id; `''` renders none. One per vehicle because the shipped hooks do not share a stem. |
+  | `containerClass` / `buttonClass` / `badgeClass` | class strings | the primitive's own family | The site's existing classes, kept so no shipped rule stops matching. The COUNT and DOT have no such prop: their classes ARE the drawing, and a drawing a caller can choose is the style divergence this capability exists to remove. |
+  | `danger` | boolean | `false` | Whether a danger chip also tints its button. |
 
-     `positive` is `Chip`'s OWN spelling of the success family — its `is-active` and
-     `is-positive` selectors share one rule there, so the two paint identically — and it is
-     passed through rather than folded into `success` because two callers converted by issue
-     1038 render `is-positive` today, and renaming a shipped class would be a markup change
-     wearing a tidy-up's clothes.
-   - ariaLabelKey / ariaLabel: the strip's own accessible name.
-   - idStem: builds `<stem>-tab-<id>` and `aria-controls="<stem>-panel-<id>"`.
-   - buttonIdStem / panelIdStem: override either half of that pair for a site whose ids do
-     not share the `-tab-`/`-panel-` shape (`checks-section-<id>` / `checks-panel-<id>`).
-   - activePanelOnly: emit `aria-controls` ONLY on the selected tab. Not cosmetic and not
-     optional for the sites that need it: a strip rendering one panel at a time points every
-     unselected tab at an id that is not in the document, which assistive technology reports
-     as a broken relationship rather than as "not currently shown".
-   - hookAttribute: the per-button `data-*` name carrying the tab id; '' renders none, which
-     is how `tools/ToolEditorTabs` keeps rendering no tab hook at all.
-   - containerAttribute: a valueless `data-*` hook on the tablist itself; '' renders none.
-   - badgeAttribute / countAttribute / dotAttribute: the per-mark `data-*` name carrying the
-     tab id, one per vehicle because the shipped hooks do not share a stem; '' renders none.
-     `badgeAttribute` keeps its name rather than becoming `issueAttribute` because three
-     shipped callers pass it.
-   - containerClass / buttonClass / badgeClass: the site's existing classes, kept so no
-     shipped rule in `styles/fabricate.css` stops matching. The COUNT and DOT have no such
-     prop: their classes are the drawing, and a drawing a caller can choose is the style
-     divergence this capability exists to remove. Their DEFAULTS are the primitive's own
-     family and are declared as one frozen map below rather than three literals, so the
-     area-scope gate can read them; see that map's own note.
-   - danger: whether a danger chip also tints its button.
-
-  ── AND THE STRIP IS ROOTED AT `fabricate-tabs` (issue 1509) ────────────────────
-
-  The tablist writes `fabricate-tabs` ahead of whatever `containerClass` carries, and every rule
-  the strip's own family owns is anchored on that class instead of on `.fabricate-manager`. So the
-  strip draws wherever it is mounted rather than only inside the manager window. The `manager-*`
-  classes stay on the elements — retiring them is a later change — and a caller's
-  own overrides, which name the caller's container, are untouched.
+  Invariants:
+  - THE DOM CONTRACT IS A PROP, because the converging sites do not share one: the HOOK ATTRIBUTE
+    NAME has no common stem and is read by the smoke harness, the View Lab registry and ~25
+    mounted assertions; the BUTTON `id` and `aria-controls` STEM has its PANEL ids rendered by the
+    caller; and the `aria-label` lang key is per-site. No converted site changes a rendered id,
+    `aria-controls`, `data-*` name or badge class.
+  - THE MARK FAMILY IS CLOSED, AND WHICH MARK A STRIP DRAWS IS DECIDED BY WHAT IT MEANS.
+    `DOMAIN.md`'s Rail Marker Family names four marks that MUST NOT be substituted for one
+    another: `count` is a RECORD COUNT, a bare mono numeral; `issue` is an ISSUE SUMMARY, the
+    filled toned chip, amber because it asks for attention rather than because anything is wrong;
+    `dot` is the filled dot, distinguished by SHAPE as well as colour and therefore REQUIRING a
+    text accessible name, so a nameless dot is DROPPED rather than drawn; and the PREMIUM chip is
+    scoped by canon to the manager rail and deliberately not offered here. A mark naming no
+    vehicle is the ISSUE chip, and an unrecognised name falls back to it.
+  - A CALLER NAMES A VEHICLE AND THE PRIMITIVE OWNS THE DRAWING. There is no route by which a call
+    site can supply markup, a class or a shape of its own, and A MARK CARRIES NO `icon`: a call
+    site passing one IS a call site choosing a shape. The reference draws the tab badge as ONE
+    pill in two states — a numeral or a tick CHARACTER in the same box — so the pass mark is the
+    issue chip's LABEL rather than a fourth vehicle. `class` is not that route reopened: it
+    appends a token to a chip this primitive still draws.
+  - `positive` IS `Chip`'s OWN SPELLING of the success family, passed through rather than folded
+    into `success`, because two converted callers render `is-positive` today and renaming a
+    shipped class would be a markup change wearing a tidy-up's clothes.
+  - THE STRIP IS ROOTED AT `fabricate-tabs`, written ahead of whatever `containerClass` carries,
+    and every rule the strip's own family owns is anchored there rather than on
+    `.fabricate-manager`. A caller's own overrides name the caller's container and are untouched.
 -->
 <script>
   import { localize } from '../util/foundryBridge.js';
   import Chip from './Chip.svelte';
 
   /*
-    THE FAMILY THIS COMPONENT WRITES, HOISTED OUT OF THE PROP DEFAULTS (issue 1509).
-
-    These three strings are the `manager-editor-tab*` family — the classes `styles/fabricate.css`
-    paints the strip, its buttons and its badges with — and until this change they lived as literal
-    `$props()` defaults. That is a real hiding place rather than a formatting preference: the
-    area-scope gate reads a component's family out of its MARKUP and out of a frozen class map, and
-    a default is in neither, so eleven of the family's thirteen selectors read CALLER-owned and the
-    gate reported the family clean while they stayed rooted at `.fabricate-manager`. Frozen and
-    named here, they reach the gate's class-map reader and the family is measured.
-
-    A value a CALLER passes stays the caller's. `manager-environment-tab-*` and
-    `manager-tool-editor-tabs` are per-site vocabularies handed in through these same props, so
-    they never enter this component's family and their rules stay application-rooted — which is the
-    boundary a later fold of the three strips would have to cross deliberately.
+    THE FAMILY THIS COMPONENT WRITES, HOISTED OUT OF THE PROP DEFAULTS: the area-scope gate reads a
+    component's family out of its MARKUP and out of a frozen class map, and a `$props()` default is
+    in neither — so as defaults, eleven of this family's thirteen selectors read CALLER-owned. A
+    value a CALLER passes stays the caller's, and its rules stay application-rooted.
   */
   const DEFAULT_CLASSES = Object.freeze({
     container: 'manager-editor-tabs',
@@ -178,13 +81,9 @@
     danger = false,
   } = $props();
 
-  // Derived rather than a destructuring default, which cannot safely read a sibling binding.
   const buttonStem = $derived(buttonIdStem || `${idStem}-tab`);
   const panelStem = $derived(panelIdStem || `${idStem}-panel`);
 
-  // The family, closed. Anything else a caller names is drawn as the chip rather than
-  // emitted as an unstyled mark, so a typo shows up as the recessive default instead of as
-  // nothing at all.
   const VEHICLES = new Set(['count', 'issue', 'dot']);
 
   function text(key, fallback) {
@@ -215,10 +114,9 @@
     };
   }
 
-  // A mark that renders no text is judged on what it DOES render: the dot on its name.
-  // Everything else is judged on its label. The zero rule is the caller's to state, because the
-  // canonical text settles it per surface rather than per vehicle: the rail's record counts
-  // render `0` and the Checks strip's do not.
+  // A mark that renders no text is judged on what it DOES render: the dot on its name, everything
+  // else on its label. The zero rule is the caller's to state, because the canonical text settles
+  // it per surface rather than per vehicle.
   function isDrawable(mark) {
     if (mark.vehicle === 'dot') return mark.name !== '';
     if (mark.label === '' || mark.label === null || mark.label === undefined) return false;
@@ -235,9 +133,8 @@
     return values.map((mark) => normalizeMark(tab, mark)).filter(isDrawable);
   }
 
-  // A mark tone name is this component's own vocabulary; `Chip` names the colour families
-  // differently (`success` is `active` there), so translate rather than leak one spelling
-  // into the other (issue 883).
+  // A mark tone name is this component's own vocabulary and `Chip` names the colour families
+  // differently, so translate rather than leak one spelling into the other.
   function badgeTone(tone) {
     if (tone === 'danger') return 'danger';
     if (tone === 'warning') return 'warning';
@@ -265,13 +162,10 @@
   function markAttributes(tab, mark) {
     if (mark.vehicle === 'count') return countAttribute ? { [countAttribute]: tab.id } : {};
     if (mark.vehicle === 'dot') return dotAttribute ? { [dotAttribute]: tab.id } : {};
-    // A chip whose whole label is a single character renders no READABLE text, so without the
-    // name it would contribute nothing to the tab's accessible name while a COUNT chip
-    // contributes its number: a screen reader would hear `Validation` for a passing tab and
-    // `Validation 3` for a failing one, which is the difference between the two states being
-    // announced and one of them being silent. It rides the chip rather than the button so the
-    // tab's own label stays first. The `dot` states the same thing on its own element two
-    // branches down in the template.
+    // A chip whose whole label is a single character renders no READABLE text, so without the name
+    // a screen reader would hear `Validation` for a passing tab and `Validation 3` for a failing
+    // one — the difference between the two states being announced and one being silent. It rides
+    // the chip rather than the button so the tab's own label stays first.
     const attributes = badgeAttribute
       ? { [badgeAttribute]: tab.id, 'data-badge-tone': mark.tone }
       : {};
@@ -279,19 +173,14 @@
     return attributes;
   }
 
-  // The chip's modifier class, joined with the empties dropped. `badgeClass` is the site's
-  // own class and `mark.class` is the per-mark modifier a shipped rule is written against
-  // (`.manager-tool-editor-tabs > button > span.is-valid`, `fabricate.css:17290`).
   function badgeClasses(mark) {
     return [badgeClass, mark.class].filter(Boolean).join(' ');
   }
 
-  // Arrow / Home / End, the four the ARIA tablist pattern asks a horizontal strip for. Home
-  // and End are not a nicety on an ordered strip — "back to the first section" and "the last
-  // one" are the two jumps a GM repeats — and a strip that handled the arrows but swallowed
-  // nothing else left them doing whatever the browser does with Home inside a button row,
-  // which is nothing. Stated once here rather than per caller, on the same rule as the tone
-  // mapping above: universal, so there is no second keyboard vocabulary to get wrong.
+  // Arrow / Home / End, the four the ARIA tablist pattern asks a horizontal strip for. Home and
+  // End are not a nicety on an ordered strip, and a strip that handled the arrows but swallowed
+  // nothing else left them doing whatever the browser does inside a button row, which is nothing.
+  // Stated once here, so there is no second keyboard vocabulary to get wrong.
   function targetIndex(key, index) {
     if (key === 'ArrowRight') return (index + 1) % tabs.length;
     if (key === 'ArrowLeft') return (index - 1 + tabs.length) % tabs.length;
@@ -355,18 +244,12 @@
 </div>
 
 <style>
-  /* The validation tab turns danger when its badge is a failing count (design
-     §7.5): the label and its underline follow the danger colour. Authored here rather
-     than in `RecipeItemEditorTabs`, because the button this rule targets is rendered by
-     THIS component — a scoped block left behind on the caller would match nothing and
-     fail the unused-selector warning gate.
-
-     `:global()` on both compounds is REQUIRED and is not a loosening. Svelte's scoper adds
-     its hash to a selector it can bind to an element in THIS component's template, and both
-     classes reach the button through the `buttonClass` prop and the `is-active` expression
-     rather than as literal attribute text, so the scoped form emits a hash the button never
-     carries and the rule is dead at runtime while warning about nothing. Specificity is
-     preserved exactly: `:global(.a.b)` is still (0,2,0). */
+  /* Authored here rather than on the caller, because the button this rule targets is rendered by
+     THIS component — a scoped block left behind on the caller would match nothing and fail the
+     unused-selector warning gate. `:global()` on both compounds is REQUIRED and is not a
+     loosening: both classes reach the button through a prop and an expression rather than as
+     literal attribute text, so the scoped form emits a hash the button never carries and the rule
+     is dead at runtime while warning about nothing. Specificity is preserved exactly. */
   :global(.manager-editor-tab-button.is-danger) {
     color: var(--fab-danger-text);
   }

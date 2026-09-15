@@ -1,131 +1,51 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  THE overflow ACTION MENU (issue 1477).
-
-  ── WHY IT EXISTS, AND WHY IT IS NOT A MODE OF `SearchablePopover` ────────────────
-  One meaning was implemented twice, and the copy that reused a shared primitive was
-  the semantically wrong one.
-
-  `environment/CompositionList.svelte` hand-rolled it correctly at four sites: an
-  `fa-ellipsis-vertical` trigger announcing `aria-haspopup="menu"` over a
-  `role="menu"` of `role="menuitem"` buttons. `component/ComponentIdentityStrip.svelte`
-  reached for `SearchablePopover` — its own comment called that "the house action-menu
-  vehicle" — and got a trigger announcing `aria-haspopup="dialog"` over a
-  `role="dialog"` containing a `role="listbox"` of `role="option"` rows, with
-  `aria-selected` on each. "Unlink Source Item" was announced to a screen-reader user
-  as an option they could SELECT rather than as a command they could RUN.
-
-  That is precisely the conversion issue 1458 refused to make in the other direction.
-  It adjudicated `CompositionList`'s four menus against `SearchablePopover` and ruled
-  them a different widget on exactly this ground; nobody checked whether a sibling had
-  already gone the way the adjudication forbade. `design-system/spec.md` requirement
-  "A picker announces the panel it opens, and a look-alike is adjudicated rather than
-  converted" records the rule, and this component is the vehicle that lets the strip
-  obey it.
-
-  `SearchablePopover` MUST NOT grow a `role` prop to absorb this. Two announced
-  semantics behind one component is how the defect happened, and the two widgets do
-  not merely announce differently — a listbox keeps DOM focus on one element and
-  points at its options with `aria-activedescendant`, while a menu MOVES FOCUS to its
-  items. Those are incompatible focus models, not two settings of one.
-
-  ── THE ARIA AND KEYBOARD CONTRACT, AND WHERE IT COMES FROM ───────────────────────
-  Derived from the W3C ARIA Authoring Practices Guide's MENU BUTTON pattern (its
-  `menu-button` example, which composes the "Menu Button" and "Menu" patterns), not by
-  copying the picker beside it:
-
-    trigger  `aria-haspopup="menu"`, `aria-expanded`, and NO `aria-controls` — the
-             panel is portaled, so an id reference across two subtrees would be the
-             only thing holding the relation together and nothing in the repository
-             could check it
-    panel    `role="menu"` with an accessible name
-    items    `role="menuitem"`, `tabindex="-1"`, NO `aria-selected` and NO
-             `aria-activedescendant` anywhere
-
-    Enter / Space / ArrowDown on the trigger   open, focus the first item
-    ArrowUp on the trigger                     open, focus the LAST item
-    ArrowDown / ArrowUp in the menu            move focus, wrapping
-    Home / End                                 first / last item
-    Escape                                     close, RETURN FOCUS TO THE TRIGGER
-    Enter / Space on an item                   activate (the native `<button>` does
-                                               this; the menu then closes and restores
-                                               focus through `choose`)
-
-  TWO DELIBERATE DEVIATIONS, stated rather than left to be discovered.
-
-  (1) APG RECOMMENDS that a disabled `menuitem` remain focusable. These items are
-  native `<button disabled>` elements, which the browser removes from the focus order
-  outright, so arrow navigation SKIPS them. The alternative is `aria-disabled` plus a
-  hand-written click refusal on every item, which is `SearchablePopover`'s
-  `triggerAriaDisabled` problem re-solved for a row that nothing focuses on purpose.
-  The one disabled item in the corpus is a NOTE ("Enable in library first"), and a note
-  the keyboard cannot land on is the correct outcome for it.
-
-  (2) APG says Tab "closes the menu and moves focus to the next element in the tab
-  sequence". Here Tab closes the menu and returns focus to the TRIGGER. The panel is
-  portaled to the application root, so "the next element in the tab sequence" from the
-  panel is whatever happens to follow the portal host — somewhere else in the window
-  entirely, and never the control after the trigger. Returning to the trigger is the
-  only answer that keeps the tab order the GM can see.
-
-  ── PORTALED, FOR A REASON THAT IS ON RECORD AND MEASURED ────────────────────────
-  `ComponentIdentityStrip` already said it: "a naive absolutely-positioned menu clips
-  inside a scrolling column". The same is true of the composition menus, which is a
-  LIVE DEFECT this component fixes rather than a hypothetical:
-  `.manager-environment-tab-panel` is `overflow: auto`, so a row menu opened near the
-  bottom of a long Tasks list is cut off by the panel's own edge.
-  `tests/components/overlay-portal-host-position.test.js` measures it with
-  `elementFromPoint`, because a clipped element still reports its full box from
-  `getBoundingClientRect` and no rect comparison can see the difference.
-
-  The host comes from `resolveOverlayHost` (issue 1466) rather than a hard-coded
-  ancestor, and the SAME resolved element is both the portal target and the coordinate
-  origin. `src/ui/svelte/util/overlayHost.js` records why those two must never be
-  computed separately.
-
-  ── NO SCOPED `<style>`, DELIBERATELY ─────────────────────────────────────────────
-  For `IconButton`'s and `ManagerButton`'s reason, plus one of this component's own: a
-  scoped rule on a class that moves onto a component tag dies SILENTLY when the
-  selector is a bare single compound — emitted with the hash attached, matching
-  nothing, no compiler warning and byte-identical compiled CSS. Everything this
-  component is painted by lives in `styles/fabricate.css`, rooted at the two namespace
-  classes it writes: `fabricate-action-menu` on its own root and
-  `fabricate-action-menu-panel` on the panel it portals, because a portaled node keeps
-  its classes and loses its ancestors.
+  THE overflow ACTION MENU: an icon trigger announcing `aria-haspopup="menu"` over a portaled
+  `role="menu"` of `role="menuitem"` buttons. IT IS NOT A MODE OF `SearchablePopover`, AND THAT
+  PRIMITIVE MUST NOT GROW A `role` PROP TO ABSORB IT: a listbox keeps DOM focus on ONE element and
+  points at its options with `aria-activedescendant` while a menu MOVES FOCUS to its items, which
+  are incompatible focus models rather than two settings of one. `design-system/spec.md`'s "a picker
+  announces the panel it opens, and a look-alike is adjudicated rather than converted" is the rule.
 
   Props:
-   - items: `[{ id, label, icon?, disabled?, danger?, data? }]`. `label` is
-     ALREADY-LOCALIZED text; `icon` is a Font Awesome class set; `danger` emits
-     `is-danger`; `data` is an optional `{ 'data-x': 'value' }` map stamped verbatim on
-     that item's button, which is how the composition rows keep the `data-action`
-     hooks (`include`, `force-include`, `exclude`, `restore`) their tests address by.
-     Spread FIRST, so a caller can never override this component's own `type`, `role`,
-     `tabindex` or `onclick`.
-   - triggerLabel: the pre-localized accessible name. REQUIRED in the sense
-     `design-system/spec.md` requires it of any icon-only control — the trigger renders
-     a glyph and nothing else, so without it the control announces "button".
-     A caller rendering ONE menu per row of a list must name the RECORD in it (issue
-     1515): a list of twenty rows whose triggers all announce "System actions" gives a
-     screen-reader user twenty identically-named controls and no way to tell which row
-     they are on, and the route header's own action group announces that same phrase.
-     The four browse views compose it from a `{name}` template key. The menu ITEMS stay
-     generic — the trigger the menu was opened from is what identifies the row, so
-     repeating the name in every item restates what the reader just acted on.
-   - triggerClass / triggerIcon / triggerTitle / triggerData: the trigger's extra
-     class, glyph, native tooltip and `data-*` hooks. The trigger IS `<IconButton>`
-     rather than a bare `<button class="manager-icon-button">`, so the primitive that
-     owns the icon-only-button meaning keeps owning it here.
-   - menuAriaLabel: the panel's accessible name, defaulting to `triggerLabel`.
-   - menuClass: an extra class on the portaled panel. The panel escapes the component's
-     own root, so a caller's popover-scoped hook has to ride the panel itself.
-   - open: OPTIONAL `$bindable` open state, for a surface that must close the menu from
-     outside itself.
-   - onSelect(id): called with the chosen item's id. ROUTE IT BY EXPLICIT ID — one
-     `if`/`else if` per id and NO terminal `else` (issue 1515; the shipped precedent is
-     `environment/CompositionList.svelte`'s `runMenuAction`). A trailing bare `else` makes
-     the last branch the CATCH-ALL for every id this component was not told about, and the
-     last branch of a row menu is Delete: adding an item, renaming an id or a stale
-     `items` array then destroys the record instead of doing nothing.
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `items` | `[{ id, label, icon?, disabled?, danger?, data? }]` | `[]` | `label` is ALREADY-LOCALIZED; `danger` emits `is-danger`; `data` is stamped verbatim on that item's button and is spread FIRST, so a caller can never override this component's own `type`, `role`, `tabindex` or `onclick`. |
+  | `triggerLabel` | pre-localized string | `''` | REQUIRED in the sense `design-system/spec.md` requires it of any icon-only control. A caller rendering ONE menu per row of a list must name the RECORD in it: twenty rows whose triggers all announce the same phrase give a screen-reader user twenty identically named controls and no way to tell which row they are on. The menu ITEMS stay generic, because the trigger the menu was opened from is what identifies the row. |
+  | `triggerClass` / `triggerIcon` / `triggerTitle` / `triggerData` | strings / bag | `''` / `{}` | The trigger's extra class, glyph, native tooltip and hooks. The trigger IS `<IconButton>` rather than a bare button, so the primitive that owns the icon-only-button meaning keeps owning it. |
+  | `menuAriaLabel` | string | `triggerLabel` | The panel's accessible name. |
+  | `menuClass` | class string | `''` | An extra class on the PORTALED panel, which escapes this component's root, so a caller's popover-scoped hook has to ride the panel itself. |
+  | `open` | bindable boolean | `false` | For a surface that must close the menu from outside itself. |
+
+  Callbacks:
+  - `onSelect(id)` — the chosen item's id. ROUTE IT BY EXPLICIT ID: one `if`/`else if` per id and
+    NO terminal `else`. A trailing bare `else` makes the last branch the CATCH-ALL for every id
+    this component was not told about, and the last branch of a row menu is Delete — so adding an
+    item, renaming an id or a stale `items` array destroys the record instead of doing nothing.
+
+  Invariants:
+  - THE ARIA AND KEYBOARD CONTRACT IS THE W3C APG MENU BUTTON PATTERN. The trigger carries
+    `aria-haspopup="menu"` and `aria-expanded` and NO `aria-controls`, because the panel is
+    portaled and an id reference across two subtrees would be the only thing holding the relation
+    together with nothing in the repository able to check it. Items are `role="menuitem"`,
+    `tabindex="-1"`, with NO `aria-selected` and NO `aria-activedescendant` anywhere.
+    Enter/Space/ArrowDown on the trigger open and focus the FIRST item; ArrowUp opens and focuses
+    the LAST; arrows wrap; Home/End jump; Escape closes and RETURNS FOCUS TO THE TRIGGER.
+  - TWO DELIBERATE DEVIATIONS FROM THE APG. (1) It recommends that a disabled `menuitem` remain
+    focusable; these are native `<button disabled>` elements, so arrow navigation SKIPS them, and
+    the one disabled item in the corpus is a NOTE. (2) It says Tab moves to the next element in
+    the tab sequence; here Tab returns focus to the TRIGGER, because the panel is portaled and
+    "the next element" from it is whatever follows the portal host.
+  - IT IS PORTALED, AND THAT IS MEASURED RATHER THAN HYPOTHETICAL: a row menu opened near the
+    bottom of a long list inside an `overflow: auto` panel is cut off by that panel's own edge.
+    `tests/components/overlay-portal-host-position.test.js` measures it with `elementFromPoint`,
+    because a clipped element still reports its full box. The host comes from `resolveOverlayHost`,
+    and the SAME resolved element is both the portal target and the coordinate origin —
+    `util/overlayHost.js` records why those two must never be computed separately.
+  - NO SCOPED `<style>`, for `IconButton`'s and `ManagerButton`'s reason plus one of its own: a
+    scoped rule on a class that moves onto a component tag dies SILENTLY when the selector is a
+    bare single compound. Everything this component is painted by lives in `styles/fabricate.css`,
+    rooted at the two namespace classes it writes — one on its own root and one on the panel it
+    portals, because a portaled node keeps its classes and loses its ancestors.
 -->
 <script>
   import { tick } from 'svelte';
@@ -166,7 +86,6 @@
 
   const panelLabel = $derived(menuAriaLabel || triggerLabel || undefined);
 
-  /** The item buttons that can actually take focus. A native `disabled` button cannot. */
   function focusableItems() {
     if (!panelRoot) return [];
     return [...panelRoot.querySelectorAll('[role="menuitem"]:not([disabled])')];
@@ -229,7 +148,6 @@
     event.stopPropagation();
   }
 
-  /** The index, among the focusable items, of the one that currently has focus. */
   function activeItemIndex() {
     const focusable = focusableItems();
     const active = typeof document === 'undefined' ? null : document.activeElement;
@@ -280,11 +198,10 @@
   });
 </script>
 
-<!-- `fabricate-action-menu` is the primitive's own NAMESPACE root, per `design-system/spec.md`
-     requirement "A shared primitive's class family is rooted at the primitive, not at an app".
-     `styles/fabricate.css` is loaded page-wide, so every selector in it must begin with
-     `.fabricate`; a root the COMPONENT writes satisfies that AND travels with it. Do not swap it
-     for an application root and do not delete it — the family roots at nothing without it. -->
+<!-- `fabricate-action-menu` is the primitive's own NAMESPACE root. `styles/fabricate.css` is
+     loaded page-wide, so every selector in it must begin with `.fabricate`; a root the COMPONENT
+     writes satisfies that AND travels with it. Do not swap it for an application root and do not
+     delete it — the family roots at nothing without it. -->
 <div
   class="fabricate-action-menu manager-action-menu"
   bind:this={menuRoot}
@@ -314,9 +231,6 @@
   </IconButton>
 
   {#if open}
-    <!-- `fabricate-action-menu-panel` is the panel's own half of the namespace root. It is a
-         SECOND class rather than the one on the root above because `anchoredPopover` moves this
-         node out of that root, taking its classes and losing its ancestors. -->
     <div
       bind:this={panelRoot}
       class={`fabricate-action-menu-panel manager-action-menu-panel ${menuClass}`}

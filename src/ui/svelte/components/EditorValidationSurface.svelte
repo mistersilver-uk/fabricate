@@ -1,150 +1,52 @@
-<!-- Svelte 5 runes mode -->
 <!--
   THE editor validation surface: an aggregate header (status medallion + count tiles) over a
   grouped, bordered, tagged row stack. Every validation surface in the manager that draws this
-  shape renders through this component (issue 1444 closed the set), so the `manager-recipe-val-*`
-  and `manager-recipe-rail-*` families in `styles/fabricate.css` have exactly one writer.
-
-  ── THE HOST HOOKS, AND WHY THEY ARE ONE BAG ─────────────────────────────────────────────────
-  Each converted site already had its OWN `data-*` names on the four chrome elements — a tab
-  panel hook on the root, a section hook on the summary row, and its own spellings for the
-  summary and counts hooks — and several are read by mounted suites and by the smoke harness, so
-  they are contract rather than decoration. They arrive through ONE `hookAttrs` bag keyed by
-  REGION, spread the same way `dataAttrs` is spread for a group or a row: four sibling props
-  would be four places a reader has to look to see whether a site's hooks survived a conversion,
-  and the hooks are one decision per call site.
-
-  The regions are a CLOSED set — `root`, `summaryRow`, `summary`, `counts` — and a typo in a key
-  is silent here, because an absent key spreads nothing. That is issue 1116's defect class, so it
-  is guarded rather than trusted: `tests/components/editor-validation-surface-source-contract.js`
-  reads the region names out of THIS file's own `hooksFor('…')` call sites and refuses a call
-  site naming anything else. `countAttrs` is the same shape keyed by COUNT rather than by region,
-  and is guarded against {@link COUNT_ORDER} the same way.
-
-  Every hook the primitive itself emits — `data-editor-validation-surface`, `-summary`, `-counts`,
-  `-count` — is emitted ALONGSIDE a site's own, never instead of it. Nothing that already reads
-  either name has to learn the other.
+  shape renders through this component, so the `manager-recipe-val-*` and `manager-recipe-rail-*`
+  families in `styles/fabricate.css` have exactly one writer.
 
   Props:
-   - title / intro: the tab heading and its one-line explanation.
-   - summary: `{ status, icon, title, sub }`. `status` is the site's own domain word and reaches
-     the DOM verbatim on the site's own summary hook; the CLASS it resolves to is one of this
-     surface's three — `is-pass`, `is-warn`, `is-block` — through {@link SUMMARY_STATUS_ALIASES}.
-     It used to be interpolated raw, on the claim that the sheet painted both vocabularies; see
-     that constant for what the sheet actually painted and what a GM saw instead.
-   - counts / countLabels: the count tiles. See {@link COUNT_ORDER} for which tiles are drawn.
-   - groups: `{ id, icon, label, rows, dataAttrs? }[]`; each row is
-     `{ id, status, title, detail?, target?, focusTarget?, recordId?, viewLabel?, dataAttrs? }`.
-     ROWS ARE RE-ORDERED — blocking first, within each group — so a caller's authored sequence is
-     a tiebreak rather than a guarantee, and a site that fixes its order on purpose (a named
-     constant, a prerequisite chain, a lifecycle) keeps that order only among rows of equal rank.
-     See {@link orderedRows}.
-   - statusLabels: the per-status pill word, localized by the caller.
-   - rowDataAttr: one attribute name, carrying the row id, put on every row.
-   - viewDataAttr: the same idea for the row's View button, carrying the row's ROUTE.
-   - viewLabel: the View button's accessible name, as a LOCALIZATION KEY this surface resolves
-     itself. See the block below for why it defaults to one and why a row may override it.
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `title` / `intro` | strings | `'Validation'` / `''` | The tab heading and its one-line explanation. Passing neither renders no head block at all. |
+  | `summary` | `{ status, icon, title, sub }` | `{}` | `status` is the site's own domain word and reaches the DOM verbatim on the site's summary hook; the CLASS it resolves to is one of this surface's three, through `SUMMARY_STATUS_ALIASES`. |
+  | `counts` / `countLabels` | `{ passing, warnings, blocking }` | zeros / localized | A site draws the tiles it REPORTS: the rail renders `COUNT_ORDER` filtered to the keys present in `counts`. |
+  | `groups` | `{ id, icon, label, rows, dataAttrs? }[]`, each row `{ id, status, title, detail?, target?, focusTarget?, recordId?, viewLabel?, dataAttrs? }` | `[]` | ROWS ARE RE-ORDERED — blocking first, within each group — so an authored sequence is a tiebreak rather than a guarantee. THE ROW ACTION IS A TWO-FIELD CONTRACT: `target` is the ROUTE, opaque here, and beside it ONE ADDRESS the row names for what it holds — `focusTarget`, the `data-validation-target` value the offending CONTROL carries, or `recordId`, a RECORD the route selects. Two names for one argument is the point: a row addresses one destination, and the producer now says which kind it emitted where a reader of the row sees it. `target` could not simply become the control id — for one host it is a TAB id consumed by a whitelist and for another an `{ activity, section }` object, and a host that never resolves its route renders no destination for the focus move to land in. |
+  | `statusLabels` | `{ pass, warn, block }` | localized | The per-status pill word. |
+  | `rowDataAttr` / `viewDataAttr` | attribute names | `''` | One attribute carrying the row id on every row, and the same idea for the View button carrying the row's ROUTE. |
+  | `viewLabel` | localization KEY | `FABRICATE.Admin.Manager.Validation.View` | The View button's visible verb. A row may override it with `row.viewLabel`, also a key, because one caller draws two different verbs down one list. |
+  | `hookAttrs` / `countAttrs` | bags keyed by REGION / by COUNT | `{}` | The host's own `data-*` hooks, over a CLOSED region set — `root`, `summaryRow`, `summary`, `counts`. Four sibling props would be four places a reader has to look to see whether a site's hooks survived a conversion, and the hooks are one decision per call site. A typo in a key is SILENT, because an absent key spreads nothing, so it is guarded rather than trusted: `tests/components/editor-validation-surface-source-contract.js` reads the region names out of THIS file's own `hooksFor('…')` call sites and refuses anything else, and `countAttrs` is guarded against `COUNT_ORDER` the same way. Every hook the primitive itself emits is emitted ALONGSIDE a site's own, never instead of it. |
+  | `class` | class string | `''` | An EXTRA class appended to this surface's own, never a replacement. |
 
-  ── THE ROW ACTION IS A TWO-FIELD CONTRACT (issue 1517) ──────────────────────────────────────
-  A row carries `target` — the ROUTE, whatever the host needs to bring the destination into the
-  DOM, opaque here — and ONE ADDRESS beside it, which the row names for what it holds: either
-  `focusTarget`, the value of the `data-validation-target` attribute the offending CONTROL
-  carries, or `recordId`, a RECORD the route selects. The button renders when a row carries any
-  of the three, and the click passes the route and whichever address the row named, positionally:
-  `onSelectIssue(row.target, row.focusTarget ?? row.recordId)`.
+  Callbacks:
+  - `onSelectIssue(target, address)` — the row's ROUTE and its one address, positionally. Two
+    positional arguments rather than one object, so both existing hosts keep their one-argument
+    signatures.
 
-  TWO NAMES FOR ONE ARGUMENT, and that is the point rather than an accident. Five of the six
-  producers address a control the host focuses; the environment editor's addresses a task or an
-  event the host SELECTS on another tab, and it spelt that `focusTarget` — which read as a sixth
-  focus wiring and is not one. A row addresses one destination and a host resolves exactly one
-  kind of address, so there is one argument; what changed is that the producer now says which
-  kind it emitted, in the field name, where a reader of the row sees it.
-
-  Two positional arguments rather than one object, because both existing hosts read argument 0 as
-  the route and keep their one-argument signatures compiling unchanged. `target` could not simply
-  become the control id: for the recipe editor it is a TAB id consumed by a whitelist, and for the
-  Checks studio it is an `{ activity, section }` object — neither is a control selector, and a
-  host that never resolves its route renders no destination for the focus move to land in.
-
-  `viewDataAttr` carries `row.target`, so a row that carries ONLY an address renders the
-  button with no site hook on it. That is stated rather than silent: the hook names the ROUTE, and
-  a row with no route has none to name. Its one caller's rows all carry a route.
-
-  ── THE ACCESSIBLE NAME IS THIS SURFACE'S OWN JOB (issue 1517) ───────────────────────────────
-  `viewLabel` defaults to a `FABRICATE.…` key and the template renders `localize(...)`, which is
-  the `DropZone` idiom: a default written into a `$props()` destructuring is a string `game.i18n`
-  never sees, so an English default there is an accessible name no world can translate. The key
-  is `FABRICATE.Admin.Manager.Validation.View`, a SHARED namespace rather than the recipe
-  editor's, because it is the default name of one primitive on nine surfaces and eight of them
-  are not the recipe editor.
-
-  A row may override it with `row.viewLabel`, also a key. That exists because one caller draws two
-  DIFFERENT verbs down one list — "View task" beside "View event" — and a single scalar prop
-  would collapse both into one word. `row.viewLabel ?? viewLabel`, so a row that says nothing
-  takes the surface's default.
-
-  AND THE VISIBLE WORD IS NOT THE WHOLE NAME. One producer emits a route on eleven sites, so a
-  tab of routed rows announced by their visible text alone is "View, button… View, button… View,
-  button…", with the row's SUBJECT in a sibling element a screen reader reaches only in linear
-  reading mode. The `data-*` hook beside the button carries the route, not the subject, and is
-  invisible to assistive technology either way. So the button carries an `aria-label` built from
-  {@link VIEW_NAMED_LABEL} — one shared default for every surface that renders this component,
-  installed here rather than left for each of them to rediscover.
-
-  IT COMPOSES THE RESOLVED VERB, NOT THE WORD "View", and that is a WCAG 2.5.3 obligation rather
-  than a nicety. The visible child is `localize(row.viewLabel ?? viewLabel)`, so a row that
-  overrides its verb reads "View task" on screen; a name hard-coding "View" would then be a
-  visible label the accessible name does not contain, which is a speech-input user saying what
-  they can see and hitting nothing. Feeding `{action}` from the SAME expression the child renders
-  makes containment true by construction instead of by coincidence: "View: Add a result group" by
-  default, "View task: Gather herbs" where a row overrides. `lang/en.json` owns the join, so a
-  language that puts the subject first or punctuates differently can.
-
-  The visible child is UNCHANGED: the override swaps the visible VERB, not the context, and it is
-  the seam a later phase's two-verb list needs. Nothing consumes that seam yet — this surface is
-  simply built so that the first thing which does cannot introduce the defect.
-   - class: an EXTRA class appended to this surface's own, never a replacement — the idiom
-     `ManagerButton`, `Field` and `Chip` already use. It exists so a site whose root carried its
-     own classes keeps them, so no shipped rule stops matching.
-
-  ── AND THE SURFACE IS ROOTED AT `fabricate-validation` (issue 1509) ───────────────────
-
-  The `<section>` writes `fabricate-validation` ahead of its own three classes, and every rule the
-  `manager-recipe-val-*` and `manager-recipe-rail-*` families own is anchored on that class instead
-  of on `.fabricate-manager`. So the summary card, its medallion, the count rail and the grouped row
-  stack draw wherever this component is mounted rather than only inside the manager window.
-
-  THREE THINGS ARE DELIBERATELY LEFT BEHIND, and they are the reason this surface is only PARTLY
-  host-independent: `manager-recipe-tab` on this root, and `manager-recipe-tab-intro` and
-  `manager-recipe-tab-title` on the head block. All three are the RECIPE EDITOR's tab vocabulary —
-  six other recipe tabs write `manager-recipe-tab` — so re-rooting their rules here would un-style
-  those six. In a bare host this surface therefore paints its body and leaves its heading, its
-  intro and the outer tab box's own layout unstyled. Retiring the `manager-*` names is issue 1507's.
+  Invariants:
+  - EVERY CALLER-FACING WORD DEFAULTS TO A LOCALIZATION KEY THIS SURFACE RESOLVES, NEVER TO
+    ENGLISH: a raw string written into a `$props()` destructuring is a word `game.i18n` never sees.
+    EVERY KEY IS WRITTEN OUT IN FULL, never composed from a shared prefix constant, because
+    `tests/ui-lang-keys-resolve.test.js` resolves the complete literals it finds in `src/` and a
+    `${base}.CountPassing` would leave it holding a namespace base it can only check for
+    existence.
+  - THE ROW ACTION'S ACCESSIBLE NAME COMPOSES THE RESOLVED VERB, NOT THE WORD "View", and that is
+    a WCAG 2.5.3 obligation: a name hard-coding "View" beside a visible "View task" is a visible
+    label the accessible name does not contain. `VIEW_NAMED_LABEL` is fed `{action}` from the SAME
+    expression the visible child renders, so containment is true by construction, and
+    `lang/en.json` owns the join.
+  - THE SURFACE IS ROOTED AT `fabricate-validation`, written ahead of its own three classes, and
+    every rule the two families own is anchored on that class rather than on `.fabricate-manager`,
+    so the surface draws wherever it is mounted. THREE CLASSES ARE DELIBERATELY LEFT BEHIND —
+    `manager-recipe-tab` on this root, `manager-recipe-tab-intro` and `manager-recipe-tab-title`
+    on the head block — because six other recipe tabs write the first, so re-rooting their rules
+    would un-style those six. In a bare host this surface paints its body and leaves its heading
+    and the outer tab box unstyled.
 -->
 <script>
   import Chip from './Chip.svelte';
   import ManagerButton from './ManagerButton.svelte';
   import { localize } from '../util/foundryBridge.js';
 
-  /*
-    THE TILE AND PILL WORDS DEFAULT TO KEYS THIS SURFACE RESOLVES, NOT TO ENGLISH (issue 1517).
-
-    Same rule, and the same reason, as `viewLabel` two blocks down: a raw English string written
-    into a `$props()` destructuring is a word `game.i18n` never sees, so a caller that omits the
-    prop ships an untranslatable count label and an untranslatable status pill in every world. And
-    the words themselves are one vocabulary — `Passing / Warnings / Blocking`, `Pass / Warning /
-    Blocks enable` — which four call sites had each written into their own namespace, byte for
-    byte. They live once, under the shared `Admin.Manager.Validation` home, and a site
-    with nothing of its own to say now passes nothing and gets them.
-
-    The two defaults that were `PASS` and `WARNING` in capitals are the shipped `Pass` and
-    `Warning`: one casing, chosen here because this is where the pill is drawn.
-
-    EVERY KEY IS WRITTEN OUT IN FULL, never composed from a shared prefix constant.
-    `tests/ui-lang-keys-resolve.test.js` resolves the complete literals it finds in `src/` against
-    `lang/en.json`; a `${base}.CountPassing` would leave it holding a NAMESPACE BASE it can only
-    check for existence, which is a check it has an explicit, counted list of exceptions for.
-  */
   let {
     title = 'Validation',
     intro = '',
@@ -171,15 +73,10 @@
   } = $props();
 
   /**
-   * The pattern the row action's ACCESSIBLE name is built from, as a localization key.
-   *
-   * Not a prop, and not a `$props()` default: the visible verb is already caller-overridable per
-   * row, and a second knob for the subject-bearing form would be a second place one accessible
-   * name lives — which is exactly how a name and the word beside it drift apart.
-   *
-   * TWO tokens. `{action}` is the row's own RESOLVED verb, the same string the visible child
-   * renders, so the accessible name always contains the visible label; `{subject}` is the row's
-   * title. See the header block for why the verb is composed rather than written in.
+   * The pattern the row action's ACCESSIBLE name is built from, as a localization key. Not a prop
+   * and not a `$props()` default: the visible verb is already caller-overridable per row, and a
+   * second knob would be a second place one accessible name lives. `{action}` is the row's own
+   * RESOLVED verb — the same string the visible child renders — and `{subject}` is its title.
    */
   const VIEW_NAMED_LABEL = 'FABRICATE.Admin.Manager.Validation.ViewNamed';
 
@@ -190,29 +87,12 @@
   };
 
   /**
-   * THE SUMMARY'S ONE STATUS VOCABULARY, and the aliases the call sites reached this surface
-   * with (issue 1373).
-   *
-   * The doc above used to say `status` "is the site's own vocabulary (`pass` for the Checks
-   * studio, `clear|warning|blocked` for the recipe editors), because the sheet paints both".
-   * The sheet did not paint both. It painted `is-clear`, `is-warning` and `is-blocked`, the
-   * minority spelling, plus one route-scoped `is-pass` for the Checks Studio — while FOUR of
-   * the six call sites spell it `pass`/`warn`/`block`, the same three words this surface's own
-   * `statusIcons`, `statusLabels` and every ROW already use. So on the Tool editor's Validation
-   * tab, at both scopes, a blocked record and a clean one rendered the same neutral card: the
-   * one thing a GM opens that tab to learn was the one thing it did not say.
-   *
-   * NORMALISED HERE rather than by rewriting six call sites to one word list. `status` is the
-   * caller's domain word — it is also what the site's own `data-*-validation-summary` hook
-   * carries, which suites and the smoke harness read — and translating a domain word into this
-   * surface's presentation class is this surface's job. The tile row two blocks down already
-   * does exactly this for `warnings` -> `is-warning`. Doing it at the boundary also closes the
-   * class of defect rather than this instance of it: a seventh caller cannot invent a spelling
-   * the sheet has no rule for, because there are only three classes this can emit.
-   *
-   * `pass` is the fallback for an unknown or absent word, which is the behaviour the template
-   * already had, and `tests/components/manager-layout.test.js` pins the emitted set against the
-   * sheet's own rules in both directions so the two cannot drift apart again.
+   * THE SUMMARY'S ONE STATUS VOCABULARY, and the aliases the call sites reach it with. NORMALISED
+   * HERE rather than by rewriting six call sites: `status` is the caller's domain word and is also
+   * what the site's own summary hook carries, so translating it into this surface's presentation
+   * class is this surface's job — and doing it at the boundary closes the CLASS of defect, because
+   * there are only three classes this can emit. `pass` is the fallback for an unknown word, and
+   * `tests/components/manager-layout.test.js` pins the emitted set against the sheet's own rules.
    */
   const SUMMARY_STATUSES = ['pass', 'warn', 'block'];
   const SUMMARY_STATUS_ALIASES = { clear: 'pass', warning: 'warn', blocked: 'block' };
@@ -224,38 +104,20 @@
   });
 
   /**
-   * The count vocabulary, closed and ORDERED here rather than taken from the caller.
-   *
-   * A site draws the tiles it REPORTS: the rail renders this list filtered to the keys present
-   * in `counts`, so `recipe-item/RecipeItemValidationTab` — whose checks are strictly two-state,
-   * a check passes or it blocks — passes `{ passing, blocking }` and gets a two-tile rail with
-   * no Warnings tile, while the three-state sites pass all three and get all three.
-   *
-   * Filtered rather than made a caller-supplied list, because the two halves of the question are
-   * different: WHICH counts exist and in what order is a property of this surface's vocabulary
-   * and a caller must not be able to invent or reorder one, whereas WHICH of them a given site
-   * can answer is a property of that site's own check set. Key presence already carries the
-   * second, so a `countOrder` prop would be a second way to say something `counts` says.
+   * The count vocabulary, closed and ORDERED here rather than taken from the caller: WHICH counts
+   * exist and in what order is a property of this surface, while WHICH of them a site can answer
+   * is a property of its own check set, which key presence already carries.
    */
   const COUNT_ORDER = ['passing', 'warnings', 'blocking'];
 
   const shownCounts = $derived(COUNT_ORDER.filter((count) => count in (counts ?? {})));
 
   /*
-    THE SURFACE'S OWN CLASS LIST, AND `fabricate-validation` LEADS IT (issue 1509).
-
-    The local is named `classes` because the area-scope gate's composed-class reader locates the
-    region by the exact opener `const classes = $derived(`, and the root sits FIRST because that
-    reader takes the array's first literal as the namespace class the component emits. Neither is
-    a formatting preference: under any other name the reader reports a NAMED extractor failure,
-    and under any other order it credits the wrong class.
-
-    `fabricate-validation` is what the surface's family is now anchored on, so the medallion, the
-    counts and the row stack paint wherever this component is mounted rather than only inside the
-    manager window. The `manager-*` classes stay on the elements; retiring them is a later change.
-    `manager-recipe-tab` is deliberately NOT part of that family — six other recipe tabs write it
-    too, so its rules, and the `-tab-intro` and `-tab-title` rules under them, stay rooted at
-    `.fabricate-manager` and this surface's heading and outer tab box stay host-dependent.
+    THE SURFACE'S OWN CLASS LIST. The local MUST be named `classes` and the root class MUST sit
+    FIRST: the area-scope gate's composed-class reader locates the region by the exact opener
+    `const classes = $derived(` and takes the array's first literal as the namespace class. Under
+    any other name it reports a named extractor failure, and under any other order it credits the
+    wrong class.
   */
   const classes = $derived(
     [
@@ -268,27 +130,20 @@
       .join(' ')
   );
 
-  // A group or a row may carry its OWN extra attributes through `dataAttrs` (issue 1096).
-  // `rowDataAttr` says "put this one attribute, holding the row id, on every row" and is
-  // right for a studio whose rows are homogeneous; the Checks Studio's are not — a check
-  // TICK and an ISSUE are two kinds of row that existing selectors, the smoke harness and
-  // four suites already tell apart by attribute. Spread so an absent bag adds nothing
-  // rather than an empty attribute a selector would still match.
+  // A group or a row may carry its OWN extra attributes: `rowDataAttr` is right for a studio
+  // whose rows are homogeneous, and the Checks Studio's are not — a check TICK and an ISSUE are
+  // two kinds of row that selectors, the smoke harness and four suites tell apart by attribute.
+  // Spread, so an absent bag adds nothing rather than an empty attribute a selector would match.
   const attributesOf = (source) =>
     source && typeof source === 'object' && source.dataAttrs ? source.dataAttrs : {};
 
-  /** The chrome hooks for one named region; an unsupplied region spreads nothing. */
   const hooksFor = (region) => hookAttrs?.[region] ?? {};
 
-  /** One count tile's own hooks; an unsupplied count spreads nothing. */
   const hooksForCount = (count) => countAttrs?.[count] ?? {};
 
   /**
-   * One optionally-named attribute, as a spreadable bag.
-   *
-   * An empty name yields NO key rather than the key `''`: spreading `{ '': undefined }` reaches
-   * `removeAttribute('')` on every render of every row, which happens to be inert and is not
-   * something to keep relying on.
+   * One optionally-named attribute, as a spreadable bag. An empty name yields NO key rather than
+   * the key `''`, which would reach `removeAttribute('')` on every render of every row.
    *
    * @param {string} name
    * @param {unknown} value
@@ -297,40 +152,13 @@
   const namedAttr = (name, value) => (name ? { [name]: value } : {});
 
   /**
-   * THE IN-GROUP ORDER: blocking rows first, everything else in the order its site authored
-   * (issue 1517).
+   * THE IN-GROUP ORDER: blocking rows first, everything else in the order its site authored.
    *
-   * TWO ranks rather than three, and the narrow reading is a decision rather than a fallback.
-   * `spec.md` asks that blocking issues sort above warnings inside a group and says nothing about
-   * passing rows; sinking every tick below every issue would turn "here is what was checked, in
-   * order" into "here is what is wrong, then a tail of ticks" on nine surfaces, for a sentence
-   * that did not ask for it.
-   *
-   * THE HAZARD IT AVOIDS IS ONE INTERLEAVE SPECIFICALLY, and it is narrower than an earlier
-   * draft of this comment claimed. `checks/ChecksValidationTab` builds ticks first and issues
-   * second, and there BOTH an unsatisfied tick and a non-critical issue are `warn` — so a
-   * three-rank sort would sink that tab's ticks past its issues and stand a failed CHECK beside a
-   * WARNING ISSUE, two different kinds of row told apart only by a data attribute. Both are rank
-   * 1 here, so a `warn` tick and a `warn` issue keep the positions the tab authored.
-   *
-   * A `critical` ISSUE IS NOT LEFT ALONE, and must not be. That tab maps it to `block`, which is
-   * rank 0, so it rises above every tick in its subsystem group — the requirement being met
-   * rather than a side effect. Anything that reads this as "the Checks tab keeps every position
-   * it authored" is reading a claim that is true of `warn` rows only.
-   *
-   * The rank reads the ROW vocabulary (`pass|warn|block`), and two producers emit a two-word
-   * subset of it: `recipe-item/RecipeItemValidationTab` builds `check.ok ? 'pass' : 'block'` and
-   * `tools/ToolValidationTab` builds `check.valid ? 'pass' : 'block'` plus an all-`block`
-   * `general` group. On those two, two ranks and three ranks are the SAME sort and the reason
-   * above cannot tell the options apart. That is accepted deliberately: their rows are one tick
-   * per check with no second kind to interleave with, so "failures first, then a tail of ticks"
-   * is the only reading available there, and it is the one the requirement asks for.
-   *
-   * All of this is a different axis from {@link COUNT_ORDER}, which orders the aggregate tiles.
-   *
-   * STABLE by construction rather than by relying on the engine: the authored position is carried
-   * through the comparison as the tiebreak, so equal-rank rows can only come out in the order they
-   * arrived. A source array is never sorted in place — `rows` belongs to the caller.
+   * TWO RANKS RATHER THAN THREE, deliberately: `spec.md` asks that blocking issues sort above
+   * warnings inside a group and says nothing about passing rows, and a third rank would sink one
+   * tab's unsatisfied TICKS past its warning ISSUES, since both are `warn`. A `critical` issue is
+   * not left alone — it maps to `block`, rank 0. STABLE by construction: the authored position is
+   * the tiebreak, and a source array is never sorted in place.
    *
    * @param {Array<{status?: string}>|undefined} rows one group's rows, as the caller authored them
    * @returns {Array<{status?: string}>} the same rows, blocking ones first
@@ -343,7 +171,6 @@
       )
       .map((entry) => entry.row);
 
-  /** Blocking rows rank 0; every other row ranks 1. See {@link orderedRows}. */
   function rowRank(row) {
     return row?.status === 'block' ? 0 : 1;
   }
@@ -362,20 +189,17 @@
 
 <!--
   `data-editor-validation-surface=""` and `data-editor-validation-counts=""` are written with an
-  EXPLICIT empty value, not as bare attributes. Both elements now carry a spread, and Svelte
-  collects every attribute on a spread element into one object — where a bare attribute is
-  boolean `true` and `set_attribute` writes the string `"true"`. Both hooks rendered `=""` before
-  the spreads arrived, every consumer resolves them by presence either way, and a silent
-  `[data-x=""]` flip is exactly what
-  `tests/helpers/primitiveAdoptionContract.js`'s valueless-attribute clause exists to refuse.
+  EXPLICIT empty value, not as bare attributes: both elements carry a spread, and Svelte collects
+  every attribute on a spread element into one object where a bare attribute is boolean `true` and
+  is written as the string `"true"`. Both hooks rendered `=""` before the spreads arrived, and a
+  silent `[data-x=""]` flip is what `tests/helpers/primitiveAdoptionContract.js`'s
+  valueless-attribute clause refuses.
 -->
 
 <section class={classes} data-editor-validation-surface="" {...hooksFor('root')}>
-  <!-- THE IN-PANE HEADING IS OPTIONAL (issue 1373). A tab reached through a labelled tab strip
-       inside a titled editor is already named three times over, and the Tool rules editor's
-       reference draws no heading on any of its three tabs. Every caller that passes a `title`
-       renders exactly what it rendered before; a caller that passes neither gets the surface
-       with no head block at all, rather than an empty `<h2>` holding open a row of space. -->
+  <!-- THE IN-PANE HEADING IS OPTIONAL: a tab reached through a labelled tab strip inside a titled
+       editor is already named three times over. A caller that passes neither gets the surface
+       with no head block, rather than an empty `<h2>` holding open a row of space. -->
   {#if title || intro}
     <div class="manager-recipe-tab-intro">
       {#if title}<h2 class="manager-recipe-tab-title">{title}</h2>{/if}
