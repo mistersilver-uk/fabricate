@@ -3085,6 +3085,10 @@ For a retained claim, `reconcileJournalRunAuthority({ claimId, disposition })` r
 It MUST reconstruct that claim's matching execution evidence and durably record the disposition before releasing the claim.
 Reconciliation releases the authority claim only; the prior request remains non-replayable and any uncertain run effect remains recovery-required.
 A retained claim can block other versioned runs, and its availability reason MUST remain visible.
+A published availability answer is a cached derivation, not a fact a surface may hold indefinitely.
+A refusal is true while it holds and MAY be published freely, but when it LIFTS the authority MUST announce the lift, because that is the moment every reading taken of it became false.
+A surface that captured a refusal MUST re-derive on that announcement, so a refusal naming a claim can never outlive the claim it names.
+This MUST NOT be implemented by polling or by re-deriving on every read.
 
 A refusal raised by an in-memory lifecycle guard before any document write MUST be reported as a refusal and MUST release its claim, even when the operation had already redeemed a mutating execution grant: redemption records intent, not an applied effect.
 An operation that fails by throwing remains uncertain, MUST retain its claim, and MUST stay recovery-required until reconciliation.

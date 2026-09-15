@@ -1525,7 +1525,7 @@ describe('journal run pause lifecycle at the real command boundary', () => {
     };
   }
 
-  async function pauseHarness() {
+  async function pauseHarness({ runCount = 1 } = {}) {
     let seq = 0;
     globalThis.foundry = { utils: { randomID: () => `rid-${(seq += 1)}` } };
     const actor = mergingActor();
@@ -1533,19 +1533,23 @@ describe('journal run pause lifecycle at the real command boundary', () => {
     globalThis.game = { user: gm, time: { worldTime: 1000 }, actors: [actor] };
     globalThis.fromUuid = async (uuid) => (uuid === actor.uuid ? actor : null);
 
+    const recipe = {
+      id: 'recipe-pause',
+      craftingSystemId: 'system',
+      validate: () => ({ valid: true, errors: [] }),
+      getExecutionSteps: () => [{ id: 'step-1', name: 'Wait' }],
+    };
     const manager = new CraftingRunManager();
-    const run = await manager.createRun(
-      actor,
-      {
-        id: 'recipe-pause',
-        craftingSystemId: 'system',
-        getExecutionSteps: () => [{ id: 'step-1', name: 'Wait' }],
-      },
-      [actor],
-      'gm',
-      { lifecycleVersion: 1, completionMode: 'worldTime' }
-    );
-    await manager.markStepWaitingForTime(actor, run, 0, { minutes: 2 });
+    const runs = [];
+    for (let index = 0; index < runCount; index += 1) {
+      const created = await manager.createRun(actor, recipe, [actor], 'gm', {
+        lifecycleVersion: 1,
+        completionMode: 'worldTime',
+      });
+      await manager.markStepWaitingForTime(actor, created, 0, { minutes: 2 });
+      runs.push(created);
+    }
+    const run = runs[0];
 
     const ledger = { id: 'ledger', state: null, claim: null };
     const authority = createJournalRunAuthority({
@@ -1574,7 +1578,16 @@ describe('journal run pause lifecycle at the real command boundary', () => {
     });
 
     let service = null;
-    const operations = loadCraftingOperations()({ craftingRunManager: manager }, () => service);
+    // The REAL engine, so a cancel drives the production `cancelVersionedRun` rather than a
+    // double that cannot reach the refund, the run write or the authority's settle path.
+    const engine = new CraftingEngine(
+      { getRecipe: (id) => (id === recipe.id ? recipe : null) },
+      manager
+    );
+    const operations = loadCraftingOperations()(
+      { craftingRunManager: manager, craftingEngine: engine, recipeManager: { getRecipe: () => recipe } },
+      () => service
+    );
     service = createJournalRunCommandService({
       authority,
       currentUser: () => gm,
@@ -1586,16 +1599,19 @@ describe('journal run pause lifecycle at the real command boundary', () => {
       operations: { crafting: operations },
     });
 
-    const command = (action, expectedRevision) =>
+    installCraftingJournalRunAuthority({ engine, service });
+
+    const commandOn = (runId, action, expectedRevision) =>
       service.executeJournalRunCommand({
         actorUuid: actor.uuid,
         runType: 'crafting',
-        runId: run.id,
+        runId,
         expectedRevision,
         action,
         payload: {},
       });
-    return { actor, authority, command, ledger, manager, run };
+    const command = (action, expectedRevision) => commandOn(run.id, action, expectedRevision);
+    return { actor, authority, command, commandOn, engine, ledger, manager, run, runs };
   }
 
   function withGlobals(body) {
@@ -1636,6 +1652,45 @@ describe('journal run pause lifecycle at the real command boundary', () => {
       const repaused = await command('pause', 3);
       assert.equal(repaused.success, true, repaused.message ?? repaused.reason);
       assert.equal(repaused.runRevision, 4);
+    })
+  );
+
+  it(
+    'leaves the authority usable for a DIFFERENT run after a real cancel settles',
+    withGlobals(async () => {
+      // M25: the maintainer cancelled one of seven runs and every remaining run then reported
+      // `claim-held` with NO claim page on the ledger. This drives the real cancel through the
+      // real authority and asks the two questions that separate a retained claim from a stale
+      // READING of one: is the ledger's claim gone when the command settles, and is the next
+      // command on a DIFFERENT run refused?
+      //
+      // The mid-command observation reproduces `main.js`'s own wiring: creating the claim page
+      // fires `createJournalEntryPage`, whose handler refreshes availability. That refusal is
+      // TRUE while the command runs, which is what makes a reading of it taken then so
+      // dangerous once the command finishes.
+      const { authority, commandOn, ledger, runs } = await pauseHarness({ runCount: 2 });
+      const [first, second] = runs;
+      const observed = [];
+      const spy = authority.run;
+      authority.run = (request, handler) =>
+        spy(request, async (helpers) => {
+          await authority.refreshAvailability();
+          observed.push({ ...authority.availability(), claim: Boolean(ledger.claim) });
+          return handler(helpers);
+        });
+
+      const cancelled = await commandOn(first.id, 'cancel', 1);
+
+      assert.equal(cancelled.success, true, cancelled.message ?? cancelled.reason);
+      assert.equal(cancelled.cancelled, true);
+      assert.deepEqual(observed, [{ available: false, reason: 'claim-held', claim: true }]);
+      assert.equal(ledger.claim, null, 'the cancel released the claim it held');
+      assert.deepEqual(authority.availability(), { available: true, reason: null });
+
+      const next = await commandOn(second.id, 'cancel', 1);
+      assert.equal(next.success, true, next.reason ?? next.message);
+      assert.equal(next.cancelled, true, 'the NEXT run is cancellable without a reload');
+      assert.deepEqual(authority.availability(), { available: true, reason: null });
     })
   );
 

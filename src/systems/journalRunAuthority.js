@@ -172,6 +172,8 @@ function claimedLedgerWriter({ ledger, claimId, requestId, writeLedgerState, cla
  * @param {Function} deps.reconstructExecutions `async ({operationId, orphaned}) => {success}`.
  * @param {Function} deps.randomId Secure nonempty ID supplier.
  * @param {Function} [deps.now] Wall-clock milliseconds for request/token records, not run timing.
+ * @param {Function} [deps.onAvailabilityRestored] Announced when a published refusal LIFTS, so a
+ *   surface holding a reading of it re-derives rather than refusing against a claim that is gone.
  * @returns {object} Setup, command, reconciliation, grant, availability and boot-recovery methods.
  */
 export function createJournalRunAuthority({
@@ -190,10 +192,36 @@ export function createJournalRunAuthority({
   reconstructExecutions,
   randomId,
   now = () => Date.now(),
+  onAvailabilityRestored = null,
 }) {
   let localQueue = Promise.resolve();
   let cachedAvailability = { available: false, reason: 'ledger-missing' };
   let recoveryReady = false;
+
+  /**
+   * The ONE writer of the cached answer, so no path can leave a refusal standing silently.
+   *
+   * A refusal is published freely: while it holds it is true, and every consumer is entitled to
+   * read it. Its LIFTING is announced, because that is the exact moment every reading taken of
+   * it became false. A `claim-held` a surface captured while a command ran is otherwise kept
+   * until something unrelated happens to re-read — which is how the maintainer's Journal went on
+   * refusing every remaining run against a claim page that no longer existed (issue 1648, M25).
+   * Announcing the lift rather than polling keeps the answer event-driven: nothing re-derives on
+   * a timer, and nothing re-derives per read.
+   * @private
+   */
+  function publishAvailability(next) {
+    const wasRefused = cachedAvailability.available !== true;
+    cachedAvailability = next;
+    if (wasRefused && next.available === true) {
+      try {
+        onAvailabilityRestored?.();
+      } catch {
+        // A consumer that throws while refreshing must not fail the command that freed the claim.
+      }
+    }
+    return next;
+  }
   const grants = new WeakMap();
   const createdGrantRecords = new Set();
 
@@ -216,7 +244,7 @@ export function createJournalRunAuthority({
   async function ensureLedger() {
     const ensured = await ensureSingleLedger();
     if (ensured.provisioned === true) recoveryReady = false;
-    if (!ensured.success) cachedAvailability = { available: false, reason: ensured.reason };
+    if (!ensured.success) publishAvailability({ available: false, reason: ensured.reason });
     return ensured;
   }
 
@@ -261,7 +289,7 @@ export function createJournalRunAuthority({
   function cacheAvailability(available, reason, result) {
     const next = { available, reason };
     if (result?.retained) next.retained = result.retained;
-    cachedAvailability = next;
+    publishAvailability(next);
     return next;
   }
 
@@ -334,7 +362,7 @@ export function createJournalRunAuthority({
     }
     const bootId = nextRandomId();
     if (!bootId) {
-      cachedAvailability = { available: false, reason: 'secure-random-unavailable' };
+      publishAvailability({ available: false, reason: 'secure-random-unavailable' });
       return unavailable('secure-random-unavailable');
     }
     const requestId = `boot-${bootId}`;
@@ -346,10 +374,10 @@ export function createJournalRunAuthority({
     const { ledger, claimId } = acquired;
     if (!activeGmMatches(currentUser?.(), activeGM?.())) {
       const released = await deleteClaim(ledger, claimId);
-      cachedAvailability = {
+      publishAvailability({
         available: false,
         reason: released ? 'active-gm-required' : 'claim-release-failed',
-      };
+      });
       return unavailable(cachedAvailability.reason);
     }
 
@@ -379,7 +407,7 @@ export function createJournalRunAuthority({
       } catch {
         // The embedded claim remains the durable stop signal when state persistence is uncertain.
       }
-      cachedAvailability = { available: false, reason: 'recovery-required' };
+      publishAvailability({ available: false, reason: 'recovery-required' });
       return unavailable('reconstruction-failed', { claimId });
     }
 
@@ -395,7 +423,7 @@ export function createJournalRunAuthority({
       } catch {
         // Preserve the claim when either election or persistence became uncertain.
       }
-      cachedAvailability = { available: false, reason: 'recovery-required' };
+      publishAvailability({ available: false, reason: 'recovery-required' });
       return unavailable('active-gm-required', { claimId });
     }
 
@@ -409,14 +437,16 @@ export function createJournalRunAuthority({
     try {
       await writeState(ledger, state);
     } catch {
-      cachedAvailability = { available: false, reason: 'recovery-required' };
+      publishAvailability({ available: false, reason: 'recovery-required' });
       return unavailable('reconstruction-failed', { claimId });
     }
     const released = await deleteClaim(ledger, claimId);
     recoveryReady = released;
-    cachedAvailability = released
-      ? { available: true, reason: null }
-      : { available: false, reason: 'claim-release-failed' };
+    publishAvailability(
+      released
+        ? { available: true, reason: null }
+        : { available: false, reason: 'claim-release-failed' }
+    );
     return released ? { success: true } : unavailable('claim-release-failed');
   }
 
@@ -530,16 +560,18 @@ export function createJournalRunAuthority({
       if (!activeGmMatches(currentUser?.(), activeGM?.())) {
         recoveryReady = false;
         const released = await releaseClaim();
-        cachedAvailability = released
-          ? { available: false, reason: 'active-gm-required' }
-          : { available: false, reason: 'claim-release-failed' };
+        publishAvailability(
+          released
+            ? { available: false, reason: 'active-gm-required' }
+            : { available: false, reason: 'claim-release-failed' }
+        );
         return unavailable(released ? 'active-gm-required' : 'claim-release-failed');
       }
       const state = normalizedState(await readState(writer.ledger));
       const prior = state.requests[request.requestId];
       if (prior && (prior.senderId !== request.senderId || prior.sessionId !== request.sessionId)) {
         if (!(await releaseClaim())) {
-          cachedAvailability = { available: false, reason: 'claim-release-failed' };
+          publishAvailability({ available: false, reason: 'claim-release-failed' });
           return unavailable('claim-release-failed');
         }
         return unavailable('request-id-collision');
@@ -550,10 +582,10 @@ export function createJournalRunAuthority({
         prior?.status === 'reconciled'
       ) {
         if (!(await releaseClaim())) {
-          cachedAvailability = { available: false, reason: 'claim-release-failed' };
+          publishAvailability({ available: false, reason: 'claim-release-failed' });
           return unavailable('claim-release-failed');
         }
-        cachedAvailability = { available: true, reason: null };
+        publishAvailability({ available: true, reason: null });
         return structuredClone(prior.response ?? unavailable('request-not-replayable'));
       }
 
@@ -570,7 +602,7 @@ export function createJournalRunAuthority({
       if (writer.lockLost) {
         // The swap happened before the handler ran, so nothing has been applied and refusing is
         // clean. Proceeding would execute against a ledger another session can claim.
-        cachedAvailability = { available: false, reason: 'claim-held' };
+        publishAvailability({ available: false, reason: 'claim-held' });
         return unavailable('claim-held');
       }
       const helpers = tokenHelpers({ state, request, persist });
@@ -612,16 +644,18 @@ export function createJournalRunAuthority({
       };
       await persist();
       if (mustRecover) {
-        cachedAvailability = { available: false, reason: 'recovery-required' };
+        publishAvailability({ available: false, reason: 'recovery-required' });
         return response;
       }
       for (const record of createdGrantRecords) {
         if (record.requestId === request.requestId) createdGrantRecords.delete(record);
       }
       const released = await releaseClaim();
-      cachedAvailability = released
-        ? { available: true, reason: null }
-        : { available: false, reason: 'claim-release-failed' };
+      publishAvailability(
+        released
+          ? { available: true, reason: null }
+          : { available: false, reason: 'claim-release-failed' }
+      );
       return response;
     });
   }
@@ -644,7 +678,7 @@ export function createJournalRunAuthority({
       // reached rather than refusing. Only a DIFFERENT claim is a genuine mismatch.
       if (!claim) {
         recoveryReady = true;
-        cachedAvailability = { available: true, reason: null };
+        publishAvailability({ available: true, reason: null });
         return { success: true, disposition, alreadyReleased: true };
       }
       if (claim.claimId !== claimId) return unavailable('claim-mismatch');
@@ -659,11 +693,11 @@ export function createJournalRunAuthority({
         const result = await reconstruct(scope);
         if (result.success !== true) throw new Error(result.reason);
       } catch {
-        cachedAvailability = { available: false, reason: 'recovery-required' };
+        publishAvailability({ available: false, reason: 'recovery-required' });
         return unavailable('reconstruction-failed', { claimId });
       }
       if (!activeGmMatches(currentUser?.(), activeGM?.())) {
-        cachedAvailability = { available: false, reason: 'recovery-required' };
+        publishAvailability({ available: false, reason: 'recovery-required' });
         return unavailable('active-gm-required', { claimId });
       }
       state.requests[requestId] = {
@@ -677,12 +711,12 @@ export function createJournalRunAuthority({
       try {
         await writeState(ledger, state);
       } catch {
-        cachedAvailability = { available: false, reason: 'recovery-required' };
+        publishAvailability({ available: false, reason: 'recovery-required' });
         return unavailable('reconstruction-failed', { claimId });
       }
       if (!(await deleteClaim(ledger, claimId))) return unavailable('claim-release-failed');
       recoveryReady = true;
-      cachedAvailability = { available: true, reason: null };
+      publishAvailability({ available: true, reason: null });
       return { success: true, disposition };
     });
   }
@@ -702,7 +736,8 @@ export function createJournalRunAuthority({
  * Create the Foundry V13/V14 JournalEntry-backed authority adapter.
  * Ledger ownership defaults to NONE and claims use `JournalEntryPage` creation with `keepId`.
  * The elected GM provisions the ledger automatically on boot and on its first command.
- * @param {object} [options] Foundry globals, secure randomness, clock and reconstruction seams.
+ * @param {object} [options] Foundry globals, secure randomness, clock, reconstruction and
+ *   availability-restored seams.
  * @returns {object} The authority API from {@link createJournalRunAuthority}.
  */
 export function createFoundryJournalRunAuthority({
@@ -713,6 +748,7 @@ export function createFoundryJournalRunAuthority({
   randomId = createSecureRandomId(crypto),
   now = () => Date.now(),
   reconstructExecutions = null,
+  onAvailabilityRestored = null,
 } = {}) {
   const isLedger = (entry) => entry?.getFlag?.('fabricate', AUTHORITY_FLAG) === true;
   const listLedgers = async () => [...(game?.journal ?? [])].filter(isLedger);
@@ -858,5 +894,6 @@ export function createFoundryJournalRunAuthority({
     reconstructExecutions,
     randomId,
     now,
+    onAvailabilityRestored,
   });
 }

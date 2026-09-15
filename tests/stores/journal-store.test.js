@@ -800,6 +800,49 @@ describe('journalStore', () => {
     assert.equal(setup.calls.list, 2, 'the cancelled command does not trigger another refresh');
   });
 
+  // Issue 1648, M25. A versioned cancel SUCCEEDS with `cancelled: true` — the run was
+  // cancelled — and the store used to read that as "the user dismissed a prompt" and return
+  // before its refresh. The listing the view kept was the one the cancel's own actor write had
+  // just triggered, taken while the command still held the execution claim, so every OTHER run
+  // stayed painted `claim-held` against a claim that no longer existed. The maintainer could not
+  // cancel the rest without reloading Foundry.
+  it('refreshes after a successful versioned cancel, so a mid-command claim cannot outlive it', async () => {
+    const target = run({ id: 'target', lifecycleContract: 'current', lifecycleVersion: 1 });
+    const other = run({ id: 'other', lifecycleContract: 'current', lifecycleVersion: 1 });
+    const setup = makeServices({
+      listing: baseListing({ activeRuns: [target, other], history: [] }),
+    });
+    const store = await loadedStore(setup);
+    const blocked = (entry) => ({
+      ...entry,
+      actions: { ...entry.actions, execute: false, disabledReason: 'claim-held' },
+    });
+    setup.services.executeJournalRunCommand = async (args) => {
+      setup.calls.command.push(args);
+      // The cancel's own run-flag write reloads the Journal WHILE its claim is live.
+      setup.state.listing = baseListing({ activeRuns: [blocked(target), blocked(other)], history: [] });
+      await store.load(true);
+      // The command then settles and the claim is released, so the ledger is truthful again.
+      setup.state.listing = baseListing({
+        activeRuns: [other],
+        history: [{ ...target, derivedStatus: 'cancelled', actions: { dismiss: true } }],
+      });
+      return { success: true, cancelled: true, refunded: false, restoredCount: 0 };
+    };
+
+    await store.cancel(target);
+    flushSync();
+
+    assert.equal(store.activeRuns.length, 1, 'the cancelled run leaves the active list');
+    assert.equal(store.activeRuns[0].id, 'other');
+    assert.equal(
+      store.activeRuns[0].actions.disabledReason ?? null,
+      null,
+      'and the run that was never cancelled is no longer blocked by a claim that has gone'
+    );
+    assert.equal(store.busyRunKey, '', 'busy flag cleared');
+  });
+
   it('clears a command failure when selection moves to another run', async () => {
     const setup = makeServices({ commandResult: { success: false, message: 'Stale run.' } });
     const store = await loadedStore(setup);

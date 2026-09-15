@@ -624,6 +624,12 @@ function createJournalCommandsForFabricate(fabricate) {
       getCraftingRunManager: () => fabricate.craftingRunManager,
       getGatheringRunManager: () => fabricate.gatheringRunManager,
     }),
+    // A refusal that has LIFTED invalidates every surface that captured it. The Journal reads
+    // availability when it builds its listing, so a `claim-held` captured while a command ran
+    // would otherwise keep refusing every run until something unrelated rebuilt the view
+    // (issue 1648, M25). Broadcast the lift, never the refusal: a refusal is true while it
+    // holds, and announcing it would only repaint the Journal mid-command.
+    onAvailabilityRestored: () => Hooks.callAll('fabricate.journalRunAuthorityRestored'),
   });
   let service = null;
   service = createJournalRunCommandService({

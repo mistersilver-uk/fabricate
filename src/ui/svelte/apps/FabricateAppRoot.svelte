@@ -23,6 +23,7 @@
     subscribeInventoryChange,
     subscribeCraftingDataChange,
     subscribeActorRunFlagChange,
+    subscribeJournalAuthorityRestored,
     subscribeJournalDismissalsChange,
   } from '../util/foundryBridge.js';
   import GatheringView from './gathering/GatheringView.svelte';
@@ -366,6 +367,11 @@
   });
   $effect(() => subscribeWorldTime(() => services?.journal?.load?.(true)));
   $effect(() => subscribeSceneChange(() => services?.journal?.load?.(true)));
+  // The listing captures the run authority's availability as it builds, so a refusal captured
+  // while a command held the execution claim outlives that claim in the rendered view. The
+  // authority announces the LIFT, and this re-derives on it, whichever client's command it was
+  // (issue 1648, M25).
+  $effect(() => subscribeJournalAuthorityRestored(() => services?.journal?.load?.(true)));
   // Dismissals live in a user setting, not actor run flags. The shell owns this
   // subscription across tabs; payload-free replicated changes refresh the viewer's
   // own listing, while local actor-scoped changes use the selection at fire time.

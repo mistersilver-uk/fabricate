@@ -663,6 +663,24 @@ export function subscribeJournalDismissalsChange(handler, { isRelevantActor } = 
   return () => hooks.off?.(hook, id);
 }
 
+/**
+ * Subscribe to the Journal run authority's refusal LIFTING.
+ *
+ * Availability is read when the Journal listing is built, so a refusal captured by one build
+ * outlives the claim it names until something rebuilds. The authority announces the lift; a
+ * surface that captured the refusal re-derives on it. There is no poll and no per-read probe.
+ *
+ * @param {Function} handler Read-only refresh callback, invoked without arguments.
+ * @returns {Function} Cleanup callback; safe when Foundry Hooks is absent.
+ */
+export function subscribeJournalAuthorityRestored(handler) {
+  const hooks = globalThis.Hooks;
+  if (!hooks?.on || typeof handler !== 'function') return () => {};
+  const hook = 'fabricate.journalRunAuthorityRestored';
+  const id = hooks.on(hook, () => handler());
+  return () => hooks.off?.(hook, id);
+}
+
 export function notifyInfo(msg) {
   globalThis.ui?.notifications?.info(msg);
 }

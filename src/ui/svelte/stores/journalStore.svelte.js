@@ -315,7 +315,14 @@ export function createJournalStore({ services } = {}) {
         action,
         payload: payload ?? {},
       });
-      if (result?.cancelled === true) return;
+      // A DISMISSED prompt is a refusal that carries `cancelled`, and nothing happened, so
+      // there is nothing to re-read. A CANCEL command answers `{success: true, cancelled: true}`
+      // for the run it just cancelled — which is a change, and the most disruptive one the
+      // Journal has. Returning here for it skipped the refresh below, leaving the view on the
+      // listing this command's own actor write had triggered mid-flight, while the execution
+      // claim was still held: every other run frozen at `claim-held` against a claim that had
+      // since been released, unfixable without reloading Foundry (issue 1648, M25).
+      if (result?.success === false && result?.cancelled === true) return;
       // Two different `success: false` results. A REFUSAL carries `reason` and no `message`
       // (which recorded an EMPTY command error and toasted nothing); a resolved failed check
       // is an OUTCOME the run's own history records, so it raises no command error and never

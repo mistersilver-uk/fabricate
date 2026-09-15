@@ -1032,6 +1032,30 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
     assert.deepEqual(loads, [], 'a closed shell cannot keep refreshing the Journal');
   });
 
+  it('quietly rebuilds the Journal when the run authority reports its refusal lifted', async () => {
+    // M25: the listing captures the authority's availability as it builds, so a `claim-held`
+    // captured while a command ran keeps refusing runs against a claim that has since gone.
+    // The authority announces the lift; this is the shell binding that acts on it.
+    const restoredHook = 'fabricate.journalRunAuthorityRestored';
+    const loads = [];
+    const services = fakeServices();
+    services.journal.load = (quiet) => loads.push({ quiet });
+    await mountWithSpies(services);
+    assert.deepEqual(loads, [], 'subscribing does not itself reload an already-loaded Journal');
+    assert.equal(hooks.count(restoredHook), 1, 'exactly one shell-owned listener');
+
+    hooks.callAll(restoredHook);
+    await tick();
+    assert.deepEqual(loads, [{ quiet: true }], 'a quiet rebuild, with no loading flicker');
+
+    await harness.remount();
+    assert.equal(hooks.count(restoredHook), 0, 'unmount removes the listener by its id');
+    loads.length = 0;
+    hooks.callAll(restoredHook);
+    await tick();
+    assert.deepEqual(loads, [], 'a closed shell cannot keep refreshing the Journal');
+  });
+
   // TABLE-DRIVEN, from the shipped constant. A domain added to the taxonomy without a
   // decision about every store reddens here rather than shipping a silent broad refresh.
   for (const domain of INVALIDATION_DOMAIN_NAMES) {

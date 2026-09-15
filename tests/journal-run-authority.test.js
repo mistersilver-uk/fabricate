@@ -194,6 +194,7 @@ function sharedAuthorityWorld() {
   const realm = (
     userId = 'gm',
     {
+      onAvailabilityRestored = null,
       reconstructExecutions = async () => ({ success: true, reconstructed: 0 }),
       getCurrentUser = () => ({ id: userId, isGM: userId === 'gm' }),
       getActiveGM = () => ({ id: 'gm', active: true, isGM: true }),
@@ -247,6 +248,7 @@ function sharedAuthorityWorld() {
       randomId: () => `id-${++nextId}`,
       now: () => currentTime,
       reconstructExecutions,
+      onAvailabilityRestored,
     });
 
   return {
@@ -310,6 +312,42 @@ describe('journal run authority ledger', () => {
       'claim-mismatch',
       'a DIFFERENT live claim is still a refusal, so the tolerance is not a blanket yes'
     );
+  });
+
+  it('announces a refusal LIFTING, and never the refusal itself', async () => {
+    // M25: availability is read when a surface builds, so a refusal captured while a command
+    // held the claim outlives that claim in the rendered view. The lift is the moment every
+    // such reading became false, so it is the one thing worth announcing. Announcing the
+    // refusal too would only repaint mid-command, and polling was ruled out.
+    const world = sharedAuthorityWorld();
+    let restored = 0;
+    const authority = world.realm('gm', { onAvailabilityRestored: () => (restored += 1) });
+
+    assert.equal(authority.availability().available, false, 'it starts refused');
+    assert.equal(restored, 0, 'and being refused announces nothing');
+
+    await authority.setup();
+    assert.deepEqual(authority.availability(), { available: true, reason: null });
+    assert.equal(restored, 1, 'the first lift is announced exactly once');
+
+    await authority.refreshAvailability();
+    assert.equal(restored, 1, 'a re-publication of the SAME available answer announces nothing');
+
+    const held = await authority.run(
+      { requestId: 'req-1', senderId: 'gm', sessionId: 'session' },
+      async () => {
+        // What `main.js` does on `createJournalEntryPage`: the claim is live, so this is true.
+        await authority.refreshAvailability();
+        assert.deepEqual(authority.availability(), { available: false, reason: 'claim-held' });
+        assert.equal(restored, 1, 'publishing the refusal announces nothing');
+        return { success: true };
+      }
+    );
+
+    assert.equal(held.success, true);
+    assert.equal(world.ledger.claim, null);
+    assert.deepEqual(authority.availability(), { available: true, reason: null });
+    assert.equal(restored, 2, 'releasing the claim announces the lift');
   });
 
   it('creates the arbitrating claim page with keepId, whose absence is a silent no-op', async () => {
