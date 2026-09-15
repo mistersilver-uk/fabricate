@@ -95,6 +95,10 @@
     gap: var(--fab-space-1);
   }
 
+  /* The pager's three controls share ONE size rule, TYPE INCLUDED (issue 1648). The 26px box was
+     already shared; `font-size` was not, so the arrows - which are `IconButton`s, painted by a
+     sheet that sets no size on their glyph - inherited the surrounding body type and drew a
+     chevron half again as tall as the digits inside identical boxes. */
   :global(.fab-stage-nav-arrow),
   .fab-stage-nav-number {
     box-sizing: border-box;
@@ -106,12 +110,12 @@
     border-radius: 7px;
     background: var(--fab-surface-soft);
     color: var(--fab-text-subtle);
+    font-size: 10.5px;
   }
 
   .fab-stage-nav-number {
     padding: 0;
     font-family: var(--fab-font-mono);
-    font-size: 10.5px;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     cursor: pointer;
