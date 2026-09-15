@@ -2887,19 +2887,56 @@ test('a retained authority claim reaches the blocked run, for a GM viewer only',
   assert.equal(player.recoveryClaim, undefined, 'a player is never handed a claim token');
 });
 
-test('a claim is withheld when the authority is blocked for some OTHER reason', () => {
-  // The control for the test above: the affordance must not appear beside a refusal
-  // `reconcileJournalRunAuthority` cannot clear.
+test('a LIVE claim offers no release, because there is nothing a GM could clear', () => {
+  // The control for the test above, in the shape the authority actually produces. `claimStanding`
+  // carries a `retained` identity ONLY for a claim nobody is coming back for; a `live` one is a
+  // command still running, and its answer is to wait. So a `claim-held` availability has no
+  // retained identity, and the affordance must not appear (issue 1648, M27).
   const run = makeBuilder({
     active: [activeCraftingRun({ lifecycleVersion: 1, runRevision: 2 })],
-    getJournalActionAvailability: () => ({
-      available: false,
-      reason: 'claim-held',
-      retained: { claimId: 'claim-7' },
-    }),
+    getJournalActionAvailability: () => ({ available: false, reason: 'claim-held' }),
   }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer: GM }).activeRuns[0];
   assert.equal(run.actions.disabledReason, 'claim-held');
   assert.equal(run.actions.recoveryClaim, undefined);
+});
+
+test('a retained claim reaches the run whose OWN evidence is uncertain, which a GM opens first', () => {
+  // M27: the maintainer was told to use `Release claim…` and answered "there is no release claim
+  // button in the UI". Keying on `blockedReason === 'recovery-required'` withheld it from every
+  // run that reports something else — including the run holding the uncertain effect, whose own
+  // evidence makes it report `recoveryRequired` instead. That is the one run a GM opens.
+  const retained = {
+    claimId: 'claim-9',
+    requestKind: 'command',
+    failureReason: 'operation-failed',
+    failureMessage: 'The crafting run requires recovery',
+    claimedAt: 2000,
+  };
+  const project = (viewer) =>
+    makeBuilder({
+      active: [
+        activeCraftingRun({
+          lifecycleVersion: 1,
+          runRevision: 2,
+          executionJournal: {
+            status: 'recoveryRequired',
+            operationId: 'op-9',
+            requestId: 'req-9',
+            effects: [{ effectId: 'consume-ingredients', kind: 'consumeIngredients', phase: 'applying' }],
+          },
+        }),
+      ],
+      getJournalActionAvailability: () => ({
+        available: false,
+        reason: 'recovery-required',
+        retained: { ...retained, requestId: 'req-9', requestStatus: 'recoveryRequired' },
+      }),
+    }).buildListing({ actor: { ...ACTOR, isOwner: true }, viewer }).activeRuns[0];
+
+  const gm = project(GM);
+  assert.equal(gm.actions.disabledReason, 'recoveryRequired', 'its OWN evidence names the block');
+  assert.deepEqual(gm.actions.recoveryClaim, retained, 'and the claim still reaches it');
+  assert.equal(project(PLAYER).actions.recoveryClaim, undefined, 'never a player');
 });
 
 test('completion-mode switching is limited to an active countdown without a player check', () => {

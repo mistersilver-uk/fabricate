@@ -46,6 +46,11 @@ export function runStateNotice(run, localize) {
 
   // The run's OWN uncertain effect. It outranks every other state because no other change
   // may happen until a person has looked at the receipts it publishes beneath this notice.
+  //
+  // It still carries the retained claim when the projection offers one. This is the run a GM
+  // opens FIRST when the world is stuck, and answering `null` here is what left them with no
+  // release control anywhere and a console call as the only way out (issue 1648, M27). The
+  // receipts stay the thing they read before deciding; the control is simply on the same screen.
   if (run?.recoveryEvidence?.required === true) {
     return {
       tone: 'danger',
@@ -56,7 +61,7 @@ export function runStateNotice(run, localize) {
       dataValue: 'true',
       ...pausedHook,
       evidence: true,
-      claim: null,
+      claim: run?.actions?.recoveryClaim ?? null,
     };
   }
 

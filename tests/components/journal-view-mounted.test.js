@@ -902,6 +902,28 @@ describe('JournalView mounted behavior', () => {
     assert.ok(!cleared.querySelector('[data-journal-command-error]'));
   });
 
+  it('offers the GM the release on the very run whose own evidence is uncertain', async () => {
+    // M27: the run holding the uncertain effect reports `recoveryRequired` from its OWN
+    // evidence, so the notice that describes it used to answer `claim: null` and withhold the
+    // one control that can clear the claim blocking the world. It is the run a GM opens first.
+    const run = makeCraftingRun({
+      lifecycleContract: 'current', lifecycleVersion: 1,
+      recoveryEvidence: { required: true, appliedEffectCount: 1, effects: [] },
+      actions: {
+        execute: false, pause: false, resume: false, setCompletionMode: false,
+        setSelection: false, cancel: false, dismiss: false, disabledReason: 'recoveryRequired',
+        recoveryClaim: { claimId: 'claim-9', requestKind: 'command', claimedAt: 2000 },
+      },
+    });
+    const { store } = makeJournal({ selectedRun: run, selectedRunKey: run.key });
+    const target = await harness.mount({ services: makeServices(store) });
+    const notice = target.querySelector('[data-journal-recovery]');
+    assert.ok(notice, 'the uncertain-effect notice still leads');
+    const action = notice.querySelector('[data-notice-action]');
+    assert.ok(Boolean(action), 'and it carries the release the GM needs');
+    assert.match(action.textContent, /Recovery\.Action/u);
+  });
+
   it('shows recovery evidence without disclosing selection internals on a redacted owner run', async () => {
     const run = makeCraftingRun({
       redacted: true, names: { title: 'Hidden recipe', subtitle: '' }, steps: [], currentStep: null,

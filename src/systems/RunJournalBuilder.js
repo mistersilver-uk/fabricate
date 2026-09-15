@@ -2428,10 +2428,7 @@ export class RunJournalBuilder {
       owner &&
       !executionBlocked;
     const legacyCancel = legacyExecute;
-    // Present ONLY when the authority's retained claim is what blocks this run, so the
-    // affordance a GM is offered is the one that can actually clear what they can see.
-    const recoveryClaim =
-      blockedReason === 'recovery-required' ? (authority?.retained ?? null) : null;
+    const recoveryClaim = this._offeredRecoveryClaim({ live, authority });
     return {
       ...runIdentityFields({ run, runType, actorUuid, activityKind, lifecycleContract }),
       recoveryEvidence,
@@ -2457,6 +2454,27 @@ export class RunJournalBuilder {
         recoveryClaim,
       }),
     };
+  }
+
+  /**
+   * The retained claim this run may offer to release, keyed on the CLAIM rather than on the
+   * run's own reason string.
+   *
+   * `claimStanding` distinguishes a `live` claim — someone is genuinely working, and the only
+   * answer is to wait — from a `retained` one, which nobody is coming back for. Only the
+   * retained case carries an identity, and `_actionAvailability` carries it for a GM viewer
+   * alone, so the affordance appears exactly where there is something a person can clear and
+   * never to a player.
+   *
+   * It used to be keyed on `blockedReason === 'recovery-required'`, the reason string of only
+   * ONE presentation of that state. A run carrying uncertain evidence of its own reports
+   * `recoveryRequired` instead, and that is the run a GM opens first — so the single claim a
+   * world was stuck on offered no way out but a console call (issue 1648, M27).
+   * @private
+   * @returns {object|null}
+   */
+  _offeredRecoveryClaim({ live, authority }) {
+    return live ? (authority?.retained ?? null) : null;
   }
 
   /** What this viewer may do to this run, and the one code that says why they may not. */
