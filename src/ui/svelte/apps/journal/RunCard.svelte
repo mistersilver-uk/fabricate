@@ -40,7 +40,6 @@
   const blindSecretPreview = $derived(run?.blindSecretPreview === true);
 
   const availableAt = $derived(Number(run?.timeGate?.availableAt));
-  const initiatedAt = $derived(Number(run?.timeGate?.initiatedAt));
   const requiredSeconds = $derived(Number(run?.timeGate?.requiredSeconds));
   const hasGate = $derived(run?.timeGate?.availableAt != null && Number.isFinite(availableAt));
   const paused = $derived(Boolean(run?.pauseState));
@@ -50,12 +49,14 @@
   const isReady = $derived(!paused && hasGate && availableAt <= now);
   const remaining = $derived(hasGate ? formatDurationHMS(remainingSeconds) : '');
 
-  // Progress fraction across the current step's time gate, clamped 0..1. Only
-  // meaningful when the gate carries a positive required-seconds budget.
+  // Progress fraction across the current step's time gate, clamped 0..1. Only meaningful when
+  // the gate carries a positive required-seconds budget. It is derived from the SAME
+  // `remainingSeconds` the countdown beside it prints, so the two cannot disagree: a resume
+  // re-anchors `availableAt` past the paused span, while `initiatedAt` never moves, so reading
+  // elapsed wall time pegged the bar full on a run still counting down (issue 1648).
   const progress = $derived.by(() => {
-    if (!hasGate || !Number.isFinite(initiatedAt) || !(requiredSeconds > 0)) return null;
-    const elapsed = paused ? requiredSeconds - remainingSeconds : now - initiatedAt;
-    return Math.max(0, Math.min(1, elapsed / requiredSeconds));
+    if (!hasGate || !(requiredSeconds > 0)) return null;
+    return Math.max(0, Math.min(1, (requiredSeconds - remainingSeconds) / requiredSeconds));
   });
   const progressPercent = $derived(progress === null ? 0 : Math.round(progress * 100));
 

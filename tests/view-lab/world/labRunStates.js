@@ -1600,12 +1600,14 @@ function applyFixtureCommand({ command, container, run, recipes, state, now }) {
     case 'resume': {
       const remaining = Math.max(0, Number(run.pauseState?.remainingSeconds) || 0);
       const pausedAt = Number(run.pauseState?.pausedAt);
-      const gate = {
-        requiredSeconds: remaining,
-        initiatedAt: now,
-        availableAt: now + remaining,
-      };
-      if (run.runType === 'gathering' || !Array.isArray(run.steps)) run.timeGate = gate;
+      const ownGate = run.runType === 'gathering' || !Array.isArray(run.steps);
+      // `persistResumedRun` re-anchors the DEADLINE and nothing else: `requiredSeconds` is the
+      // authored budget and `initiatedAt` records when the stage started, so neither moves
+      // across a pause. Rewriting all three made every resumed fixture gate self-consistent
+      // and hid the progress-bar defect issue 1648 reports.
+      const current = ownGate ? run.timeGate : run.steps[run.currentStepIndex]?.timeGate;
+      const gate = { ...(current ?? {}), availableAt: now + remaining };
+      if (ownGate) run.timeGate = gate;
       else if (run.steps[run.currentStepIndex]) run.steps[run.currentStepIndex].timeGate = gate;
       run.pausedDurationSeconds =
         Math.max(0, Number(run.pausedDurationSeconds) || 0) +

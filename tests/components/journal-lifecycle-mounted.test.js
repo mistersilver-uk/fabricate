@@ -1804,6 +1804,51 @@ describe('Journal versioned lifecycle (mounted)', () => {
     assert.equal(paused.store.selectedRun.derivedStatus, 'waiting');
   });
 
+  it('draws both resumed progress bars from the re-anchored gate, not elapsed wall time', async () => {
+    // Issue 1648, reported from manual testing: pause, advance world time past the original
+    // deadline, resume — and BOTH bars painted full while the TIME card and the list row still
+    // read hours to wait. `applyResume` re-anchors `availableAt` past the paused span and
+    // `initiatedAt` never moves, so a bar measuring `now - initiatedAt` banks the pause as work.
+    const paused = await mountState('waiting-auto-eligible');
+    const run = paused.containers.craftingRuns.active['lab-v1-waiting-auto-eligible'];
+    const required = run.steps[0].timeGate.requiredSeconds;
+
+    paused.target.querySelector('[data-run-action="pause"]').click();
+    await settleAction();
+    paused.advanceWorldTime(6 * 3600);
+    paused.store.tickWorldTime();
+    flushSync();
+    paused.target.querySelector('[data-run-action="resume"]').click();
+    await settleAction();
+
+    const remaining = run.steps[0].timeGate.availableAt - paused.store.worldTime;
+    assert.equal(remaining, 3 * 3600, 'the resumed gate still owes the whole frozen remainder');
+    const expected = ((required - remaining) / required) * 100;
+    assert.equal(expected, 25, 'a four-hour gate with three hours left is a quarter served');
+
+    const left = [
+      ...paused.target.querySelectorAll('[data-journal-summary-card="time"] [data-journal-fact]'),
+    ].find((row) => row.textContent.includes(english.FABRICATE.App.Journal.Summary.Left));
+    assert.match(left.textContent, /3h 0m 0s/u, 'the TIME card still reports three hours left');
+
+    const fill = paused.target.querySelector(
+      '[data-journal-stages] [data-run-progress-track="0"] .fab-fill-bar-fill'
+    );
+    assert.equal(
+      fill.getAttribute('style'),
+      `width: ${expected}%;`,
+      'the detail bar agrees with the label beside it rather than pegging full'
+    );
+    const row = paused.target.querySelector(
+      '[data-journal-list="active"] [data-run-id="lab-v1-waiting-auto-eligible"] [data-run-progress]'
+    );
+    assert.equal(
+      row.getAttribute('data-run-progress'),
+      String(expected),
+      'and so does the list row, which read the same unmoved initiatedAt'
+    );
+  });
+
   it('keeps paging independent, retains off-page detail, and filters through real controls', async () => {
     const paging = await mountState('active-page-two');
     const firstCard = paging.target.querySelector(

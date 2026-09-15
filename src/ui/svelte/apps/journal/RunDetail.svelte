@@ -82,14 +82,19 @@
     };
   });
   const summaryGate = $derived(viewedStage?.timeGate ?? (viewedIsCurrent ? currentGate : null));
+  // THE BAR READS THE GATE'S DEADLINE, NEVER ELAPSED WALL TIME (issue 1648). `applyResume`
+  // re-anchors `availableAt` past every paused second, so `required - remaining` carries any
+  // number of pause cycles already and agrees with the remaining-time labels beside it.
+  // `now - initiatedAt` counted the pause as progress and pegged the bar full on a run the
+  // same panel reported as still waiting.
   const elapsed = $derived.by(() => {
     const required = Number(currentGate?.requiredSeconds);
     if (!(Number.isFinite(required) && required > 0)) return status === 'ready' ? 100 : 0;
     const pausedRemaining = numberOrNaN(run?.pauseState?.remainingSeconds);
-    const elapsedSeconds = Number.isFinite(pausedRemaining)
-      ? required - pausedRemaining
-      : now - Number(currentGate?.initiatedAt ?? now);
-    return Math.max(0, Math.min(100, (elapsedSeconds / required) * 100));
+    const gateRemaining = Number(currentGate?.availableAt) - now;
+    const remaining = Number.isFinite(pausedRemaining) ? pausedRemaining : gateRemaining;
+    if (!Number.isFinite(remaining)) return 0;
+    return Math.max(0, Math.min(100, ((required - remaining) / required) * 100));
   });
   const progressBlocker = $derived(
     run?.pauseState ? localize('FABRICATE.App.Journal.Notice.PausedTitle') : ''
