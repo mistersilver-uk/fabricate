@@ -2,7 +2,7 @@ src/canvas/InteractableManager.js	1151
 src/canvas/InteractableManager.js::_spawnInteractableRegion	120
 src/canvas/interactableResolution.js::buildRegionSpawnRequest	116
 src/canvas/regions/interactableRegionFlags.js::buildInteractableBehaviorSchema	104
-src/main.js	6780
+src/main.js	6786
 src/main.js::Hooks.once#2	291
 src/main.js::Hooks.once>on	111
 src/main.js::_runMigrations	206
@@ -25,7 +25,7 @@ src/systems/BulkSalvageService.js	816
 src/systems/CompendiumImporter.js	1542
 src/systems/CompendiumImporter.js::_remapComponentUuids	134
 src/systems/CompendiumImporter.js::importFromPackData	291
-src/systems/CraftingEngine.js	9853
+src/systems/CraftingEngine.js	9869
 src/systems/CraftingEngine.js::_applyToolBreakage	114
 src/systems/CraftingEngine.js::_buildVersionedStageOperation	273
 src/systems/CraftingEngine.js::_createSingleResult	169
@@ -85,7 +85,7 @@ src/systems/RecipeVisibilityService.js::evaluateRecipeAccess	141
 src/systems/ResolutionModeService.js	1036
 src/systems/ResolutionModeService.js::validateRecipe	158
 src/systems/ResolutionModeService.js::validateSalvage	116
-src/systems/RunJournalBuilder.js	2804
+src/systems/RunJournalBuilder.js	2822
 src/systems/RunJournalBuilder.js::_craftingRunModel	187
 src/systems/RunJournalBuilder.js::_craftingStepModel	126
 src/systems/RunJournalBuilder.js::_passthroughRunModel	113
@@ -106,11 +106,11 @@ src/systems/gatheringLocation.js::evaluateLocationAvailability	101
 src/systems/importReferenceResolver.js	1047
 src/systems/importReferenceResolver.js::collectBrokenInternalReferences	155
 src/systems/inventorySnapshot.js::buildInventorySnapshot	152
-src/systems/journalRunAuthority.js	862
-src/systems/journalRunAuthority.js::createFoundryJournalRunAuthority	155
-src/systems/journalRunAuthority.js::createJournalRunAuthority	523
-src/systems/journalRunAuthority.js::createJournalRunAuthority>run	125
-src/systems/journalRunAuthority.js::createJournalRunAuthority>run>queue	123
+src/systems/journalRunAuthority.js	899
+src/systems/journalRunAuthority.js::createFoundryJournalRunAuthority	157
+src/systems/journalRunAuthority.js::createJournalRunAuthority	555
+src/systems/journalRunAuthority.js::createJournalRunAuthority>run	129
+src/systems/journalRunAuthority.js::createJournalRunAuthority>run>queue	127
 src/systems/journalRunCommands.js	992
 src/systems/journalRunCommands.js::createJournalRunCommandService	396
 src/systems/journalRunCommands.js::createJournalRunCommandService>executeOperation	179
@@ -129,7 +129,7 @@ src/ui/navTabBadgeStore.js::createNavTabBadgeStore	123
 src/ui/svelte/SvelteApplicationMixinCore.js::createSvelteApplicationMixin	111
 src/ui/svelte/actions/anchoredPopover.js::anchoredPopover	197
 src/ui/svelte/apps/ActorSelectTopBar.svelte	524
-src/ui/svelte/apps/FabricateAppRoot.svelte	824
+src/ui/svelte/apps/FabricateAppRoot.svelte	830
 src/ui/svelte/apps/InteractableBrowserRoot.svelte	668
 src/ui/svelte/apps/InteractableConfigRoot.svelte	1172
 src/ui/svelte/apps/alchemy/Workbench.svelte	868
@@ -239,12 +239,12 @@ src/ui/svelte/stores/craftingStore.svelte.js::createCraftingStore	978
 src/ui/svelte/stores/inventoryStore.svelte.js	1833
 src/ui/svelte/stores/inventoryStore.svelte.js::createInventoryStore	1260
 src/ui/svelte/stores/inventoryStore.svelte.js::createInventoryStore>salvage	137
-src/ui/svelte/stores/journalStore.svelte.js::createJournalStore	553
+src/ui/svelte/stores/journalStore.svelte.js::createJournalStore	560
 src/ui/svelte/stores/worldScopeActions.js	881
 src/ui/svelte/stores/worldScopeActions.js::createWorldScopeEntityActions	467
 src/ui/svelte/stores/worldScopeActions.js::createWorldVocabularyActions	128
 src/ui/svelte/stores/worldScopeProjection.js	924
-src/ui/svelte/util/foundryBridge.js	915
+src/ui/svelte/util/foundryBridge.js	933
 src/ui/svelte/util/foundryIconCatalogue.js	1553
 src/ui/svelte/util/recipeGraphBuilder.js	936
 src/ui/svelte/util/shoppingListAggregator.js::aggregateShoppingList	179
