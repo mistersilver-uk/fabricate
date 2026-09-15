@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { importsModule, parseComponent } from '../helpers/svelteStructureContract.js';
-import { calledName, walkNodes } from '../helpers/moduleAst.js';
+import { calledName, parseModule, walkNodes } from '../helpers/moduleAst.js';
 
 import { JOURNAL_RUN_REASON_KEYS } from '../../src/ui/svelte/util/journalRunReasons.js';
 
@@ -175,6 +175,51 @@ describe('Journal label mirrors resolve in lang/en.json (drift guard)', () => {
   // The historical branch spells no whole key: `tests/ui-lang-keys-resolve.test.js` sees only the
   // interpolated prefix, resolves it to an object and checks nothing beneath it, so deleting
   // `History.RollNotRecorded` passed every gate. Prefix and leaves both come from the AST.
+  // The same `text(leaf)` idiom now appears in three places, so the checker is shared. A
+  // module that composes its own prefix is invisible to `ui-lang-keys-resolve`, which can
+  // only check that the BASE exists — these assertions are what check the leaves.
+  const textHelperKeys = (ast) => {
+    const leaves = (node) => {
+      if (node?.type === 'Literal' && typeof node.value === 'string') return [node.value];
+      if (node?.type === 'ConditionalExpression')
+        return [...leaves(node.consequent), ...leaves(node.alternate)];
+      return [];
+    };
+    let prefix = null;
+    const keys = [];
+    for (const node of walkNodes(ast)) {
+      if (
+        node.type === 'VariableDeclarator' &&
+        node.id?.name === 'text' &&
+        calledName(node.init?.body) === 'localize'
+      ) {
+        prefix = node.init.body.arguments[0]?.quasis?.[0]?.value?.cooked ?? null;
+      }
+      if (calledName(node) === 'text') keys.push(...leaves(node.arguments?.[0]));
+    }
+    return { prefix, keys };
+  };
+
+  for (const [label, path, floor] of [
+    ['the run state notice', '../../src/ui/svelte/apps/journal/runStateNotice.js', 4],
+    ['the claim recovery dialog', '../../src/ui/svelte/apps/journal/runRecovery.js', 4],
+  ]) {
+    it(`resolves every prefixed label ${label} reads through its text helper`, () => {
+      // These two are plain .js modules, so they parse with parseModule; the historical
+      // branch below is a .svelte component and parses with parseComponent.
+      const { prefix, keys } = textHelperKeys(parseModule(read(path)));
+      assert.ok(prefix?.startsWith('FABRICATE.'), `the text helper localizes a prefix: ${prefix}`);
+      assert.ok(keys.length >= floor, `extracted the text() call sites: ${keys.length}`);
+      for (const key of new Set(keys)) {
+        assert.equal(
+          typeof resolveLangKey(prefix + key),
+          'string',
+          `${prefix}${key} must resolve to a string in lang/en.json`
+        );
+      }
+    });
+  }
+
   it('resolves every prefixed History label the historical branch reads through its text helper', () => {
     const ast = parseComponent(historySource);
     const leaves = (node) => {

@@ -132,7 +132,7 @@ src/ui/svelte/apps/ActorSelectTopBar.svelte	524
 src/ui/svelte/apps/FabricateAppRoot.svelte	824
 src/ui/svelte/apps/InteractableBrowserRoot.svelte	668
 src/ui/svelte/apps/InteractableConfigRoot.svelte	1172
-src/ui/svelte/apps/alchemy/Workbench.svelte	861
+src/ui/svelte/apps/alchemy/Workbench.svelte	868
 src/ui/svelte/apps/crafting/RecipeBrowser.svelte	502
 src/ui/svelte/apps/crafting/ShoppingList.svelte	642
 src/ui/svelte/apps/crafting/detail/ProgressiveStageList.svelte	823
@@ -231,14 +231,14 @@ src/ui/svelte/stores/adminStore.js::createAdminStore>_createTravelSection>buildS
 src/ui/svelte/stores/adminStore.js::createAdminStore>refresh	349
 src/ui/svelte/stores/adminStore.js::createAdminStore>updateEnvironmentDraft	131
 src/ui/svelte/stores/adminSystemInspectorProjection.js::buildSelectedSystemViewData	313
-src/ui/svelte/stores/alchemyStore.svelte.js::createAlchemyStore	637
+src/ui/svelte/stores/alchemyStore.svelte.js::createAlchemyStore	644
 src/ui/svelte/stores/craftingSourcesStore.svelte.js::createCraftingSourcesStore	126
-src/ui/svelte/stores/craftingStore.svelte.js	1050
-src/ui/svelte/stores/craftingStore.svelte.js::createCraftingStore	970
+src/ui/svelte/stores/craftingStore.svelte.js	1062
+src/ui/svelte/stores/craftingStore.svelte.js::createCraftingStore	978
 src/ui/svelte/stores/inventoryStore.svelte.js	1833
 src/ui/svelte/stores/inventoryStore.svelte.js::createInventoryStore	1260
 src/ui/svelte/stores/inventoryStore.svelte.js::createInventoryStore>salvage	137
-src/ui/svelte/stores/journalStore.svelte.js::createJournalStore	528
+src/ui/svelte/stores/journalStore.svelte.js::createJournalStore	534
 src/ui/svelte/stores/worldScopeActions.js	881
 src/ui/svelte/stores/worldScopeActions.js::createWorldScopeEntityActions	467
 src/ui/svelte/stores/worldScopeActions.js::createWorldVocabularyActions	128
