@@ -368,10 +368,17 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-future-stage',
   ]),
+  // `HistoricalRunDetail.svelte:168` renders this card too, so a change to its inset or its
+  // region rhythm moves the multi-stage HISTORY cards as well as the active ones — and the three
+  // active frames alone would publish evidence that does not show it. `claim-retained` is here
+  // because it is the state where the card's first region is the io block with no stage heading
+  // above it, which is the shape the top-inset rule governs.
   'src/ui/svelte/components/StageCard.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
     'fabricate-journal-lifecycle-past-stage',
     'fabricate-journal-lifecycle-future-stage',
+    'fabricate-journal-lifecycle-claim-retained',
+    'fabricate-journal-lifecycle-history-multi-success',
   ]),
   'src/ui/svelte/components/ListRow.svelte': Object.freeze([
     'fabricate-journal-lifecycle-ready-single',
