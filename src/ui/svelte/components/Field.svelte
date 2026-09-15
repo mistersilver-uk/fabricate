@@ -1,157 +1,73 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  THE manager's labelled form field — the `.manager-field` column (issue 1428).
-
-  ── WHY IT EXISTS ─────────────────────────────────────────────────────────────────
-  `.manager-field` was a CSS CONVENTION and nothing else: write
-  `class="manager-field"`, then remember which HOST element the field is supposed to
-  be. The sheet declares the box once —
-  `styles/fabricate.css:10123`, `display: flex; flex-direction: column;
-  gap: var(--fab-space-chip); font-size: 0.82rem; font-weight: 700` — and 88 sites
-  across 24 components re-typed the class onto an element each of them chose for
-  itself.
-
-  ── THE FAMILY IS ROOTED AT THE CLASS THIS COMPONENT EMITS (issue 1508) ───────────
-  That box rule and the family's control chrome are written `.fabricate-field…` rather
-  than `.fabricate-manager .manager-field…`, so a field paints wherever it is rendered
-  instead of only inside the manager. `fabricate-field` is the FIRST literal of the
-  class array below, and that position is a constraint rather than a style note:
-  `tests/components/searchable-popover-area-scope.test.js` reads the composed region up
-  to the first `]`, so a root moved off the head of the array is a root that gate
-  reports as unemitted while every re-rooted rule keeps matching.
-
-  THE FONT FLOOR IS NOT IN THIS FAMILY'S BLOCK. This family's root is not its control —
-  the field is a column and the control is a bare `<input>`, `<select>` or `<textarea>`
-  inside it — so the floor is written at the family root PLUS the element it owns,
-  `.fabricate-field :is(input, select, textarea)` at (0,1,1), grouped with
-  `ManagerSearchField`'s and `ChanceSlider`'s members immediately below the area's own
-  bare-element baseline (`fabricate.css:1471`). Position is load-bearing: `font` is a
-  shorthand that resets `line-height`, and at (0,1,1) the group ties every LATER
-  same-rank rule in the area, two of which restate a `font` longhand for controls these
-  floors reach. Declared thousands of lines further down in this family's own block it
-  would win both and silently re-type every manager textarea and select.
-
-  The group carries `font: inherit` AND NOTHING ELSE, because at a tie a declaration the
-  baseline does not also carry is a real move inside the manager. `appearance` and
-  `min-height` are the two this family would like and cannot have at that rank, so
-  Field's element-typed chrome is a SECOND rule in the family's own block
-  (`fabricate.css:10739`) that restates the area baseline's element predicate leg for
-  leg — six `input` legs and `textarea` — and carries only that block's `appearance`,
-  `-webkit-appearance` and `min-height`. Widening the floor instead would take the radios
-  inside a `<Field as="fieldset">` from 16px to 34, a range input from 28 to 34 and a
-  `.fab-stepper-input` from 22 to 34.
-
-  THE PAIR EXCLUDES `select`, DELIBERATELY, and the reason is now historical. The family
-  declares both halves — the strip `.fabricate-field :is(input, textarea):focus`
-  (`fabricate.css:10823`) and the repaint `.fabricate-field input:focus-visible,
-  .fabricate-field textarea:focus-visible` (`:10840`) — over `input` and `textarea` only. A
-  `select` leg would have been (0,2,1), tied `.fabricate-app select:focus-visible` and won on
-  source order, deleting the inset ring that existed because an outset outline on a select is
-  clipped by an overflow-clipped container; that rule was deleted with the player app's last
-  native select at issue 1511. A `<select>` in a Field keeps the area's ring and the area's
-  `appearance`, a stated residue owned by issue 1510's sweep and by the root's own convergence
-  (issue 1357).
-
-  ── THE HOST IS THE WHOLE POINT, WHICH IS WHY IT IS A REQUIRED-SHAPED PROP ────────
-  Measured on the tree this extraction started from, those 88 sites used THREE hosts:
-  56 `<label>`, 31 `<div>` and 1 `<fieldset>`. That is not a styling variant. A
-  `<label>` field WRAPS its control and gives it its accessible name, so a screen
-  reader announces "Maximum stamina, edit text" on a control that carries no `id`,
-  no `for` and no `aria-label` of its own. A `<div>` field does not, and 31 sites
-  rely on that: they hold two controls, or none, or a control that is already named
-  by something else, and wrapping any of them in a `<label>` would hand the label
-  text to whichever labelable descendant happens to come first.
-
-  So `as` is a CLOSED SET with no correct default — exactly the shape `ManagerButton`
-  gave `tag` and for the same reason: a per-site decision that is invisible in the
-  rendered pixels and load-bearing in the announcement must be written at the call
-  site, not remembered. `tests/components/field-source-contract.test.js` requires a
-  literal `as` on every `<Field>` in `src/`, so the fallback below is unreachable from
-  the product.
-
-  ── WHY THE FALLBACK IS `div` AND NOT `label` ─────────────────────────────────────
-  `label` is the majority host, so it is the tempting default, and it is the wrong
-  one. A missing `as` that renders a `<div>` LOSES an implicit association: the
-  control keeps whatever name it already had and the field reads as unlabelled. A
-  missing `as` that rendered a `<label>` would INVENT one: the wrapped control is
-  announced under text that belongs to a different control, the field gains
-  click-to-focus behaviour that moves focus somewhere unexpected, and nothing about
-  either is visible on screen. A `<div>` is the box with no contract; `label` and
-  `fieldset` both carry behaviour, so neither may be reached by omission. The
-  fallback also `console.warn`s, so it is loud in a dev console as well as red in
-  the gate.
-
-  ── THE `fieldset` MEMBER HAS ONE CALLER, AND IT IS NOT A `div` IN DISGUISE ───────
-  `components/RadioCardGroup.svelte` is the single `<fieldset>` site. It is a
-  genuine grouped-control case on three independent counts, each of which a `<div>`
-  would silently drop: it renders a `<legend>`, which is only valid as a fieldset's
-  first child and is what names the group; it holds a radio group — several `<input
-  type="radio">` sharing one `name` — which is the exact construct `fieldset`/`legend`
-  exists to announce; and it forwards a `disabled` attribute, which on a `<fieldset>`
-  disables every descendant form control and on a `<div>` does nothing at all. It is
-  a member of the set rather than an allowlisted exception because the alternative is
-  a hole in the source-contract gate for the one host whose behaviour is hardest to
-  reproduce by hand.
-
-  ── MOVING A CLASS ONTO THIS COMPONENT CAN KILL A SCOPED RULE ────────────────────
-  Same trap `ManagerButton.svelte` documents at length, and it bit three files here.
-  Svelte stamps a component's `svelte-<hash>` onto the elements THAT component
-  writes; a `class` handed to a child is forwarded verbatim, so a scoped
-  `.manager-task-dc-field { … }` in the caller compiles to
-  `.manager-task-dc-field.svelte-<hash>` and matches nothing the moment that class
-  moves onto a `<Field>`. It fails two ways and only one of them warns, and WHICH way is a
-  property of the whole caller rather than of the class you moved: measured on svelte 5.56.3,
-  the rule is emitted-with-hash and SILENT whenever that file also holds a REGULAR element
-  carrying a spread (`<li {...hook}>`) or a `class` whose value is an expression (`class={o.icon}`,
-  template literals included). A spread or dynamic class on a COMPONENT tag, a `class:` directive
-  and a static class all prune-and-warn instead. Expression-valued classes are common here, so
-  assume the silent mode and grep the caller's own `<style>` rather than trusting
-  `lint:svelte:warnings`. The repair is `:global(.manager-field.the-other-class)`, chained so the
-  compound keeps the (0,2,0) the scoped form had — the bare `:global(.the-other-class)` reaches
-  the element and smuggles a cascade change in as a repair. A DESCENDANT selector must be wrapped
-  WHOLE: `:global(ancestor) .child` leaves `.child` as the only scoped compound, so the hash is
-  emitted bare and the rule silently goes (0,3,0) to (0,4,0).
-  `tests/components/manager-button-scoped-class-reach.test.js` is the mechanical guard; its
-  `PRIMITIVES` registry carries the `Field` row.
-
-  It deliberately has no scoped `<style>`, for the reason `ManagerButton` states: the
-  global sheet owns `.manager-field` and its ~30 descendant rules, and a scoped block
-  here would be a second source of truth for the same box.
+  THE manager's labelled form field — the `.manager-field` column that stacks a caption over its
+  control.
 
   Props:
-   - as: `'label'`, `'div'` or `'fieldset'`. REQUIRED-SHAPED — see above. An
-     unrecognised or missing value renders a `<div>` and warns.
-   - class: an EXTRA class, appended to `manager-field` — never a replacement. It is a
-     named prop rather than a rest key because the rest spread lands after
-     `class={classes}` in the markup, so a `class` arriving through it would REPLACE
-     `manager-field` outright and silently unstyle the field while every `data-*`
-     selector kept resolving.
-   - children: the field's content — conventionally a `<span>` caption followed by the
-     control, which is the shape `.fabricate-manager .manager-field > span` and the
-     blanket `.manager-field select|input|textarea` rules in `styles/fabricate.css`
-     are written against.
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `as` | `'label'` \| `'div'` \| `'fieldset'` | none | REQUIRED-SHAPED; see the invariants. An unrecognised or missing value renders a `<div>` and `console.warn`s. |
+  | `class` | class string | `''` | An EXTRA class, appended to the primitive's own, never a replacement. |
+  | `children` | snippet | `undefined` | Conventionally a `<span>` caption followed by the control — the shape the sheet's `> span` and blanket control rules are written against. |
 
-  Every other attribute — `data-*` hooks, `id`, `aria-*`, `title`, `disabled` on the
-  fieldset — is forwarded through the rest spread, so a call site keeps its own
-  selectors.
+  Rest spread:
+  - `{...rest}` lands on the host element, so a call site keeps its `data-*` hooks, `id`,
+    `aria-*`, `title`, and `disabled` on the fieldset.
+  - `class` is a named prop, because a rest key would REPLACE `manager-field` outright and
+    silently unstyle the field while every `data-*` selector kept resolving.
+
+  Invariants:
+  - `as` IS A CLOSED SET WITH NO CORRECT DEFAULT, and the choice must be written at the call
+    site rather than remembered. A `<label>` field WRAPS its control and gives it its accessible
+    name; a `<div>` field does not, and the sites that need a `<div>` hold two controls, or
+    none, or a control already named by something else, where a `<label>` would hand the caption
+    to whichever labelable descendant came first. The decision is invisible in the rendered
+    pixels and load-bearing in the announcement.
+    `tests/components/field-source-contract.test.js` requires a literal `as` on every `<Field>`
+    in `src/`, so the fallback is unreachable from the product.
+  - THE FALLBACK IS `div`, NEVER `label`. A missing `as` that renders a `<div>` LOSES an implicit
+    association: the control keeps whatever name it had and the field reads as unlabelled. A
+    missing `as` that rendered a `<label>` would INVENT one — the wrapped control announced under
+    text belonging to a different control, plus click-to-focus that moves focus somewhere
+    unexpected, neither visible on screen. `div` is the box with no contract; `label` and
+    `fieldset` both carry behaviour, so neither may be reached by omission.
+  - `fieldset` IS A MEMBER OF THE SET, not an allowlisted exception. Its one caller,
+    `components/RadioCardGroup.svelte`, renders a `<legend>` (valid only as a fieldset's first
+    child), holds a radio group, and forwards `disabled` — which on a `<fieldset>` disables every
+    descendant control and on a `<div>` does nothing at all.
+  - THE FONT FLOOR IS NOT IN THIS FAMILY'S BLOCK, and its POSITION is the rule. The family root is
+    not its control — the field is a column and the control is a bare `<input>`, `<select>` or
+    `<textarea>` inside it — so the floor is written as `.fabricate-field :is(input, select,
+    textarea)` at (0,1,1), grouped immediately below the area's own bare-element baseline. `font`
+    is a shorthand that resets `line-height`, and at (0,1,1) the group TIES every later same-rank
+    rule in the area, two of which restate a `font` longhand for controls these floors reach.
+    Declared thousands of lines further down in this family's own block it would win both and
+    silently re-type every manager textarea and select.
+  - THE FLOOR GROUP CARRIES `font: inherit` AND NOTHING ELSE, because at a tie a declaration the
+    baseline does not also carry is a real move inside the manager. `appearance` and `min-height`
+    are the two this family would like and cannot have at that rank, so Field's element-typed
+    chrome is a SECOND rule in the family's own block that restates the baseline's element
+    predicate leg for leg and carries only those. Widening the floor instead would take the
+    radios inside a `<Field as="fieldset">` from 16px to 34, a range input from 28 to 34 and a
+    `.fab-stepper-input` from 22 to 34.
+  - THE FOCUS PAIR EXCLUDES `select`, DELIBERATELY. Both halves are declared over `input` and
+    `textarea` only; a `select` leg would have been (0,2,1) and would have deleted the inset ring
+    that exists because an outset outline on a select is clipped by an overflow-clipped
+    container. A `<select>` in a Field keeps the area's ring and the area's `appearance`.
+  - MOVING A CLASS ONTO THIS COMPONENT CAN KILL A SCOPED RULE, usually SILENTLY — the trap
+    `ManagerButton.svelte` states in full, and it bit three callers here. The repair is
+    `:global(.manager-field.the-other-class)`, CHAINED so the compound keeps the specificity the
+    scoped form had. `tests/components/manager-button-scoped-class-reach.test.js` is the
+    mechanical guard; its `PRIMITIVES` registry carries the `Field` row.
+  - No scoped `<style>`: the global sheet owns `.manager-field` and its descendant rules, and a
+    scoped block here would be a second source of truth for the same box.
 -->
 <script>
-  let {
-    as = undefined,
-    // An EXTRA class, appended to the primitive's own — never a replacement for it.
-    class: extraClass = '',
-    children = undefined,
-    ...rest
-  } = $props();
+  let { as = undefined, class: extraClass = '', children = undefined, ...rest } = $props();
 
-  // The closed host set. `Set` rather than an array so the membership test is not a
-  // linear scan that a fourth member would quietly make wrong, and declared outside the
-  // component instance so `field-source-contract.test.js` can read the literal.
+  // Declared outside the component instance so `field-source-contract.test.js` can read the
+  // literal, and a `Set` so a fourth member cannot make the membership test a linear scan.
   const HOSTS = new Set(['label', 'div', 'fieldset']);
 
-  // `div` is the fallback, deliberately, and the docblock above records why: it is the
-  // only member of the set that carries no behaviour, so it is the only one that may be
-  // reached by omission.
   const FALLBACK_HOST = 'div';
 
   const host = $derived(HOSTS.has(as) ? as : FALLBACK_HOST);

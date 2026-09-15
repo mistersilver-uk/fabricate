@@ -1,177 +1,56 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  THE manager's filter bar (issue 1039).
-
-  ── WHY IT EXISTS ─────────────────────────────────────────────────────────────────
-  `openspec/specs/design-system/spec.md`'s browse archetype names "the filter bar" as
-  a fixed element of every browse screen, and until this component the bar was a CSS
-  CONVENTION: write `class="manager-toolbar"` on a `<section>` and the sheet gives you
-  the `--fab-space-3` padding, the hairline bottom rule, the `--fab-overlay-light-03`
-  fill and the wrapping flex row (`fabricate.css:5594` for the box, `:5599` for the
-  never-rendered grid form and `:5605` for the flex branch every bar actually takes).
-  Eleven sites across eleven components wrote that out by hand.
-
-  ── THE FAMILY IS ROOTED AT THE CLASS THIS COMPONENT EMITS (issue 1508) ───────────
-  Those three rules, `.manager-environments-toolbar`/`.manager-task-toolbar`'s two caps
-  and the 38px select rung are written `.fabricate-filter-bar.manager-toolbar…` rather
-  than `.fabricate-manager .manager-toolbar…`, so the bar paints wherever it is
-  rendered instead of only inside the manager. `fabricate-filter-bar` is the FIRST
-  literal of the class array below, and that position is a constraint rather than a
-  style note: `tests/components/searchable-popover-area-scope.test.js` reads the
-  composed region up to the first `]`, so a root moved off the head of the array is a
-  root that gate reports as unemitted while every re-rooted rule keeps matching.
-
-  This family declares NO font floor and NO focus pair, and that is a positive
-  decision rather than an omission. The bar owns no control of its own — it renders
-  `{@render children?.()}` and nothing else — and `openspec/specs/design-system/
-  spec.md`'s pair requirement forbids a primitive displacing an area's chrome for a
-  control it does not own. The one family rule that REACHES a caller's control,
-  `.fabricate-filter-bar.manager-toolbar select.is-size-38` (`fabricate.css:26928`),
-  travels with the family and takes Foundry's own type and chrome in a bare host; that
-  is a recorded residue owned by issues 1510/1511, not a licence to floor it here.
-  `tests/components/re-rooted-controls-host-independence.test.js` carries the negative
-  control that asserts neither half exists.
-
-  ONE rule stays application-rooted, named rather than silently left behind:
-  `fabricate.css:9941`'s `.fabricate-manager [data-scoped-page='world-vocabulary']
-  .manager-toolbar.manager-scoped-list-toolbar select`. Its family compound stands
-  THIRD, behind an attribute ancestor that is not the application root, so neither
-  re-rooting form exists for it. The reason is recorded beside the rule in the sheet.
-
-  ── ONE HOST, AND THE CENSUS THAT ESTABLISHED IT ──────────────────────────────────
-  All eleven sites are a `<section>`. That was measured by walking each component's
-  Svelte AST rather than by grep, because a `class` attribute on its own line, a
-  multi-line attribute list or a template-literal `class` all defeat a line-based
-  census — `StatusToggle`'s found three element shapes and needed an `as` prop, and
-  `InspectorCard`'s found one and rightly refused one. This census found one, so there
-  is no polymorphism prop here either.
-
-  A raw grep says TWELVE. It is wrong, and the reason is worth stating because the
-  same regex will be written again: `GatheringTaskEditView.svelte:1813` is a
-  `.manager-toolbar-pills` chip row on a `<div>`, and `\b` matches before a hyphen, so
-  a `\b`-terminated token pattern counts it. A class-token pattern has to end
-  `(?![\w-])`. `tests/helpers/primitiveSourceContract.js` matches on that boundary for
-  the same reason.
-
-  ── WHAT THIS COMPONENT DOES NOT OWN, AND WHY ─────────────────────────────────────
-  THE ROW DIV IS NOT SWALLOWED. Four bars wrap their controls in a row class —
-  `manager-component-filter-row`, `manager-essence-filter-row`,
-  `manager-recipe-filter-row` and `manager-scoped-list-filter-row` — and the Component
-  and Recipe studios render THREE such rows each (the base row, `.is-secondary` and
-  `.is-chips`). More importantly the row class is a SHARED SEAM already:
-  `BulkSelectionToolbar.svelte:116` renders `<div class="{rowClass} is-selection">` in
-  its OWN template, which is how spec.md's "the selection bar replaces the filter bar
-  in place" is built. `EssenceBrowserView.svelte:527-536` records that contract
-  breaking once already — a row rule authored in the essence view's scoped block never
-  reached the primitive's div, and the selection row shipped with no row metrics at
-  all. A bar that rendered the row itself would have to re-decide that, so it renders
-  its children and nothing else.
-
-  THE FILTER CONTROL IS NOT PICKED. Across the eleven bars the control beside the
-  search field is three different things — `<label class="manager-filter"><select>`
-  (16 sites), a bare `<select>` carrying its own accessible name (2), and a
-  segmented control (2, at `EssenceBrowserView.svelte:289` and
-  `RecipesBrowserView.svelte:519`). `library.html:1432` sketches a `<FilterBar>` that
-  owns `toggles`, `selects`, `segments` and `sort` as DATA; the shipped corpus has
-  three control vocabularies and no bar in a position to choose between them, so this
-  primitive takes a slot. See the manifest row and `ui-integration/spec.md`.
-
-  NO VARIANT PROP. The sheet paints four further treatments and they are not one
-  vocabulary: `.manager-environments-toolbar` and `.manager-task-toolbar` cap the bar
-  at 100px and 112px and scroll it (`fabricate.css:5611`, `:5617`);
-  `.manager-scoped-list-toolbar` is sized from a SCOPED rule in
-  `scoped/EntityListInspectorFrame.svelte` rather than from the sheet at all; and
-  `.fabricate-filter-bar.manager-toolbar:not(:has(.manager-toolbar-primary))` (`:5605`)
-  switches the bar from grid to flex — a branch that is ALWAYS taken, because no
-  component under `src/` writes `.manager-toolbar-primary`, measured, so the grid form
-  at `:5599` is declared and never rendered. Every modifier therefore travels as a
-  pass-through on `class`, spelled as it is spelled today.
-
-  It deliberately has no scoped `<style>`, for `ManagerButton.svelte`'s,
-  `IconButton.svelte`'s and `InspectorCard.svelte`'s reason: the bar is painted by
-  `styles/fabricate.css`, and a scoped block here would be a second source of truth for the
-  same box.
-
-  THE "IT RENDERS UNSTYLED OUTSIDE THE MANAGER" CLAUSE THAT STOOD HERE WAS FALSE, and it
-  was already false when it was written (corrected in issue 1520). Issue 1508's second
-  phase re-rooted this family at `fabricate-filter-bar`, the class `classes` below emits, so
-  the padding-and-rule pair, the grid form and the flex branch that always wins are all
-  written `.fabricate-filter-bar.manager-toolbar` and reach the bar wherever it renders.
-
-  ONE RESIDUE IS REAL and is named rather than swept in with the claim: the responsive
-  narrowing at `styles/fabricate.css`'s `@container fabricate-manager (max-width: 680px)`
-  block, whose container NAME is established by `.fabricate-manager` itself. In a host with
-  no `.fabricate-manager` above the bar there is no such container to query, so that rule
-  simply does not apply — a residue of the responsive layer, owned by issue 1518, exactly as
-  `ManagerSearchField.svelte` records for its own two members of the same block.
-
-  The clause's second half is retired rather than re-dated: the Interactable browser renders
-  this bar as its system-and-search control row, inside a `.fabricate-app` frame.
-
-  It is an IMPORT-FREE LEAF, like `Stepper`, `IconButton` and `InspectorCard`: props
-  only, no `foundryBridge`, no util imports. Callers pass an ALREADY-LOCALIZED
-  `ariaLabel`. One util import inside a leaf propagates a required raw-module entry
-  into every mount harness that compiles anything rendering it, and an omission there
-  is reported as `# cancelled` rather than `# fail` — see the measured account in
-  `tests/components/mounted-harness-primitive-allowlist.test.js`.
-
-  ── THE ACCESSIBLE NAME IS A NAMED PROP, NOT A REST KEY ───────────────────────────
-  A `<section>` is a `region` landmark only while it has an accessible name; without
-  one it is a generic grouping element and drops out of the landmark list entirely. All
-  eleven hand-rolled bars carried an `aria-label` and nothing made them. Passing it
-  through the rest spread would have kept that a convention, so it is a named prop and
-  `tests/components/manager-filter-bar-source-contract.test.js` asserts every call
-  site passes it.
-  That is the clause that earns this primitive its own guard file, exactly as the
-  accessible-name clause earns `IconButton`'s.
+  THE manager's filter bar — the `<section>` landmark a browse screen writes its search field
+  and filter controls into. It renders its children and nothing else.
 
   Props:
-   - children: the bar's contents. A snippet, because the bar is a container: its rows,
-     its search field and its filter controls are whatever the screen writes.
-   - ariaLabel: the landmark's accessible name, already localized. Required in
-     practice and gated by the source contract.
-   - class: an EXTRA class, appended to the primitive's own, never a replacement. It
-     has to be a named prop rather than a rest key, because the rest spread lands after
-     `class={classes}` and a `class` passed through it would REPLACE `manager-toolbar`
-     outright — silently un-barring the section while every `data-*` selector in the
-     tests kept resolving.
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `ariaLabel` | localized string | `undefined` | The landmark's accessible name. Required in practice. |
+  | `class` | class string | `''` | An EXTRA class, appended to the primitive's own, never a replacement. |
+  | `children` | snippet | `undefined` | The bar's contents: rows, search field, filter controls. |
 
-     Before writing a rule against it, read `InspectorCard.svelte`'s note on the same
-     prop. A scoped `<style>` rule in the CALLING component stops reaching the element
-     the moment that site converts, and on Svelte 5.56.3 that is usually SILENT: a rule
-     survives with the hash attached and matching nothing whenever the same component
-     also writes a regular element carrying a spread or an expression-valued `class`.
-     One rule died to this conversion —
-     `scoped/EntityListInspectorFrame.svelte`'s `.manager-scoped-list-toolbar { flex: 0
-     0 auto }` — and it is repaired as `:global(.manager-toolbar.manager-scoped-list-toolbar)`,
-     chained so its specificity is unchanged at (0,2,0).
+  Rest spread:
+  - `{...rest}` lands on the `<section>`, so a call site keeps its own `data-*` hooks, `id` and
+    the `tabindex="-1"` the manager root focuses.
+  - `ariaLabel` and `class` are named props, not rest keys. A `<section>` is a `region` landmark
+    only while it has an accessible name; without one it drops out of the landmark list
+    entirely, and passing it through the spread would leave that a convention.
+    `tests/components/manager-filter-bar-source-contract.test.js` asserts every call site passes
+    it. A `class` arriving through the spread would REPLACE `manager-toolbar` outright and
+    silently un-bar the section while every `data-*` selector kept resolving.
+  - A BARE `data-*` on a COMPONENT tag is the boolean `true`, not the `""` it is on an element:
+    `<ManagerToolbar data-x>` renders `data-x="true"`. Presence selectors resolve either way, so
+    call sites spell it `data-x=""`.
 
-  Every other attribute — `data-*` hooks, `tabindex`, `id` — is forwarded through the
-  rest spread onto the `<section>`, so a call site keeps its own selectors and the
-  three browsers keep the `tabindex="-1"` landmark the manager root focuses.
-
-  ── ONE TRAP THE REST SPREAD CARRIES ──────────────────────────────────────────────
-  A BARE `data-*` attribute on a COMPONENT tag is the boolean `true`, not the empty
-  string it is on an element. `<section data-recipe-toolbar>` renders
-  `data-recipe-toolbar=""`; `<ManagerToolbar data-recipe-toolbar>` spreads `true` and
-  renders `data-recipe-toolbar="true"`. Four of the converted attributes were written
-  bare and every one is spelled `data-…=""` at its call site for that reason. Presence
-  selectors resolve either way, which is precisely why this would not have been caught
-  by the suites and smoke steps that use them.
+  Invariants:
+  - This family declares NO font floor and NO focus pair, deliberately: the bar owns no control
+    of its own, and the design-system pair requirement forbids a primitive displacing an area's
+    chrome for a control it does not own. Pinned by
+    `tests/components/re-rooted-controls-host-independence.test.js`.
+  - THE ROW DIV IS NOT SWALLOWED and THE FILTER CONTROL IS NOT PICKED. The row class is a shared
+    seam — `BulkSelectionToolbar.svelte` renders it in its own template, which is how "the
+    selection bar replaces the filter bar in place" is built — and the control beside the search
+    field is three different vocabularies across the shipped bars. A bar that rendered either
+    would have to re-decide them, so it takes a slot instead.
+  - No `variant` prop: the sheet's four further treatments are not one vocabulary, and one of
+    them is sized from a SCOPED rule in `scoped/EntityListInspectorFrame.svelte` rather than
+    from the sheet at all. Every modifier travels as a pass-through on `class`.
+  - No scoped `<style>`: `styles/fabricate.css` owns the box, and a scoped block here would be a
+    second source of truth for it.
+  - IMPORT-FREE LEAF; callers pass an ALREADY-LOCALIZED `ariaLabel`. One util import inside a
+    leaf propagates a required raw-module entry into every mount harness that compiles anything
+    rendering it, and a missing entry HANGS that suite as `# cancelled` rather than failing it.
+  - A scoped rule in a CALLING component that targets a class handed to this primitive stops
+    reaching the element, usually SILENTLY — see `ManagerButton.svelte`. Repair with
+    `:global(…)` chained so its specificity is unchanged;
+    `tests/components/manager-button-scoped-class-reach.test.js` is the mechanical guard.
+  - ONE family rule stays application-rooted, and the sheet records why beside it:
+    `.fabricate-manager [data-scoped-page='world-vocabulary'] .manager-toolbar
+    .manager-scoped-list-toolbar select`. Its family compound stands THIRD, behind an attribute
+    ancestor that is not the application root, so neither re-rooting form exists for it.
 -->
 <script>
-  let {
-    children = undefined,
-    // The landmark's accessible name, already localized. Named rather than spread because a
-    // `<section>` with no accessible name is not a `region` landmark at all.
-    ariaLabel = undefined,
-    // An EXTRA class, appended to the primitive's own — never a replacement for it. It has to
-    // be a named prop rather than a rest key: the rest spread lands after `class={…}` in the
-    // markup, so a `class` passed through it would REPLACE `manager-toolbar` outright and
-    // silently un-bar the section while every `data-*` selector in the tests kept resolving.
-    class: extraClass = '',
-    ...rest
-  } = $props();
+  let { children = undefined, ariaLabel = undefined, class: extraClass = '', ...rest } = $props();
 
   const classes = $derived(
     ['fabricate-filter-bar', 'manager-toolbar', extraClass].filter(Boolean).join(' ')
