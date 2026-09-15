@@ -933,6 +933,59 @@ describe('journal run command protocol', () => {
     assert.equal(posts, 0);
   });
 
+  /**
+   * QE2-8 reported that `journalStore`'s cancel discriminator now lets the prepare-token
+   * RELEASE fall through to a refresh. It cannot: `executeJournalRunCommand` consumes the
+   * release's answer itself and returns its own `roll-cancelled` refusal, so the
+   * `{success: true, cancelled: true}` shape never leaves this module. Pinned here, because
+   * the reading that made the report plausible is one nothing failed on.
+   */
+  it('keeps a dismissed roll a refusal, and never returns the release command answer', async () => {
+    const run = { id: 'released-run', lifecycleVersion: 1, runRevision: 2, status: 'waiting' };
+    const released = [];
+    const { service } = commandHarness({
+      currentUserId: 'gm',
+      run,
+      promptCheck: async () => ({ confirmed: false }),
+      operations: {
+        crafting: {
+          getRun: () => run,
+          describeCheck: async () => ({
+            required: true,
+            publicPrompt: { label: 'Forge' },
+            privateEvaluation: { recipeId: 'recipe', rollFormula: '1d20' },
+          }),
+          execute: async () => {
+            throw new Error('a dismissed roll must never execute');
+          },
+        },
+      },
+      authority: {
+        availability: () => ({ available: true, reason: null }),
+        run: async (_request, handler) =>
+          handler({
+            createExecutionGrant: () => ({ grant: true }),
+            issuePrepareToken: () => 'token',
+            consumePrepareToken: () => ({}),
+            releasePrepareToken: (token) => (released.push(token), true),
+          }),
+        consumeExecutionGrant: (grant) => grant?.grant === true,
+      },
+    });
+
+    const result = await service.executeJournalRunCommand({
+      actorUuid: 'Actor.a',
+      runType: 'crafting',
+      runId: run.id,
+      expectedRevision: 2,
+      action: 'execute',
+    });
+
+    assert.equal(released.length, 1, 'the prepare token was released');
+    assert.deepEqual(result, { success: false, cancelled: true, reason: 'roll-cancelled' });
+    assert.equal(result.success, false, 'so the store returns early on a dismissal, as it did');
+  });
+
   it('accepts a command only from the server-attested sender and re-resolves ownership', async () => {
     const { service, emitted, emissionOptions } = commandHarness({ currentUserId: 'gm' });
     const reply = await service.handleSocketMessage(

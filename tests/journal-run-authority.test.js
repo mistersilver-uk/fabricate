@@ -15,7 +15,7 @@ import { JOURNAL_RUN_COMMAND_TIMEOUT_MS } from '../src/systems/journalRunCommand
  * requested embedded `_id` (without it the id is silently replaced by a fresh one), and only then
  * does the parent collection's duplicate-`_id` check reject the second create.
  */
-function foundryAuthorityFixture(crypto) {
+function foundryAuthorityFixture(crypto, { failServerRead = () => false } = {}) {
   const journal = [];
   const claimCalls = [];
   // Every message the real `SocketInterface.#handleError` would have shown the user. It raises
@@ -121,6 +121,13 @@ function foundryAuthorityFixture(crypto) {
     DatabaseBackend: {
       get: async (_documentClass, { query = {} } = {}) => {
         getCalls.push(query);
+        // `get` dispatches through `SocketInterface`, whose `#handleError` toasts and THEN
+        // rejects, so the read is a rejecting seam exactly like the writes beside it.
+        if (failServerRead(query)) {
+          const message = 'You do not have permission to browse this Journal';
+          serverRejections.push(message);
+          throw new Error(message);
+        }
         return journal
           .filter((entry) => Object.entries(query).every(([key, value]) => entry[key] === value))
           .map((entry) => ({
@@ -483,6 +490,40 @@ describe('journal run authority ledger', () => {
       reason: 'claim-release-failed',
     });
     assert.deepEqual(authority.serverRejections, []);
+  });
+
+  /**
+   * FI1. The release CONFIRMS server-side before deleting, and the confirming read can reject —
+   * the same seam, the same `#handleError`, as the writes around it. Unguarded, that rejection
+   * escaped `deleteClaim`, whose contract is `async => boolean`, and unwound the queued task after
+   * the request was already settled with `claimId: null`: the claim survived with nothing
+   * recording it, `publishAvailability` never ran, and every client sat at `claim-held`.
+   */
+  it('answers a release whose confirming server read rejects, rather than letting it escape', async () => {
+    let failRead = false;
+    const authority = foundryAuthorityFixture(
+      { randomUUID: () => 'secure-uuid' },
+      { failServerRead: () => failRead }
+    );
+    assert.equal((await authority.setup()).success, true);
+
+    const response = await authority.run(
+      { requestId: 'read-rejects', senderId: 'player', sessionId: 'one' },
+      async () => {
+        failRead = true;
+        return { success: true, handlerRan: true };
+      }
+    );
+
+    assert.deepEqual(
+      response,
+      { success: true, handlerRan: true },
+      'the command answers its caller rather than rejecting out of the queue'
+    );
+    assert.ok(authority.serverRejections.length > 0, 'and the read really did reject');
+    // An unreadable server is UNSETTLED, never "the claim is gone": the release falls through to
+    // the local delete, which the fixture's server honours, so the claim is genuinely released.
+    assert.deepEqual(authority.availability(), { available: true, reason: null });
   });
 
   it('refuses a contended acquire before any create is dispatched', async () => {

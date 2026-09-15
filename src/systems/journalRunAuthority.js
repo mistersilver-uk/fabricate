@@ -765,7 +765,14 @@ export function createFoundryJournalRunAuthority({
     if (game?.user?.isGM !== true || typeof CONFIG?.DatabaseBackend?.get !== 'function') {
       return null;
     }
-    return [...((await CONFIG.DatabaseBackend.get(JournalEntry, { query })) ?? [])];
+    try {
+      return [...((await CONFIG.DatabaseBackend.get(JournalEntry, { query })) ?? [])];
+    } catch {
+      // The read itself can reject: `get` dispatches through `SocketInterface`, whose error
+      // handler toasts and then rejects. A rejection is "unanswered", the same `null` the
+      // provisioner's guarded read returns (`journalRunLedger.js`) - never "nothing exists".
+      return null;
+    }
   };
   const listLedgerRecords = async () => {
     const entries = await authoritativeEntries({});
@@ -818,9 +825,16 @@ export function createFoundryJournalRunAuthority({
     // This create KEEPS its duplicate-`_id` rejection, unlike the release below. It is the
     // compare-and-set the lock is made of — `_createDocuments` runs inside the database semaphore
     // — and asking first could not replace it, because "free when asked" is what both racers
-    // would be told. It is not an everyday error either: `ledgerResult` answers `claim-held` for
-    // a LIVE claim before `acquire` reaches `claimOn`, so ordinary contention is refused locally
-    // and dispatches nothing. Only two realms that BOTH saw the claim free collide here.
+    // would be told. `ledgerResult` answers `claim-held` for a LIVE claim before `acquire`
+    // reaches `claimOn`, so ordinary contention is refused locally and dispatches nothing; only
+    // two realms that BOTH saw the claim free collide here.
+    //
+    // That pair is reachable in ordinary play: two browser tabs of the SAME elected GM both pass
+    // `currentRealmIsActiveGm`, both read the broadcast-fed local pages inside the broadcast
+    // window, and both reach here. The loser's refusal is handled correctly, but the server's
+    // throw is routed through `SocketInterface`, which toasts before rejecting, so such a GM sees
+    // one Foundry error per journal command. A per-session election would remove the toast; it is
+    // not attempted here (issue 1648, FI2).
     createClaim: async (entry, source) => {
       const created = await entry.createEmbeddedDocuments(
         'JournalEntryPage',
