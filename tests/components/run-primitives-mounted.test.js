@@ -255,6 +255,14 @@ describe('run primitives mounted behavior', () => {
       /height:\s*34px/u,
       /border-radius:\s*9px/u,
     ]);
+    // Issue 1648 (M16): an unbounded prompt sentence was sizing the header as a
+    // `flex: 0 1 auto` item, pushing the Begin/Cancel button off the card's right edge. Taking
+    // its own line keeps the buttons — not the prose — in control of the bar's width.
+    expectGeometry(
+      'RunActionBar',
+      '.fab-run-begin-prompt,\n  .fab-run-cancel-prompt',
+      [/flex:\s*1 1 100%/u]
+    );
   });
 
   it('adds repeated essence needs before evaluating a shared physical allocation', async () => {

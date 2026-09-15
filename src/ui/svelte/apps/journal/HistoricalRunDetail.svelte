@@ -107,7 +107,7 @@
 {/snippet}
 
 {#snippet essenceRecaps()}
-  {#each account.stages.filter((stage) => stage.essence) as stage (stage.stepId)}
+  {#each account.stages.filter((stage) => stage.essence?.carriers?.length > 0) as stage (stage.stepId)}
     <EssencePool
       history={stage.essence}
       label={text('EssenceSpent')}

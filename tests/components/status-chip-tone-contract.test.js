@@ -189,29 +189,37 @@ describe('1506 the outlined emphasis — an exact census', () => {
  */
 const RUN_CHIP_CLASS = 'journal-run-status';
 
+// Read RULE BLOCKS rather than matching the class immediately before a brace. A caller that
+// groups the row's two chips into one selector list — `:global(.a), :global(.b) {` — satisfies
+// this requirement exactly, and a regex anchored on `)` `{` would call that a missing
+// declaration. The block's selector list is what has to name the chip; its body is what has to
+// carry the property. Comments are stripped first and the selector is required to precede the
+// block's own `{`, so a comment mentioning the selector immediately above an UNRELATED rule that
+// happens to carry `flex: 0 0 auto;` cannot satisfy this — only the selector list belonging to
+// that rule's own opening brace can.
+const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '');
+const declaresShrinkProtection = (source) =>
+  stripComments(source)
+    .split('}')
+    .some((block) => {
+      const braceIndex = block.indexOf('{');
+      if (braceIndex === -1) return false;
+      return (
+        block.slice(0, braceIndex).includes(`:global(.${RUN_CHIP_CLASS})`) &&
+        /flex:\s*0 0 auto;/.test(block.slice(braceIndex + 1))
+      );
+    });
+
 describe('1506 the journal run chip — its shrink protection is restated per caller', () => {
   it('is declared by every file that renders it, and by no other', () => {
     const callers = COMPONENTS.filter(({ source }) => source.includes(`class="${RUN_CHIP_CLASS}"`));
     assert.equal(
       callers.length,
       2,
-      'RunDetail owns a header chip and HistoryRow an outcome glyph (#1648); two row chip callers remain. ' +
-        `Found: ${callers.map(({ path }) => path).join(', ')}`
+      'RunCard owns the Active list row chip and RecentResults the Finished list row chip; two ' +
+        `row chip callers remain. Found: ${callers.map(({ path }) => path).join(', ')}`
     );
 
-    // Read RULE BLOCKS rather than matching the class immediately before a brace. A caller
-    // that groups the row's two chips into one selector list — `:global(.a), :global(.b) {` —
-    // satisfies this requirement exactly, and a regex anchored on `)` `{` would call that a
-    // missing declaration. The block's selector list is what has to name the chip; its body is
-    // what has to carry the property.
-    const declaresShrinkProtection = (source) =>
-      source
-        .split('}')
-        .some(
-          (block) =>
-            block.includes(`:global(.${RUN_CHIP_CLASS})`) &&
-            /flex:\s*0 0 auto;/.test(block.slice(block.indexOf('{') + 1))
-        );
     const missing = callers
       .filter(({ source }) => !declaresShrinkProtection(source))
       .map(({ path }) => path);
@@ -223,6 +231,36 @@ describe('1506 the journal run chip — its shrink protection is restated per ca
         'chip gives up width to a name beside it that was meant to absorb the squeeze. Position ' +
         'stays with the caller, which is exactly why each caller has to say it'
     );
+  });
+
+  it('is not satisfied by a comment mentioning the selector above an unrelated rule', () => {
+    // The defect this guards against: a comment mentioning `:global(.journal-run-status)`
+    // immediately above an unrelated rule that happens to carry `flex: 0 0 auto;` used to pass,
+    // because the old check searched the whole block rather than only the text before `{`.
+    const trap = `
+      /* :global(.${RUN_CHIP_CLASS}) is mentioned here but this rule is unrelated */
+      .something-else {
+        flex: 0 0 auto;
+      }
+    `;
+    assert.equal(declaresShrinkProtection(trap), false, 'a comment mention must not satisfy the guard');
+
+    // The guard must still accept a real grouped selector list, which is a correct declaration.
+    const grouped = `
+      .journal-run-card-heading :global(.${RUN_CHIP_CLASS}),
+      .journal-run-card-heading :global(.journal-run-attention) {
+        flex: 0 0 auto;
+      }
+    `;
+    assert.equal(declaresShrinkProtection(grouped), true, 'a grouped selector list must still pass');
+
+    // And it must fail outright when the declaration is simply absent.
+    const absent = `
+      .journal-run-card-heading :global(.${RUN_CHIP_CLASS}) {
+        color: red;
+      }
+    `;
+    assert.equal(declaresShrinkProtection(absent), false, 'no flex declaration must fail');
   });
 });
 

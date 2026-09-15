@@ -214,6 +214,7 @@
 
   .fab-run-begin-prompt,
   .fab-run-cancel-prompt {
+    flex: 1 1 100%;
     color: var(--fab-text-subtle);
     font-size: 10.5px;
   }

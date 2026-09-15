@@ -324,6 +324,19 @@ describe('RunDetail mounted behavior', () => {
     assert.match(results.textContent, /Recovered/);
     assert.doesNotMatch(results.textContent, /Crafted/);
   });
+  it('does not render an empty essence band for a materials-only stage (issue 1648, M20)', async () => {
+    // A stage that never needed essence still carries a captured `essenceSpend` receipt
+    // (`{labels: {}, carriers: []}`) rather than an absent one, so the filter must test for
+    // CONTENT, not presence.
+    const run = makeSucceededRun({ steps: [{
+      stepId: 's1', stepName: 'Assemble', index: 0, status: 'succeeded',
+      consumedIngredients: [{ actorUuid: 'Actor.a', itemUuid: 'Actor.a.Item.iron', name: 'Iron Ingot', quantity: 2 }],
+      createdResults: [], usedTools: [],
+      essenceSpend: { labels: {}, carriers: [] },
+    }] });
+    const target = await harness.mount({ run });
+    assert.ok(!target.querySelector('[data-essence-pool]'), 'no essence card renders when nothing was spent');
+  });
   it('never expands an opaque applied count from private planned awards', async () => {
     const run = await projectGatheringRecord({ checkResult: { blind: true },
       createdResults: [{ actorUuid: 'Actor.gatherer', itemUuid: 'Item.secret', name: 'PRIVATE_AWARD', quantity: 99 }],

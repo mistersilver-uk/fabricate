@@ -99,13 +99,16 @@
      already shared; `font-size` was not, so the arrows - which are `IconButton`s, painted by a
      sheet that sets no size on their glyph - inherited the surrounding body type and drew a
      chevron half again as tall as the digits inside identical boxes. */
-  /* SPECIFICITY, not just naming. `styles/fabricate.css` carries NO `@layer`, so it competes on
-     specificity alone, and its `.fabricate-icon-button.manager-icon-button` block is (0,2,0)
-     while a bare `:global(.fab-stage-nav-arrow)` is (0,1,0) — the scoping class Svelte adds to
-     an ordinary selector is NOT added inside `:global()`. So the 26px box below never reached
-     the arrows: they stayed content-sized by the global control rule while the numbers took the
-     explicit box, and the pager rendered two sizes. Qualifying with both root classes makes this
-     (0,3,0), which wins outright rather than relying on stylesheet injection order. */
+  /* NOT specificity. `styles/fabricate.css` DOES carry `@layer` (8 declarations in this build),
+     and it only reaches the browser through `module.json`'s `styles` array, which Foundry loads
+     inside `@layer modules`. Svelte's scoped styles are unlayered, so they beat that sheet by
+     LAYER ORDER at any specificity — the original one-class `:global(.fab-stage-nav-arrow)`
+     selector was already winning against `.fabricate-icon-button.manager-icon-button`. The 26px
+     box was never the missing piece; `font-size` was, as the paragraph above states: only
+     `.fab-stage-nav-number` declared a size, so the arrows inherited body type and drew a
+     chevron half again as tall as the digits in an identically-sized box. Qualifying the
+     selector with both root classes changed nothing about which rule won; it is kept because it
+     has not been shown to be harmful, not because it fixed anything. */
   :global(.fabricate-icon-button.manager-icon-button.fab-stage-nav-arrow),
   .fab-stage-nav-number {
     box-sizing: border-box;
