@@ -203,8 +203,8 @@ export async function writeAcknowledgedRunContainer(actor, namespace, key, curre
     // re-splits it on every dot and the `-=` lands on another node. Mirrors the same guard on
     // `GatheringStaminaService._deleteRetiredStaminaKeys`.
     if (!isSafeFlagKeySegment(id)) continue;
-    // `-=` is deprecated `{since: 14, until: 16}` and V14's `_migrateDeletionKey` logs a
-    // compatibility warning for it (behaviour is unchanged; it becomes a throw only under
+    // `-=` is deprecated on V14: `_migrateDeletionKey` logs a compatibility warning for it
+    // (behaviour is unchanged; it becomes a throw only under
     // `CONFIG.compatibility.mode = FAILURE`). It is KEPT DELIBERATELY. The replacement,
     // `foundry.data.operators.ForcedDeletion`, does not exist on V13 and this module ships at
     // `minimum: "13"`, and the only generation-neutral alternative — `Document#unsetFlag` —

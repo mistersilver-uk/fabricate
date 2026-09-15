@@ -324,6 +324,11 @@ The explicit Journal setup action provisions one private ledger only after singl
 `reconcileJournalRunAuthority({ claimId, disposition })` records `reconciled` or `abandoned` and releases the matching retained claim only after reconstructing its run evidence; it never retries uncertain effects or promises transactional rollback.
 Initial crafting check descriptors are redacted in `createCraftingJournalOperations` in `src/main.js` before transport, independently of the post-commit roll-handoff entitlement check.
 
+The authority ledger MUST stay a world `JournalEntry`, and that is a correctness dependency rather than a placement preference.
+`JournalEntry.dump()` takes no user and applies no ownership filter, so the `ownership: {default: 0}` ledger is present in every player's `game.journal` from the connect payload alone.
+Every player-side read in `createFoundryJournalRunAuthority` in `src/systems/journalRunAuthority.js` relies on that: move the ledger into a compendium, or assume its absence, and each player client resolves `ledger-missing` and refuses every Journal run control permanently.
+The restored-availability announcement is local in the same way — `Hooks.callAll` never crosses the socket, so a remote client re-derives only because the core `deleteJournalEntryPage` hook fires its own refresh, which holds because the collection delete precedes the `callAll`.
+
 ### Manager confirm-discard guard
 
 Every editor in the Crafting System Manager (component, essence, environment, gathering task, gathering event, tools) guards an unsaved draft on route exit.

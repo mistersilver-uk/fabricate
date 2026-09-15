@@ -369,8 +369,12 @@
   $effect(() => subscribeSceneChange(() => services?.journal?.load?.(true)));
   // The listing captures the run authority's availability as it builds, so a refusal captured
   // while a command held the execution claim outlives that claim in the rendered view. The
-  // authority announces the LIFT, and this re-derives on it, whichever client's command it was
-  // (issue 1648, M25).
+  // authority announces the LIFT and this re-derives on it (issue 1648, M25).
+  //
+  // The hook is LOCAL — `Hooks.callAll` never crosses the socket. A remote client re-derives
+  // because the core `deleteJournalEntryPage` hook fires its own refresh, which is correct only
+  // because the collection delete precedes the `callAll`. The player side of that depends on the
+  // ledger being in `game.journal` at all; see `.agents/docs/foundry-and-architecture.md`.
   $effect(() => subscribeJournalAuthorityRestored(() => services?.journal?.load?.(true)));
   // Dismissals live in a user setting, not actor run flags. The shell owns this
   // subscription across tabs; payload-free replicated changes refresh the viewer's
