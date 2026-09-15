@@ -526,6 +526,7 @@ test('the global ignores are pinned, so a new exclusion is a visible edit', asyn
     'docs/',
     'coverage/',
     '.worktrees/',
+    '.claude/worktrees/',
     '.foundry-e2e/',
     '.foundry-chrome/',
     '.foundry-perf/',
