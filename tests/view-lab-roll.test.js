@@ -34,7 +34,12 @@ import { installLabRandom } from './view-lab/foundry/labRandom.js';
 import { installFoundryShim } from './view-lab/foundry/installFoundryShim.js';
 import { buildLabContent } from './view-lab/world/labContent.js';
 import { buildLabActors } from './view-lab/world/labActors.js';
-import { rolledDiceGroups, evaluateCheckRoll } from '../src/systems/checkRoll.js';
+import {
+  rolledDiceGroups,
+  evaluateCheckRoll,
+  evaluatePreparedRunCheck,
+  postCheckRollHandoff,
+} from '../src/systems/checkRoll.js';
 import {
   buildCheckModifierChoice,
   buildCheckModifierContext,
@@ -295,6 +300,129 @@ test('toMessage routes to ChatMessage.create and tolerates its absence', async (
     assert.equal(await roll.toMessage({}), null);
   } finally {
     globalThis.ChatMessage = previous;
+  }
+});
+
+test('evaluated Roll snapshots survive JSON transport without consuming seeded entropy', async () => {
+  const Roll = makeRoll();
+  const ControlRoll = makeRoll();
+  const formula = '2d20kh1 + @prof + 1d4 [Tool]';
+  const options = { flavor: 'Smithing', custom: { source: 'check' } };
+  const original = await new Roll(formula, { prof: 3 }, options).evaluate();
+  await new ControlRoll(formula, { prof: 3 }).evaluate();
+  const snapshot = original.toJSON();
+  assert.deepEqual(
+    Object.keys(snapshot).sort((a, b) => a.localeCompare(b)),
+    ['class', 'dice', 'evaluated', 'formula', 'options', 'terms', 'total']
+  );
+  assert.equal(snapshot.class, 'LabRoll');
+  assert.equal(snapshot.evaluated, true, 'core uses evaluated, not _evaluated, on the wire');
+  assert.equal(snapshot.formula, '2d20kh1 + 3 + 1d4 [Tool]');
+  assert.equal(snapshot.total, original.total);
+  assert.deepEqual(snapshot.options, options);
+  const transported = JSON.parse(JSON.stringify(snapshot));
+  const restored = Roll.fromData(transported);
+  assert.ok(restored instanceof Roll);
+  assert.deepEqual(restored.terms, original.terms);
+  assert.deepEqual(restored.dice, original.dice);
+  assert.equal(restored.result, original.result);
+  assert.equal(restored.formula, original.formula);
+  assert.equal(restored._evaluated, true);
+  assert.equal(await restored.evaluate(), restored);
+  assert.equal(restored.total, original.total);
+  assert.deepEqual(rolledDiceGroups(restored), rolledDiceGroups(original));
+  const message = await restored.toMessage(
+    { flags: { fabricate: { check: true } } },
+    { messageMode: 'self', create: false }
+  );
+  assert.equal(message.messageMode, 'self');
+  assert.deepEqual(message.flags, { fabricate: { check: true } });
+  assert.equal(message.rolls[0], restored);
+  assert.deepEqual(
+    (await new Roll('4d20').evaluate()).dice,
+    (await new ControlRoll('4d20').evaluate()).dice,
+    'restore/evaluate/post consumed no draws'
+  );
+  snapshot.terms[0].results[0].result = -1;
+  transported.options.custom.source = 'changed';
+  transported.dice[0].results[0].result = -2;
+  assert.ok(original.terms[0].results[0].result > 0, 'serialization detached nested results');
+  assert.ok(restored.dice[0].results[0].result > 0, 'restoration detached nested results');
+  assert.equal(restored.options.custom.source, 'check');
+});
+
+test('Roll reconstruction preserves zero totals and unevaluated state', async () => {
+  const Roll = makeRoll();
+  const zero = await new Roll('0').evaluate();
+  assert.equal(Roll.fromData(JSON.parse(JSON.stringify(zero))).total, 0);
+  const pending = Roll.fromData(
+    JSON.parse(JSON.stringify(new Roll('1d6 + @prof', { prof: 2 })))
+  );
+  assert.equal(pending._evaluated, false);
+  assert.equal(pending.total, undefined);
+  assert.deepEqual(pending.dice, []);
+  const expected = await new (makeRoll())('1d6 + 2').evaluate();
+  assert.equal((await pending.evaluate()).total, expected.total);
+});
+
+test('prepared run checks hand the evaluated lab roll to player chat on both chat APIs', async (t) => {
+  for (const [api, modeOption] of [
+    ['v13', 'rollMode'],
+    ['v14', 'messageMode'],
+  ]) {
+    await t.test(api, async (t) => {
+      const Roll = makeRoll();
+      const ControlRoll = makeRoll();
+      const posted = [];
+      const previous = ['Roll', 'ChatMessage'].map((key) => [
+        key, Object.getOwnPropertyDescriptor(globalThis, key),
+      ]);
+      t.after(() => {
+        for (const [key, descriptor] of previous) {
+          if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+          else delete globalThis[key];
+        }
+      });
+      globalThis.Roll = Roll;
+      globalThis.ChatMessage = {
+        ...(api === 'v14' ? { applyMode() {} } : {}),
+        async create(data) {
+          posted.push(data);
+          return data;
+        },
+      };
+      const speaker = { actor: 'lab-actor-brenna', alias: 'Brenna' };
+      const preparation = {
+        rollFormula: '1d20 + @prof',
+        slot: 'simple',
+        checkConfig: { dc: 1 },
+        flavor: 'Crafting · Smithing',
+        speaker,
+      };
+      const result = await evaluatePreparedRunCheck(
+        preparation,
+        { getRollData: () => ({ prof: 3 }) },
+        { allowAdvantage: true, advantage: 'advantage', rollMode: 'selfroll' }
+      );
+      assert.equal(result.success, true);
+      assert.equal(posted.length, 0, 'authority evaluation does not post the visible check');
+      assert.ok(result.rollHandoff?.serializedRoll, 'authority produces a serializable handoff');
+      const handoff = JSON.parse(JSON.stringify(result.rollHandoff));
+      assert.deepEqual(await postCheckRollHandoff(handoff, { Roll }), { success: true });
+      assert.equal(posted.length, 1);
+      const message = posted[0];
+      assert.deepEqual(message.speaker, speaker);
+      assert.equal(message.flavor, preparation.flavor);
+      assert.equal(message[modeOption], api === 'v14' ? 'self' : 'selfroll');
+      assert.equal(message.rolls[0].total, result.data.total);
+      assert.deepEqual(rolledDiceGroups(message.rolls[0]), result.data.diceGroups);
+      assert.equal(message.rolls[0]._evaluated, true);
+      await new ControlRoll('2d20kh1 + 3').evaluate();
+      assert.deepEqual(
+        (await new Roll('4d20').evaluate()).dice,
+        (await new ControlRoll('4d20').evaluate()).dice
+      );
+    });
   }
 });
 

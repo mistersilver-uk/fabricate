@@ -24,6 +24,8 @@
  * a placeholder would also collapse the intrinsic dimensions of anything sized by its image.
  */
 
+import { seedJournalPrototype } from './labJournalPrototype.js';
+
 /** Foundry serves `public/` at the web root; the lab mounts the harvested cache here. */
 export const ICON_BASE = '/@foundry-chrome/icons';
 
@@ -3674,7 +3676,7 @@ const HERBALISM_GATHERING_CHECK = Object.freeze({
   defaultModifierIds: ['hb-mod-nature', 'hb-mod-tools'],
 });
 
-export function buildLabContent() {
+export function buildLabContent({ journalCaseState = null } = {}) {
   const systems = [
     {
       id: LAB_SYSTEM_IDS.SMITHING,
@@ -4027,12 +4029,16 @@ export function buildLabContent() {
     },
   };
 
-  return {
+  const content = {
     systems,
     recipes: [
       ...SMITHING_RECIPES,
       ...HERBALISM_RECIPES,
-      ...ALCHEMY_RECIPES,
+      ...ALCHEMY_RECIPES.map((entry) =>
+        journalCaseState === 'alchemy' && entry.id === 'al-r-fire'
+          ? { ...entry, access: { playerIds: ['user-lab-player'], characterIds: [] } }
+          : entry
+      ),
       ...JEWELRY_RECIPES,
       ...RUNEWORK_RECIPES,
       ...TIDEWRACK_RECIPES,
@@ -4397,5 +4403,31 @@ export function buildLabContent() {
     // not by document) but every surface that resolves the source through `fromUuid` renders it
     // unresolved — the same "looks unpopulated" failure the component index exists to prevent.
     recipeItems: [...HERBALISM_RECIPE_ITEMS],
+  };
+  return seedJournalPrototype(content, journalCaseState, { component, recipe });
+}
+
+/**
+ * Author the Journal's ready single-step fixture as a real optional no-check craft.
+ *
+ * Crafting check availability belongs to the system, not the recipe. The ordinary lab world
+ * keeps Karrun Forgecraft's authored check for its manager and crafting cases; this state-local
+ * variant turns that check off and clears its simple formula before the real managers normalize
+ * the persisted content. Bend Horseshoe already has no recipe-level check override, so the
+ * resulting run follows the same unconditional simple-mode path as a production no-check craft.
+ *
+ * @param {ReturnType<typeof buildLabContent>} content Fresh lab content, mutated in place.
+ * @returns {void}
+ */
+export function seedJournalNoCheckFixture(content) {
+  const system = content.systems?.find((entry) => entry?.id === LAB_SYSTEM_IDS.SMITHING);
+  const recipeEntry = content.recipes?.find((entry) => entry?.id === 'sm-r-horseshoe');
+  if (!system || !recipeEntry) {
+    throw new Error('view lab: ready-single no-check fixture requires smithing and Bend Horseshoe');
+  }
+  system.craftingCheck = {
+    ...system.craftingCheck,
+    enabled: false,
+    simple: { ...system.craftingCheck?.simple, rollFormula: '' },
   };
 }

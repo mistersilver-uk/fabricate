@@ -12,6 +12,8 @@
  * so no fixture may install one.
  */
 
+import { attachAwardReceipts } from '../../src/systems/runHistoryEvidence.js';
+
 /**
  * A managed component with salvage enabled by default.
  *
@@ -111,6 +113,26 @@ export function craftingSystemLookup(systems) {
  *   positional arguments separately, so a suite can assert the options bag without
  *   having to reconstruct which argument it was.
  */
+/**
+ * The award array a real `salvage()` returns: the created documents carrying the
+ * immutable per-invocation receipts `attachAwardReceipts` stamped on them. Every
+ * consumer of a salvage return reads those receipts rather than the documents, so a
+ * bare array here would stand in for a return the engine never produces.
+ *
+ * @param {Array<object>} items The created item-likes.
+ * @returns {Array<object>} The same array, with its award receipts attached.
+ */
+export function recordedSalvageResults(items) {
+  return attachAwardReceipts(
+    items,
+    items.map((item) => ({
+      name: item.name,
+      img: item.img,
+      quantity: item.quantity ?? item.system?.quantity ?? 1,
+    }))
+  );
+}
+
 export function recordingSalvage(result = { success: true, results: [] }) {
   const calls = [];
   const seam = async (actorUuid, systemId, componentId, options) => {

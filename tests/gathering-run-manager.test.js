@@ -22,8 +22,8 @@ class FakeActor {
   async setFlag(namespace, key, value) {
     this.setFlagCalls.push({ namespace, key, value });
     this.flags[namespace] = this.flags[namespace] || {};
-    this.flags[namespace][key] = value;
-    return value;
+    this.flags[namespace][key] = mergeObjects(this.flags[namespace][key], value);
+    return this;
   }
 }
 
@@ -59,7 +59,7 @@ class MergingActor extends FakeActor {
     this.setFlagCalls.push({ namespace, key, value });
     this.flags[namespace] = this.flags[namespace] || {};
     this.flags[namespace][key] = mergeObjects(this.flags[namespace][key], value);
-    return this.flags[namespace][key];
+    return this;
   }
 }
 
@@ -83,6 +83,47 @@ function runData(overrides = {}) {
   };
 }
 
+test('pending and settlement writes require Actor acknowledgment without phantom cache state', async () => {
+  const actor = new FakeActor();
+  actor.setFlag = async function(namespace, key, value) {
+    if (this.refuse) return undefined;
+    this.flags[namespace] ??= {};
+    this.flags[namespace][key] = structuredClone(value);
+    return this;
+  };
+  const runs = manager();
+  const active = await runs.createRun(actor, runData());
+  actor.refuse = true;
+  await assert.rejects(runs.completeRun(actor, active, 'succeeded', { historySettlement: { awards: 'pending' } }));
+  for (const current of [runs, manager()]) {
+    assert.equal(current.getActiveRuns(actor).length, 1);
+    assert.equal(current.getRunHistory(actor).length, 0);
+  }
+  actor.refuse = false;
+  await runs.completeRun(actor, active, 'succeeded', { historySettlement: { awards: 'pending' } });
+  actor.refuse = true;
+  await assert.rejects(runs.settleHistory(actor, active.id, { createdResults: [], historySettlement: { awards: 'complete' } }));
+  for (const current of [runs, manager()]) assert.equal(current.getRunHistory(actor)[0].historySettlement.awards, 'pending');
+});
+
+test('an unrelated stale manager write preserves settled same-ID history and another new run', async () => {
+  const actor = new FakeActor();
+  actor.setFlag = async function(namespace, key, value) { this.flags[namespace] ??= {}; this.flags[namespace][key] = structuredClone(value); return this; };
+  const first = manager();
+  const other = manager({ randomID: () => 'other-run' });
+  const pending = await first.createTerminalRun(actor, runData(), 'succeeded', { historySettlement: { awards: 'pending' } });
+  first.getRunHistory(actor);
+  const receipt = { actorUuid: actor.uuid, itemUuid: `${actor.uuid}.Item.award`, quantity: 2, resultRowId: 'ore-row', sourceItemUuid: 'Item.ore' };
+  await other.settleHistory(actor, pending.id, { createdResults: [receipt], historySettlement: { awards: 'complete' } });
+  await other.createTerminalRun(actor, runData({ taskId: 'other-task' }));
+  await first.createRun(actor, runData({ taskId: 'unrelated' }));
+  const history = manager().getRunHistory(actor);
+  assert.equal(history.length, 2);
+  assert.deepEqual(history.find((run) => run.id === pending.id).createdResults.map((row) => row.quantity), [2]);
+  const repeated = await first.settleHistory(actor, pending.id, { createdResults: [], historySettlement: { awards: 'complete' } });
+  assert.equal(repeated.createdResults[0].resultRowId, 'ore-row');
+});
+
 test('GatheringRunManager writes canonical gatheringRuns flag path only', async () => {
   const actor = new FakeActor();
   const runs = manager();
@@ -94,6 +135,97 @@ test('GatheringRunManager writes canonical gatheringRuns flag path only', async 
   assert.deepEqual(
     actor.setFlagCalls.map(call => [call.namespace, call.key]),
     [['fabricate', 'gatheringRuns']]
+  );
+});
+
+test('GatheringRunManager reconstructs applying versioned journals only within one authority scope', async () => {
+  const actor = new FakeActor();
+  const runs = manager({ getActors: () => [actor] });
+  const plan = (operationId) => ({
+    operationId,
+    requestId: `request-${operationId}`,
+    baseRunRevision: 0,
+    intent: { activity: 'gathering', trigger: 'start' },
+    effects: [
+      { effectId: 'blind', kind: 'recordGatheringBlindRun', planned: null },
+      { effectId: 'economy', kind: 'commitGatheringEconomy', planned: { phase: 'waitingStart' } }
+    ]
+  });
+  const leaveEconomyApplying = async (run, operationId) => {
+    let current = await runs.updateExecutionJournal(
+      actor,
+      run.id,
+      { type: 'effectApplying', effectId: 'blind' },
+      { expectedRevision: run.runRevision, executionOperationId: operationId }
+    );
+    current = await runs.updateExecutionJournal(
+      actor,
+      run.id,
+      { type: 'effectApplied', effectId: 'blind', receipt: { recorded: true } },
+      { expectedRevision: current.runRevision, executionOperationId: operationId }
+    );
+    return runs.updateExecutionJournal(
+      actor,
+      run.id,
+      { type: 'effectApplying', effectId: 'economy' },
+      { expectedRevision: current.runRevision, executionOperationId: operationId }
+    );
+  };
+
+  const active = await runs.createRun(
+    actor,
+    runData({ lifecycleVersion: 1 }),
+    { executionPlan: plan('active-operation') }
+  );
+  await leaveEconomyApplying(active, 'active-operation');
+  const history = await runs.createTerminalRun(
+    actor,
+    runData({ taskId: 'history-task', lifecycleVersion: 1 }),
+    'succeeded',
+    {},
+    { executionPlan: plan('history-operation') }
+  );
+  await leaveEconomyApplying(history, 'history-operation');
+
+  const fresh = manager({ getActors: () => [actor] });
+  const result = await fresh.reconstructVersionedExecutions({
+    operationId: 'history-operation'
+  });
+
+  assert.deepEqual(result, {
+    success: true,
+    scope: 'operation',
+    operationId: 'history-operation',
+    inspected: 1,
+    reconstructed: 1,
+    runs: [{
+      actorUuid: actor.uuid,
+      runId: history.id,
+      status: 'succeeded',
+      runRevision: 4,
+      journalStatus: 'recoveryRequired'
+    }]
+  });
+  assert.equal(fresh.getRun(actor, active.id).executionJournal.status, 'planned');
+  assert.equal(fresh.getRun(actor, history.id).executionJournal.status, 'recoveryRequired');
+  assert.deepEqual(
+    fresh.getRun(actor, history.id).executionJournal.effects[0].receipt,
+    { recorded: true }
+  );
+
+  const orphaned = await fresh.reconstructVersionedExecutions({ orphaned: true });
+  assert.equal(orphaned.scope, 'orphaned');
+  assert.equal(orphaned.inspected, 1);
+  assert.equal(orphaned.reconstructed, 1);
+  assert.equal(fresh.getRun(actor, active.id).executionJournal.status, 'recoveryRequired');
+
+  await assert.rejects(
+    () => fresh.reconstructVersionedExecutions(),
+    /exactly one authority scope/i
+  );
+  await assert.rejects(
+    () => fresh.reconstructVersionedExecutions({ operationId: 'active-operation', orphaned: true }),
+    /exactly one authority scope/i
   );
 });
 
@@ -191,7 +323,7 @@ test('GatheringRunManager creates active runs with only canonical fields', async
   ]);
   assert.equal(run.id, 'run-1');
   assert.equal(run.status, 'inProgress');
-  assert.deepEqual(run.usedTools, [{ actorUuid: actor.uuid, itemUuid: 'Item.tool', quantity: 1 }]);
+  assert.deepEqual(run.usedTools, [{ actorUuid: actor.uuid, itemUuid: 'Item.tool', quantity: 1, name: null, img: null }]);
   // name/img are canonical display fields for created results (for the run journal);
   // other extras (e.g. `leaked`) are still stripped.
   assert.deepEqual(run.createdResults, [
@@ -199,6 +331,223 @@ test('GatheringRunManager creates active runs with only canonical fields', async
   ]);
   assert.equal('blindLabel' in actor.flags.fabricate.gatheringRuns.active[run.id], false);
   assert.equal('environmentSnapshot' in actor.flags.fabricate.gatheringRuns.active[run.id], false);
+});
+
+test('GatheringRunManager preserves explicit lifecycle v1 state and pause preferences', async () => {
+  const actor = new FakeActor();
+  let now = 1000;
+  const runs = manager({ nowWorldTime: () => now });
+  const run = await runs.createWaitingRun(
+    actor,
+    runData({ lifecycleVersion: 1, completionMode: 'worldTime' }),
+    { requiredSeconds: 120, initiatedAt: 1000, availableAt: 1120 }
+  );
+
+  assert.equal(run.lifecycleVersion, 1);
+  assert.equal(run.runRevision, 0);
+  assert.equal(run.completionMode, 'worldTime');
+  assert.equal(run.pausedDurationSeconds, 0);
+
+  now = 1030;
+  const paused = await runs.pauseRun(actor, run.id, { expectedRevision: 0 });
+  assert.deepEqual(paused.pauseState, { pausedAt: 1030, remainingSeconds: 90 });
+  assert.deepEqual(runs.getMaturedWaitingRuns(5000), []);
+  await assert.rejects(
+    () => runs.completeRun(actor, paused, 'succeeded'),
+    (error) => error.code === 'RUN_PAUSED'
+  );
+
+  now = 1130;
+  const resumed = await runs.resumeRun(actor, run.id, { expectedRevision: 1 });
+  assert.equal(resumed.timeGate.availableAt, 1220);
+  assert.equal(resumed.pausedDurationSeconds, 100);
+  assert.equal(resumed.runRevision, 2);
+
+  const manual = await runs.setCompletionMode(actor, run.id, 'manual', { expectedRevision: 2 });
+  assert.equal(manual.completionMode, 'manual');
+  assert.equal(manual.runRevision, 3);
+});
+
+test('GatheringRunManager exposes only legacy and opted-in world-time runs for automatic completion', async () => {
+  const actor = new FakeActor();
+  const runs = manager({ getActors: () => [actor], nowWorldTime: () => 1000 });
+  await runs.createWaitingRun(actor, runData({ taskId: 'legacy' }), {
+    requiredSeconds: 10,
+    initiatedAt: 0,
+    availableAt: 10,
+  });
+  await runs.createWaitingRun(
+    actor,
+    runData({ taskId: 'manual', lifecycleVersion: 1, completionMode: 'manual' }),
+    { requiredSeconds: 10, initiatedAt: 0, availableAt: 10 }
+  );
+  const automatic = await runs.createWaitingRun(
+    actor,
+    runData({ taskId: 'automatic', lifecycleVersion: 1, completionMode: 'worldTime' }),
+    { requiredSeconds: 10, initiatedAt: 0, availableAt: 10 }
+  );
+
+  assert.deepEqual(
+    runs.getMaturedWaitingRuns(10).map(({ run }) => run.taskId).sort(),
+    ['automatic', 'legacy']
+  );
+  assert.equal(runs.canExecuteRun(automatic, 10), true);
+});
+
+test('GatheringRunManager allows a paused v1 run to be cancelled', async () => {
+  const actor = new FakeActor();
+  const runs = manager();
+  const run = await runs.createWaitingRun(
+    actor,
+    runData({ lifecycleVersion: 1 }),
+    { requiredSeconds: 120, initiatedAt: 1000, availableAt: 1120 }
+  );
+  await runs.pauseRun(actor, run.id, { expectedRevision: 0 });
+
+  const cancelled = await runs.cancelRun(actor, run.id);
+
+  assert.equal(cancelled.status, 'cancelled');
+  assert.equal(runs.getActiveRun(actor, run.id), null);
+});
+
+test('GatheringRunManager checks v1 revisions against the fresh actor record', async () => {
+  const actor = new FakeActor();
+  const firstManager = manager();
+  const secondManager = manager();
+  const created = await firstManager.createWaitingRun(
+    actor,
+    runData({ lifecycleVersion: 1 }),
+    { requiredSeconds: 120, initiatedAt: 1000, availableAt: 1120 }
+  );
+  secondManager.getActiveRun(actor, created.id);
+
+  await firstManager.setCompletionMode(actor, created.id, 'worldTime', { expectedRevision: 0 });
+
+  await assert.rejects(
+    () => secondManager.pauseRun(actor, created.id, { expectedRevision: 0 }),
+    (error) => error.code === 'STALE_RUN_REVISION'
+  );
+  secondManager.invalidateCache();
+  assert.equal(secondManager.getActiveRun(actor, created.id).completionMode, 'worldTime');
+  assert.equal(secondManager.getActiveRun(actor, created.id).pauseState, undefined);
+});
+
+test('GatheringRunManager updates execution evidence in terminal history by run id', async () => {
+  const actor = new FakeActor();
+  const runs = manager();
+  const terminal = await runs.createTerminalRun(
+    actor,
+    runData({ lifecycleVersion: 1 }),
+    'succeeded',
+    {}
+  );
+  const plan = {
+    operationId: 'operation-1',
+    requestId: 'request-1',
+    baseRunRevision: 0,
+    intent: { taskId: 'task-1' },
+    effects: [{ effectId: 'award', kind: 'awardItems', planned: { componentId: 'herb' } }],
+  };
+
+  await runs.updateExecutionJournal(terminal.actorUuid && actor, terminal.id, {
+    type: 'plan',
+    plan,
+  }, { expectedRevision: 0 });
+  await assert.rejects(
+    () => runs.updateExecutionJournal(actor, terminal.id, {
+      type: 'effectApplying',
+      effectId: 'award',
+    }, { expectedRevision: 1, executionOperationId: 'wrong-operation' }),
+    (error) => error.code === 'EXECUTION_OPERATION_MISMATCH'
+  );
+  await runs.updateExecutionJournal(actor, terminal.id, {
+    type: 'effectApplying',
+    effectId: 'award',
+  }, { expectedRevision: 1, executionOperationId: 'operation-1' });
+  await runs.updateExecutionJournal(actor, terminal.id, {
+    type: 'effectApplied',
+    effectId: 'award',
+    receipt: { itemUuid: 'Item.herb' },
+  }, { expectedRevision: 2, executionOperationId: 'operation-1' });
+  const committed = await runs.updateExecutionJournal(actor, terminal.id, {
+    type: 'commit',
+    outcome: { status: 'succeeded' },
+  }, { expectedRevision: 3, executionOperationId: 'operation-1' });
+
+  assert.equal(committed.executionJournal.status, 'committed');
+  assert.deepEqual(committed.executionJournal.effects[0].receipt, { itemUuid: 'Item.herb' });
+  assert.equal(runs.getActiveRun(actor, terminal.id), null);
+  assert.equal(runs.getRunHistory(actor)[0].id, terminal.id);
+  assert.equal(runs.getRunHistory(actor)[0].runRevision, 4);
+});
+
+test('GatheringRunManager preserves future lifecycle records and refuses mutation', async () => {
+  const actor = new FakeActor();
+  actor.flags.fabricate = {
+    gatheringRuns: {
+      active: {
+        future: {
+          id: 'future',
+          lifecycleVersion: 2,
+          craftingSystemId: 'system-1',
+          environmentId: 'env-1',
+          taskId: 'task-1',
+          status: 'waitingTime',
+          startedAtWorldTime: 0,
+          updatedAtWorldTime: 0,
+          timeGate: { requiredSeconds: 10, initiatedAt: 0, availableAt: 10 },
+          futureState: { opaque: true },
+        },
+      },
+      history: [
+        {
+          id: 'future-history',
+          lifecycleVersion: 2,
+          craftingSystemId: 'system-1',
+          environmentId: 'env-1',
+          taskId: 'task-history',
+          status: 'futureTerminal',
+          futureState: { opaque: ['keep-me'] },
+        },
+      ],
+    },
+  };
+  const originalContainer = structuredClone(actor.flags.fabricate.gatheringRuns);
+  const runs = manager({ getActors: () => [actor] });
+
+  assert.equal(runs.getActiveRun(actor, 'future').lifecycleVersion, 2);
+  assert.deepEqual(runs.getMaturedWaitingRuns(100), []);
+  await runs.removeRunsForSystem('system-1');
+  await runs.removeRunsForEnvironment('env-1');
+  await runs.removeRunsForTask('task-1');
+  await runs.removeRunsForTask('task-history');
+  await assert.rejects(
+    () => runs.cancelRun(actor, 'future'),
+    (error) => error.code === 'UNSUPPORTED_LIFECYCLE_VERSION'
+  );
+  assert.equal(actor.setFlagCalls.length, 0);
+  assert.deepEqual(actor.flags.fabricate.gatheringRuns, originalContainer);
+});
+
+test('GatheringRunManager keeps unsupported run data byte-shaped during unrelated writes', async () => {
+  const actor = new FakeActor();
+  const future = {
+    id: 'future',
+    lifecycleVersion: 2,
+    craftingSystemId: 'system-1',
+    environmentId: 'env-1',
+    taskId: 'future-task',
+    status: 'futureWaiting',
+    startedAtWorldTime: 0,
+    updatedAtWorldTime: 0,
+    futureState: { opaque: ['keep-me'] },
+  };
+  actor.flags.fabricate = { gatheringRuns: { active: { future }, history: [] } };
+  const runs = manager();
+
+  await runs.createRun(actor, runData({ taskId: 'legacy-task' }));
+
+  assert.deepEqual(actor.flags.fabricate.gatheringRuns.active.future, future);
 });
 
 test('GatheringRunManager rejects persistence failures without dirtying the cache', async () => {
@@ -300,7 +649,7 @@ test('GatheringRunManager keeps terminal identity refs from the active run', asy
   assert.equal(runs.getRunHistory(actor)[0].taskId, 'task-original');
 });
 
-test('GatheringRunManager clears created results for failed and cancelled completions', async () => {
+test('GatheringRunManager retains permitted failure awards across completion and fresh reload', async () => {
   const actor = new FakeActor();
   const runs = manager();
   const failedRun = await runs.createRun(actor, runData({ taskId: 'task-failed' }));
@@ -313,9 +662,9 @@ test('GatheringRunManager clears created results for failed and cancelled comple
     createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.ore', quantity: 1 }]
   });
 
-  assert.deepEqual(failed.createdResults, []);
+  assert.deepEqual(failed.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 1, name: null, img: null }]);
   assert.deepEqual(cancelled.createdResults, []);
-  assert.deepEqual(runs.getRunHistory(actor).map(run => run.createdResults), [[], []]);
+  assert.deepEqual(manager().getRunHistory(actor).map(run => run.createdResults), [[], failed.createdResults]);
 });
 
 test('GatheringRunManager preserves waiting time gates on completion and cancellation', async () => {
@@ -356,8 +705,8 @@ test('GatheringRunManager drops malformed run item refs', async () => {
     ]
   }));
 
-  assert.deepEqual(run.usedTools, [{ actorUuid: actor.uuid, itemUuid: 'Item.valid-tool', quantity: 1 }]);
-  assert.deepEqual(run.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.valid-result', quantity: 2 }]);
+  assert.deepEqual(run.usedTools, [{ actorUuid: actor.uuid, itemUuid: 'Item.valid-tool', quantity: 1, name: null, img: null }]);
+  assert.deepEqual(run.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.valid-result', quantity: 2, name: null, img: null }]);
 });
 
 test('GatheringRunManager creates terminal history directly for immediate attempts', async () => {
@@ -374,13 +723,14 @@ test('GatheringRunManager creates terminal history directly for immediate attemp
   });
   worldTime += 10;
   const failed = await runs.createTerminalRun(actor, runData({ taskId: 'task-failed' }), 'failed', {
-    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.should-drop', quantity: 1 }]
+    createdResults: [{ actorUuid: actor.uuid, itemUuid: 'Item.failure-award', quantity: 1 }]
   });
 
   assert.equal(succeeded.status, 'succeeded');
-  assert.deepEqual(succeeded.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 3 }]);
+  assert.deepEqual(succeeded.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.herb', quantity: 3, name: null, img: null }]);
   assert.equal(failed.status, 'failed');
-  assert.deepEqual(failed.createdResults, []);
+  assert.deepEqual(failed.createdResults, [{ actorUuid: actor.uuid, itemUuid: 'Item.failure-award', quantity: 1, name: null, img: null }]);
+  assert.deepEqual(manager().getRunHistory(actor)[0].createdResults, failed.createdResults);
   assert.deepEqual(runs.getActiveRuns(actor), []);
   assert.deepEqual(runs.getRunHistory(actor).map(run => run.taskId), ['task-failed', 'task-success']);
 });
@@ -446,7 +796,7 @@ test('GatheringRunManager completes terminal runs newest-first and caps history 
   assert.ok(history.every(run => Number.isFinite(run.completedAtWorldTime)));
 });
 
-test('GatheringRunManager deletes completed active runs before replacing flags in Foundry-style merging updates', async () => {
+test('GatheringRunManager commits history and active deletions in one acknowledged flag update', async () => {
   const actor = new MergingActor();
   const runs = manager();
   const run = await runs.createWaitingRun(actor, runData({ taskId: 'task-time' }), { minutes: 1 });
@@ -457,8 +807,8 @@ test('GatheringRunManager deletes completed active runs before replacing flags i
   assert.equal(actor.flags.fabricate.gatheringRuns.history[0].taskId, 'task-time');
   assert.deepEqual(runs.getActiveRuns(actor), []);
   assert.ok(
-    actor.updateCalls.some(call => Object.hasOwn(call, `flags.fabricate.gatheringRuns.active.-=${run.id}`)),
-    'completed run should be explicitly deleted for merging Foundry flag updates'
+    actor.setFlagCalls.some(call => Object.hasOwn(call.value.active, `-=${run.id}`) && call.value.history.some(entry => entry.id === run.id)),
+    'the deletion and terminal recovery evidence belong to the same write'
   );
 });
 
@@ -555,7 +905,8 @@ function mergeObjects(previous, next) {
 
   const merged = clonePlain(previous);
   for (const [key, value] of Object.entries(next)) {
-    merged[key] = mergeObjects(merged[key], value);
+    if (key.startsWith('-=')) delete merged[key.slice(2)];
+    else merged[key] = mergeObjects(merged[key], value);
   }
   return merged;
 }

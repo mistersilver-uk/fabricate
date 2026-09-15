@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { computeIconPickerPopoverLayout } from '../../src/ui/svelte/util/iconPickerPopover.js';
 import { scopedComponentCss, withScopeHash } from '../helpers/scoped-component-css.js';
+import { declaration, splitTopLevel, topLevelRules } from '../helpers/fullWidthRoute.js';
 
 // ONE Chromium process for this whole file (issue tests-perf follow-up). This file carries
 // every computed-style parity guard in the repo and used to launch a fresh browser per test —
@@ -5402,40 +5403,30 @@ test('every view-specific manager-body grid override narrows the rail column whe
   // narrows column one to 56px, otherwise the later view rule wins on equal specificity and the
   // collapse no-ops (issue #331 regression: a wide, mostly-empty icon strip).
   //
-  // Two simple, linear-time regexes are used deliberately (rather than one combined pattern with
-  // chained `+` quantifiers) to keep the matching free of any backtracking concern.
-  const viewNames = Array.from(
-    css.matchAll(/data-manager-view="(\w[\w-]*)"\] \.manager-body \{/g),
-    (m) => m[1]
+  // Read each selector in grouped rules, including task-mode attributes and wrapped lines.
+  // Only top-level rules own a rail; narrow container-query stacks do not.
+  const rules = topLevelRules(css).flatMap(({ prelude, declarations }) =>
+    splitTopLevel(prelude, ',').map((selector) => ({
+      selector: selector.replace(/\s+/g, ' '),
+      columns: declaration(declarations, 'grid-template-columns'),
+    }))
   );
-  const views = Array.from(new Set(viewNames));
-
-  assert.ok(
-    views.length > 0,
-    'expected at least one view-specific manager-body grid override to pin'
+  const views = rules.filter(({ selector, columns }) =>
+    selector.includes('[data-manager-view') && selector.endsWith(' .manager-body') && columns
   );
+  assert.ok(views.length > 0, 'expected view-specific manager-body grid overrides');
 
-  for (const view of views) {
-    const overrideBlock = blockFor(`.fabricate-manager[data-manager-view="${view}"] .manager-body`);
-    const columnsMatch = overrideBlock.match(/grid-template-columns:\s*(\S+)/);
-    const firstColumn = columnsMatch ? columnsMatch[1] : '';
+  for (const { selector, columns } of views) {
+    const firstColumn = columns.split(/\s+/)[0];
     // A view that stacks to a single column (e.g. inside a narrow container query) has no rail
     // column to narrow, so it does not need a collapsed override.
     if (firstColumn === '1fr' || firstColumn.startsWith('minmax')) {
       continue;
     }
 
-    const collapsedBlock = blockFor(
-      `.fabricate-manager[data-manager-view="${view}"] .manager-body.is-rail-collapsed`
-    );
-    assert.ok(
-      collapsedBlock,
-      `view "${view}" overrides the manager-body grid but is missing a .is-rail-collapsed override; the collapse will be overridden on equal specificity`
-    );
-    assert.ok(
-      collapsedBlock.includes('grid-template-columns: 56px '),
-      `view "${view}" collapsed override should narrow the rail column to 56px`
-    );
+    const collapsed = rules.find((rule) => rule.selector === `${selector}.is-rail-collapsed`);
+    assert.ok(collapsed, `${selector} is missing its collapsed override`);
+    assert.match(collapsed.columns ?? '', /^56px\s/, `${selector} must narrow the rail to 56px`);
   }
 });
 
@@ -13476,10 +13467,11 @@ const CONVERTED_PAGER_SITES = Object.freeze([
     probe: 'journal',
     padding: '12px',
     area: 'fabricate-app',
-    wrapper: 'journal-history-body',
+    wrapper: 'journal-list-section',
     component: 'src/ui/svelte/apps/journal/HistoryList.svelte',
-    fill: 'surface',
-    floored: false,
+    // The recomposed Journal footer uses the Pagination rung's own fill.
+    fill: 'bg-2',
+    floored: true,
     declaredArrow: 28,
   }),
   // The manager pager states no fill of its own, so it takes the `inline` rung's `--fab-bg-2` —
@@ -13496,7 +13488,7 @@ const CONVERTED_PAGER_SITES = Object.freeze([
   }),
 ]);
 
-test('every converted pager site paints its own trigger fill, and only the manager floors it', async () => {
+test('every converted pager site retains its declared trigger fill and width floor', async () => {
   const scoped = CONVERTED_PAGER_SITES.filter((site) => site.component).map((site) => ({
     site,
     ...scopedComponentCss(resolve(__dirname, '../..', site.component)),
@@ -13615,9 +13607,9 @@ test('every converted pager site paints its own trigger fill, and only the manag
         measured.background,
         report.tokens[site.fill],
         `${site.probe}: the trigger takes --fab-${site.fill}` +
-          (site.component
+          (site.fill === 'surface'
             ? ', from its own scoped block, which beats the rung rule on layer AND specificity'
-            : ', the `inline` rung`s own fill, because the manager states none of its own')
+            : ', the `inline` rung`s own fill, because this caller states none of its own')
       );
       assert.ok(
         Math.abs(measured.height - 30) <= 1,
@@ -13682,7 +13674,7 @@ test('every converted pager site paints its own trigger fill, and only the manag
         measured.minWidth,
         site.floored ? '64px' : '0px',
         site.floored
-          ? 'the manager pager keeps the 64px floor the retired select rule carried, so a ' +
+          ? `${site.probe}: the pager keeps the shared 64px floor, so a ` +
               'one-digit and a three-digit value do not sit at two widths'
           : `${site.probe}: no floor at a player site — its pager row is a nowrap single line ` +
               'in a narrow column, and a floor is what would wrap it'
@@ -13906,8 +13898,8 @@ test('the pager names its per-page control with the words a GM can see', () => {
   );
   assert.match(
     source,
-    /<span id=\{captionId\}\s*>\{text\('FABRICATE\.Admin\.Manager\.Pagination\.PerPage'/,
-    'the visible caption carries the per-instance id'
+    /<span id=\{captionId\}\s+class:manager-pagination-hidden=\{compact\}\s*>\{text\('FABRICATE\.Admin\.Manager\.Pagination\.PerPage'/,
+    'the caption carries the per-instance id, visually hidden only in compact mode'
   );
   assert.match(
     source,

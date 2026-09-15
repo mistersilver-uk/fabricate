@@ -54,10 +54,10 @@ export function blindActor({
     items: [],
     flags,
     getFlag: (namespace, key) => flags[namespace]?.[key],
-    setFlag: async (namespace, key, value) => {
+    async setFlag(namespace, key, value) {
       flags[namespace] = flags[namespace] || {};
       flags[namespace][key] = JSON.parse(JSON.stringify(value));
-      return value;
+      return this;
     },
     testUserPermission(user, level) {
       if (!user) return false;

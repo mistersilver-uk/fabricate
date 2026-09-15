@@ -151,8 +151,11 @@ function makeItem(id, { stored, updateResult = 'document' } = {}) {
  * refusing `_preCreate` hook, a refusing `preCreateItem` hook and a throwing `Item` constructor
  * all look like to a caller, and `createOrStackComponentItem` turns it into a `null` return.
  */
+let awardActorSequence = 0;
 function makeAwardActor({ createResult = 'document' } = {}) {
   const actor = {
+    id: `award-actor-${++awardActorSequence}`,
+    uuid: `Actor.award-actor-${awardActorSequence}`,
     name: 'Bearer',
     items: [],
     created: [],
@@ -165,6 +168,10 @@ function makeAwardActor({ createResult = 'document' } = {}) {
         const created = makeItem(`created-${actor.created.length + index}`);
         const authored = storedQuantity(data);
         if (authored !== null) storeQuantity(created, authored);
+        created.uuid = `${actor.uuid}.Item.${created.id}`;
+        created.parent = actor;
+        created.documentName = 'Item';
+        created._source = structuredClone(data);
         return created;
       });
       actor.created.push(...documents);

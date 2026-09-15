@@ -103,9 +103,14 @@ export default defineConfig(({ command }) => {
         // exists: it dies with `ENOSPC ... watch '<some>.hbs'` naming a file in another
         // worktree's system cache, which reads as a Vite bug rather than a watch-budget one.
         // None of these trees is ever edited, so watching them buys nothing at any price.
+        // On Windows the same exhaustion surfaces as fs.watch UNKNOWN (-4094).
+        // Linked worktrees carry a .git FILE, so Vite's default .git directory ignore
+        // does not exclude them; Vite does not read .gitignore for watcher exclusions.
+        // This list is additive to Vite's built-in chokidar ignores.
         watch: {
           ignored: [
             '**/.worktrees/**',
+            '**/.claude/worktrees/**',
             '**/.foundry-e2e/**',
             '**/.foundry-chrome/**',
             '**/ui-screenshot-artifact/**',

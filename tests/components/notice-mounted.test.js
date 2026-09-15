@@ -289,4 +289,38 @@ describe('1505 Notice — the API the library states', () => {
       'a live count sentence must not jitter as the run resolves'
     );
   });
+
+  it('carries the evidence as a band across the padding box, not a third line of the body', () => {
+    // Issue 1648. The band is TABULAR — a caller renders a consumed/produced grid into it — so
+    // starting it after the glyph column made those rows disagree with the identical rows drawn
+    // by the card beside them. The markup half is asserted here because a band nested back
+    // inside `.fab-notice-body` would satisfy every CSS assertion below and render inset again.
+    const emittedAt = noticeSource.indexOf('class="fab-notice-evidence"');
+    assert.ok(emittedAt > 0, 'the band is emitted');
+    assert.ok(
+      emittedAt > noticeSource.indexOf('data-notice-dismiss'),
+      'after BOTH controls, which puts it outside the body column by construction'
+    );
+    assert.ok(
+      emittedAt < noticeSource.indexOf('<style>'),
+      'and that index is the markup, not a rule'
+    );
+
+    const root = ruleBody('.fab-notice');
+    assert.match(root, /flex-wrap:\s*wrap/, 'which is what gives the band its own line');
+    assert.match(
+      root,
+      /row-gap:\s*var\(--fab-space-2\)/,
+      'at the space it shipped with — the change moves its left edge and nothing else'
+    );
+
+    const band = ruleBody('.fab-notice-evidence');
+    assert.match(band, /flex:\s*1 1 100%/, 'a full-basis item wraps whole rather than sharing a line');
+    assert.match(band, /min-width:\s*0/, 'so its own grid can still shrink inside a narrow notice');
+    assert.doesNotMatch(
+      band,
+      /margin-top/,
+      'the row gap owns that separation now, so the two cannot double up'
+    );
+  });
 });

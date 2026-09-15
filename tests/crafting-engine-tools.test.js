@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { resolveToolForItem, itemIsToolByDurableIdentity } from '../src/utils/sourceUuid.js';
+import { nativeCraftRunManager } from './helpers/native-run-manager.js';
 
 // ---------------------------------------------------------------------------
 // Globals
@@ -95,9 +96,16 @@ class FakeItem {
     setPath(this._flags[scope], key, value);
     return value;
   }
-  async delete() { this.deleted = true; }
-  async update() {}
+  // Foundry resolves the deleted/updated DOCUMENT from both writes, and the
+  // acknowledged-receipt contract reads that return to decide whether an effect
+  // actually happened, so returning undefined here would model a refused write.
+  async delete() { this.deleted = true; return this; }
+  async update(payload = {}) {
+    for (const [path, value] of Object.entries(payload)) setPath(this, path, value);
+    return this;
+  }
 }
+
 
 function recipe() {
   return { id: 'recipe-1', name: 'R', craftingSystemId: 'sys-1' };
@@ -452,16 +460,7 @@ test('craft(): records usedTools on the success run record and increments toolUs
   const recipeManager = fullCraftRecipeManager({ ingredientItem, toolItem, fakeTool, ingredientSet });
 
   let successPayload = null;
-  const runManager = {
-    findActiveRunForRecipe: () => null,
-    getActiveRun: () => null,
-    async createRun() { return { id: 'run-1', status: 'inProgress', currentStepIndex: 0 }; },
-    canProceedTimeGate: () => true,
-    async markStepInProgress(_actor, run) { return run; },
-    async markStepWaitingForTime(_actor, run) { return run; },
-    async completeStepSuccess(_actor, run, _idx, payload) { successPayload = payload; return { ...run, status: 'succeeded' }; },
-    async completeStepFailure() { return {}; }
-  };
+  const runManager = nativeCraftRunManager({ onSuccess: (payload) => { successPayload = payload; } });
 
   const engine = new CraftingEngine(recipeManager, runManager, null);
   engine._runCraftingCheck = async () => ({ success: true, message: 'ok', outcome: null, value: null, data: {} });
@@ -480,6 +479,16 @@ test('craft(): records usedTools on the success run record and increments toolUs
     actorUuid: 'Actor.a1', itemUuid: 'Item.c-axe', quantity: 1, componentId: 'c-axe', toolId: null, broken: false
   });
   assert.deepEqual(getPath(toolItem._flags.fabricate, 'fabricate.toolUsage'), { timesUsed: 1 });
+  // Mutation control for the native consumption receipt: the acknowledged source
+  // decrement is what puts the ingredient on the persisted stage, so removing the
+  // writer attachment or the settlement leaves consumption unsettled here.
+  const stage = runManager.inspectRun().steps[0];
+  assert.equal(stage.historySettlement.consumption, 'complete');
+  assert.deepEqual(stage.consumedIngredients, [
+    { actorUuid: null, itemUuid: 'Item.ing-1', name: 'Item ing-1', img: null, quantity: 1 }
+  ]);
+  assert.equal(ingredientItem.system.quantity, 1);
+  assert.ok(runManager.inspectUpdates().length >= 3, 'each stage transition was persisted');
 });
 
 test('craft(): consumes one matching copy and reserves a different physical copy as the Tool', async () => {
@@ -514,27 +523,7 @@ test('craft(): consumes one matching copy and reserves a different physical copy
     ingredientMatchesItem: (_recipe, _ingredient, item) => item === consumedVial,
   };
   let successPayload = null;
-  const runManager = {
-    findActiveRunForRecipe: () => null,
-    getActiveRun: () => null,
-    async createRun() {
-      return { id: 'run-1', status: 'inProgress', currentStepIndex: 0 };
-    },
-    canProceedTimeGate: () => true,
-    async markStepInProgress(_actor, run) {
-      return run;
-    },
-    async markStepWaitingForTime(_actor, run) {
-      return run;
-    },
-    async completeStepSuccess(_actor, run, _idx, payload) {
-      successPayload = payload;
-      return { ...run, status: 'succeeded' };
-    },
-    async completeStepFailure() {
-      return {};
-    },
-  };
+  const runManager = nativeCraftRunManager({ onSuccess: (payload) => { successPayload = payload; } });
   const engine = new CraftingEngine(recipeManager, runManager, null);
   engine._runCraftingCheck = async () => ({
     success: true,
@@ -685,16 +674,7 @@ test('craft(): a tool absent from inventory but present as activeCanvasTool craf
   const recipeManager = fullCraftRecipeManager({ ingredientItem, toolItem: null, fakeTool, ingredientSet });
 
   let successPayload = null;
-  const runManager = {
-    findActiveRunForRecipe: () => null,
-    getActiveRun: () => null,
-    async createRun() { return { id: 'run-1', status: 'inProgress', currentStepIndex: 0 }; },
-    canProceedTimeGate: () => true,
-    async markStepInProgress(_actor, run) { return run; },
-    async markStepWaitingForTime(_actor, run) { return run; },
-    async completeStepSuccess(_actor, run, _idx, payload) { successPayload = payload; return { ...run, status: 'succeeded' }; },
-    async completeStepFailure() { return {}; }
-  };
+  const runManager = nativeCraftRunManager({ onSuccess: (payload) => { successPayload = payload; } });
 
   const engine = new CraftingEngine(recipeManager, runManager, null);
   engine._runCraftingCheck = async () => ({ success: true, message: 'ok', outcome: null, value: null, data: {} });
@@ -909,16 +889,7 @@ function failingCraftEngine() {
   const ingredientSet = fakeIngredientSet(ingredientItem);
   const recipeManager = fullCraftRecipeManager({ ingredientItem, toolItem, fakeTool, ingredientSet });
   let failurePayload = null;
-  const runManager = {
-    findActiveRunForRecipe: () => null,
-    getActiveRun: () => null,
-    async createRun() { return { id: 'run-1', status: 'inProgress', currentStepIndex: 0 }; },
-    canProceedTimeGate: () => true,
-    async markStepInProgress(_actor, run) { return run; },
-    async markStepWaitingForTime(_actor, run) { return run; },
-    async completeStepSuccess() { return {}; },
-    async completeStepFailure(_actor, run, _idx, _reason, payload) { failurePayload = payload; return { ...run, status: 'failed' }; },
-  };
+  const runManager = nativeCraftRunManager({ onFailure: (payload) => { failurePayload = payload; } });
   const engine = new CraftingEngine(recipeManager, runManager, null);
   // The check FAILS with an engine-evaluated natural-1 roll (so the checkDriven
   // trigger matches) — the only thing under test is whether the failure path breaks.

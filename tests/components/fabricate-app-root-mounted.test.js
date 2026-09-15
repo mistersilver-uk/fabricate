@@ -90,6 +90,11 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/gathering/scopedSelection.js',
     'src/ui/svelte/apps/gathering/selectionDefault.js',
     'src/ui/svelte/apps/journal/journalRunStatus.js',
+    'src/ui/svelte/apps/journal/historyPresentation.js',
+    'src/ui/svelte/apps/journal/runStateNotice.js',
+    'src/ui/svelte/apps/journal/runDetailPresentation.js',
+    'src/ui/svelte/apps/journal/stageHeading.js',
+    'src/ui/svelte/apps/journal/runRecovery.js',
     'src/ui/svelte/util/craftingImageDefaults.js',
     'src/ui/svelte/util/craftingArtResolution.js',
     'src/ui/svelte/util/craftingRecipeStatus.js',
@@ -99,6 +104,8 @@ const harness = createMountedComponentHarness({
   'src/ui/svelte/util/foundryIconCatalogue.js',
     'src/ui/svelte/util/formatDuration.js',
     'src/ui/svelte/util/foundryBridge.js',
+    // Issue 1648: the shared authority-refusal wording the Journal panels and stores read.
+    'src/ui/svelte/util/journalRunReasons.js',
     'src/ui/svelte/util/listReorderAnnouncement.js',
     'src/ui/svelte/util/gatheringConditionIcons.js',
     'src/ui/svelte/util/gatheringFormat.js',
@@ -229,11 +236,27 @@ const harness = createMountedComponentHarness({
     'src/ui/svelte/apps/journal/RecentResults.svelte',
     'src/ui/svelte/apps/journal/RunCard.svelte',
     'src/ui/svelte/apps/journal/RunDetail.svelte',
+    'src/ui/svelte/apps/journal/HistoricalRunDetail.svelte', 'src/ui/svelte/apps/journal/ThisRun.svelte',
     'src/ui/svelte/apps/journal/StepDetails.svelte',
+    'src/ui/svelte/components/RadioCardGroup.svelte',
     'src/ui/svelte/apps/journal/StepTimeline.svelte',
     'src/ui/svelte/apps/journal/TimeRemainingBox.svelte',
     'src/ui/svelte/apps/journal/WhatToExpect.svelte',
     'src/ui/svelte/apps/ActorSelectTopBar.svelte',
+    'src/ui/svelte/components/ManagerSearchField.svelte',
+    'src/ui/svelte/components/RunActionBar.svelte',
+    'src/ui/svelte/components/SlotTile.svelte',
+    'src/ui/svelte/components/ChoiceOptionList.svelte',
+    'src/ui/svelte/components/SlotRow.svelte',
+    'src/ui/svelte/components/EssencePool.svelte',
+    'src/ui/svelte/components/RunProgress.svelte',
+    'src/ui/svelte/components/InspectorCard.svelte',
+    'src/ui/svelte/components/StageNav.svelte',
+    'src/ui/svelte/components/StageCard.svelte',
+    'src/ui/svelte/components/ListRow.svelte',
+    'src/ui/svelte/components/YieldScale.svelte',
+    'src/ui/svelte/components/OutcomeLadder.svelte',
+    'src/ui/svelte/components/WorldClockChip.svelte',
     'src/ui/svelte/components/FillBar.svelte',
     'src/ui/svelte/components/Pagination.svelte',
     'src/ui/svelte/components/IconButton.svelte',
@@ -317,7 +340,14 @@ function fakeServices({ selectedActorId = '' } = {}) {
       selectScopedActor: () => {},
       selectActor: () => {},
     },
-    journal: { navCount: 0, loadedOnce: true, load: () => {} },
+    journal: {
+      navCount: 0,
+      loadedOnce: true,
+      load: () => {},
+      worldTime: 28800,
+      listing: { selectedActorId: selectedActorId || null },
+    },
+    getWorldTimeComponents: () => ({ day: 13, hour: 8, minute: 0, secondsPerDay: 86400 }),
   };
 }
 
@@ -425,6 +455,25 @@ after(() => harness.teardown());
 afterEach(() => harness.remount());
 
 describe('FabricateAppRoot (mounted, against a real player registry)', () => {
+  it('shows the read-only shared world clock only while the Journal tab is active', async () => {
+    const registry = createPlayerExtensionsRegistry({ emitHook: () => {} });
+    const host = makeHost(registry, 'journal');
+    host.selectActor('actor-1');
+    const root = await harness.mount(host.props());
+    const clock = root.querySelector('[data-world-clock]');
+    assert.ok(clock, 'the Journal top bar contains the world clock');
+    assert.equal(root.querySelector('.fabricate-app-actor-bar').style.background, 'transparent', 'the actor child releases its second translucent fill');
+    assert.ok(clock.classList.contains('is-clock'));
+    assert.match(clock.textContent, /"day":14,"time":"08:00"/, 'it uses the existing calendar formatter');
+    assert.equal(clock.querySelector('button, input'), null, 'the clock is read-only');
+
+    railButton(root, 'crafting').click();
+    await tick();
+    await harness.setProps(host.props());
+    assert.equal(root.querySelector('[data-world-clock]'), null, 'other tabs do not duplicate it');
+    assert.equal(root.querySelector('.fabricate-app-actor-bar').style.background, '', 'other tabs keep the ordinary actor surface');
+  });
+
   it('appends provider tabs after the Core tabs and addresses them by route key', async () => {
     const registry = createPlayerExtensionsRegistry({ emitHook: () => {} });
     registry.publicApi.registerPlayerNavProvider(makeProvider().provider);
@@ -882,7 +931,7 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
   }
 
   /** Mount the shell with counting services and a live Hooks fake. */
-  async function mountWithSpies() {
+  async function mountWithSpies(serviceOverrides = {}) {
     installHooks();
     const registry = createPlayerExtensionsRegistry({ emitHook: () => {} });
     const { calls, services } = spyServices();
@@ -890,7 +939,7 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
       activeTab: DEFAULT_TAB,
       showAlchemy: false,
       onSelectTab: () => {},
-      services,
+      services: { ...services, ...serviceOverrides },
       extensionSurfaces: deriveExtensionSurfaces(registry, { experimentalFeaturesEnabled: true }),
       playerExtensions: registry,
     });
@@ -928,6 +977,83 @@ describe('FabricateAppRoot invalidation-domain routing (mounted)', () => {
         'narrowing was possible however good a delta was emitted'
     );
     assert.equal(hooks.count('fabricate.craftingSystemsChanged'), 0);
+  });
+
+  it('quietly refreshes Journal dismissals across tabs and actor switches, then unsubscribes', async () => {
+    const dismissalHook = 'fabricate.journalDismissalsChanged';
+    const loads = [];
+    let selectedActorId = 'actor-1';
+    const services = fakeServices({ selectedActorId });
+    services.getSelectedActorId = () => selectedActorId;
+    services.journal.load = (quiet) => loads.push({ actorId: selectedActorId, quiet });
+    await mountWithSpies(services);
+    assert.deepEqual(loads, [], 'subscribing does not itself reload an already-loaded Journal');
+
+    const localDismissal = (actorId) => ({
+      actorUuid: `Actor.${actorId}`,
+      runType: 'crafting',
+      runId: 'finished-run',
+    });
+    const expectQuietRefresh = async (payload) => {
+      loads.length = 0;
+      hooks.callAll(dismissalHook, payload);
+      await tick();
+      assert.deepEqual(loads, [{ actorId: selectedActorId, quiet: true }]);
+      assert.equal(hooks.count(dismissalHook), 1, 'exactly one shell-owned dismissal listener');
+    };
+
+    await expectQuietRefresh(localDismissal(selectedActorId));
+    await expectQuietRefresh(undefined); // Both createSetting and updateSetting publish no args.
+    loads.length = 0;
+    hooks.callAll(dismissalHook, localDismissal('actor-2'));
+    assert.deepEqual(loads, [], 'an unrelated local actor dismissal does not reload this Journal');
+
+    await harness.setProps({ activeTab: 'journal' });
+    await expectQuietRefresh(undefined);
+    selectedActorId = 'actor-2';
+    await harness.setProps({
+      services: {
+        ...services,
+        actorBar: { ...services.actorBar, selectedActorId },
+      },
+    });
+    loads.length = 0;
+    hooks.callAll(dismissalHook, localDismissal('actor-1'));
+    assert.deepEqual(loads, [], 'the listener does not retain the outgoing actor selection');
+    await expectQuietRefresh(localDismissal(selectedActorId));
+
+    await harness.setProps({ activeTab: 'crafting' });
+    await expectQuietRefresh(undefined);
+    await harness.remount();
+    assert.equal(hooks.count(dismissalHook), 0, 'unmount removes the dismissal hook by its id');
+    loads.length = 0;
+    hooks.callAll(dismissalHook);
+    await tick();
+    assert.deepEqual(loads, [], 'a closed shell cannot keep refreshing the Journal');
+  });
+
+  it('quietly rebuilds the Journal when the run authority reports its refusal lifted', async () => {
+    // M25: the listing captures the authority's availability as it builds, so a `claim-held`
+    // captured while a command ran keeps refusing runs against a claim that has since gone.
+    // The authority announces the lift; this is the shell binding that acts on it.
+    const restoredHook = 'fabricate.journalRunAuthorityRestored';
+    const loads = [];
+    const services = fakeServices();
+    services.journal.load = (quiet) => loads.push({ quiet });
+    await mountWithSpies(services);
+    assert.deepEqual(loads, [], 'subscribing does not itself reload an already-loaded Journal');
+    assert.equal(hooks.count(restoredHook), 1, 'exactly one shell-owned listener');
+
+    hooks.callAll(restoredHook);
+    await tick();
+    assert.deepEqual(loads, [{ quiet: true }], 'a quiet rebuild, with no loading flicker');
+
+    await harness.remount();
+    assert.equal(hooks.count(restoredHook), 0, 'unmount removes the listener by its id');
+    loads.length = 0;
+    hooks.callAll(restoredHook);
+    await tick();
+    assert.deepEqual(loads, [], 'a closed shell cannot keep refreshing the Journal');
   });
 
   // TABLE-DRIVEN, from the shipped constant. A domain added to the taxonomy without a

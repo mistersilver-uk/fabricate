@@ -86,6 +86,10 @@ function itemFake(id, quantity, parent = null) {
     },
     async update(payload) {
       log.push({ id, op: 'update', payload });
+      // Foundry's own update APPLIES the payload before resolving the document, and
+      // the acknowledged-receipt contract re-reads the stored stack to establish the
+      // delta, so a fake that only logs would report every decrement as uncertain.
+      for (const [path, value] of Object.entries(payload)) setByPath(this, path, value);
       return this;
     },
   };
@@ -418,15 +422,15 @@ describe('_consumeComponentItems equivalence', () => {
     { name: 'an over-full first stack', stacks: [9, 4], quantity: 2 },
     { name: 'two whole stacks then a partial', stacks: [2, 4, 9], quantity: 7 },
     { name: 'every stack exactly', stacks: [2, 3], quantity: 5 },
-    { name: 'more than the pool holds', stacks: [2, 1], quantity: 10 },
+    { name: 'more than the pool holds', stacks: [2, 1], quantity: 10, short: true },
     { name: 'a stored zero among real stacks', stacks: [0, 4], quantity: 3 },
     { name: 'an unreadable stack', stacks: [undefined, 2], quantity: 2 },
     { name: 'nothing asked for', stacks: [5], quantity: 0 },
-    { name: 'an empty candidate list', stacks: [], quantity: 4 },
+    { name: 'an empty candidate list', stacks: [], quantity: 4, short: true },
     { name: 'items owned by two different actors', stacks: [2, 2, 2], quantity: 5, split: 1 },
   ];
 
-  for (const { name, stacks, quantity, split = stacks.length } of CASES) {
+  for (const { name, stacks, quantity, split = stacks.length, short = false } of CASES) {
     it(`consumes identically to the pre-extraction loop: ${name}`, async () => {
       const build = () => {
         const items = stacks.map((stack, index) => itemFake(`i${index}`, stack));
@@ -437,22 +441,36 @@ describe('_consumeComponentItems equivalence', () => {
       const engineItems = build();
       const oracleItems = build();
 
-      const consumed = await new CraftingEngine({})._consumeComponentItems(
-        engineItems[0]?.parent ?? { id: 'alice' },
-        engineItems,
-        quantity
-      );
+      const drained = await new CraftingEngine({})
+        ._consumeComponentItems(engineItems[0]?.parent ?? { id: 'alice' }, engineItems, quantity)
+        .then(
+          (records) => ({ records }),
+          (error) => ({ error })
+        );
       const expected = await legacyConsumeComponentItems(
         oracleItems[0]?.parent ?? { id: 'alice' },
         oracleItems,
         quantity
       );
 
-      assert.deepEqual(
-        consumed.map((record) => [record.item.id, record.quantity]),
-        expected.map((record) => [record.item.id, record.quantity]),
-        'the returned consumption records match the pre-extraction loop'
-      );
+      // A drain the pool cannot satisfy applies the same writes as the pre-extraction
+      // loop, but is no longer REPORTED as a consumption: the deltas that did apply come
+      // back as receipts on an uncertain-history error rather than as a short success,
+      // so nothing downstream can settle a partial drain as the full one (issue 1648).
+      if (short) {
+        assert.equal(drained.error?.code, 'HISTORY_EFFECT_UNCERTAIN');
+        assert.deepEqual(
+          drained.error.receipts.map((receipt) => [receipt.itemUuid, receipt.quantity]),
+          expected.map((record) => [record.item.uuid ?? null, record.quantity]),
+          'the refusal carries exactly the deltas the pre-extraction loop applied'
+        );
+      } else {
+        assert.deepEqual(
+          drained.records.map((record) => [record.item.id, record.quantity]),
+          expected.map((record) => [record.item.id, record.quantity]),
+          'the returned consumption records match the pre-extraction loop'
+        );
+      }
       assert.deepEqual(
         writeLog(engineItems),
         writeLog(oracleItems),
@@ -480,8 +498,8 @@ describe('_consumeComponentItems equivalence', () => {
     const body = source.slice(start, source.indexOf('\n  }\n', start));
 
     assert.ok(
-      body.replace(/\s+/g, ' ').includes('planFirstFitDrain(items, quantity)'),
-      'the method drains through the extracted policy, over the items and quantity it was given'
+      body.replace(/\s+/g, ' ').includes('planFirstFitDrain(snapshots, quantity)'),
+      'the method drains through the extracted policy, over the persisted source of the items and the quantity it was given'
     );
     assert.ok(
       !body.includes('Math.min('),

@@ -70,10 +70,12 @@ class FakeItem {
   }
   async delete() {
     this._deleted = true;
+    return this;
   }
   async update(payload) {
     this._updates.push({ ...payload });
     if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+    return this;
   }
 }
 
@@ -90,6 +92,9 @@ class FakeActor {
     const made = data.map((d, i) => {
       const item = new FakeItem(`created-${this.created.length + i}`, d.name, d.system?.quantity ?? 1, null);
       item.img = d.img;
+      item.parent = this;
+      item.uuid = `${this.uuid}.Item.${item.id}`;
+      item._source = structuredClone(d);
       return item;
     });
     this.created.push(...made);

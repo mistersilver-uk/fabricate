@@ -32,6 +32,35 @@ Where a primitive ships and its props differ from its specimen, the specimen is 
 
 ## Requirements
 
+### Requirement: Dense result rows and compact rail pagination retain their meaning
+
+The dense ListRow form MUST render a 22px Medallion, a 12px semibold sans name and an inline caller-formatted quantity, with space-2/space-3 padding, space-2 gap and 9px radius.
+The caller owns entitlement, localization and actual-versus-preview meaning; a missing quantity MUST NOT be coerced to an award.
+The supported read-only API is `name`, `art`, `icon`, `tint`, `quantity`, `detail`, `tone`, `muted` and the optional `trailing` snippet.
+The opt-in `truncateName` form MUST keep name and detail on one ellipsized line, retaining their complete DOM text and title text; the default MUST continue wrapping.
+The host MAY arrange dense rows in a four-column `minmax(0, 1fr)` grid without changing their 22px image/name/quantity anatomy.
+The broader browse, selection, loading and error forms remain targets in the library.
+HistoricalRunDetail and StageCard are the initial independent result-row callers.
+
+Pagination's opt-in `compact` presentation MUST keep the range, arrows and page-size control in one row while retaining accessible page-position and page-size labels.
+The default presentation and arithmetic MUST remain unchanged for callers that do not opt in.
+Compact controls MUST retain at least 24px hit areas, and both landmarks MUST retain their caller-supplied names.
+Journal browse density uses the existing 30px search rung, inline Select and spacing tokens so four default Active and four Finished entries can share the wide window's vertical budget.
+RadioCardGroup's optional `optionBody(option)` snippet MAY render read-only consequence content such as dense ListRow results inside a choice; it MUST NOT introduce nested interactive controls.
+StageCard `io` groups MAY supply a `content` snippet in place of plain items so a future requirement group and its route/ladder output stay paired inside the stage.
+Their default absent-snippet forms retain existing geometry and behavior.
+
+### Requirement: Compact Journal geometry is owned by the existing primitives
+
+WorldClockChip MUST compose Chip's opt-in `presentation="clock"` with direct icon, label and value flex children aligned centrally inside a 28px border-box, 28px minimum height, radius 7, space-2 horizontal padding and gap.
+Its info-family fill, border and ink MUST remain distinct from the single shared player-header surface behind it.
+Other Chip presentations MUST retain their default geometry.
+Chip's `density="list"` MUST explicitly use the rendered library specimen's 1.6 line-height with 9px/600 type, 1px/space-2 padding and stadium radius: 18.4px bordered or 16.4px bare for a single text line.
+The independently specified icon-only list square MUST remain 15px; the default density's line-height MUST remain 1.
+IconButton's opt-in numeric `size={24}` MUST own a 24px-square border-box, both minimum dimensions, zero padding and a fixed 24px flex-basis; other callers retain their existing default or pager geometry.
+EmptyState's opt-in `fill` MUST stretch its border-box to the bounded host's full width and height with a zero minimum height while preserving its chosen variant's appearance and content.
+The host owns that allocation and MUST NOT derive it from the current page's record count.
+
 ### Requirement: The primitive set is a closed, versioned vocabulary
 
 The shared primitive set MUST be the set `openspec/specs/design-system/library.html` enumerates, one member per `div.spec-head > h4` heading, and a surface MUST reach for a member of it before writing a new component.
@@ -1546,3 +1575,47 @@ The second difference is structural and smaller — `Kicker` forwards no `id` an
 - **WHEN** a proposal names a candidate the register already declined
 - **THEN** the proposal must address the recorded reasoning
 - **AND** absent new evidence, the composition in the register is used instead
+
+### Requirement: Run detail composes the specified run controls
+
+The player Journal MUST use the active-current, active-browsed, ordinary-history and recovery compositions specified by `ui-integration` rather than a universal detail order.
+It MUST reuse the run-control contracts and geometry specified in `library.html`.
+`RunActionBar` MUST retain cancel, pause or resume, completion preference and primary action order.
+An armed cancellation decision MUST replace the other actions in that bar until confirmed or dismissed; this is the run bar's explicit carve-out from the default Foundry confirmation dialog.
+`WorldClockChip` MUST remain read-only and accept the application's calendar-formatted value.
+Completion-preference visibility MUST follow the no-player-check countdown contract in `ui-integration`, independently of the zero-spend automatic blockers in `recipes-and-steps`.
+The detail MUST preserve readable permitted identity, compact This run timing and one untitled contextual guidance callout; ordinary history MUST NOT show an expanded Run record, active progress/navigation or the TIME/CHECK pair.
+Terminal and recovery guidance MUST describe recorded evidence and uncertainty rather than inviting another execution.
+Finished MUST remain the Journal's sole history browser, and the browse/detail composition MUST preserve Active, Finished, detail order when stacked at the player window's minimum width.
+
+`RunProgress` and `StageNav` MUST keep the executable stage distinct from the stage being viewed.
+Past and future `StageCard` presentations MUST be inert; browsing them MUST NOT change persisted selections or the executable stage.
+`SlotRow`, `SlotTile` and `ChoiceOptionList` MUST expose the selected materials and held-versus-needed amounts without hiding unavailable choices.
+`EssencePool` MUST derive every threshold from one shared physical carrier allocation and place overshoot evidence below its source list.
+Repeated thresholds for the same essence MUST sum their required amounts before comparing the shared contribution and render one keyed pool, so Fire 2 plus Fire 2 requires four Fire rather than counting the same two Fire twice.
+`ChoiceOptionList` MUST use each option's own `needed` amount when provided, falling back to the slot-level amount only for uniform-quantity callers.
+`SlotRow` MUST retain a caller's explicit infeasibility verdict even when held stock alone reaches the required quantity.
+Stale selections MUST remain visibly repairable, including a single surviving option; a route change MUST replace route-scoped choices and allocation rather than silently carrying them into another set.
+`StageCard` MUST derive its completion marker from an explicit stage status when supplied; past browse position alone cannot mark an unexecuted or failed stage successful.
+`YieldScale` MUST show one shared d100 cut against the item chances when shared-roll evidence is established.
+Its opt-in `rollModel` MUST accept `shared` (default), `perRow` and `unknown`; the latter two MUST omit the global cut and MUST NOT infer an outcome from the root roll.
+Historical callers MUST select `perRow` for recorded row rolls without an explicit shared root roll, even when those row values are equal.
+The optional `labels.evidence(entry)` callback MUST support each row's independently recorded raw roll, effective roll when different, threshold and outcome, alongside its attributable actual quantity.
+A missing field MUST NOT hide other known fields or rows, and unknown outcomes MUST remain neutral.
+A known shared roll whose unknown outcomes prevent locating a cut MUST remain visible as a standalone roll reading without inventing a cut position.
+Default preview callers MUST retain the existing shared comparison and ordering.
+An explicitly recorded `cleared` boolean MUST govern historical row outcomes, preserving native high-roll semantics; an explicit unknown outcome MUST remain unknown, while callers omitting that field retain the default low-roll comparison.
+`OutcomeLadder` MUST display the complete noninteractive routed outcome ladder for authored previews; ordinary routed history MUST instead use its recorded outcome log as specified by `ui-integration`.
+
+#### Scenario: A player views another stage while allocating materials
+
+- **WHEN** a player browses a past or future stage
+- **THEN** the stage navigator identifies both the viewed and executable stages
+- **AND** material controls for the viewed stage cannot mutate the run
+- **AND** returning to the executable stage restores its persisted choices and shared essence allocation
+
+#### Scenario: A player arms cancellation
+
+- **WHEN** the player activates the run bar's cancel control
+- **THEN** the bar presents the cancellation consequence and confirm-or-keep actions
+- **AND** pause, completion preference and execution cannot be activated through the armed bar
