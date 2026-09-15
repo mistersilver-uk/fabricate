@@ -86,7 +86,14 @@ const LEGACY_GATE_FILE_COUNT = 359;
 const DEBT_COUNTS = {
   scripts: { files: 15, pairs: 96 },
   srcUi: { files: 60, pairs: 146 },
-  srcRoot: { files: 4, pairs: 27 },
+  // `srcRoot` GREW at issue 1677, which is the direction this pin exists to make expensive, so the
+  // reason is recorded here rather than in a commit message. Arming `no-restricted-globals` over
+  // the domain layer exposed 117 bare Foundry-global reads across 13 files that no gate had ever
+  // looked at; every one is debt to pay, not an exemption to keep, and their per-file READ COUNTS
+  // are pinned exactly by `tests/foundry-global-reads-ratchet.test.js` so the disable cannot be
+  // used to take on more. Paying a file off drops its line from `eslint-debt.txt`, its row from
+  // that ledger, and both numbers here.
+  srcRoot: { files: 17, pairs: 40 },
   examples: { files: 8, pairs: 16 },
   rootConfig: { files: 2, pairs: 7 },
 };
@@ -352,7 +359,11 @@ test('every baselined file and rule is real', async () => {
   const known = new Set();
   const { builtinRules } = await import('eslint/use-at-your-own-risk');
   for (const name of builtinRules.keys()) known.add(name);
-  const clean = 'src/systems/CraftingEngine.js';
+  // `src/systems/CraftingEngine.js` was this seed until issue 1677 armed `no-restricted-globals`
+  // on the domain layer and gave that file a debt entry for its 44 bare `game` reads. The seed's
+  // requirement is only that the file carry NO entry, which the assertion below enforces — so it
+  // is replaced rather than made an exception, and the replacement is a sibling in the same group.
+  const clean = 'src/systems/GatheringEngine.js';
   assert.equal(
     Object.values(ESLINT_DEBT).some((group) => clean in group),
     false,
