@@ -77,6 +77,7 @@ import {
   createJournalRunCommandService,
   createManagerMutation,
   executePublicCraft,
+  executePublicGather,
   installCraftingJournalRunAuthority,
   installGatheringJournalRunAuthority,
 } from './systems/journalRunCommands.js';
@@ -4610,7 +4611,24 @@ class Fabricate {
     // `requestStart`, not `startAttempt`: a blind timed start this client may not
     // write is routed to the active GM before any task is drawn (issue 901). Every
     // other start delegates straight to `startAttempt` and is unchanged.
-    return callGatheringRuntimeWithCurrentViewer(gatheringEngine, 'requestStart', withRememberedActor, () => game.user);
+    //
+    // Wrapped in `executePublicGather` so a READY attempt still finishes in one call. The
+    // `lifecycleVersion: 1` stamped above routes a ready attempt into a started run awaiting
+    // execution instead of the engine's immediate resolution, so without this the public API
+    // answers `accepted: true` and awards nothing (issue 1759). A waiting or timed attempt is
+    // untouched and still matures at world time.
+    return executePublicGather({
+      requestStart: () =>
+        callGatheringRuntimeWithCurrentViewer(
+          gatheringEngine,
+          'requestStart',
+          withRememberedActor,
+          () => game.user
+        ),
+      actor: selectedActor,
+      executeCommand: (command, commandOptions) =>
+        this.executeJournalRunCommand(command, commandOptions),
+    });
   }
 
   /**

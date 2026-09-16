@@ -19,6 +19,7 @@ import {
   journalRunDismissalKey,
   createJournalRunCommandService,
   executePublicCraft,
+  executePublicGather,
   installCraftingJournalRunAuthority,
   installGatheringJournalRunAuthority,
 } from '../src/systems/journalRunCommands.js';
@@ -519,6 +520,124 @@ describe('journal run command protocol', () => {
     assert.equal(promptCalls, 0, 'the API never opens a dialog it has nobody to answer');
     assert.equal(settled.success, true, JSON.stringify(settled));
     assert.equal(executed.length, 1, 'the stage still executed, with the check settled for it');
+  });
+
+  it('finishes a ready public gather in one call, and leaves a waiting one alone', async () => {
+    // Issue 1759. Issue 1648 gave gathering a versioned lifecycle and `startGatheringAttempt`
+    // began selecting it unconditionally, which routes a READY attempt away from the engine's
+    // immediate resolution and into a started run awaiting execution. Crafting was given
+    // `executePublicCraft` for exactly this in the same work; gathering was not. So every macro
+    // calling `game.fabricate.startGatheringAttempt()` went on answering `accepted: true` and
+    // awarding nothing -- a silent behaviour change in a documented public API.
+    const executed = [];
+    const ready = await executePublicGather({
+      requestStart: async () => ({
+        accepted: true,
+        started: true,
+        requiresExecution: true,
+        canExecuteImmediately: true,
+        runId: 'gather-1',
+        // Top-level, as the command service's NORMALISED result carries it -- it lifts the
+        // revision out and drops the run document. A fixture shaped `run: { runRevision }` passes
+        // while production sends `undefined`.
+        runRevision: 4,
+        blockedReasons: [],
+      }),
+      actor: { uuid: 'Actor.a' },
+      executeCommand: async (command, options) => {
+        executed.push({ command, options });
+        return { success: true, terminal: true, status: 'succeeded', createdResultUuids: [] };
+      },
+    });
+
+    assert.equal(executed.length, 1, 'a ready attempt executes without a second caller');
+    assert.deepEqual(executed[0].options, { interactive: false }, 'and never opens a dialog');
+    assert.equal(executed[0].command.runType, 'gathering');
+    assert.equal(executed[0].command.runId, 'gather-1');
+    assert.equal(executed[0].command.expectedRevision, 4, 'the run revision guards the execute');
+    assert.equal(executed[0].command.action, 'execute');
+    assert.equal(ready.success, true, JSON.stringify(ready));
+    assert.equal(ready.accepted, true, 'the attempt was accepted AND it executed; both are true');
+
+    // A waiting attempt is a different thing entirely: it matures at GM-gated world time, and
+    // finishing it here would spend the wait the task declares.
+    const waitingExecutes = [];
+    const waiting = await executePublicGather({
+      requestStart: async () => ({
+        accepted: true,
+        started: true,
+        requiresExecution: true,
+        canExecuteImmediately: false,
+        runId: 'gather-2',
+        // Top-level, as the command service's NORMALISED result carries it -- it lifts the
+        // revision out and drops the run document. A fixture shaped `run: { runRevision }` passes
+        // while production sends `undefined`.
+        runRevision: 1,
+      }),
+      actor: { uuid: 'Actor.a' },
+      executeCommand: async (...args) => (waitingExecutes.push(args), { success: true }),
+    });
+    assert.deepEqual(waitingExecutes, [], 'a timed attempt is never completed early');
+    assert.equal(waiting.canExecuteImmediately, false);
+
+    // A refused attempt is returned untouched, so its blocked reasons still reach the caller.
+    const blockedExecutes = [];
+    const blocked = await executePublicGather({
+      requestStart: async () => ({
+        accepted: false,
+        started: false,
+        state: 'SCENE_BLOCKED',
+        blockedReasons: [{ code: 'SCENE_BLOCKED' }],
+      }),
+      actor: { uuid: 'Actor.a' },
+      executeCommand: async (...args) => (blockedExecutes.push(args), { success: true }),
+    });
+    assert.deepEqual(blockedExecutes, []);
+    assert.deepEqual(blocked.blockedReasons, [{ code: 'SCENE_BLOCKED' }]);
+  });
+
+  it('reports a ready gather whose execution failed as accepted but unsuccessful', async () => {
+    // The start result is kept UNDER the settled one rather than replaced. An attempt that was
+    // accepted and then failed to execute is both of those things at once, and a caller reading
+    // `accepted` must not be told the attempt never happened.
+    const settled = await executePublicGather({
+      requestStart: async () => ({
+        accepted: true,
+        started: true,
+        requiresExecution: true,
+        canExecuteImmediately: true,
+        runId: 'gather-3',
+        // Top-level, as the command service's NORMALISED result carries it -- it lifts the
+        // revision out and drops the run document. A fixture shaped `run: { runRevision }` passes
+        // while production sends `undefined`.
+        runRevision: 2,
+      }),
+      actor: { uuid: 'Actor.a' },
+      executeCommand: async () => ({ success: false, reason: 'claim-held' }),
+    });
+    assert.equal(settled.accepted, true, 'the attempt genuinely was accepted');
+    assert.equal(settled.success, false, 'and the execution genuinely failed');
+    assert.equal(settled.reason, 'claim-held', 'with the refusal reason intact for the player');
+  });
+
+  it('refuses a ready gather with no command client rather than reporting a silent award', async () => {
+    const settled = await executePublicGather({
+      requestStart: async () => ({
+        accepted: true,
+        started: true,
+        requiresExecution: true,
+        canExecuteImmediately: true,
+        runId: 'gather-4',
+        // Top-level, as the command service's NORMALISED result carries it -- it lifts the
+        // revision out and drops the run document. A fixture shaped `run: { runRevision }` passes
+        // while production sends `undefined`.
+        runRevision: 1,
+      }),
+      actor: { uuid: 'Actor.a' },
+    });
+    assert.equal(settled.success, false);
+    assert.equal(settled.reason, 'execute-command-unavailable');
+    assert.equal(settled.authorityUnavailable, true);
   });
 
   it('executes a ready fully-selected public craft under a second authority request', async () => {
