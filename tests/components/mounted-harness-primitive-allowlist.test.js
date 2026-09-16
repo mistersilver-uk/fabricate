@@ -513,8 +513,9 @@ test('every hand-rolled mount harness names the shared primitives its tree rende
 
   for (const suitePath of suitePaths) {
     const suite = readRepoFile(suitePath);
-    // A suite that compiles nothing cannot hang on a missing component.
-    if (!suite.includes('writeCompiledSvelte') && !suite.includes('compiledModules')) continue;
+    // A suite that compiles nothing cannot hang on a missing component. Matched as a CALL, so a
+    // suite that only names the helper in prose is not read as compiling anything.
+    if (!suite.includes('writeCompiledSvelte(') && !suite.includes('compiledModules')) continue;
 
     const compiled = new Set(compiledPathsOf(suite));
     const named = componentPaths.filter((path) => compiled.has(path));
@@ -552,7 +553,10 @@ test('every inspected suite resolves at least one real component, so none passes
   const unreadable = [];
   for (const suitePath of repoPathsUnder('tests', '.test.js')) {
     const suite = readRepoFile(suitePath);
-    if (!suite.includes('writeCompiledSvelte') && !suite.includes('compiledModules')) continue;
+    // The same CALL form as the guard above: `tests/file-size-ledger.test.js` records what a new
+    // `.svelte` child would have to join, naming this helper in a comment while compiling
+    // nothing, and a bare-identifier trigger accused it of vacuity for the prose.
+    if (!suite.includes('writeCompiledSvelte(') && !suite.includes('compiledModules')) continue;
     if (suite.includes('createMountedComponentHarness')) continue;
     // The scoped-screen factories (`tests/helpers/componentScopeMountModules.js`) hand a suite
     // its `compiledModules` as a RETURN VALUE, not as a literal it declares, and they carry

@@ -1,15 +1,7 @@
 /**
- * Every Vite server a test boots must own its dep-optimizer cache directory.
- *
- * `node --test` runs test files in parallel processes, and five of them boot a Vite server through
- * the two helpers read below. On Vite's default `cacheDir` they share one
- * `<root>/node_modules/.vite`, and a pre-bundle one process rewrites fails another's in-flight
- * requests with `ERR_OUTDATED_OPTIMIZED_DEP` (issue 1654).
- *
- * The guard is a source-text pin because the race is cold-cache only: a test that tried to observe
- * it would pass for the wrong reason against a warm `node_modules/.vite`, which is what every
- * second local run has. It pins the call-site count too, so a fourth `createServer` added to these
- * helpers without the option fails here rather than reintroducing the race.
+ * Every test Vite factory must use the per-process optimizer cache to prevent cold-cache races.
+ * Warm-cache runs cannot prove isolation, so the factory count and cache wiring are pinned.
+ * The composition boots share one factory; the fixture server owns the other (issue 1648).
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,9 +12,8 @@ const HARNESSES = [
   'tests/helpers/extension-composition-harness.js',
   'tests/helpers/vite-fixture-server.js',
 ];
-const EXPECTED_SERVERS = 3;
+const EXPECTED_SERVERS = 2;
 
-/** Reads a file named relative to the repository root, which is what {@link HARNESSES} holds. */
 function sourceOf(relativePath) {
   return readFileSync(resolve(import.meta.dirname, '..', relativePath), 'utf8');
 }

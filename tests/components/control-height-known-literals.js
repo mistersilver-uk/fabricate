@@ -147,7 +147,8 @@ export const SCANNED_HEIGHT_PROPERTIES = Object.freeze([
  * `ManagerSearchField` now, which paints itself at the ladder's own 34px. The row is layout and
  * declares no height at all, so the debt is PAID by adoption rather than snapped to a rung.
  */
-export const KNOWN_RETIRED_HEIGHT_TOTAL = 64;
+// #1648 removes the dead Journal primary button's retired 36px minimum (64 - 1).
+export const KNOWN_RETIRED_HEIGHT_TOTAL = 63;
 
 /**
  * The per-corpus height-declaration counts the floors were CHOSEN AGAINST, at the commit that
@@ -201,7 +202,7 @@ const ROWS = Object.freeze([
   'styles/fabricate.css | height | 36 | 11 | 36px => 36px',
   'styles/fabricate.css | height | 40 | 7 | 40px => 40px',
   'styles/fabricate.css | min-height | 32 | 6 | 32px => 32px',
-  'styles/fabricate.css | min-height | 36 | 7 | 36px => 36px',
+  'styles/fabricate.css | min-height | 36 | 6 | 36px => 36px',
   'styles/fabricate.css | min-height | 40 | 4 | 40px => 40px ; calc(40px + (2 * var(--fab-space-3)) + 2px) => calc(40px + (2 * 12px) + 2px)',
 ]);
 

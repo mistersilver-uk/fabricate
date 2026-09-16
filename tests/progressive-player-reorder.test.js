@@ -294,8 +294,8 @@ function makeMergingActor(id = 'actor-1') {
       flags: {},
       parent: null,
       toObject: () => ({ name: 'Dragon Scale', type: 'loot', system: { quantity: 1 } }),
-      async delete() {},
-      async update() {},
+      async delete() { return this; },
+      async update(payload) { if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity']; return this; },
     },
   ];
   const merge = (target, source) => {
@@ -332,6 +332,7 @@ function makeMergingActor(id = 'actor-1') {
         value && typeof value === 'object' && !Array.isArray(value)
           ? merge(cur[leaf] ?? {}, JSON.parse(JSON.stringify(value)))
           : value;
+      return this;
     },
     async update(updates) {
       for (const [path, value] of Object.entries(updates)) {
@@ -348,7 +349,7 @@ function makeMergingActor(id = 'actor-1') {
     async createEmbeddedDocuments(_type, dataArr) {
       return dataArr.map((d, i) => {
         createdNames.push(d.name);
-        return { id: `created-${i}`, uuid: `Actor.${id}.Item.c${i}`, name: d.name, system: {} };
+        return { id: `created-${i}`, uuid: `Actor.${id}.Item.c${i}`, parent: this, _source: structuredClone(d), name: d.name, system: structuredClone(d.system ?? {}) };
       });
     },
   };

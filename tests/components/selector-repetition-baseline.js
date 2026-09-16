@@ -25,11 +25,11 @@
  * all, and the chain joined by ` >> ` when a rule is nested. The at-context is part of the key
  * because two rules under different conditions are never the same rule: the same selector inside
  * a `@container` and at the top level is two different pieces of authoring, and merging them is
- * not a thing that can be done. Keyed on the selector ALONE the sheet holds 206 repeated selectors
- * rather than these 112, and both figures are published so a reader can tell which produced a pin.
+ * not a thing that can be done. Keyed on the selector ALONE the sheet holds 207 repeated selectors
+ * rather than these 113, and both figures are published so a reader can tell which produced a pin.
  *
  * ── WHY THE TABLE IS FILTERED TO count >= 2 ─────────────────────────────────────────────
- * Unfiltered, the sheet holds 3,043 `(at-context, selector)` keys, of which 2,931 appear exactly
+ * Unfiltered, the sheet holds 3,060 `(at-context, selector)` keys, of which 2,947 appear exactly
  * once. `assertRatchet` compares the observed tally against the baseline key by key, so an
  * unfiltered table would report every singleton as new debt the first time anybody added a rule,
  * and the gate's output would be unreadable on the day it mattered. The filter is applied on BOTH
@@ -37,11 +37,11 @@
  * is a VANISHED row rather than a silent pass.
  *
  * ── WHERE THE NUMBERS COME FROM ─────────────────────────────────────────────────────────
- * MEASURED over this branch's own head, rebased onto the merged main at 75dd8bf9 (which carries
- * issue 1371's fix adding one rule to the sheet), by `the sheet's cross-list selector repetition
+ * MEASURED after #1648's history batch replaces the dismiss override with an owning 24px
+ * variant and adds ListRow name/detail truncation, by `the sheet's cross-list selector repetition
  * does not move` in `design-system-debt-ratchets.test.js`, over
  * `scripts/lib/stylesheetSelectorCensus.js`, which is the same implementation the census report is
- * printed from. The sheet holds 2,562 rules at that head, 112 repeated keys and 229 appearances
+ * printed from. The sheet holds 2,576 rules at that head, 113 repeated keys and 231 appearances
  * between them; five keys appear three times and none appears four or more.
  *
  * ISSUE 1517 PHASE 3 RE-KEYED NO ROW AND MOVED THE THREE CONTEXTUAL FIGURES, by adding ONE rule
@@ -438,6 +438,6 @@ export const SELECTOR_REPETITION_BASELINE = checkedRows(TABLE.rows);
  *
  * `assertRatchet` asserts exactly that and throws before any comparison if the two disagree, so
  * this is the one figure a reviewer can check against the issue without reading the table. At the
- * measured commit it is 229 across 112 rows.
+ * measured commit it is 231 across 113 rows.
  */
 export const SELECTOR_REPETITION_TOTAL = TABLE.pinnedTotal;

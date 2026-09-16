@@ -1,6 +1,16 @@
 import { getFabricateFlag } from '../config/flags.js';
 
-import { persistFabricateRunContainer, runContainerBaseline } from './runContainerCoherence.js';
+import {
+  reconcileAgainstDocument,
+  compareFinishedAtNewestFirst,
+  runContainerBaseline,
+} from './runContainerCoherence.js';
+import {
+  historyEvidenceFields,
+  itemReceipt,
+  preserveSettledHistory,
+  writeAcknowledgedRunContainer,
+} from './runHistoryEvidence.js';
 
 const HISTORY_LIMIT = 50;
 
@@ -59,23 +69,52 @@ export class RunContainerManagerBase {
   }
 
   async _persist(actor, container) {
-    // Reconcile the about-to-persist container against the CURRENT document, cache the
-    // reconciled reference, and write the flag with explicit removed-key deletion, so a
-    // stale in-memory view cannot clobber runs written out-of-band by another
-    // client/session or the world-time resume (issues 733 + 739). See the shared helper.
-    await persistFabricateRunContainer({
-      actor,
-      container,
-      flagKey: this._flagKey,
-      normalizeContainer: (raw) => this._normalizeContainer(raw),
-      cache: this._cache,
-      baseline: this._baseline,
+    const current = this._normalizeContainer(getFabricateFlag(actor, this._flagKey, null));
+    const next = this._normalizeContainer(JSON.parse(JSON.stringify(container)));
+    next.history = preserveSettledHistory(current.history, next.history);
+    const reconciled = reconcileAgainstDocument({
+      current,
+      next,
+      baseline: this._baseline.get(actor.id),
+      compareHistory: compareFinishedAtNewestFirst,
       historyLimit: HISTORY_LIMIT,
     });
+    for (const run of reconciled.history) delete reconciled.active[run.id];
+    try {
+      await writeAcknowledgedRunContainer(
+        actor,
+        'fabricate',
+        `fabricate.${this._flagKey}`,
+        current,
+        reconciled
+      );
+    } catch (error) {
+      this.invalidateCache(actor.id);
+      throw error;
+    }
+    Object.assign(container, reconciled);
+    this._cache.set(actor.id, structuredClone(reconciled));
+    this._recordBaseline(actor.id, reconciled);
   }
 
   _recordBaseline(actorId, container) {
     this._baseline.set(actorId, runContainerBaseline(container));
+  }
+
+  async settleHistory(actor, runId, payload = {}) {
+    this.invalidateCache(actor.id);
+    const container = this._getContainer(actor);
+    const run = container.history.find((entry) => entry.id === runId);
+    if (!run || Object.hasOwn(run, 'lifecycleVersion'))
+      throw new Error('Native terminal history is required');
+    const settlement = Object.values(run.historySettlement ?? {});
+    if (settlement.length > 0 && !settlement.includes('pending')) return structuredClone(run);
+    Object.assign(run, historyEvidenceFields(payload));
+    for (const field of ['consumedIngredients', 'consumedComponents', 'createdResults']) {
+      if (Array.isArray(payload[field])) run[field] = payload[field].map(itemReceipt);
+    }
+    await this._persist(actor, container);
+    return structuredClone(run);
   }
 
   invalidateCache(actorId = null) {
@@ -96,7 +135,7 @@ export class RunContainerManagerBase {
     // `_persist` can distinguish an intentional removal from a run this manager never
     // observed (another client's concurrent write).
     this._recordBaseline(actor.id, container);
-    return container;
+    return structuredClone(container);
   }
 
   getActiveRuns(actor) {

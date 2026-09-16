@@ -32,6 +32,35 @@ Where a primitive ships and its props differ from its specimen, the specimen is 
 
 ## Requirements
 
+### Requirement: Dense result rows and compact rail pagination retain their meaning
+
+The dense ListRow form MUST render a 22px Medallion, a 12px semibold sans name and an inline caller-formatted quantity, with space-2/space-3 padding, space-2 gap and 9px radius.
+The caller owns entitlement, localization and actual-versus-preview meaning; a missing quantity MUST NOT be coerced to an award.
+The supported read-only API is `name`, `art`, `icon`, `tint`, `quantity`, `detail`, `tone`, `muted` and the optional `trailing` snippet.
+The opt-in `truncateName` form MUST keep name and detail on one ellipsized line, retaining their complete DOM text and title text; the default MUST continue wrapping.
+The host MAY arrange dense rows in a four-column `minmax(0, 1fr)` grid without changing their 22px image/name/quantity anatomy.
+The broader browse, selection, loading and error forms remain targets in the library.
+HistoricalRunDetail and StageCard are the initial independent result-row callers.
+
+Pagination's opt-in `compact` presentation MUST keep the range, arrows and page-size control in one row while retaining accessible page-position and page-size labels.
+The default presentation and arithmetic MUST remain unchanged for callers that do not opt in.
+Compact controls MUST retain at least 24px hit areas, and both landmarks MUST retain their caller-supplied names.
+Journal browse density uses the existing 30px search rung, inline Select and spacing tokens so four default Active and four Finished entries can share the wide window's vertical budget.
+RadioCardGroup's optional `optionBody(option)` snippet MAY render read-only consequence content such as dense ListRow results inside a choice; it MUST NOT introduce nested interactive controls.
+StageCard `io` groups MAY supply a `content` snippet in place of plain items so a future requirement group and its route/ladder output stay paired inside the stage.
+Their default absent-snippet forms retain existing geometry and behavior.
+
+### Requirement: Compact Journal geometry is owned by the existing primitives
+
+WorldClockChip MUST compose Chip's opt-in `presentation="clock"` with direct icon, label and value flex children aligned centrally inside a 28px border-box, 28px minimum height, radius 7, space-2 horizontal padding and gap.
+Its info-family fill, border and ink MUST remain distinct from the single shared player-header surface behind it.
+Other Chip presentations MUST retain their default geometry.
+Chip's `density="list"` MUST explicitly use the rendered library specimen's 1.6 line-height with 9px/600 type, 1px/space-2 padding and stadium radius: 18.4px bordered or 16.4px bare for a single text line.
+The independently specified icon-only list square MUST remain 15px; the default density's line-height MUST remain 1.
+IconButton's opt-in numeric `size={24}` MUST own a 24px-square border-box, both minimum dimensions, zero padding and a fixed 24px flex-basis; other callers retain their existing default or pager geometry.
+EmptyState's opt-in `fill` MUST stretch its border-box to the bounded host's full width and height with a zero minimum height while preserving its chosen variant's appearance and content.
+The host owns that allocation and MUST NOT derive it from the current page's record count.
+
 ### Requirement: The primitive set is a closed, versioned vocabulary
 
 The shared primitive set MUST be the set `openspec/specs/design-system/library.html` enumerates, one member per `div.spec-head > h4` heading, and a surface MUST reach for a member of it before writing a new component.
@@ -132,6 +161,8 @@ The prose above already covers such a rule — it can only ever match inside tha
 The resolution is to name the caller's container by a class the caller writes ON THAT SAME ELEMENT, at the same rank and the same position, leaving the rule app-rooted and exempt.
 That is not the "second ancestor picked for reach" this requirement forbids above: it is the SAME ancestor named a different way, and the change that does it MUST publish the measured match set of both forms.
 Where the caller writes no such class, the rule is a named residue recorded with the change that retires the family.
+A rule declared inside an `@container` block named for an application root is a residue of the same kind for a different reason: the container NAME is established by the application root itself, as `fabricate-manager` is by `.fabricate-manager`, so in a host that carries no such root there is no container to query and the rule cannot travel with the family however it is rooted.
+A change that re-roots such a family names those rules and EXCLUDES them by count from the host-equality walk, so the walk is not read as covering them; `tests/components/re-rooted-controls-host-independence.test.js` holds both the walk and the exclusions.
 The SECOND instance of that case is what makes it a rule rather than one change's episode, and it adds a discipline the first did not need.
 Where a caller writes SEVERAL classes on that element, the change picks the NARROWEST one whose carriers it has MEASURED, and records the wider candidates it refused.
 Naming a shared default instead of a per-site class widens the rule onto surfaces it has never painted, which is the same defect as picking a second ancestor for reach, arriving through a class rather than through a combinator.
@@ -164,6 +195,11 @@ A literal written for this reason still takes a published ramp value for every O
 A caller MAY carry its OWN family on the primitive's elements through DECLARED CLASS PROPS, and the family is still rooted at a class the PRIMITIVE writes into the DOM, using the value the caller supplies.
 The guarantee above is therefore unchanged, and the gate reads a declared class prop as EMISSION: what moved is which file holds the string, not whether it is rendered.
 A declared class prop is checked against the component it is PASSED TO rather than the component that passes it, so a renamed prop on the primitive reds rather than leaving the gate reading a value the framework discards.
+A class a caller hands over that way leaves the caller's own scoped `<style>` unable to reach it, and the failure is SILENT: Svelte stamps its scope hash onto the markup the caller writes and never onto the element the primitive renders, so the rule compiles, the class is on the element, and the two never meet.
+The repair is a `:global(…)` selector CHAINED onto the caller's own scoped compound rather than written alone, so the rule keeps the specificity the scoped form had; `tests/components/manager-button-scoped-class-reach.test.js` holds the registry of primitives this applies to and fails a caller that moves a styled class onto one without it.
+It fails two ways and neither names the cause — the rule is EMITTED with the hash appended and matches nothing, or it is PRUNED behind a bare `css_unused_selector` warning — and which one a caller gets is a property of the WHOLE file rather than of the class that moved: measured on Svelte 5.56.3, it is emitted-and-silent whenever that file also holds a regular element carrying a spread or an expression-valued `class`, so the silent mode is the one to assume and the caller's own style block is what to read rather than `lint:svelte:warnings`.
+A DESCENDANT selector is wrapped WHOLE, because `:global(ancestor) .child` leaves `.child` as the only scoped compound and the rule silently gains a level of specificity.
+A primitive that forwards a rest spread therefore declares `class` as a NAMED prop and writes the spread AFTER its own `class={…}`, because a rest key would REPLACE the family class outright and unstyle the control while every `data-*` selector kept resolving.
 
 The CASCADE forces a corollary.
 A caller rule that must out-rank the primitive's own is deepened at the CALLER's own namespace roots.
@@ -633,6 +669,9 @@ Under `prefers-reduced-motion: reduce` every transition and animation is removed
 NOTHING GATES THE 140ms FIGURE AND NOTHING SHIPS IT: measured across both stylesheet corpora, the durations written are 120ms seventeen times, 150ms nine times, and four others, and 140ms appears nowhere at all.
 So this sentence names a rung the product has never used, which makes it a decision owed rather than a rule enforced — either the ladder becomes 120/150 and a gate holds it, or the corpus moves onto 140 — and it is recorded here as unenforced so that the next reader does not mistake the silence for compliance.
 
+The chip's RECESSIVE TONES are one ladder rather than a set of percentages, and the order is `secondary` → `neutral` → `subtle` → `muted`, loudest to quietest: `secondary` names the rule the GM is reading, `neutral` a fact merely present, `subtle` a quiet non-actionable state, and `muted` something unavailable.
+The quantity that orders them is the CONTRAST of each ink composited over that theme's own ground — never an alpha and never a channel, because the themes do not agree on a model and an alpha comparison ties three of the four — and a caller routes by that MEANING rather than by matching a tone name to a token name, since the names deliberately do not track the tokens.
+
 A SELECTED face is a FILL and an EDGE.
 A leading inset bar is a single-select affordance and MUST NOT be drawn on a list that admits more than one answer, because several rows carry the selected state at once and a bar on each of them claims a singularity the list does not have.
 So a selected row takes `--fab-surface-active` behind `--fab-accent-border`, and the `--fab-accent-soft` fill under a 3px inset accent bar belongs to a radio card group, whose one answer the bar is naming.
@@ -668,6 +707,13 @@ An `aria-label` bound to a prop that may be empty MUST be written `aria-label={n
 
 A change with no visible focus consequence MUST be announced through a live region, and focus MUST move BEFORE the announcement is made, because polite speech is cancelled by a focus change.
 Reorder announces the moved item, its new position and the total.
+A control that DELETES the element holding focus MUST take its destination BEFORE it emits, because deleting the focused node otherwise drops focus to `<body>`, which Foundry reads as an unfocused window.
+The order is the next peer's control, then the previous peer's, then the nearest enclosing fallback hook the CALLER supplies; and because a caller's add trigger is often conditional, the caller owes a SECOND hook on the row itself, carrying `tabindex="-1"` and rendered in the empty state too, since a trigger that exists only while something is left to add disappears in exactly the removal that needs it.
+An editable set of tokens owes ONE `aria-live="polite"` summary BESIDE the row and never a region wrapped AROUND it: `aria-relevant` defaults to `additions text`, so a wrapping region announces each added token's entire subtree, its remove button's label included, and announces NOTHING AT ALL on a removal.
+The summary states NAMES as well as a count, because "3 selected" does not tell a non-sighted GM which three.
+A live region is also announced by its ROLE rather than by `aria-live` alone where the region and its text are INSERTED in one mutation, which is what a notice does: a live region created in the same mutation as its content is not announced and only its later updates are, while a live-region role is recognised on insertion.
+A control that is unavailable but must stay READABLE takes `aria-disabled` rather than the native `disabled` attribute, and the two failures that decides are defects rather than preferences: several screen readers drop a `disabled` button from the tab order, so a capped or gated control is tabbed past even though its own `aria-describedby` explains why; and `focus()` on a disabled button silently no-ops and drops the keyboard user to `<body>`, which breaks any post-deletion focus destination that lands on it.
+The trade is that `aria-disabled` does not suppress the click, so the component's own handler must refuse.
 
 Any element with a bounded width MUST state what a value too long for it does.
 The default is to wrap to a stated number of lines and then truncate with an ellipsis, never to expand the container: a long document name and a long localized string are the normal case rather than the exception, and a control that grows with its content moves every control beside it.
@@ -700,6 +746,9 @@ A focusable element that is not a form control, contentEditable, or a button wit
 The condition is HOLDING FOCUS, not handling keys: an element that handles nothing still takes every keystroke the GM aims at it and hands it to the canvas, so `tabindex="-1"` on a non-form element is itself the trigger, since that attribute exists only to make the element a focus target.
 The carve-out for a button is FORM-SCOPED and stays that way: `hasFocus` answers `!!focused.form`, so a button outside a form is exactly as unrecognised as a bare div, and a roving-tabindex tab strip — which handles the arrows and calls `preventDefault()` without `stopPropagation()` — runs its own handler AND pans the canvas.
 The attribute is an OPT-IN that declares the element focused: `data-keyboard-focus="false"` does the opposite and hands the keypress to the canvas, so the value matters as much as the attribute.
+A primitive writes that attribute on the SAME SIDE of its `{...rest}` as its own `class`, because `KeyboardManager#hasFocus` reads it off the focused element with no inheritance and a spread landing after it lets a caller's attribute bag unset it unremarked.
+HOW A `data-*` VALUE IS SPELLED is part of the same contract: a bare `data-*` written on a COMPONENT tag is the boolean `true` rather than the empty string it is on an element, and an attribute-bag entry written `{ 'data-x': true }` does the same, so a call site that means the empty string MUST spell `data-x=""`.
+A presence selector resolves either way, which is why no mounted suite, source pin or smoke step written with one can see the difference.
 `tests/design-system-keyboard-focus.test.js` holds all three populations this obliges, and for two of them it holds a pinned baseline rather than an absence: the `tabindex="-1"` targets are compliant, while the elements that carry a static `tabindex="0"` and an interactive role, and the buttons with no ancestor form, are counted debt that the shared primitives emitting the attribute will collapse.
 A listbox MUST keep DOM focus on ONE element and drive selection with `aria-activedescendant`; roving focus onto option buttons re-arms those bindings and is forbidden.
 A MENU is the deliberate exception and not a loophole: its pattern requires focus to MOVE to its items, so each item carries the keyboard-focus attribute above and the bindings are declared away rather than avoided.
@@ -1546,3 +1595,47 @@ The second difference is structural and smaller — `Kicker` forwards no `id` an
 - **WHEN** a proposal names a candidate the register already declined
 - **THEN** the proposal must address the recorded reasoning
 - **AND** absent new evidence, the composition in the register is used instead
+
+### Requirement: Run detail composes the specified run controls
+
+The player Journal MUST use the active-current, active-browsed, ordinary-history and recovery compositions specified by `ui-integration` rather than a universal detail order.
+It MUST reuse the run-control contracts and geometry specified in `library.html`.
+`RunActionBar` MUST retain cancel, pause or resume, completion preference and primary action order.
+An armed cancellation decision MUST replace the other actions in that bar until confirmed or dismissed; this is the run bar's explicit carve-out from the default Foundry confirmation dialog.
+`WorldClockChip` MUST remain read-only and accept the application's calendar-formatted value.
+Completion-preference visibility MUST follow the no-player-check countdown contract in `ui-integration`, independently of the zero-spend automatic blockers in `recipes-and-steps`.
+The detail MUST preserve readable permitted identity, compact This run timing and one untitled contextual guidance callout; ordinary history MUST NOT show an expanded Run record, active progress/navigation or the TIME/CHECK pair.
+Terminal and recovery guidance MUST describe recorded evidence and uncertainty rather than inviting another execution.
+Finished MUST remain the Journal's sole history browser, and the browse/detail composition MUST preserve Active, Finished, detail order when stacked at the player window's minimum width.
+
+`RunProgress` and `StageNav` MUST keep the executable stage distinct from the stage being viewed.
+Past and future `StageCard` presentations MUST be inert; browsing them MUST NOT change persisted selections or the executable stage.
+`SlotRow`, `SlotTile` and `ChoiceOptionList` MUST expose the selected materials and held-versus-needed amounts without hiding unavailable choices.
+`EssencePool` MUST derive every threshold from one shared physical carrier allocation and place overshoot evidence below its source list.
+Repeated thresholds for the same essence MUST sum their required amounts before comparing the shared contribution and render one keyed pool, so Fire 2 plus Fire 2 requires four Fire rather than counting the same two Fire twice.
+`ChoiceOptionList` MUST use each option's own `needed` amount when provided, falling back to the slot-level amount only for uniform-quantity callers.
+`SlotRow` MUST retain a caller's explicit infeasibility verdict even when held stock alone reaches the required quantity.
+Stale selections MUST remain visibly repairable, including a single surviving option; a route change MUST replace route-scoped choices and allocation rather than silently carrying them into another set.
+`StageCard` MUST derive its completion marker from an explicit stage status when supplied; past browse position alone cannot mark an unexecuted or failed stage successful.
+`YieldScale` MUST show one shared d100 cut against the item chances when shared-roll evidence is established.
+Its opt-in `rollModel` MUST accept `shared` (default), `perRow` and `unknown`; the latter two MUST omit the global cut and MUST NOT infer an outcome from the root roll.
+Historical callers MUST select `perRow` for recorded row rolls without an explicit shared root roll, even when those row values are equal.
+The optional `labels.evidence(entry)` callback MUST support each row's independently recorded raw roll, effective roll when different, threshold and outcome, alongside its attributable actual quantity.
+A missing field MUST NOT hide other known fields or rows, and unknown outcomes MUST remain neutral.
+A known shared roll whose unknown outcomes prevent locating a cut MUST remain visible as a standalone roll reading without inventing a cut position.
+Default preview callers MUST retain the existing shared comparison and ordering.
+An explicitly recorded `cleared` boolean MUST govern historical row outcomes, preserving native high-roll semantics; an explicit unknown outcome MUST remain unknown, while callers omitting that field retain the default low-roll comparison.
+`OutcomeLadder` MUST display the complete noninteractive routed outcome ladder for authored previews; ordinary routed history MUST instead use its recorded outcome log as specified by `ui-integration`.
+
+#### Scenario: A player views another stage while allocating materials
+
+- **WHEN** a player browses a past or future stage
+- **THEN** the stage navigator identifies both the viewed and executable stages
+- **AND** material controls for the viewed stage cannot mutate the run
+- **AND** returning to the executable stage restores its persisted choices and shared essence allocation
+
+#### Scenario: A player arms cancellation
+
+- **WHEN** the player activates the run bar's cancel control
+- **THEN** the bar presents the cancellation consequence and confirm-or-keep actions
+- **AND** pause, completion preference and execution cannot be activated through the armed bar

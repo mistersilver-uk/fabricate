@@ -55,12 +55,22 @@
     // that skips this dispatcher silently drops to null and every step block falls back
     // to its baked projection.
     displayedStepId = null,
+    // The localized versioned-run authority refusal, or '' when the authority is available.
+    // Read by the HEADER alone, but declared here because this dispatcher is the only route to it.
+    authorityRefusal = '',
   } = $props();
 
   const redacted = $derived(recipe?.redaction?.redacted === true);
   const mode = $derived(String(recipe?.modeToken ?? 'simple'));
 
   // Craft-button gating (the button is a fixed footer below the scrolling body).
+  //
+  // Deliberately NOT gated on `authorityRefusal`. Availability is a CACHE the boot and journal
+  // hooks refresh, so a stale `false` would disable the only CTA this pane has and leave the
+  // player no way to clear it short of reloading Foundry — while an enabled button costs at
+  // worst one click answered by the same sentence the header is already showing, and "try again
+  // in a moment" is the documented remedy for every transient authority state. The header states
+  // the consequence in its callout instead (`RecipeDetailHeader.svelte`, `refusalLine`).
   const canCraft = $derived(craftability?.canCraft === true);
   const craftLabel = $derived(
     rollResult
@@ -109,7 +119,7 @@
   </div>
 {:else}
   <div class="crafting-detail" data-crafting-detail-state="selected" data-recipe-detail-mode={mode}>
-    <RecipeDetailHeader {recipe} />
+    <RecipeDetailHeader {recipe} {authorityRefusal} />
     {#if !redacted}
       <div class="crafting-detail-body" data-crafting-detail-scroll>
         <Body

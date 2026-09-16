@@ -38,7 +38,7 @@ An environment defines what can be gathered there and how gathering attempts are
 To avoid collision with `CraftingSystem.resolutionMode` from `resolution-modes/spec.md`, this spec uses:
 
 - **Environment selection mode** for `targeted` vs `blind`
-- **Task resolution mode** for `progressive`, `routed`, or `d100`
+- **Task resolution mode** for `straight`, `d100`, `routed`, or legacy `progressive`
 
 ## Scope
 
@@ -708,10 +708,10 @@ The blocking `modifierRollExpression` readiness issue issue 1117 raised is RETIR
 **The disambiguation is now a naming requirement about SECTIONS, not libraries.**
 The GM-facing section label on a Checks route is **"Check modifiers"** because what that route authors is a selection; the drop-row and event sections keep **"Character modifiers"** because what they author is a reference with its own arithmetic; and the one authoring surface is labelled simply **"Modifiers"**, because it is neither — it is the library both read.
 
-**The check-modifier seam on gathering is DORMANT.**
-`_libraryTaskToRuntimeTask` hardcodes `resolutionMode: 'd100'` pending issue 683 and `GatheringEconomyView` renders `progressive` and `routed` disabled, so no GM-selectable configuration reaches `runFormulaRouted` or `runFormulaProgressive` today.
-The persisted shape, both mirrored normalizers (`normalizeLibraryTask` and `_normalizeGatheringTask` must BOTH emit `GatheringTask.checkModifierIds`), the projection and the UI all land now, and the Modifiers section renders the same inert notice `d100` gets, **naming that reason**.
-The capability activates when 683 lands; no separate follow-up issue is opened.
+The check-modifier seam applies to task-owned formula modes (`routed` and legacy `progressive`).
+Both library normalizers preserve `GatheringTask.checkModifierIds`, `resolutionMode` and `resultGroups`, and `_libraryTaskToRuntimeTask` forwards them to the engine.
+An absent task mode defaults to `d100`; the economy's compatibility mode never overrides it.
+Task authoring controls are delivered separately by #1648; progressive remains unavailable as a new authoring option.
 
 ## Gathering Character Modifiers
 
@@ -829,7 +829,7 @@ GatheringTask = {
   img?: string,  // default is 'icons/containers/bags/pouch-leather-brown-green.webp'
   enabled: boolean,
 
-  resolutionMode: "progressive" | "routed" | "d100",
+  resolutionMode: "straight" | "d100" | "routed" | "progressive", // absence defaults to d100
 
   toolIds: string[],  // references the system-owned Tools library (system.tools[].id, the craftingSystems setting); legacy tasks default to []
   defaultEnvironmentId?: string | null,  // NEW optional field; drop-time env-resolution middle tier (placement hint only; see data-models Canvas Interactables)
@@ -847,7 +847,7 @@ GatheringTask = {
   risk?: string,
   encounterHooks?: GatheringEncounterHook[],
 
-  // Used by both routed and progressive modes.
+  // Used by straight, routed and progressive modes; inactive for d100.
   // Routed resolution routes a system-check outcome tier to the result group
   // whose name matches that tier (see the routed-resolution requirement below);
   // a routed task carries no per-task result-selection provider.
@@ -864,7 +864,11 @@ GatheringTask = {
 
 ### Requirements
 
-1. `resolutionMode` must be `"progressive"`, `"routed"`, or gathering-native `"d100"`.
+1. Task-level `resolutionMode` governs `"straight"`, gathering-native `"d100"`, `"routed"`, or legacy `"progressive"` resolution.
+Absence defaults to `"d100"`; the economy mode is inert compatibility data.
+Both task-library normalization paths and runtime composition preserve the mode and canonical `ResultGroup` / `Result` data across save, reload, export and import.
+Only the active mode's source produces awards: `dropRows` for d100 and authored `resultGroups` for the other modes.
+Inactive source data may remain stored.
 2. Gathering tasks have no ingredients.
 Any configuration that depends on `IngredientSet` or `ingredientSet` routing is invalid.
 3. `failureOutcome` is optional, but task failure must still be supported at runtime by applying default failure feedback when no special outcome is configured.
@@ -881,6 +885,74 @@ Tasks previously carried no environment reference (they are composed into enviro
 It normalizes to a trimmed string or `null` (empties dropped) in `adminStore._normalizeGatheringTask` and is preserved by `GatheringEnvironmentStore`.
 It serves as the middle tier of **drop-time** environment resolution for a canvas Gathering-Task Interactable; a stale id (no matching environment) falls through to the GM dialog rather than throwing.
 It does **not** participate in environment composition and is unrelated to `environment.sceneUuid` (the runtime gathering gate).
+
+## Versioned Gathering Run Lifecycle
+
+New applicable gathering runs use lifecycle version 1 and the revision, pause, completion-preference and execution-journal contracts in `data-models/spec.md`.
+Missing-version records retain legacy automatic completion; unsupported present versions refuse mutation without being rewritten as legacy.
+
+- New runs default to manual collection when their time gate is ready.
+Eligible waiting stages may retain world-time completion, but player checks remain manual.
+Manual collection and automatic completion enter the same authoritative, revision-guarded operation.
+Every versioned start and mutation requires the active GM and the world’s single private authority ledger, which the active GM provisions automatically as specified in `data-models/spec.md`.
+The run records the attested initiating user rather than the executing GM as its owner.
+- Pause freezes remaining world time and retains the run's choices; resume reanchors readiness.
+Paused runs do not advance through world-time processing.
+- Stamina spending, node depletion and reservations, start-time runtime/economy snapshots, independent hazards, blind storage and Tool timing remain at their established lifecycle points.
+The lifecycle does not change the shared d100 item-drop resolver or independent event rolls.
+Versioned start effects, including blind-store, reservation and economy writes, MUST carry execution-journal evidence rather than being hidden inside an unrecorded aggregate effect.
+- The terminal history record, including its planned execution journal, is persisted before terminal side effects.
+Applying phases and actual receipts are updated in that same history record by run ID.
+Versioned Journal history MUST prefer the applied createGatheredResults receipt over pre-effect planned createdResults, including failure awards; missing or opaque receipts MUST NOT establish itemized awards.
+Recorded d100 roll, threshold and cleared/missed evidence remains usable when individual awarded quantities cannot be attributed; the Journal retains unknown per-row amounts and shows the unattributed actual receipt once.
+Native d100 item rows clear when `effectiveRoll >= 101 - finalDropRate`; historical presentation MUST honor recorded outcomes rather than reinterpret them as a low-roll check.
+The d100 resolver's status is independent of item hits: it returns failed when selected events exist under `failureWithEvent`, otherwise succeeded, including an all-miss item result.
+Subsequent engine failure rules still apply; the Journal MUST use the recorded terminal status rather than derive success or failure from item quantities.
+Stale, duplicate or ambiguous operations cannot repeat spending or awards; uncertain writes require recovery.
+Recovery MUST retain blind-task redaction and expose only permitted receipt evidence, never the private task snapshot or arbitrary journal payloads.
+A retained global authority claim can also block unrelated versioned runs until the active GM records its manual disposition; releasing that claim does not replay the old attempt.
+- Versioned cancellation forfeits elapsed time and retains costs already incurred and awards already delivered.
+It releases applicable reservations without refunding sunk costs or touching unconsumed materials.
+
+## Native Gathering History Settlement
+
+Native (unversioned) gathering retains its existing terminal-history-before-effects ordering and introduces no new execution-policy deviation.
+The terminal record is persisted first with an empty planned `createdResults`, `historySettlement.awards` of `pending`, and an applicable `resolutionSnapshot` naming the resolution the task actually executed.
+The existing terminal effects then run in their existing order, and the actual receipts MUST settle into that same terminal record, by run id, on the same actor, through the run manager's document-coherent persistence.
+
+- Settlement MUST NOT append a second terminal record, discard concurrently written history, or overwrite settled evidence with a stale pending copy.
+Every gathering persistence path, not the settlement method alone, MUST preserve a settled same-id record against a stale in-memory copy.
+Settling a record whose awards are already `complete` or `uncertain` MUST return the stored record unchanged rather than settle it twice.
+- The terminal response, the posted chat card and the completion publication MUST report the settled actual receipts rather than the pre-effect plan.
+- A failed or partially applied terminal effect MUST record `uncertain` awards, retain its confirmed receipt prefix, and authorize neither replay nor an automatic refund.
+Confirmed legacy cancellation and refund behaviour is unchanged, and uncertainty never triggers one.
+- Pending and uncertain awards project as unknown rather than as zero.
+An existing legacy reported array keeps its existing meaning, so an empty `createdResults` on a succeeded record still reads as zero.
+An older FAILED record is the exception: earlier normalization erased its award refs, so its empty array proves nothing and remains unknown unless an explicit `complete` awards settlement says otherwise.
+- A versioned deliberate no-award branch MUST record an applied empty result receipt without invoking item creation, so a decided zero stays distinguishable from an absent effect.
+- An opaque blind record settles with redacted evidence: it records no itemized receipts and no awards settlement, so its withheld awards remain withheld rather than becoming a confirmed empty.
+
+### Row and Source Linkage
+
+- Every evaluated result row MUST receive a stable `resultRowId` on the evaluated input, before route selection or row filtering, so duplicate component or source rows stay distinct.
+Rendering order MUST NOT reconstruct that identity.
+- History MUST preserve the evaluated rows, which of them were selected, and the linkage between a selected row and its actual receipt.
+- An actual award ref MUST carry the `sourceItemUuid` creation actually used, distinct from the owned destination `itemUuid`.
+- Result creation and shared component stacking MUST require the matching Item document's acknowledgment and derive each delta from the stored source quantity rather than from prepared data.
+An undefined or wrong document return, a short create, or a throw MUST NOT produce a positive receipt.
+Each invocation owns immutable receipts captured at the write, including repeated awards onto one document, so no cumulative mutable award tag can supply a later row's or run's amount.
+- Recorded d100 rows retain their native high-roll semantics, and the resolver's status stays independent of award presence, exactly as specified above.
+
+## Straight Gathering Resolution
+
+### Requirements
+
+1. A straight task requires exactly one nonempty authored result group.
+Invalid cardinality or an empty group blocks start before spending or awards.
+2. Immediate and matured-waiting attempts award all Results in that group through the existing award pipeline without a yield or check roll.
+`Result` has no enabled field; inactive d100 rows never contribute awards.
+3. Stamina, node reservations, hazards, tools, blind storage, terminal-history ordering, chat and hooks retain their existing timing.
+Straight resolution does not introduce lifecycle version fields or change legacy automatic completion.
 
 ## D100 Gathering Resolution
 
@@ -1074,7 +1146,7 @@ Allow crafting systems with gathering enabled to independently toggle two pacing
 // Two independent boolean toggles select the limitation models; there is no
 // single mutually-exclusive `mode` field.
 GatheringEconomyConfig = {
-  resolutionMode: "d100" | "progressive" | "routed", // system-level gathering resolution; default "d100"
+  resolutionMode: "d100" | "progressive" | "routed", // inert compatibility data; default "d100"
   stamina: {
     enabled: boolean,                   // actor stamina limitation toggle
     max: string,                        // expression template (number or formula), blank ⇒ start full at max
@@ -1138,8 +1210,8 @@ A legacy pool persisted under the former `provider: "external"` value reads back
 26. The economy block carries a system-level `resolutionMode` (`"d100" | "progressive" | "routed"`, default `"d100"`) normalized on both the read and persist paths;
 an absent, invalid, or wrong-shape value (including a stray `"simple"`) falls back to `"d100"`.
 It is GM configuration and is not part of the player gathering listing payload.
-This is the system-level default gathering resolution and relates to the existing per-task `resolutionMode`:
-today only `d100` is honored at runtime, and `progressive`/`routed` are modelled but unimplemented (surfaced disabled in the GM UI as a "coming soon" affordance).
+This field is inert compatibility data and never overrides task-level `resolutionMode`.
+Task-owned straight, d100 and routed resolution execute through distinct result sources; progressive retains its separate accumulated-budget runtime contract.
 27. A stamina pool persists a `lastRegenWorldTime` accrual anchor (see "World-Time Anchors and Rewind Policy") recording the instant up to which regeneration has already been granted.
 A backward world-time delta leaves that anchor untouched and writes no actor state at all, so rewinding refunds no spent stamina, grants no regeneration, and mints none on the way forward again.
 A pool materialized without an anchor — for example by a GM `setGatheringStamina` on an actor with no prior pool, which persists no `lastRegenWorldTime` key — is seeded at the current world time on its first evaluation and regenerates normally thereafter.
@@ -1647,8 +1719,8 @@ threshold/outcome-tier configuration) drives resolution:
 4. A failing tier, or no tier name, takes the failure path.
 5. A succeeding tier name must match exactly one `ResultGroup.name` under
    trim-normalized, case-insensitive comparison; the matched group is awarded.
-6. If a succeeding tier name matches no result group, the attempt resolves to the
-   MISCONFIGURED disposition `ROUTED_TIER_UNROUTED`, not to a terminal failure.
+6. A succeeding tier with no match resolves to `ROUTED_TIER_UNROUTED`; more than one match resolves to `ROUTED_TIER_AMBIGUOUS`.
+   Both are misconfiguration, never terminal failure.
    Gathering routes by NAME, so renaming a tier on the system silently unroutes every
    task whose groups were named for the old tier; reporting it as misconfigured surfaces
    the drift on the first roll and — because a misconfigured outcome becomes a blocked
@@ -1695,14 +1767,11 @@ roll time.
 The Checks Studio's gathering On-failure section cross-references it read-only.
 The `d100` branch is untouched.
 
-**THE WHOLE PATH SHIPS DORMANT.** `_libraryTaskToRuntimeTask` hardcodes
-`resolutionMode: 'd100'` and synthesizes a single result group, and `GatheringEconomyView`
-renders `progressive` and `routed` disabled — both pending issue 683 — so no configuration
-a GM can select reaches this path today.
-The persisted shape, all three rebuilds, the projection and the UI land now, and the
-On-failure section renders the same inert notice `d100` gets on Modifiers, **naming that
-reason**.
-The capability activates when 683 lands.
+Task normalization and composition preserve routed mode and authored result groups, so this path executes for routed tasks.
+A policy-permitted failure result requires exactly one normalized-name match.
+No match means the record authors no failure output and produces nothing, including under `always`; multiple matches resolve to `ROUTED_TIER_AMBIGUOUS` misconfiguration.
+Gathering matches group names, never recipe `checkOutcomeIds`.
+The separate task-authoring controls remain owned by #1648.
 
 ### Reserved Keywords
 
@@ -1798,9 +1867,8 @@ A progressive gathering attempt fires the component complications its committed 
    That is the same rule the crafting misconfiguration gate states, and for the same reason: a GM authoring gap is not a narrative outcome.
 4. **The macro contract is CROSS-ACTIVITY and is defined in `recipes-and-steps/spec.md` § Complication Macros**, which this domain references rather than restates.
    Everything there applies unchanged to a gathering-fired complication: GM-authoritative execution, the addressing-only relay payload, the attested-sender and actor re-authorization rules, the drop when no GM is connected, and the tolerate-running-twice rule.
-5. **This path ships DORMANT.**
-   Progressive gathering is unreachable from any GM-selectable configuration today: the runtime task conversion pins the d100 resolution mode and the economy editor renders both formula-rolled modes disabled, pending issue 683.
-   The wiring lands anyway, on the same precedent as the other dormant gathering seams, so that issue 683 flips one switch rather than reopening this design.
+5. Progressive gathering remains a legacy runtime path with no new authoring option.
+   Task normalization and composition preserve an existing progressive mode; straight and routed never substitute for its accumulated-budget resolution.
    Its tests MUST drive the progressive outcome resolution and the terminal commit DIRECTLY: an end-to-end gathering test of this passes VACUOUSLY, asserting that nothing fires on a d100 attempt, which is true whether or not any of it works.
    No player-facing progressive gathering surface is built, because none is reachable.
 

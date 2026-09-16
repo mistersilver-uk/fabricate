@@ -105,7 +105,7 @@ const TESTS_DEBT_RULE_COUNT = 82;
 const PRETTIER_DEBT_MARKER = '# --- FORMATTING DEBT BASELINE';
 
 /** Entries in that section, pinned exactly. */
-const PRETTIER_DEBT_COUNT = 101;
+const PRETTIER_DEBT_COUNT = 99;
 
 
 /** Whether an ESLint rule entry is switched on. */
@@ -532,6 +532,7 @@ test('the global ignores are pinned, so a new exclusion is a visible edit', asyn
     '.foundry-perf/',
     '.benchmarks/',
     'test-results/',
+    'tmp/',
     'ui-screenshot-artifact/',
     'content-packs/',
     '.air/',

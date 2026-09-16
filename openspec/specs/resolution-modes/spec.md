@@ -73,7 +73,7 @@ The historical macro-as-check-source and the `checkSource: "builtIn"` game-syste
 - Each of the three activity checks carries a **failure-result policy**, `failureResultPolicy` (`'never' | 'perRecord' | 'always'`), answering whether a FAILED check may produce a result at all.
 It SELECTS an authored failure output and never fabricates one, so `always` on a record authoring none produces nothing; `perRecord` and `always` therefore share ONE runtime predicate and differ as GM-facing declarations of intent.
 A newly-created system defaults to `perRecord`; an absent or unrecognized value normalizes to `perRecord` on read; and the `1.25.0` seed migration writes `never` onto every check block already on disk, so no upgraded world changes behaviour.
-Its reach is bounded by what each mode's model can express: real on crafting `simple` and alchemy `simple` and on salvage `simple` (the reserved `role: 'failure'` group, selected BY ROLE and never by index); real on crafting `routedByCheck` and salvage `routed`, where — and only where — the policy permits, failure-marked outcome tiers become assignable in the recipe result-authoring UI, route with a `disposition: 'failure'`, and are PRODUCED by the crafting failure branch (see `recipes-and-steps` §Check and Resolution item 3, including the disposition allowlist that stops a single-group routed recipe awarding its SUCCESS output on a failed check); inert on `routedByIngredients` and `progressive`, which have no tier to mark; and on gathering the whole path ships DORMANT pending issue 683.
+Its reach is bounded by what each mode's model can express: real on crafting `simple` and alchemy `simple` and on salvage `simple` (the reserved `role: 'failure'` group, selected BY ROLE and never by index); real on crafting `routedByCheck` and salvage `routed`, where — and only where — the policy permits, failure-marked outcome tiers become assignable in the recipe result-authoring UI, route with a `disposition: 'failure'`, and are PRODUCED by the crafting failure branch (see `recipes-and-steps` §Check and Resolution item 3, including the disposition allowlist that stops a single-group routed recipe awarding its SUCCESS output on a failed check); inert on `routedByIngredients` and `progressive`, which have no tier to mark; and on gathering routed tasks use the same policy through their named result-group failure path.
 **The policy therefore gates AUTHORING as well as resolution** — the tier picker, the readiness validator and the routing all read the same policy-conditional set, so the editor can never offer a tier the validator calls unroutable or the engine refuses to resolve.
 - The legacy `craftingCheck.mode` discriminator has the single valid value `passFail` and drives nothing; the active check sub-object is selected by `resolutionMode` (see `data-models` requirement 29).
 - A world carries **ONE named modifier library, at WORLD level**, in the `characterLibraries` setting, of `{id, label, expression, isRollExpression, icon?, min?, max?}` (issue 1117 absorbed the gathering character-modifier library into a single system-level list; issue 1308 lifted that list off the crafting system, so a WORLD authors modifiers in exactly one place and three crafting systems no longer mean three copies of the same expression).
@@ -175,7 +175,7 @@ Fail-open relaxes VALIDATION only: steps 2 and 4 are positional and structural i
 The placement classifier `describeRetiredModifierPlaceholder` answers only step 2 and is NOT a substitute for it: `1d20 - @craftingmod -`, `@craftingmod +` and `1d20 * -@craftingmod` are ADDITIVE placements that the decider REFUSES at step 4, so a surface asking the classifier where usability is decided by the decider gives the GM the OPPOSITE instruction on exactly those formulas.
 - **All THREE active-check derivations apply the shim BEFORE their emptiness test** — `resolveActiveCraftingCheckFormula`, `resolveActiveSalvageCheckFormula` (which delegates to `resolveSalvageCheck`, the single salvage `(mode, checkUsable)` derivation) and `resolveActiveGatheringCheckFormula` — so readiness and the roll path can never disagree on any activity: a stored `'@craftingmod'` alone reports `noFormula` rather than reporting usable, reaching `evaluateCheckRoll`, stripping to `''` and throwing inside `new Roll('')` as a rolled — and therefore consuming — failure.
 All three return the same shape, which is what lets the per-activity inert cause (`noCheck` / `noFormula`) be one derivation rather than three, with gathering `d100` the single documented exception that overrides it to `noModifierSupport`.
-`resolveActiveGatheringCheckFormula` takes the gathering resolution MODE as an argument rather than reading it off the system, because gathering's mode lives on the per-system gathering economy config and not on the crafting system.
+`resolveActiveGatheringCheckFormula` takes the gathering task's resolution MODE as an argument rather than reading it off the crafting system or the inert gathering economy mode.
 - **Salvage and gathering gain a modifier seam they never had.**
 Salvage's is live: `salvageCraftingCheck` selects over the system catalogue with the COMPONENT as its `bySubject` subject, tool bonuses append first and the modifier term after them, and all three salvage modes carry it.
 Gathering's seam is on the **FORMULA-ROLLED modes only** (`progressive`, `routed`); the `d100` mode rolls no authored formula and reports the check-modifier selection inert with cause `noModifierSupport`.
@@ -185,7 +185,8 @@ It is no longer a separate LIBRARY.
 `migrateUnifyModifierLibraries` merges `gatheringConfig.systems[].characterModifiers` into `CraftingSystem.modifiers`, rewrites every reference on drop rows, stamina-cost modifiers and events, and deletes BOTH legacy keys — the gathering one and `CraftingSystem.checkModifiers`, where the check library had lived since `1.22.0` — so one library now serves both applications.
 **The partition is stated in both directions, and it partitions APPLICATIONS rather than entries:** the character-modifier application does not participate in `progressive` or `routed`, exactly as the check-modifier application does not participate in `d100`.
 One entry may be reached by both, and it is the SELECTION or the REFERENCE that decides which arithmetic applies, never the entry itself.
-**Gathering's seam ships DORMANT**: `_libraryTaskToRuntimeTask` hardcodes `resolutionMode: 'd100'` and both other modes render `disabled` pending issue 683, so the whole check-modifier surface is inert in every configuration a GM can select today; the section renders the same inert notice `d100` gets, naming that reason, and the capability activates when 683 lands.
+Gathering composition preserves task-owned modes, so routed and legacy progressive tasks reach the formula-check seam.
+Task authoring controls are delivered separately by #1648; progressive remains unavailable as a new authoring option.
 - **`playerPicks` is the one rule deferred to ROLL time.** CRAFTING and SALVAGE supply a `modifierChoice`, built through one shared derivation (`CraftingEngine._buildInteractiveModifierChoice`), and their dialogs render the modifier fieldset on the same terms.
 GATHERING does NOT, and the gap is deliberate rather than an omission: it threads the modifier CONTEXT through both formula-rolled runners and resolves a `playerPicks` selection through the deterministic best-legal-selection, but builds no roll-time prompt, and that prompt is deferred to issue 683 with the rest of the seam.
 That is not the dormancy the seam claims elsewhere: dormancy means unreachable-but-complete, and a prompt for a path no GM-selectable configuration can reach would be speculative rather than dormant.
@@ -237,7 +238,7 @@ This is a defensive guard rather than a fix: legacy salvage tokens are normalize
 ## Player-Facing Mode Labels
 
 The `resolutionMode` token is system-internal and must never surface raw in player UI.
-The player-facing Journal screen (see `ui-integration/spec.md` *Journal App*) maps each mode to a localized display label through a frozen label-key map (`RunJournalBuilder.MODE_LABEL_KEYS`), resolved against the `FABRICATE.App.Journal.Mode.*` localization keys.
+The player-facing Journal screen (see `ui-integration/spec.md` *Journal App*) maps crafting modes through `RunJournalBuilder.MODE_LABEL_KEYS` and gathering yield modes through their dedicated keys, all resolved against `FABRICATE.App.Journal.Mode.*`.
 
 | Mode                  | Localization key                                 | Player label          |
 |-----------------------|--------------------------------------------------|-----------------------|
@@ -246,10 +247,66 @@ The player-facing Journal screen (see `ui-integration/spec.md` *Journal App*) ma
 | `routedByCheck`       | `FABRICATE.App.Journal.Mode.RoutedByCheck`       | Routed by Check       |
 | `progressive`         | `FABRICATE.App.Journal.Mode.Progressive`         | Progressive           |
 | `alchemy`             | `FABRICATE.App.Journal.Mode.Alchemy`             | Alchemy               |
+| `straight` (gathering) | `FABRICATE.App.Journal.Mode.straight` | Direct |
+| `d100` (gathering) | `FABRICATE.App.Journal.Mode.d100` | d100 |
+| `routed` (gathering) | `FABRICATE.App.Journal.Mode.routed` | Check |
 
 - There is no canonical "Standard" resolution mode.
 `simple` (a DC pass/fail check) renders as "Standard (DC)" for players, even though its internal token stays `simple`.
-- A run whose recipe resolves to an unknown or absent mode falls back to the `simple` ("Standard (DC)") label rather than emitting a raw token.
+- Active crafting mode labels fall back to `simple` ("Standard (DC)") for an unknown or absent resolved mode rather than emitting a raw token.
+- Terminal recipe-backed crafting mode labels MUST use the first attempted stage carrying a captured resolution mode; an absent or unrecognized captured mode yields no mode label, never a fallback inferred from current configuration.
+Recipe-less alchemy fizzle history retains its Alchemy label.
+
+## Captured Resolution Evidence
+
+A completed managed write records the resolution it actually executed, so a run's history can be read without consulting live configuration.
+See `recipes-and-steps/spec.md` § Captured Execution Evidence for the write-side contract and `data-models/spec.md` for the persisted shape.
+
+1. Every applicable completed managed write MUST capture `resolutionSnapshot` as `{kind, mode}`, where `mode` is the resolution mode that executed and `kind` is `check`, `ingredients` or `none`.
+Legacy and version-1 immediate and timed crafting, recipe-less alchemy fizzle, native salvage, and Direct, d100, routed and legacy progressive gathering are all in scope.
+2. On crafting and salvage, `kind` is `check` when the canonical active-check derivation reported the check required or usable at execution, `ingredients` for `routedByIngredients` routing, and `none` only for a confirmed no-check resolution.
+A `simple` stage on a system with crafting checks disabled resolves to `none`, as do a no-check salvage and an alchemy fizzle.
+Native gathering derives `kind` from the task's own mode instead: Direct records `none`, and every rolled mode — d100, routed and legacy progressive — records `check`.
+Reading gathering history back therefore uses `mode`, not `kind`, to choose the terminal composition.
+A recorded `d100` check-result provider, or a recorded outcome tier, overrides the captured mode, because the stored result shape is the stronger evidence of what actually resolved.
+3. The snapshot is captured from the derivation at execution, never re-derived from configuration at read time.
+Editing or deleting the recipe, component, task, system or check configuration afterwards MUST NOT change a captured snapshot, and MUST NOT retroactively supply one.
+4. A record with no captured snapshot is **unknown**.
+Success alone MUST NOT be read as resolution evidence: an older record whose `lastCheckResult` is `{success: true, reason: 'Success', data: {}}` captured no resolution strategy and MUST read as unknown, never as a confirmed no-check resolution.
+Missing check evidence is likewise unknown rather than a confirmed absence of a check.
+5. A genuinely unattempted or cancelled resolution fact is **not applicable**, which is distinct from unknown.
+A storage or effect failure leaves the affected evidence explicitly **uncertain** under the existing no-replay and no-rollback rules; uncertainty is never resolved into invented certainty.
+6. The guarantee covers complete permitted evidence on completed managed writes.
+It does not extend to arbitrary external macro effects, and it does not promise certainty after a storage failure.
+
+## Gathering Task Modes
+
+1. A gathering task owns its mode; absence selects `d100`, and the economy mode is inert compatibility data.
+2. `straight` awards all Results in exactly one nonempty authored group without a yield or check roll.
+3. `d100` resolves only drop rows using the shared item-drop roll; hazard rolls remain independent.
+4. `routed` uses `gatheringCraftingCheck.routed` and the existing `failureResultPolicy`.
+A succeeding tier requires exactly one group whose trim-normalized, case-insensitive name matches the resolved tier name; missing or duplicate matches are misconfiguration.
+A failing tier with no matching group has no authored failure output and awards nothing under every policy; one match is eligible only when the existing failure policy permits it, and multiple matches are misconfiguration.
+Gathering does not use recipe `checkOutcomeIds` as routing authority.
+5. `progressive` retains its distinct accumulated numeric-budget semantics; it is never an alias for routed resolution.
+6. Immediate and matured-waiting execution select the same active result source, and production/reference reporting follows that source.
+Inactive mode data may remain stored but never contributes awards jointly.
+7. New task authoring offers Direct, d100 and Check; a persisted progressive task retains its legacy budget behavior until explicitly changed to an authorable mode.
+8. Journal previews MUST distinguish authored possible yields from actual received results.
+Direct displays its one result set, d100 displays one shared roll cut against drop chances, and Check displays the complete noninteractive outcome ladder including failure.
+Progressive retains ordered component costs and accumulated-budget semantics rather than being rendered as drop chances or outcome tiers.
+Historical d100 uses recorded high-roll thresholds and cleared/missed evidence, and historical routed gathering uses its recorded check/outcome log rather than the authored preview ladder.
+Whether that d100 history shows one shared cut or each row's own recorded roll follows the roll-model rule in `ui-integration/spec.md`.
+Actual awards and terminal status remain independent evidence: all-miss d100 item rows do not themselves establish a failed run, and a permitted routed failure award does not make a failed run successful.
+
+## Versioned Check Entitlement
+
+The canonical active-check resolver MUST govern both Journal check labels and completion-preference eligibility.
+Alchemy `none` has no check, `simple` reads the simple check slot, and `tiered` reads the routed slot.
+Versioned player checks use an authenticated prepare/resolve exchange: the player chooses permitted roll options, while the active GM evaluates the authoritative check.
+Initial secret prompts MUST omit protected subject, artwork, formula, DC and modifier details before transport.
+Secret checks use GM private posting without serialized roll-data handoff; non-secret roll handoff additionally requires a fresh post-commit entitlement check and never rolls a second time.
+Roll delivery and chat posting are separate from run settlement; missing chat delivery MUST NOT authorize replay of spending or awards.
 
 ## Simple Mode
 
@@ -729,7 +786,7 @@ The reserved-keyword "nothing" rule must not collide with Simple's producing fai
 - The projected revealed-recipe **signature summary** must be rich enough to display alternatives, per-option quantities, and set-level essence requirements (an alchemy recipe now carries exactly one ingredient set, so multi-set richness no longer applies — issue 554).
 - **Client mode is advisory; the engine is authoritative on brew.** The client resolves TWO signature shapes: a concrete plain-component multiset AND an essence-only requirement (via a projected `essenceRequirement`, using `>=` matching that mirrors the engine's `_matchAlchemySignature`).
 It fails safe to `untried` for everything else — alternatives (multi-option groups), tag-based requirements, and mixed group+essence sets (`AlchemyListingBuilder._essenceRequirement` deliberately returns null for those) — and NEVER emits a false `ready`/`assembling`.
-- **Brew-result banner status enum.** A brew reports one of five banner states, styled distinctly: `success` (a passed brew produced its success result set); `tiered-tier` (a passed Tiered brew produced its outcome-tier result set); `produced-on-failure` (a matched Simple brew FAILED its check and produced the reserved failure result set — styled with the warning tone, NEVER success-green, and composing with a discovery); `brewing` (a TIME-GATED brew that STARTED — the signature matched, the inputs are consumed, and the run is live in the Journal awaiting world time; styled informationally, never as a failure, and composing with a discovery); `no-match-fizzle` (no reaction, a Tiered fail, or a misconfiguration).
+- **Brew-result banner status enum.** A brew reports one of five banner states, styled distinctly: `success` (a passed brew produced its success result set); `tiered-tier` (a passed Tiered brew produced its outcome-tier result set); `produced-on-failure` (a matched Simple brew FAILED its check and produced the reserved failure result set — styled with the warning tone, NEVER success-green, and composing with a discovery); `brewing` (a TIME-GATED brew that STARTED — the signature matched and the run is live in the Journal; version 1 defers editable-material spending to execution, while legacy runs consumed at START; styled informationally, never as a failure, and composing with a discovery); `no-match-fizzle` (no reaction, a Tiered fail, or a misconfiguration).
 A started time-gated brew is identified by the engine's `disposition: 'timed-start'`, NOT by `success` — which is `false` for it, because nothing has been produced yet (issue 966).
 Without that disposition the workbench read a successfully started brew as a no-signature fizzle and told the player it had failed while their ingredients were being consumed.
 A `simple`/`tiered` learned recipe carries a "check gates this outcome" hint; the reserved failure-group result is NEVER surfaced to the player Produces panel (leak invariant).

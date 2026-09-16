@@ -406,6 +406,39 @@ export function buildCurrencyAffordProbe(craftingActor, recipe, seams = {}) {
 }
 
 /**
+ * Whether a whole SET of currency spends is affordable together, aggregated onto the common base
+ * ladder exactly as {@link checkCurrencySpends} aggregates it before spending. Synchronous, so a
+ * display surface can ask the aggregate question the per-option probe cannot answer: two currency
+ * ingredients each affordable alone but not together (issue 1648, F2).
+ *
+ * It reads coins, so a `macro` spend strategy — whose affordability is only knowable by running an
+ * async macro — answers `true` here, as {@link buildAffordCurrencyProbe} does. That is the one
+ * cause this cannot name; the engine's async gate stays authoritative.
+ *
+ * @param {object|null} craftingActor
+ * @param {object} recipe
+ * @param {Array<{unit?: string, amount?: number}>} currencySpends
+ * @param {object} [seams]
+ * @returns {boolean}
+ */
+export function affordsCurrencySpends(craftingActor, recipe, currencySpends, seams = {}) {
+  if (!currencySpends?.length) return true;
+  const context = resolveCurrencyContext(recipe, seams);
+  if (!context.enabled) return true;
+  if (context.error || context.spenderUnavailableReason) return false;
+  if (context.config.spendStrategy === 'macro') return true;
+  const probe = buildAffordCurrencyProbe({
+    actor: craftingActor || null,
+    profile: context.profile,
+    spendStrategy: context.config.spendStrategy,
+    spender: context.spender,
+  });
+  return aggregateCurrencySpends(currencySpends, context.profile).every((group) =>
+    probe({ unit: group.unit.id, amount: group.amount })
+  );
+}
+
+/**
  * Resolve one raw spend against the profile: its unit, its TERMINAL base unit, that unit's integer
  * base value, and the clamped amount. Returns `null` for a spend that is not spendable at all — an
  * unresolvable unit, a unit that reaches no base unit, or a non-positive amount.

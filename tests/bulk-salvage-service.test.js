@@ -20,6 +20,8 @@ import {
   classifySalvageOutcome,
 } from '../src/systems/BulkSalvageService.js';
 import { hasPlainD20 } from '../src/utils/craftingCheckExpression.js';
+import { attachAwardReceipts, createItemReceiptCollector } from '../src/systems/runHistoryEvidence.js';
+import { createOrStackComponentItem } from '../src/systems/componentStacking.js';
 import {
   bulkComponent,
   bulkSystem,
@@ -43,6 +45,12 @@ function silenceErrors(t) {
 const ORE = bulkComponent({ id: 'comp-ore', name: 'Iron Ore', img: 'icons/ore.webp' });
 const HIDE = bulkComponent({ id: 'comp-hide', name: 'Boar Hide', img: 'icons/hide.webp' });
 const BONE = bulkComponent({ id: 'comp-bone', name: 'Cave Bone', img: 'icons/bone.webp' });
+
+function recordedResults(items) {
+  return attachAwardReceipts(items, items.map((item) => ({
+    name: item.name, img: item.img, quantity: item.system?.quantity ?? 1,
+  })));
+}
 
 /** A one-system service over `components`, with the salvage seam supplied by the test. */
 function makeService({
@@ -259,7 +267,7 @@ describe('BulkSalvageService.run: one bad row never costs the player the others'
 
 describe('BulkSalvageService.run: every outcome the vocabulary defines', () => {
   const RETURNS = {
-    'comp-ore': { success: true, results: [{ name: 'Iron Ingot', img: 'icons/ingot.webp' }] },
+    'comp-ore': { success: true, results: recordedResults([{ name: 'Iron Ingot', img: 'icons/ingot.webp' }]) },
     'comp-hide': { success: false, results: null, message: 'Nothing recovered' },
     'comp-bone': {
       success: true,
@@ -846,6 +854,35 @@ describe('BulkSalvageService.run: a run spanning two actors and two systems', ()
 });
 
 describe('BulkSalvageService.run: what the run hands back', () => {
+  it('reports immutable per-row deltas across repeated bulk calls onto the same stack', async () => {
+    const actor = { uuid: 'Actor.awards' };
+    const stack = {
+      uuid: 'Actor.awards.Item.ingot', parent: actor, name: 'Iron Ingot', img: 'icons/ingot.webp',
+      _source: { system: { quantity: 40 } }, system: { quantity: 999 },
+      async update(patch) { this._source.system.quantity = patch['system.quantity']; return this; },
+    };
+    const service = makeService({
+      systems: [bulkSystem({ components: [ORE, HIDE] })],
+      salvage: async () => {
+        const collector = createItemReceiptCollector();
+        const items = [];
+        for (const quantity of [2, 1]) {
+          items.push(await createOrStackComponentItem({ actor, itemData: {}, matchingItems: [stack],
+            awardedQuantity: quantity, receiptCollector: collector }));
+        }
+        return { success: true, results: attachAwardReceipts(items, collector.snapshot()) };
+      },
+    });
+    const targets = [ORE, HIDE].map((component) => bulkTarget({ componentId: component.id }));
+    const first = await service.run({ targets, interactive: false });
+    const second = await service.run({ targets, interactive: false });
+    assert.equal(stack._source.system.quantity, 52);
+    for (const result of [first, second]) {
+      assert.deepEqual(result.items.map((item) => item.results.map((row) => row.quantity)), [[2, 1], [2, 1]]);
+      assert.deepEqual(Object.keys(result.items[0].results[0]).sort(), ['img', 'name', 'quantity']);
+    }
+  });
+
   it('returns plain models, never Item documents', async () => {
     // A consumed source's document is already deleted by the time this returns, so
     // handing one back would hand back a document that no longer exists.
@@ -857,7 +894,7 @@ describe('BulkSalvageService.run: what the run hands back', () => {
     };
     const service = makeService({
       systems: [bulkSystem({ components: [ORE] })],
-      salvage: async () => ({ success: true, results: [created] }),
+      salvage: async () => ({ success: true, results: recordedResults([created]) }),
     });
 
     const result = await service.run({ targets: [bulkTarget({})], interactive: false });
@@ -999,7 +1036,7 @@ describe('BulkSalvageService.run: the per-system chatOutput gate', () => {
     try {
       const service = makeService({
         systems: [bulkSystem({ components: [ORE] })],
-        salvage: async () => ({ success: true, results: [{ name: 'Iron Ingot' }] }),
+        salvage: async () => ({ success: true, results: recordedResults([{ name: 'Iron Ingot' }]) }),
         postChatMessage: async () => {
           throw new Error('chat is down');
         },

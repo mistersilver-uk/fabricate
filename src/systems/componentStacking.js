@@ -13,12 +13,8 @@
  * configured path rather than to a hardcoded literal.
  */
 
-import {
-  itemStackQuantityPath,
-  readStackQuantity,
-  readStoredStackQuantity,
-  updateStackQuantity,
-} from './itemStackQuantity.js';
+import { itemStackQuantityPath, readStackQuantity } from './itemStackQuantity.js';
+import { writeItemAward } from './runHistoryEvidence.js';
 
 const AWARDED_QUANTITY_KEY = '_fabricateAwardedQuantity';
 
@@ -96,24 +92,20 @@ export async function createOrStackComponentItem({
   matchingItems = [],
   awardedQuantity = 1,
   quantityPath = itemStackQuantityPath(),
+  receiptCollector = null,
+  receiptIdentity = {},
 }) {
-  const amount = Number(awardedQuantity);
-  const delta = Number.isFinite(amount) && amount > 0 ? amount : 1;
-
   const existing = Array.isArray(matchingItems)
     ? matchingItems.find((item) => item && typeof item.update === 'function')
     : null;
 
-  if (existing) {
-    // A finite current quantity (including a legitimate 0) is kept; only an
-    // absent/non-numeric quantity defaults to a single unit (issue 858 review) — hence
-    // the stored-value reader with an absent default of 1, not `readStackQuantity`.
-    const base = readStoredStackQuantity(existing, { absentDefault: 1, path: quantityPath });
-    await updateStackQuantity(existing, base + delta, quantityPath);
-    return existing;
-  }
-
-  if (typeof actor?.createEmbeddedDocuments !== 'function') return null;
-  const [created] = await actor.createEmbeddedDocuments('Item', [itemData]);
-  return created ?? null;
+  return writeItemAward({
+    actor,
+    itemData,
+    existing,
+    quantity: awardedQuantity,
+    path: quantityPath,
+    receiptCollector,
+    receiptIdentity,
+  });
 }
