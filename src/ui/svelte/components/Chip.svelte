@@ -72,6 +72,8 @@
     disabled = false,
     element = $bindable(null),
     children,
+    // WorldClockChip opts into its owning geometry; ordinary density callers keep their face.
+    presentation = '',
     ...rest
   } = $props();
 
@@ -173,6 +175,7 @@
       density === 'inspector' ? 'is-inspector' : '',
       iconOnly ? 'is-icon-only' : '',
       removeControl ? 'is-removable' : '',
+      presentation === 'clock' ? 'is-clock' : '',
       extraClass,
     ]
       .filter(Boolean)
@@ -351,9 +354,28 @@
     border-radius: 999px;
     font-size: 9px;
     font-weight: 600;
+    /* The canonical library states an explicit 1.6 line-height: 18.4px with the border,
+       16.4px bare. Issue 1648 repairs the inherited line-height of 1 to match that
+       specimen rather than the contradictory height prose it replaced. */
+    line-height: 1.6;
+    /* SINGLE-LINE, and the one density that had to say so. Shrink protection stays with the
+       caller: this states how the text lays out, never how much room the row gives the chip. */
     white-space: nowrap;
   }
 
+  /* Opt-in WorldClockChip composition; icon, label and value are direct flex children. */
+  .manager-chip.is-clock {
+    height: 28px;
+    min-height: 28px;
+    padding: 0 var(--fab-space-2);
+    border-radius: 7px;
+    gap: var(--fab-space-2);
+    white-space: nowrap;
+  }
+
+  /* ACTION density. 34px is the button's own figure, restated because a layered `min-height`
+     cannot be inherited by an unlayered block; `manager-header-geometry.test.js` measures BOTH in
+     one composed page and fails naming the pair — a duplicated figure with a gate on it. */
   .manager-chip.is-action {
     min-height: 34px;
     padding: 0 var(--fab-space-3);

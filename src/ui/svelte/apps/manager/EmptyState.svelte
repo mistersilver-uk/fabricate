@@ -52,6 +52,8 @@
      skips the icon/title apparatus while keeping ONE dashed panel vocabulary.
    - field: default false; sizes a short placeholder to full control width and 34px height.
      Pair with inline for availability fields; the dashed edge and typography stay intact.
+   - fill: default false; stretches the panel to a bounded host's full width/height,
+     with zero minimum height. The caller owns the allocation, independently of content.
    - contextClass: extra class(es) whose rules live in the global sheet because they
      describe how a specific container places this panel (fill, min-height). Never use it
      for appearance — add a prop here instead.
@@ -104,6 +106,7 @@
     compact = false,
     inline = false,
     field = false,
+    fill = false,
     note = false,
     filtered = false,
     contextClass = '',
@@ -133,6 +136,7 @@
   class:is-compact={compact}
   class:is-inline={inline}
   class:is-field={field}
+  class:is-fill={fill}
   class:is-note={note}
   class:is-filtered={filtered}
   {...hookAttributes}
@@ -304,6 +308,13 @@
     width: 100%;
     height: 34px;
     padding: var(--fab-space-1) var(--fab-space-2);
+  }
+
+  /* Bounded host allocation, independent of content count; defaults remain padding-driven. */
+  .manager-empty.is-fill {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
   }
 
   /* ── THE POPOVER NOTE (issue 1373) ────────────────────────────────────────────────────

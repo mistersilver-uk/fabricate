@@ -16,6 +16,7 @@ import test from 'node:test';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
+import { createItemReceiptCollector } from '../src/systems/runHistoryEvidence.js';
 import {
   awardedQuantityOf,
   createOrStackComponentItem,
@@ -55,6 +56,44 @@ globalThis.foundry = {
 globalThis.ui = { notifications: { info() {}, warn() {}, error() {} } };
 globalThis.fromUuid = async () => null;
 
+test('award receipts require matching acknowledgments and capture each stored delta independently', async () => {
+  const actor = { uuid: 'Actor.receipts' };
+  const item = { uuid: `${actor.uuid}.Item.stack`, parent: actor, name: 'Output',
+    system: { quantity: 999 }, _source: { system: { quantity: 10 } },
+    async update(payload) { this._source.system.quantity = payload['system.quantity']; return this; },
+  };
+  const collector = createItemReceiptCollector();
+  for (const awardedQuantity of [2, 3]) {
+    assert.equal(await createOrStackComponentItem({ actor, itemData: {}, matchingItems: [item], awardedQuantity,
+      receiptCollector: collector, receiptIdentity: { resultRowId: `row-${awardedQuantity}` } }), item);
+  }
+  assert.deepEqual(collector.snapshot().map((receipt) => receipt.quantity), [2, 3]);
+  assert.equal(item._source.system.quantity, 15);
+  item.update = async () => undefined;
+  await assert.rejects(createOrStackComponentItem({ actor, itemData: {}, matchingItems: [item], awardedQuantity: 2, receiptCollector: collector }), { code: 'HISTORY_EFFECT_UNCERTAIN' });
+  assert.deepEqual(collector.snapshot().map((receipt) => receipt.quantity), [2, 3]);
+});
+
+test('native salvage retains a confirmed consumption prefix and refuses the same run after reload', async () => {
+  const items = [makeItem('first', 'Input', 1), makeItem('refused', 'Input', 1)];
+  const actor = makeActor('prefix', items);
+  for (const item of items) { item.parent = actor; item.uuid = `${actor.uuid}.Item.${item.id}`; item._source = structuredClone(item.toObject()); }
+  let deletes = 0;
+  items[0].delete = async function() { deletes++; this.name = 'Changed after deletion'; return this; };
+  items[1].delete = async () => { deletes++; return undefined; };
+  const source = { id: 'input', name: 'Input', salvage: { enabled: true, ingredientQuantity: 2, toolIds: [], resultGroups: [] } };
+  const system = { id: 'prefix-system', features: { salvage: true }, components: [source], salvageResolutionMode: 'simple', salvageCraftingCheck: {} };
+  const manager = setupSalvageGame(system, actor);
+  const engine = makeEngine(manager);
+  await assert.rejects(engine.salvage(actor.uuid, system.id, source.id), { code: 'HISTORY_EFFECT_UNCERTAIN' });
+  const reloaded = new SalvageRunManager().getActiveRuns(actor)[0];
+  assert.equal(reloaded.historySettlement.consumption, 'uncertain');
+  assert.deepEqual(reloaded.consumedComponents.map(({ name, quantity }) => ({ name, quantity })), [{ name: 'Input', quantity: 1 }]);
+  await assert.rejects(engine.salvage(actor.uuid, system.id, source.id, { runId: reloaded.id }), { code: 'HISTORY_EFFECT_UNCERTAIN' });
+  assert.equal(deletes, 2);
+  assert.equal(actor.createdItems.length, 0);
+});
+
 // ---------------------------------------------------------------------------
 // Builders
 // ---------------------------------------------------------------------------
@@ -85,10 +124,15 @@ function makeItem(id, name, quantity = 1, { roles = null } = {}) {
     async update(payload) {
       this.updateCalled = true;
       this.updatePayloads.push({ ...payload });
-      if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+      for (const [path, value] of Object.entries(payload)) {
+        setProperty(this, path, value);
+        if (this._source) setProperty(this._source, path, value);
+      }
+      return this;
     },
     async delete() {
       this.deleteCalled = true;
+      return this;
     },
   };
 }
@@ -114,12 +158,16 @@ function makeActor(id, items = []) {
     async setFlag(ns, key, value) {
       if (!flags[ns]) flags[ns] = {};
       flags[ns][key] = value;
+      return this;
     },
     flags: {},
     createdItems: created,
     async createEmbeddedDocuments(_type, dataArr) {
       return dataArr.map((d, i) => {
         const it = makeItem(`created-${id}-${i}`, d.name || 'Created', d.system?.quantity || 1);
+        it.parent = this;
+        it.uuid = `${this.uuid}.Item.${it.id}`;
+        it._source = structuredClone(it.toObject());
         created.push(it);
         return it;
       });
@@ -204,14 +252,13 @@ test('createOrStackComponentItem honours an injected quantity path (issue #853 s
   assert.deepEqual(existing.updatePayloads.at(-1), { 'system.details.count': 6 });
 });
 
-test('createOrStackComponentItem returns null when it can neither stack nor create', async () => {
-  const result = await createOrStackComponentItem({
+test('createOrStackComponentItem refuses when it can neither stack nor create', async () => {
+  await assert.rejects(createOrStackComponentItem({
     actor: {},
     itemData: { name: 'x' },
     matchingItems: [],
     awardedQuantity: 1,
-  });
-  assert.equal(result, null);
+  }), { code: 'HISTORY_EFFECT_UNCERTAIN' });
 });
 
 test('awardedQuantityOf prefers the award tag and falls back to the item quantity', () => {
@@ -318,11 +365,7 @@ test('salvage() run record reports the amount recovered, not the merged stack to
   assert.equal(recorded.quantity, 2, 'records the 2 recovered, not the stack total of 7');
 });
 
-test('salvage() reports the SAME component listed in two result rows once, with the summed award (issue 858 review)', async () => {
-  // Two result rows of the same component: the second stacks onto the item the first
-  // created (or the pre-existing stack), returning the same object. The award tag must
-  // ACCUMULATE and the merged item must be reported ONCE — not twice, each showing the
-  // last award (which would over-report the total).
+test('salvage() retains independent receipt rows while returning one shared Item document', async () => {
   const existing = makeItem('have-scrap', 'Scrap Metal', 5, {
     roles: { 'sys-1': { componentId: 'recovered' } },
   });
@@ -366,8 +409,8 @@ test('salvage() reports the SAME component listed in two result rows once, with 
   assert.equal(actor.createdItems.length, 0, 'both rows stack onto the held item, no duplicate');
   assert.equal(existing.system.quantity, 9, '5 held + 2 + 2 recovered');
   const records = result.salvageRun.createdResults.filter((r) => r.componentId === 'recovered');
-  assert.equal(records.length, 1, 'the merged component is recorded ONCE, not per result row');
-  assert.equal(records[0].quantity, 4, 'the single record sums both awards (2 + 2), not the stack total');
+  assert.deepEqual(records.map((record) => record.quantity), [2, 2]);
+  assert.equal(new Set(records.map((record) => record.resultRowId)).size, 2);
   assert.equal(
     result.results.filter((item) => item === existing).length,
     1,

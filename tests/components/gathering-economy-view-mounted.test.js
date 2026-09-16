@@ -176,91 +176,25 @@ describe('GatheringEconomyView (GM economy panel) mounted behavior', () => {
     target.remove();
   });
 
-  it('renders a gathering resolution-mode card above limitation mode (d100 live, others coming soon)', async () => {
+  it('keeps legacy resolution data inert while persisting unrelated economy edits', async () => {
     const { services, calls } = makeServices({
+      resolutionMode: 'progressive',
       stamina: { enabled: false, regen: { policy: 'none' } },
       nodes: { enabled: false },
     });
     await mountView({ services, systemId: 'sys-1' });
 
-    const resolutionCard = target.querySelector('[data-gathering-resolution-mode]');
-    assert.ok(resolutionCard, 'gathering resolution-mode card should render');
+    assert.equal(target.querySelector('[data-gathering-resolution-mode]'), null);
+    assert.ok(target.querySelector('[data-economy-mode-card]'));
 
-    // THE CARD WEARS ITS COMPACT FACE, and that is a PROP this view has to state (issue 1509).
-    // `RadioCardGroup.configCards` defaults to TRUE. This site reached the primitive through the
-    // deleted `ResolutionModeCard` shim, which derived `isConfigCard = variant === 'config-card'`
-    // and — because this call passes no `variant` — handed it FALSE, so the view now writes
-    // `configCards={false}` explicitly. Deleting that one prop flips a SHIPPED GM surface from
-    // these compact single-column rows to the two-column icon-tile config-card face:
-    // `.manager-resolution-mode-card.is-config-cards .manager-resolution-mode-options` is the
-    // `grid-template-columns: repeat(2, …)` rule, plus the per-row border, radius and fill. The
-    // class is the whole observable difference here — these three options carry no `icon`, so the
-    // `configCards && option.icon` branch renders nothing either way — which is why this assertion
-    // is the only thing standing between that flip and a green suite.
-    assert.ok(
-      !resolutionCard.classList.contains('is-config-cards'),
-      'the gathering resolution card is wearing the config-card face. `configCards={false}` has ' +
-        'been dropped from the `<RadioCardGroup>` call in `GatheringEconomyView.svelte` and the ' +
-        'primitive`s `true` default has taken over: this card is now a two-column grid of ' +
-        'bordered tiles instead of the compact rows it ships as.'
-    );
-    assert.ok(
-      !resolutionCard.closest('.is-config-cards'),
-      'and no ancestor supplies the class either, so the check above is reading the element the ' +
-        'rules actually select on'
-    );
-
-    // The resolution card renders BEFORE the limitation-mode card in document order.
-    const limitationCard = target.querySelector('[data-economy-mode-card]');
-    assert.ok(limitationCard, 'limitation mode card should render');
-    assert.equal(
-      resolutionCard.compareDocumentPosition(limitationCard) & Node.DOCUMENT_POSITION_FOLLOWING,
-      Node.DOCUMENT_POSITION_FOLLOWING,
-      'the resolution card precedes the limitation card'
-    );
-
-    const rows = [...resolutionCard.querySelectorAll('[data-gathering-resolution-mode-option]')];
-    assert.deepEqual(
-      rows.map((row) => row.getAttribute('data-gathering-resolution-mode-option')),
-      ['d100', 'progressive', 'routed'],
-      'gathering card lists d100, progressive, routed in order'
-    );
-
-    const radioFor = (value) =>
-      resolutionCard.querySelector(
-        `[data-gathering-resolution-mode-option="${value}"] input[type="radio"]`
-      );
-    assert.equal(radioFor('d100').disabled, false, 'd100 is selectable');
-    assert.equal(radioFor('progressive').disabled, true, 'progressive is disabled (coming soon)');
-    assert.equal(radioFor('routed').disabled, true, 'routed is disabled (coming soon)');
-    assert.deepEqual(
-      rows
-        .slice(1)
-        .map((row) => row.querySelector('.manager-resolution-option-badge')?.textContent.trim()),
-      ['Coming soon', 'Coming soon'],
-      'disabled shared radio cards retain their visible availability explanation'
-    );
-
-    // Clicking a disabled option persists nothing.
-    const before = calls.setEconomy.length;
-    radioFor('progressive').click();
-    flushSync();
-    assert.equal(
-      calls.setEconomy.length,
-      before,
-      'clicking a disabled option pushes no setEconomy call'
-    );
-
-    // Selecting d100 round-trips resolutionMode === 'd100'.
-    const d100 = radioFor('d100');
-    d100.checked = true;
-    d100.dispatchEvent(new window.Event('change', { bubbles: true }));
+    target.querySelector('[data-economy-mode-option="nodes"]').click();
     flushSync();
     assert.equal(
       calls.setEconomy.at(-1).economy.resolutionMode,
-      'd100',
-      'selecting d100 persists resolutionMode d100'
+      'progressive',
+      'an unrelated limitation edit retains the legacy compatibility value'
     );
+    assert.equal(calls.setEconomy.at(-1).economy.nodes.enabled, true);
     unmount(mounted);
     mounted = null;
     target.remove();

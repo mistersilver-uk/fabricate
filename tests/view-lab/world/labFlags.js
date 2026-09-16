@@ -48,13 +48,24 @@ export function makeGetFlag(document) {
 }
 
 /**
- * A `setFlag` that stores where Foundry stores.
+ * A `setFlag` that stores where Foundry stores, and MERGES the way Foundry merges.
  *
  * `setFlag(ns, key, v)` becomes `update({flags: {[ns]: {[key]: v}}})`, and V13's `updateSource`
  * expands dotted keys only when a TOP-LEVEL key contains a dot
- * (`common/abstract/data.mjs:442-451`). The inner key here never does, so nothing expands and the
- * value lands one level deep — which is why the three run containers do not agree with each other.
- * See {@link RUN_CONTAINER_PATHS}.
+ * (`common/abstract/data.mjs:442-451`). The top-level key here is `flags`, so the inner
+ * `ns`/`key` pair never expands and a dotted `key` lands LITERALLY, one level deep — which is why
+ * the three run containers do not agree with each other. See {@link RUN_CONTAINER_PATHS}.
+ *
+ * The write itself then goes through {@link applyUpdate}, exactly as the `update` seam does,
+ * because a `setFlag` is an `update` — Foundry deep-merges the value and honours `-=key`
+ * deletions at every depth of it. A shallow spread that stored the value verbatim got both
+ * halves wrong, and the second one was fatal rather than cosmetic:
+ * `writeAcknowledgedRunContainer` (`src/systems/runHistoryEvidence.js`) retires a finished run by
+ * setting `active['-=<runId>'] = null` INSIDE the container it writes, so the lab kept a property
+ * literally named `-=<runId>` whose value was `null`. `CraftingRunManager.getActiveRuns` is
+ * `Object.values(container.active)`, so every subsequent read handed the UI a null run and
+ * `findActiveRunForRecipe` threw on `run.recipeId` — a craft could be performed but its summary
+ * could never be rendered.
  *
  * @param {object} document The document to write to.
  * @returns {(scope: string, key: string, value: unknown) => Promise<object>} The bound mutator.
@@ -62,7 +73,7 @@ export function makeGetFlag(document) {
 export function makeSetFlag(document) {
   return async (scope, key, value) => {
     document.flags = document.flags ?? {};
-    document.flags[scope] = { ...(document.flags[scope] ?? {}), [key]: value };
+    applyUpdate(document.flags, { [scope]: { [key]: value } });
     return document;
   };
 }

@@ -1,22 +1,24 @@
 <!-- Svelte 5 runes mode -->
-<!--
-  ActiveRunsList is the top of the Journal's left column: the shared
-  JournalListShell chrome (title + count + "Soonest Ready"/"Newest" sort + empty
-  state) wrapping the list of active RunCards. List ordering is owned by the
-  store's `activeRuns` derived (an explicit comparator); this is a pure presenter.
--->
 <script>
   import { localize } from '../../util/foundryBridge.js';
-  import RunCard from './RunCard.svelte';
+  import Pagination from '../../components/Pagination.svelte';
   import JournalListShell from './JournalListShell.svelte';
+  import RunCard from './RunCard.svelte';
 
   let {
     runs = [],
-    selectedRunId = '',
+    totalCount = 0,
+    filtered = false,
+    selectedRunKey = '',
     onSelect = null,
     now = 0,
     sort = 'soonestReady',
     onSortChange = null,
+    pageIndex = 0,
+    pageSize = 4,
+    pageSizeOptions = [4, 6, 12, 25],
+    onPageChange = null,
+    onPageSizeChange = null,
   } = $props();
 
   const sortOptions = $derived([
@@ -26,40 +28,55 @@
     },
     { value: 'newest', label: localize('FABRICATE.App.Journal.ActiveRuns.Sort.Newest') },
   ]);
+  const keyOf = (run) => String(run?.key ?? run?.id ?? '');
 </script>
 
 <JournalListShell
   titleId="journal-active-runs-title"
   kind="active"
+  listName="active"
   title={localize('FABRICATE.App.Journal.ActiveRuns.Title')}
-  count={localize('FABRICATE.App.Journal.ActiveRuns.Count', { count: runs.length })}
+  count={localize('FABRICATE.App.Journal.ActiveRuns.Count', { count: totalCount })}
   sortLabel={localize('FABRICATE.App.Journal.ActiveRuns.Sort.Label')}
   sortValue={sort}
   {sortOptions}
   {onSortChange}
-  isEmpty={runs.length === 0}
+  isEmpty={totalCount === 0}
   emptyIcon="fa-hourglass-start"
-  emptyText={localize('FABRICATE.App.Journal.Empty.Active')}
+  emptyText={localize(
+    filtered ? 'FABRICATE.App.Journal.Empty.MatchingActive' : 'FABRICATE.App.Journal.Empty.Active'
+  )}
 >
   <div class="journal-run-list" role="list">
-    {#each runs as run (run.id)}
-      <div role="listitem" class="journal-run-list-item">
-        <RunCard {run} {now} selected={run.id === selectedRunId} {onSelect} />
+    {#each runs as run (keyOf(run))}
+      <div role="listitem">
+        <RunCard {run} {now} selected={keyOf(run) === selectedRunKey} {onSelect} />
       </div>
     {/each}
   </div>
+  {#snippet footer()}
+    <Pagination
+      {totalCount}
+      {pageSize}
+      {pageIndex}
+      {pageSizeOptions}
+      persistent
+      compact
+      label={localize('FABRICATE.App.Journal.ActiveRuns.Title')}
+      navLabel={localize('FABRICATE.App.Journal.ActiveRuns.Title')}
+      onPageChange={(index) => onPageChange?.(index)}
+      onPageSizeChange={(size) => onPageSizeChange?.(size)}
+    />
+  {/snippet}
 </JournalListShell>
 
 <style>
   .journal-run-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fab-space-2);
+    display: grid;
     min-width: 0;
+    gap: var(--fab-space-1);
   }
-
-  .journal-run-list-item {
-    flex: 0 0 auto;
+  .journal-run-list > div {
     min-width: 0;
   }
 </style>

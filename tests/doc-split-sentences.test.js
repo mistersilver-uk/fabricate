@@ -34,6 +34,7 @@ import {
   missingSentences,
   multiset,
   sentencesOf,
+  withoutCounts,
   withoutLinkTargets,
 } from '../scripts/lib/docSentences.js';
 
@@ -104,6 +105,37 @@ const RETARGETED = [
 /** Pinned for the same reason as DEDUPLICATED_COUNT. */
 const RETARGETED_COUNT = 1;
 
+/**
+ * Sentences that state a View Lab registry case count, where the only change is that NUMBER.
+ *
+ * `scripts/lib/viewLabCases.js` grows independently of the AGENTS.md/CLAUDE.md/CONTRIBUTING.md
+ * split, and these frozen sentences state the registry size directly, so a case-count PR changes
+ * them for a reason that has nothing to do with a move. RETARGETED's shape — pin the literal
+ * replacement text — does not fit here: the count keeps changing (it is already 463, and TP14-F
+ * raises it again to 479), so a pinned `after` string would need editing on every registry change,
+ * which is the churn this allowance exists to avoid.
+ *
+ * So each entry is the frozen `before` sentence only, and the proof is narrower instead of the
+ * replacement being narrower: `withoutCounts` (digits replaced with a placeholder) must match
+ * EXACTLY ONE surviving sentence, and the frozen text itself must no longer be present. Every
+ * character that is not part of a digit run must still match exactly, so a reworded rule cannot
+ * hide behind a coincidental digit change.
+ */
+const RENUMBERED = [
+  'As of this writing the registry holds 379 cases: 148 `exact`, 8 `window`, 223 `beyond`.',
+  'By default a PR touching the case registry, `labActors.js`, `labRunStates.js`, or any other ' +
+    'file the lab depends on selects **surface coverage**: one frame of every route and tab the ' +
+    'lab renders — every manager route, every player tab, one per single-screen canvas window, ' +
+    'plus the light-theme pair — which is 48 of the 379 publishable cases.',
+  'For a view covered by the canonical registry (`scripts/lib/viewLabCases.js`) — which is the ' +
+    'normal case, at 379 cases across five windows — the **View Lab** is the producer, and it is ' +
+    'what CI runs on every PR push: `node scripts/view-lab-screenshots.mjs apps` renders every ' +
+    'case, or pass a comma-separated id list to render a subset, into `ui-screenshot-artifact/apps/`.',
+];
+
+/** Pinned for the same reason as DEDUPLICATED_COUNT and RETARGETED_COUNT. */
+const RENUMBERED_COUNT = 3;
+
 /** Every sentence of the post-split set, as one multiset. */
 function survivingSentences() {
   const all = [];
@@ -138,6 +170,7 @@ test('every sentence of the pre-split documents still exists somewhere', () => {
   const allowed = new Set([
     ...DEDUPLICATED.map(({ sentence }) => sentence),
     ...RETARGETED.map(({ before }) => before),
+    ...RENUMBERED,
   ]);
   const lost = missingSentences(before, after).filter(({ sentence }) => !allowed.has(sentence));
 
@@ -147,7 +180,8 @@ test('every sentence of the pre-split documents still exists somewhere', () => {
     'these sentences were in the harness documents before the split and are not in the files ' +
       'DESTINATIONS names. Move them, or — if one is a genuine duplicate that now lives in one ' +
       'place — add it to DEDUPLICATED with the file that still carries it, and raise ' +
-      'DEDUPLICATED_COUNT in the same commit.'
+      'DEDUPLICATED_COUNT in the same commit. If only a registry case count changed, add it to ' +
+      'RENUMBERED and raise RENUMBERED_COUNT instead.'
   );
 });
 
@@ -201,6 +235,36 @@ test('every retarget claim really is a retarget and nothing more', () => {
       surviving.get(before) ?? 0,
       0,
       `RETARGETED still lists this sentence, which is present after all — remove the entry:\n  ${before}`
+    );
+  }
+});
+
+test('every renumbering claim really is a renumbering and nothing more', () => {
+  assert.equal(
+    RENUMBERED.length,
+    RENUMBERED_COUNT,
+    'the renumbering allowlist changed size. Each entry excuses one sentence from the subset ' +
+      'assertion, so growing it needs its own justification in review.'
+  );
+
+  const surviving = survivingSentences();
+  for (const sentence of RENUMBERED) {
+    // 1. It must not be stale: an entry whose text still exists excuses nothing.
+    assert.equal(
+      surviving.get(sentence) ?? 0,
+      0,
+      `RENUMBERED still lists this sentence, which is present after all — remove the entry:\n  ${sentence}`
+    );
+    // 2. Exactly one surviving sentence may match once digits are ignored. Zero means the count
+    //    changed into a sentence that also changed some other word; more than one means the digit
+    //    normalisation is too coarse to say which surviving sentence replaced this one.
+    const target = withoutCounts(sentence);
+    const matches = [...surviving.keys()].filter((candidate) => withoutCounts(candidate) === target);
+    assert.equal(
+      matches.length,
+      1,
+      `RENUMBERED entry does not match exactly one surviving sentence once digits are ignored ` +
+        `(found ${matches.length}):\n  ${sentence}`
     );
   }
 });

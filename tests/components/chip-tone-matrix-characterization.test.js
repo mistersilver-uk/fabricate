@@ -905,7 +905,7 @@ describe('1506 Chip — the icon-only chip', () => {
     [
       'is-icon-only.is-list',
       15,
-      'the 15px stadium `proto:4872` publishes, ~2px above the ~13px a labelled list chip renders',
+      'the independent 15px icon square, distinct from the labelled 18.4px bordered list chip',
     ],
     ['is-icon-only.is-action', 34, "`is-action`'s min-height, which is the button's own figure"],
     ['is-icon-only.is-tag-run', 25, "the height `is-tag-run`'s note computes: 6 + 6 + 11 + 2"],

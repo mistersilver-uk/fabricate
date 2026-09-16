@@ -178,9 +178,11 @@ function makeEssenceItem(uuid, quantity, essences) {
         .reduce((value, part) => (value == null ? undefined : value[part]), scopes[scope]),
     async delete() {
       this.deleted = true;
+      return this;
     },
     async update(payload) {
       if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+      return this;
     },
   };
 }

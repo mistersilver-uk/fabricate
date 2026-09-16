@@ -45,6 +45,7 @@
     dataAttr = '',
     optionDataAttr = '',
     configCards = true,
+    optionBody = null,
     onChange = () => {},
   } = $props();
 
@@ -97,7 +98,7 @@
             ><i class={option.icon}></i></span
           >
         {/if}
-        <span class="manager-resolution-option-body">
+        <div class="manager-resolution-option-body">
           <span class="manager-resolution-option-name" data-tool-choice-title>
             {text(option.labelKey, option.label || option.fallback)}
             {#if option.meta}<code class="manager-resolution-option-meta" data-radio-card-meta
@@ -114,7 +115,8 @@
               >{text(option.descKey, option.description || option.descFallback)}</span
             >
           {/if}
-        </span>
+          {#if optionBody}{@render optionBody(option)}{/if}
+        </div>
       </label>
     {/each}
   </div>

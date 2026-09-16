@@ -64,9 +64,9 @@ const TABLE_ROWS = DOMAIN.split('\n').filter((line) => isTableRow(line));
 test('DOMAIN.md is the corpus these assertions think it is', () => {
   // A guard over a file that stopped having tables — or stopped being read — reports success
   // forever. Both inputs are floored.
-  // 216 rows across four tables, and the number is worth stating exactly because two looser
-  // counts are close enough to be mistaken for it. `line.startsWith('|')` answers 313 and
-  // `/^\s*\|/` answers 323; the difference is 107 lines of an ASCII tree of the world-settings
+  // 219 rows across four tables, and the number is worth stating exactly because two looser
+  // counts are close enough to be mistaken for it. `line.startsWith('|')` answers 316 and
+  // `/^\s*\|/` answers 326; the difference is 107 lines of an ASCII tree of the world-settings
   // layout (`|- World settings`), ten of them indented. `isTableRow` excludes every one of them
   // because they do not CLOSE with a pipe — the fence they sit in plays no part in it, and
   // `reflowTables` skips fenced content separately.
@@ -74,7 +74,7 @@ test('DOMAIN.md is the corpus these assertions think it is', () => {
   // A floor above the real corpus fails forever, and the obvious fix for that is to lower it
   // until it passes — at which point it measures nothing. So this is derived, with enough slack
   // to survive an edit but not a deleted table.
-  assert.equal(TABLE_ROWS.length, 216, 'the DOMAIN.md table corpus changed size');
+  assert.equal(TABLE_ROWS.length, 219, 'the DOMAIN.md table corpus changed size');
   assert.ok(DOMAIN.length > 100_000, 'DOMAIN.md is far smaller than any version of this document');
 });
 
