@@ -9,13 +9,7 @@
  * idempotent (existing ids are never overwritten).
  */
 
-/**
- * Shared display metadata (label + icon) for every modifier id used by the
- * preset bundles. Each Foundry-system bundle reuses these so the two bundles
- * differ only in their roll `expression`.
- *
- * @type {Readonly<Record<string, {label: string, icon: string}>>}
- */
+/** Shared display metadata (label + icon) for every modifier id used by the preset bundles. */
 const MODIFIER_DISPLAY = Object.freeze({
   strength: { label: 'Strength', icon: 'fa-solid fa-dumbbell' },
   dexterity: { label: 'Dexterity', icon: 'fa-solid fa-feather' },
@@ -35,13 +29,8 @@ const MODIFIER_DISPLAY = Object.freeze({
 });
 
 /**
- * Build a frozen preset bundle from an ordered id→expression map, pulling
- * shared label/icon metadata from {@link MODIFIER_DISPLAY}. The resulting array
- * preserves the insertion order of `expressions`.
- *
- * @param {Record<string, string>} expressions Ordered map of modifier id to
- *   the system-specific roll expression.
- * @returns {ReadonlyArray<object>} Frozen preset bundle.
+ * Build a frozen preset bundle from an ordered id→expression map, pulling shared label/icon
+ * metadata from {@link MODIFIER_DISPLAY}.
  */
 function buildPresetBundle(expressions) {
   return Object.freeze(
@@ -56,13 +45,7 @@ function buildPresetBundle(expressions) {
   );
 }
 
-/**
- * D&D 5e ability and skill presets. The expressions assume the Foundry
- * `dnd5e` system's actor roll data shape (`@abilities.<key>.mod`,
- * `@skills.<key>.total`).
- *
- * @type {ReadonlyArray<object>}
- */
+/** D&D 5e ability and skill presets. */
 export const DND5E_CHARACTER_MODIFIER_PRESETS = buildPresetBundle({
   strength: '@abilities.str.mod',
   dexterity: '@abilities.dex.mod',
@@ -80,12 +63,7 @@ export const DND5E_CHARACTER_MODIFIER_PRESETS = buildPresetBundle({
   history: '@skills.his.total',
 });
 
-/**
- * Pathfinder 2e ability and skill presets. The expressions assume the
- * Foundry `pf2e` actor roll data shape.
- *
- * @type {ReadonlyArray<object>}
- */
+/** Pathfinder 2e ability and skill presets. */
 export const PF2E_CHARACTER_MODIFIER_PRESETS = buildPresetBundle({
   strength: '@actor.system.abilities.str.mod',
   dexterity: '@actor.system.abilities.dex.mod',
@@ -102,16 +80,7 @@ export const PF2E_CHARACTER_MODIFIER_PRESETS = buildPresetBundle({
   occultism: '@actor.system.skills.occultism.totalModifier',
 });
 
-/**
- * Return the matching preset bundle for the active Foundry game system id.
- *
- * Unknown ids return an empty array. The bundle is read-only — callers should
- * pass it through `seedCharacterModifierPresets()` rather than copying into
- * the library directly.
- *
- * @param {string} foundrySystemId Foundry game system id (`game.system.id`).
- * @returns {ReadonlyArray<object>} Frozen preset bundle (possibly empty).
- */
+/** Return the matching preset bundle for the active Foundry game system id. */
 export function getCharacterModifierPresetsForFoundrySystem(foundrySystemId) {
   const id = String(foundrySystemId || '').trim();
   if (id === 'dnd5e') return DND5E_CHARACTER_MODIFIER_PRESETS;
@@ -119,20 +88,7 @@ export function getCharacterModifierPresetsForFoundrySystem(foundrySystemId) {
   return Object.freeze([]);
 }
 
-/**
- * Idempotently merge a preset bundle into a per-system library.
- *
- * Existing entries with a matching id are preserved untouched. The return
- * value is a fresh array suitable for assignment back onto the per-system
- * `characterModifiers` field.
- *
- * @param {object} options
- * @param {ReadonlyArray<object>} options.presets Preset bundle.
- * @param {Array<object>} [options.currentLibrary] Current library entries.
- * @returns {{added: Array<object>, skipped: Array<object>, next: Array<object>}}
- *   `added` lists newly inserted entries, `skipped` lists presets whose id
- *   already existed in the library, and `next` is the merged library array.
- */
+/** Idempotently merge a preset bundle into a per-system library. */
 export function seedCharacterModifierPresets({ presets = [], currentLibrary = [] } = {}) {
   const safePresets = Array.isArray(presets) ? presets : [];
   const safeCurrent = Array.isArray(currentLibrary) ? currentLibrary : [];

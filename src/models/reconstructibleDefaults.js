@@ -23,36 +23,20 @@
  * the suite rather than failing it.
  */
 
-/** @returns {boolean} whether `value` is an array holding nothing. */
 export const isEmptyArray = (value) => Array.isArray(value) && value.length === 0;
 
-/** @returns {boolean} whether `value` is exactly `null`. */
 export const isNull = (value) => value === null;
 
-/** @returns {boolean} whether `value` is exactly `false`. */
 export const isFalse = (value) => value === false;
 
-/** @returns {boolean} whether `value` is the empty string. */
 export const isEmptyString = (value) => value === '';
 
-/**
- * @returns {boolean} whether `value` is a plain object carrying no own keys — the shape a
- *   `data.x || {}` constructor default rebuilds from absence.
- */
 export const isEmptyMap = (value) =>
   !!value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0;
 
 /**
- * Drop every key of a serialized payload whose value is the one the constructor rebuilds
- * from absence.
- *
- * Implemented as a FILTER over the caller's key order rather than as a rebuilt object
- * literal, so the serialized text of an unchanged model is stable across calls — which
- * `RecipeManager.reload()` relies on, detecting change by stringify comparison.
- *
- * @param {Record<string, unknown>} payload
- * @param {Record<string, (value: unknown) => boolean>} omittedWhenDefault
- * @returns {Record<string, unknown>}
+ * Drop every key of a serialized payload whose value is the one the constructor rebuilds from
+ * absence.
  */
 export function omitReconstructibleDefaults(payload, omittedWhenDefault) {
   const out = {};

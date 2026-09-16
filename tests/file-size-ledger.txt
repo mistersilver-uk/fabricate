@@ -2,7 +2,7 @@ src/canvas/InteractableManager.js	1151
 src/canvas/InteractableManager.js::_spawnInteractableRegion	120
 src/canvas/interactableResolution.js::buildRegionSpawnRequest	116
 src/canvas/regions/interactableRegionFlags.js::buildInteractableBehaviorSchema	104
-src/main.js	6796
+src/main.js	6823
 src/main.js::Hooks.once#2	291
 src/main.js::Hooks.once>on	111
 src/main.js::_runMigrations	206
@@ -16,10 +16,8 @@ src/migration/migrateRecipeForModeChange.js::migrateRecipeForModeChange	107
 src/migration/migrateUnifyGatheringRegions.js::migrateUnifyGatheringRegions	126
 src/migration/migrateWorldScopeEntities.js::migrateWorldScopeEntities	286
 src/migration/remapWorldScopeIdentityFlags.js	976
-src/models/IngredientSet.js	1905
-src/models/Recipe.js	1039
-src/models/Recipe.js::_validate	126
-src/models/Recipe.js::constructor	107
+src/models/IngredientSet.js	1231
+src/models/Recipe.js::_validate	122
 src/systems/AlchemyListingBuilder.js::buildListing	120
 src/systems/BulkSalvageService.js	816
 src/systems/CompendiumImporter.js	1542
@@ -53,7 +51,7 @@ src/systems/CraftingSystemManager.js::_normalizeSalvage	113
 src/systems/CraftingSystemManager.js::_normalizeSystem	291
 src/systems/CraftingSystemManager.js::repairItemData	152
 src/systems/CraftingSystemManager.js::updateSystem	137
-src/systems/GatheringEngine.js	6299
+src/systems/GatheringEngine.js	6310
 src/systems/GatheringEngine.js::_postGatheringChatMessage	118
 src/systems/GatheringEngine.js::_processMaturedWaitingRun	188
 src/systems/GatheringEngine.js::_resolveImmediateAttempt	145
@@ -106,13 +104,13 @@ src/systems/gatheringLocation.js::evaluateLocationAvailability	101
 src/systems/importReferenceResolver.js	1047
 src/systems/importReferenceResolver.js::collectBrokenInternalReferences	155
 src/systems/inventorySnapshot.js::buildInventorySnapshot	152
-src/systems/journalRunAuthority.js	913
+src/systems/journalRunAuthority.js	975
 src/systems/journalRunAuthority.js::createFoundryJournalRunAuthority	171
-src/systems/journalRunAuthority.js::createJournalRunAuthority	555
+src/systems/journalRunAuthority.js::createJournalRunAuthority	597
 src/systems/journalRunAuthority.js::createJournalRunAuthority>run	129
 src/systems/journalRunAuthority.js::createJournalRunAuthority>run>queue	127
-src/systems/journalRunCommands.js	992
-src/systems/journalRunCommands.js::createJournalRunCommandService	396
+src/systems/journalRunCommands.js	1085
+src/systems/journalRunCommands.js::createJournalRunCommandService	411
 src/systems/journalRunCommands.js::createJournalRunCommandService>executeOperation	179
 src/systems/scopedDefinitionStore.js	888
 src/systems/systemValidation.js::collectSystemBlockers	180
@@ -216,8 +214,8 @@ src/ui/svelte/apps/manager/tools/toolStudio.js::projectToolBehaviorFacts	166
 src/ui/svelte/apps/manager/tools/toolStudio.js::projectToolPlayerPreview	110
 src/ui/svelte/apps/manager/world/WorldCurrencyTab.svelte	1155
 src/ui/svelte/apps/manager/world/WorldModifiersTab.svelte	551
-src/ui/svelte/components/Chip.svelte	648
-src/ui/svelte/components/SearchablePopover.svelte	1052
+src/ui/svelte/components/Chip.svelte	515
+src/ui/svelte/components/SearchablePopover.svelte	882
 src/ui/svelte/stores/actorBarStore.svelte.js::createActorBarStore	205
 src/ui/svelte/stores/adminComponentRowProjection.js::_createItemCard	131
 src/ui/svelte/stores/adminRecipeRowProjection.js	889
@@ -244,5 +242,5 @@ src/ui/svelte/util/foundryBridge.js	933
 src/ui/svelte/util/foundryIconCatalogue.js	1553
 src/ui/svelte/util/recipeGraphBuilder.js	936
 src/ui/svelte/util/shoppingListAggregator.js::aggregateShoppingList	179
-src/utils/rollExpressionAverage.js::createReader	201
-src/utils/scopedEntityListModel.js::createScopedEntityListModel	157
+src/utils/rollExpressionAverage.js::createReader	181
+src/utils/scopedEntityListModel.js::createScopedEntityListModel	118
