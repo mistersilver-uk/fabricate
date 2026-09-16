@@ -19,29 +19,11 @@
  * never evaluates a `class extends foundry…` at load time.
  */
 
-// Matches FABRICATE_SETTINGS_NAMESPACE in settings.js; hardcoded to avoid a
-// settings <-> menu import cycle.
+// Matches FABRICATE_SETTINGS_NAMESPACE in settings.js; hardcoded to avoid a settings <-> menu
+// import cycle.
 const NAMESPACE = 'fabricate';
 
-/**
- * Register a settings-menu button whose only behaviour is to run `open()`.
- *
- * No-op (returning `false`) when Foundry's settings-menu API or `ApplicationV2` is
- * unavailable — e.g. under the test harness. A caller asserting on the registered
- * payload therefore has to stub `ApplicationV2` or its assertion passes vacuously
- * against a menu that was never registered.
- *
- * @param {object} options
- * @param {string} options.key Setting-menu key, unique within the namespace.
- * @param {string} options.name i18n key for the menu label.
- * @param {string} options.label i18n key for the button text.
- * @param {string} [options.hint] i18n key for the hint text.
- * @param {string} [options.icon] Font Awesome classes for the button icon.
- * @param {() => (void|Promise<void>)} options.open Action run when the button is clicked.
- * @param {string} [options.id] DOM id for the shell application; defaults to
- *   `fabricate-<key>`.
- * @returns {boolean} `true` when the menu was registered.
- */
+/** Register a settings-menu button whose only behaviour is to run `open()`. */
 export function registerDialogSettingsMenu({ key, name, label, hint, icon, open, id = null } = {}) {
   const ApplicationV2 = globalThis.foundry?.applications?.api?.ApplicationV2;
   if (!ApplicationV2 || typeof globalThis.game?.settings?.registerMenu !== 'function') {
@@ -52,8 +34,6 @@ export function registerDialogSettingsMenu({ key, name, label, hint, icon, open,
   const applicationId = id || `fabricate-${key}`;
 
   // Defined lazily so `extends ApplicationV2` only evaluates when Foundry is present.
-  // Overriding render() turns the menu button into a direct action rather than a
-  // window that opens.
   class FabricateDialogSettingsMenu extends ApplicationV2 {
     static DEFAULT_OPTIONS = { id: applicationId };
 

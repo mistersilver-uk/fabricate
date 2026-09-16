@@ -1,56 +1,17 @@
 /**
- * Pure selection + staging model for the GM component browser's bulk edit (issue 772).
- *
- * A sibling of `componentBrowserModel.js`, and here for the same reason it is: `src/ui/**`
- * is not covered by the ESLint/Prettier globs, so a module there can be lint-green and
- * Sonar-red. Nothing in this file touches Foundry globals, the store, or localization —
- * the panel and the toolbar localize, and the admin store persists. Everything that can
- * be reasoned about without a DOM lives here; the Svelte surfaces are wiring.
- *
- * Two shapes travel together and must not be confused:
- *
- * - the SELECTION, a `Set` of component ids the browser owns as lifted view state;
- * - the DRAFT, the staged-but-unwritten edit the inspector rail's panel owns.
- *
- * Only the DRAFT half is defined here. The selection half now lives in the row-agnostic
- * `bulkSelectionModel.js`, shared with the Recipe Studio's bulk edit (issue 1010), and is
- * re-exported at the foot of this file under its original `…ComponentSelection` names — so
- * the distinction above still holds for every importer, and no call site moved.
- *
- * Nothing here mutates its input. Every draft helper returns a NEW draft and every
- * selection helper returns a NEW `Set` — the Svelte side propagates on reference change,
- * exactly as `collapsedCategories` already documents.
- *
- * Category and tags carry a natural empty sentinel, so their staging is derivable from
- * the value. Essences and difficulty do not (`{}` and `0` are both meaningful values), so
- * those two axes carry an explicit `…Staged` flag: the flag is the axis's opt-in to the
- * write, not a second kind of state. A staged, all-zero essence map is a real edit
- * meaning "clear essences on every selected component", so emptiness must NEVER be read
- * as "no change" anywhere downstream of `toBulkComponentEdit`.
- */
-
-/**
- * @typedef {object} ComponentBulkDraft
- * @property {string} category the staged category; `''` is the `Leave unchanged` sentinel.
- * @property {string[]} tagAdd tags staged for addition.
- * @property {string[]} tagRemove tags staged for removal; disjoint from `tagAdd`.
- * @property {boolean} essencesStaged whether the essence axis participates in the write.
- * @property {Record<string, number>} essences the staged whole-map replacement.
- * @property {boolean} difficultyStaged whether the progressive-DC axis participates.
- * @property {number} difficulty the staged progressive DC, 0..35; 0 CLEARS.
+ * Pure staging model for the GM component browser's bulk edit (issue 772). Two shapes travel
+ * together: the SELECTION (a `Set` the browser owns, defined in `bulkSelectionModel.js` and
+ * re-exported at the foot of this file under its original `…ComponentSelection` names) and the
+ * DRAFT, which is what this file defines. Every helper returns a NEW draft. Essences and difficulty
+ * carry an explicit `…Staged` flag because `{}` and `0` are meaningful values — a staged all-zero
+ * essence map means "clear essences", so emptiness is never "no change" downstream.
  */
 
 /** The shipped component-editor clamp (`<Stepper min={0} max={35}>`), mirrored here. */
 const DIFFICULTY_MIN = 0;
 const DIFFICULTY_MAX = 35;
 
-/**
- * Coerce an essence quantity to a non-negative integer.
- *
- * The write primitive's `_normalizeEssenceQuantities` coerces with a bare `Number()` and
- * does NOT floor, so truncation is this model's job — otherwise a fractional quantity
- * would reach persisted data.
- */
+/** Coerce an essence quantity to a non-negative integer. */
 function clampQuantity(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 0;
@@ -82,12 +43,8 @@ function essenceMap(value) {
 }
 
 /**
- * Read arbitrary input as a well-formed draft, so every export below is total and none of
- * them has to re-guard its input.
- *
- * `tagAdd` wins over `tagRemove` on collision: the never-both-states invariant is
- * structural here rather than merely a property of the cycle, so a draft that arrived
- * from anywhere else can never stage one tag as both.
+ * Read arbitrary input as a well-formed draft, so every export below is total and none of them has
+ * to re-guard its input.
  */
 function readDraft(draft) {
   const source = draft && typeof draft === 'object' ? draft : {};
@@ -103,15 +60,7 @@ function readDraft(draft) {
   };
 }
 
-/**
- * A fresh, wholly unstaged draft.
- *
- * Always a NEW object with NEW collections — the manager root holds one per selection and
- * discards it when the selection empties, so a shared singleton would leak one bulk edit
- * into the next.
- *
- * @returns {ComponentBulkDraft}
- */
+/** A fresh, wholly unstaged draft. */
 export function createComponentBulkDraft() {
   return {
     category: '',
@@ -124,17 +73,7 @@ export function createComponentBulkDraft() {
   };
 }
 
-/**
- * Advance one tag through the three-state machine: `none -> add -> remove -> none`.
- *
- * The prototype's `cycleBulkTag` verbatim. A tag is never simultaneously staged for
- * addition and removal, which is what lets the write primitive apply `removeTags` after
- * `addTags` without the collision ever being reachable from the UI.
- *
- * @param {ComponentBulkDraft} draft
- * @param {string} tag
- * @returns {ComponentBulkDraft} a NEW draft; the input is not mutated.
- */
+/** Advance one tag through the three-state machine: `none -> add -> remove -> none`. */
 export function cycleBulkTag(draft, tag) {
   const next = readDraft(draft);
   const name = String(tag ?? '');
@@ -153,29 +92,14 @@ export function cycleBulkTag(draft, tag) {
   return { ...next, tagAdd: [...next.tagAdd, name] };
 }
 
-/**
- * Stage a single-valued, overwriting category. `''` is the `Leave unchanged` sentinel.
- *
- * The value is stored verbatim rather than trimmed, because the panel's `<select>` binds
- * to it and matches an option by exact string; a whitespace-only value is treated as
- * unset by `bulkDraftHasChanges` and `toBulkComponentEdit` instead.
- *
- * @param {ComponentBulkDraft} draft
- * @param {string} category
- * @returns {ComponentBulkDraft} a NEW draft; the input is not mutated.
- */
+/** Stage a single-valued, overwriting category. */
 export function setBulkCategory(draft, category) {
   return { ...readDraft(draft), category: String(category ?? '') };
 }
 
 /**
- * Stage an absolute quantity for one essence, clamped at 0 and truncated, and STAGE the
- * essence axis — matching the prototype's `bumpBulkEss`, which arms `essOn` on every touch.
- *
- * @param {ComponentBulkDraft} draft
- * @param {string} essenceId
- * @param {number} quantity
- * @returns {ComponentBulkDraft} a NEW draft; the input is not mutated.
+ * Stage an absolute quantity for one essence, clamped at 0 and truncated, and STAGE the essence
+ * axis — matching the prototype's `bumpBulkEss`, which arms `essOn` on every touch.
  */
 export function setBulkEssence(draft, essenceId, quantity) {
   const next = readDraft(draft);
@@ -188,18 +112,7 @@ export function setBulkEssence(draft, essenceId, quantity) {
   };
 }
 
-/**
- * Nudge one essence by a delta, clamped at 0 and truncated, and STAGE the essence axis.
- *
- * Note this is not the only way to stage the axis, and cannot be: `Stepper` never emits a
- * no-op, so on a fresh draft (every essence 0) the steppers can only stage the axis via a
- * bump up and back down. `toggleBulkEssencesStaged` is the direct affordance.
- *
- * @param {ComponentBulkDraft} draft
- * @param {string} essenceId
- * @param {number} delta
- * @returns {ComponentBulkDraft} a NEW draft; the input is not mutated.
- */
+/** Nudge one essence by a delta, clamped at 0 and truncated, and STAGE the essence axis. */
 export function adjustBulkEssence(draft, essenceId, delta) {
   const next = readDraft(draft);
   const id = String(essenceId ?? '').trim();
@@ -209,56 +122,26 @@ export function adjustBulkEssence(draft, essenceId, delta) {
   return setBulkEssence(next, id, current + (Number.isFinite(step) ? Math.trunc(step) : 0));
 }
 
-/**
- * Arm or disarm the essence axis without touching the staged values.
- *
- * Disarming keeps the map, so re-arming restores what the GM staged; the axis flag is the
- * opt-in to the write, not a second copy of the value.
- *
- * @param {ComponentBulkDraft} draft
- * @returns {ComponentBulkDraft} a NEW draft; the input is not mutated.
- */
+/** Arm or disarm the essence axis without touching the staged values. */
 export function toggleBulkEssencesStaged(draft) {
   const next = readDraft(draft);
   return { ...next, essencesStaged: !next.essencesStaged };
 }
 
-/**
- * Arm or disarm the progressive-DC axis.
- *
- * Arming an untouched draft leaves `difficulty` at its seeded `0`, so the panel shows a
- * `0` stepper the moment the axis is staged and "staged but untouched" is never a silent
- * clear — the write primitive treats `0`, `null` and `''` identically as CLEAR.
- *
- * @param {ComponentBulkDraft} draft
- * @returns {ComponentBulkDraft} a NEW draft; the input is not mutated.
- */
+/** Arm or disarm the progressive-DC axis. */
 export function toggleBulkDifficultyStaged(draft) {
   const next = readDraft(draft);
   return { ...next, difficultyStaged: !next.difficultyStaged };
 }
 
-/**
- * Stage a progressive DC, clamped to 0..35, and STAGE the axis. `0` clears the value on
- * every selected component.
- *
- * @param {ComponentBulkDraft} draft
- * @param {number} value
- * @returns {ComponentBulkDraft} a NEW draft; the input is not mutated.
- */
+/** Stage a progressive DC, clamped to 0..35, and STAGE the axis. */
 export function setBulkDifficulty(draft, value) {
   return { ...readDraft(draft), difficulty: clampDifficulty(value), difficultyStaged: true };
 }
 
 /**
- * Whether anything at all is staged — the prototype's `anyChange`, and the enablement
- * condition for `Apply to {N} component(s)`.
- *
- * A REMOVAL-ONLY draft counts: a tag cycled straight to `remove` is a real edit the chip
- * run can stage on its own, and reading only `tagAdd` here would leave Apply inert for it.
- *
- * @param {ComponentBulkDraft} draft
- * @returns {boolean}
+ * Whether anything at all is staged — the prototype's `anyChange`, and the enablement condition for
+ * `Apply to {N} component(s)`.
  */
 export function bulkDraftHasChanges(draft) {
   const next = readDraft(draft);
@@ -271,22 +154,7 @@ export function bulkDraftHasChanges(draft) {
   );
 }
 
-/**
- * Project the draft onto the `edit` object the set-apply write primitive takes.
- *
- * The `essences` key is present IF AND ONLY IF `essencesStaged`, and `difficulty` IF AND
- * ONLY IF `difficultyStaged`. That is the whole point of the two flags: `{}` and `0` are
- * both real instructions ("clear essences", "clear the DC"), so the primitive's no-op
- * guard tests key PRESENCE rather than truthiness, and this projection must give it
- * something to test. An unstaged axis is never sent.
- *
- * Zero quantities are emitted verbatim rather than filtered out: `_normalizeEssenceQuantities`
- * drops non-positive quantities, so `{fire: 0}` and `{}` reach persisted data identically,
- * and passing what the GM staged keeps the two sides honest.
- *
- * @param {ComponentBulkDraft} draft
- * @returns {{category?: string, addTags?: string[], removeTags?: string[], essences?: Record<string, number>, difficulty?: number}}
- */
+/** Project the draft onto the `edit` object the set-apply write primitive takes. */
 export function toBulkComponentEdit(draft) {
   const next = readDraft(draft);
   const edit = {};
@@ -299,28 +167,9 @@ export function toBulkComponentEdit(draft) {
 }
 
 /**
- * How many of the selected components would have an AUTHORED essence value CHANGED or
- * REMOVED if the staged map were applied — the count the conditional overwrite warning
- * names, per `openspec/specs/ui-integration/spec.md` Component Studio requirement 10.
- *
- * The rule is deliberately wide rather than "would lose value". Overwriting a GM's
- * hand-tuned `3` with a `5` destroys that authored `3` just as surely as a `0` does, so a
- * bulk set of one essence across a dozen individually-tuned components deserves the same
- * warning as a bulk clear. The permanent sub-hint already says that applying essences
- * overwrites every selected component; this count's job is to say how many of them
- * actually carry authored values in the blast radius.
- *
- * Only AUTHORED entries are compared, so a component with no essences at all is never
- * counted (the staged map purely ADDS to it, destroying nothing), and neither is a
- * component whose every authored quantity survives the overwrite unchanged.
- *
- * Reads the PROJECTED `itemCards[].essences` ARRAY (`[{id, quantity}]`), never the
- * persisted map — the map shape only ever reaches the write primitive — so this stays
- * pure and testable over the same rows the browser renders.
- *
- * @param {{essences?: {id: string, quantity: number}[]}[]} selectedCards
- * @param {Record<string, number>} stagedEssences
- * @returns {number}
+ * How many of the selected components would have an AUTHORED essence value CHANGED or REMOVED if
+ * the staged map were applied — the count the conditional overwrite warning names, per
+ * `openspec/specs/ui-integration/spec.md` Component Studio requirement 10.
  */
 export function countComponentsChangingEssences(selectedCards, stagedEssences) {
   const staged = essenceMap(stagedEssences);
@@ -338,13 +187,6 @@ export function countComponentsChangingEssences(selectedCards, stagedEssences) {
 /**
  * The axes a draft stages, in the order the reference's foot names them (issue 1371 r16-list,
  * `proto:5523`-`5528`): `category`, `tags`, `essences`, `difficulty`.
- *
- * Reads the SAME predicates `bulkDraftHasChanges` reads — a removal-only tag draft and a staged
- * all-zero essence map are both axes — so the foot's `Apply tags to 3 components` and the Apply
- * gate cannot disagree about whether anything is staged.
- *
- * @param {ComponentBulkDraft} draft
- * @returns {Array<'category'|'tags'|'essences'|'difficulty'>}
  */
 export function stagedBulkAxes(draft) {
   const next = readDraft(draft);
@@ -357,12 +199,8 @@ export function stagedBulkAxes(draft) {
 }
 
 /**
- * How many of the selected components' effective category is `category` — the `n/N` an inset
- * row states beside the value it would write (`proto:5571`, `carried`).
- *
- * @param {Array<{category?: string}>} selectedCards
- * @param {string} category
- * @returns {number}
+ * How many of the selected components' effective category is `category` — the `n/N` an inset row
+ * states beside the value it would write (`proto:5571`, `carried`).
  */
 export function countSelectedWithCategory(selectedCards, category) {
   const wanted = String(category ?? '');
@@ -372,12 +210,8 @@ export function countSelectedWithCategory(selectedCards, category) {
 }
 
 /**
- * How many of the selected components already carry `tag`, compared case-insensitively because
- * the `itemTags` vocabulary and the write primitive both store tags lowercase.
- *
- * @param {Array<{tags?: string[]}>} selectedCards
- * @param {string} tag
- * @returns {number}
+ * How many of the selected components already carry `tag`, compared case-insensitively because the
+ * `itemTags` vocabulary and the write primitive both store tags lowercase.
  */
 export function countSelectedWithTag(selectedCards, tag) {
   const wanted = String(tag ?? '').toLowerCase();
@@ -388,17 +222,7 @@ export function countSelectedWithTag(selectedCards, tag) {
   ).length;
 }
 
-/**
- * How many of the selected components carry a POSITIVE quantity of `essenceId`.
- *
- * Reads the PROJECTED `essences` ARRAY (`[{id, quantity}]`), like `countComponentsChangingEssences`,
- * and a projected zero is not a carrier: `_normalizeEssenceQuantities` drops non-positive values,
- * so a zero in the projection is a value the write would never have kept.
- *
- * @param {Array<{essences?: {id: string, quantity: number}[]}>} selectedCards
- * @param {string} essenceId
- * @returns {number}
- */
+/** How many of the selected components carry a POSITIVE quantity of `essenceId`. */
 export function countSelectedWithEssence(selectedCards, essenceId) {
   const wanted = String(essenceId ?? '').trim();
   return (Array.isArray(selectedCards) ? selectedCards : []).filter((card) =>
@@ -411,24 +235,7 @@ export function countSelectedWithEssence(selectedCards, essenceId) {
 /** The reference's inset window: five rows, so the groups below never move on a keystroke. */
 const INSET_PAGE_SIZE = 5;
 
-/**
- * One staging inset's visible page: the rows whose `name` survives the search, windowed.
- *
- * SHARED BY EVERY INSET the system bulk panel draws (`proto:1120`-`1240` draws the same object
- * for categories, tags and essences), so the search predicate, the window size and the range
- * arithmetic cannot drift between them. It deliberately imports nothing: the world panel keeps
- * its twin beside its only caller for the manifest reason it records, and this module is already
- * in every mounted closure that renders the rules list, so a new import here would be a new
- * required entry in each of them — and a missing entry hangs a suite rather than failing it.
- *
- * `pageCount` is never 0: an empty match is one empty page, so a pager reads `1/1` over
- * `Showing 0-0 of 0` rather than dividing by nothing.
- *
- * @param {Array<{id: string, name: string}>} items
- * @param {{query?: string, pageIndex?: number, pageSize?: number}} view
- * @returns {{rows: Array<object>, pageIndex: number, pageCount: number, total: number,
- *   rangeStart: number, rangeEnd: number}}
- */
+/** One staging inset's visible page: the rows whose `name` survives the search, windowed. */
 export function pageBulkInsetRows(
   items,
   { query = '', pageIndex = 0, pageSize = INSET_PAGE_SIZE } = {}
@@ -459,14 +266,8 @@ export function pageBulkInsetRows(
 }
 
 /**
- * The selection helpers this module used to define, re-exported under the names every call
- * site already imports.
- *
- * They moved to `bulkSelectionModel.js` (issue 1010) so the Recipe Studio's bulk edit can
- * share them rather than own a second copy: the selection semantics are identical over any
- * row id, while the STAGED DRAFT above is not shareable at all — the two studios' axes
- * differ entirely. Re-exporting rather than re-pointing every importer keeps that move
- * invisible to the component surfaces, which is what makes it verifiably behaviour-preserving.
+ * The selection helpers this module used to define, re-exported under the names every call site
+ * already imports.
  */
 export {
   describeBulkSelection as describeComponentSelection,
