@@ -82,7 +82,6 @@ function countFor(issueCounts, id) {
 /**
  * Build the ordered list of visible Checks children. Salvage and gathering are optional FEATURES
  * whose children drop when the feature is off; crafting and Validation always render.
- *
  * @param {object} args
  * @param {object} [args.features] Feature flags. `salvage` defaults ON; `gathering` is opt-in.
  * @param {string} [args.resolutionMode] The system's recipe resolution mode.
@@ -162,7 +161,7 @@ export function activeChecksTab(view) {
 }
 
 /**
- * Whether a view belongs to the Checks group. The `checks` redirect counts, route guards asking
+ * Whether a view belongs to the Checks group; the `checks` redirect counts, route guards asking
  * this before normalization has rewritten it.
  * @param {string} view The view id to test.
  * @returns {boolean}

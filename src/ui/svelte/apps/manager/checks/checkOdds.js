@@ -43,9 +43,9 @@ export const ODDS_REASONS = Object.freeze({
 });
 
 /**
- * Why a PROGRESSIVE histogram has nothing to draw even though the formula is enumerable.
- * Deliberately NOT an {@link ODDS_REASONS} member: those say the formula cannot be enumerated,
- * where this says the opposite — the missing input is the GM's own sandbox order.
+ * Why a PROGRESSIVE histogram has nothing to draw even though the formula is enumerable, and
+ * deliberately NOT an {@link ODDS_REASONS} member: those say the formula cannot be enumerated,
+ * where this says the missing input is the GM's own sandbox order.
  * @type {string}
  */
 export const SANDBOX_ABSENT = 'no-sandbox-order';
@@ -60,10 +60,9 @@ const NON_NUMERIC_DENOMINATION = /^[fc]$/i;
 const refuse = (reason) => ({ enumerable: false, reason });
 
 /**
- * A term that carries a dice term's shape, whatever class it is. Deliberately STRUCTURAL: the
- * View Lab has no `foundry.dice.*` namespace, so an `instanceof` test would make this untestable
- * outside a live client.
- *
+ * A term that carries a dice term's shape, whatever class it is, and deliberately STRUCTURAL:
+ * the View Lab has no `foundry.dice.*` namespace, so an `instanceof` test would make this
+ * untestable outside a live client.
  * @param {object} term A parsed roll term.
  * @returns {boolean} True when the term looks like a `DiceTerm`.
  */
@@ -77,7 +76,6 @@ function isDiceTermLike(term) {
  * evaluate. `typeof term.term === 'string'` ALONE is not this test: `ParentheticalTerm` also
  * declares a string `term`, so `1d20 + (2d6)` would refuse as `string-term` rather than as the
  * `non-deterministic-remainder` it is, and is told apart by the two fields only it carries.
- *
  * @param {object} term A parsed roll term.
  * @returns {boolean} True when the term is a string term.
  */
@@ -94,7 +92,6 @@ function isStringTermLike(term) {
  * test refuses every formula with a die inside brackets — which, a bounded rolling modifier
  * being `min(max((1d8), -1), 6)`, is every system carrying one. What survives is the
  * `StringTerm` refusal, the one shape whose `isDeterministic` LIES.
- *
  * @param {Array<object>} terms Every parsed term except the dice.
  * @returns {?{enumerable: false, reason: string}} A refusal, or null when it passes.
  */
@@ -111,7 +108,6 @@ function refuseRemainder(terms) {
  * plausibly labelled and wrong. So the dice are found by the SAME recursive-descent reader that
  * reduces the expression, which knows a function argument from a top-level addend because it
  * parsed both, and which asserts END OF INPUT.
- *
  * @param {string} display The `@`-resolved formula, flavour and all.
  * @returns {{dice: Array<{faces: number}>} | {enumerable: false, reason: string}} The plan.
  */
@@ -149,7 +145,6 @@ function planDice(display) {
  * Walk the joint face space, reducing the expression once per assignment. EXACT, never sampled:
  * every assignment is equally likely, so the bucket counts are the real distribution, including
  * through a clamp — which charts a bounded `1d8` modifier as the `1..6` it contributes.
- *
  * @param {string} display The `@`-resolved formula.
  * @param {Array<{faces: number}>} dice The dice, in reading order.
  * @returns {Array<{total: number, diceGroups: Array<object>}>} One outcome per assignment.
@@ -182,7 +177,6 @@ function enumerateOutcomes(display, dice) {
  * `evaluateCheckRoll` appends the check-modifier scalar itself, so a histogram on the authored
  * string spans `1..20` while the readout beside it rolls `5..24`. So the context IS a parameter
  * and the append is {@link resolveRolledFormula}, with no double application.
- *
  * @param {string} formula The AUTHORED preview formula.
  * @param {object|null} actor The previewed actor, or null for "No actor".
  * @param {object} [options] Options.
@@ -258,7 +252,6 @@ export function describeFormulaEnumerability(
  * `results` or spells `group` differently makes every natural-20 trigger silently invisible to
  * the histogram while STILL matching a hand-computed distribution for a trigger-free check.
  * EVERY die is in it, modifier terms being APPENDED and the authored dice keeping their group ids.
- *
  * @param {Array<{faces: number}>} dice The dice, in reading order.
  * @param {Array<number>} assignment The face each die shows.
  * @returns {Array<object>} The dice-group bag for that assignment.
@@ -286,13 +279,11 @@ function percentOf(count, total) {
 
 /**
  * Bucket every enumerated outcome of a routed check through the engine's own classifier.
- *
  * @param {object} params Params.
- * @param {Array<{total: number, diceGroups: Array<object>}>} params.outcomes The outcome space,
- *   one entry per equally-likely assignment of faces.
+ * @param {Array<{total: number, diceGroups: Array<object>}>} params.outcomes The outcome space.
  * @param {object} params.args The classifier arguments.
- * @returns {Array<{id: string, name: string, success: boolean, count: number,
- *   percent: number}>} One bucket per reachable tier, in tier order, zero-probability omitted.
+ * @returns {Array<{id: string, name: string, success: boolean, count: number, percent: number}>}
+ *   One bucket per reachable tier, in tier order, zero-probability omitted.
  */
 export function enumerateRoutedOdds({ outcomes, args }) {
   const buckets = new Map();
@@ -321,7 +312,6 @@ export function enumerateRoutedOdds({ outcomes, args }) {
  * Bucket every enumerated outcome of a pass/fail check, mirroring {@link runFormulaPassFail}'s
  * own two decisions — a matched forced outcome first, then the comparison — because a trigger
  * forcing a failure on a natural 1 changes the histogram and nothing else here would see it.
- *
  * @param {object} params Params.
  * @param {Array<{total: number, diceGroups: Array<object>}>} params.outcomes The outcome space.
  * @param {object} params.args `{ dc, comparison, triggers }`.
@@ -355,7 +345,6 @@ export function enumeratePassFailOdds({ outcomes, args }) {
  * spent down an ordered list of result difficulties, and the spend is
  * {@link resolveProgressiveAward}, the same loop all three activities award through. An outcome
  * that awards nothing IS listed; a count no outcome can reach is omitted.
- *
  * @param {object} params Params.
  * @param {Array<{total: number, diceGroups: Array<object>}>} params.outcomes The outcome space.
  * @param {Array<number>} params.difficulties The record's ordered result difficulties.

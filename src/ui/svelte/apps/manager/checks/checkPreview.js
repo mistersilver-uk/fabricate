@@ -39,7 +39,6 @@ const RUNNER_KINDS = new Map([
  * actor directory is mostly bestiary. Membership is the shared, GM-CONFIGURABLE predicate that
  * already serves the actor-selection bar and the stamina, Access and Knowledge rosters, and both
  * seams are injected so the list is testable without a `game`.
- *
  * @param {object} [options] Options.
  * @param {() => Iterable<object>} [options.getActors] The actor source.
  * @param {(actor: object) => boolean} [options.isPlayerCharacter] The membership predicate.
@@ -64,9 +63,7 @@ export function listPreviewActors({
 
 /**
  * The previewed actor document, or null for "No actor". Under null every `@` key resolves to
- * `0`, which is why the readout renders its unresolved warning rather than a plausible wrong
- * total.
- *
+ * `0`, which is why the readout renders its unresolved warning rather than a wrong total.
  * @param {string} id The selected actor id, or {@link NO_ACTOR_ID}.
  * @param {object} [options] Options.
  * @param {(id: string) => object|null} [options.getActor] The lookup seam.
@@ -82,7 +79,6 @@ export function resolvePreviewActor(
 
 /**
  * A shallow-safe copy of an actor's roll data.
- *
  * @param {object|null} actor The previewed actor.
  * @returns {object} A copy no caller can write back through.
  */
@@ -98,7 +94,6 @@ export function cloneRollData(actor) {
  * FIXED routed check's bands are the same for every record and the selector still lists them,
  * the readout being per-record. A RECORD SUPPLIES A DC AND NOTHING ELSE: a progressive check has
  * none, its award count coming from the check's preview sandbox.
- *
  * @param {object} params Params.
  * @param {object|null} params.check The active check draft.
  * @param {string} [params.defaultLabel] The localized name of the default record.
@@ -127,7 +122,6 @@ export function buildPreviewRecords({ check, defaultLabel = 'Default' }) {
 
 /**
  * Build the argument bag the engines build, for one previewed (activity, mode, record, actor).
- *
  * @param {object} params Params.
  * @param {'crafting'|'salvage'|'gathering'} params.activity Which activity's check.
  * @param {'simple'|'routed'|'progressive'} params.mode The readiness mode.
@@ -222,7 +216,6 @@ export function buildPreviewCheckArgs({
 
 /**
  * Roll the preview through the engine's own runner.
- *
  * @param {{kind: string|null, args: object}} plan {@link buildPreviewCheckArgs}'s output.
  * @returns {Promise<object|null>} The runner's own result verbatim, or null when nothing rolls.
  */
@@ -237,7 +230,6 @@ export async function runCheckPreview(plan) {
  * The TERSE breakdown line the readout shows — NOT the full resolved formula, which is the
  * `THIS CHECK` digest's job — so it reduces the result to the faces rolled, the signed remainder
  * they were added to, and who rolled them.
- *
  * @param {object|null} result A runner result.
  * @param {string} [actorName] The previewed actor's name.
  * @returns {string} The breakdown line, or '' when there is nothing to describe.

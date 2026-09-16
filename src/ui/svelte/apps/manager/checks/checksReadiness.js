@@ -9,7 +9,7 @@ import {
 } from '../../../../../utils/craftingCheckExpression.js';
 
 /**
- * Pure readiness evaluator for one subsystem check. Mirrors `recipeReadiness.js`: it returns
+ * Pure readiness evaluator for one subsystem check, mirroring `recipeReadiness.js`: it returns
  * stable check/issue ids the Checks Validation tab maps to localized copy.
  *
  * @typedef {{ id: string, satisfied: boolean }} CheckReadinessCheck
@@ -17,11 +17,10 @@ import {
  */
 
 /**
- * EVERY issue id this evaluator can raise — the SOURCE OF TRUTH, not a summary, inline literals
- * being enumerable only by reaching every branch. IT IS A GUARD, NOT A CONVENTION: `pushIssue`
- * is the ONLY way an issue reaches the returned list and it THROWS on an unregistered id, and
- * `tests/checks-readiness.test.js` also scans this file's source, so a direct `push` is caught
- * on an unreached branch too.
+ * EVERY issue id this evaluator can raise — the SOURCE OF TRUTH, inline literals being
+ * enumerable only by reaching every branch. A GUARD, NOT A CONVENTION: `pushIssue` is the ONLY
+ * way an issue reaches the list and it THROWS on an unregistered id, and
+ * `tests/checks-readiness.test.js` also scans this source, catching a direct `push`.
  * @type {ReadonlyArray<string>}
  */
 export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
@@ -51,7 +50,7 @@ const REGISTERED_ISSUE_IDS = new Set(CHECK_READINESS_ISSUE_IDS);
 
 /**
  * The five sections an activity route renders, in reading order: the `data-checks-section`
- * values the strip emits, declared once beside the registry that buckets into them.
+ * values the strip emits, declared beside the registry that buckets into them.
  * @type {ReadonlyArray<string>}
  */
 export const CHECK_SECTION_IDS = Object.freeze([
@@ -64,9 +63,8 @@ export const CHECK_SECTION_IDS = Object.freeze([
 
 /**
  * Which SECTION owns each readiness issue: the strip's dots, the rail's badge and the Validation
- * deep links all read this one map. PROVEN EXHAUSTIVE in BOTH directions by
- * `tests/checks-readiness.test.js`. `rangeGap` buckets to Outcomes rather than The roll, the
- * hole being between two authored TIERS and the rows that close it being on Outcomes.
+ * deep links read this one map, PROVEN EXHAUSTIVE both ways by `tests/checks-readiness.test.js`.
+ * `rangeGap` buckets to Outcomes rather than The roll, the hole being between two authored TIERS.
  * @type {Readonly<Record<string, string>>}
  */
 export const CHECK_ISSUE_SECTIONS = Object.freeze({
@@ -90,8 +88,8 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
 
 /**
  * The mode this evaluator answers "this activity rolls no check at all" under. Gathering `d100`
- * and alchemy `none` are the two reachable members, differing only in WHY, which the modifier
- * issue splits on. The name is "no check to AUTHOR", not a claim that nothing is rolled.
+ * and alchemy `none` are the reachable members, differing only in WHY, which the modifier issue
+ * splits on. The name is "no check to AUTHOR", not a claim that nothing is rolled.
  * @type {'none'}
  */
 export const NO_CHECK_MODE = 'none';
@@ -105,12 +103,11 @@ export const CHECK_READINESS_MODES = Object.freeze(['simple', 'routed', 'progres
 const SUPPORTED_MODES = new Set(CHECK_READINESS_MODES);
 
 /**
- * The readiness mode for a RESOLVED check slot. No subsystem's AUTHORED resolution mode is ever
- * `routed`, and the translation is ALREADY OWNED by `checkModifierResolver`'s slot maps. SO THIS
- * TAKES THE SLOT, NOT THE MODE: a second mapping is how the rail badge came to evaluate the
- * alchemy SIMPLE draft under ROUTED rules and to demand a roll formula for a mode whose route
- * renders no formula field. `null` becomes {@link NO_CHECK_MODE}.
- *
+ * The readiness mode for a RESOLVED check slot. No AUTHORED resolution mode is ever `routed`,
+ * and the translation is ALREADY OWNED by `checkModifierResolver`'s slot maps. SO THIS TAKES THE
+ * SLOT, NOT THE MODE: a second mapping is how the rail badge came to evaluate the alchemy SIMPLE
+ * draft under ROUTED rules, and to demand a roll formula for a mode whose route renders no
+ * formula field. `null` becomes {@link NO_CHECK_MODE}.
  * @param {'simple'|'routed'|'progressive'|null|undefined} slot The resolvers' `slot` field.
  * @returns {'simple'|'routed'|'progressive'|'none'}
  */
@@ -121,7 +118,6 @@ export function readinessModeForSlot(slot) {
 /**
  * The section that owns an issue id, or `null` for an id no bucket claims — deliberately not a
  * default section, which would put a dot on a section whose controls cannot clear it.
- *
  * @param {string} id A {@link CHECK_READINESS_ISSUE_IDS} member.
  * @returns {string|null}
  */
@@ -133,7 +129,6 @@ export function sectionForIssue(id) {
  * Append one issue, refusing any id not in {@link CHECK_READINESS_ISSUE_IDS}. The throw is the
  * mechanism, a frozen exported array being only a convention. `data` is the optional
  * interpolation payload for an issue whose sentence NAMES something.
- *
  * @param {CheckReadinessIssue[]} issues
  * @param {string} id
  * @param {'critical'|'warning'|'info'} severity
@@ -154,8 +149,8 @@ function trimmed(value) {
 }
 
 /**
- * The active outcome-tier list for a routed check. Relative and fixed tiers are
- * independent lists; only the active type's list is authored/validated.
+ * The active outcome-tier list for a routed check; relative and fixed are independent lists and
+ * only the active type's is authored or validated.
  * @param {object} check
  * @returns {{ type: 'relative' | 'fixed', outcomes: object[] }}
  */
@@ -171,7 +166,6 @@ function routedOutcomes(check) {
  * exactly one existing tier: a DANGLING target no-ops at runtime and is reachable by ordinary
  * authoring, the relative↔fixed switch dangling every `tierId` at once, while MULTIPLE targets
  * are guidance, a static count not knowing which conditions will match.
- *
  * @param {object} check    Plain check draft.
  * @param {object[]} outcomes The ACTIVE outcome-tier list (relative or fixed).
  * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }}
@@ -203,7 +197,6 @@ function tierStepTargetReadiness(check, outcomes) {
  * SPAN-INTERIOR ONLY, a set not covering every value a die can roll being a deliberate window,
  * and invalid and overlapping ranges are excluded first, a `start > end` range otherwise
  * manufacturing a phantom gap.
- *
  * @param {object[]} outcomes The active FIXED outcome-tier list.
  * @param {Set<number>} excluded Indices already reported invalid or overlapping.
  * @returns {boolean}
@@ -236,14 +229,13 @@ function fixedRangesHaveGap(outcomes, excluded) {
  * `modifierExpressionInvalid` is an entry whose EXPRESSION cannot contribute and excludes bounds
  * faults. All three NAME the offending entries and cover only entries this activity selects; the
  * three `modifiersInert*` warnings report a selection reaching no roll, gated on NON-EMPTY.
- *
  * @param {object|null} modifierContext A `buildCheckModifierContext` bag, or null (no-ops).
  * @param {{ rollsNoCheck: boolean, hasRollFormula: boolean }} formulaState
  * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }}
  */
 /**
- * The offending entries' display names, comma-joined, or `''` when none are faulted. The
- * label is preferred and the id is the fallback, so an unnamed entry is still locatable.
+ * The offending entries' display names, comma-joined, or `''` when none are faulted; the label
+ * is preferred and the id the fallback, so an unnamed entry is still locatable.
  * @param {Array<{entry: object}>} faulted
  * @returns {string}
  */
@@ -299,12 +291,11 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
 
 /**
  * Evaluate one subsystem check's readiness.
- *
  * @param {object} check Plain check draft (the active draft for its mode).
  * @param {object} [options]
  * @param {'routed'|'simple'|'progressive'|'none'} [options.mode] A {@link CHECK_READINESS_MODES}
  *   member, derived through {@link readinessModeForSlot}. An unrecognized mode THROWS rather
- *   than defaulting: a caller handing through a raw resolution mode silently skipped every rule.
+ *   than defaulting: a caller handing through a raw resolution mode skipped every rule silently.
  * @param {object|null} [options.modifierContext] A `buildCheckModifierContext` bag, or null.
  * @param {'crafting'|'salvage'|'gathering'} [options.activity] Which activity's check this is;
  *   it changes one answer — WHY a no-check mode's selection reaches no roll.

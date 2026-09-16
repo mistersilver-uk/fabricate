@@ -42,7 +42,7 @@ const FACT_LABELS = Object.freeze({
 });
 
 /**
- * Resolve a `[key, fallback]` pair to a localization key. One already containing a `.` is
+ * Resolve a `[key, fallback]` pair to a localization key; one already containing a `.` is
  * ABSOLUTE and used verbatim, which is how a sentence shipped under another namespace is reused
  * rather than re-authored under a second key that would drift from it.
  */
@@ -210,7 +210,6 @@ export const CHECK_MODE_KEYS = Object.freeze(Object.keys(MODES));
 /**
  * The key for one (activity, mode) pair. Alchemy is folded onto its CHECK MODE here rather than
  * at every call site, so the one place knowing `alchemy` is not itself a check mode is this one.
- *
  * @param {object} args
  * @param {string} args.activity `crafting` | `salvage` | `gathering`.
  * @param {string} args.mode The authored resolution mode for that activity.
@@ -230,10 +229,9 @@ export function checkModeKey({ activity, mode, alchemyCheckMode = '' } = {}) {
 }
 
 /**
- * Describe one resolution mode. Returns `null` for a pair this studio does not render, so a
+ * Describe one resolution mode, returning `null` for a pair this studio does not render so a
  * caller renders NOTHING rather than a callout about another mode: a missing explanation is a
  * gap, a confident wrong one is a lie.
- *
  * @param {object} args
  * @param {string} args.activity `crafting` | `salvage` | `gathering`.
  * @param {string} args.mode The authored resolution mode.

@@ -56,14 +56,12 @@ function effectKind(kind) {
 
 /**
  * The presets offered for one check, or an empty list when none can be authored.
- *
  * @param {object} args
  * @param {string} args.kind `routed` | `progressive` | `simple`.
  * @param {Array<{groupId: number, label: string, sides: number}>} args.diceGroups Groups parsed
  *   from the roll formula, in evaluated-term order.
  * @returns {Array<{id: string, icon: string, key: string, fallback: string, data: object}>} Each
- *   a `{ key, fallback, data }` fragment in `checkTriggerSummary`'s shape, so one resolver in
- *   the component serves both.
+ *   a `{ key, fallback, data }` fragment in `checkTriggerSummary`'s shape.
  */
 export function checkTriggerPresets({ kind = 'simple', diceGroups = [] } = {}) {
   const groups = Array.isArray(diceGroups) ? diceGroups : [];
@@ -88,9 +86,8 @@ export function checkTriggerPresets({ kind = 'simple', diceGroups = [] } = {}) {
 
 /**
  * Build the trigger one preset authors, in `CheckTriggers.addTrigger`'s shape field for field —
- * including `tierStep`, written here rather than left to the normalizer for the reason it is
- * written there — so a preset-authored trigger and a hand-authored one are the same object.
- *
+ * including `tierStep`, written here rather than left to the normalizer — so a preset-authored
+ * trigger and a hand-authored one are the same object.
  * @param {object} args
  * @param {string} args.presetId `high` | `low`.
  * @param {string} args.kind `routed` | `progressive` | `simple`.

@@ -36,7 +36,6 @@ function copy(pair) {
 /**
  * The comparison word for an operator, defaulting to `exactly` rather than the raw symbol: a
  * summary reading "Roll total is >= 15" is the control restated, not a sentence.
- *
  * @param {string} operator The stored operator.
  * @returns {{key: string, fallback: string}}
  */
@@ -46,7 +45,6 @@ export function operatorWord(operator) {
 
 /**
  * The aggregate word for a dice-group condition.
- *
  * @param {string} aggregate The stored aggregate.
  * @returns {{key: string, fallback: string}}
  */
@@ -56,7 +54,6 @@ export function aggregateWord(aggregate) {
 
 /**
  * The card TITLE: what this trigger watches, as a sentence fragment.
- *
  * @param {object} condition The trigger's condition.
  * @param {object} [context]
  * @param {Array<{groupId: number, label: string}>} [context.diceGroups] Groups parsed from the
@@ -110,14 +107,13 @@ export function summariseCondition(condition = {}, context = {}) {
  * The sentence under the title: what happens when the condition matches. The three effects are
  * INDEPENDENT and a trigger may carry any combination, so the clauses are collected and joined
  * rather than selected — one that steps a tier AND breaks tools must say both.
- *
  * @param {object} trigger The whole trigger.
  * @param {object} [context]
  * @param {Record<string, string>} [context.tierNames] Outcome tier names by id.
  * @param {boolean} [context.progressive] Whether this check awards rather than passes.
  * @param {boolean} [context.showBreakTools] Whether tool breakage is authored on this check.
- * @returns {{key: string, fallback: string, data?: object}[]} One clause per effect in force,
- *   in reading order; a single `nothing changes` clause when none is.
+ * @returns {{key: string, fallback: string, data?: object}[]} One clause per effect in force, in
+ *   reading order; a single `nothing changes` clause when none is.
  */
 export function summariseEffect(trigger = {}, context = {}) {
   const { tierNames = {}, progressive = false, showBreakTools = false } = context;
@@ -177,7 +173,6 @@ export function summariseEffect(trigger = {}, context = {}) {
  * sentence, each effect shape taking the glyph and family its own vocabulary uses. ONE effect
  * wins the head — a tier step is the most specific statement about the result, a forced outcome
  * next, a bare tool break last — and the combination is still in `summariseEffect`'s prose.
- *
  * @param {object} trigger The whole trigger.
  * @param {object} [context]
  * @param {Record<string, string>} [context.tierNames] Outcome tier names by id.

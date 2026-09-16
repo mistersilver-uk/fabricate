@@ -34,28 +34,27 @@
   import { MODIFIER_POLICY_OPTION_ATTR } from './modifierPolicyAttrs.js';
 
   const DEFAULT_MODIFIER_ICON = 'fa-solid fa-dice-d20';
-  // The cap hint is the ONLY place "empty means unlimited" is stated and a blank number field
-  // cannot state it, so the input takes the hint as its accessible description.
+  // The cap hint is the ONLY place "empty means unlimited" is stated, so the input takes it as
+  // its accessible description.
   const MAX_PICKS_HINT_ID = 'manager-crafting-modifier-max-picks-hint';
 
   let {
-    // Which activity's SELECTION this card edits: the `bySubject` label vocabulary and whether
-    // the gathering notices render, and NOTHING about editability.
+    // Which activity's SELECTION this card edits: the `bySubject` vocabulary and the gathering
+    // notices, and NOTHING about editability.
     activity = 'crafting',
     modifiers = [],
     defaultModifierPolicy = 'addAll',
     defaultModifierIds = [],
-    // The cap on how many modifiers a SELECTING rule may pick. ABSENT is a real value, so no
-    // call site may coerce it: `resolveMaxModifierPicks` decides what absence means.
+    // The pick cap. ABSENT is a real value, so no call site may coerce it:
+    // `resolveMaxModifierPicks` decides what absence means.
     maxModifierPicks = null,
-    // Why the catalogue reaches no roll, or '' when it does. Each cause needs a different
-    // remedy, so it is passed rather than derived from one boolean.
+    // Why the catalogue reaches no roll, or '' when it does. Each cause needs a different remedy,
+    // so it is passed rather than derived from one boolean.
     inertCause = '',
-    // Whether this activity's whole check-modifier seam is DORMANT. Its own notice, ALONGSIDE
+    // Whether this activity's check-modifier seam is DORMANT. Its own notice, ALONGSIDE
     // `inertCause`: the two are different facts with different fixes.
     dormant = false,
-    // Navigate to the surface where the library is authored; a null default keeps the card
-    // mountable in isolation.
+    // Navigate to the surface that authors the library; a null default keeps this mountable.
     onEditLibrary = null,
     onChange = () => {},
   } = $props();
@@ -65,8 +64,8 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // The `bySubject` rule's LABEL is per-activity while its TOKEN is not. One vocabulary map
-  // rather than three rule lists, so `MODIFIER_POLICIES` stays the single source of the order.
+  // The `bySubject` rule's LABEL is per-activity while its TOKEN is not, so one vocabulary map
+  // leaves `MODIFIER_POLICIES` the single source of the order.
   const SUBJECT_COPY = {
     crafting: {
       labelKey: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierPolicyBySubjectCrafting',
@@ -147,8 +146,7 @@
   ]);
 
   // The ELIGIBILITY vocabulary: THREE words, one per KIND of rule, and `bySubject` SHARES
-  // `playerPicks`'s rather than owning a fourth. Both are required by the spec section the
-  // header names.
+  // `playerPicks`'s rather than owning a fourth. Both are required by the spec section above.
   const ELIGIBILITY_COPY = {
     addAll: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityApplied',
@@ -176,8 +174,7 @@
     },
   };
 
-  // The NOT-selected vocabulary, keyed off the rule for the same reason the ON one is: an off
-  // word is the negation of ONE on word and of no other.
+  // The NOT-selected vocabulary, keyed off the rule too: an off word is the negation of ONE.
   const NOT_ELIGIBLE_COPY = {
     addAll: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityOff',
@@ -210,8 +207,8 @@
       fallback:
         'The check for this resolution mode has no roll formula yet, so nothing here is rolled. Author one on The roll section and these modifiers are added to it automatically.',
     },
-    // GATHERING d100 ONLY, and it exists because `noCheck` is FALSE here: the d100 against
-    // each drop's chance IS this mode's check, lacking only a seam for modifiers.
+    // GATHERING d100 ONLY, because `noCheck` is FALSE here: the drop-chance roll IS this mode's
+    // check, lacking only a seam for modifiers.
     noModifierSupport: {
       key: 'FABRICATE.Admin.Manager.Checks.Gathering.ModifierInertNoModifierSupport',
       fallback:
@@ -220,15 +217,15 @@
   };
 
   const library = $derived(Array.isArray(modifiers) ? modifiers : []);
-  // Normalized through the resolver's OWN rule vocabulary rather than a local mirror of it,
-  // which is also what makes a world still carrying the legacy `byRecipe` select `bySubject`.
+  // Normalized through the resolver's OWN vocabulary rather than a local mirror, which is also
+  // what makes a world carrying the legacy `byRecipe` select `bySubject`.
   const selectedPolicy = $derived(normalizeModifierPolicy(defaultModifierPolicy) ?? 'addAll');
-  // Whether the selected rule defers the selection, and so whether the cap means anything at
-  // all. Asked of the resolver rather than re-derived from a local membership test.
+  // Whether the rule defers the selection, and so whether the cap means anything, asked of the
+  // resolver rather than a local membership test.
   const defersSelection = $derived(policyDefersSelection(selectedPolicy));
   const eligibility = $derived(ELIGIBILITY_COPY[selectedPolicy] || ELIGIBILITY_COPY.addAll);
   // The cap means a different thing under each selecting rule, so the hint is keyed by rule;
-  // only the two `policyDefersSelection` admits can appear, hence no third entry.
+  // only the two `policyDefersSelection` admits can appear.
   const maxPicksCopy = $derived(
     selectedPolicy === 'bySubject'
       ? { key: subjectCopy.capKey, fallback: subjectCopy.cap }
@@ -240,27 +237,25 @@
           }
         : null
   );
-  // Routed through the resolver so the field shows the bound the ENGINE would apply, where a
-  // stored `0`, `-2` or `"three"` all read as unlimited. `Infinity` → `null` is the Stepper's
-  // unset value, which makes "unlimited" a blank field.
+  // Routed through the resolver so the field shows the bound the ENGINE would apply, a stored
+  // `0`, `-2` or `"three"` all reading as unlimited. `Infinity` → `null` is the unset value.
   const maxPicksLimit = $derived(resolveMaxModifierPicks({ maxModifierPicks }));
   const maxPicksValue = $derived(Number.isFinite(maxPicksLimit) ? maxPicksLimit : null);
   const maxPicksLabel = $derived(
     text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierMaxPicks', 'Maximum picks')
   );
-  // THE CARD'S DESCRIPTION, keyed by RULE — what marking an entry MEANS is this card's whole
-  // subject — and additionally by ACTIVITY under `bySubject`.
+  // THE CARD'S DESCRIPTION, keyed by RULE — what marking an entry MEANS is this card's subject
+  // — and additionally by ACTIVITY under `bySubject`.
   const cardLead = $derived(
     selectedPolicy === 'bySubject'
       ? { key: subjectCopy.leadKey, fallback: subjectCopy.lead }
       : { key: eligibility.leadKey, fallback: eligibility.lead }
   );
-  // KEYED BY ACTIVITY, not a module-level literal: this component is instantiated three times,
-  // and a duplicate DOM id silently re-points every `aria-describedby` on the page.
+  // KEYED BY ACTIVITY: this component mounts three times, and a duplicate DOM id silently
+  // re-points every `aria-describedby` on the page.
   const ELIGIBILITY_INTRO_ID = $derived(`manager-${activity}-modifier-eligibility-intro`);
   // Gated on the catalogue being NON-EMPTY as well as on the cause: the notice reports a
-  // CATALOGUE that reaches no roll, and an empty one is not that, so an ungated notice warned
-  // about nothing on first contact with the tab.
+  // CATALOGUE that reaches no roll, and an empty one is not that.
   const inert = $derived(library.length > 0 ? INERT_COPY[inertCause] || null : null);
   const defaultIds = $derived(Array.isArray(defaultModifierIds) ? defaultModifierIds : []);
 
@@ -281,9 +276,8 @@
     onChange({ defaultModifierIds: next });
   }
 
-  // The read-only bounds chip, signed on BOTH ends because a modifier is a signed contribution.
-  // An unbounded entry renders no chip rather than the word on every row of a catalogue that
-  // mostly is.
+  // The read-only bounds chip, signed on BOTH ends because a modifier is a signed contribution,
+  // and absent entirely on an unbounded entry.
   function boundsChipLabel(modifier) {
     const { min, max } = resolveModifierBounds(modifier);
     if (min === null && max === null) return '';
@@ -321,14 +315,14 @@
   data-crafting-modifier-catalogue={activity}
   data-check-modifier-activity={activity}
 >
-  <!-- The head carries the deep link at its top right. A full-width button under the rows sits
-       in the slot every other list in this studio fills with its "add a row" control. -->
+  <!-- The head carries the deep link at its top right: a full-width button under the rows sits
+         where every other list in this studio puts its "add a row" control. -->
   <div class="manager-checks-card-head">
     <div class="manager-checks-card-head-body">
       <div class="manager-checks-card-heading">
-        <!-- `Named modifiers`, a DIFFERENT key from `ModifierCatalogueHeading`, which the gathering
-             task editor renders to disambiguate a task's check-modifier pick from its drop rows'
-             character modifiers. One key serving two meanings is how a rename breaks a screen. -->
+        <!-- `Named modifiers`, a DIFFERENT key from `ModifierCatalogueHeading`, which disambiguates
+                     a task's check-modifier pick from its drop rows' character modifiers. One key
+                     serving two meanings is how a rename breaks a screen. -->
         <h3 class="manager-checks-card-title">
           {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierNamedHeading', 'Named modifiers')}
         </h3>
@@ -347,8 +341,8 @@
         {/if}
       </div>
       <!-- The RULE'S OWN SENTENCE, above the rows that do the marking rather than under the grid
-           that sets the rule, where it read as a footnote about the pick cap. It keeps the
-           `aria-describedby` target id, which makes the pill's state word mean something. -->
+                 that sets the rule, and keeping the `aria-describedby` target id that makes the
+                 pill's state word mean something. -->
       <p
         class="manager-checks-card-description"
         id={ELIGIBILITY_INTRO_ID}
@@ -361,8 +355,8 @@
 
   <div class="manager-checks-card-body is-stack" data-crafting-modifier-rows>
     {#if activity === 'gathering'}
-      <!-- The disambiguation is a NAMING rule stated in BOTH directions: no surface shows both
-           concepts at once, so one direction answers a question the screen never raises. -->
+      <!-- The disambiguation is a NAMING rule stated BOTH ways: no surface shows both concepts at
+                 once, so one direction answers a question the screen never raises. -->
       <p class="manager-muted" data-gathering-modifier-disambiguation>
         {text(
           'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDisambiguation',
@@ -405,8 +399,7 @@
     {/if}
 
     {#if library.length === 0}
-      <!-- ONE sentence on every activity, naming the surface that does add an entry, since
-           nothing on this screen does. -->
+      <!-- ONE sentence on every activity, naming the surface that does add an entry. -->
       <p class="manager-muted" data-crafting-modifier-empty="linked">
         {text(
           'FABRICATE.Admin.Manager.Checks.Crafting.ModifierCatalogueEmptyLinked',
@@ -437,9 +430,8 @@
           >
         {/if}
         {#if modifier.isRollExpression}
-          <!-- A rolling entry is APPENDED AS DICE to this check's formula, so the chip is a
-               neutral fact about the entry rather than a warning: the dice reach the roll,
-               animate and show on the card. -->
+          <!-- A rolling entry is APPENDED AS DICE to this check's formula, so the chip is a neutral
+                         fact rather than a warning: the dice reach the roll and show on the card. -->
           <Chip density="row" class="manager-modifier-roll-chip" data-crafting-modifier-roll
             >{text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierRollTag', 'Rolls dice')}</Chip
           >
@@ -488,7 +480,7 @@
     {/each}
 
     <!-- THE NOTE THAT CLOSES THE CARD: a standing pointer to the surface that owns the entries,
-         read AFTER them rather than opening the screen with clauses of mechanism. -->
+             read AFTER them. -->
     <p class="manager-modifier-library-note" role="note" data-crafting-modifier-library-note>
       <i class="fas fa-circle-info" aria-hidden="true"></i>
       <span>
@@ -501,8 +493,8 @@
   </div>
 </InspectorCard>
 
-<!-- CARD TWO: how the marked entries reduce to the one number the roll gets, in its own studio
-     card rather than under an uppercase micro-label this studio retired everywhere else. -->
+<!-- CARD TWO: how the marked entries reduce to the one number the roll gets, in its own
+     studio card rather than under an uppercase micro-label. -->
 <InspectorCard class="manager-checks-card" data-crafting-modifier-policy-card="">
   <div class="manager-checks-card-head">
     <div class="manager-checks-card-head-body">
@@ -539,12 +531,10 @@
 
     {#if defersSelection && maxPicksCopy}
       <!-- Shown under the two SELECTING rules only, a cap on a selection nobody makes being a
-           control with no effect. Membership comes from the resolver, not a local list, so
-           this surface cannot drift from the reduction it bounds. -->
+                 control with no effect. Membership comes from the resolver, not a local list. -->
       <div class="manager-modifier-max-picks" data-crafting-modifier-max-picks-block>
         <div class="manager-modifier-max-picks-body">
-          <!-- A sentence-case `<h4>`, NOT the uppercase micro-label this card wore: the other
-               kickers on this screen became card titles. -->
+          <!-- A sentence-case `<h4>`, NOT the uppercase micro-label this card wore. -->
           <h4 class="manager-checks-card-subheading">{maxPicksLabel}</h4>
           <p class="manager-modifier-max-picks-hint" id={MAX_PICKS_HINT_ID}>
             {text(maxPicksCopy.key, maxPicksCopy.fallback)}
@@ -644,8 +634,8 @@
      icon-beside-text shape so the two read as the same kind of statement. */
   .manager-modifier-inert {
     display: flex;
-    /* Without this the flex default `stretch` gives the icon a box as tall as the callout and
-       centres the glyph in it, floating it halfway down a three-line note. */
+    /* Without this the flex default `stretch` gives the icon a callout-tall box and centres the
+           glyph in it, floating it halfway down a three-line note. */
     align-items: flex-start;
     gap: var(--fab-space-2);
     margin-block: 0;
@@ -659,8 +649,7 @@
   }
 
   .manager-modifier-inert > i {
-    /* Share the paragraph's line box so the glyph lands ON the first line: Font Awesome states
-       its own line-height, which sits the glyph high. */
+    /* Share the paragraph's line box, Font Awesome's own line-height sitting the glyph high. */
     flex: 0 0 auto;
     line-height: inherit;
   }

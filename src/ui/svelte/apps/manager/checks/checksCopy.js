@@ -124,7 +124,6 @@ export function checkTickCopy(id) {
  * does this for a LOCALIZED string, but the fallbacks above are module constants that never
  * reach it, so a world with no `lang/` entry would render a literal `{names}`. Deliberately the
  * same `{key}` syntax Foundry uses, and here rather than in the two components that need it.
- *
  * @param {string} sentence The resolved sentence.
  * @param {object} [data] Interpolation values.
  * @returns {string}
