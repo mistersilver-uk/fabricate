@@ -387,7 +387,10 @@ test('player-facing starts explicitly select the current journal lifecycle', () 
   );
   assert.match(
     mainSource,
-    /executeCommand: \(command\) => this\.executeJournalRunCommand\(command\),\s*resolveUuid: \(uuid\) => globalThis\.fromUuid\?\.\(uuid\),/,
+    // The options are FORWARDED, not dropped: `executePublicCraft` asks for the
+    // non-interactive route, because the public API has no user to answer a roll dialog
+    // and `promptCheck` waits for one without a timeout (issue 1683).
+    /executeCommand: \(command, options\) => this\.executeJournalRunCommand\(command, options\),\s*resolveUuid: \(uuid\) => globalThis\.fromUuid\?\.\(uuid\),/,
     'a ready public craft should execute through the command service and hydrate result UUIDs locally'
   );
   assert.match(
