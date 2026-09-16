@@ -1,61 +1,26 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  ONE essence, rendered as either a LIST ROW or a GRID CARD (issue 1036).
+  ONE essence, rendered as either a LIST ROW or a GRID CARD, from one component deliberately: the
+  card must carry the SAME state vocabulary as the row, because a presentation toggle must not
+  silently remove state, and two components would make that a convention where one makes it a
+  construction. What legitimately differs is the ACTIONS, so `variant` gates only the cluster.
 
-  Two presentations, one component, deliberately. The delta requires the grid card to carry
-  the SAME state vocabulary as the row — the Disabled pill, the capability pills and the
-  recipe count — because a presentation toggle must not silently remove state, and the
-  prototype's grid signals disabled by dimming alone, which fails "icon + word, always". Two
-  components would make that a convention; one component makes it a construction.
+  ARIA: the list is a real `<ul role="list">` of `<li>` cards, and this row carries NO `role="row"` /
+  `role="cell"` / `aria-selected` — the `role="table"` head they depended on is deleted, and
+  `aria-selected` is not valid on an `<li>` outside a listbox. Selection is conveyed by the
+  `.is-selected` ring, `aria-current` and the inspector heading. THE FIRST `.manager-icon-button`
+  MUST STAY THE EDIT PENCIL, because a View Lab case navigates by it; the toggle and the selection
+  box emit other elements, so only a new icon button placed BEFORE the pencil could intercept.
 
-  What legitimately differs is the ACTIONS. Row actions are row-only: the grid card carries
-  the selection box and nothing else, and grid selection routes through the inspector. That
-  is the prototype's own division and it is why `variant` gates only the trailing cluster.
+  THE CARD IS NOT A `<button>`; ITS IDENTITY IS. The root `<li>` carries no handler and the selecting
+  control is an inner `<button class="manager-essence-identity">`, with the checkbox, the toggle and
+  the pencil all OUTSIDE it, because interactive content inside a `<button>` is invalid DOM that
+  `createElement` lands silently. A handler-bearing `<div>` with `tabindex="0"` is not the
+  alternative: it raises two Svelte compiler warnings, which `lint:svelte:warnings` fails on.
 
-  ── ARIA (issue 1036) ─────────────────────────────────────────────────────────────
-  The list is a real `<ul role="list">` of `<li>` cards and this row carries NO `role="row"`
-  / `role="cell"` / `aria-selected`: the `role="table"` head they depended on is deleted,
-  and `aria-selected` is not valid on an `<li>` outside a listbox. Selection is conveyed by
-  the `.is-selected` ring, `aria-current` and the inspector heading, exactly as
-  `RecipesBrowserView` does.
-
-  ── THE FIRST `.manager-icon-button` MUST STAY THE EDIT PENCIL ────────────────────
-  The View Lab case `manager-essence-edit-first-state` navigates by
-  `.manager-essence-row[data-essence-id="earth"] .manager-icon-button`. The row also carries
-  an enable toggle and a selection box; the toggle wears `.manager-status-toggle`, not
-  `.manager-icon-button`, and `SelectionCheckbox` renders no `<button>` at all, so neither
-  can intercept. A new icon button placed BEFORE the pencil would.
-
-  ── THE CARD IS NOT A `<button>`; ITS IDENTITY IS ─────────────────────────────────
-  The row/card root is an `<li>` and carries NO click or keydown handler. The selecting
-  control is an inner `<button class="manager-essence-identity">`, exactly as
-  `.manager-recipe-identity` and `.manager-component-identity` already are.
-
-  The plan said "a `<div>` with a click/keydown handler and `tabindex=\"0\"`, as
-  `.manager-essence-row` does today", and this DEVIATES from that — deliberately, and in the
-  direction the plan's own reasoning points. The plan's stated concern was that the card
-  must not BECOME a `<button>`, because it contains `SelectionCheckbox` (a `<label><input>`)
-  and an interactive inside a `<button>` is invalid DOM that `createElement` lands silently.
-  That concern is fully honoured: the checkbox, the toggle and the pencil are all OUTSIDE
-  the identity button. Meanwhile a handler-bearing `<div>` with `tabindex="0"` and no role
-  raises two Svelte compiler warnings, and `npm run lint:svelte:warnings` fails on any
-  warning at all — the shipped row escaped them only because of the `role="row"` this
-  redesign deletes along with the table head. Nesting rather than converting is the rule the
-  hazard list states, and this nests.
-
-  The identity button needs the manager's `<button>` RESET (`appearance: none`,
-  `text-align: left`, `height: auto`, `min-height`, no border/background) or Foundry's fixed
-  button height crops it — a defect no mounted test can see. It is therefore joined into the
-  existing reset, focus and focus-visible lists in `styles/fabricate.css` beside its three
-  siblings, rather than restated here.
-
-  `height: auto` was ADDED to that shared list for this change, and adding it there rather
-  than restating it on the card variant is deliberate. `min-height` alone does not defeat
-  Foundry's fixed `height`: used height is `max(height, min-height)`, so a grow-tall variant
-  still resolves to 46px. The four row-shaped siblings never noticed because their content
-  never exceeds 46px; this card, a ~150px stack of the SAME button, is the first that does.
-  CONTRIBUTING.md states the two properties as one rule, so splitting them across two blocks
-  would leave the next tall identity button to rediscover the same crop.
+  The identity button needs the manager's `<button>` RESET or Foundry's fixed height crops it — a
+  defect no mounted test can see — so it joins the shared reset, focus and focus-visible lists in
+  `styles/fabricate.css` rather than restating them. `height: auto` belongs in that shared list too,
+  because used height is `max(height, min-height)`.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
@@ -74,15 +39,11 @@
     bulkSelected = false,
     effectTransferEnabled = false,
     propertyMacrosEnabled = false,
-    // ── THE THREE-STATE MEMBERSHIP ANSWER (issue 1372) ─────────────────────────────────────
-    // `''` means the world corpus could not answer it, which is NOT the same as `absent`: a row
-    // that cannot be asked renders exactly as it did before this change, and a row that answered
-    // `absent` renders the Add treatment. Collapsing the two would put an Add button on every row
-    // of a world whose corpus is unreadable.
+    // THE THREE-STATE MEMBERSHIP ANSWER. `''` means the world corpus could not answer, which is
+    // NOT `absent`: collapsing the two would put an Add button on every row of an unreadable world.
     membershipState = '',
-    // `{section, label}[]` — one CLAUSE per world-default section, each naming the value that
-    // section resolves to in this system and marking a local override. See `summaryClauses` in
-    // `EssenceBrowserView.svelte` for the wording and for what it cannot say.
+    // One CLAUSE per world-default section, naming the value it resolves to here and marking a
+    // local override; `EssenceBrowserView.summaryClauses` owns the wording.
     summaryClauses = [],
     text = (_key, fallback) => fallback,
     format = (_key, fallback) => fallback,
@@ -95,11 +56,8 @@
 
   const isCard = $derived(variant === 'grid');
   const disabled = $derived(essence?.enabled === false);
-  // AN ABSENT ROW HAS NOTHING TO EDIT, DISABLE, SELECT OR DELETE. It is a world essence this
-  // system has no record for, so the enable toggle would write to a record that does not exist,
-  // the pencil would open an editor over nothing, and the bulk checkbox would enrol it in a
-  // delete that addresses this system's own list. It renders its identity, its state and ONE
-  // verb: Add.
+  // AN ABSENT ROW HAS NOTHING TO EDIT, DISABLE, SELECT OR DELETE: it is a world essence this system
+  // has no record for, so it renders its identity, its state and ONE verb — Add.
   const absent = $derived(membershipState === 'absent');
   const capabilities = $derived(
     essenceCapabilityPills(essence, { effectTransferEnabled, propertyMacrosEnabled }, text)
@@ -108,22 +66,9 @@
     essence?.description || text('FABRICATE.Admin.Manager.NoDescription', 'No description')
   );
   /**
-   * A usage sentence that AGREES WITH ITS NUMBER (issue 1372, maintainer parity round 8).
-   *
-   * `{count} components` rendered `1 components` on five of the six grid cards in the lab world,
-   * and on the inspector's Usage row, because one key served every count. The corpus's own
-   * convention for this is a `…One` sibling holding the singular written out (`GroupCountOne`,
-   * `ImpactRecipesOne`, `SelectedHeadingOne`), which is what this selects — never the `(s)`
-   * marker, which `lang-hardcoded-singular-keeps-plural-marker.test.js` exists to keep off a
-   * literal 1.
-   *
-   * BOTH KEYS ARE PASSED AS LITERALS, never composed as `` `${key}One` ``: `lang-keys-no-orphans`
-   * scans `src/` for captured literals, and a key it only ever sees interpolated is reported as
-   * unreferenced while rendering perfectly.
-   *
-   * @param {{plural: string, singular: string, pluralText: string, singularText: string,
-   *   count: number}} spec
-   * @returns {string}
+   * A usage sentence that AGREES WITH ITS NUMBER, through a `…One` sibling holding the singular
+   * written out rather than the `(s)` marker. BOTH KEYS ARE LITERALS, because an interpolated one
+   * is reported as unreferenced by `lang-keys-no-orphans` while rendering perfectly.
    */
   function usageSentence(spec) {
     if (spec.count === 1) return format(spec.singular, spec.singularText, { count: 1 });
@@ -150,24 +95,10 @@
   );
 
   /**
-   * One usage sentence split into the NUMBER and the unit that names it.
-   *
-   * The prototype's row draws each count as a right-aligned figure over a tracked micro-label
-   * (`proto:1571`), not as a grey sentence - that is what makes two numbers read as a column
-   * down the list instead of as body copy jammed against the switch.
-   *
-   * IT SPLITS THE ALREADY-FORMATTED SENTENCE rather than composing from a second lang key, so
-   * the LIST and the GRID card cannot drift: both are the same string, and the row's rendered
-   * `textContent` stays byte-identical to the card's - which is exactly what
-   * `essence-browser-view-mounted.test.js` compares when it asserts the view toggle is a
-   * PRESENTATION toggle that removes no state.
-   *
-   * A translation that does not lead with the count degrades to the whole sentence as the value
-   * and no label - the shipped rendering - rather than to a mis-split.
-   *
-   * @param {string} sentence the localized count sentence.
-   * @param {number} count the count it was formatted from.
-   * @returns {{value: string, unit: string}}
+   * One usage sentence split into the NUMBER and the unit naming it, so two counts read as a column
+   * down the list. IT SPLITS THE ALREADY-FORMATTED SENTENCE rather than composing from a second
+   * lang key, so the LIST and the GRID card cannot drift; a translation not leading with the count
+   * degrades to the whole sentence as the value rather than to a mis-split.
    */
   function statParts(sentence, count) {
     const value = String(count);
@@ -179,15 +110,10 @@
   const componentStat = $derived(statParts(componentUsage, essence?.componentUsageCount || 0));
   const recipeStat = $derived(statParts(recipeUsage, essence?.recipeUsageCount || 0));
 
-  // The GRID card's recessed well. BOTH counts read the same (maintainer round): they are two
-  // readings of the same kind — how much of the library uses this essence — and emphasising
-  // the first implied a precedence between them that does not exist. The prototype's leading
-  // stat is emphasised because "2 in · 1 out" is a headline over "2 steps"; "N components"
-  // beside "N recipes" is a pair. The `strong` tone stays in the shared card for the studios
-  // whose well DOES have a headline. The shared card draws the hairline between them.
-  //
-  // The classes and data hooks are this studio's, not the primitive's: the mounted tests and
-  // the bulk panel read the counts through them.
+  // The GRID card's recessed well. BOTH counts read the same: they are two readings of one kind,
+  // and emphasising the first would imply a precedence that does not exist — the `strong` tone
+  // stays in the shared card for the studios whose well DOES have a headline. The classes and data
+  // hooks are this studio's, because the mounted tests and the bulk panel read the counts by them.
   const cardFacts = $derived([
     {
       id: 'components',
@@ -204,10 +130,8 @@
     },
   ]);
 
-  // Stringified for the READER, not for the renderer: Svelte drops an attribute only for
-  // `null`/`undefined`, so a raw `false` would reach `setAttribute` and coerce to "false"
-  // by itself. Saying it here means the rendered `data-essence-bulk-selected="false"` is
-  // legible at the call site instead of resting on that coercion.
+  // Stringified for the READER, not the renderer: a raw `false` would coerce identically, but the
+  // rendered `data-essence-bulk-selected="false"` is legible at the call site this way.
   const cardRootAttrs = $derived({
     'data-essence-id': essence?.id,
     'data-essence-variant': 'grid',
@@ -227,9 +151,8 @@
   />
 {/snippet}
 
-<!-- NO colour-name chip (issue 1036, maintainer round 2). The medallion already carries the
-     essence's colour, and a maintained display name for every theme colour is upkeep with no
-     reader. Removing it also un-wraps the DISABLED pill. -->
+<!-- NO colour-name chip: the medallion carries the colour, and a display name per theme colour
+     is upkeep with no reader. Removing it also un-wraps the DISABLED pill. -->
 {#snippet nameRow()}
   <span class="manager-essence-name-row">
     <span class="manager-system-name" title={essence.name}>{essence.name}</span>
@@ -245,20 +168,14 @@
   </span>
 {/snippet}
 
-<!-- WHAT THIS ESSENCE DOES IN THIS SYSTEM, one clause per world-default section.
-
-     Each clause NAMES ITS VALUE and marks a local override in parentheses, which is the
-     prototype's own line (`sysEss.png`): `Effects from Ember Brand (override) · Macro: Radiant
-     Blessing`. The clauses arrive already worded from `EssenceBrowserView.summaryClauses`; this
-     snippet owns only their separator and the one-line clamp. -->
+<!-- WHAT THIS ESSENCE DOES IN THIS SYSTEM, one clause per world-default section, each NAMING ITS
+     VALUE and marking a local override in parentheses. The clauses arrive already worded from
+     `EssenceBrowserView.summaryClauses`; this snippet owns the separator and the clamp. -->
 {#snippet summaryReadout()}
   {#if summaryClauses.length > 0}
-    <!-- A `title` carrying the WHOLE readout, because the row's own width decides how much of
-         it is on screen. It clamps to one line and ellipsises, and the labelled `Edit rules`
-         control this change adds to the cluster takes about 90px out of the identity block
-         that holds it — enough that a row overriding both sections shows only the first. The
-         sibling name and description already carry the same affordance for the same reason;
-         without it the second clause is unrecoverable rather than merely abbreviated. -->
+    <!-- A `title` carrying the WHOLE readout, because the row's width decides how much is on
+         screen: it clamps to one line, and a row overriding both sections shows only the first.
+         Without it the second clause is unrecoverable rather than merely abbreviated. -->
     <span
       class="manager-essence-inherit-readout"
       data-essence-inherit-readout={essence.id}
@@ -284,9 +201,7 @@
   </ManagerButton>
 {/snippet}
 
-<!-- NEVER hidden for a disabled essence: hiding a pill removes state. They render in the
-     muted tone beside the Disabled badge instead. In the GRID card they sit in the header
-     row beside the medallion; in the LIST row they stay in the trailing cluster. -->
+<!-- NEVER hidden for a disabled essence, since hiding a pill removes state: they render muted. -->
 {#snippet capabilityPills(extraClass = '')}
   <span class={`manager-essence-capabilities ${extraClass}`} data-essence-capabilities>
     {#each capabilities as pill (pill.id)}
@@ -301,9 +216,7 @@
   </span>
 {/snippet}
 
-<!-- The two usage counts. Deleting an essence is warned, not blocked (issue 1036, maintainer
-     round), so the component count renders plainly — the impact of a delete is stated in the
-     confirm dialog and the bulk panel rather than as a padlock here. -->
+<!-- The two usage counts, plain: deleting an essence is warned rather than blocked. -->
 {#snippet usageReadout()}
   <span class="manager-essence-usage-readout" data-essence-usage>
     <span
@@ -333,9 +246,7 @@
   />
 {/snippet}
 
-<!-- The enable/disable toggle and the edit pencil. Shared by the LIST row's trailing cluster
-     and the GRID card's footer (issue 1036, maintainer round): the prototype's grid card carries
-     these actions in a divided footer, not only in the inspector. -->
+<!-- The toggle and the edit control: the GRID card carries them too, not only the inspector. -->
 {#snippet statusToggle()}
   <StatusToggle
     on={!disabled}
@@ -355,29 +266,12 @@
 {/snippet}
 
 <!--
-  THE ROW'S EDIT CONTROL, LABELLED IN THE LIST AND ICON-ONLY IN THE GRID CARD.
-
-  The prototype's system essence-rules row ends in a LABELLED pill — `Edit rules` followed by
-  a small external-link glyph (`proto:1576`) — not in a bare pencil. The words are what say
-  which layer the control opens: this screen edits the SYSTEM's rules for a world essence, and
-  an unlabelled pencil beside a world-shared name reads as "edit the essence".
-
-  IT IS STILL `.manager-icon-button`, AND THAT IS LOAD-BEARING RATHER THAN INHERITED.
-  Three surfaces address this control by that class and nothing else — the View Lab cases
-  `manager-essence-edit-*` (`scripts/lib/viewLabCases.js`), the Foundry smoke's
-  `.manager-icon-button[title*="Edit" i]` inside the first row, and two mounted tests that
-  assert the row has EXACTLY ONE and that it is the edit control. The smoke's locator sits
-  behind a `count() > 0` guard, so losing the class would not fail it: it would silently stop
-  producing the `manager-essence-edit-first-state` frame the docs site publishes. So the
-  variant is a MODIFIER on the shipped primitive, and the `title` keeps its `Edit` lead.
-
-  WHAT EMITS THAT CLASS CHANGED AT ISSUE 1422 AND THE MODIFIER HAD TO FOLLOW IT.
-  `IconButton.svelte` now writes the `<button>` and prepends `manager-icon-button` itself, so
-  the class here is the caller's EXTRA rather than the whole attribute. `is-labelled` cannot
-  ride a `class:` directive any more — that directive is element-only, and this is a component
-  tag — so it is computed into the string instead. The order the primitive emits,
-  `manager-icon-button` then the extra, is the order this site already wrote by hand, so the
-  rendered `class` is unchanged in both states and the three surfaces above still resolve.
+  THE ROW'S EDIT CONTROL, LABELLED IN THE LIST AND ICON-ONLY IN THE GRID CARD: the words say which
+  layer it opens, where an unlabelled pencil beside a world-shared name reads as "edit the essence".
+  IT IS STILL `.manager-icon-button`, AND THAT IS LOAD-BEARING: three surfaces address it by that
+  class alone, and the smoke's locator sits behind a `count() > 0` guard, so losing it would stop a
+  published frame rather than fail. `IconButton.svelte` prepends the class itself, so this is the
+  caller's EXTRA, and `is-labelled` is computed in because a `class:` directive is element-only.
 -->
 {#snippet editButton(labelled = false)}
   <IconButton
@@ -410,11 +304,9 @@
 {/snippet}
 
 {#if isCard}
-  <!-- GRID CARD — the shared `LibraryCard` primitive supplies the anatomy (header, badges,
-       description, recessed facts well, divider, footer) and this studio supplies the
-       vocabulary. The essence hooks the smoke walk, the View Lab and the mounted tests
-       navigate by (`.manager-essence-row`, `.manager-essence-identity`, `data-essence-*`)
-       are passed through, so the rendered card is the one those surfaces already know. -->
+  <!-- GRID CARD — the shared `LibraryCard` supplies the anatomy and this studio the vocabulary.
+       The essence hooks the smoke walk, the View Lab and the mounted tests navigate by
+       (`.manager-essence-row`, `.manager-essence-identity`, `data-essence-*`) pass through. -->
   <LibraryCard
     rootClass="manager-essence-row is-card"
     identityClass="manager-essence-identity"
@@ -460,34 +352,20 @@
     data-essence-bulk-selected={bulkSelected}
     aria-current={selected ? 'true' : undefined}
   >
-    <!-- THE SELECTION BOX LEADS THE ROW, as the prototype draws it — `[☐] [icon] [name] …`
-         (`sysEss.png`). It shipped TRAILING, after the edit control, which put it under the
-         toolbar's own Select all only by accident of row width and read as the last of five
-         trailing controls rather than as the row's membership in a set.
-
-         It stays OUTSIDE the identity `<button>`: `SelectionCheckbox` renders a `<label>` around
-         an `<input>`, and interactive content inside a `<button>` is invalid DOM.
-
-         An ABSENT row still renders none — it is a world essence this system has no record for,
-         so there is nothing for a bulk edit addressed at this system's list to act on. -->
+    <!-- THE SELECTION BOX LEADS THE ROW: shipped TRAILING it read as the last of five trailing
+         controls rather than as the row's membership in a set. It stays OUTSIDE the identity
+         `<button>`, because `SelectionCheckbox` renders a `<label>` around an `<input>`. An ABSENT
+         row renders none — there is nothing for a bulk edit on this system's list to act on. -->
     {#if !absent}{@render selectionBox()}{/if}
     <button type="button" class="manager-essence-identity" onclick={() => onSelect(essence.id)}>
       {@render medallionTile()}
       <span class="manager-system-copy">
         {@render nameRow()}
-        <!--
-          THE SUMMARY LINE, WHICH IS THE INHERIT READOUT WHENEVER THERE IS ONE.
-
-          The prototype's row writes `member ? essSummary(essence, system) : description`
-          (`proto:5001`): a system that HAS rules for the essence is described by what those
-          rules resolve to, and only a system that does not falls back to the world description.
-
-          It also repairs a measured overflow. The readout shipped in the TRAILING CLUSTER,
-          which is `flex: 0 0 auto` and cannot shrink, and at two sections it is roughly 390px
-          of text - so on a 1280px window the first row's bulk checkbox was cropped by the
-          list's own edge while every shorter row below it fitted. Moving it into the identity
-          block, which does shrink, is both the prototype's layout and the repair.
-        -->
+        <!-- THE SUMMARY LINE, WHICH IS THE INHERIT READOUT WHENEVER THERE IS ONE: a system that
+             HAS rules for the essence is described by what those rules resolve to, and only one
+             that does not falls back to the world description. Its position in the identity block
+             also repairs a measured overflow — in the trailing cluster, which is `flex: 0 0 auto`
+             and cannot shrink, ~390px of readout cropped the first row's bulk checkbox. -->
         {#if summaryClauses.length > 0}
           {@render summaryReadout()}
         {:else}
@@ -517,17 +395,12 @@
 {/if}
 
 <style>
-  /* The row's INTERIOR only. `.manager-essence-row` itself stays in the four shared
-     selector lists in `styles/fabricate.css` — the row skin, the 76px geometry group, the
-     hover group and the `.is-selected` accent-ring group — so the one-consistent-
-     selected-row-signal rule holds by construction and two of those lists stay pinned by
-     exact multi-line selector text in `manager-layout.test.js`.
-
-     The row LEAVES the narrow `@container` join and the `display: grid` +
-     essence-grid join: the first sets `align-items: stretch`, a live flex
-     property that would stretch the medallion and the controls to full card height, and
-     the second has no table head left to serve. The replacement narrow behaviour is
-     specified below and photographed. */
+  /* The row's INTERIOR only. `.manager-essence-row` itself stays in the four shared selector lists
+     in `styles/fabricate.css`, so the one-consistent-selected-row-signal rule holds by construction
+     and two of those lists stay pinned by exact multi-line selector text in
+     `manager-layout.test.js`. The row LEAVES the narrow `@container` join, whose `align-items:
+     stretch` would stretch the medallion and the controls to full card height, and the grid join,
+     which has no table head left to serve. */
   .manager-essence-row {
     display: flex;
     flex-wrap: wrap;
@@ -577,35 +450,12 @@
     gap: var(--fab-space-2);
   }
 
-  /* THE LABELLED VARIANT OF `.manager-icon-button`, and every value here is COPIED from the
-     labelled-button authority rather than chosen: `.manager-button.fab-manager-button` in
-     `styles/fabricate.css` declares `min-height: 34px`, `padding: 0 var(--fab-space-3)` and
-     `font-size: 0.72rem`, which is the Tool Studio treatment `ManagerButton` reproduces. The
-     control cannot BE a `ManagerButton` — that primitive emits `fabricate-button
-     manager-button fab-manager-button`, whose auto width would fight
-     `.manager-icon-button`'s square `width: 34px; flex: 0 0 34px`, and the class this row is
-     addressed by is the icon one.
-
-     The selector is compounded through `.manager-essence-row` on purpose. The rule it has to
-     beat is `.fabricate-icon-button.manager-icon-button`, which is (0,2,0); a bare
-     `.manager-essence-edit` scopes to (0,2,0) as well and would be decided by injection order
-     — the kind of tie that resolves differently in a bundle than in a mounted test. Chained,
-     it is (0,3,0) and wins outright.
-
-     `height: auto` with a `min-height` rather than a fixed `height`: Foundry's own `button`
-     rule pins a height, and used height is `max(height, min-height)`, so the pair is what
-     lets the label sit on one line at the shared 34px without the glyph clipping.
-
-     THE CHILD HALF IS `:global` BECAUSE `IconButton.svelte` WRITES THE BUTTON (issue 1422).
-     Svelte stamps its `svelte-<hash>` onto the elements THIS component writes, and a `class`
-     handed to a child component is forwarded verbatim, so a fully scoped
-     `.manager-essence-edit.is-labelled` stopped matching the moment the control converted —
-     the pill would have silently collapsed back to the primitive's square 34px box with the
-     words inside it. The row keeps its scoping, so these rules cannot escape to a labelled
-     edit control drawn by any other component. Specificity is unchanged by construction:
-     Svelte compiles the scoped halves with `:where(.svelte-<hash>)`, which contributes
-     nothing, so the pair is (0,3,0) and (0,3,1) before and after — still beating
-     `.fabricate-icon-button.manager-icon-button` at (0,2,0), exactly as reasoned above. */
+  /* THE LABELLED VARIANT OF `.manager-icon-button`, every value COPIED from the labelled-button
+     authority rather than chosen; it cannot BE a `ManagerButton`, whose auto width would fight the
+     square 34px box. Compounded through `.manager-essence-row` on purpose, because a bare selector
+     ties at (0,2,0) and is decided by injection order. THE CHILD HALF IS `:global` BECAUSE
+     `IconButton.svelte` WRITES THE BUTTON: a forwarded `class` carries no `svelte-<hash>`, so a
+     fully scoped selector stopped matching the moment the control converted. */
   .manager-essence-row :global(.manager-essence-edit.is-labelled) {
     width: auto;
     height: auto;
@@ -618,34 +468,25 @@
     white-space: nowrap;
   }
 
-  /* The external-link glyph is the prototype's small trailing mark (8px against a 10.5px
-     label), not a second icon at label size.
-
-     The `i` sits INSIDE the `:global(...)` rather than after it because Svelte rejects a
-     `:global()` in the middle of a sequence (`css_global_invalid_placement`) — it may only
-     open or close one. Scoping it separately is not an option either way: the glyph is
-     written in a snippet this component hands to `IconButton`, and while a snippet's markup
-     does carry this component's hash, the BUTTON between them does not, so the chain has to
-     cross the boundary in one global step. Specificity is (0,3,1) either way. */
+  /* A small trailing mark, not a second icon at label size. The `i` sits INSIDE the `:global(...)`
+     because Svelte rejects one in the middle of a sequence (`css_global_invalid_placement`), and
+     the chain has to cross the component boundary in one step: the BUTTON between the snippet and
+     the glyph carries no hash of ours. Specificity is (0,3,1) either way. */
   .manager-essence-row :global(.manager-essence-edit.is-labelled i) {
     font-size: 0.55rem;
   }
 
-  /* The chips in the GRID card wrap and sit on the card's tighter badge rhythm. This is a
-     MODIFIER on the span rather than a descendant of `.manager-essence-row.is-card`, because
-     the card's `<li>` is rendered by `LibraryCard` now: a selector reaching through it would
-     never match (Svelte scopes both halves to THIS component) and would be reported as an
-     unused selector, which `lint:svelte:warnings` fails on. The span itself is still ours —
-     snippet bodies compile in the parent — so a single-element modifier still applies. */
+  /* A MODIFIER on the span rather than a descendant of the card root, because that `<li>` is
+     `LibraryCard`'s: a selector reaching through it would never match and would be reported as an
+     unused selector, which `lint:svelte:warnings` fails on. The span is still ours. */
   .manager-essence-capabilities.is-card-badges {
     flex-wrap: wrap;
     gap: var(--fab-space-1);
     min-width: 0;
   }
 
-  /* TWO STAT CELLS SIDE BY SIDE, at the prototype's right-aligned figure-over-label rhythm
-     (`proto:1571`). A fixed `min-width` is what turns two per-row numbers into two columns down
-     the list; `tabular-nums` holds the digits on one advance so the same holds within a cell. */
+  /* TWO STAT CELLS SIDE BY SIDE. A fixed `min-width` turns two per-row numbers into two columns
+     down the list, and `tabular-nums` holds the digits on one advance within a cell. */
   .manager-essence-usage-readout {
     display: flex;
     align-items: center;
@@ -686,17 +527,9 @@
     opacity: 0.72;
   }
 
-  /* The GRID card's interior — header, badges, description, recessed facts well, divider and
-     footer — now lives in `../library/LibraryCard.svelte`, which every studio's grid will
-     render. It moved wholesale rather than being duplicated: a card whose look is authored
-     twice is two cards. The `.is-card` hooks the global sheet still needs
-     (`.manager-essence-row.is-card { margin: 0 }`) stay in `styles/fabricate.css`.
-
-     NARROW (issue 1036). The LIST row keeps `display: flex` and simply wraps: the identity
-     block takes the first line and the cluster wraps onto a second, aligned right.
-     `.manager-labeled-cell` and its `::before` data-label reveal are not used at all —
-     there are no columns left to label. The `:not(.is-card)` guards are gone with the card
-     branch: this component only renders the list row now. */
+  /* The GRID card's interior lives in `../library/LibraryCard.svelte`, moved wholesale rather than
+     duplicated, because a card whose look is authored twice is two cards. NARROW: the LIST row
+     keeps `display: flex` and wraps, and there are no columns left to label. */
   @container fabricate-manager (max-width: 1120px) {
     .manager-essence-identity {
       flex: 1 1 100%;

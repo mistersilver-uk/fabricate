@@ -1,37 +1,23 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The essence editor's tab strip (issue 1036) — `Essence rules` and `Validation` for an essence
-  the world catalogue holds, and the shipped `Identity, On craft, Validation` for a CREATE draft,
-  which has no shared definition to contradict. The SET is the caller's, passed as `tabs`.
+  The essence editor's tab strip — `Essence rules` and `Validation` for a catalogued essence, and
+  `Identity, On craft, Validation` for a CREATE draft. The SET is the caller's, passed as `tabs`.
 
-  A thin caller of the promoted `EditorTabs` primitive (issue 1038). It was authored as the
-  eighth hand-rolled `{activeTab, badges, onSelect}` strip because the extraction obligation
-  is to convert every existing site in the same change, and no primitive existed yet; issue
-  1362 promoted one and this is the follow-up that owed it. This file now owns the tab SET, the
-  two badges, and this site's DOM contract — the `data-essence-tab` hook, the
-  `essence-tab-*` / `essence-panel-*` id stem whose panels `EssenceEditView.svelte` renders,
-  the `manager-essence-editor-tabs` container class and the strip's own aria-label. No
-  rendered id, `aria-controls`, `data-*` attribute or class changed in the conversion.
+  A thin caller of the promoted `EditorTabs` primitive. This file owns the tab SET, the two badges
+  and this site's DOM contract — the `data-essence-tab` hook, the `essence-tab-*` /
+  `essence-panel-*` id stem, the container class and the strip's aria-label — and no rendered id,
+  `aria-controls`, `data-*` attribute or class changed in the conversion.
 
-  THE KEYBOARD MODEL CAME WITH THE PRIMITIVE, AND THAT IS WHY THE VARIABLE SET IS SAFE HERE.
-  This file used to close over `tabs.length` in its own Arrow/Home/End handler, so a two-tab
-  set and a three-tab set were two things to keep in step by hand. `EditorTabs` derives every
-  index from the `tabs` it is handed, so the rules strip wraps across two tabs and the create
-  strip across three with nothing said here about either.
+  THE KEYBOARD MODEL CAME WITH THE PRIMITIVE, WHICH IS WHY THE VARIABLE SET IS SAFE: this file used
+  to close over `tabs.length` in its own handler, so two-tab and three-tab sets were two things to
+  keep in step. `EditorTabs` derives every index from the `tabs` it is handed.
 
-  ── THE TAB IDS ARE LITERALS, TWICE ───────────────────────────────────────────────
-  `idStem="essence"` builds `essence-tab-<id>` inside the primitive, so the View Lab's
-  source-coverage scan cannot credit the ids it produces from THIS file either. The ids are
-  therefore ALSO present as literals in `ESSENCE_EDITOR_TABS` and `ESSENCE_RULES_TABS` in
-  `essenceStudio.js` — and the scan reads the literals `'identity'`, `'oncraft'`, `'rules'`
-  and `'validation'` there.
+  THE TAB IDS ARE LITERALS, TWICE, because the primitive builds them from `idStem` and the View
+  Lab's source-coverage scan cannot credit ids produced that way. They are also literals in
+  `ESSENCE_EDITOR_TABS` and `ESSENCE_RULES_TABS`, which is where the scan reads them.
 
-  ── THE ON-CRAFT BADGE COUNTS CONFIGURED BEHAVIOURS ───────────────────────────────
-  0, 1 or 2 — a linked source and a linked property macro — following
-  `ToolEditorTabs.requirementCount`. It never counted EFFECTS, so dropping the prototype's
-  invented "2 effects" number does not delete it. A zero renders NO badge, which is the
-  primitive's own rule rather than a condition restated here. The rules set has no `oncraft`
-  tab at all, so on that set the entry is simply never matched to a tab.
+  THE ON-CRAFT BADGE COUNTS CONFIGURED BEHAVIOURS — 0, 1 or 2 — following
+  `ToolEditorTabs.requirementCount`, and never counted EFFECTS. A zero renders NO badge, which is
+  the primitive's own rule, and the rules set has no `oncraft` tab for the entry to match.
 -->
 <script>
   import EditorTabs from '../../../components/EditorTabs.svelte';
@@ -39,9 +25,8 @@
   import { ESSENCE_EDITOR_TABS } from './essenceStudio.js';
 
   let {
-    // The SET, supplied by the caller: `ESSENCE_RULES_TABS` for an essence with a shared world
-    // definition, `ESSENCE_EDITOR_TABS` for a create draft. Defaulted to the shipped three so a
-    // caller that passes none renders exactly what it always did.
+    // The SET: `ESSENCE_RULES_TABS` for a catalogued essence, `ESSENCE_EDITOR_TABS` for a create
+    // draft, defaulted to the shipped three so a caller passing none renders as it always did.
     tabs = ESSENCE_EDITOR_TABS,
     activeTab = 'identity',
     onCraftCount = 0,
@@ -57,9 +42,8 @@
     validation: 'FABRICATE.Admin.Manager.Essence.Tabs.Validation',
   };
 
-  // `$derived`, not a module constant, because the set is now a PROP. Computed once at load it
-  // would pin whichever set the first render happened to pass, and the create draft and the
-  // rules editor would then draw the same strip.
+  // `$derived`, not a module constant: computed once at load it would pin whichever set rendered
+  // first, and the create draft and the rules editor would draw the same strip.
   const editorTabs = $derived(
     tabs.map((tab) => ({
       id: tab.id,
@@ -82,9 +66,8 @@
     );
   }
 
-  // Blocking outranks warning, and a clean tab shows a tick rather than a zero: a badge
-  // reading `0` is indistinguishable at a glance from a badge reading `8`. The tick has no
-  // readable name of its own, so it carries `name`.
+  // Blocking outranks warning, and a clean tab shows a tick rather than a zero, which is
+  // indistinguishable at a glance from an `8`. The tick has no readable name, so it carries one.
   function validationBadgeFor(blocking, warnings) {
     if (blocking > 0) {
       return { tone: 'danger', label: String(blocking), name: issueCountLabel(blocking) };
@@ -92,13 +75,10 @@
     if (warnings > 0) {
       return { tone: 'warning', label: String(warnings), name: issueCountLabel(warnings) };
     }
-    // NEUTRAL, not green, and carrying no `is-valid` (issue 1372, maintainer parity round).
-    // The reference draws its clear tab badge in the recessive `surface-soft` / `border` /
-    // `text2` treatment (`proto:4566`); a green tick claims a RESULT where the reference states
-    // an absence of findings. `WorldEssenceEntryPage` states the same pair, so the two essence
-    // editors' strips cannot disagree about what "clear" looks like. It is ONE pill in two
-    // states — a numeral or a tick in the same box — which is exactly the issue chip's label
-    // and never a second shape.
+    // NEUTRAL, not green, and carrying no `is-valid`: a green tick claims a RESULT where the
+    // reference states an absence of findings. `WorldEssenceEntryPage` states the same pair, so
+    // the two essence editors cannot disagree about what "clear" looks like. It is ONE pill in
+    // two states — a numeral or a tick in the same box — never a second shape.
     return {
       tone: 'neutral',
       label: '✓',
