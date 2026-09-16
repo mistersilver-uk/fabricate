@@ -9,10 +9,8 @@ import { createInventoryStore } from './svelte/stores/inventoryStore.svelte.js';
 import { createAlchemyStore } from './svelte/stores/alchemyStore.svelte.js';
 import { createJournalStore } from './svelte/stores/journalStore.svelte.js';
 import { notifyWarn, localize, confirmDialog } from './svelte/util/foundryBridge.js';
-// The V13/V14 progress-notification reporter (issue 859) — see its own docblock
-// and `AGENTS.md`'s "V13 progress notifications" note. Pure plumbing (no Foundry
-// import beyond what it itself guards), reused rather than re-authored so the
-// bulk salvage/destroy progress toast cannot drift from the compendium import's.
+// Reused rather than re-authored, so the bulk salvage/destroy progress toast cannot drift from the
+// compendium import's (issue 859).
 import { createDefaultProgressReporter } from '../systems/CompendiumImporter.js';
 import {
   authorityUnavailableAvailability,
@@ -32,47 +30,26 @@ import { getSetting, SETTING_KEYS } from '../config/settings.js';
 const CORE_TABS = new Set(['crafting', 'alchemy', 'gathering', 'journal', 'inventory']);
 const DEFAULT_TAB = 'crafting';
 
-/**
- * The world's experimental-features opt-in, read LIVE at every gate decision.
- *
- * This window is the seam's Foundry-facing edge, so the setting is read here and handed to
- * `playerNavModel.js` as a boolean, which is what keeps that module the UI-free leaf it is
- * documented to be. It is read rather than cached because the derivations below already run on
- * every window open and every registry publication, and a cached value would make a world whose
- * setting changed mid-session stay wrong until reload.
- *
- * Read directly through `getSetting`, exactly as `SvelteCraftingSystemManagerApp` reads its own
- * settings: every path reaching it runs after `init` has registered the setting.
- *
- * @returns {boolean} True when `fabricate.experimentalFeatures` is on.
- */
+// Read LIVE at every gate decision, and handed to `playerNavModel.js` as a boolean, which is what
+// keeps that module the UI-free leaf it is documented to be. Not cached: the derivations below run
+// on every window open and registry publication anyway, and a cached value would leave a world
+// whose setting changed mid-session wrong until reload.
 function isExperimentalFeaturesEnabled() {
   return getSetting(SETTING_KEYS.EXPERIMENTAL_FEATURES) === true;
 }
 
-/**
- * Is `tab` a route this window can currently show?
- *
- * A LIVE predicate rather than a frozen set (issue 1198), because the answer changes when a
- * companion registers or unregisters. `isCoreTabId` is structural — it answers "is this key
- * NOT a provider route key", which is true of any non-empty string — so it is intersected
- * with this window's own Core ids rather than trusted alone; without that intersection an
- * unknown id such as `bogus` would become valid and the constructor, `_selectTab` and
- * `static show` would all silently accept it.
- *
- * @param {*} tab Candidate tab id or `ext:<surfaceId>:<tabId>` route key.
- * @returns {boolean} True when the tab is currently offered.
- */
+// A LIVE predicate rather than a frozen set (issue 1198), because the answer changes when a
+// companion registers. `isCoreTabId` is STRUCTURAL — true of any non-empty string that is not a
+// provider route key — so it is intersected with this window's own Core ids rather than trusted
+// alone; without that, an unknown id such as `bogus` would be accepted everywhere.
 function isOfferedTab(tab) {
   if (typeof tab !== 'string' || tab === '') return false;
   if (isCoreTabId(tab)) return CORE_TABS.has(tab);
   const route = parseRouteKey(tab);
   if (!route) return false;
-  // The experimental gate is repeated HERE rather than inherited, because this predicate is the
-  // one route test that reads the REGISTRY instead of the derived snapshot. `_selectTab`, the
-  // constructor and `static show` all reach a companion route through it, so without this read a
-  // gated surface would be missing from the rail and still reachable programmatically — unlinked
-  // rather than unreachable, which is the distinction the Manager's own gate is written against.
+  // The gate is repeated HERE because this is the one route test reading the REGISTRY rather than
+  // the derived snapshot: without it a gated surface would be missing from the rail and still
+  // reachable programmatically — unlinked rather than unreachable.
   if (
     !isPlayerSurfaceAvailable(route.surfaceId, {
       experimentalFeaturesEnabled: isExperimentalFeaturesEnabled(),
@@ -84,15 +61,8 @@ function isOfferedTab(tab) {
   return Boolean(provider?.tabs?.some((providerTab) => providerTab.id === route.tabId));
 }
 
-/**
- * Every route key the rail currently offers, in `{ routeKey }` shape for `resolveActiveTab`.
- *
- * Alchemy is deliberately included unconditionally: its availability is `_refreshAlchemy`'s
- * concern and handling it in two places would let the two disagree.
- *
- * @param {readonly {surfaceId: string, provider: object}[]} extensionSurfaces Snapshot.
- * @returns {{routeKey: string}[]} Offered routes.
- */
+// Alchemy is included UNCONDITIONALLY: its availability is `_refreshAlchemy`'s concern, and
+// handling it in two places would let the two disagree.
 function offeredRoutes(extensionSurfaces) {
   const routes = [...CORE_TABS].map((id) => ({ routeKey: id }));
   for (const { surfaceId, provider } of extensionSurfaces) {
@@ -103,13 +73,6 @@ function offeredRoutes(extensionSurfaces) {
   return routes;
 }
 
-/**
- * Normalize a scene-interactable ref to `{sceneId, regionId, behaviorId}` (issue
- * 302), or null when any id is missing.
- *
- * @param {object|null} ref
- * @returns {{sceneId:string, regionId:string, behaviorId:string}|null}
- */
 function normalizeInteractableRef(ref) {
   if (!ref || typeof ref !== 'object') return null;
   const sceneId = typeof ref.sceneId === 'string' ? ref.sceneId : null;
@@ -119,23 +82,14 @@ function normalizeInteractableRef(ref) {
   return { sceneId, regionId, behaviorId };
 }
 
-/**
- * The unified Fabricate window: a single shared application with a full-height
- * left navigation (Crafting, Gathering, Journal, Inventory, and the conditional
- * Alchemy tab). Each tab renders its implemented consumer surface; this class owns
- * the active tab and wires the crafting, inventory, salvage, alchemy, and gathering
- * service seams the tab views call.
- * Journal services route versioned actions through active-GM commands and confirm the
- * single-GM-session prerequisite before explicit authority setup.
- * The shared Journal store supplies both the tab and the navigation badge.
- *
- * The Alchemy tab is conditional: it appears only when an enabled alchemy
- * crafting system has at least one recipe (see {@link isAlchemyTabAvailable}),
- * and is re-evaluated live while the window is open.
- *
- * Both the "Craft Item" and "Gathering" sidebar buttons target this one window
- * via {@link SvelteFabricateApp.show}; the button decides which tab to open.
- */
+// The unified player window: one shared application over a full-height nav rail (Crafting,
+// Gathering, Journal, Inventory, and the conditional Alchemy tab). This class owns the active tab
+// and wires every service seam the tab views call. The Alchemy tab appears only when an enabled
+// alchemy crafting system has at least one recipe, re-evaluated live while the window is open.
+// Journal services route versioned actions through active-GM commands and confirm the
+// single-GM-session prerequisite before explicit authority setup; one shared Journal store feeds
+// both the tab and the nav badge. Both the "Craft Item" and "Gathering" sidebar buttons target
+// this one window, and the button decides which tab opens.
 export class SvelteFabricateApp extends SvelteApplicationMixin(
   foundry.applications.api.ApplicationV2
 ) {
@@ -147,36 +101,24 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   _activeTab = DEFAULT_TAB;
   _services = null;
   _hookIds = null;
-  // The player window's SOLE player-extension registry subscription (issue 1198). It lives
-  // beside the Foundry hook ids because it has the same lifetime: joined in
-  // `_registerHooks()` and released in `_removeHooks()`.
+  // The window's SOLE player-extension subscription (issue 1198), beside the Foundry hook ids
+  // because it shares their lifetime.
   _playerExtensionsUnsubscribe = null;
-  // Session-scoped canvas Tool. When the GM grants activation of a Tool-station
-  // interactable region (the controlling player walked their token in and clicked
-  // Interact), the station Tool is injected here as a virtual-present tool: a
-  // `{ componentId, systemId, toolId, label }` shape that crafting/gathering
-  // prerequisite checks treat as satisfied WITHOUT the actor owning the item,
-  // and which is excluded from breakage/usage. Cleared on close.
+  // Session-scoped: a granted Tool-station activation injects the station Tool here as a
+  // VIRTUAL-PRESENT tool, which prerequisite checks treat as satisfied without the actor owning the
+  // item and which is excluded from breakage and usage. Cleared on close.
   _activeCanvasTool = null;
-  // Session-scoped environment+task for a gathering-task interactable shortcut.
-  // When a gathering-task region activation is granted the gathering view
-  // auto-selects this environment+task on open. Cleared on close.
+  // A granted gathering-task activation makes the gathering view auto-select this pair on open.
   _scopedEnvironmentId = null;
   _scopedTaskId = null;
-  // Session-scoped actor for an interactable activation. When a region activation
-  // is granted the interacting actor (the token the player walked in) becomes the
-  // default-selected actor in the top bar (when selectable). Cleared on close.
+  // The interacting actor becomes the default top-bar selection, when selectable.
   _scopedActorId = null;
-  // Session-scoped scene-interactable ref ({sceneId, regionId, behaviorId}) for a
-  // gathering-task interactable that owns its own scoped node pool (issue 302).
-  // Threaded into the gathering attempt so it decrements that scoped pool. Cleared
-  // on close.
+  // Threaded into the gathering attempt so it decrements that interactable's OWN node pool
+  // (issue 302) rather than the environment's.
   _scopedInteractableRef = null;
-  // One-shot close callback set by a canvas interactable activation (issue 332):
-  // when this session opened from clicking Interact, the manager registers a
-  // handler here so closing the window re-raises the Interact prompt if the token
-  // is still in the originating region. Invoked once (defensively) and cleared on
-  // close so a later manual open never re-fires it.
+  // Set by a canvas activation (issue 332) so closing re-raises the Interact prompt while the token
+  // is still in the region. REPLACED on every `show` and invoked ONCE, so a later manual open never
+  // re-fires a stale re-prompt.
   _onCloseCallback = null;
 
   static DEFAULT_OPTIONS = {
@@ -194,45 +136,20 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     }
   };
 
-  // Minimum window size enforced on the resizable Fabricate window so it can
-  // never shrink below the point where the gathering view's three columns (each
-  // floored at 280px) get clipped. Derived from the column minimums: the ~84px
-  // nav rail + 3 x 280px columns + 2 gutters + content padding + window chrome
-  // round up to a 1024x640 floor that keeps all three columns usable before the
-  // narrow-width stacking breakpoint takes over. ApplicationV2 V13 does NOT
-  // accept `minWidth`/`minHeight` inside the (non-extensible) `position` option
-  // (assigning to it throws), so the floor is enforced two ways: a
-  // CSS floor on `.fabricate.fabricate-app-window` in styles/fabricate.css, which
-  // is what visually stops the drag handle, and the `_updatePosition` clamp below
-  // which is the single ApplicationV2 position-transform hook applied by BOTH
-  // `setPosition()` and drag-resize.
-  //
-  // THE FLOOR IS ON `fabricate-app-window`, NOT ON THE SHARED `fabricate-app` AREA
-  // CLASS, and that is deliberate (issue 1520). `fabricate-app` carries typography,
-  // colour and `color-scheme`, and the three canvas interactables windows adopted it
-  // at 420, 480 and 560 wide; a floor on the shared class would have matched their
-  // frames too and painted every one of them at this window's floor, because a CSS
-  // floor beats the inline `width` Foundry writes onto the frame. This window is the
-  // only one that emits the third class, so it is the only one the floor reaches.
+  // Derived from the gathering view's column minimums, so the three columns cannot be clipped.
+  // ApplicationV2 V13 THROWS on `minWidth`/`minHeight` inside its non-extensible `position`, so the
+  // floor is enforced twice: a CSS floor on `.fabricate.fabricate-app-window`, which is what stops
+  // the drag handle visually, and the `_updatePosition` clamp below, the one position-transform
+  // hook both `setPosition()` and drag-resize pass through.
+  // THE FLOOR IS ON `fabricate-app-window`, NOT the shared `fabricate-app` area class (issue 1520):
+  // the three canvas windows adopted that class at 420, 480 and 560 wide, and a CSS floor beats the
+  // inline `width` Foundry writes onto a frame, so it would have painted all of them at this floor.
   static MIN_WINDOW_WIDTH = 1024;
   static MIN_WINDOW_HEIGHT = 640;
 
-  /**
-   * Clamp the window up to the configured minimum size. `_updatePosition` is the
-   * V13 ApplicationV2 hook that translates a requested position into the resolved
-   * applied position; it is invoked by BOTH programmatic `setPosition()` and the
-   * drag-resize handler, and its return value is what gets applied. We override
-   * it (rather than the pointer-only `_onResize` drag handler, whose return value
-   * V13 does not consume) so the minimum-size floor is real for every code path.
-   *
-   * We mutate `width`/`height` on the resolved position only — never
-   * `minWidth`/`minHeight`, which V13's non-extensible `position` rejects with a
-   * throw. The CSS floor on the app root is the belt-and-suspenders partner that
-   * makes the drag handle stop visually.
-   *
-   * @param {object} position Requested `{width, height, ...}` positioning data.
-   * @returns {object} The resolved, clamped position.
-   */
+  // Overridden rather than `_onResize`, whose return value V13 does not consume, so the floor is
+  // real on every code path. Only `width`/`height` are mutated — never `minWidth`/`minHeight`,
+  // which the non-extensible `position` rejects with a throw.
   _updatePosition(position) {
     const result = super._updatePosition(position);
     if (result && typeof result === 'object') {
@@ -272,19 +189,11 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   }
 
   _buildServices() {
-    // Derive the system-scoped virtual-present tool payload from the active
-    // canvas Tool. When a Tool station is active, BOTH its componentId AND its
-    // owning crafting system are threaded into the gathering listing/attempt API
-    // as `presentTools = { systemId, componentIds }`. The prerequisite check
-    // treats the componentId as present without an owned item, but ONLY for tasks
-    // in the matching crafting system — componentId is a per-system id, so a tool
-    // from system A must not satisfy a system-B task whose required tool shares
-    // the same componentId string. The engine excludes a virtual match from
-    // breakage/usage. This is the single app→engine threading boundary for the
-    // gathering surface. With no active tool the payload is null (inert).
-    // Issue 1119: the payload carries the station's library TOOL id alongside any
-    // componentId. An item-sourced Tool has no componentId, so a componentId-only payload
-    // was inert for every station the Tool Studio can author.
+    // BOTH the componentId and its owning system are threaded, because componentId is a PER-SYSTEM
+    // id: a tool from system A must not satisfy a system-B task whose required tool happens to
+    // share the string. The payload also carries the station's library TOOL id (issue 1119), since
+    // an item-sourced Tool has no componentId and a componentId-only payload was inert for every
+    // station the Tool Studio can author. This is the single app-to-engine threading boundary here.
     const presentTools = () => {
       const componentId = this._activeCanvasTool?.componentId;
       const toolId = this._activeCanvasTool?.toolId;
@@ -306,57 +215,35 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       }) ?? null,
       startGatheringAttempt: (opts = {}) => game?.fabricate?.startGatheringAttempt?.({
         presentTools: presentTools(),
-        // Thread the session-scoped interactable ref (issue 302) unless the caller
-        // overrode it. Inert when null (the engine uses the environment scope).
+        // Inert when null, where the engine uses the environment scope instead (issue 302).
         interactableRef: this._scopedInteractableRef,
         ...opts
       }) ?? null,
       getGatheringDropBreakdown: (opts = {}) => game?.fabricate?.getGatheringDropBreakdown?.(opts) ?? null,
-      // Player Crafting tab seams. The listing/craft/source reads mirror the
-      // gathering seams: every Foundry-facing call routes through the
-      // `game.fabricate` facade so the stores stay Foundry-free.
+      // Every Foundry-facing call routes through the `game.fabricate` facade, so stores stay
+      // Foundry-free. That is the rule for every seam in this bag.
       listCraftingForActor: (opts = {}) => game?.fabricate?.listCraftingForActor?.(opts) ?? null,
-      // The DETAIL half of that read (issue 1075): the exact rich model for ONE selected
-      // recipe. Synchronous for the same reason `evaluateSelectedSet` below is — the store's
-      // `selectedRecipe` $derived reads it without an async round-trip — and null when the
-      // facade is absent or the viewer may not see the recipe.
+      // Synchronous, because the store's `selectedRecipe` $derived reads it without an async
+      // round-trip; null when the facade is absent or the viewer may not see the recipe.
       hydrateCraftingRecipe: (opts = {}) => game?.fabricate?.hydrateCraftingRecipe?.(opts) ?? null,
-      // Player Inventory tab seam — owned components/essences across the shared
-      // crafting source actors. Foundry-free store consumes this wrapper only.
       listInventoryForActor: (opts = {}) => game?.fabricate?.listInventoryForActor?.(opts) ?? null,
       // Learn one recipe from an owned recipe-item book (Inventory learn button).
       learnRecipeFromInventory: (opts = {}) =>
         game?.fabricate?.learnRecipeFromInventory?.(opts) ?? null,
       craftRecipe: (opts = {}) => game?.fabricate?.craftRecipe?.(opts) ?? null,
-      // Salvage one owned component (issue 675) — the Inventory tab's Salvage panel,
-      // and the first UI caller of the engine's salvage pipeline. Takes
-      // `{ actorId, systemId, componentId, interactive }`: an ACTOR ID, never a uuid,
-      // so the facade's `_resolveCraftingSources` gate — the only ownership check on
-      // this path — is not bypassed.
+      // An ACTOR ID, never a uuid, so the facade's `_resolveCraftingSources` gate — the only
+      // ownership check on this path — is not bypassed (issue 675).
       salvageComponent: (opts = {}) => game?.fabricate?.salvageComponent?.(opts) ?? null,
-      // Bulk salvage/destroy (issue 859) — the Inventory tab's bulk panel. Both
-      // route through `game.fabricate`, degrading to null (never throwing) while
-      // that facade is unimplemented or absent, exactly like every other seam here.
       salvageComponents: (opts = {}) => game?.fabricate?.salvageComponents?.(opts) ?? null,
       destroyComponents: (opts = {}) => game?.fabricate?.destroyComponents?.(opts) ?? null,
-      // The player app has no confirm-dialog seam today; `confirmDialog` is a thin
-      // wrapper the manager app already exposes identically (`confirmDialog:
-      // (options) => confirmDialog(options)`, `SvelteCraftingSystemManagerApp.svelte.js`) —
-      // bulk destroy's consequence sentence cannot fit a button label, so the
-      // caller composes full `DialogV2.confirm` copy and this seam is a pure
-      // pass-through.
+      // A pure pass-through, exposed identically by the manager app: bulk destroy's consequence
+      // sentence cannot fit a button label, so the caller composes the full confirm copy.
       confirmDialog: (options) => confirmDialog(options),
-      // A FRESH stateful reporter per bulk run (issue 859) — never a shared
-      // singleton, or a second run would update the first run's already-dismissed
-      // toast (see `createDefaultProgressReporter`'s own docblock).
+      // FRESH per bulk run, never a shared singleton: a second run would otherwise update the
+      // first run's already-dismissed toast (issue 859).
       createProgressReporter: () => createDefaultProgressReporter(),
-      // Fresh per-set craftability for an in-session ingredient-option override
-      // (issue 552). Synchronous so the store's `selectedCraftability` $derived can
-      // read it without an async round-trip; returns null when the facade is absent.
+      // Synchronous, so the store's `selectedCraftability` $derived reads it without a round-trip.
       evaluateSelectedSet: (opts = {}) => game?.fabricate?.evaluateSelectedSet?.(opts) ?? null,
-      // Player Alchemy tab seams — the leak-safe workbench listing + brew submit +
-      // the persisted active-discipline getter/setter. Foundry-free store consumes
-      // these wrappers only.
       listAlchemyForActor: (opts = {}) => game?.fabricate?.listAlchemyForActor?.(opts) ?? null,
       submitAlchemyAttempt: (opts = {}) => game?.fabricate?.submitAlchemyAttempt?.(opts) ?? null,
       getSelectedAlchemySystemId: () => game?.fabricate?.getSelectedAlchemySystemId?.() ?? '',
@@ -369,21 +256,18 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       setCraftingComponentSourceIds: (ids) => game?.fabricate?.setCraftingComponentSourceIds?.(ids),
       getFavouriteRecipeIds: () => game?.fabricate?.getFavouriteRecipeIds?.() ?? [],
       toggleFavouriteRecipe: (id) => game?.fabricate?.toggleFavouriteRecipe?.(id) ?? [],
-      // Progressive stage order (issue 651). Unlike the favourites seam directly above,
-      // the setter is ASYNC and its promise is RETURNED, not dropped: under `scope: user`
-      // this is a replicated document write that can reject, and the store's failure path
-      // (revert + announce) depends on seeing the rejection.
+      // The setter's promise is RETURNED, not dropped: under `scope: user` this is a replicated
+      // document write that can reject, and the store's revert-and-announce path needs to see it.
       getProgressiveResultOrder: () => game?.fabricate?.getProgressiveResultOrder?.() ?? {},
       setProgressiveResultOrder: (key, order) =>
         game?.fabricate?.setProgressiveResultOrder?.(key, order),
-      // Announced through the stage list's live region when a write fails — a toast alone
-      // is insufficient, since a keyboard user reordering by chevron never sees one.
+      // A live region, because a keyboard user reordering by chevron never sees a toast.
       progressiveOrderRevertMessage: () =>
         localize('FABRICATE.App.Crafting.Detail.StageOrderSaveFailed'),
       // Player-facing notification seam (a failed craft surfaces as a warning).
       notify: (message) => notifyWarn(message),
-      // Localized generic craft-failure message for a thrown craft (the engine can
-      // throw on the currency-payment macro path, producing no result message).
+      // For a THROWN craft: the engine can throw on the currency-payment macro path, with no
+      // result message to report.
       craftErrorMessage: () => localize('FABRICATE.App.Crafting.Notify.CraftFailed'),
       // The stores stay Foundry-free, so the i18n lookup an authority refusal needs
       // (`{success:false, reason}` carries no `message`) arrives as a seam too.
@@ -391,18 +275,13 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       listSelectableActors: () => game?.fabricate?.listSelectableActors?.() ?? [],
       getSelectedActorId: () => game?.fabricate?.getSelectedGatheringActorId?.() ?? '',
       setSelectedActorId: (id) => game?.fabricate?.setSelectedGatheringActorId?.(id),
-      // Player-side "hide unavailable (locked) environments" preference for the
-      // Environments column. Client-scoped, so it persists per client/device
-      // (`localStorage`), not per user account. The component reads/writes it
-      // through these seams rather than touching Foundry globals directly; the
-      // getter defaults to false (show all) when the facade is unavailable.
+      // CLIENT-scoped, so it persists per device rather than per user account; the getter defaults
+      // to false, showing all, when the facade is unavailable.
       getHideUnavailableEnvironments: () =>
         game?.fabricate?.getHideUnavailableEnvironments?.() ?? false,
       setHideUnavailableEnvironments: (value) =>
         game?.fabricate?.setHideUnavailableEnvironments?.(value),
       getGatheringConditions: () => game?.fabricate?.getGatheringConditions?.() ?? null,
-      // Player-facing Journal seams. The store/components never touch Foundry
-      // globals; these wrappers are the single Foundry-facing edge.
       listJournalForActor: (opts = {}) => game?.fabricate?.listJournalForActor?.(opts) ?? null,
       executeJournalRunCommand: (opts = {}) =>
         game?.fabricate?.executeJournalRunCommand?.(opts) ?? null,
@@ -422,16 +301,13 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       getWorldTime: () => game?.fabricate?.getWorldTime?.() ?? 0,
       getWorldTimeComponents: (worldTime) =>
         game?.fabricate?.getWorldTimeComponents?.(worldTime) ?? null,
-      // GM economy authoring + manual state controls (Manager app).
       getGatheringEconomy: (opts = {}) => game?.fabricate?.getGatheringEconomy?.(opts) ?? null,
       setGatheringEconomy: (opts = {}) => game?.fabricate?.setGatheringEconomy?.(opts),
       getGatheringStaminaState: (opts = {}) => game?.fabricate?.getGatheringStaminaState?.(opts) ?? [],
       setGatheringStamina: (opts = {}) => game?.fabricate?.setGatheringStamina?.(opts),
       adjustGatheringStamina: (opts = {}) => game?.fabricate?.adjustGatheringStamina?.(opts),
       restockGatheringNode: (opts = {}) => game?.fabricate?.restockGatheringNode?.(opts),
-      // Whether the given actor uuid is some party's travel-marker actor. Lets the
-      // gathering view ignore movement of ordinary tokens and only re-resolve the
-      // live current region when an actual travel marker moves.
+      // Lets the gathering view re-resolve the live region only when a real travel marker moves.
       isTravelMarkerActor: (actorUuid) => {
         if (!actorUuid) return false;
         const parties = game?.fabricate?.getGatheringPartyStore?.()?.list?.() ?? [];
@@ -439,31 +315,22 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
           .some(party => party?.travelActorUuid && String(party.travelActorUuid) === String(actorUuid));
       }
     };
-    // One shared actor-bar store instance, reused across renders, so the shell
-    // and the gathering tab read/write the same reactive selection state.
+    // One instance across renders, so the shell and the gathering tab share one selection state.
     services.actorBar = createActorBarStore({ services });
-    // Player Crafting tab stores. The component-sources store is created first so
-    // the crafting store can read the current source ids off it when it loads.
+    // The component-sources store is created FIRST, so the crafting store can read the current
+    // source ids off it as it loads.
     services.craftingSources = createCraftingSourcesStore({ services });
     services.crafting = createCraftingStore({ services });
-    // Player Inventory tab store. Shares the crafting source/actor selection (it
-    // reads the same seams + sibling craftingSources store) so both tabs agree on
-    // what the player owns.
     services.inventory = createInventoryStore({ services });
-    // Player Alchemy tab store. Reads the same crafting actor/source selection as
-    // the crafting + inventory stores (so all three agree on what the player owns)
-    // and owns the workbench/discipline state locally.
+    // All three tab stores read the SAME actor and source selection, so they agree on what the
+    // player owns; only the workbench and discipline state is local to this one.
     services.alchemy = createAlchemyStore({ services });
-    // Cross-tab navigation for the Inventory tab's "Pin for Crafting" / used-by
-    // links: select the recipe in the shared crafting store, then switch to the
-    // Crafting tab. Both stores are the same singletons the Crafting tab reads, so
-    // the selection is already applied when that tab renders.
+    // Both stores are the singletons the Crafting tab reads, so the selection is already applied
+    // by the time that tab renders.
     services.navigateToCraftingRecipe = (recipeId) => {
       if (recipeId) services.crafting?.select?.(recipeId);
       this._selectTab('crafting');
     };
-    // One shared journal store instance so the nav badge (shell) and the Journal
-    // tab read the same reactive run state.
     services.journal = createJournalStore({ services });
     return services;
   }
@@ -477,39 +344,22 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
       showAlchemy: isAlchemyTabAvailable(this._services),
       onSelectTab: (tab) => this._selectTab(tab),
       services: this._services,
-      // Session-scoped canvas Tool, surfaced reactively so the shell can render a
-      // status chip naming the active station tool (Phase 4 SHOULD-FIX 3). Null
-      // when no Tool station is active.
       activeCanvasTool: this._activeCanvasTool,
-      // Session-scoped environment + task for a gathering-task interactable
-      // shortcut: when a canvas gathering-task region activation is granted, the
-      // gathering view auto-selects this environment + task on open. Null on a
-      // plain manual open.
       scopedEnvironmentId: this._scopedEnvironmentId,
       scopedTaskId: this._scopedTaskId,
-      // Session-scoped interacting actor: when a region activation is granted the
-      // shell seeds this actor as the default top-bar selection (once per distinct
-      // value). Null on a plain manual open.
       scopedActorId: this._scopedActorId,
-      // SEEDED HERE, not merely refreshed on publication (issue 1198). `_registerHooks()`
-      // runs from `_onRender` — after this method and after Svelte has mounted — and returns
-      // early once the hook bag exists, while `show()` reuses the singleton. Without this
-      // seed a companion following the documented contract (register during your own `init`,
-      // before the window is ever opened) would have no tabs on first open and, if it
-      // registers once and never re-registers, never at all. DERIVED here rather than read
-      // off a field, because a key present in `_prepareSvelteProps` is re-assigned over the
-      // reactive props on every re-render, so a stale field would clobber a live snapshot.
-      // `showAlchemy` above is the same pattern and the precedent.
+      // SEEDED here, not merely refreshed on publication (issue 1198): `_registerHooks()` runs
+      // from `_onRender`, after this method, so a companion following the documented contract —
+      // register during your own `init` — would otherwise have no tabs on first open and, if it
+      // never re-registers, none at all. DERIVED rather than read off a field, because a key
+      // present here is re-assigned over the reactive props on every re-render.
       extensionSurfaces: deriveExtensionSurfaces(playerExtensions, {
         experimentalFeaturesEnabled: isExperimentalFeaturesEnabled(),
       }),
-      // The registry itself, so the mount host emits its surface hooks through the same
-      // injectable edge the registry's own hooks travel on.
       playerExtensions
     };
   }
 
-  /** Switch the active tab, reactively updating the mounted component. */
   _selectTab(tab) {
     if (!isOfferedTab(tab) || tab === this._activeTab) {
       return;
@@ -518,11 +368,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     this.updateProps({ activeTab: tab });
   }
 
-  /**
-   * Re-evaluate Alchemy tab availability (e.g. after systems or recipes change)
-   * and push it to the mounted component. If the Alchemy tab disappears while
-   * active, fall back to the default tab.
-   */
+  // An Alchemy tab that disappears while ACTIVE falls back to the default tab.
   _refreshAlchemy() {
     if (!this._services) {
       return;
@@ -534,17 +380,10 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     this.updateProps({ showAlchemy, activeTab: this._activeTab });
   }
 
-  /**
-   * Push a fresh companion-surface snapshot to the mounted shell (issue 1198).
-   *
-   * Called on every registry publication, which `publish` broadcasts on registration,
-   * unregistration and same-surface re-registration alike. A publication is also when a
-   * changed `fabricate.experimentalFeatures` setting first reaches an already-open window,
-   * because the gate is read at derivation rather than pushed. The active route falls back to
-   * the default Core tab when the new tab set no longer offers it — the identical shape
-   * `_refreshAlchemy` already uses when Alchemy disappears, and the reason an unregistered
-   * companion leaves the user on Crafting rather than on an empty panel.
-   */
+  // Called on every registry publication, which is also when a changed `experimentalFeatures`
+  // setting first reaches an already-open window, because the gate is read at derivation rather
+  // than pushed. The active route falls back to the default Core tab when the new set no longer
+  // offers it, which is why an unregistered companion leaves the user on Crafting (issue 1198).
   _refreshExtensionSurfaces() {
     const extensionSurfaces = deriveExtensionSurfaces(playerExtensions, {
       experimentalFeaturesEnabled: isExperimentalFeaturesEnabled(),
@@ -557,14 +396,8 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     this.updateProps({ extensionSurfaces, activeTab: this._activeTab });
   }
 
-  /**
-   * Re-project the actor-selection bar after the GM changed which actor types count
-   * as player characters (issue 1024).
-   *
-   * The bar seeds ONCE at load, so without this a player whose only owned actor just
-   * became a player character keeps an empty bar until reload — which is the reported
-   * bug's second half.
-   */
+  // The bar seeds ONCE at load, so without this a player whose only owned actor just became a
+  // player character keeps an empty bar until reload (issue 1024).
   _refreshSelectableActors() {
     this._services?.actorBar?.refreshSelectableActors?.();
   }
@@ -585,11 +418,8 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
         this._refreshSelectableActors()
       )
     };
-    // EXACTLY ONE subscriber per registry, per window. `FabricateAppRoot` subscribes to
-    // nothing; it takes the snapshot as a prop, so the rail and the panel can never disagree
-    // about which surfaces exist. `subscribeSurfaceIds` suffices because `publish` broadcasts
-    // a freshly built frozen id array on every registration, unregistration and same-surface
-    // re-registration.
+    // EXACTLY ONE subscriber per registry, per window: `FabricateAppRoot` subscribes to nothing and
+    // takes the snapshot as a prop, so the rail and the panel cannot disagree about what exists.
     this._playerExtensionsUnsubscribe = playerExtensions.subscribeSurfaceIds(() =>
       this._refreshExtensionSurfaces()
     );
@@ -609,8 +439,7 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
 
   async close(options) {
     this._removeHooks();
-    // Destroy the session-scoped canvas-tool + scoped env/task context so the
-    // singleton does not leak them into the next manual open.
+    // So the singleton does not leak this session's context into the next manual open.
     this._activeCanvasTool = null;
     this._scopedEnvironmentId = null;
     this._scopedTaskId = null;
@@ -619,23 +448,16 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     if (SvelteFabricateApp._instance === this) {
       SvelteFabricateApp._instance = null;
     }
-    // Commit any debounced progressive-order write before the window goes away
-    // (issue 651). Without this a player who reorders and immediately closes,
-    // refreshes, or logs out inside the debounce window loses the order silently.
+    // Without this a player who reorders and closes inside the debounce window loses it silently.
     this._flushPendingOrderWrite();
-    // Companion UI owns its own DOM and cleanup. Dispose it before `super.close()` unmounts
-    // the Svelte root, so its mount target is still connected: `unmount()` destroys the root
-    // effect and `destroy_effect` removes the effect's DOM BEFORE running teardowns, so every
-    // `onDestroy` in the tree runs against an already-detached target. This is the WINDOW-CLOSE
-    // half of the connected-target teardown, not the whole of it: `FabricateAppRoot`'s surface
-    // `$effect.pre` is the other caller, disposing while connected when the tab leaves a
-    // companion route, moves to a different companion surface, or the active provider
-    // unregisters under its own live tab.
+    // Disposed BEFORE `super.close()` unmounts the Svelte root, so the mount target is still
+    // connected: `destroy_effect` removes the effect's DOM before running teardowns, so every
+    // `onDestroy` would otherwise run against a detached target. This is the window-close HALF of
+    // that rule; `FabricateAppRoot`'s surface `$effect.pre` is the other caller.
     this._svelteComponent?.disposePlayerProvidersBeforeRemoval?.();
     const result = await super.close(options);
-    // Fire the canvas re-prompt callback AFTER the window has fully closed (issue
-    // 332) so the Interact prompt re-appears against a settled canvas. One-shot
-    // and no-throw — a handler error must never break the close.
+    // AFTER the window has fully closed, so the Interact prompt re-appears against a settled
+    // canvas. One-shot and no-throw: a handler error must never break the close.
     this._fireCloseCallback();
     return result;
   }
@@ -647,37 +469,21 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     this._scopedTaskId = null;
     this._scopedActorId = null;
     this._scopedInteractableRef = null;
-    // Safety net mirroring close(): a forced teardown bypasses our close() override,
-    // and a pending order write must survive that too (issue 651).
+    // A forced teardown bypasses the `close()` override, and a pending write must survive it.
     this._flushPendingOrderWrite();
     super._onClose(options);
-    // Safety net mirroring close(): if the window is torn down via the _onClose
-    // lifecycle without our close() override (e.g. a forced teardown), still fire
-    // the one-shot re-prompt callback.
+    // The same safety net for the one-shot re-prompt callback.
     this._fireCloseCallback();
   }
 
-  /**
-   * Commit a debounced progressive stage-order write immediately (issue 651).
-   *
-   * Reorder writes are debounced because each is a replicated document write, which
-   * leaves a window where the player's chosen order exists only in memory. Closing the
-   * window must not discard it. Safe to call from both `close()` and `_onClose()`: the
-   * store's flush is a no-op when no write is pending, so a double call writes once.
-   *
-   * Flushes BOTH progressive-order writers: the crafting store (issue 651) and the
-   * inventory store's salvage stage order (issue 675). This is the only teardown net
-   * either has.
-   *
-   * Deliberately NOT awaited and never throws — a rejected write is the store's business
-   * (it reverts and announces), and a teardown must not be blocked or broken by it.
-   *
-   * The `try/catch` below catches only SYNCHRONOUS throws, and `void` discards the
-   * promise, so a store flush that REJECTED would surface as an unhandled promise
-   * rejection here — a console error on a path with no user to see it. Both stores
-   * therefore report failure by return status rather than rejecting; the `.catch()`
-   * below is a second line of defence so this seam is safe regardless.
-   */
+  // Reorder writes are debounced because each is a replicated document write, which leaves a window
+  // where the chosen order exists only in memory. Safe from both `close()` and `_onClose()`: each
+  // store's flush is a no-op with nothing pending, so a double call writes once. It flushes BOTH
+  // progressive-order writers and is the only teardown net either has.
+  // Deliberately NOT awaited and never throwing: a rejected write is the store's own business, and
+  // a teardown must not be blocked by it. The `try/catch` catches only SYNCHRONOUS throws and `void`
+  // discards the promise, so both stores report failure by RETURN STATUS rather than rejecting; the
+  // `.catch()` below is the second line of defence.
   _flushPendingOrderWrite() {
     try {
       const noop = () => {};
@@ -688,11 +494,6 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     }
   }
 
-  /**
-   * Invoke the one-shot interactable-close callback exactly once, then clear it
-   * (issue 332). Defensive: never throws — a re-prompt failure must not break the
-   * window close. Safe to call from both close() and _onClose().
-   */
   _fireCloseCallback() {
     const callback = this._onCloseCallback;
     this._onCloseCallback = null;
@@ -700,40 +501,13 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     try {
       callback();
     } catch {
-      // A re-prompt failure must never break the window close.
+      // Never throws: a re-prompt failure must not break the window close.
     }
   }
 
-  /**
-   * Open (or re-focus) the shared Fabricate window on the requested tab.
-   *
-   * `activeCanvasTool` semantics: the active canvas tool is session-scoped and is
-   * REPLACED on every `show`, including re-show of the live singleton. An explicit
-   * `show('crafting', { activeCanvasTool })` sets it; a plain `show('crafting')`
-   * CLEARS it — a fresh manual open (or a manual re-open of the existing window)
-   * has no canvas tool, so it must not silently inherit a station tool from a
-   * prior interactable activation. The context is also cleared on close.
-   *
-   * @param {string} [tab='crafting'] A Core tab id (crafting/alchemy/gathering/journal/
-   *   inventory) or a currently registered companion route key `ext:<surfaceId>:<tabId>`.
-   * @param {object} [options]
-   * @param {object|null} [options.activeCanvasTool] Virtual-present Tool injected
-   *   by a granted Tool-station region activation: `{ componentId, systemId, toolId, label }`.
-   * @param {string} [options.environmentId] Scoped environment (gathering-task region).
-   * @param {string} [options.taskId] Scoped task (gathering-task region).
-   * @param {string} [options.actorId] Scoped interacting actor — seeds the default
-   *   top-bar selection (set when supplied, cleared when not, like the tool/env/task
-   *   context).
-   * @param {object} [options.interactableRef] Scoped scene-interactable ref
-   *   (`{sceneId, regionId, behaviorId}`) for a gathering-task interactable that
-   *   owns its own node pool (issue 302); threaded into the attempt.
-   * @param {() => void} [options.onClose] One-shot callback invoked once the
-   *   window closes (issue 332). Set by a canvas interactable activation so the
-   *   Interact prompt re-appears when the activating token is still in the region;
-   *   REPLACED on every show (set when supplied, cleared when not) so a later
-   *   manual open never re-fires a stale interactable re-prompt.
-   * @returns {Promise<SvelteFabricateApp>}
-   */
+  // The session-scoped canvas tool is REPLACED on every `show`, including a re-show of the live
+  // singleton: an explicit one sets it, a plain `show(tab)` CLEARS it, because a manual open must
+  // not silently inherit a station tool from a prior interactable activation.
   static async show(tab = DEFAULT_TAB, { activeCanvasTool, environmentId, taskId, actorId, interactableRef, onClose } = {}) {
     const initialTab = isOfferedTab(tab) ? tab : DEFAULT_TAB;
     const nextCanvasTool = activeCanvasTool ?? null;
@@ -744,20 +518,13 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
     const nextOnClose = typeof onClose === 'function' ? onClose : null;
     const existing = SvelteFabricateApp._instance;
     if (existing?.rendered) {
-      // Re-show REPLACES the session-scoped canvas tool + scoped env/task/actor/ref
-      // context (set when supplied, cleared when not) so a manual re-open never
-      // inherits a stale station context.
       existing._activeCanvasTool = nextCanvasTool;
       existing._scopedEnvironmentId = nextEnvironmentId;
       existing._scopedTaskId = nextTaskId;
       existing._scopedActorId = nextActorId;
       existing._scopedInteractableRef = nextInteractableRef;
-      // Replace the one-shot close re-prompt callback too (issue 332): a fresh
-      // interactable activation re-arms it; a plain re-open clears it.
+      // The one-shot re-prompt callback is replaced on the same rule (issue 332).
       existing._onCloseCallback = nextOnClose;
-      // Push the replaced tool + scoped env/task/actor to the mounted tree so the
-      // status chip updates, the gathering view re-auto-selects the scoped env+task,
-      // and a re-interaction with a different actor re-seeds the selection.
       existing.updateProps({
         activeCanvasTool: nextCanvasTool,
         scopedEnvironmentId: nextEnvironmentId,
@@ -783,7 +550,6 @@ export class SvelteFabricateApp extends SvelteApplicationMixin(
   }
 }
 
-// Register with the factory so getFabricateAppClass() can return this class.
-// This file is imported as a side-effect by main.js, which triggers this
-// registration at module load time.
+// Registered so `getFabricateAppClass()` can return this class; `main.js` imports this file for
+// the side effect.
 registerFabricateApp(SvelteFabricateApp);

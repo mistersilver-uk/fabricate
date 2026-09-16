@@ -61,27 +61,13 @@ export function buildEditableEssenceOptions(essenceDefinitions = [], currentEsse
     .sort(compareComponentEditorEssenceOptions);
 }
 
-/**
- * The essence quantities a component's map carries that this system's roster does NOT define
- * (issue 1371 r20-store3, reviewer round 6 finding 2).
- *
- * A world map is NOT narrowed to the ids a given system holds (`data-models`, `### Component
- * scope`), so a resolved map can carry an essence this system never joined. `buildEditableEssenceOptions`
- * maps over the system's own `essenceDefinitions`, which means such an id has no row, no tile and
- * no way back into `updates.essences` — so the very next component save DROPPED it, silently, from
- * a save the GM made to change a category.
- *
- * These entries are therefore CARRIED FORWARD verbatim rather than rendered: the system has no
- * name, icon or colour for the essence and no control that could edit it, so offering a nameless
- * stepper would be worse than saying nothing. The quantity is passed through UNCLAMPED for the
- * same reason — nothing here authored it, and re-flooring a value this editor cannot show is an
- * edit the GM did not make. Non-positive and non-finite entries are dropped, because that is what
- * `normalizeComponentEssenceMap` does with them at the write boundary anyway.
- *
- * @param {unknown} currentEssences the map (or the item card's array) the editor was seeded from.
- * @param {object[]} essenceOptions the rows the editor CAN offer.
- * @returns {Record<string, number>} the entries no row represents.
- */
+// A world essence map is NOT narrowed to the ids a given system holds (`data-models`, Component
+// scope), so a resolved map can carry an essence this system never joined — and such an id gets no
+// row, so the next save DROPPED it silently (issue 1371). These entries are CARRIED FORWARD
+// verbatim rather than rendered: the system has no name, icon or colour for them and no control
+// that could edit them. The quantity passes through UNCLAMPED for the same reason, since re-flooring
+// a value this editor cannot show is an edit the GM did not make; non-positive and non-finite
+// entries are dropped, which is what `normalizeComponentEssenceMap` does at the write boundary.
 export function carriedComponentEssences(currentEssences, essenceOptions = []) {
   const offered = new Set(
     (Array.isArray(essenceOptions) ? essenceOptions : []).map(option => option?.id)
