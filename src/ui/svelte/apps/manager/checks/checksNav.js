@@ -5,10 +5,8 @@
  * load-bearing: `craftingNav.js` declares a nav item `settings` whose view is `crafting-settings`,
  * so a pin written against nav ids would compare the wrong vocabulary.
  * `tests/view-lab-cases.test.js` pins every `expectView` value beginning `checks` against this
- * array, and `expectView` is matched against `data-manager-view`. The bare `checks` id is NOT a
- * member — the root never renders it — and is exported as {@link CHECKS_REDIRECT_VIEW}, so a
- * deep link has a defined answer without widening the pinned set. Pure and dependency-free.
- */
+ * array. The bare `checks` id is NOT a member — the root never renders it — and is exported as
+ * {@link CHECKS_REDIRECT_VIEW}, so a deep link has a defined answer. Pure and dependency-free. */
 
 /** The retained entry point, landing on the first AVAILABLE child, which depends on the feature
  *  flags — so it is resolved rather than aliased. @type {string} */
@@ -92,8 +90,7 @@ function countFor(issueCounts, id) {
  *   IGNORED if supplied and computed here, being the total of the three.
  * @param {Record<string, boolean>} [args.dirtyActivities] Per-activity unsaved-edit flags.
  * @returns {Array<{ id: string, view: string, icon: string, labelKey: string, labelFallback:
- *   string, activity: boolean, mode: string, issueCount: number, dirty: boolean }>}
- */
+ *   string, activity: boolean, mode: string, issueCount: number, dirty: boolean }>} */
 export function buildChecksNavItems({
   features = {},
   resolutionMode = 'simple',

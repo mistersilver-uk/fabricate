@@ -11,18 +11,15 @@ import {
 /**
  * Pure readiness evaluator for one subsystem check, mirroring `recipeReadiness.js`: it returns
  * stable check/issue ids the Checks Validation tab maps to localized copy.
- *
  * @typedef {{ id: string, satisfied: boolean }} CheckReadinessCheck
- * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info' }} CheckReadinessIssue
- */
+ * @typedef {{ id: string, severity: 'critical' | 'warning' | 'info' }} CheckReadinessIssue */
 
 /**
  * EVERY issue id this evaluator can raise — the SOURCE OF TRUTH, inline literals being
  * enumerable only by reaching every branch. A GUARD, NOT A CONVENTION: `pushIssue` is the ONLY
  * way an issue reaches the list and it THROWS on an unregistered id, and
  * `tests/checks-readiness.test.js` also scans this source, catching a direct `push`.
- * @type {ReadonlyArray<string>}
- */
+ * @type {ReadonlyArray<string>} */
 export const CHECK_READINESS_ISSUE_IDS = Object.freeze([
   // Formula
   'noRollFormula',
@@ -51,8 +48,7 @@ const REGISTERED_ISSUE_IDS = new Set(CHECK_READINESS_ISSUE_IDS);
 /**
  * The five sections an activity route renders, in reading order: the `data-checks-section`
  * values the strip emits, declared beside the registry that buckets into them.
- * @type {ReadonlyArray<string>}
- */
+ * @type {ReadonlyArray<string>} */
 export const CHECK_SECTION_IDS = Object.freeze([
   'roll',
   'outcomes',
@@ -64,9 +60,8 @@ export const CHECK_SECTION_IDS = Object.freeze([
 /**
  * Which SECTION owns each readiness issue: the strip's dots, the rail's badge and the Validation
  * deep links read this one map, PROVEN EXHAUSTIVE both ways by `tests/checks-readiness.test.js`.
- * `rangeGap` buckets to Outcomes rather than The roll, the hole being between two authored TIERS.
- * @type {Readonly<Record<string, string>>}
- */
+ * `rangeGap` buckets to Outcomes rather than The roll, the hole being between authored TIERS.
+ * @type {Readonly<Record<string, string>>} */
 export const CHECK_ISSUE_SECTIONS = Object.freeze({
   noRollFormula: 'roll',
   retiredPlaceholderBreaksFormula: 'roll',
@@ -89,15 +84,12 @@ export const CHECK_ISSUE_SECTIONS = Object.freeze({
 /**
  * The mode this evaluator answers "this activity rolls no check at all" under. Gathering `d100`
  * and alchemy `none` are the reachable members, differing only in WHY, which the modifier issue
- * splits on. The name is "no check to AUTHOR", not a claim that nothing is rolled.
- * @type {'none'}
- */
+ * splits on; the name is "no check to AUTHOR", not a claim that nothing is rolled.
+ * @type {'none'} */
 export const NO_CHECK_MODE = 'none';
 
-/**
- * Every mode {@link evaluateCheckReadiness} dispatches on. Frozen, and enforced below.
- * @type {ReadonlyArray<string>}
- */
+/** Every mode {@link evaluateCheckReadiness} dispatches on, frozen and enforced below.
+ *  @type {ReadonlyArray<string>} */
 export const CHECK_READINESS_MODES = Object.freeze(['simple', 'routed', 'progressive', 'none']);
 
 const SUPPORTED_MODES = new Set(CHECK_READINESS_MODES);
@@ -109,8 +101,7 @@ const SUPPORTED_MODES = new Set(CHECK_READINESS_MODES);
  * draft under ROUTED rules, and to demand a roll formula for a mode whose route renders no
  * formula field. `null` becomes {@link NO_CHECK_MODE}.
  * @param {'simple'|'routed'|'progressive'|null|undefined} slot The resolvers' `slot` field.
- * @returns {'simple'|'routed'|'progressive'|'none'}
- */
+ * @returns {'simple'|'routed'|'progressive'|'none'} */
 export function readinessModeForSlot(slot) {
   return slot || NO_CHECK_MODE;
 }
@@ -118,9 +109,7 @@ export function readinessModeForSlot(slot) {
 /**
  * The section that owns an issue id, or `null` for an id no bucket claims — deliberately not a
  * default section, which would put a dot on a section whose controls cannot clear it.
- * @param {string} id A {@link CHECK_READINESS_ISSUE_IDS} member.
- * @returns {string|null}
- */
+ * @param {string} id A {@link CHECK_READINESS_ISSUE_IDS} member. @returns {string|null} */
 export function sectionForIssue(id) {
   return CHECK_ISSUE_SECTIONS[id] ?? null;
 }
@@ -132,8 +121,7 @@ export function sectionForIssue(id) {
  * @param {CheckReadinessIssue[]} issues
  * @param {string} id
  * @param {'critical'|'warning'|'info'} severity
- * @param {object|null} [data] Interpolation values for the issue's localized sentence.
- */
+ * @param {object|null} [data] Interpolation values for the localized sentence. */
 function pushIssue(issues, id, severity, data = null) {
   if (!REGISTERED_ISSUE_IDS.has(id)) {
     throw new Error(
@@ -151,9 +139,7 @@ function trimmed(value) {
 /**
  * The active outcome-tier list for a routed check; relative and fixed are independent lists and
  * only the active type's is authored or validated.
- * @param {object} check
- * @returns {{ type: 'relative' | 'fixed', outcomes: object[] }}
- */
+ * @param {object} check @returns {{ type: 'relative' | 'fixed', outcomes: object[] }} */
 function routedOutcomes(check) {
   const type = check?.type === 'fixed' ? 'fixed' : 'relative';
   const key = type === 'fixed' ? 'fixedOutcomes' : 'relativeOutcomes';
@@ -168,8 +154,7 @@ function routedOutcomes(check) {
  * are guidance, a static count not knowing which conditions will match.
  * @param {object} check    Plain check draft.
  * @param {object[]} outcomes The ACTIVE outcome-tier list (relative or fixed).
- * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }}
- */
+ * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }} */
 function tierStepTargetReadiness(check, outcomes) {
   const triggers = Array.isArray(check?.checkBreakage?.triggers)
     ? check.checkBreakage.triggers
@@ -199,8 +184,7 @@ function tierStepTargetReadiness(check, outcomes) {
  * manufacturing a phantom gap.
  * @param {object[]} outcomes The active FIXED outcome-tier list.
  * @param {Set<number>} excluded Indices already reported invalid or overlapping.
- * @returns {boolean}
- */
+ * @returns {boolean} */
 function fixedRangesHaveGap(outcomes, excluded) {
   const spans = outcomes
     .map((outcome, index) => ({ index, start: Number(outcome?.start), end: Number(outcome?.end) }))
@@ -231,14 +215,11 @@ function fixedRangesHaveGap(outcomes, excluded) {
  * three `modifiersInert*` warnings report a selection reaching no roll, gated on NON-EMPTY.
  * @param {object|null} modifierContext A `buildCheckModifierContext` bag, or null (no-ops).
  * @param {{ rollsNoCheck: boolean, hasRollFormula: boolean }} formulaState
- * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }}
- */
+ * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }} */
 /**
  * The offending entries' display names, comma-joined, or `''` when none are faulted; the label
  * is preferred and the id the fallback, so an unnamed entry is still locatable.
- * @param {Array<{entry: object}>} faulted
- * @returns {string}
- */
+ * @param {Array<{entry: object}>} faulted @returns {string} */
 function namesOf(faulted) {
   return faulted.map(({ entry }) => entry.label || entry.id).join(', ');
 }
@@ -299,8 +280,7 @@ function checkModifierReadiness(modifierContext, { rollsNoCheck, hasRollFormula,
  * @param {object|null} [options.modifierContext] A `buildCheckModifierContext` bag, or null.
  * @param {'crafting'|'salvage'|'gathering'} [options.activity] Which activity's check this is;
  *   it changes one answer — WHY a no-check mode's selection reaches no roll.
- * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }}
- */
+ * @returns {{ checks: CheckReadinessCheck[], issues: CheckReadinessIssue[] }} */
 export function evaluateCheckReadiness(check = {}, options = {}) {
   const mode = options.mode || 'simple';
   if (!SUPPORTED_MODES.has(mode)) {

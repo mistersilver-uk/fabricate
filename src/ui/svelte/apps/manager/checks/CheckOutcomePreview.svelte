@@ -31,8 +31,7 @@
   const result = $derived(preview?.result ?? null);
   const rolled = $derived(Boolean(result));
   const facts = $derived(Array.isArray(preview?.facts) ? preview.facts : []);
-  // The FIRST rolled face, which is what the medallion shows; the breakdown line beside it
-  // carries the rest of a multi-group formula.
+  // The FIRST rolled face, the breakdown line beside it carrying the rest.
   const face = $derived(result?.data?.diceGroups?.[0]?.results?.[0] ?? null);
   const marginLabel = $derived.by(() => {
     if (!Number.isFinite(preview?.margin)) return '';
@@ -61,14 +60,10 @@
     </p>
   {:else}
     <!-- THE STUDIO'S BUTTON PRIMITIVE, not a hand-written class string: a bare
-         `manager-button is-primary` matches no rule stating a type size, so the label lands on
-         Foundry's inherited app base while every other button in the studio reads at the
-         primitive's own size — exactly the drift `ManagerButton` exists to end and exactly the
-         drift a remembered class string cannot be checked for.
-
-         It is a CONVERSION, not a wrapper: the element below is already the button. Its Foundry
-         `<button>` reset moved to the sheet's Checks Studio block with it, a scoped rule naming a
-         class this component no longer emits matching nothing. -->
+             `manager-button is-primary` matches no rule stating a type size, so the label lands on
+             Foundry's inherited app base while every other button reads at the primitive's size —
+             the drift `ManagerButton` exists to end, and one a remembered class string cannot be
+             checked for. A CONVERSION, not a wrapper: the element below is already the button. -->
     <ManagerButton
       role="primary"
       class="manager-checks-simulator-roll"
@@ -104,10 +99,9 @@
 
     {#if rolled}
       <div class="manager-checks-simulator-readout" data-checks-simulator-readout>
-        <!-- The rolled face, ON the medallion: the digit is the subject and the die glyph behind it
-             is the tile's own art, so the number is LAYERED over the tile. An absolutely-positioned
-             child with no offsets would sit at its STATIC position, to the right of the tile and
-             under the breakdown line, so `inset: 0` is what makes "on the medallion" true. -->
+        <!-- The rolled face, ON the medallion: the digit is the subject and the glyph behind it the
+                     tile's art, so an absolutely-positioned child with no offsets would sit at its STATIC
+                     position, right of the tile. `inset: 0` is what makes "on the medallion" true. -->
         <span class="manager-checks-simulator-face" data-checks-simulator-face>
           <Medallion icon="" size={44} />
           <small data-checks-simulator-face-value>
@@ -190,9 +184,8 @@
     justify-content: center;
   }
 
-  /* The digit is the SUBJECT of this tile, so the medallion renders no competing glyph: an
-     icon and a numeral centred on the same square overlap into an unreadable blob, which is
-     why the caption sits below the number rather than an icon beside it. */
+  /* The digit is the SUBJECT of this tile, so the medallion renders no competing glyph: an icon
+       and a numeral centred on one square overlap into an unreadable blob. */
   .manager-checks-simulator-face small {
     position: absolute;
     inset: 0;
@@ -240,8 +233,7 @@
   }
 
   /* The matched band card mixes into an OPAQUE base for the reason the band ramp records: a
-     translucent surface token makes the mix behave as an OPACITY ramp and drops the label
-     below WCAG AA. */
+       translucent token makes the mix an OPACITY ramp and drops the label below WCAG AA. */
   .manager-checks-simulator-band {
     display: flex;
     gap: var(--fab-space-2);

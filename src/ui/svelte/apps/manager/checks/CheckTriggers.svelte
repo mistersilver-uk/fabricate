@@ -48,8 +48,7 @@
 
   const triggers = $derived(Array.isArray(value?.triggers) ? value.triggers : []);
 
-  // Dice groups in evaluated-term order, `groupId` matching the engine's `roll.dice` term
-  // index; a duplicate label is disambiguated by an occurrence counter.
+  // Dice groups in evaluated-term order, `groupId` matching the engine's `roll.dice` index.
   const diceGroups = $derived(
     (() => {
       const parsed = parseDiceGroups(rollFormula);
@@ -75,9 +74,7 @@
 
   const firstD20GroupId = $derived(diceGroups.find((group) => group.sides === 20)?.groupId ?? null);
 
-  // The comparison a GM reads, not the symbol the model stores: `==` in a sentence-shaped row
-  // is the operator restated as code. Ordered as the design orders them rather than as the
-  // stored values happen to sort.
+  // The comparison a GM reads, not the symbol the model stores, and in the design order.
   const OPERATORS = [
     {
       value: '==',
@@ -163,8 +160,8 @@
     ].filter(Boolean)
   );
 
-  // Outcome toggle segments, ordered good→neutral→bad so the neutral default sits in the
-  // middle. A progressive check has no pass/fail, only a numeric value, so it relabels.
+  // Outcome toggle segments, good→neutral→bad so the neutral default sits in the middle; a
+  // progressive check has no pass/fail, only a value, so it relabels.
   const outcomeChoices = $derived(
     kind === 'progressive'
       ? [
@@ -209,8 +206,8 @@
         ]
   );
 
-  // DISABLED on the radio itself, not merely dimmed, for an outcomeTier condition: that pin is
-  // what keeps forcing non-circular.
+  // DISABLED on the radio itself, not merely dimmed, for an outcomeTier condition: that pin
+  // is what keeps forcing non-circular.
   function outcomeSegments(isOutcomeTier) {
     return outcomeChoices.map((option) => ({
       ...option,
@@ -249,18 +246,16 @@
     text('FABRICATE.Admin.Manager.Checks.Breakage.TierStepMode', 'Tier step mode')
   );
 
-  // The tier-step operand's only name is "Steps up"/"Steps down", so the shared adjunct strings
-  // parametrized with it read as "Decrease Steps up". Its adjuncts take the ROW's label
-  // instead, so the shared derivation is spread from `tierStepLabel` and only `ariaLabel` is
-  // overridden after it.
+  // The tier-step operand's only name is "Steps up"/"Steps down", so the shared adjuncts
+  // parametrized with it read as "Decrease Steps up"; they take the ROW's label instead, and
+  // only `ariaLabel` is overridden after the spread.
   const tierStepAdjunctLabels = $derived(stepperLabels(tierStepLabel));
   const conditionValueLabel = $derived(
     text('FABRICATE.Admin.Manager.Checks.Breakage.Value', 'Value')
   );
 
   // The expanded body's micro-labels. `TierStep`/`OutcomeColumn` stay the CONTROL's own
-  // accessible names, because a radiogroup announced as "And the tier moves" reads as a
-  // fragment; these are the visible headings over each group, which is a different job.
+  // accessible names, a radiogroup announced as "And the tier moves" reading as a fragment.
   const conditionLegend = $derived(
     text('FABRICATE.Admin.Manager.Checks.Breakage.ConditionLegend', 'Condition')
   );
@@ -275,28 +270,24 @@
   );
 
   // THE LIST COLLAPSES: at most ONE trigger is open and none on arrival, three full editors
-  // being taller than the pane — which is why authoring a preset looked inert, the new card
-  // landing below the fold. So a new trigger OPENS and is SCROLLED TO, the other half of that
-  // fix; without the scroll the accordion just moves the invisible card.
+  // being taller than the pane — which is why authoring a preset looked inert. So a new
+  // trigger OPENS and is SCROLLED TO, without which the accordion moves an invisible card.
   let expandedId = $state(null);
-  // Element per trigger, for the scroll. `$state` rather than a plain object, because
-  // `bind:this` into a plain member warns `binding_property_non_reactive` and the warning is
-  // the truth: the effect below has to notice the node arriving.
+  // Element per trigger, for the scroll. `$state` rather than a plain object, `bind:this` into
+  // a plain member warning `binding_property_non_reactive` — and the warning is the truth.
   const triggerNodes = $state({});
   // The id already scrolled to, so re-rendering a still-expanded trigger does not yank back.
   let scrolledTo = null;
 
   $effect(() => {
-    // Read the list as well as the node map: `expandedId` is set BEFORE the parent emits the
-    // longer list back down, so the effect must re-run once the card exists.
+    // Read the list too: `expandedId` is set BEFORE the parent emits the longer list back down.
     void triggers.length;
     const id = expandedId;
     if (!id || scrolledTo === id) return;
     const node = triggerNodes[id];
     if (!node) return;
     scrolledTo = id;
-    // `nearest` so expanding an already-visible card does not move the pane at all; happy-dom
-    // does not implement it, hence the optional call.
+    // `nearest` so an already-visible card does not move the pane; happy-dom lacks it, hence `?.`
     node.scrollIntoView?.({ block: 'nearest' });
   });
 
@@ -333,8 +324,7 @@
         outcome: 'none',
         // Default a new trigger to breaking tools only where that effect is reachable.
         breakTools: showBreakTools === true,
-        // Authored here rather than left to the normalizer, so a freshly added trigger and
-        // a saved-then-reloaded one are the same object.
+        // Authored here, so a freshly added trigger and a saved-then-reloaded one are one object.
         tierStep: { mode: 'none', steps: 1, tierId: null },
       },
     ]);
@@ -375,9 +365,8 @@
     return Array.isArray(condition?.tierIds) && condition.tierIds.includes(id);
   }
 
-  // The trigger's tierStep effect, read defensively because an older or hand-edited trigger may
-  // carry none. FLAT rather than a discriminated union, so switching mode never destroys the
-  // other mode's operand.
+  // The trigger's tierStep effect, read defensively because an older trigger may carry none,
+  // and FLAT, so switching mode never destroys the other mode's operand.
   function tierStepFor(trigger) {
     const source =
       trigger?.tierStep && typeof trigger.tierStep === 'object' ? trigger.tierStep : {};
@@ -396,7 +385,7 @@
   }
 
   // A target naming no tier on the ACTIVE list, reachable by ordinary authoring: the
-  // relative↔fixed switch swaps the whole tier list and dangles every `tierId` at once.
+  // relative↔fixed switch dangles every `tierId` at once.
   function isDanglingTarget(step) {
     return Boolean(step.tierId) && !outcomeOptions.some((option) => option.id === step.tierId);
   }
@@ -410,9 +399,8 @@
     updateCondition(id, { tierIds: next });
   }
 
-  // What each trigger says about itself. The sentence is composed by the pure
-  // `checkTriggerSummary` module and this is only the localization bridge, which is why a
-  // fragment arrives as `{ key, fallback }` and is resolved here.
+  // What each trigger says about itself, composed by the pure `checkTriggerSummary` module;
+  // this is only the localization bridge, hence the `{ key, fallback }` fragments.
   const tierNames = $derived(
     Object.fromEntries((outcomeOptions ?? []).map((option) => [option.id, option.name || '']))
   );
@@ -459,9 +447,8 @@
     );
   }
 
-  // The preset row, withheld entirely when the formula rolls no dice: a preset offered against
-  // a formula with no die would author a condition pointing at a group that does not exist.
-  // `checkTriggerPresets` decides that, not this component.
+  // The preset row, withheld when the formula rolls no dice: a preset offered against one
+  // would author a condition pointing at a group that does not exist.
   const presets = $derived(checkTriggerPresets({ kind, diceGroups }));
 
   function addPreset(presetId) {
@@ -473,17 +460,16 @@
       newId,
     });
     if (!trigger) return;
-    // Open and scroll to it for the same reason `addTrigger` does, and MORE so: the card a
-    // preset authors lands at the foot of a list routinely taller than the pane.
+    // Open and scroll to it for `addTrigger`'s reason, and MORE so: a preset's card lands at
+    // the foot of a list routinely taller than the pane.
     expandedId = trigger.id;
     emit([...triggers, trigger]);
   }
 </script>
 
-<!-- ADD A COMMON TRIGGER, in its own card above the list: it is not part of the trigger
-     editor, it is the shortcut past having to learn the editor first. A preset authors an
-     ORDINARY trigger, with no marker field and nothing downstream treating it differently,
-     which is what keeps it a shortcut rather than a second kind of trigger. -->
+<!-- ADD A COMMON TRIGGER, in its own card above the list: the shortcut past having to learn
+     the editor first. A preset authors an ORDINARY trigger, with no marker field and nothing
+     downstream treating it differently. -->
 {#if presets.length > 0}
   <InspectorCard class="manager-checks-card" data-check-trigger-presets="">
     <div class="manager-checks-card-head">
@@ -556,10 +542,9 @@
           bind:this={triggerNodes[trigger.id]}
         >
           <div class="manager-checks-trigger-head">
-            <!-- The WHOLE head is the disclosure, glyph tile to chevron, because the chevron alone is a
-                 10px target for the commonest action on this screen. The delete button is its SIBLING,
-                 never its child: a `<button>` inside a `<button>` is invalid. The title is a `<span>` for
-                 the same reason — a heading is not phrasing content and may not sit inside a button. -->
+            <!-- The WHOLE head is the disclosure, glyph tile to chevron, the chevron alone being a 10px
+                             target for the commonest action here. The delete button is its SIBLING and the title
+                             a `<span>`: neither a button nor a heading may sit inside a button. -->
             <button
               type="button"
               class="manager-checks-trigger-disclosure"
@@ -591,8 +576,7 @@
                 class={`fas ${expanded ? 'fa-chevron-up' : 'fa-chevron-down'} manager-checks-trigger-chevron`}
                 aria-hidden="true"
               ></i>
-              <!-- The accessible name of the disclosure, which its visible content does not supply: the
-                   title reads as a condition and the chevron is decorative. -->
+              <!-- The accessible name of the disclosure, which its visible content does not supply. -->
               <span class="visually-hidden">
                 {expanded
                   ? text(
@@ -726,9 +710,8 @@
                       {/each}
                     </select>
                   </Field>
-                  <!-- A PLAIN NUMBER FIELD, not a stepper: a threshold is typed rather than walked to, and
-                       reaching 20 from 1 is nineteen clicks. `Stepper` still owns the tier-step operand below,
-                       which is a magnitude of one or two and is genuinely stepped. -->
+                  <!-- A PLAIN NUMBER FIELD: a threshold is typed rather than walked to, and reaching 20 from
+                                         1 is nineteen clicks. `Stepper` still owns the tier-step operand below. -->
                   <Field as="label" class="manager-checks-trigger-value">
                     <span>{conditionValueLabel}</span>
                     <input
@@ -744,8 +727,8 @@
                 {/if}
               </div>
 
-              <!-- THE FORCED OUTCOME, placed where the effect groups read as a sequence: the condition,
-                   then what it does to the outcome, then what it does to the tier. -->
+              <!-- THE FORCED OUTCOME, where the effect groups read as a sequence: the condition, what it
+                                 does to the outcome, what it does to the tier. -->
               <div class="manager-checks-trigger-effect-row">
                 <Field as="div" class="manager-checks-trigger-outcome">
                   <span>{outcomeLegend}</span>
@@ -767,8 +750,8 @@
               {#if kind === 'routed'}
                 {@const step = tierStepFor(trigger)}
                 {@const dangling = isDanglingTarget(step)}
-                <!-- Its OWN row, not a third field in the bottom row: at the pinned manager geometry the
-                     outcome toggle plus the break pill already spend most of the card's width. -->
+                <!-- Its OWN row: at the pinned manager geometry the outcome toggle and the break pill
+                                     already spend most of the card's width. -->
                 <div class="manager-checks-trigger-effect-row" data-trigger-tier-step>
                   <Field as="div" class="manager-checks-trigger-step-mode">
                     <span>{tierStepLegend}</span>
@@ -784,20 +767,19 @@
                   </Field>
 
                   <!-- The operand slot is ALWAYS present at one pinned width and only its contents swap, so
-                       changing mode never moves the control out from under the pointer. -->
+                                         changing mode never moves the control out from under the pointer. -->
                   <Field
                     as="div"
                     class={`manager-checks-trigger-step-operand ${dangling ? 'is-invalid' : ''}`}
                   >
                     <span>{tierStepAmountLabel}</span>
                     {#if step.mode === 'up' || step.mode === 'down'}
-                      <!-- `fill` is what keeps the canonical no-movement guarantee (`openspec/specs/ui-integration/
-                           spec.md`, "a stable operand slot at one pinned width"): the slot stays pinned and the
-                           primitive stretches into it, so swapping mode leaves the control's POSITION and BOX SIZE
-                           unchanged. Radius and fill still differ between the primitives.
-                           `data-trigger-tier-step-steps` rides `inputProps` onto the real `<input>`, neither
-                           Playwright's `fill()` nor `inputValue()` resolving against a wrapper `<div>`. `Math.trunc`
-                           stays: `Stepper` clamps but does not truncate. -->
+                      <!-- `fill` is what keeps the canonical no-movement guarantee
+                                                 (`openspec/specs/ui-integration/spec.md`, "a stable operand slot at one pinned
+                                                 width"): the slot stays pinned and the primitive stretches into it, so a mode
+                                                 swap leaves POSITION and BOX SIZE unchanged, radius and fill still differing.
+                                                 `data-trigger-tier-step-steps` rides `inputProps` onto the real `<input>`, and
+                                                 `Math.trunc` stays: `Stepper` clamps but does not truncate. -->
                       <Stepper
                         fill
                         value={step.steps}
@@ -817,9 +799,9 @@
                           updateTierStep(trigger.id, { steps: Math.max(1, Math.trunc(next)) })}
                       />
                     {:else if step.mode === 'target' && outcomeOptions.length > 0}
-                      <!-- A <select> whose value matches no option renders its FIRST option as selected, so a null
-                           `tierId` would show a real tier the check has not persisted. The disabled placeholder is
-                           what makes "nothing chosen" read as nothing chosen. -->
+                      <!-- A <select> whose value matches no option renders its FIRST as selected, so a null
+                                                 `tierId` would show a tier the check has not persisted; the disabled
+                                                 placeholder is what makes "nothing chosen" read as nothing chosen. -->
                       <select
                         data-trigger-tier-step-target
                         aria-label={text(
@@ -861,8 +843,8 @@
 
                   {#if step.mode === 'target' && outcomeOptions.length === 0}
                     <!-- Its own hook, distinct from the outcomeTier condition's: a trigger that is both
-                         outcomeTier-conditioned and target-stepping on a tier-less check would otherwise carry
-                         two identically-hooked nodes in one card. -->
+                                             outcomeTier-conditioned and target-stepping on a tier-less check would otherwise
+                                             carry two identically-hooked nodes in one card. -->
                     <p
                       class="manager-muted manager-checks-trigger-step-hint"
                       data-trigger-step-no-tiers
@@ -876,9 +858,8 @@
                 </div>
               {/if}
 
-              <!-- BREAKING THE TOOLS IS ITS OWN CARD: a hazard with a glyph, a title and a sentence, not a
-                   two-word pill in a row of toggles. It renders the shared `ToggleCard`, which is that exact
-                   shape and which the On failure screen's own two flags already use. -->
+              <!-- BREAKING THE TOOLS IS ITS OWN CARD: a hazard with a glyph, a title and a sentence,
+                                 through the shared `ToggleCard` the On failure screen's own flags use. -->
               {#if showBreakTools}
                 <ToggleCard
                   icon="fas fa-hammer"
@@ -900,8 +881,7 @@
                   onToggle={(next) => updateTrigger(trigger.id, { breakTools: next })}
                 />
               {:else}
-                <!-- WHY THERE IS NO BREAK CARD, stated where the missing control would be, which is the only
-                     place a GM asks the question. -->
+                <!-- WHY THERE IS NO BREAK CARD, stated where the missing control would be. -->
                 <p class="manager-muted manager-checks-trigger-hint" data-trigger-break-unavailable>
                   {text(
                     'FABRICATE.Admin.Manager.Checks.Breakage.LeadOutcomeOnly',
@@ -910,8 +890,7 @@
                 </p>
               {/if}
 
-              <!-- The rule restated in prose, as the prototype closes every expanded trigger:
-                   the controls above are the parts, and this is what they add up to. -->
+              <!-- The rule restated in prose: the controls above are the parts, this is the sum. -->
               <p class="manager-checks-trigger-quote" data-trigger-quote={trigger.id}>
                 <i class="fas fa-quote-left" aria-hidden="true"></i>
                 <span>{effectSentence(trigger)}</span>
@@ -923,9 +902,8 @@
     </div>
   {/if}
 
-  <!-- The prototype extends the list with a full-width dashed control UNDER it, not a
-       button in a card head: the action that grows the list belongs at the end of the list
-       it grows. -->
+  <!-- A full-width dashed control UNDER the list rather than a button in a card head: the
+         action that grows the list belongs at the end of the list it grows. -->
   <ManagerButton role="dashed" data-add-trigger onclick={addTrigger}>
     <i class="fas fa-plus" aria-hidden="true"></i>
     <span>{text('FABRICATE.Admin.Manager.Checks.Breakage.AddTrigger', 'Add trigger')}</span>

@@ -44,16 +44,15 @@
     resolutionMode = null,
     section = '',
     foundrySystemId = '',
-    // The activity's own word for the thing a check is rolled for, for the Difficulty card's
-    // copy: hard-coding one activity's noun is how a gathering screen talks about recipes.
+    // The activity's own word for what a check is rolled for: hard-coding one is how a gathering
+    // screen comes to talk about recipes.
     recordNoun = 'recipe',
-    // The check modifiers this check APPLIES and the rule combining them, for the formula
-    // card's inset. Resolved by the caller from the same derivation the Modifiers section
-    // counts from, an editor re-deriving it being a second opinion.
+    // The check modifiers this check APPLIES and the rule combining them, from the same
+    // derivation the Modifiers section counts from rather than a second opinion.
     appliedModifiers = [],
     modifierPolicy = 'addAll',
-    // The PREVIEW AGAINST binding: `previewRecords` is the route's own record list, the same
-    // one the rail's simulator previews against, and the other two are its DC and name.
+    // The PREVIEW AGAINST binding: the route's own record list, the same one the rail's
+    // simulator previews against, plus its DC and name.
     previewRecords = [],
     previewRecordId = '',
     previewDcOverride = null,
@@ -90,8 +89,7 @@
     return typeof random === 'function' ? random() : Math.random().toString(36).slice(2, 12);
   }
 
-  // Icons name what a tier threshold IS in each type: an offset from the record's DC, or a
-  // measured segment of the value range.
+  // Icons name what a tier threshold IS: an offset from the record's DC, or a measured segment.
   const TYPE_OPTIONS = [
     {
       value: 'relative',
@@ -112,17 +110,14 @@
   ];
 
   const type = $derived(value?.type === 'fixed' ? 'fixed' : 'relative');
-  // Relative and fixed tiers are independent lists and only the active one is ever written,
-  // so changes in one mode never touch the other.
+  // Relative and fixed tiers are independent lists and only the active one is ever written.
   const outcomesKey = $derived(type === 'fixed' ? 'fixedOutcomes' : 'relativeOutcomes');
   const outcomes = $derived(Array.isArray(value?.[outcomesKey]) ? value[outcomesKey] : []);
   // Fixed-mode tiers own a non-overlapping segment of the roll value range, and the conflict
-  // set drives the per-row invalid highlight below. The textual validation messages live on the
-  // Validation tab, the one canonical place a GM reviews per-check issues.
+  // set drives the per-row highlight; the textual messages live on the Validation tab.
   const conflicts = $derived(type === 'fixed' ? findRangeConflicts(outcomes) : null);
 
-  // The three numeric column labels, hoisted because each is needed THREE times: its header
-  // cell, its stepper's accessible name and the shared adjunct strings' `{label}` slot.
+  // The three numeric column labels, hoisted because each is needed THREE times.
   const dcLabel = $derived(text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeDc', 'DC ±'));
   const startLabel = $derived(
     text('FABRICATE.Admin.Manager.Checks.Crafting.OutcomeStart', 'Start')
@@ -223,10 +218,9 @@
   const previewTier = $derived(
     routeOwnsPreview ? null : recipeTiers.find((tier) => tier.id === localPreviewRecordId) || null
   );
-  // The DC the relative bands are resolved against: the PREVIEWED RECORD's, falling back to the
-  // check's own default. A relative band's absolute position is a function of that number, which
-  // is why the strip announces both readings — switching records moves every tick with no data
-  // change at all.
+  // The DC the relative bands resolve against: the PREVIEWED RECORD's, falling back to the
+  // check's own. A relative band's absolute position is a function of that number, which is
+  // why the strip announces both readings.
   const previewDc = $derived.by(() => {
     const supplied = Number(previewDcOverride);
     if (routeOwnsPreview && Number.isFinite(supplied)) return supplied;
@@ -252,11 +246,9 @@
 
   // THE RAMP IS BOUNDED BY THE BAND NAME'S CONTRAST, and is mixed into an OPAQUE base for that
   // reason: each band carries its tier's NAME as normal-size text, so WCAG AA wants 4.5:1, and
-  // mixing into a TRANSLUCENT surface token makes the mix percentage double as an opacity — the
-  // fill lightening as the ramp climbs and the ink falling to 1.74:1.
-  //
-  // Each tone brings its OWN ink rather than one `--fab-text` for the whole strip, which is what
-  // buys the headroom. Measured across all five tones, all seven palettes and every band count the
+  // a TRANSLUCENT surface token makes the mix percentage double as an opacity, dropping the
+  // ink to 1.74:1. Each tone brings its OWN ink rather than one `--fab-text`, which is what
+  // buys the headroom: measured across five tones, seven palettes and every band count the
   // floor is 7.12:1 — see the AA gate in tests/components/manager-layout.test.js.
   const BAND_TONES = ['danger', 'warning', 'success', 'info', 'accent'];
   const BAND_TONE_MIX = 26;
@@ -264,8 +256,7 @@
 
   /**
    * The tone for the band at `position` of `count`, in value order. A single band takes the
-   * MIDDLE tone, an end of the ramp being a claim about a tier list that has no shape, and
-   * counts above five reuse a tone — the cost of a five-stop ramp, stated rather than hidden.
+   * MIDDLE tone, and counts above five reuse one — the cost of a five-stop ramp, stated here.
    */
   function toneFor(position, count) {
     if (count <= 1) return BAND_TONES[Math.floor(BAND_TONES.length / 2)];
@@ -285,8 +276,8 @@
       from: type === 'fixed' ? Number(outcome.start) : previewDc + Number(outcome.dc),
       to: type === 'fixed' ? Number(outcome.end) : null,
     }));
-    // Value order, the order the strip DRAWS in, not the authored order. A plain object keyed
-    // by authored index rather than a `Map`, which `svelte/prefer-svelte-reactivity` rejects.
+    // Value order, the order the strip DRAWS in, not the authored order. A plain object rather
+    // than a `Map`, which `svelte/prefer-svelte-reactivity` rejects.
     const ordered = [...rows].sort(
       (a, b) => (Number.isFinite(a.from) ? a.from : 0) - (Number.isFinite(b.from) ? b.from : 0)
     );
@@ -305,17 +296,16 @@
     });
   });
 
-  // The key to the strip, on the tier ROW: the band's tone at FULL STRENGTH, as a dot, without
-  // which the ramp is a pattern with no legend. Undiluted rather than the band's own fill,
-  // because it carries no text and so is not bounded by contrast.
+  // The key to the strip, on the tier ROW: the band's tone at FULL STRENGTH, without which the
+  // ramp is a pattern with no legend. Undiluted, because it carries no text.
   const bandSwatchById = $derived(
     Object.fromEntries(bandStripBands.map((band) => [band.id, band.swatch]))
   );
 
   /**
-   * Apply one boundary move. The strip has already resolved WHICH authored fields the handle
-   * writes and clamped against its neighbours, so this only persists the patch — including the
-   * FIXED case's coupled pair, as ONE `emit`, so a half-applied move cannot be observed.
+   * Apply one boundary move. The strip has already resolved WHICH fields the handle writes and
+   * clamped against its neighbours, so this only persists the patch — the FIXED case's coupled
+   * pair as ONE `emit`, so a half-applied move cannot be observed.
    */
   function applyBandStripChange(patch) {
     if (patch?.binding === 'fixed') {
@@ -399,9 +389,9 @@
     </InspectorCard>
 
     <!-- DIFFICULTY, in its own card, WITH its DC-source chooser: a routed RELATIVE check is
-         DEFINED as bands offset from a DC, so it has one by construction and offering the number
-         without its source was incoherent. `bandsAreAbsolute` is the one state with no DC at all,
-         and it is the SAME named gate the tier list and `PREVIEW AGAINST` read. -->
+             DEFINED as bands offset from a DC, so offering the number without its source was
+             incoherent. `bandsAreAbsolute` is the one state with no DC, and it is the SAME named
+             gate the tier list and `PREVIEW AGAINST` read. -->
     {#if !bandsAreAbsolute}
       <CheckDifficultyCard
         showDcSource
@@ -425,13 +415,12 @@
     />
   {/if}
 
-  <!-- The tier list renders under BOTH DC modes: the macro is handed the selected tier's DC
-       as its anchor and returns the final number, so the two COMPOSE rather than compete. -->
+  <!-- The tier list renders under BOTH DC modes: the macro takes the tier's DC as its anchor
+         and returns the final number, so the two COMPOSE rather than compete. -->
   {#if showTiers && !bandsAreAbsolute && shows('roll')}
-    <!-- `manager-checks-card`, not the bare shared `.manager-inspector-card` shell: that generic
-         contract pads on TOP of `CheckRecipeTiers`' own card-body padding and insets the tier rows
-         past the cards above. `SimpleCraftingCheckEditor`'s `data-static-dc` wrapper carries both
-         classes for the same reason. -->
+    <!-- `manager-checks-card`, not the bare `.manager-inspector-card` shell, which pads on TOP of
+             `CheckRecipeTiers`' own card-body padding and insets the tier rows past the cards above.
+             `SimpleCraftingCheckEditor`'s `data-static-dc` wrapper carries both for that reason. -->
     <InspectorCard class="manager-checks-card" data-routed-tiers="">
       <CheckRecipeTiers
         anchorsBands
@@ -447,14 +436,13 @@
   {/if}
 
   {#if shows('outcomes')}
-    <!-- ONE card: the strip and the tier rows it draws are the same subject, and two cards put a
-         border between a band and the row that moves it. -->
+    <!-- ONE card: the strip and the tier rows it draws are one subject, and two cards put a
+             border between a band and the row that moves it. -->
     <InspectorCard class="manager-checks-card" data-outcome-bands="">
       <!-- STACKED and full-width, like every other studio card head: `is-inline` sets the
-           description on the title's line and pushes it right, where a sentence squeezed into the
-           remaining half-width reads as a caption rather than as the card's lead. The head action
-           went with it, leaving ONE add control at the foot of the list — where the list ends and
-           where a new tier appears. -->
+                 description on the title's line and pushes it right, where it reads as a caption rather
+                 than the card's lead. The head action went with it, leaving ONE add control at the
+                 foot of the list. -->
       <div class="manager-checks-card-head">
         <div>
           <h3 class="manager-checks-card-title">
@@ -486,10 +474,9 @@
             </select>
           </div>
         {/if}
-        <!-- THE STRIP AND ITS HINT ARE FOR A CHECK THAT HAS TIERS: rendered unconditionally, both
-             say something FALSE when there are none — the strip falls back to a gap-or-overlap warning
-             about tiers that do not exist, and the hint invites a GM to drag a band edge on a strip
-             with no edges. The zero state's own sentence is below. -->
+        <!-- THE STRIP AND ITS HINT ARE FOR A CHECK THAT HAS TIERS: rendered unconditionally both say
+                     something FALSE when there are none — a gap-or-overlap warning about tiers that do
+                     not exist, and an invitation to drag a band edge on a strip with no edges. -->
         {#if outcomes.length > 0}
           <ThresholdBandStrip
             binding={type === 'fixed' ? 'fixed' : 'relative'}
@@ -513,7 +500,7 @@
           />
           <p class="manager-muted" data-outcome-band-strip-hint>
             <!-- The pointer glyph leads the sentence: the hint is about a DIRECT-MANIPULATION
-                 affordance, which is what separates it from the prose elsewhere on the screen. -->
+                             affordance. -->
             <i class="fas fa-arrow-pointer" aria-hidden="true"></i>
             {text(
               'FABRICATE.Admin.Manager.Checks.Crafting.BandsHint',
@@ -531,7 +518,7 @@
           </p>
         {:else}
           <!-- A FLEX LIST, not a subgrid table, and no column headers: every control on the row
-               states its own subject through its accessible name. -->
+                         states its own subject through its accessible name. -->
           <div
             class="manager-checks-tier-list"
             role="list"
@@ -547,8 +534,8 @@
                 data-outcome-row={outcome.id}
                 data-outcome-id={outcome.id}
               >
-                <!-- The KEY to the strip above: this row's band in its own tone. Decorative to a screen
-                     reader, the row's accessible name coming from the Name field beside it. -->
+                <!-- The KEY to the strip above: this row's band in its own tone, decorative to a screen
+                                     reader, the row's accessible name coming from the Name field. -->
                 <span
                   class="manager-checks-tier-swatch"
                   data-outcome-swatch={outcome.id}
@@ -564,10 +551,9 @@
                     updateOutcome(outcome.id, { name: event.currentTarget.value })}
                 />
 
-                <!-- `fill` plus a WIDTH from the layout context, the one thing a layout context may take
-                     from this primitive. `allowUnset` is deliberately absent: a tier threshold has no
-                     "unset" meaning, so 0 is the real value. Every `data-*` hook goes through `inputProps`
-                     so it lands on the real `<input>` rather than the wrapper `<div>`. -->
+                <!-- `fill` plus a WIDTH from the layout context, the one thing it may take from this
+                                     primitive. `allowUnset` is absent, a tier threshold having no "unset" meaning, and
+                                     every `data-*` hook goes through `inputProps` onto the real `<input>`. -->
                 {#if type === 'relative'}
                   <div class="manager-checks-tier-stepper">
                     <Stepper
@@ -600,8 +586,7 @@
                 {/if}
 
                 <!-- A SEGMENTED TOGGLE, not a pill that swaps its own label: the click-in-place pill
-                     showed only the state the tier is IN, so the word could be read either as a reading or
-                     as the verb that would change it. -->
+                                     showed only the state the tier is IN, readable as either a reading or a verb. -->
                 <SegmentedControl
                   density="compact"
                   options={outcomeSegments}
@@ -617,8 +602,8 @@
                 />
 
                 <!-- KEPT, and gated, on purpose: the MATCHED TIER's own `breakTools` is read by
-                     `checkRoll.js` when a routed check resolves, so under `checkDriven` this is the only
-                     authoring surface for a live engine field and deleting it would strand data. -->
+                                     `checkRoll.js`, so under `checkDriven` this is the only authoring surface for a
+                                     live engine field. -->
                 {#if checkDriven}
                   <SegmentedControl
                     density="compact"
@@ -652,15 +637,11 @@
           </div>
         {/if}
 
-        <!-- OUTSIDE the `{#if}`, and that is the point rather than the layout: as the last child of
-             the tier list, which only renders with at least one row, a check with ZERO tiers showed
-             the empty sentence and NOTHING to press — a dead end, and the state every routed check
-             starts in.
-
-             Placed BENEATH the empty sentence rather than beside it, which is what `CheckRecipeTiers`
-             and `CheckTriggers` already do, so the action that grows the list sits where the list ends
-             in both states. Its `margin-top` is the list's own gap, so the populated state is
-             pixel-unchanged. -->
+        <!-- OUTSIDE the `{#if}`, which is the point rather than the layout: as the last child of the
+                     tier list, which only renders with at least one row, a check with ZERO tiers showed
+                     the empty sentence and NOTHING to press — the state every routed check starts in.
+                     Placed BENEATH that sentence, as `CheckRecipeTiers` and `CheckTriggers` do, on the
+                     list's own gap, so the populated state is pixel-unchanged. -->
         <ManagerButton
           role="dashed"
           class="manager-checks-outcome-add"

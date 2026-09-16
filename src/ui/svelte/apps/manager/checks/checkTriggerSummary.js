@@ -6,8 +6,7 @@
  * COMPOSED FROM FRAGMENTS, NOT WRITTEN PER SHAPE — a sentence per combination of five condition
  * types, five aggregates, five operators and three effects is hundreds of strings — and PURE, so
  * `tests/check-trigger-summary.test.js` pins every shape without mounting. IT DESCRIBES AND
- * NEVER DECIDES: every value it states is read off the same `condition` the controls bind to.
- */
+ * NEVER DECIDES: every value it states is read off the same `condition` the controls bind to. */
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Breakage.';
 
@@ -36,18 +35,14 @@ function copy(pair) {
 /**
  * The comparison word for an operator, defaulting to `exactly` rather than the raw symbol: a
  * summary reading "Roll total is >= 15" is the control restated, not a sentence.
- * @param {string} operator The stored operator.
- * @returns {{key: string, fallback: string}}
- */
+ * @param {string} operator The stored operator. @returns {{key: string, fallback: string}} */
 export function operatorWord(operator) {
   return copy(OPERATOR_WORDS[operator] ?? OPERATOR_WORDS['==']);
 }
 
-/**
- * The aggregate word for a dice-group condition.
- * @param {string} aggregate The stored aggregate.
- * @returns {{key: string, fallback: string}}
- */
+/** The aggregate word for a dice-group condition.
+ *  @param {string} aggregate The stored aggregate.
+ *  @returns {{key: string, fallback: string}} */
 export function aggregateWord(aggregate) {
   return copy(AGGREGATE_WORDS[aggregate] ?? AGGREGATE_WORDS.total);
 }
@@ -179,8 +174,7 @@ export function summariseEffect(trigger = {}, context = {}) {
  * @param {boolean} [context.progressive] Whether this check awards rather than passes.
  * @param {boolean} [context.showBreakTools] Whether tool breakage is authored on this check.
  * @returns {{glyph: string, tone: string, chip: (object|null)}} `chip` is null when nothing is
- *   in force, such a trigger stating that in its own prose line.
- */
+ *   in force, such a trigger stating that in its own prose line. */
 export function summariseHeadline(trigger = {}, context = {}) {
   const { tierNames = {}, progressive = false, showBreakTools = false } = context;
   const step = trigger?.tierStep ?? {};

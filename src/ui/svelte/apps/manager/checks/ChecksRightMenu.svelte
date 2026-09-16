@@ -41,15 +41,15 @@
     modifierCount = null,
     issueCount = 0,
     allChecks = [],
-    // The "Preview as" selection. The rail RENDERS it and reports changes; the ROUTE owns it,
-    // because the Outcomes band strip is bound to the same record.
+    // The "Preview as" selection: the rail RENDERS it, the ROUTE owns it, the band strip being
+    // bound to the same record.
     previewActors = [],
     previewRecords = [],
     previewActorId = NO_ACTOR_ID,
     previewRecordId = '',
     previewActorSummary = '',
-    // The progressive PREVIEW SANDBOX: a progressive check has no DC, so the record selector
-    // has nothing to offer it and the ordered result difficulties take that slot.
+    // The progressive PREVIEW SANDBOX: with no DC the record selector has nothing to offer, so
+    // the ordered result difficulties take that slot.
     previewIsProgressive = false,
     previewDifficultiesText = '',
     preview = null,
@@ -76,19 +76,18 @@
     'Turn this check on to require a roll for the activity, or off to resolve it without one.'
   );
   // The gathering active toggle is mode-aware and inverted from the generic `optional` flag:
-  // d100 is the fixed roll with no toggle, and the other two expose one.
+  // d100 is the fixed roll with no toggle.
   const gatheringD100 = $derived(activeTab === 'gathering' && activation?.mode === 'd100');
   const showActiveToggle = $derived(
     activeTab === 'gathering' ? !gatheringD100 : activation?.optional === true
   );
   // THE LOCKED TOGGLE ALWAYS READS ON, with no exception, every mode that hides the switch
   // running its check (`openspec/specs/ui-integration/spec.md` → "GM Checks Studio"). Alchemy
-  // `checkMode: 'none'` is not one: it reports `optional: true` with `enabled: false` and renders
-  // the LIVE switch off, a GM looking at a check that is off needing the control that turns it on.
-  //
-  // Reading this from the MODE rather than `activation.enabled` is deliberate: a mandatory check
-  // runs whatever the persisted flag says. There is therefore no `lockedOn` flag and no off branch
-  // behind it, and `onLabel` is the single source both slots read.
+  // `checkMode: 'none'` is not one: it reports `optional: true` with `enabled: false` and
+  // renders the LIVE switch off, a GM looking at an off check needing the control to turn it
+  // on. Reading this from the MODE rather than `activation.enabled` is deliberate, a mandatory
+  // check running whatever the flag says, so there is no `lockedOn` flag and no off branch,
+  // and `onLabel` is the single source both slots read.
   const lockedLabel = $derived(
     `${onLabel} — ${text('FABRICATE.Admin.Manager.Checks.Active.LockedSuffix', 'locked by the resolution mode')}`
   );
@@ -106,8 +105,7 @@
 
   // The "Preview as" option list. "No actor" LEADS, always, and is a real option rather than a
   // search's empty state: it is the selection under which the readout renders its
-  // unresolved-roll-data warning, so it must be reachable from any filter — hence its own
-  // `data-popover-option` handle rather than a lookup by localized label.
+  // unresolved-roll-data warning, hence its own `data-popover-option` handle.
   const noActorLabel = text('FABRICATE.Admin.Manager.Checks.PreviewAs.NoActor', 'No actor');
   const previewActorLabel = text(
     'FABRICATE.Admin.Manager.Checks.PreviewAs.Actor',
@@ -136,8 +134,8 @@
 
   const DOCS_BASE = 'https://mistersilver-uk.github.io/fabricate';
 
-  // The rail opens with a documentation / quickstart PAIR rather than an explainer card, which
-  // pushed every panel with a subject below the fold.
+  // A documentation / quickstart PAIR rather than an explainer card, which pushed every panel
+  // with a subject below the fold.
   const DOCS_LINKS = {
     crafting: `${DOCS_BASE}/checks/crafting`,
     salvage: `${DOCS_BASE}/checks/salvage`,
@@ -149,8 +147,8 @@
   const docsLabel = text('FABRICATE.Admin.Manager.Checks.Documentation', 'Documentation');
   const quickstartLabel = text('FABRICATE.Admin.Manager.Checks.Quickstart', 'Quickstart');
 
-  // The digest's status chip. THREE states, not interchangeable: `OFF` is a GM's own choice and
-  // says nothing about correctness, where `OK` claims the check is complete.
+  // The digest's status chip. THREE states, not interchangeable: `OFF` is a GM's own choice,
+  // where `OK` claims the check is complete.
   const digestStatus = $derived.by(() => {
     if (checkOff)
       return { tone: 'neutral', label: text('FABRICATE.Admin.Manager.StatusOff', 'Off') };
@@ -177,20 +175,16 @@
       : text('FABRICATE.Admin.Manager.Checks.Digest.NoFormula', 'No roll formula yet')
   );
 
-  // The odds heading's right-aligned adjunct names the DOMAIN the enumerator walks, so it is
-  // DERIVED: a `1d20` check enumerates twenty faces and a `2d6` one does not.
-  //
-  // IT IS THE ENUMERATOR'S OWN NUMBER WHERE THERE IS ONE. The regex below reads the AUTHORED
-  // formula, while the formula that is ROLLED may carry a check modifier's die on top of it, and
-  // a heading claiming a domain the panel beneath refuses to chart is the exact failure the
-  // histogram is guarded against. A supplied view-model answers for itself, including by
-  // answering NOTHING when it abstains; the regex survives only for a rail mounted without one.
+  // The odds heading's adjunct names the DOMAIN the enumerator walks, so it is DERIVED. IT IS
+  // THE ENUMERATOR'S OWN NUMBER WHERE THERE IS ONE: the regex below reads the AUTHORED
+  // formula, where the ROLLED one may carry a modifier die on top, and a heading claiming a
+  // domain the panel refuses to chart is the failure the histogram is guarded against. A
+  // supplied view-model answers for itself, the regex surviving only for a rail without one.
   const oddsDomain = $derived.by(() => {
     if (odds) {
       if (odds.enumerable !== true) return '';
-      // TWO SENTENCES, because they are two different facts: one die has FACES, while a formula
-      // carrying a rolling modifier on top of its own die has a joint SPACE, and calling 160
-      // assignments "faces" would name a die with 160 sides that nothing rolls.
+      // TWO SENTENCES, two different facts: one die has FACES, a formula carrying a rolling
+      // modifier has a joint SPACE, and calling 160 assignments "faces" names a die nothing rolls.
       const faces = Number(odds.faces);
       if (Number.isFinite(faces)) {
         return text('FABRICATE.Admin.Manager.Checks.Odds.Faces', 'all {faces} faces').replace(
@@ -283,9 +277,8 @@
     return rows;
   });
 
-  // The Validation rail's rows carry the SAME shape and render through the same row. They open
-  // the activity's own check, and their glyph is an activity mark rather than a report on
-  // something authored, so `tone` is not `set`.
+  // The Validation rail's rows are the SAME shape through the same row, opening the activity's
+  // own check, with an activity mark for a glyph rather than a report, so `tone` is not `set`.
   const allCheckRows = $derived(
     allChecks.map((row) => ({
       id: row.id,
@@ -297,15 +290,12 @@
     }))
   );
 
-  // THE SANDBOX ORDER FIELD HOLDS THE GM'S OWN TEXT. The stored datum is `number[]`, so echoing
-  // the field back through it REWRITES what was typed — "4, " re-renders as "4" and the caret
-  // jumps back on every separator. The field therefore keeps its raw text and reseeds from
-  // upstream only when the two describe DIFFERENT ORDERS, so an order arriving from a route
-  // change, a discarded draft or a reload still lands.
-  //
-  // Seeded through `untrack` and resynced by the effect, the shipped `PartyNameField` idiom —
-  // but the guard is necessary here and is not there, because this field commits on every
-  // keystroke rather than on blur, so its upstream value is NOT stable while typing.
+  // THE SANDBOX ORDER FIELD HOLDS THE GM'S OWN TEXT. The stored datum is `number[]`, so
+  // echoing the field back through it REWRITES what was typed. It therefore keeps its raw
+  // text and reseeds from upstream only when the two describe DIFFERENT ORDERS, so an order
+  // from a route change, a discarded draft or a reload still lands. Seeded through `untrack`
+  // and resynced by the effect, the shipped `PartyNameField` idiom — but the guard is needed
+  // here and is not there, this field committing on every keystroke rather than on blur.
   let sandboxText = $state(untrack(() => previewDifficultiesText));
   $effect(() => {
     const incoming = previewDifficultiesText;
@@ -322,20 +312,16 @@
   }
 </script>
 
-<!--
-  The heading row every section shares: a leading glyph and a flat kicker. A caller carrying an
-  adjunct renders it after this, inside the same row, where `margin-left: auto` puts it right.
--->
+<!-- The heading row every section shares: a leading glyph and a flat kicker, with a caller's
+     adjunct rendered after it in the same row. -->
 {#snippet railHead(icon, title)}
   <i class={`${icon} manager-checks-rail-head-icon`} aria-hidden="true"></i>
   <p class="manager-kicker">{title}</p>
 {/snippet}
 
-<!--
-  One compact row of a rail list. `row.target` is `[activity, section]` or `null`, and a row with
-  no target states an absence, so it renders with no chevron and nothing to press. `row.tone` is
-  `set` when the glyph reports something the GM has authored.
--->
+<!-- One compact row of a rail list. `row.target` is `[activity, section]` or `null`, a row
+     with none stating an absence and rendering no chevron; `row.tone` is `set` when the
+     glyph reports something the GM has authored. -->
 {#snippet railRow(row, hook)}
   {#if row.target}
     <button
@@ -395,8 +381,7 @@
   </div>
 
   {#if isValidation}
-    <!-- The Validation rail: the docs pair above, and this. Nothing else has a subject on a
-         route that validates all three checks at once. -->
+    <!-- The Validation rail: the docs pair above, and this. Nothing else has a subject. -->
     <div class="manager-checks-rail-head">
       {@render railHead(
         'fas fa-layer-group',
@@ -410,8 +395,7 @@
     </InspectorCard>
   {:else}
     {#if activation}
-      <!-- NO KICKER: the card IS the section — the switch, the reading, and the sentence saying
-           which mode locks it. See the header. -->
+      <!-- NO KICKER: the card IS the section — switch, reading, locking mode. See the header. -->
       <InspectorCard
         class={`manager-checks-active-card ${showActiveToggle && !activeOn ? 'is-off' : 'is-on'}`}
         data-checks-active={activeTab}
@@ -425,10 +409,9 @@
           />
           <p class="manager-muted">{optionalHint}</p>
         {:else}
-          <!-- A LOCKED toggle, not a bare sentence: removing the control removes the STATE with it, so
-               a GM could not see whether the check was on at all, and "the mode requires this check"
-               does not say which way the switch is set. It is an INDICATOR rather than a disabled
-               control, announced as one labelled image rather than as a button. -->
+          <!-- A LOCKED toggle, not a bare sentence: removing the control removes the STATE with it,
+                         and "the mode requires this check" does not say which way the switch is set. An
+                         INDICATOR rather than a disabled control, announced as one labelled image. -->
           <StatusToggle
             as="indicator"
             on
@@ -496,11 +479,10 @@
         {/if}
         {#if previewIsProgressive}
           <!-- THE SANDBOX ORDER, in the slot the record selector cannot fill: a progressive check has
-               no DC, so a record — whose whole contribution is a DC — has nothing to offer it, and what
-               its histogram needs is an ORDERED list of result difficulties to spend the rolled value
-               down. Scratch state for one experiment: persisted on the check so it survives a reload,
-               read by no engine path, validated by no readiness rule and stripped by export. A
-               nonsensical order is allowed on purpose. -->
+                         no DC, so a record has nothing to offer it, and its histogram needs an ORDERED list
+                         of result difficulties. Scratch state for one experiment — persisted so it survives
+                         a reload, read by no engine path, validated by no rule and stripped by export — and
+                         a nonsensical order is allowed on purpose. -->
           <Field as="label">
             <span
               >{text(

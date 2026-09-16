@@ -20,9 +20,8 @@
     rollFormula = '',
     placeholder = '1d20+@abilities.int.mod',
     foundrySystemId = '',
-    // The check modifiers this check APPLIES, already resolved against the catalogue by the
-    // caller as `[{ id, name, icon }]`. Eligibility depends on the activity's whole modifier
-    // context, which lives one level up and is what the Modifiers section counts from.
+    // The check modifiers this check APPLIES, already resolved by the caller as
+    // `[{ id, name, icon }]`: eligibility depends on the activity's whole modifier context.
     appliedModifiers = [],
     // Which rule combines them: `addAll` | `highest` | `bySubject` | `playerPicks`.
     modifierPolicy = 'addAll',
@@ -36,15 +35,12 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // The formula token quick-add row, DERIVED FROM THE ACTIVE WORLD and never a literal list. A
-  // literal list shipped a term that resolves against nothing, so one click wrote it into the
-  // formula and BROKE the check — a one-click path to a broken check being worse than no chip —
-  // and the rest were system-shaped guesses in a system-agnostic module.
-  //
-  // `getModifierExpressionSuggestions` is the derivation the modifier chips already use, and its
-  // system-specific half comes from the shipped preset bundles, so a chip can only offer a path
-  // the product would itself author for this world and an UNSUPPORTED world degrades to the
-  // system-agnostic terms. That removes the class of defect rather than the instance.
+  // The formula token quick-add row, DERIVED FROM THE ACTIVE WORLD and never a literal list.
+  // A literal list shipped a term that resolves against nothing, so one click wrote it into
+  // the formula and BROKE the check, and the rest were system-shaped guesses in a
+  // system-agnostic module. `getModifierExpressionSuggestions` is the derivation the modifier
+  // chips already use, with a system-specific half from the shipped preset bundles, so a chip
+  // can only offer a path the product would itself author and an UNSUPPORTED world degrades.
   const quickTokens = $derived(
     getModifierExpressionSuggestions(foundrySystemId).map((suggestion) => suggestion.expression)
   );
@@ -58,9 +54,9 @@
     text('FABRICATE.Admin.Manager.Checks.Crafting.FormulaLabel', 'Formula')
   );
 
-  // Every `@`-path taken as ZERO. `reduceRollExpression` needs the substitution to have
-  // happened already and REFUSES an expression it cannot fully consume, so a formula with a
-  // stray token reduces to NaN and the reading is withheld rather than read off a prefix.
+  // Every `@`-path taken as ZERO. `reduceRollExpression` needs the substitution already done
+  // and REFUSES what it cannot fully consume, so a stray token reduces to NaN and the reading
+  // is withheld rather than read off a prefix.
   const average = $derived.by(() => {
     const source = String(rollFormula || '').trim();
     if (source === '') return null;
@@ -72,8 +68,7 @@
   const DEFAULT_MODIFIER_ICON = 'fas fa-wand-magic-sparkles';
   const applied = $derived(Array.isArray(appliedModifiers) ? appliedModifiers : []);
 
-  // ONE sentence naming the rule in force, restating what the Modifiers section authors rather
-  // than re-deciding it: `modifierPolicy` is that section's own value.
+  // ONE sentence naming the rule in force, restating what the Modifiers section authors.
   const ruleSentence = $derived.by(() => {
     if (applied.length === 0) {
       return text(
@@ -108,13 +103,12 @@
 
 <div class="manager-checks-formula">
   <!-- The CARD TITLE is `Formula`, so the input takes an `aria-label` rather than a second
-       visible label repeating it. -->
+         visible label. -->
   <div class="manager-checks-formula-input">
     <i class="fas fa-dice-d20" aria-hidden="true"></i>
     <!-- THE CONTROL HALF of the Validation route's row action. All three roll issues are about
-         THIS field, and it is the roll section's first control in every editor rendering the
-         section, so `ChecksValidationTab` addresses it as `checks-roll-formula`. An `<input>` is
-         natively focusable, so it needs no `tabindex` and no keyboard-focus declaration. -->
+             THIS field, the roll section's first control in every editor, so it is addressed as
+             `checks-roll-formula`. An `<input>` is natively focusable, so no `tabindex`. -->
     <input
       data-check-roll-formula
       data-validation-target="checks-roll-formula"
@@ -147,9 +141,9 @@
       <p class="manager-checks-formula-expression">
         <span class="manager-checks-formula-base">{rollFormula || placeholder}</span>
         {#if applied.length > 0}
-          <!-- The join between the FORMULA and the modifier list carries the accent and the separators
-               inside the list are subtle, so the expression reads as one written term plus a set of
-               automatic ones rather than as a flat sum. -->
+          <!-- The join between the FORMULA and the modifier list carries the accent and the list's
+                         own separators are subtle, so the expression reads as one written term plus a set
+                         of automatic ones rather than a flat sum. -->
           <span class="manager-checks-formula-join" aria-hidden="true">+</span>
         {/if}
         {#each applied as modifier, index (modifier.id)}
@@ -169,7 +163,7 @@
   </div>
 
   <!-- Real `<button>`s: this row is five controls a GM operates, and a span with an `onclick`
-       is reachable by neither the keyboard nor a screen reader. -->
+         reaches neither the keyboard nor a screen reader. -->
   <span class="manager-checks-formula-tokens" data-check-formula-tokens>
     {#each quickTokens as token (token)}
       <button
@@ -178,8 +172,7 @@
         data-check-formula-token={token}
         onclick={() => appendToken(token)}
       >
-        <!-- The verb as a GLYPH: the chip APPENDS the term to the formula, and a literal `+`
-             character in the label reads as part of the expression rather than as the action. -->
+        <!-- The verb as a GLYPH: a literal `+` in the label reads as part of the expression. -->
         <i class="fas fa-plus" aria-hidden="true"></i>
         <span>{token}</span>
       </button>

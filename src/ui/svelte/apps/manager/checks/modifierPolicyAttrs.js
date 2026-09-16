@@ -1,15 +1,12 @@
 /**
  * The DOM hook names the check-modifier combination-rule group renders, hoisted out of Svelte
- * markup so a test can import them.
- *
- * WHY THIS MODULE EXISTS. `scripts/lib/viewLabCases.js` targets rule options by that attribute
- * and `tests/view-lab-cases.test.js` asserts every value in the registry is a real
+ * markup so a test can import them. `scripts/lib/viewLabCases.js` targets rule options by that
+ * attribute and `tests/view-lab-cases.test.js` asserts every value in the registry is a real
  * `MODIFIER_POLICIES` member — a guard worthless if it RESTATES the name: on a rename it
  * extracts an EMPTY set, the subset assertion holds, and the registry's selectors point at a
  * dead hook, failing the capture job whole while `check-screenshots` stays green on stale
  * frames. Importing the name from the component is not implementable: the card passes the
- * literal as a PROP VALUE in markup and exports nothing.
- */
+ * literal as a PROP VALUE in markup and exports nothing. */
 
 /** The attribute `RadioCardGroup` stamps on the WRAPPER of the whole rule group.
  *  @type {string} */

@@ -10,8 +10,7 @@
  * THE `MODES` TABLE IS ONE COPY-PASTE BLOCK, so keep edits inside it SMALL: SonarCloud's CPD
  * measures new-code density over the lines a PR touches, so ANY edit there lands at 100%
  * duplicated — which is why this rationale is in the header. GATHERING'S ROUTED AND PROGRESSIVE
- * MODES ARE DORMANT but REACHABLE, so the framing is the Modifiers section's own, reused VERBATIM.
- */
+ * MODES ARE DORMANT but REACHABLE, so the framing is the Modifiers section's own, VERBATIM. */
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Mode.';
 
@@ -44,8 +43,7 @@ const FACT_LABELS = Object.freeze({
 /**
  * Resolve a `[key, fallback]` pair to a localization key; one already containing a `.` is
  * ABSOLUTE and used verbatim, which is how a sentence shipped under another namespace is reused
- * rather than re-authored under a second key that would drift from it.
- */
+ * rather than re-authored under a second key that would drift from it. */
 function copy(pair) {
   return { key: pair[0].includes('.') ? pair[0] : `${NAMESPACE}${pair[0]}`, fallback: pair[1] };
 }

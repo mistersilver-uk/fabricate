@@ -42,8 +42,7 @@
     return text(copy.key, copy.fallback);
   }
   // `data` is the optional interpolation payload an issue carries when its sentence names
-  // something. The English fallback is interpolated by hand, so a world with no localization
-  // still reads the names rather than a literal `{names}`.
+  // something; the English fallback is interpolated by hand, so no world reads `{names}`.
   function issueTitle(id, data) {
     const copy = checkIssueCopy(id);
     return interpolate(text(copy.key, copy.fallback, data), data);
@@ -106,9 +105,8 @@
         title: issueTitle(issue.id, issue.data),
         status: issue.severity === 'critical' ? 'block' : 'warn',
         target: { activity: subsystem, section: sectionForIssue(issue.id) },
-        // NO KEY rather than an empty one for a route-only row: the host resolves any
-        // non-empty string, so `focusTarget: ''` would report as focus-wired while focusing
-        // nothing.
+        // NO KEY rather than an empty one for a route-only row: the host resolves any non-empty
+        // string, so `focusTarget: ''` would report as focus-wired while focusing nothing.
         ...(CHECK_ISSUE_CONTROLS[issue.id] ? { focusTarget: CHECK_ISSUE_CONTROLS[issue.id] } : {}),
         dataAttrs: {
           'data-subsystem': subsystem,
@@ -138,11 +136,9 @@
     }))
   );
 
-  // THE RAIL IS A TALLY OF THE ROWS ABOVE IT, and is declared after them for that reason.
-  // Counting the readiness objects instead misses two states the tab can reach: an unsatisfied
-  // check whose subsystem raised no matching issue paints an amber row nothing tallied, and a
-  // subsystem with no tick and no issue draws the synthesised "No issues detected." PASS row.
-  // Counting what is RENDERED closes both without either half knowing about the other.
+  // THE RAIL IS A TALLY OF THE ROWS ABOVE IT, declared after them for that reason: counting
+  // the readiness objects instead misses an unsatisfied check whose subsystem raised no
+  // matching issue, and a subsystem with no tick and no issue whose PASS row is synthesised.
   const counts = $derived.by(() => {
     const tally = { passing: 0, warnings: 0, blocking: 0 };
     for (const group of groups) {
@@ -156,7 +152,7 @@
   });
 
   // The hero. Three states, and the UNSAVED one is not decoration: readiness ran against the
-  // live DRAFT while enabling reads what is COMMITTED, so a clean draft is not evidence.
+  // live DRAFT while enabling reads what is COMMITTED.
   const summary = $derived.by(() => {
     if (counts.blocking > 0) {
       return {
@@ -194,8 +190,8 @@
 </script>
 
 <!-- THE COUNT AND PILL WORDS ARE NOT PASSED: they are the vocabulary
-     `EditorValidationSurface` already defaults to, and a second home for them is what the
-     design-system requirement's "lives once" sentence forbids. -->
+     `EditorValidationSurface` defaults to, and a second home is what the design-system
+     requirement's "lives once" sentence forbids. -->
 <div class="manager-checks-validation-route" data-checks-panel="validation">
   <EditorValidationSurface
     title={text('FABRICATE.Admin.Manager.Checks.Validation.Title', 'Validation')}

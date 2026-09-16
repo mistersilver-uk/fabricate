@@ -22,9 +22,8 @@
   import CheckTriggers from './CheckTriggers.svelte';
   import InspectorCard from '../../../components/InspectorCard.svelte';
 
-  // `breakageAuthority` gates the per-trigger break-tools toggle on `checkDriven`, the trigger
-  // editor itself always rendering. `section` selects which cards render, so the studio's
-  // five-section strip hosts the SAME editor rather than a per-section fork.
+  // `breakageAuthority` gates the per-trigger break-tools toggle on `checkDriven`, and
+  // `section` selects which cards render, so one editor serves the five-section strip.
   let {
     value = null,
     showDcSource = true,
@@ -33,13 +32,13 @@
     foundrySystemId = '',
     // The activity's own word for the thing a check is rolled for; see CheckDifficultyCard.
     recordNoun = 'recipe',
-    // The check modifiers this check APPLIES and the rule combining them, from the same
-    // derivation the Modifiers section counts from rather than a second opinion.
+    // The check modifiers this check APPLIES and the rule combining them, from the derivation
+    // the Modifiers section counts from rather than a second opinion.
     appliedModifiers = [],
     modifierPolicy = 'addAll',
     // The PREVIEW AGAINST binding, and the third `ThresholdBandStrip` binding. A simple check's
-    // single boundary IS the DC, so the handle writes the same field the Difficulty card's
-    // stepper writes, and the track bounds scale it to the reachable total range.
+    // single boundary IS the DC, so the handle writes the Difficulty card's own field, and the
+    // track bounds scale it to the reachable total range.
     previewRecords = [],
     previewRecordId = '',
     previewLabel = '',
@@ -73,13 +72,10 @@
   );
 
   // The strip's domain, defaulting to a symmetric window around the DC when the route supplies
-  // nothing, a track with no width being undraggable. `min` is additionally clamped BELOW the DC
-  // so a DC at the reachable floor still leaves the failure band a band.
-  //
-  // `null` and `''` are ABSENT, not zero — the same guard `ThresholdBandStrip` records for its
-  // own `to` edge: `Number(null)` is 0 and `Number.isFinite(0)` is true, so a bare coercion read
-  // "no track supplied" as a track ending at zero and silently stopped the strip being
-  // draggable.
+  // nothing, a track with no width being undraggable; `min` is additionally clamped BELOW the
+  // DC so a DC at the reachable floor still leaves the failure band a band. `null` and `''`
+  // are ABSENT, not zero — the guard `ThresholdBandStrip` records for its own `to` edge —
+  // because a bare coercion read "no track supplied" as a track ending at zero.
   const suppliedBound = (bound) => {
     if (bound === null || bound === undefined || bound === '') return null;
     const parsed = Number(bound);
@@ -108,10 +104,9 @@
   ]);
 
   /**
-   * Apply the single boundary move. The strip has already clamped the value inside the track, so
-   * this only persists the DC — the same field the Difficulty card's stepper writes, which makes
+   * Apply the single boundary move. The strip has already clamped the value inside the track,
+   * so this only persists the DC — the field the Difficulty card's stepper writes, which makes
    * the strip a visualisation of that number rather than a second authority over it.
-   *
    * @param {{binding: string, dc: number}} patch The strip's own patch.
    */
   function applyBandStripChange(patch) {
@@ -149,8 +144,7 @@
     </InspectorCard>
 
     <!-- DIFFICULTY, in its own card: the DC, the meet/exceed comparison and — on this slot
-         alone — where the number comes from. The simple check is the one carrying
-         `dcMode`/`macroUuid`, so it is the one that shows the chooser. -->
+             alone, the simple check being the one carrying `dcMode` — where the number is from. -->
     <CheckDifficultyCard
       dc={value?.dc ?? 15}
       thresholdMode={value?.thresholdMode || 'meet'}
@@ -161,10 +155,9 @@
     />
   {/if}
 
-  <!-- A simple check's OUTCOME model: exactly two, and neither is authored. It is a statement
-       rather than an editor, which is why it renders through the shared icon fact row and why
-       the section carries no count badge. It renders in every mode precisely because it IS the
-       mode's outcome model. -->
+  <!-- A simple check's OUTCOME model: exactly two, neither authored. A statement rather than
+         an editor, hence the shared icon fact row and no count badge, and it renders in every
+         mode precisely because it IS the mode's outcome model. -->
   {#if shows('outcomes')}
     <InspectorCard class="manager-checks-card" data-simple-outcomes="">
       <div class="manager-checks-card-head">
@@ -181,8 +174,8 @@
         </div>
       </div>
       <div class="manager-checks-card-body">
-        <!-- PREVIEW AGAINST: the SAME selection the rail's "Preview as" card offers, reported upward
-             rather than held here, so the simulator and the strip cannot read different records. -->
+        <!-- PREVIEW AGAINST: the SAME selection the rail's card offers, reported upward, so the
+                     simulator and the strip cannot read different records. -->
         {#if previewRecords.length > 1}
           <Field as="label" class="manager-checks-band-record">
             <span
@@ -266,9 +259,9 @@
   {/if}
 
   {#if showDcSource && shows('roll')}
-    <!-- THE TIER LIST RENDERS UNDER BOTH MODES: the macro is handed the tier's DC as its anchor
-         and returns the final number, so the two COMPOSE rather than compete, and hiding the tiers
-         under dynamic would hide half of what the engine reads. -->
+    <!-- THE TIER LIST RENDERS UNDER BOTH MODES: the macro takes the tier's DC as its anchor and
+             returns the final number, so hiding the tiers under dynamic would hide half of what
+             the engine reads. -->
     <InspectorCard class="manager-checks-card" data-static-dc="">
       <CheckRecipeTiers
         tiers={value?.tiers || []}

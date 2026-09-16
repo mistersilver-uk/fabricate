@@ -83,15 +83,14 @@
     craftingFailureResultPolicy = 'perRecord',
     salvageFailureResultPolicy = 'perRecord',
     gatheringFailureResultPolicy = 'perRecord',
-    // The gathering row the rail's `PREVIEW AS` selector has chosen, or `null`. The On-failure
+    // The gathering row the rail's `PREVIEW AS` selector has chosen, or `null`; the On-failure
     // section cross-references THAT row's `task.failureOutcome` read-only, this screen being
-    // system-level; with no selection it renders its stated no-record state.
+    // system-level, and renders its stated no-record state without one.
     previewedGatheringTask = null,
     onOpenGatheringTask = () => {},
     // The ONE system-level modifier library, READ-ONLY here; Checks owns only the SELECTION.
     modifiers = [],
-    // Crafting's SELECTION, rendered even where the catalogue reaches no roll, which `inertCause`
-    // reports.
+    // Crafting's SELECTION, rendered even where the catalogue reaches no roll, per `inertCause`.
     craftingDefaultModifierPolicy = 'addAll',
     craftingDefaultModifierIds = [],
     // The pick cap. `null`, NOT a number: absence is "unlimited", and a numeric default would
@@ -144,8 +143,7 @@
     // A section the ROUTER wants opened: it travels WITH the route rather than being set on a
     // component instance the router is about to hand a different `activity`.
     requestedSection = '',
-    // Its IDENTITY: a router request is an EVENT, and latching on the section VALUE swallows a
-    // repeat of it.
+    // Its IDENTITY: a request is an EVENT, and latching on the section VALUE swallows a repeat.
     requestedSectionNonce = 0,
     // Route to another activity, for the catalogue link and the Validation deep links.
     foundrySystemId = '',
@@ -166,11 +164,10 @@
     return interpolate(text(copy.key, copy.fallback, data), data);
   }
 
-  // The alchemy check-mode selector, at the TOP of the crafting route's roll section. Selecting
-  // a mode STAGES it on the root's draft and swaps the editor below.
-  //
-  // "NO CHECK" IS NOT A MODE HERE: the persisted enum still carries `none`, but offering it as a
-  // third radio made the on/off decision and the shape decision one control. Off is the switch.
+  // The alchemy check-mode selector, at the TOP of the crafting route's roll section, STAGING
+  // the mode on the root's draft and swapping the editor below. "NO CHECK" IS NOT A MODE
+  // HERE: the persisted enum still carries `none`, but a third radio made the on/off decision
+  // and the shape decision one control. Off is the switch.
   const ALCHEMY_CHECK_MODE_OPTIONS = [
     {
       value: 'simple',
@@ -203,10 +200,9 @@
   const consumeComponentOnFail = $derived(salvageConsumption?.consumeComponentOnFail !== false);
   const salvageBreakToolsOnFail = $derived(salvageConsumption?.breakToolsOnFail === true);
 
-  // Only `routedByCheck` uses the tier-routing editor. Alchemy has a dedicated FIRST branch in
-  // the crafting render, so `craftingAlchemy` wins before these two can match — but they still
-  // INCLUDE the alchemy cases, so `validationSections` picks the right draft. Do not tighten
-  // them without re-checking that.
+  // Only `routedByCheck` uses the tier-routing editor, and alchemy has a dedicated FIRST
+  // branch, so `craftingAlchemy` wins before these two can match — but they still INCLUDE the
+  // alchemy cases, so `validationSections` picks the right draft. Do not tighten them.
   const craftingAlchemy = $derived(resolutionMode === 'alchemy');
   const craftingRouted = $derived(
     resolutionMode === 'routedByCheck' || (craftingAlchemy && alchemyCheckMode === 'tiered')
@@ -218,9 +214,9 @@
   );
   const craftingProgressive = $derived(resolutionMode === 'progressive');
 
-  // Which crafting check this mode actually rolls, and whether it carries an authored formula,
-  // through the shared five-mode selector rather than a local ternary — a copy of which had no
-  // case for alchemy `none`. Fed from the DRAFTS, the GM editing those formulas here.
+  // Which crafting check this mode actually rolls, and whether it has an authored formula,
+  // through the shared five-mode selector rather than a local ternary with no alchemy `none`
+  // case. Fed from the DRAFTS, the GM editing those formulas here.
   const activeCraftingCheck = $derived(
     resolveActiveCraftingCheckFormula({
       resolutionMode,
@@ -233,9 +229,9 @@
     })
   );
 
-  // The TWO reasons a catalogue reaches no roll, in the order they become answerable: no check,
-  // then no formula. A guard chain rather than nested ternaries, and the ORDER is the point. It
-  // reads the DRAFT; the store's projection reads the PERSISTED system, and both must exist.
+  // The TWO reasons a catalogue reaches no roll, in the order they become answerable, as a
+  // guard chain rather than nested ternaries. It reads the DRAFT; the store's projection
+  // reads the PERSISTED system, and both must exist.
   function inertCauseFor(active) {
     if (!active.slot) return 'noCheck';
     if (!active.checkUsable) return 'noFormula';
@@ -269,13 +265,13 @@
     )
   );
   // Gathering d100 is NOT a `noCheck` — the drop-chance roll IS its check — so it has its own
-  // cause, with no seam to add modifiers to.
+  // cause, with no seam for modifiers.
   const gatheringModifierInertCause = $derived(
     gatheringResolutionMode === 'd100' ? 'noModifierSupport' : inertCauseFor(activeGatheringCheck)
   );
 
-  // The eligibility bag, from the SAME builder the engine uses. Subject `null`: this route
-  // validates the SYSTEM's selection.
+  // The eligibility bag, from the SAME builder the engine uses; subject `null`, this route
+  // validating the SYSTEM's selection.
   const draftSystem = $derived({
     modifiers,
     craftingCheck: {
@@ -354,11 +350,9 @@
 
   // The AUTHORED mode, for the "does not apply in {mode} mode" copy and the Validation rail's
   // rows — deliberately NOT the readiness mode, which collapses every no-check mode to `none`
-  // and would name a mode no economy editor offers.
-  //
-  // IT IS LOCALIZED, through the SAME strings the rest of the manager uses: the authored token
-  // is an internal identifier and the three subsystems spell one concept three ways, so printing
-  // it raw put two camelCase tokens for one mode in one rail card.
+  // and would name a mode no economy editor offers. IT IS LOCALIZED through the SAME strings
+  // the rest of the manager uses: the authored token is an internal identifier and the three
+  // subsystems spell one concept three ways.
   const SUBSYSTEM_MODE_LABELS = {
     crafting: {
       simple: ['FABRICATE.Admin.SystemSettings.ResolutionSimple', 'Simple'],
@@ -404,7 +398,7 @@
         subsystem: 'crafting',
         // THE SLOT, not the resolution mode: one resolver chooses the check AND its rules.
         mode: readinessModeForSlot(activeCraftingCheck.slot),
-        // What the GM SELECTED, in the picker's OWN words — the readiness mode would name a mode no
+        // What the GM SELECTED, in the picker's OWN words; the readiness mode would name a mode no
         // editor offers.
         authoredMode: craftingAlchemy
           ? subsystemModeLabel('alchemy', alchemyCheckMode)
@@ -488,8 +482,7 @@
   // owns it and offers the way back.
   const routeIsInert = $derived(activity === 'gathering' && gatheringD100);
   // The check-OFF state, distinct from INERT: inert is what the MODE does, off is what the GM
-  // chose. The predicate is stated per activity for the reason
-  // `openspec/specs/ui-integration/spec.md` → "GM Checks Studio" gives.
+  // chose, and the predicate is per activity for the reason "GM Checks Studio" gives.
   const routeIsOff = $derived.by(() => {
     // ALCHEMY ANSWERS FROM ITS OWN MODE, BEFORE THE ACTIVATION BAG: `activation` defaults to
     // `{}`, and with no crafting state the checks below return false, which dropped an alchemy
@@ -538,8 +531,8 @@
 
   let activeSection = $state('roll');
   // The last router request honoured, latched by NONCE, or the effect below drags the strip
-  // back the instant the GM clicks anything else; latching on the VALUE is the mirror defect.
-  // `-1` rather than `0`, so a first request carrying nonce 0 still lands.
+  // back the instant the GM clicks anything else; latching on the VALUE is the mirror defect,
+  // and `-1` rather than `0` so a first request carrying nonce 0 still lands.
   let adoptedSectionNonce = $state(-1);
   // A section the route does not render must not stay selected, and a NEW router request wins
   // where the route offers it, carrying a deep link across its own route change.
@@ -656,9 +649,9 @@
 
   // THE SECTION-LEVEL CALLOUT and THE PANE HEADING, both required by
   // `openspec/specs/ui-integration/spec.md` → "GM Checks Studio". The callout reads the SAME
-  // `activeReadiness` pass the strip's dot is counted from and renders the SAME exported copy the
-  // Validation route renders. The pane heading is keyed on the SECTION, the activity already being
-  // named by the rail, the breadcrumb and the route title.
+  // `activeReadiness` pass the strip's dot is counted from and renders the SAME exported copy
+  // the Validation route does; the heading is keyed on the SECTION, the activity being named
+  // by the rail, the breadcrumb and the route title.
   const outcomesLead = $derived.by(() => {
     if (routeIsRouted)
       return text(
@@ -716,15 +709,13 @@
     return entry ? { title: entry[0], lead: entry[1] } : null;
   });
 
-  // WHAT THE FORMULA CARD'S `WHAT ACTUALLY GETS ROLLED` INSET RESTATES: check modifiers are added
-  // automatically and never appear in the formula text, so the field a GM types into is not the
-  // expression the engine rolls. Fed from the SAME `resolveEligibleModifierIds` pass the section
-  // strip counts `Modifiers` from.
-  //
-  // IT MAPS TO THE VIEW SHAPE, and that is the contract: `CheckFormulaFields` takes
-  // `[{ id, name, icon }]` where a persistence entry carries `label`, so the raw entries rendered
-  // `undefined` into every chip's span. Mapped HERE because the component is presentational and
-  // its prop is the seam, with the catalogue card's own `|| entry.id` fallback.
+  // WHAT THE FORMULA CARD'S `WHAT ACTUALLY GETS ROLLED` INSET RESTATES: check modifiers are
+  // added automatically and never appear in the formula text, so the field a GM types into is
+  // not the expression the engine rolls. Fed from the SAME `resolveEligibleModifierIds` pass
+  // the section strip counts from. IT MAPS TO THE VIEW SHAPE, and that is the contract:
+  // `CheckFormulaFields` takes `[{ id, name, icon }]` where a persistence entry carries
+  // `label`, so raw entries rendered `undefined` into every chip's span. Mapped HERE because
+  // the component is presentational and its prop is the seam.
   const appliedModifiers = $derived.by(() => {
     const context = activeActivity?.modifierContext;
     if (!context) return [];
@@ -805,8 +796,8 @@
       }))
   );
 
-  // ONE previewed record, three readers, so it lives HERE; two copies is how two surfaces come
-  // to disagree about which record is previewed.
+  // ONE previewed record, three readers, so it lives HERE; two copies is how two surfaces
+  // disagree about which record is previewed.
   let previewActorId = $state(NO_ACTOR_ID);
   let previewRecordId = $state(DEFAULT_RECORD_ID);
   let previewResult = $state(null);
@@ -818,10 +809,9 @@
   const previewActors = $derived(activity === 'validation' ? [] : listPreviewActors());
   const previewActor = $derived(resolvePreviewActor(previewActorId));
 
-  // THE PROGRESSIVE PREVIEW SANDBOX: a progressive histogram cannot be drawn without an ORDERED
-  // list of result difficulties, and that list is SANDBOX STATE ON THE CHECK rather than a
-  // record's. Read from the live DRAFT, written back through the usual update callback, read
-  // by nothing else and stripped by the exporter.
+  // THE PROGRESSIVE PREVIEW SANDBOX: a progressive histogram needs an ORDERED list of result
+  // difficulties, and that list is SANDBOX STATE ON THE CHECK rather than a record's. Read
+  // from the live DRAFT, written back through the usual callback, read by nothing else.
   const isProgressive = $derived(activeMode === 'progressive');
   const previewDifficulties = $derived(
     isProgressive && Array.isArray(activeCheck?.preview?.difficulties)
@@ -891,17 +881,13 @@
   // enumerable, the editor falling back to a window around the DC.
   const previewTrack = $derived.by(() => {
     if (!enumeration.enumerable) return { min: null, max: null };
-    // THE REACHABLE TOTALS, off the enumeration: a bounded rolling modifier clamps its die, so
-    // there is no single remainder to recompute from.
+    // THE REACHABLE TOTALS, off the enumeration: a bounded rolling modifier clamps its die.
     const totals = enumeration.outcomes.map((outcome) => outcome.total);
     return { min: Math.min(...totals), max: Math.max(...totals) };
   });
 
-  /**
-   * The odds view-model. Every branch either enumerates or states why it did not.
-   *
-   * @returns {object} The model `CheckOddsPanel` renders.
-   */
+  /** The odds view-model, every branch either enumerating or stating why it did not.
+   *  @returns {object} The model `CheckOddsPanel` renders. */
   function buildOddsModel() {
     const kind = previewPlan.kind;
     if (!kind) return { kind: null };
@@ -940,7 +926,6 @@
   /**
    * Progressive bucketing, by AWARD COUNT rather than by tier. An empty sandbox is a stated
    * absence with the control named, never an invented sample.
-   *
    * @param {Array<object>} outcomes The enumerated outcome space.
    * @param {?number} faces The die's face count, for a single-die formula.
    * @param {number} combinations How many assignments the space holds.
@@ -1018,12 +1003,9 @@
     };
   }
 
-  /**
-   * The "What happens" rows, each read off the SAME result object the engine would act on.
-   *
-   * @param {object|null} result The runner result.
-   * @returns {Array<object>} `IconFactRow` inputs.
-   */
+  /** The "What happens" rows, each read off the SAME result object the engine would act on.
+   *  @param {object|null} result The runner result.
+   *  @returns {Array<object>} `IconFactRow` inputs. */
   function buildPreviewFacts(result) {
     if (!result) return [];
     const facts = [];
@@ -1226,8 +1208,8 @@
 {/snippet}
 
 <!-- The failure-RESULT policy card, rendered by all three activity routes AND the alchemy
-     branch from ONE definition. Which policy and which saver it reaches are resolved HERE from
-     `activity`, so no call site can pair crafting's value with salvage's saver. -->
+     branch from ONE definition. Which policy and which saver it reaches are resolved HERE
+     from `activity`, so no call site can pair crafting's value with salvage's saver. -->
 {#snippet failurePolicyCard()}
   <CheckFailurePolicy
     {activity}
@@ -1248,9 +1230,8 @@
 {/snippet}
 
 <!-- GATHERING'S On-failure SECTION, from ONE definition for both gathering branches. IT
-     RENDERS NO CONSUMPTION TOGGLES, which is a data fact rather than an omission: gathering has
-     no `consumption` block at all, and what it has is `task.failureOutcome`, authored on the
-     task and cross-referenced here read-only. -->
+     RENDERS NO CONSUMPTION TOGGLES, a data fact rather than an omission: gathering has no
+     `consumption` block, and what it has is `task.failureOutcome`, cross-referenced here. -->
 {#snippet gatheringOnFailureSection()}
   {@render failurePolicyCard()}
   <!-- NEUTRAL, not info: that tint is for LIVE state and this reports the product. -->
@@ -1331,13 +1312,12 @@
   bind:this={checksRoot}
 >
   <!--
-      THE ROW ACTION'S LIVE REGION, HOSTED HERE rather than in the validation surface: a row action
-      routes to another ACTIVITY, unmounting the whole validation panel — live region included — in
-      the same update that was supposed to announce. So the element carrying `aria-live` is ALWAYS
-      in the DOM, outside the validation branch, with its own `{#if}` inside it. A THIRD CHILD OF
-      THIS TWO-ROW GRID IS SAFE because `.visually-hidden` is `position: absolute` and so is not a
-      grid item; it is addressed by a `data-` hook, so it joins no pinned class family.
-    -->
+        THE ROW ACTION'S LIVE REGION, HOSTED HERE rather than in the validation surface: a row
+        action routes to another ACTIVITY, unmounting the validation panel — live region included
+        — in the update that was supposed to announce. So the `aria-live` element is ALWAYS in the
+        DOM, outside the validation branch, with its own `{#if}` inside it. A THIRD CHILD OF THIS
+        TWO-ROW GRID IS SAFE because `.visually-hidden` is `position: absolute`.
+      -->
   <div class="visually-hidden" role="status" aria-live="polite" data-checks-issue-announcement>
     {#if issueAnnouncement}{issueAnnouncement}{/if}
   </div>
@@ -1353,9 +1333,8 @@
 
   <div class="manager-environment-workspace">
     <!-- `tabindex="-1"` and `data-keyboard-focus="true"` are the ROUTE-ONLY row's focus
-         destination: the button it was activated from is unmounted by the route change, so without
-         this focus falls to `<body>`. `-1` rather than `0`, the panel being a programmatic
-         destination and not a tab stop. -->
+             destination, the button it was activated from being unmounted by the route change, so
+             without this focus falls to `<body>`. `-1`, the panel being programmatic. -->
     <div
       class="manager-environment-tab-panel"
       role="tabpanel"
@@ -1387,9 +1366,8 @@
 
       {#if activity !== 'validation' && !routeIsOff && activeSectionIssues.length > 0}
         <div class="manager-checks-section-callouts" data-checks-section-callouts={activeSection}>
-          <!-- The tone is DERIVED and both values stand: a readiness issue is a statement about
-               the live record, which is what `info` is for, and a critical one is the hazard
-               `warning` names. -->
+          <!-- The tone is DERIVED and both values stand: a readiness issue is a statement about the
+                         live record, which is what `info` is for, and a critical one is the hazard. -->
           {#each activeSectionIssues as issue (issue.id)}
             <Callout
               tone={issue.tone}
@@ -1458,10 +1436,9 @@
           {/if}
 
           {#if activeSection === 'on-failure'}
-            <!-- ALCHEMY RENDERS IT TOO: `alchemy simple` is one of the two crafting modes
-                 where the reserved `role: 'failure'` group is a LIVE award. Alchemy's own
-                 `consumeOnFail` stays below — it substitutes for the generic consumption
-                 pair, not for this. -->
+            <!-- ALCHEMY RENDERS IT TOO: `alchemy simple` is one of the two crafting modes where the
+                             reserved `role: 'failure'` group is a LIVE award, and alchemy's own `consumeOnFail`
+                             below substitutes for the generic consumption pair, not for this. -->
             {@render failurePolicyCard()}
             <InspectorCard data-alchemy-behaviour="">
               <h3 class="manager-checks-card-title">
@@ -1541,9 +1518,8 @@
             </InspectorCard>
           {/if}
 
-          <!-- There is no alchemy `none` branch here: an alchemy system whose check is off is an
-               OFF check rather than an inert mode, so it takes the shared `routeIsOff` empty
-               state above, with its "Turn this check on" button. -->
+          <!-- There is no alchemy `none` branch here: an off alchemy check is an OFF check rather
+                         than an inert mode, so it takes the shared `routeIsOff` empty state above. -->
           {#if craftingRouted}
             <CraftingCheckEditor
               {appliedModifiers}
@@ -1577,9 +1553,8 @@
         </div>
       {:else if activity === 'crafting' && (craftingRouted || craftingSimple || craftingProgressive)}
         <!-- Non-alchemy crafting: the per-mode editor plus the system-level failure consumption
-             policy. The wrapper keeps `data-checks-panel="crafting"` but deliberately NOT the
-             `manager-checks-page` class, which a test asserts is absent once the editor
-             renders. -->
+                     policy. The wrapper keeps `data-checks-panel="crafting"` but deliberately NOT the
+                     `manager-checks-page` class, which a test asserts is absent here. -->
         <div class="manager-checks-editor-stack" data-checks-panel="crafting">
           {#if craftingRouted}
             <CraftingCheckEditor
@@ -1621,11 +1596,10 @@
 
           {#if activeSection === 'on-failure'}
             {@render failurePolicyCard()}
-            <!-- TWO TOP-LEVEL CARDS plus the note the screen ends with, and no wrapping
-                 `Failure consumption policy` card: it named a policy the design does not name,
-                 and the pane head already says what a failed check costs.
-                 `data-failure-consumption` rides the bare list wrapper so the smoke's anchor,
-                 the mounted suites' lookup and the alchemy absence check all keep resolving. -->
+            <!-- TWO TOP-LEVEL CARDS plus the note the screen ends with, and no wrapping card: it named
+                             a policy the design does not name, and the pane head already says what a failed
+                             check costs. `data-failure-consumption` rides the bare list wrapper, which the
+                             smoke's anchor and two suites resolve against. -->
             <div class="manager-checks-flag-list" data-failure-consumption>
               <ToggleCard
                 icon="fas fa-fire"
@@ -1728,10 +1702,9 @@
             {@render salvageModifierCard()}
           {/if}
           {#if activeSection === 'on-failure'}
-            <!-- SALVAGE'S On-failure SECTION. The "nothing to set here" empty state it used
-                 to render was true of the screen and false of the data:
-                 `consumeComponentOnFail` and `breakToolsOnFail` were persisted and reachable
-                 from no editor. -->
+            <!-- SALVAGE'S On-failure SECTION. The "nothing to set here" empty state it used to render
+                             was true of the screen and false of the data, both flags being persisted and
+                             reachable from no editor. -->
             {@render failurePolicyCard()}
             <div class="manager-checks-flag-list" data-salvage-failure-consumption>
               <ToggleCard

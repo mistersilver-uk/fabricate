@@ -34,8 +34,8 @@
   import { MODIFIER_POLICY_OPTION_ATTR } from './modifierPolicyAttrs.js';
 
   const DEFAULT_MODIFIER_ICON = 'fa-solid fa-dice-d20';
-  // The cap hint is the ONLY place "empty means unlimited" is stated, so the input takes it as
-  // its accessible description.
+  // The cap hint is the ONLY place "empty means unlimited" is stated, so the input describes
+  // itself with it.
   const MAX_PICKS_HINT_ID = 'manager-crafting-modifier-max-picks-hint';
 
   let {
@@ -45,14 +45,13 @@
     modifiers = [],
     defaultModifierPolicy = 'addAll',
     defaultModifierIds = [],
-    // The pick cap. ABSENT is a real value, so no call site may coerce it:
-    // `resolveMaxModifierPicks` decides what absence means.
+    // The pick cap. ABSENT is a real value, so no call site may coerce it.
     maxModifierPicks = null,
-    // Why the catalogue reaches no roll, or '' when it does. Each cause needs a different remedy,
+    // Why the catalogue reaches no roll, or '' when it does; each cause needs a different remedy,
     // so it is passed rather than derived from one boolean.
     inertCause = '',
-    // Whether this activity's check-modifier seam is DORMANT. Its own notice, ALONGSIDE
-    // `inertCause`: the two are different facts with different fixes.
+    // Whether the check-modifier seam is DORMANT: its own notice, ALONGSIDE `inertCause`, the
+    // two being different facts with different fixes.
     dormant = false,
     // Navigate to the surface that authors the library; a null default keeps this mountable.
     onEditLibrary = null,
@@ -102,11 +101,10 @@
   const subjectCopy = $derived(SUBJECT_COPY[activity] || SUBJECT_COPY.crafting);
 
   // Icon vocabulary for the four combination rules. THE GLYPH TEST IS WHETHER FOUNDRY CAN
-  // RENDER IT, not whether the name is free: a module is licensed to write a configuration
-  // Foundry resolves to a premium icon and not to bundle the icon, and Fabricate ships no font.
-  // The ORDER mirrors `MODIFIER_POLICIES`, so the two selecting rules sit adjacent and the 2x2
-  // grid reads them as a pair, and each description names the eligibility word the rule puts on
-  // the rows above.
+  // RENDER IT, not whether the name is free: a module may write a configuration Foundry
+  // resolves to a premium icon and may not bundle the icon, and Fabricate ships no font. The
+  // ORDER mirrors `MODIFIER_POLICIES`, so the two selecting rules sit adjacent, and each
+  // description names the eligibility word the rule puts on the rows above.
   const policyOptions = $derived([
     {
       value: 'addAll',
@@ -146,7 +144,7 @@
   ]);
 
   // The ELIGIBILITY vocabulary: THREE words, one per KIND of rule, and `bySubject` SHARES
-  // `playerPicks`'s rather than owning a fourth. Both are required by the spec section above.
+  // `playerPicks`'s rather than owning a fourth — both required by the spec section above.
   const ELIGIBILITY_COPY = {
     addAll: {
       key: 'FABRICATE.Admin.Manager.Checks.Crafting.ModifierEligibilityApplied',
@@ -220,12 +218,11 @@
   // Normalized through the resolver's OWN vocabulary rather than a local mirror, which is also
   // what makes a world carrying the legacy `byRecipe` select `bySubject`.
   const selectedPolicy = $derived(normalizeModifierPolicy(defaultModifierPolicy) ?? 'addAll');
-  // Whether the rule defers the selection, and so whether the cap means anything, asked of the
-  // resolver rather than a local membership test.
+  // Whether the rule defers the selection, and so whether the cap means anything, asked of
+  // the resolver rather than a local membership test.
   const defersSelection = $derived(policyDefersSelection(selectedPolicy));
   const eligibility = $derived(ELIGIBILITY_COPY[selectedPolicy] || ELIGIBILITY_COPY.addAll);
-  // The cap means a different thing under each selecting rule, so the hint is keyed by rule;
-  // only the two `policyDefersSelection` admits can appear.
+  // The cap means a different thing under each selecting rule, so the hint is keyed by rule.
   const maxPicksCopy = $derived(
     selectedPolicy === 'bySubject'
       ? { key: subjectCopy.capKey, fallback: subjectCopy.cap }
@@ -251,16 +248,16 @@
       ? { key: subjectCopy.leadKey, fallback: subjectCopy.lead }
       : { key: eligibility.leadKey, fallback: eligibility.lead }
   );
-  // KEYED BY ACTIVITY: this component mounts three times, and a duplicate DOM id silently
-  // re-points every `aria-describedby` on the page.
+  // KEYED BY ACTIVITY: this mounts three times, and a duplicate DOM id silently re-points
+  // every `aria-describedby` on the page.
   const ELIGIBILITY_INTRO_ID = $derived(`manager-${activity}-modifier-eligibility-intro`);
   // Gated on the catalogue being NON-EMPTY as well as on the cause: the notice reports a
   // CATALOGUE that reaches no roll, and an empty one is not that.
   const inert = $derived(library.length > 0 ? INERT_COPY[inertCause] || null : null);
   const defaultIds = $derived(Array.isArray(defaultModifierIds) ? defaultModifierIds : []);
 
-  // The three SELECTION writes, the whole of what this card persists. None can touch the
-  // library: the store's check-modifier saver accepts no library key at all.
+  // The three SELECTION writes, the whole of what this card persists; none can touch the
+  // library, the store's check-modifier saver accepting no library key at all.
   function selectPolicy(policy) {
     onChange({ defaultModifierPolicy: policy });
   }
@@ -276,8 +273,8 @@
     onChange({ defaultModifierIds: next });
   }
 
-  // The read-only bounds chip, signed on BOTH ends because a modifier is a signed contribution,
-  // and absent entirely on an unbounded entry.
+  // The read-only bounds chip, signed on BOTH ends because a modifier is a signed
+  // contribution, and absent entirely on an unbounded entry.
   function boundsChipLabel(modifier) {
     const { min, max } = resolveModifierBounds(modifier);
     if (min === null && max === null) return '';
@@ -315,14 +312,13 @@
   data-crafting-modifier-catalogue={activity}
   data-check-modifier-activity={activity}
 >
-  <!-- The head carries the deep link at its top right: a full-width button under the rows sits
-         where every other list in this studio puts its "add a row" control. -->
+  <!-- The head carries the deep link at its top right, where every other list in this studio
+           puts its "add a row" control. -->
   <div class="manager-checks-card-head">
     <div class="manager-checks-card-head-body">
       <div class="manager-checks-card-heading">
         <!-- `Named modifiers`, a DIFFERENT key from `ModifierCatalogueHeading`, which disambiguates
-                     a task's check-modifier pick from its drop rows' character modifiers. One key
-                     serving two meanings is how a rename breaks a screen. -->
+                             a task's check-modifier pick from its drop rows' character modifiers. -->
         <h3 class="manager-checks-card-title">
           {text('FABRICATE.Admin.Manager.Checks.Crafting.ModifierNamedHeading', 'Named modifiers')}
         </h3>
@@ -341,8 +337,7 @@
         {/if}
       </div>
       <!-- The RULE'S OWN SENTENCE, above the rows that do the marking rather than under the grid
-                 that sets the rule, and keeping the `aria-describedby` target id that makes the
-                 pill's state word mean something. -->
+                       that sets the rule, and keeping the `aria-describedby` target id. -->
       <p
         class="manager-checks-card-description"
         id={ELIGIBILITY_INTRO_ID}
@@ -355,8 +350,8 @@
 
   <div class="manager-checks-card-body is-stack" data-crafting-modifier-rows>
     {#if activity === 'gathering'}
-      <!-- The disambiguation is a NAMING rule stated BOTH ways: no surface shows both concepts at
-                 once, so one direction answers a question the screen never raises. -->
+      <!-- The disambiguation is a NAMING rule stated BOTH ways: no surface shows both concepts
+                       at once, so one direction answers a question the screen never raises. -->
       <p class="manager-muted" data-gathering-modifier-disambiguation>
         {text(
           'FABRICATE.Admin.Manager.Checks.Gathering.ModifierDisambiguation',

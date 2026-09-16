@@ -10,8 +10,7 @@
  * THROWS on a mid-edit formula; (2) its `missing: "0"` hides an unresolved `@` key, so the
  * refusal reads `resolved === false`; (3) determinism must RECURSE, and
  * `StringTerm#isDeterministic` LIES. Every refusal carries a discriminated REASON CODE, and
- * `Roll` is a parameter, so a missing or throwing `parse` is a result rather than an exception.
- */
+ * `Roll` is a parameter, so a missing or throwing `parse` is a result rather than an exception. */
 
 import {
   classifyCheckTotal,
@@ -26,9 +25,8 @@ import { reduceRollExpression } from '../../../../../utils/rollExpressionAverage
 /**
  * Why a formula is not enumerable, discriminated so each refusal is testable on its own terms.
  * `nonNumericDenomination` is separate from `nonIntegerFaces` because `FateDie` and `Coin` both
- * report integral faces and are distinguished ONLY by denomination.
- * @type {Readonly<Record<string, string>>}
- */
+ * report integral faces and are told apart ONLY by denomination.
+ * @type {Readonly<Record<string, string>>} */
 export const ODDS_REASONS = Object.freeze({
   parseThrew: 'parse-threw',
   noDice: 'no-dice',
@@ -45,9 +43,7 @@ export const ODDS_REASONS = Object.freeze({
 /**
  * Why a PROGRESSIVE histogram has nothing to draw even though the formula is enumerable, and
  * deliberately NOT an {@link ODDS_REASONS} member: those say the formula cannot be enumerated,
- * where this says the missing input is the GM's own sandbox order.
- * @type {string}
- */
+ * where this says the missing input is the GM's own sandbox order. @type {string} */
 export const SANDBOX_ABSENT = 'no-sandbox-order';
 
 /** The largest joint outcome space this will walk. The enumeration is a cartesian product, so
@@ -63,9 +59,7 @@ const refuse = (reason) => ({ enumerable: false, reason });
  * A term that carries a dice term's shape, whatever class it is, and deliberately STRUCTURAL:
  * the View Lab has no `foundry.dice.*` namespace, so an `instanceof` test would make this
  * untestable outside a live client.
- * @param {object} term A parsed roll term.
- * @returns {boolean} True when the term looks like a `DiceTerm`.
- */
+ * @param {object} term A parsed roll term. @returns {boolean} True when it looks like a die. */
 function isDiceTermLike(term) {
   if (!term || typeof term !== 'object') return false;
   return 'faces' in term && 'number' in term && Array.isArray(term.modifiers);
@@ -76,9 +70,7 @@ function isDiceTermLike(term) {
  * evaluate. `typeof term.term === 'string'` ALONE is not this test: `ParentheticalTerm` also
  * declares a string `term`, so `1d20 + (2d6)` would refuse as `string-term` rather than as the
  * `non-deterministic-remainder` it is, and is told apart by the two fields only it carries.
- * @param {object} term A parsed roll term.
- * @returns {boolean} True when the term is a string term.
- */
+ * @param {object} term A parsed roll term. @returns {boolean} True when it is a string term. */
 function isStringTermLike(term) {
   if (!term || typeof term !== 'object') return false;
   if (isDiceTermLike(term)) return false;
@@ -93,8 +85,7 @@ function isStringTermLike(term) {
  * being `min(max((1d8), -1), 6)`, is every system carrying one. What survives is the
  * `StringTerm` refusal, the one shape whose `isDeterministic` LIES.
  * @param {Array<object>} terms Every parsed term except the dice.
- * @returns {?{enumerable: false, reason: string}} A refusal, or null when it passes.
- */
+ * @returns {?{enumerable: false, reason: string}} A refusal, or null. */
 function refuseRemainder(terms) {
   if (terms.some((term) => isStringTermLike(term))) return refuse(ODDS_REASONS.stringTerm);
   return null;
@@ -116,13 +107,12 @@ function planDice(display) {
   let refusal = null;
   const probe = reduceRollExpression(display, {
     dieValue: ({ count, faces, modifiers }) => {
-      // ONE unmodified numeric die per group, the only shape whose faces are uniform: every
-      // Foundry die modifier reweights, unbounds or changes what `total` means.
+      // ONE unmodified numeric die per group, the only uniform shape: every Foundry die modifier
+      // reweights, unbounds or changes what `total` means.
       if (modifiers !== '') refusal ??= ODDS_REASONS.dieModifiers;
       else if (count !== 1) refusal ??= ODDS_REASONS.nonUnitCount;
       else if (NON_NUMERIC_DENOMINATION.test(faces)) {
-        // `FateDie` and `Coin` report integral faces and are told apart by DENOMINATION
-        // alone, so "the faces are not an integer" would be false about either.
+        // `FateDie` and `Coin` report integral faces and are told apart by DENOMINATION alone.
         refusal ??= ODDS_REASONS.nonNumericDenomination;
       } else if (!Number.isInteger(Number(faces)) || Number(faces) < 1) {
         refusal ??= ODDS_REASONS.nonIntegerFaces;
@@ -147,8 +137,7 @@ function planDice(display) {
  * through a clamp — which charts a bounded `1d8` modifier as the `1..6` it contributes.
  * @param {string} display The `@`-resolved formula.
  * @param {Array<{faces: number}>} dice The dice, in reading order.
- * @returns {Array<{total: number, diceGroups: Array<object>}>} One outcome per assignment.
- */
+ * @returns {Array<{total: number, diceGroups: Array<object>}>} One outcome per assignment. */
 function enumerateOutcomes(display, dice) {
   const outcomes = [];
   const assignment = dice.map(() => 1);
@@ -183,8 +172,7 @@ function enumerateOutcomes(display, dice) {
  * @param {*} [options.Roll] The `Roll` class; defaults to `globalThis.Roll`.
  * @param {object|null} [options.craftingModifier] The check-modifier context, where there is one.
  * @returns {{enumerable: true, faces: number, remainder: number, display: string}
- *   | {enumerable: false, reason: string}} The verdict.
- */
+ *   | {enumerable: false, reason: string}} The verdict. */
 export function describeFormulaEnumerability(
   formula,
   actor,
@@ -209,14 +197,12 @@ export function describeFormulaEnumerability(
   }
   if (!Array.isArray(terms)) return refuse(ODDS_REASONS.parseThrew);
 
-  // The one shape whose `isDeterministic` lies. Everything else is decided by the reader below,
-  // which — unlike `flattenTree`'s top-level term list — sees inside a parenthetical.
+  // The one shape whose `isDeterministic` lies; everything else is the reader's, which —
+  // unlike `flattenTree`'s top-level term list — sees inside a parenthetical.
   const stringRefusal = refuseRemainder(terms.filter((term) => !isDiceTermLike(term)));
   if (stringRefusal) return stringRefusal;
 
-  // The ONE fact the reader cannot state: `1d(1d4)` puts an EXPRESSION where the faces go, so
-  // the reader does not recognise the token as a die at all and would report it as an expression
-  // that does not reduce, which is true and unhelpful.
+  // The ONE fact the reader cannot state: `1d(1d4)` puts an EXPRESSION where the faces go.
   const nonIntegerFaces = terms
     .filter((term) => isDiceTermLike(term))
     .some((die) => !Number.isInteger(die.faces));
@@ -231,7 +217,7 @@ export function describeFormulaEnumerability(
   const outcomes = enumerateOutcomes(display.display, plan.dice);
   if (outcomes.some((outcome) => !Number.isFinite(outcome.total))) {
     // Every assignment reduced during the probe, so a non-finite total means the reduction is
-    // not a function of the faces alone. Refusing the WHOLE histogram beats charting part.
+    // not a function of the faces alone; refusing the WHOLE histogram beats charting part.
     return refuse(ODDS_REASONS.nonDeterministicRemainder);
   }
 
@@ -254,8 +240,7 @@ export function describeFormulaEnumerability(
  * EVERY die is in it, modifier terms being APPENDED and the authored dice keeping their group ids.
  * @param {Array<{faces: number}>} dice The dice, in reading order.
  * @param {Array<number>} assignment The face each die shows.
- * @returns {Array<object>} The dice-group bag for that assignment.
- */
+ * @returns {Array<object>} The dice-group bag for that assignment. */
 function diceGroupsFor(dice, assignment) {
   return rolledDiceGroups({
     dice: dice.map((die, index) => ({
@@ -270,9 +255,7 @@ function diceGroupsFor(dice, assignment) {
 /**
  * A percentage, to one decimal place, that still sums to 100 across a partition.
  * @param {number} count Outcomes in this bucket.
- * @param {number} total Outcomes in the whole enumerated space.
- * @returns {number} The percentage.
- */
+ * @param {number} total Outcomes in the whole enumerated space. @returns {number} */
 function percentOf(count, total) {
   return Math.round((count / total) * 1000) / 10;
 }
@@ -283,8 +266,7 @@ function percentOf(count, total) {
  * @param {Array<{total: number, diceGroups: Array<object>}>} params.outcomes The outcome space.
  * @param {object} params.args The classifier arguments.
  * @returns {Array<{id: string, name: string, success: boolean, count: number, percent: number}>}
- *   One bucket per reachable tier, in tier order, zero-probability omitted.
- */
+ *   One bucket per reachable tier, in tier order, zero-probability omitted. */
 export function enumerateRoutedOdds({ outcomes, args }) {
   const buckets = new Map();
   for (const outcome of outcomes) {

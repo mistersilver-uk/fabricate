@@ -2,13 +2,10 @@
  * The ONE set of sentences the Checks Studio uses to describe a readiness result. A section's
  * warning dot is explained IN the panel by a `Callout`, and a dot whose sentence is a second
  * copy of the Validation route's is how one issue comes to be described two ways on two screens
- * a click apart.
- *
- * Each entry is `[localizationSuffix, englishFallback]`, resolved against the shared
- * `FABRICATE.Admin.Manager.Checks.Validation.` namespace, so this module stays pure. The issue
- * map is PROVEN EXHAUSTIVE against `CHECK_READINESS_ISSUE_IDS` in both directions by
- * `tests/checks-readiness.test.js`.
- */
+ * a click apart. Each entry is `[localizationSuffix, englishFallback]`, resolved against the
+ * shared `FABRICATE.Admin.Manager.Checks.Validation.` namespace, so this module stays pure; the
+ * issue map is PROVEN EXHAUSTIVE against `CHECK_READINESS_ISSUE_IDS` in both directions by
+ * `tests/checks-readiness.test.js`. */
 
 /** The satisfied/unsatisfied TICKS a check reports. */
 export const CHECK_TICK_LABELS = Object.freeze({
@@ -101,20 +98,15 @@ function copyFor(map, id) {
   return { key: `${NAMESPACE}${meta[0]}`, fallback: meta[1] };
 }
 
-/**
- * The localization key and English fallback for a readiness ISSUE id.
- * @param {string} id A `CHECK_READINESS_ISSUE_IDS` member.
- * @returns {{ key: string, fallback: string }}
- */
+/** The localization key and English fallback for a readiness ISSUE id.
+ *  @param {string} id A `CHECK_READINESS_ISSUE_IDS` member.
+ *  @returns {{ key: string, fallback: string }} */
 export function checkIssueCopy(id) {
   return copyFor(CHECK_ISSUE_LABELS, id);
 }
 
-/**
- * The localization key and English fallback for a readiness TICK id.
- * @param {string} id A check tick id.
- * @returns {{ key: string, fallback: string }}
- */
+/** The localization key and English fallback for a readiness TICK id.
+ *  @param {string} id A check tick id. @returns {{ key: string, fallback: string }} */
 export function checkTickCopy(id) {
   return copyFor(CHECK_TICK_LABELS, id);
 }

@@ -7,16 +7,14 @@
  * special, the engine, the readiness pass and the summariser would each need to know about it.
  * THEY ADAPT TO WHAT THE CHECK CAN DO through its `kind`, and are withheld entirely when the
  * formula rolls no dice, a preset offered against one authoring a condition pointing at a group
- * that does not exist. `tests/check-trigger-presets.test.js` pins what each preset authors.
- */
+ * that does not exist. `tests/check-trigger-presets.test.js` pins what each preset authors. */
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Breakage.';
 
 /**
  * The two presets, as descriptions rather than built triggers, the die group and the check kind
  * not being known until a call site supplies them: `high` fires on the best face of the leading
- * die group and `low` on the worst.
- */
+ * die group and `low` on the worst. */
 const PRESETS = Object.freeze([
   Object.freeze({
     id: 'high',

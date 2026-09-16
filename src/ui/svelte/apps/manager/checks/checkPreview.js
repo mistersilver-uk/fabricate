@@ -8,8 +8,7 @@
  * `openspec/specs/ui-integration/spec.md` → "Outcome-preview simulator". Two mechanisms carry
  * it: `rollOptions: null`, which the runners SPREAD so the chat post's `options?.interactive`
  * gate and `allowInteractive: false` both hold; and never writing to the LIVE `system` object
- * `Actor#getRollData()` returns, {@link cloneRollData} existing for a caller that must augment it.
- */
+ * `Actor#getRollData()` returns, {@link cloneRollData} existing for a caller that must augment. */
 
 import { isPlayerCharacterActor } from '../../../../../config/playerCharacterTypes.js';
 import { buildCheckModifierContext } from '../../../../../systems/checkModifierResolver.js';
@@ -42,8 +41,7 @@ const RUNNER_KINDS = new Map([
  * @param {object} [options] Options.
  * @param {() => Iterable<object>} [options.getActors] The actor source.
  * @param {(actor: object) => boolean} [options.isPlayerCharacter] The membership predicate.
- * @returns {Array<{id: string, name: string, img: string}>} Actors, in world order.
- */
+ * @returns {Array<{id: string, name: string, img: string}>} Actors, in world order. */
 export function listPreviewActors({
   getActors = () => globalThis.game?.actors?.contents ?? globalThis.game?.actors ?? [],
   isPlayerCharacter = isPlayerCharacterActor,
@@ -67,8 +65,7 @@ export function listPreviewActors({
  * @param {string} id The selected actor id, or {@link NO_ACTOR_ID}.
  * @param {object} [options] Options.
  * @param {(id: string) => object|null} [options.getActor] The lookup seam.
- * @returns {object|null} The actor document.
- */
+ * @returns {object|null} The actor document. */
 export function resolvePreviewActor(
   id,
   { getActor = (actorId) => globalThis.game?.actors?.get?.(actorId) ?? null } = {}
@@ -77,11 +74,9 @@ export function resolvePreviewActor(
   return getActor(id) ?? null;
 }
 
-/**
- * A shallow-safe copy of an actor's roll data.
- * @param {object|null} actor The previewed actor.
- * @returns {object} A copy no caller can write back through.
- */
+/** A shallow-safe copy of an actor's roll data.
+ *  @param {object|null} actor The previewed actor.
+ *  @returns {object} A copy no caller can write back through. */
 export function cloneRollData(actor) {
   const live = actor?.getRollData?.() ?? actor?.system ?? {};
   const clone = globalThis.foundry?.utils?.deepClone;
@@ -97,8 +92,7 @@ export function cloneRollData(actor) {
  * @param {object} params Params.
  * @param {object|null} params.check The active check draft.
  * @param {string} [params.defaultLabel] The localized name of the default record.
- * @returns {Array<{id: string, name: string, dc: number}>} The records, default first.
- */
+ * @returns {Array<{id: string, name: string, dc: number}>} The records, default first. */
 export function buildPreviewRecords({ check, defaultLabel = 'Default' }) {
   const baseDc = Number(check?.dc ?? 0);
   const records = [
@@ -133,8 +127,7 @@ export function buildPreviewRecords({ check, defaultLabel = 'Default' }) {
  * @param {Array<{value: number, label: string}>} [params.toolTerms] Tool contributions, which
  *   gathering has no seam for and a preview never populates.
  * @returns {{kind: 'passFail'|'routed'|'progressive'|null, formula: string, dc: number,
- *   dynamicDc: boolean, actor: object|null, args: object}} `kind: null` means nothing rolls.
- */
+ *   dynamicDc: boolean, actor: object|null, args: object}} `kind: null` means nothing rolls. */
 export function buildPreviewCheckArgs({
   activity,
   mode,
@@ -151,7 +144,7 @@ export function buildPreviewCheckArgs({
   const formula =
     activity === 'gathering' ? authored : appendToolBonusTerms(authored, toolTerms ?? []);
 
-  // A dynamic DC is resolved by RUNNING a macro; the preview refuses to and falls back to the
+  // A dynamic DC is resolved by RUNNING a macro; the preview refuses and falls back to the
   // static DC, the same value the engine's own try/catch falls back to.
   const dynamicDc = draft?.dcMode === 'dynamic';
   const recordDc = Number(record?.dc);
@@ -167,8 +160,8 @@ export function buildPreviewCheckArgs({
     formula,
     triggers,
     actor,
-    // `rollOptions: null` — see the module header. Stated rather than omitted, so a reader can
-    // check the "posts nothing, prompts nothing" claim against it.
+    // `rollOptions: null` — see the module header — stated so a reader can check the "posts
+    // nothing, prompts nothing" claim against it.
     rollOptions: null,
     craftingModifier,
   };
@@ -191,8 +184,8 @@ export function buildPreviewCheckArgs({
         type: draft?.type === 'fixed' ? 'fixed' : 'relative',
         relativeOutcomes: Array.isArray(draft?.relativeOutcomes) ? draft.relativeOutcomes : [],
         fixedOutcomes: Array.isArray(draft?.fixedOutcomes) ? draft.fixedOutcomes : [],
-        // Every routed caller opts in, so a preview that did not would report a
-        // rolled-but-unrouted total no craft can produce.
+        // Every routed caller opts in, so a preview that did not would report a rolled-but-unrouted
+        // total no craft can produce.
         clampToNearest: true,
         // A recipe's minimum success tier, stated so the arg bag is the engine's whole shape.
         minOutcomeId: null,
@@ -214,11 +207,9 @@ export function buildPreviewCheckArgs({
   };
 }
 
-/**
- * Roll the preview through the engine's own runner.
- * @param {{kind: string|null, args: object}} plan {@link buildPreviewCheckArgs}'s output.
- * @returns {Promise<object|null>} The runner's own result verbatim, or null when nothing rolls.
- */
+/** Roll the preview through the engine's own runner.
+ *  @param {{kind: string|null, args: object}} plan {@link buildPreviewCheckArgs}'s output.
+ *  @returns {Promise<object|null>} The runner's result verbatim, or null when nothing rolls. */
 export async function runCheckPreview(plan) {
   if (!plan?.kind || String(plan.formula ?? '').trim() === '') return null;
   if (plan.kind === 'routed') return runFormulaRouted(plan.args);
@@ -232,8 +223,7 @@ export async function runCheckPreview(plan) {
  * they were added to, and who rolled them.
  * @param {object|null} result A runner result.
  * @param {string} [actorName] The previewed actor's name.
- * @returns {string} The breakdown line, or '' when there is nothing to describe.
- */
+ * @returns {string} The breakdown line, or '' when there is nothing to describe. */
 export function terseBreakdown(result, actorName = '') {
   const groups = Array.isArray(result?.data?.diceGroups) ? result.data.diceGroups : [];
   const total = Number(result?.data?.total);
