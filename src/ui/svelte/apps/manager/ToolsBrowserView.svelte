@@ -24,66 +24,48 @@
   let {
     tools = [],
     selectedToolId = '',
-    // THE WORLD TOOL SELECTED THAT THIS SYSTEM HAS NO RULES RECORD FOR. It is a second id
-    // rather than a widening of `selectedToolId`, because that one is derived from the OPEN
-    // TOOL DRAFT and an unadopted Tool has no draft to be derived from. Held by the root,
-    // because the inspector it fills is rendered by the shell's aside rather than by this
-    // view; see `selectLibraryTool` there.
+    // The world Tool selected that this system has no rules record for. A second id rather than
+    // a widening of `selectedToolId`, which is derived from the open tool DRAFT that an unadopted
+    // Tool has none of. Held by the root, because the shell's aside renders the inspector it
+    // fills; see `selectLibraryTool` there.
     selectedUnadoptedToolId = '',
     managedItemOptions = [],
     breakageAuthority = 'toolSpecific',
-    // THE WORLD SCOPE'S OWN PROJECTION and the AUTHORING LAYER of the resolved token above
-    // (issue 1373). Both are already passed by the call site, which is what makes the
-    // tri-state buildable without reopening a gateway file: `CraftingSystemManagerRoot`
-    // spreads the tool bundle FIRST and restates `breakageAuthority` / `breakageSource`
-    // after, so declaring exactly what the site passes keeps the lookup off the spread.
-    //
-    // Declaring a name the site does NOT pass would make every reader of it a live
-    // subscriber to the whole bundle, which the root's own note records; both of these are
-    // passed, so neither does.
+    // The world scope's own projection and the AUTHORING layer of the resolved token above.
+    // Both are restated by the call site after it spreads the tool bundle, so declaring exactly
+    // what the site passes keeps the lookup off the spread: declaring a name the site does NOT
+    // pass would make every reader a live subscriber to the whole bundle.
     scope = null,
-    // THE WORLD TOOL WRITE FAMILY, for the one write this screen makes that its own system
-    // cannot: adopting a world Tool that has no rules record here. Passed by the call site in
-    // the same tool bundle as `scope`.
+    // The world Tool write family, for the one write this screen makes that its own system
+    // cannot: adopting a world Tool with no rules record here.
     actions = null,
-    // THE CRAFTING SYSTEM THIS SCREEN IS SCOPED TO, and it is read rather than inferred.
-    // `scope.entries[].systems[]` is the world projection's own JOIN, and picking this
-    // system's row out of it is the only way a row can state whether it INHERITS the world
-    // defaults or overrides one — the system's own tool record carries the resolved values
-    // and cannot tell the two apart. The call site already passes it in the tool bundle.
+    // Read rather than inferred. `scope.entries[].systems[]` is the world projection's own JOIN,
+    // and picking this system's row out of it is the only way a row can state whether it INHERITS
+    // the world defaults or overrides one — the system's own tool record carries the resolved
+    // values and cannot tell the two apart.
     systemId = '',
     breakageSource = 'default',
     onSelectTool = () => {},
     onEditTool = () => {},
-    // NO `onCreateToolDrop`, AND NO DROP ZONE. Creation moved to the WORLD Tools Catalogue,
-    // which is where the design puts it and where it belongs: a Tool is one world record every
-    // system adopts, and this screen can only ever author RULES for a record the world already
-    // holds. `WorldToolCataloguePage` carries the zone now, and the root resolves the dropped
-    // Item through `services.resolveToolSource` before creating the world entity - the seam
-    // that did not exist when the zone was parked here.
+    // No `onCreateToolDrop`, and no drop zone: a Tool is one world record every system adopts,
+    // and this screen can only ever author RULES for a record the world already holds.
+    // `WorldToolCataloguePage` carries the zone, and the root resolves the dropped Item through
+    // `services.resolveToolSource` before creating the world entity.
     onToggleToolEnabled = () => {},
     onSetBreakageAuthority = () => {},
-    // THE ROUTE OUT OF THE ZERO STATE that leaves this system. Passed rather than reached
-    // through `actions`, which is the world Tool WRITE family: opening a route is the shell's
-    // job and the write family has no navigation on it (issue 1373).
+    // The route out of the zero state that leaves this system. Passed rather than reached through
+    // `actions`, the world Tool WRITE family: opening a route is the shell's job.
     onOpenWorldCatalogue = () => {},
-    // ── THE VIEW-STATE IS LIFTED (issue 1438) ────────────────────────────────────────────
-    // Search and page live on an object the manager root owns and binds here: opening a tool
-    // switches `currentView` to `tool-edit`, which unmounts this component, so held locally
-    // both were reset by the trip out and back. Unbound, the local fallback keeps the controls
-    // reactive in-component for the isolated mounted tests.
+    // The view-state is LIFTED (issue 1438): opening a tool switches `currentView` and unmounts
+    // this component, so state held locally was reset by the trip out and back. Unbound, the
+    // local fallback keeps the controls reactive for the isolated mounted tests.
     browserState = $bindable(null),
   } = $props();
 
   /**
-   * The FOUR INHERITED world-default sections, named once. `repairRequirements` is deliberately
-   * absent: `worldToolStudio` records that it is SEEDED on adoption and then diverges, so it
-   * has no inherit state a row could report.
-   *
-   * `prerequisites` and `bonus` joined at `1.31.0` (issue 1373). A row that overrides one of
-   * them now SAYS so, where before it read `Inherits world defaults` over a character gate its
-   * own system authored — which was true of every migrated world, because the model held both
-   * fields per system only and there was no world layer for them to inherit from.
+   * The four inherited world-default sections, named once. `repairRequirements` is deliberately
+   * absent: `worldToolStudio` records that it is SEEDED on adoption and then diverges, so it has
+   * no inherit state a row could report.
    */
   const TOOL_WORLD_SECTIONS = [
     { id: 'breakage', key: 'FABRICATE.Admin.Manager.Tools.Breakage', label: 'Breakage' },
@@ -96,19 +78,11 @@
     { id: 'bonus', key: 'FABRICATE.Admin.Manager.Scoped.Sections.Bonus', label: 'Check bonus' },
   ];
 
-  // ── THE VIEW-STATE IS LIFTED (issue 1438), ON ALL SIX AXES ───────────────────────────
-  // Search and page live on an object the manager root owns and binds here: opening a tool
-  // switches `currentView` to `tool-edit`, which unmounts this component, so held locally
-  // both were reset by the trip out and back. Unbound, the local fallback keeps the controls
-  // reactive in-component for the isolated mounted tests.
-  //
-  // MEMBERSHIP, SORT KEY AND SORT DIRECTION ARE LIFTED WITH THEM (issue 1373). They arrived
-  // on this screen after the lift was written, and they are the same KIND of state by that
-  // change's own test: view filters over rows the store has already published, not cohort
-  // selectors the store must hold. Leaving them component-local would half-lift the toolbar —
-  // a GM who filters to `Overriding`, opens a tool and comes back would find the search term
-  // preserved beside a membership segment silently snapped back to `In this system`, which is
-  // the exact defect issue 1438 exists to remove, made harder to see by being partial.
+  // Lifted on all six axes, for the reason above. Membership, sort key and sort direction are
+  // lifted with search and page because they are the same KIND of state: view filters over rows
+  // the store has already published, not cohort selectors the store must hold. Leaving them
+  // local would half-lift the toolbar, which is the defect issue 1438 removes, made harder to
+  // see by being partial.
   let ownBrowserState = $state(createToolsBrowserState());
   const ui = $derived(browserState ?? ownBrowserState);
 
@@ -127,15 +101,11 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // PROJECTED TO A SCALAR IMMEDIATELY, and that is a cost decision rather than a style one.
-  // `scope` is a NEW OBJECT on every world-corpus publish, so reading it inside a reactive
-  // scope would re-render this whole view on every world-scope edit. One derivation bounds
-  // that to a string comparison; world-corpus publishes are GM-edit-driven, not per-frame.
-  //
-  // `worldScopeProjection` attaches `toolBreakage` ONLY when the corpus holds one, so `''`
-  // means the world authored nothing - which is a different label and a different pill from
-  // an authored `toolSpecific`, and is why this is read rather than inferred from the
-  // resolved token.
+  // Projected to a scalar immediately, as a cost decision: `scope` is a NEW object on every
+  // world-corpus publish, so reading it inside a reactive scope would re-render this whole view
+  // on every world-scope edit. `worldScopeProjection` attaches `toolBreakage` ONLY when the
+  // corpus holds one, so `''` means the world authored nothing — a different label and a
+  // different pill from an authored `toolSpecific`.
   const worldAuthority = $derived(scope?.toolBreakage?.authority ?? '');
 
   const authoritySegments = $derived(
@@ -149,9 +119,8 @@
 
   const authorityPill = $derived(breakModeSourcePill(breakageSource, text));
 
-  // THE WORLD PROJECTION'S PER-SYSTEM JOIN, indexed by world entity id. Read as a Map rather
-  // than scanned per row: `scope` republishes a NEW object on every world-scope edit and a
-  // `find` per row would walk the whole corpus once per Tool on every one of them.
+  // The world projection's per-system join, indexed by world entity id. A Map rather than a
+  // `find` per row, which would walk the whole corpus once per Tool on every re-render.
   const worldRowsByToolId = $derived(
     new Map(
       (Array.isArray(scope?.entries) ? scope.entries : []).map((entry) => [
@@ -164,16 +133,11 @@
   );
 
   /**
-   * How many of THIS system's recipes require one Tool.
-   *
-   * READ OFF THE PROJECTION'S PER-SYSTEM ROW, never counted here. `adminStore` walks every
-   * recipe in every system once per publish - across a recipe's top-level `toolIds`, each
-   * ingredient set's, and both again per step - and keys the answer by `(tool, system)`. This
-   * screen has no recipe corpus at all, so counting here would mean threading one in and
-   * recounting it per row on every re-render.
-   *
-   * `0` for a world Tool this system has no rules for is a real answer rather than a fallback:
-   * a recipe here cannot reference a Tool the system is not a member of.
+   * How many of THIS system's recipes require one Tool, read off the projection's per-system row
+   * and never counted here: `adminStore` walks every recipe once per publish and keys the answer
+   * by `(tool, system)`, and this screen has no recipe corpus at all. `0` for a world Tool this
+   * system has no rules for is a real answer, since a recipe here cannot reference a Tool the
+   * system is not a member of.
    *
    * @param {string} toolId
    * @returns {number}
@@ -184,11 +148,8 @@
 
   /**
    * What one row says about its relationship to the world defaults, or `null` when the world
-   * corpus has no record of this Tool and there is therefore nothing to inherit FROM.
-   *
-   * `null` is a real answer rather than a fallback: a Tool that exists only in this system
-   * inherits nothing, and writing "Inherits world defaults" over it would claim a parent that
-   * does not exist. The screen states nothing there instead.
+   * corpus has no record of this Tool. `null` is a real answer: a Tool that exists only in this
+   * system inherits nothing, and the screen states nothing there rather than claiming a parent.
    *
    * @param {string} toolId
    * @returns {{state: string, label: string}|null}
@@ -214,20 +175,18 @@
     };
   }
 
-  // ── THE THREE MEMBERSHIP FILTERS ────────────────────────────────────────────────────────
-  // `all` is the one that changes what a row IS. Search and sort narrow a list of THIS
-  // system's tools; `All world tools` widens it past them, to world records this system has
-  // no rules for at all — which is the only route on this screen to a Tool a GM has not
-  // adopted yet, and therefore the only thing the inspector's `Add … to …` button can act on.
+  // `all` is the one filter that changes what a row IS: search and sort narrow this system's
+  // tools, while `All world tools` widens past them to world records this system has no rules
+  // for — the only route on this screen to an unadopted Tool, and therefore the only thing the
+  // inspector's `Add … to …` button can act on.
   const systemToolIds = $derived(new Set(tools.map((tool) => String(tool?.id ?? ''))));
   const worldEntries = $derived(Array.isArray(scope?.entries) ? scope.entries : []);
 
   /**
-   * The world records this system has NO tool for, projected to the same row shape a member
-   * renders through. They are `member: false` and carry no breakage, enabled or validation
-   * answer, because this system has authored none: everything a row states about behaviour is
-   * a MEMBERSHIP fact, and inventing one from the world default would claim rules that do not
-   * exist here.
+   * The world records this system has NO tool for, projected to the member row shape. They are
+   * `member: false` and carry no breakage, enabled or validation answer: everything a row states
+   * about behaviour is a MEMBERSHIP fact, and inventing one from the world default would claim
+   * rules that do not exist here.
    */
   const ghostRows = $derived(
     worldEntries
@@ -259,12 +218,10 @@
     })
   );
 
-  // THE COHORT SEGMENTS, in the shape the shared segmented control reads (issue 1515). The primitive
-  // localizes each label itself, so the options carry `labelKey` / `fallback` rather than
-  // already-resolved text, and the tally rides its `count` slot instead of being baked into the
-  // copy — which is why `Tools.FilterInSystem` and `Tools.FilterAllWorld` no longer interpolate
-  // a `{count}`. `Overriding` supplies no count and renders none: the slot omits a non-finite
-  // value rather than drawing `NaN`.
+  // The cohort segments, in the shape the shared segmented control reads. The primitive
+  // localizes each label itself, so the options carry `labelKey` / `fallback` and the tally rides
+  // its `count` slot — which is why `Tools.FilterInSystem` and `Tools.FilterAllWorld` no longer
+  // interpolate a `{count}`. `Overriding` supplies none and renders none.
   const membershipFilters = $derived([
     {
       value: 'in',
@@ -286,20 +243,13 @@
   ]);
 
   /**
-   * THE SET THE MEMBERSHIP SEGMENT SELECTED, before the search term and before the page.
+   * The set the membership segment selected, before the search term and before the page.
    *
-   * NAMED RATHER THAN INLINED, and that is the whole repair (issue 1373). Three places asked
-   * "is there anything on this screen" and all three answered with the raw `tools` prop —
-   * THIS SYSTEM'S ADOPTED TOOLS — while the counts, the list, the pager's total and the result
-   * summary were all computed over the widened cohort. For a system that has adopted nothing
-   * the two disagree the moment the segment moves to `All world tools`: the toolbar read
-   * `3 shown · 0 of 3 in this system` over a body drawing the zero state, because
-   * `tools.length === 0` was true and stayed true whatever the segment said. The ghost rows
-   * were derived, counted, sorted and paged, and then discarded by one boolean.
-   *
-   * That made the ONE route in the product to adopt a world Tool into a system holding none
-   * unreachable — by the segment AND by the zero state's own primary button, which sets that
-   * segment and could therefore only ever re-render the panel that hid its result.
+   * NAMED RATHER THAN INLINED, and that is the whole repair (issue 1373): three places asked "is
+   * there anything on this screen" and answered with the raw `tools` prop — this system's ADOPTED
+   * tools — while the counts, the list, the pager's total and the result summary were computed
+   * over the widened cohort. For a system that has adopted nothing that made the one route in the
+   * product to adopt a world Tool unreachable.
    *
    * A superset of `memberRows` in every case, so every previously reachable state is reached
    * identically: `all` widens, `in` and `over` are `memberRows` exactly.
@@ -324,20 +274,18 @@
       })
   );
 
-  // KEPT AS THE PAGER'S INPUT under its shipped name, because the Foundry smoke's
-  // `assertToolLibraryPagination` phase pins this list's footer geometry — and, since issue
-  // 1373, its PRESENCE: the pager below is `multiPageOnly`, so that phase now asserts the bar is
-  // absent at eight rows on an eight-row page and present at nine.
+  // Kept as the pager's input under its shipped name: the Foundry smoke's
+  // `assertToolLibraryPagination` phase pins this list's footer geometry and, since the pager
+  // became `multiPageOnly`, its PRESENCE — absent at eight rows on an eight-row page, present at
+  // nine.
   const filteredTools = $derived(filteredRows);
   const pagedTools = $derived(
     filteredTools.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize)
   );
 
-  // `{shown}` IS THE PAGE, NOT THE FILTER (issue 1373). It was fed `filteredRows.length`, so a
-  // two-page result read `11 shown` over eight rows while the pager immediately below read
-  // `Showing 1-8 of 11`. Two counts in one pane contradicting each other is worse than either
-  // alone; the filter total is not lost, because `{world}` and the membership filter's own
-  // `All world tools (11)` both still state it.
+  // `{shown}` is the PAGE, not the filter: fed the filter total, a two-page result read
+  // `11 shown` over eight rows while the pager below read `Showing 1-8 of 11`. The filter total
+  // is not lost — `{world}` and the membership filter both still state it.
   const resultCountText = $derived(
     text(
       'FABRICATE.Admin.Manager.Tools.ResultCountScoped',
@@ -363,10 +311,9 @@
   }
 
   $effect(() => {
-    // A DELIBERATE UNADOPTED SELECTION SUPPRESSES THE AUTO-SELECT. Without this the effect
-    // sees an id that is not in `tools`, decides nothing is selected, and re-selects the first
-    // adopted Tool - which would snap the panel away from the row the GM just clicked, on the
-    // one row whose whole purpose is the `Add {tool} to {system}` action.
+    // A deliberate unadopted selection suppresses the auto-select. Without this the effect sees
+    // an id that is not in `tools`, decides nothing is selected, and snaps the panel away from
+    // the one row whose whole purpose is the `Add {tool} to {system}` action.
     if (selectedUnadoptedToolId) {
       autoSelectedToolId = '';
       return;
@@ -375,22 +322,15 @@
       autoSelectedToolId = '';
       return;
     }
-    // THE FIRST ROW THE GM IS LOOKING AT, read off `pagedTools` rather than off the raw
-    // `tools` prop. The list renders `pagedTools`, which is the membership filter, the search
-    // term, the sort key and direction and the page slice applied in that order; `tools` is
-    // the unsorted, unfiltered authored array. Since this screen gained the design's
-    // `SORT BY [Name] [Asc]` control (issue 1373) those two disagree for every library whose
-    // authored order is not name-ascending, and the effect selected a row the GM could not
-    // see - the Foundry smoke reads the top row as `Alchemist's Supplies` while this selected
-    // the sixth, `Smith's Hammer`.
+    // The first row the GM is LOOKING at, read off `pagedTools` rather than the raw `tools` prop:
+    // `tools` is the unsorted, unfiltered authored array, and since this screen gained a sort
+    // control the two disagree for every library whose authored order is not name-ascending.
     //
-    // `.member` SKIPS THE GHOST ROWS, and that is not an optimisation. Under the `all`
-    // membership filter `filteredRows` also carries unadopted world Tools, which are inspected
-    // through `selectedUnadoptedToolId` and not through `onSelectTool`; auto-selecting one here
-    // would push an unadopted id down the adopted path AND then latch, because the first early
-    // return above suppresses every later auto-select while an unadopted row is selected.
-    // A page holding no member row at all selects nothing: there is no adopted Tool to inspect
-    // and the GM chooses.
+    // `.member` skips the ghost rows, and that is not an optimisation. Under `all`,
+    // `filteredRows` also carries unadopted world Tools, which are inspected through
+    // `selectedUnadoptedToolId`; auto-selecting one would push an unadopted id down the adopted
+    // path AND then latch, because the early return above suppresses every later auto-select. A
+    // page holding no member row selects nothing.
     const firstToolId = pagedTools.find((row) => row.member)?.id || '';
     if (!firstToolId || autoSelectedToolId === firstToolId) return;
     autoSelectedToolId = firstToolId;
@@ -398,13 +338,9 @@
   });
 
   /**
-   * Select a row, ADOPTED OR NOT.
-   *
-   * It used to refuse a world Tool with no rules record here, because the inspector was fed
-   * `selectedLibraryTool` alone - a lookup over THIS system's tools - so selecting one emptied
-   * the panel rather than describing the row. The panel now takes the world entry too and
-   * answers that state with the design's `No rules here` pill and its `Add {tool} to {system}`
-   * action, so refusing the click would withhold the one affordance the row exists for.
+   * Select a row, adopted or not. The panel takes the world entry too and answers an unadopted
+   * row with `No rules here` and its `Add {tool} to {system}` action, so refusing the click would
+   * withhold the one affordance that row exists for.
    *
    * @param {{id: string}} entry
    * @returns {void}
@@ -452,12 +388,11 @@
       <div class="manager-tools-authority-heading">
         <span><i class="fas fa-sliders" aria-hidden="true"></i></span>
         <!--
-          THE PILL SITS INSIDE THE TITLE CELL, not beside the `ALL TOOLS` chip, and that is a
-          layout constraint rather than a preference. `styles/fabricate.css` gives this heading
-          `grid-template-columns: 20px minmax(0, 1fr) max-content` and is closed to this lane,
-          so a FOURTH child would flow into an implicit second row under the glyph. Nesting it
-          in the `1fr` cell keeps the heading at three children and lets the pill wrap under a
-          long title instead of forcing a row.
+          THE PILL SITS INSIDE THE TITLE CELL, not beside the chip, and that is a layout
+          constraint: `styles/fabricate.css` gives this heading three grid columns and is closed
+          to this lane, so a fourth child would flow into an implicit second row under the glyph.
+          Nesting it in the `1fr` cell keeps the heading at three children and lets the pill wrap
+          under a long title.
         -->
         <div class="manager-tools-authority-title">
           <strong>{text('FABRICATE.Admin.Manager.Tools.AuthorityKicker', 'Breakage mode')}</strong>
@@ -467,11 +402,10 @@
         </div>
       </div>
       <!--
-        THREE SEGMENTS, SELECTED ON THE AUTHORED LAYER (issue 1373). `selected` comes from
-        `breakageSource`, never from `breakageAuthority === value`: the resolved token cannot
-        tell "this system chose it" from "this system inherited it", so a two-state control
-        drew the inherited value as current and MINTED a per-system override the moment a GM
-        clicked the segment already highlighted - an override nothing could then clear.
+        Three segments, selected on the AUTHORED layer: `selected` comes from `breakageSource`,
+        never from `breakageAuthority === value`. The resolved token cannot tell "this system
+        chose it" from "this system inherited it", so a two-state control minted a per-system
+        override the moment a GM clicked the segment already highlighted.
       -->
       <div
         class="manager-tools-authority-segments"
@@ -488,9 +422,8 @@
               onchange={() =>
                 onSetBreakageAuthority(segment.value === INHERIT_BREAK_MODE ? null : segment.value)}
             />
-            <!-- NO GLYPH, and that is the prototype's own composition: the WORLD card leads
-                 each segment with an icon, the system card does not. `systemBreakModeOptions`
-                 emits no `icon` for the same reason. -->
+            <!-- No glyph: the WORLD card leads each segment with an icon and the system card
+                 does not. `systemBreakModeOptions` emits no `icon` for the same reason. -->
             <span class="manager-tools-authority-option">{segment.label}</span>
           </label>
         {/each}
@@ -498,25 +431,22 @@
     </InspectorCard>
 
     <!--
-      THE BROWSE ARCHETYPE'S FILTER BAR, INSIDE THIS SECTION RATHER THAN INSTEAD OF IT
-      (issue 1515). The two controls in this band are a SEARCH and a FILTER, which is what
-      `openspec/specs/design-system/spec.md`'s browse recipe puts in the filter bar, so they
-      render through `ManagerToolbar` like the other ten bars. The three segments above are a
-      SETTING - they author `breakageSource` on the system record rather than narrow this list -
-      so they stay in their own card and do not join the bar.
+      The browse archetype's filter bar, INSIDE this section rather than instead of it. The two
+      controls in this band are a search and a filter, which is what the browse recipe in
+      `openspec/specs/design-system/spec.md` puts in the filter bar; the three segments above are
+      a SETTING — they author `breakageSource` on the system record rather than narrow this list —
+      so they stay in their own card.
 
       THE SECTION STAYS AND THE BAR NESTS INSIDE IT. `styles/fabricate.css`'s three Tools-browser
-      search overrides are written `.manager-tools-library-card .manager-search…`, and the rule
-      beside them records the premise: this view writes exactly one search field, inside the one
-      section carrying both `manager-tools-library-card` and `data-manager-tools-search`. Putting
-      the class on the bar instead would move the field out of a carrier the class names and take
-      those three rules with it. `tool-rules-list-parity.test.js` reads the source for both halves.
+      search overrides are written as descendants of `.manager-tools-library-card`, whose premise
+      is that this view writes exactly one search field inside the one section carrying both that
+      class and `data-manager-tools-search`. Putting the class on the bar would move the field out
+      of a carrier the class names. `tool-rules-list-parity.test.js` reads the source for both
+      halves.
 
-      THE LANDMARK HAS ITS OWN NAME NOW. Every other bar is named `<Area>.Filters`
-      ("Component filters", "Access filters"), and this one reused the radiogroup's
-      `Tools.FilterLabel` for one phase only because `lang/en.json` was unowned then; the
-      duplicated announcement that produced - the band and the control inside it saying the same
-      sentence - is what the dedicated key retires (issue 1515).
+      The landmark has its own name: every other bar is named `<Area>.Filters`, and reusing the
+      radiogroup's `Tools.FilterLabel` made the band and the control inside it announce the same
+      sentence.
     -->
     <section class="manager-tools-library-card" data-manager-tools-search>
       <ManagerToolbar ariaLabel={text('FABRICATE.Admin.Manager.Tools.Filters', 'Tool filters')}>
@@ -530,18 +460,15 @@
           ariaLabel={text('FABRICATE.Admin.Manager.Tools.Search', 'Search tools')}
         />
         <!--
-          THE COHORT SWITCH IS THE SHARED SEGMENTED CONTROL (issue 1515), not a fourth copy of
-          it. This view hand-rolled the radiogroup and painted it with twenty-eight lines of
-          scoped CSS that re-derived the primitive's own track, segment, selected fill and
-          visually-hidden radio — the same control the sibling `ComponentsBrowserView` cohort
-          switch already renders through the same primitive at `density="compact" tone="accent"`,
-          which is why the props below match it. (Spelled without its angle bracket deliberately:
+          The cohort switch is the SHARED segmented control, not a fourth copy of it: this view
+          hand-rolled the radiogroup and re-derived the primitive's track, segment, selected fill
+          and visually-hidden radio in scoped CSS. The sibling `ComponentsBrowserView` cohort
+          switch renders through the same primitive at `density="compact" tone="accent"`, which is
+          why the props below match it. (Spelled without its angle bracket deliberately:
           `screenshot-capture-scoping.test.js` scans this directory for opening tags of the
-          primitive, and a mention in prose is counted as one and swallows the real span below.) The two `data-*` hooks are kept verbatim through
-          the primitive's `dataAttr` / `optionDataAttr` channels; note that `dataAttr` stamps
-          `true` on the TRACK rather than the current value, so the selected segment is read from
-          its radio (`[data-tool-membership-option="…"] input:checked`) rather than from the
-          track's attribute or the retired `.is-selected` class.
+          primitive, and a prose mention is counted as one and swallows the real span below.)
+          `dataAttr` stamps `true` on the TRACK rather than the current value, so the selected
+          segment is read from its radio (`[data-tool-membership-option="…"] input:checked`).
         -->
         <SegmentedControl
           options={membershipFilters}
@@ -564,10 +491,10 @@
     </section>
 
     <!--
-      SORT AND THE RESULT COUNT ON ONE ROW, which is where the prototype puts them and is also
-      the only place the count can say something useful: `3 tools` states the length of a list
-      the GM is looking at, while `3 shown · 3 of 10 in this system` states the two numbers the
-      membership filter above is switching between.
+      Sort and the result count on one row, which is the only place the count can say something
+      useful: `3 tools` states the length of the list the GM is looking at, while
+      `3 shown · 3 of 10 in this system` states the two numbers the membership filter switches
+      between.
     -->
     <div class="manager-tools-sort-row" data-manager-tools-sort>
       <span class="manager-tools-sort-label"
@@ -610,30 +537,16 @@
       <div class="manager-tools-library-scroll" data-tool-library-scroll>
         {#if cohortRows.length === 0}
           <!--
-            THE ZERO STATE IS A FACT ABOUT THE SELECTED COHORT, not about `tools` (issue 1373).
-            Gated on the raw prop, this branch won unconditionally for a system that had adopted
-            nothing — so the two controls that widen the cohort, the segment above and this
-            panel's own primary button below, both moved a filter whose result the panel then
-            hid. `cohortRows` is what the list draws, so the predicate and the list are now the
-            same set rather than two expressions that happened to agree.
+            The zero state is a fact about the SELECTED COHORT, not about `tools`: gated on the
+            raw prop this branch won unconditionally for a system that had adopted nothing, so
+            both controls that widen the cohort moved a filter whose result the panel then hid.
+            A cohort non-empty before the search term and empty after it is the FILTERED state
+            and falls through below.
 
-            A cohort that is non-empty BEFORE the search term and empty after it is the FILTERED
-            state, and falls through to the branch below.
-
-            THE EMPTY STATE NAMES A DESTINATION, SO IT OFFERS ONE (issue 1373).
-
-            It read `Add a Tool from the world Tools Catalogue, where Tools are created.` and
-            gave the GM no control at all - while the toolbar directly above it said
-            `All world tools (11)`, i.e. eleven Tools were adoptable one chip-click away without
-            leaving the screen. `EmptyState` has taken `children` for exactly this since it was
-            extracted; this call site simply passed none.
-
-            TWO ROUTES, because the state has two honest answers and they are different sizes.
-            The nearer one switches the membership filter in place and is the primary: nothing
-            is created, nothing is navigated, and the eleven adoptable rows appear with their
-            own `Add to system` buttons. It renders only when there is something to show. The
-            farther one leaves for the world catalogue, which is where a Tool that does not
-            exist yet has to be made, and is the only route when the world holds none either.
+            TWO ROUTES, because the state has two honest answers of different sizes. The nearer
+            one switches the membership filter in place and is the primary, and renders only when
+            there is something to show; the farther one leaves for the world catalogue, and is the
+            only route when the world holds none either.
           -->
           <EmptyState
             icon="fas fa-screwdriver-wrench"
@@ -676,16 +589,13 @@
           </EmptyState>
         {:else if filteredTools.length === 0}
           <!--
-            FILTERED TO NOTHING IS NOT AN ABSENCE (issue 1373), and the primitive has said so
-            since it was extracted. This call site passed an `icon` and a `title` and no
-            `filtered`, so a list that simply matched no rows drew the full hero panel — a 44px
-            inset, a 46px glyph tile and a 13px serif heading — where `proto:2545` draws one
-            dashed box, 26px around a single 11.5px sentence, with no icon and no title at all.
+            Filtered to nothing is not an absence: without `filtered` the primitive draws the full
+            hero panel where the design draws one dashed box around a single sentence, with no icon
+            and no title.
 
             THE SENTENCE NAMES THE FILTER, not the search. Three controls narrow this list and
-            only one of them is the query: a GM who has switched the membership segment to
-            `Overriding` on a system that overrides nothing was told `No Tools match your
-            search` over an empty search box.
+            only one is the query, so a GM who switched the membership segment to `Overriding` was
+            told `No Tools match your search` over an empty search box.
           -->
           <EmptyState
             filtered
@@ -744,12 +654,10 @@
                                 'Needs attention'
                               )}
                         </Chip>
-                        <!-- ONE BREAKAGE CHIP, not two. The prototype's system row carries
-                             `[breakage] [Enabled|Disabled]`; the ON-BREAK action is a WORLD
-                             default, stated on the world catalogue's row, and repeating it
-                             here says nothing this screen decides. The enabled half of that
-                             pair is the toggle in the action cluster rather than a second
-                             chip beside it - see the note there. -->
+                        <!-- ONE breakage chip, not two: the on-break action is a WORLD default,
+                             stated on the world catalogue's row, and repeating it here says
+                             nothing this screen decides. The enabled half of that pair is the
+                             toggle in the action cluster — see the note there. -->
                         <Chip tone="neutral" density="list" class="manager-tools-breakage-chip"
                           >{breakageLabel(entry.tool, row.breakage)}</Chip
                         >
@@ -772,25 +680,19 @@
                   </span>
                 </button>
                 <div class="manager-tools-library-actions">
-                  <!-- HOW MANY RECIPES HERE REQUIRE IT, which is the fact the design ends this
-                       row with. It sits before the action rather than among the chips because
-                       it is not a property of the Tool: it is how much of this system leans on
-                       it, and it is the number a GM checks before disabling or removing one. -->
+                  <!-- How many recipes here require it. It sits before the action rather than
+                       among the chips because it is not a property of the Tool: it is how much of
+                       this system leans on it, and it is the number a GM checks before disabling
+                       or removing one. -->
                   <span class="manager-tools-row-recipes" data-tool-row-recipes={entry.id}>
-                    <!-- A DASH, NOT A ZERO, for a world Tool this system holds no rules for. A
+                    <!-- A dash, not a zero, for a world Tool this system holds no rules for: a
                          recipe here cannot reference a Tool the system is not a member of, so
-                         `0` is not a count that came out low - there is nothing to count, and
-                         the reference draws the em dash for exactly that (issue 1373). -->
+                         there is nothing to count. -->
                     <strong>{entry.member ? recipeCount(entry.id) : '\u2014'}</strong>
-                    <!-- THE PLURAL IS OURS AND IT STAYS (issue 1373 parity round). `proto:2536`
-                         writes an invariant `Recipes` under the figure, and the audit asked for
-                         a decision either way. Kept: the reference is a single-locale artefact
-                         and English is the one language where an invariant unit caption happens
-                         to read acceptably at 1. `RowRecipeOne` is a real localization seam - a
-                         language with a dual or a paucal needs it - and deleting it to match a
-                         mock would be trading a translator's affordance for a character. The
-                         two labels are the same size, weight and tracking, so nothing about the
-                         column's geometry turns on which one renders. -->
+                    <!-- The plural stays. `RowRecipeOne` is a real localization seam — a language
+                         with a dual or a paucal needs it — and the two labels are the same size,
+                         weight and tracking, so nothing about the column's geometry turns on which
+                         one renders. -->
                     <small
                       >{recipeCount(entry.id) === 1 && entry.member
                         ? text('FABRICATE.Admin.Manager.Tools.RowRecipeOne', 'Recipe')
@@ -799,28 +701,18 @@
                   </span>
                   {#if entry.member}
                     <!--
-                      THE TOGGLE STAYS, AND THE PROTOTYPE'S `Enabled` PILL IS THEREFORE NOT
-                      ALSO DRAWN. The prototype states the enabled flag as a read-only pill
-                      because its own inspector footer is where membership is authored; that
-                      footer needs `systemName` and the membership flag, neither of which this
-                      screen's call site passes, so the pill would replace a working control
-                      with a label and leave nothing able to set it. Drawing BOTH is worse
-                      still: two controls over one field is the redundancy the prototype's
-                      composition exists to avoid.
-                      It is also the only surface the Foundry smoke's Tool Studio phase drives
-                      `toggleToolEnabled` through, so removing it deletes proven coverage.
+                      THE TOGGLE STAYS, so the prototype's read-only `Enabled` pill is not also
+                      drawn: that pill belongs to an inspector footer needing `systemName` and the
+                      membership flag, neither of which this call site passes, so it would replace
+                      a working control with a label. Drawing both is worse — two controls over
+                      one field. It is also the only surface the Foundry smoke's Tool Studio phase
+                      drives `toggleToolEnabled` through.
 
-                      IT IS A `StatusToggle` RATHER THAN A HAND-ROLLED SWITCH (issue 1515), and
-                      the objection above does not reach that: it argues against replacing a
-                      writing control with a read-only PILL, and this is the same writing control
-                      through the primitive that owns the switch tree. `class` is composed rather
+                      A `StatusToggle` rather than a hand-rolled switch. `class` is composed rather
                       than replaced, so `manager-tools-enabled-toggle` survives and neither the
-                      smoke's selector nor the View Lab's steps move.
-
-                      IT DOES NOT SATISFY the browse recipe's "a row's state renders as a status
-                      button rather than a toggle" clause. That clause wants a different control,
-                      no browse surface in the app meets it today, and closing it is a successor
-                      rather than a side effect of this conversion.
+                      smoke's selector nor the View Lab's steps move. It does not satisfy the
+                      browse recipe's "a row's state renders as a status button rather than a
+                      toggle" clause, which wants a different control and is a successor.
                     -->
                     <StatusToggle
                       class="manager-tools-enabled-toggle"
@@ -832,9 +724,9 @@
                     />
                   {/if}
                   {#if entry.member}
-                    <!-- A LABELLED, BORDERED BUTTON rather than a bare pen: the row leads
-                         somewhere named, and the prototype names it. The `data-tool-edit-rules`
-                         hook is what the View Lab cases select on now that the pen is gone. -->
+                    <!-- A labelled, bordered button rather than a bare pen: the row leads
+                         somewhere named. `data-tool-edit-rules` is what the View Lab cases select
+                         on now that the pen is gone. -->
                     <button
                       type="button"
                       class="manager-tools-edit-rules"
@@ -867,36 +759,22 @@
       </div>
     </section>
   </div>
-  <!-- THE FOOT PAGER RENDERS ONLY WHERE THERE IS MORE THAN ONE PAGE (issue 1373).
-
-       `PROTO-tool-rules.png` draws three rows and NO bar under them, and this list shipped a
-       `persistent` one — a full-width `Showing 1-8 of 8 · Page 1 of 1 · Per page 8` band stating
-       nothing the `3 shown · 3 of 10 in this system` count above the list does not already say.
-       That is the maintainer's ruling on the world catalogues applied to the remaining caller;
+  <!-- THE FOOT PAGER RENDERS ONLY WHERE THERE IS MORE THAN ONE PAGE (issue 1373): a persistent
+       `Showing 1-8 of 8 · Page 1 of 1` band states nothing the count above the list does not.
        `multiPageOnly` is the mode the essence lane added to `Pagination` for it.
 
-       THE WRAPPER STAYS UNCONDITIONAL (given any cohort at all) and only the BAR inside it comes
+       THE WRAPPER STAYS UNCONDITIONAL, given any cohort at all, and only the BAR inside it comes
        and goes. It is the bottom-pinned layout slot — `margin-top: auto`, zero padding — so a
-       bar, when there is one, sits full-bleed at the foot of the pane rather than under the
-       list card. Empty, the slot measures zero and the flex free space it would have occupied is
-       absorbed by its own auto margin, which is why leaving it in costs nothing.
+       bar, when there is one, sits full-bleed at the foot of the pane. Empty, the slot measures
+       zero and its own auto margin absorbs the free space, so leaving it in costs nothing.
 
-       IT DOES NOT DECIDE ANYTHING ABOUT `:last-child`, and a previous version of this note said
-       it did. The slot is a sibling of `.manager-tools-main-content`, not a child of it — that
-       div closes above this comment — so
-       `.manager-tools-main-content > .manager-tools-library-card:last-child` matches the browser
-       card whether the slot renders or not, and its `flex: 1 1 auto` is unconditional. The claim
-       was repeated in `scripts/foundry-test-run.mjs` and has been corrected there too. Written
-       down because the false premise is the kind a later reader acts on: it argues for keeping a
-       slot that has a real but different reason to stay.
+       It decides nothing about `:last-child`: the slot is a SIBLING of
+       `.manager-tools-main-content`, so that section's `:last-child` rule matches the browser card
+       whether the slot renders or not. The Foundry smoke's `assertToolLibraryPagination` phase
+       reads the BAR rather than this slot for the same reason.
 
-       The Foundry smoke's `assertToolLibraryPagination` phase reads the BAR rather than this
-       slot for the same reason.
-
-       "GIVEN ANY TOOLS AT ALL" IS THE SELECTED COHORT, not the `tools` prop (issue 1373). Read
-       off the prop, the slot stayed absent for a zero-member system even once the widened list
-       drew rows above it — the same raw-prop proxy the list body used, with the same effect one
-       layer down. -->
+       "Given any tools at all" is the selected COHORT, not the `tools` prop: read off the prop,
+       the slot stayed absent for a zero-member system even once the widened list drew rows. -->
   {#if cohortRows.length > 0}
     <div class="manager-tools-browser-pagination" data-tool-browser-pagination>
       <Pagination
@@ -918,18 +796,14 @@
 </main>
 
 <style>
-  /* The title cell holds the heading word AND the authoring-source pill (issue 1373). STATIC
-     class name, so Svelte can prove the selector is used and `lint:svelte:warnings` stays at
-     zero.
+  /* The title cell holds the heading word AND the authoring-source pill. STATIC class name, so
+     Svelte can prove the selector is used and `lint:svelte:warnings` stays at zero.
 
-     The PILL'S OWN SIZING is not authored here: the host sheet's descendant rule under
-     `.manager-tools-authority-heading` still reaches it one level deeper, which is why it
-     stays the smaller 18px/0.56rem treatment its sibling wears.
-
-     The token that rule selects on is deliberately not written out. `manager-layout.test.js`
-     ratchets the hand-rolled-chip migration by matching that token ANYWHERE in a manager
-     `.svelte` file, comment prose included - which is a decision it records, because one site
-     passes the classes to a child as a string prop and an attribute-shaped scan missed it. */
+     The pill's own sizing is not authored here: the host sheet's descendant rule under
+     `.manager-tools-authority-heading` still reaches it one level deeper. The token that rule
+     selects on is deliberately not written out — `manager-layout.test.js` ratchets the
+     hand-rolled-chip migration by matching that token ANYWHERE in a manager `.svelte` file,
+     comment prose included. */
   .manager-tools-authority-title {
     display: flex;
     flex-wrap: wrap;
@@ -938,54 +812,40 @@
     min-width: 0;
   }
 
-  /* ── THE TOOLBAR ────────────────────────────────────────────────────────────────────────
-     Two rows, matching the prototype: search and the membership filter share the first, sort
-     and the result count share the second. The rules live HERE rather than in
-     `styles/fabricate.css` so `VIEW_RECIPES` maps a change to the tool views alone; the
-     search field's own geometry is already stated in the global sheet under
-     `.manager-tools-library-card` and is reused rather than restated.
+  /* THE TOOLBAR: two rows, matching the prototype — search and the membership filter share the
+     first, sort and the result count the second. The rules live here rather than in
+     `styles/fabricate.css` so `VIEW_RECIPES` maps a change to the tool views alone; the search
+     field's own geometry is already stated in the global sheet and is reused rather than
+     restated.
 
-     THE FIRST ROW'S OWN BOX IS GONE FROM HERE (issue 1515). This block used to make
-     `[data-manager-tools-search]` the wrapping, centred, `--fab-space-2` flex row itself; the
-     row is now `ManagerToolbar`'s, which states the same wrap, the same centring and the same
-     gap for every browse screen. Keeping a copy would have been a second source of truth for
-     one box — and a WRONG one the moment it applied, because the section now holds a single
-     child and `flex-direction: row` with `align-items: center` sizes that child to its content
-     instead of to the section. What remains here is the field's own grow, which is this
-     screen's and not the bar's. */
+     The first row's own box is `ManagerToolbar`'s now, which states the same wrap, centring and
+     gap for every browse screen. A copy here would be a second source of truth, and a wrong one:
+     the section holds a single child, and `flex-direction: row` with `align-items: center` sizes
+     that child to its content instead of to the section. What remains is the field's own grow. */
 
-  /* `:global()` ON THE FIELD HALF ONLY (issue 1039). `.manager-search` now sits on a
-     `<ManagerSearchField>` tag rather than on an element this component writes, so Svelte
-     stamps no `svelte-<hash>` onto it and prunes the whole selector - `lint:svelte:warnings`
-     fails on the `css_unused_selector` that produces. The ANCESTOR half stays local, so the
-     hash lands on `[data-manager-tools-search]` instead and the selector keeps the same three
-     components of specificity it had. */
+  /* `:global()` on the FIELD half only (issue 1039): `.manager-search` sits on a
+     `<ManagerSearchField>` tag rather than an element this component writes, so Svelte stamps no
+     `svelte-<hash>` onto it and prunes the whole selector, which fails `lint:svelte:warnings`.
+     The ANCESTOR half stays local, so the hash lands on `[data-manager-tools-search]` and the
+     selector keeps the same three components of specificity. */
   [data-manager-tools-search] :global(.manager-search) {
     flex: 1 1 150px;
     min-width: 0;
   }
 
-  /* ── THE THREE FILLS ON THIS SCREEN ARE THE DESIGN'S OWN, AND THEY STAY ─────────────────
-     The flattening pass across these screens removes card fills that paint a surface the
-     design does not have. These three are not that: the membership filter, the sort select
-     and the two bordered buttons are RAISED CONTROLS, and the design fills each of them with
-     its own `--surface-soft` — the same token, not merely a similar one.
+  /* THE THREE FILLS ON THIS SCREEN ARE THE DESIGN'S OWN. The flattening pass removes card fills
+     that paint a surface the design does not have; the membership filter, the sort select and the
+     two bordered buttons are RAISED CONTROLS, and the design fills each with its own
+     `--surface-soft` — the same token, not merely a similar one. Removing these would flatten a
+     control into the page rather than a card into it.
 
-     Measured out of the design's own tool-rules frame: the filter track and the sort select
-     sample exactly what `--fab-surface-soft` composites to over the pane colour. Removing
-     these fills would flatten a CONTROL into the page rather than flattening a card into it,
-     so they keep the token.
-
-     The SELECT is the one exception, and its own block says why: a translucent background on
-     a `<select>` opens a light native popup, so it inherits the shipped opaque fill instead
-     of the design's composited one. */
-  /* THE PER-ROW RECIPE COUNT, stacked as a figure over its unit exactly as the design draws
-     it: the number is what a GM scans down the column, and the word beneath it is what tells
-     them what the number counts. Right-aligned so the figures line up row to row. */
-  /* `proto:2536` states `text-align: right; min-width: 50px; flex: 0 0 auto` — and the
-     `min-width` is the one that does the work. Without it a `1` and a `12` give two different
-     column widths, so the `Edit rules` buttons beside them do not line up down the list and
-     the eye has nothing to run along. */
+     The SELECT is the one exception, and its own block says why: a translucent background on a
+     `<select>` opens a light native popup, so it inherits the shipped opaque fill. */
+  /* The per-row recipe count, stacked as a figure over its unit: the number is what a GM scans
+     down the column, and the word beneath says what it counts. Right-aligned so the figures line
+     up row to row. */
+  /* The `min-width` is the one that does the work: without it a `1` and a `12` give two different
+     column widths, so the `Edit rules` buttons beside them do not line up down the list. */
   .manager-tools-row-recipes {
     display: inline-flex;
     flex: 0 0 auto;
@@ -996,10 +856,9 @@
     text-align: right;
   }
 
-  /* MONO AND ONE RUNG DOWN. The reference sets this figure at `700 12px var(--mono)` in the
-     SECONDARY ink - a column of numerals a GM scans down, in the face that lines them up. It
-     rendered in the full text colour, which made it the brightest thing in a row whose subject
-     is the Tool's name (issue 1373). */
+  /* Mono and one rung down, in the secondary ink: a column of numerals a GM scans down, in the
+     face that lines them up. In the full text colour it was the brightest thing in a row whose
+     subject is the Tool's name. */
   .manager-tools-row-recipes strong {
     color: var(--fab-text-secondary);
     font-family: var(--fab-font-mono);
@@ -1008,9 +867,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* `proto:2536`: `font: 600 8px var(--sans); letter-spacing: .07em`. 0.52rem is 8.32px, so
-     only the tracking was short — and tracking is most of what makes an 8px uppercase caption
-     legible at all. */
+  /* Tracking is most of what makes an 8px uppercase caption legible at all. */
   .manager-tools-row-recipes small {
     color: var(--fab-text-subtle);
     font-size: 0.52rem;
@@ -1028,9 +885,7 @@
     min-width: 0;
   }
 
-  /* `proto:2519`: `font: 700 8.5px var(--sans); letter-spacing: .09em; text-transform:
-     uppercase; color: var(--subtle)`. The tracking and the transform were already right; the
-     ink was a rung bright, which put a control's LABEL at the same weight of attention as the
+  /* The ink was a rung bright, which put a control's LABEL at the same weight of attention as the
      controls it labels. */
   .manager-tools-sort-label {
     color: var(--fab-text-subtle);

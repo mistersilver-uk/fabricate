@@ -36,12 +36,9 @@
   } from './scoped/componentScoped.js';
 
   /**
-   * The world entry route a GHOST ROW opens.
-   *
-   * A MODULE CONSTANT rather than an inline literal, because it is the one string that decides
-   * whether the link resolves at all: the issue body named `world-component-edit`, which appears
-   * nowhere in the route table, and a token that does not resolve loses the breadcrumb's middle
-   * crumb and lands the navigation on nothing without erroring.
+   * The world entry route a GHOST ROW opens. A module constant rather than an inline literal,
+   * because it is the one string that decides whether the link resolves at all: a token that does
+   * not resolve lands the navigation on nothing without erroring.
    */
   const WORLD_ENTRY_ROUTE = 'world-component-entry';
 
@@ -50,34 +47,28 @@
     itemSearchTerm = '',
     selectedComponentId = '',
     selectedSystemId = '',
-    // ── THE WORLD SCOPE'S OWN PROJECTION, ITS WRITE FAMILY, AND THE SYSTEM THIS SCREEN IS ON ──
     // Three of the four keys the call site's component bundle spreads. `systems` stays
-    // undeclared, as the sibling Tool Rules list leaves it: declaring a name the site does not
-    // pass makes the lookup fall THROUGH to the spread and turns every reader of that prop into
-    // a live subscriber to the whole bundle, including `scope`, which is a new object on every
-    // publish. All three of these ARE passed, so none of them does.
+    // undeclared, as the sibling Tool Rules list leaves it: declaring a name the site does NOT
+    // pass makes the lookup fall through to the spread and turns every reader into a live
+    // subscriber to the whole bundle, `scope` included.
     //
     // `systemId` is read rather than inferred: `scope.entries[].systems[]` is the world
     // projection's own JOIN, and it carries the two facts this list draws that the in-system
-    // record cannot answer — the per-system `recipeCount` the `Recipes` column states, and
-    // whether the category was inherited or set here, which the inspector's `Category` block
-    // reads.
+    // record cannot answer — the per-system `recipeCount`, and whether the category was inherited
+    // or set here.
     scope = null,
     actions = null,
     systemId = '',
     // eslint-disable-next-line no-unused-vars -- deliberately reader-less; see the note below
     selectedSystemResolutionMode = 'simple',
-    // Whether the system is progressive on ANY axis that reads `component.difficulty` —
-    // crafting resolution mode, salvage resolution mode, or the gathering economy's
-    // (issue 772). The row's read-only DC badge used to gate on the CRAFTING mode alone,
-    // which made it invisible on a salvage-only-progressive system while the editor
-    // control and the bulk panel both showed it. All three read ONE predicate now, and it
-    // arrives as its own prop rather than being re-derived from
-    // `selectedSystemResolutionMode`. That prop now has no reader in this component at
-    // all, and is kept ANYWAY as a NEGATIVE CONTROL: the re-gate test in
-    // `components-browser-view-mounted.test.js` passes a non-progressive crafting mode
-    // alongside a progressive salvage axis, and the badge must still render. Deleting it
-    // would leave that test unable to state the thing it is checking.
+    // Whether the system is progressive on ANY axis that reads `component.difficulty` — crafting,
+    // salvage or the gathering economy (issue 772). Gated on the crafting mode alone, the row's
+    // DC badge was invisible on a salvage-only-progressive system while the editor and the bulk
+    // panel both showed it; all three read one predicate now.
+    //
+    // This prop has no reader in this component and is kept as a NEGATIVE CONTROL: the re-gate
+    // test in `components-browser-view-mounted.test.js` passes a non-progressive crafting mode
+    // beside a progressive salvage axis and the badge must still render.
     difficultyAxisProgressive = false,
     categoryVocabulary = [],
     dropEnabled = false,
@@ -85,45 +76,40 @@
     onSelectComponent = () => {},
     onDropComponent = () => {},
     onEditComponent = () => {},
-    // Told AFTER the toolbar's Clear has emptied the selection (issue 1157). The clear stays
-    // this browser's — the selection is its state — but the FEEDBACK cannot be: emptying the
-    // selection unmounts the bulk panel and the Clear button that was pressed, so the
-    // announcement and the focus hop belong to something that outlives both. Optional, so a
-    // standalone mount clears exactly as it did.
+    // Told AFTER the toolbar's Clear has emptied the selection (issue 1157). The clear stays this
+    // browser's, but the FEEDBACK cannot be: emptying the selection unmounts the bulk panel and
+    // the Clear button that was pressed. Optional, so a standalone mount clears as it did.
     onSelectionCleared = null,
-    // THE DEEP LINK OUT OF THIS SCREEN, into the world catalogue entry that AUTHORS a record's
-    // identity. Called with the ROUTE TOKEN and the entity id, because the token is the half
-    // that decides whether the navigation resolves and a page cannot route.
+    // The deep link into the world catalogue entry that AUTHORS a record's identity. Called with
+    // the ROUTE TOKEN and the entity id, because the token is the half that decides whether the
+    // navigation resolves.
     onOpenWorldEntry = () => {},
-    // The filter / sort / group / paginate view-state (issue 676). The manager root
-    // LIFTS this up and binds it here so it survives the editor round-trip.
+    // The filter / sort / group / paginate view-state (issue 676), lifted by the manager root and
+    // bound here so it survives the editor round-trip.
     browserState = $bindable(null),
   } = $props();
 
   let ownBrowserState = $state(createComponentBrowserState());
-  // The active view-state: the root's lifted object when bound, else the local
-  // fallback. Both are `$state` proxies, so nested writes (`ui.categoryFilter = …`)
-  // are reactive AND, when bound, propagate back to the root.
+  // The root's lifted object when bound, else the local fallback. Both are `$state` proxies, so
+  // nested writes are reactive and, when bound, propagate back to the root.
   const ui = $derived(browserState ?? ownBrowserState);
 
-  // Switching system resets the filters — they name a vocabulary the new system does
-  // not share. The page/sort/group PREFERENCES are deliberately kept.
+  // Switching system resets the filters — they name a vocabulary the new system does not share.
+  // The page, sort and group PREFERENCES are deliberately kept.
   $effect(() => {
     if (selectedSystemId === ui.systemId) return;
     ui.categoryFilter = 'all';
     ui.essenceFilter = 'all';
     ui.pageIndex = 0;
-    // The bulk selection is scoped to the selected system — its ids name components the
-    // new system does not have — so a switch clears it, and the root discards the staged
-    // draft when the count reaches zero (issue 772).
+    // The bulk selection is scoped to the selected system, so a switch clears it and the root
+    // discards the staged draft when the count reaches zero (issue 772).
     ui.bulkSelectedComponentIds = new Set();
     ui.systemId = selectedSystemId;
   });
 
-  // THE FILTER READS THE RUN THE ROWS DRAW (issue 1371 r22-store4). The card carries two: the
-  // whole resolved map under `essences`, which is what the component EDITOR is seeded from, and
-  // the drawn chips under `essenceChips`. Offering an option for an essence no row can show is
-  // the divergence `ui-integration` requirement 2's one-function rule exists to prevent.
+  // The filter reads the run the ROWS draw (`essenceChips`), not the whole resolved map the
+  // editor is seeded from: offering an option for an essence no row can show is the divergence
+  // `ui-integration` requirement 2's one-function rule exists to prevent.
   const showComponentEssences = $derived(
     (itemCards || []).some((item) => item.showEssences || componentEssenceRun(item).length > 0)
   );
@@ -136,10 +122,8 @@
   );
   const categoryOptions = $derived(componentCategoryOptions(itemCards || [], categoryVocabulary));
 
-  // ── THE WORLD PROJECTION'S PER-SYSTEM JOIN, indexed by world entity id ──────────────────
-  // Read as a Map rather than scanned per row: `scope` republishes a NEW object on every
-  // world-scope edit, and a `find` per row would walk the whole corpus once per component on
-  // every one of them.
+  // The world projection's per-system join, indexed by world entity id. A Map rather than a
+  // `find` per row, which would walk the whole corpus once per component on every republish.
   const worldRowsByComponentId = $derived(
     new Map(
       (Array.isArray(scope?.entries) ? scope.entries : []).map((entry) => [
@@ -151,19 +135,14 @@
     )
   );
 
-  // ── THE COHORT SWITCH ────────────────────────────────────────────────────────────────────
-  // `all` is the one control that changes what a row IS. Search, category and essence narrow a
-  // list of THIS system's components; `All world components` widens it past them, to world
-  // records this system has no rules for at all — which is the only route on this screen to
-  // adopt a component a GM has not added yet.
+  // `all` is the one control that changes what a row IS: search, category and essence narrow
+  // this system's components, while `All world components` widens past them to world records this
+  // system has no rules for — the only route on this screen to adopt one. The shipped third
+  // option, `Overriding`, is gone: it was a predicate over the member cohort rather than a cohort
+  // of its own, which is why it alone could carry no count.
   //
-  // The shipped third option, `Overriding`, is GONE (gap-list row 145): the reference draws two
-  // segments and no third, and that option was a predicate over the member cohort rather than a
-  // cohort of its own, which is why it alone could carry no count.
-  //
-  // HELD LOCALLY RATHER THAN LIFTED, and that is a scope decision rather than a preference: the
-  // lifted browser state is minted by `createComponentBrowserState`, in a file this change does
-  // not open, so a lifted axis would be a key that object does not declare.
+  // Held locally rather than lifted: the lifted browser state is minted by
+  // `createComponentBrowserState`, so a lifted axis would be a key that object does not declare.
   let membershipFilter = $state('in');
   const allWorldCohort = $derived(membershipFilter === 'all');
 
@@ -173,13 +152,10 @@
 
   /**
    * The world records this system has NO component for, projected into the SAME row shape the
-   * member rows use.
-   *
-   * They are `member: false` and carry no category, essence, difficulty or salvage answer,
-   * because this system has authored none: everything a row states about behaviour is a
-   * MEMBERSHIP fact, and inventing one from the world default would claim rules that do not
-   * exist here. What they DO keep is identity — the art, the name and the world description —
-   * because the reference draws the ghost as the dimmed member row and not as a stub.
+   * member rows use. They are `member: false` and carry no category, essence, difficulty or
+   * salvage answer, because everything a row states about behaviour is a MEMBERSHIP fact. What
+   * they keep is identity — art, name and world description — because the reference draws the
+   * ghost as the dimmed member row and not as a stub.
    */
   const ghostRows = $derived(
     (Array.isArray(scope?.entries) ? scope.entries : [])
@@ -202,12 +178,10 @@
   );
 
   /**
-   * THE GHOST HALF OF THE COHORT, after the membership segment and the search term.
-   *
-   * THE ZERO STATE IS GATED ON THE COHORT AND NOT ON THE RAW PROP, which is the whole point of
-   * naming this. The sibling Tool Rules list records what happens otherwise: for a system that
-   * has adopted nothing, the toolbar reads `3 shown` over a body drawing the zero state, and the
-   * ONE route in the product to adopt a component into an empty system becomes unreachable.
+   * The ghost half of the cohort, after the membership segment and the search term. The zero
+   * state is gated on the COHORT and not on the raw prop, which is the whole point of naming
+   * this: otherwise the toolbar reads `3 shown` over a body drawing the zero state, and the one
+   * route in the product to adopt a component into an empty system becomes unreachable.
    */
   const visibleGhostRows = $derived(
     allWorldCohort
@@ -235,28 +209,19 @@
   );
   const filteredComponents = $derived(model.filtered);
 
-  // ── ONE WINDOW OVER THE WHOLE COHORT ──────────────────────────────────────────────────────
+  // ONE WINDOW OVER THE WHOLE COHORT. The pager and the body have to count the same list: with
+  // the ghost half rendered unpaginated after a paginated member list, a widened cohort drew
+  // every remaining world component in one column under a pager reading `1–10 of 8`.
   //
-  // THE PAGER AND THE BODY HAVE TO COUNT THE SAME LIST. Until revision 8 the ghost half was
-  // rendered as an UNPAGINATED column after the paginated member list, while `Pagination` was fed
-  // the member count alone: on a world with a large component corpus and a system holding a few,
-  // the widened cohort drew every remaining world component in one column under a pager reading
-  // `1–10 of 8`. That is both halves of the standing objection at once — a surface enumerating a
-  // whole corpus without paging it, under a count that describes a different list.
-  //
-  // THE COHORT IS `sorted MEMBERS then GHOSTS`, and one window is taken across the join. The two
-  // halves stay separate lists in the markup, for the reason the ghost note there gives — a ghost
-  // has no category, no difficulty and no salvage answer, so folding it into the model would put
-  // unadoptable rows through a grouping and a sort that mean nothing for them — but they are ONE
+  // The cohort is `sorted MEMBERS then GHOSTS` and one window is taken across the join. The two
+  // halves stay separate lists in the markup — see the ghost note there — but they are ONE
   // paginated sequence, so a page can hold members, ghosts, or the boundary between them.
   //
-  // THE ARITHMETIC IS HERE RATHER THAN IN `buildComponentBrowserModel`, and deliberately: that
-  // model is the shared filter→sort→paginate→group pipeline both studios read, and the ghost
-  // cohort is a fact about THIS screen. What it does mean is that the model's own `pageIndex`,
-  // `pageCount` and `rangeStart/End` describe the member half only and must not be read below —
-  // `paginateRows` CLAMPS its page index into the member page count, so on a page that lies
-  // wholly past the members `model.page` answers the LAST member page rather than nothing.
-  // Everything the body and the pager use is derived from `cohort*` for exactly that reason.
+  // The arithmetic is here rather than in `buildComponentBrowserModel`, which is the shared
+  // pipeline both studios read; the ghost cohort is a fact about THIS screen. So that model's own
+  // `pageIndex`, `pageCount` and `rangeStart/End` describe the member half only and must not be
+  // read below — `paginateRows` CLAMPS its page index into the member page count, so a page
+  // wholly past the members answers the LAST member page rather than nothing.
   const cohortPageSize = $derived(
     Math.max(1, Math.trunc(Number(ui.pageSize)) || COMPONENT_DEFAULT_PAGE_SIZE)
   );
@@ -277,12 +242,12 @@
       Math.max(0, cohortWindowEnd - memberCount)
     )
   );
-  // The expensive half of a component card — its linked source document, the "Missing"
-  // badge and the live description fallback — is resolved for the PAGE and nothing else
-  // (issue 1081). `hydrate()` is idempotent and memoized per card. Called off the card rather
-  // than through the projection's helper on purpose: importing that store module here would
-  // pull it into the dependency closure of every mounted suite that renders this tree, where a
-  // module missing from the harness allowlist HANGS the suite as `# cancelled`.
+  // The expensive half of a component card — its linked source document, the "Missing" badge and
+  // the live description fallback — is resolved for the PAGE and nothing else (issue 1081).
+  // `hydrate()` is idempotent and memoized per card. Called off the card rather than through the
+  // projection's helper, because importing that store module here would pull it into the
+  // dependency closure of every mounted suite that renders this tree, where a module missing from
+  // the harness allowlist HANGS the suite as `# cancelled`.
   $effect(() => {
     for (const card of memberWindow) card?.hydrate?.()?.catch?.(() => {});
   });
@@ -294,19 +259,17 @@
     rangeStart: cohortTotalCount === 0 ? 0 : cohortWindowStart + 1,
     rangeEnd: Math.min(cohortWindowEnd, cohortTotalCount),
   });
-  // GROUPED OVER THE COHORT WINDOW, not over the model's own page, so the headers describe the
-  // rows actually drawn. `categoryTotals` stays the model's: a group header states its bucket's
-  // size in the whole FILTERED cohort beside the count on this page, which is what issue 676
-  // settled and what a total recomputed from the window would break.
+  // Grouped over the cohort WINDOW, not the model's own page, so the headers describe the rows
+  // actually drawn. `categoryTotals` stays the model's: a group header states its bucket's size
+  // in the whole FILTERED cohort beside the count on this page (issue 676).
   const groups = $derived(
     ui.groupByCategory ? groupComponentsByCategory(memberWindow, model.categoryTotals) : []
   );
 
-  // ── Bulk selection (issue 772) ───────────────────────────────────────────────────
-  // `pageIds` is the set of RENDERED MEMBER row ids. Ghost rows are not in it and carry no
-  // selection box at all: `pruneComponentSelection` below drops every id the system has no
-  // component for, so a ticked ghost would be removed on the very next render and the box
-  // would be a control that visibly does nothing. See the ghost-row note in the markup.
+  // Bulk selection (issue 772). `pageIds` is the set of RENDERED MEMBER row ids: ghost rows are
+  // not in it and carry no selection box, because `pruneComponentSelection` below drops every id
+  // the system has no component for, so a ticked ghost would be a control that visibly does
+  // nothing. See the ghost-row note in the markup.
   const bulkSelectedIds = $derived(ui.bulkSelectedComponentIds ?? new Set());
   const filteredIds = $derived(filteredComponents.map((item) => item.id));
   const pageIds = $derived(
@@ -322,9 +285,9 @@
     })
   );
 
-  // A delete, an unlink or a store refresh must never leave a phantom id in the count or
-  // in an `Apply`. Only assigned when something actually dropped — the pruned set is a
-  // subset, so equal sizes mean an identical set — so this cannot loop.
+  // A delete, an unlink or a store refresh must never leave a phantom id in the count or in an
+  // `Apply`. Only assigned when something actually dropped — the pruned set is a subset, so equal
+  // sizes mean an identical set — so this cannot loop.
   $effect(() => {
     const current = ui.bulkSelectedComponentIds ?? new Set();
     if (current.size === 0) return;
@@ -335,39 +298,35 @@
     if (pruned.size !== current.size) ui.bulkSelectedComponentIds = pruned;
   });
 
-  // ── THE FIRST SHOWN ROW IS SELECTED WHEN NOTHING IS (issue 1371 r13-list, M14) ──────────
   // NOT lifted: this is the "nothing is selected, pick the first row" guard, and it names one
-  // mount's worth of auto-selection rather than anything the GM chose — the latch
-  // `ToolsBrowserView` keeps for the same rule.
+  // mount's worth of auto-selection rather than anything the GM chose.
   let autoSelectedComponentId = $state('');
 
   $effect(() => {
-    // A SELECTION THIS SYSTEM HOLDS A ROW FOR IS NEVER MOVED: not by a sort, a filter, a page
-    // turn or the cohort segment. A GM who re-sorts is looking for a component, not replacing
-    // the one they are inspecting; and a deep link or a remembered selection arrives here as an
-    // id this cohort holds, which is exactly this branch. The root clears the id on a system
-    // switch and a deleted row leaves a dangling one — both read as "nothing is selected".
+    // A selection this system holds a row for is NEVER moved — not by a sort, a filter, a page
+    // turn or the cohort segment. A deep link or a remembered selection arrives here as an id
+    // this cohort holds, which is this branch; the root clears the id on a system switch, and a
+    // deleted row leaves a dangling one, both of which read as "nothing is selected".
     if ((itemCards || []).some((item) => item.id === selectedComponentId)) {
       autoSelectedComponentId = '';
       return;
     }
-    // THE FIRST ROW THE GM IS LOOKING AT, read off `pageIds` — the member rows the body draws,
-    // in the order it draws them: the category-major sort, then the page window. The root's
-    // inspector fallback answers `itemCards[0]`, the manager's STORED order, which is how the
-    // panel opened on `Iron Ore` while the list's first row was `Chainmail Shirt` and no row was
-    // marked (the `manager-components-normal` frame at `60e035d2`).
+    // The first row the GM is LOOKING at, read off `pageIds` — the member rows the body draws, in
+    // the order it draws them. The root's inspector fallback answers `itemCards[0]`, the
+    // manager's STORED order, which is how the panel opened on one component while the list's
+    // first row was another and no row was marked.
     //
-    // A GHOST IS NEVER SELECTED. `pageIds` holds member rows only, so a page drawing ghosts alone
-    // selects nothing: a ghost's identity opens the world entry (see `ghostRowProps`) and the
-    // inspector answers from the in-system record, which a ghost by definition has none of.
+    // A ghost is never selected: `pageIds` holds member rows only, so a page drawing ghosts alone
+    // selects nothing. A ghost's identity opens the world entry (see `ghostRowProps`), and the
+    // inspector answers from the in-system record, which a ghost has none of.
     const firstId = pageIds[0] || '';
     if (!firstId || autoSelectedComponentId === firstId) return;
     autoSelectedComponentId = firstId;
     onSelectComponent(firstId);
   });
 
-  // Every mutation assigns a NEW Set rather than mutating in place, so the bound lifted
-  // state propagates back to the manager root.
+  // Every mutation assigns a NEW Set rather than mutating in place, so the bound lifted state
+  // propagates back to the manager root.
   function toggleComponentBulkSelected(id) {
     ui.bulkSelectedComponentIds = toggleComponentSelection(bulkSelectedIds, id);
   }
@@ -399,10 +358,9 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // `replacements` TOLERATES ABSENCE (issue 1371). It was a bare `Object.entries(replacements)`,
-  // which THROWS on a two-argument call — and this helper is handed to the shared
-  // component-scope model as its localizer, where several strings carry no token at all. A throw
-  // inside a render kills the whole route.
+  // `replacements` tolerates absence: a bare `Object.entries(replacements)` THROWS on a
+  // two-argument call, and this helper is handed to the shared component-scope model as its
+  // localizer, where several strings carry no token. A throw inside a render kills the route.
   function format(key, fallback, replacements) {
     let result = text(key, fallback);
     for (const [token, value] of Object.entries(replacements ?? {})) {
@@ -459,14 +417,10 @@
     ui.groupByCategory = !ui.groupByCategory;
   }
 
-  // ── THE GROUP HEADER'S COUNT IS A BARE NUMERAL ───────────────────────────────────────────
-  // `proto:1073` draws it as a mono count and nothing else — the reference frame reads
-  // `Beast 1` — where this list wrote `1 component` / `7 components`. The noun is the group
-  // band's whole subject, so repeating it on every band is the noise the reference removes.
-  //
-  // The `of` form SURVIVES for the one case that needs it: this view groups the PAGE, so a
-  // category spanning a page boundary would otherwise report the slice as the whole bucket.
-  // `group.total` is the category's size across the FILTERED rows.
+  // The group header's count is a bare numeral: the noun is the group band's whole subject, so
+  // repeating it on every band is noise. The `of` form survives for the one case that needs it —
+  // this view groups the PAGE, so a category spanning a page boundary would otherwise report the
+  // slice as the whole bucket, and `group.total` is the category's size across the FILTERED rows.
   function groupCountText(group) {
     const count = group.components.length;
     const total = group.total ?? count;
@@ -487,10 +441,10 @@
     onSearchChange('');
   }
 
-  // Progressive-difficulty parity with the component editor (issue 651, re-gated for
-  // issue 772): shown whenever the system is progressive on ANY axis that reads
-  // `component.difficulty`, and only where a value is authored. It reads "None" when the
-  // axis is on but the component has no difficulty, so a GM can see the gap.
+  // Progressive-difficulty parity with the component editor (issue 651, re-gated for issue 772):
+  // shown whenever the system is progressive on any axis that reads `component.difficulty`, and
+  // only where a value is authored. It reads "None" when the axis is on but the component has no
+  // difficulty, so a GM can see the gap.
   const showProgressiveDifficulty = $derived(difficultyAxisProgressive === true);
 
   function difficultyBadgeFor(item) {
@@ -501,10 +455,9 @@
       : text('FABRICATE.Admin.Manager.Component.DifficultyNone', 'None');
   }
 
-  // THE `Recipes` COLUMN'S VALUE (gap-list row 112). It is the world projection's own
-  // per-system count — `scope.entries[].systems[].recipeCount` — and not a re-derivation:
-  // that number is built once per refresh over every system's recipe cohort, and counting it
-  // again per row would walk the corpus once per rendered component.
+  // The `Recipes` column's value: the world projection's own per-system count, not a
+  // re-derivation. That number is built once per refresh over every system's recipe cohort, and
+  // counting it again per row would walk the corpus once per rendered component.
   function recipesValueFor(id) {
     const row = worldRowsByComponentId.get(String(id || ''));
     const count = Number(row?.recipeCount);
@@ -513,9 +466,8 @@
 
   const recipesLabel = $derived(text('FABRICATE.Admin.Manager.Component.RecipesStat', 'Recipes'));
   const salvageLabel = $derived(text('FABRICATE.Admin.Manager.Component.SalvagePill', 'Salvage'));
-  // The em dash the ghost row draws in the `Recipes` column. A MODULE-LEVEL constant rather
-  // than a literal in the markup: it is the one glyph that says "this system has no rules, so
-  // there is no number", and a hyphen typed in its place would read as a minus sign.
+  // The em dash the ghost row draws in the `Recipes` column. A module constant rather than a
+  // literal in the markup: a hyphen typed in its place would read as a minus sign.
   const NO_VALUE = '—';
 
   /**
@@ -557,8 +509,8 @@
   /**
    * One GHOST row's props — the same row, dimmed and stated.
    *
-   * ADOPTION IS TWO WRITES AND THIS CALLS ONE KEY. `actions.addToSystem` is the COMPOSED verb:
-   * it writes the membership record AND the in-system record the read union's row set is built
+   * Adoption is two writes and this calls ONE key: `actions.addToSystem` is the composed verb,
+   * writing the membership record AND the in-system record the read union's row set is built
    * from. A membership record written alone names a component no reader can see.
    *
    * @param {object} ghost
@@ -581,18 +533,13 @@
         'Add {name} to this system',
         { name: ghost.name }
       ),
-      // A GHOST ROW'S IDENTITY OPENS THE WORLD CATALOGUE ENTRY, not the in-system selection.
-      //
+      // A ghost row's identity opens the world catalogue ENTRY, not the in-system selection.
       // `onSelectComponent` writes `selectedComponentId`, and the inspector resolves that id
-      // against THIS SYSTEM's row set — which by definition holds no row for a ghost. Wiring the
-      // ghost's identity to it therefore emptied the inspector: the panel for whatever was
-      // selected disappeared and nothing replaced it, so the click read as a control that
-      // visibly does nothing. (The reference selects a ghost into its own inspector, `proto:4994`;
-      // Fabricate's inspector is built from the in-system record and cannot answer for a record
-      // that has none. Recorded as a deviation.)
-      //
-      // The world catalogue entry is where that record's name, art and description ARE authored,
-      // so it is the destination the click already implied.
+      // against THIS system's row set, which by definition holds no row for a ghost — so wiring
+      // the ghost's identity to it emptied the inspector and the click read as a control that
+      // visibly does nothing. (The reference selects a ghost into its own inspector; Fabricate's
+      // is built from the in-system record and cannot. Recorded as a deviation.) The world
+      // catalogue entry is where that record's name, art and description ARE authored.
       onSelect: (id) => onOpenWorldEntry(WORLD_ENTRY_ROUTE, id),
       onAdd: (id) => actions?.addToSystem?.(id, systemId),
     };
@@ -602,9 +549,8 @@
     componentCohortCountText(
       {
         allWorld: allWorldCohort,
-        // `shown` IS THE WINDOW, both halves of it. It reads `{shown} shown · {mine} of {all} in
-        // this system`, so it has to count what is on screen; `mine` and `all` beside it are the
-        // cohort totals and are unwindowed on purpose.
+        // `shown` IS the window, both halves of it; `mine` and `all` beside it are the cohort
+        // totals and are unwindowed on purpose.
         shown: page.components.length + ghostWindow.length,
         total: (itemCards || []).length,
         mine: (itemCards || []).length,
@@ -624,23 +570,17 @@
   aria-label={text('FABRICATE.Admin.Manager.Nav.ComponentRules', 'Component Rules')}
 >
   <!--
-    ONE HEAD, AND THE CHILD COUNT IS THE POINT (issue 1371).
+    ONE HEAD, AND THE CHILD COUNT IS THE POINT. `.manager-main` on this route is a four-track
+    grid for four children: this head, the toolbar, the list and the pager. Anything drawn as a
+    fifth DIRECT child pushes every child down one track — the toolbar lands in the `minmax(0,
+    1fr)` track, whose min is 0, collapses, and paints itself over rows 1 to 3. The wrapper holds
+    the count at four whatever it contains.
 
-    `.manager-main` on this route is a FOUR-TRACK grid — `auto auto minmax(0, 1fr) auto` — for
-    four children: this head, the toolbar, the list and the pager. Anything drawn as a fifth
-    DIRECT child pushes every child down one track: the toolbar lands in `minmax(0, 1fr)`, whose
-    min is 0, collapses, and paints itself on top of rows 1 to 3. The wrapper holds the count at
-    four whatever it contains.
-
-    THE `SharedDefinitionCallout` THAT USED TO HEAD THIS PANE IS GONE (gap-list row 101,
-    `rebuild-spec.md` C2). The reference draws that callout on the rules EDITOR only, and puts
-    its content on THIS screen in the inspector, as the `Shared identity` card — a card in the
-    wrong screen is the exact class the parity inventory exists to name. The subject-only
-    `N inherit the world category · M override it` line went with it (row 105): its information
-    is the inspector's `Category` block.
-
-    The drop zone STAYS, under maintainer ruling M2 ("KEEP the system-scope one"). It is the one
-    subject-only card on this screen that is licensed.
+    The `SharedDefinitionCallout` that used to head this pane is gone: the reference draws that
+    callout on the rules EDITOR only and puts its content on this screen in the inspector, as the
+    `Shared identity` card. The subject-only `N inherit the world category · M override it` line
+    went with it — its information is the inspector's `Category` block. The drop zone stays, under
+    maintainer ruling M2.
   -->
   <div class="manager-component-head">
     <section
@@ -674,18 +614,16 @@
   </div>
 
   <!--
-    TWO TOOLBAR ROWS, NOT FOUR (gap-list row 103, `rebuild-spec.md` C3). Row one is the three
-    controls that narrow the list — search, category, essence — plus the cohort switch that
-    widens it. Row two carries the selection register, the two VIEW controls (how the list is
-    grouped and how it is ordered) split by hairline dividers and each titled by an uppercase
-    micro-label, and the count pinned to the trailing edge.
-
-    The active-filter CHIP row is gone with the other two rows: the reference draws none, and
-    each of the three filters already shows its own state in the control that set it.
+    TWO TOOLBAR ROWS, NOT FOUR. Row one is the three controls that narrow the list — search,
+    category, essence — plus the cohort switch that widens it. Row two carries the selection
+    register, the two VIEW controls split by hairline dividers and each titled by an uppercase
+    micro-label, and the count pinned to the trailing edge. The active-filter CHIP row is gone
+    with the other two rows: each of the three filters already shows its state in the control that
+    set it.
   -->
-  <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop
-       (issue 1157). The manager root lands the keyboard here when an action empties the bulk
-       selection and unmounts the panel that was acted on. -->
+  <!-- `tabindex="-1"` makes this landmark a FOCUS TARGET without making it a tab stop (issue
+       1157). The manager root lands the keyboard here when an action empties the bulk selection
+       and unmounts the panel that was acted on. -->
   <ManagerToolbar
     class="manager-component-toolbar"
     tabindex="-1"
@@ -695,25 +633,18 @@
   >
     <div class="manager-component-filter-row">
       <!--
-        THREE CONTROLS AT 38px, WHICH IS WHAT THE REFERENCE DRAWS (UX F5, `proto:1053-1055`).
+        THREE CONTROLS AT 38px, which is a published rung (26 / 28 / 30 / 34 / 38 / 44) and what
+        the reference draws. The field takes `size="38"` and each select carries `is-size-38`.
 
-        38 IS a rung — the published ladder is 26 / 28 / 30 / 34 / 38 / 44, and only 32 / 36 / 40
-        are retired — so nothing licensed the 34 these three shipped at; they were one rung short.
-        Ruling M12b made the rung reachable on the shared primitives rather than here, and this is
-        the consuming edit: the field takes `size="38"` and each select carries `is-size-38`.
+        The asymmetry is the tree's shape rather than a shortcut: `ManagerSearchField` is a
+        component and owns its own class list, while the manager has no select COMPONENT, because
+        the control beside the field is three different things across eleven bars and
+        `ManagerToolbar` deliberately takes a slot rather than choosing between them.
 
-        THE FIELD TAKES A PROP AND THE SELECTS TAKE A CLASS, and the asymmetry is the tree's shape
-        rather than a shortcut. `ManagerSearchField` is a component and owns its own class list;
-        the manager has no select COMPONENT, because `ManagerToolbar`'s own header records that
-        the control beside the field is three different things across eleven bars and that the bar
-        deliberately takes a slot rather than choosing between them. So the contract a caller opts
-        into for a select is the class itself.
-
-        NEITHER IS A LOCAL HEIGHT, which is the point. A per-screen `height: 38px` here would be
-        the fourth place this bar re-derives a control size, and it is precisely what the opt-in
-        exists to prevent: `.manager-toolbar select.is-size-38` is (0,3,1) and beats this bar's own
-        (0,2,1) 34px rule on specificity, so it lands wherever the class is written rather than
-        wherever the rule happens to sit in the sheet.
+        NEITHER IS A LOCAL HEIGHT, which is the point: a per-screen `height: 38px` here would be a
+        fourth place this bar re-derives a control size. `.manager-toolbar select.is-size-38` is
+        (0,3,1) and beats this bar's own (0,2,1) 34px rule, so it lands wherever the class is
+        written rather than wherever the rule sits in the sheet.
       -->
       <!-- The capture registry's narrowing hook: a case that has to reach a specific component
            types into this field rather than depending on where that component happens to sort. -->
@@ -729,8 +660,8 @@
         ariaLabel={text('FABRICATE.Admin.Manager.Component.SearchLabel', 'Search components')}
       />
 
-      <!-- Bare: the `aria-label` is the select's accessible name. A filter bar whose controls
-           each announce themselves in sentence case reads as a form. -->
+      <!-- Bare: the `aria-label` is the select's accessible name. A filter bar whose controls each
+           announce themselves in sentence case reads as a form. -->
       <select
         class="manager-component-category-filter is-size-38"
         data-component-category-filter
@@ -763,8 +694,8 @@
           <option value="all"
             >{text('FABRICATE.Admin.Manager.Component.EssenceAll', 'All essences')}</option
           >
-          <!-- The reference's two PREDICATES ahead of the per-essence entries (`proto:5533`;
-               issue 1371 r12-list). Their values are the model's sentinels, not names. -->
+          <!-- The reference's two PREDICATES ahead of the per-essence entries. Their values are
+               the model's sentinels, not names. -->
           <option value={COMPONENT_ESSENCE_FILTER_ANY}
             >{text('FABRICATE.Admin.Manager.Component.EssenceAny', 'Carries any essence')}</option
           >
@@ -778,11 +709,10 @@
       {/if}
 
       <!--
-        THE COHORT SWITCH, as the two-segment inline filter the reference draws (`proto:1558`,
-        gap-list row 145) rather than the `<select>` that shipped. `tone="accent"` fills the
-        chosen segment; `density="compact"` is the rung its `padding: 5px 11px` / radius-6 /
-        10.5px-600 geometry lands on. The per-segment count rides the primitive's `badge`, which
-        draws it in the mono face the reference sets it in.
+        THE COHORT SWITCH, as the two-segment inline filter the reference draws rather than the
+        `<select>` that shipped. `tone="accent"` fills the chosen segment and `density="compact"`
+        is the rung its geometry lands on; the per-segment count rides the primitive's `badge`,
+        which draws it in the mono face.
       -->
       <SegmentedControl
         options={membershipFilters}
@@ -805,15 +735,14 @@
 
     <div class="manager-component-filter-row is-secondary">
       <!--
-        THE SELECTION REGISTER, INLINE AND FIRST (gap-list rows 104 and 147). `Select all` is
-        the reference's first item on this row, not a fourth row of its own, and once a row is
-        ticked the SAME register grows the accent count, the standing sentence pointing at the
-        inspector, and the two bare text actions at the trailing edge.
+        THE SELECTION REGISTER, INLINE AND FIRST. `Select all` is the reference's first item on
+        this row, not a fourth row of its own, and once a row is ticked the SAME register grows the
+        accent count, the standing sentence pointing at the inspector, and the two bare text
+        actions at the trailing edge.
 
-        `rowClass` is a `display: contents` shim, so the primitive's own children become items
-        of THIS row rather than a nested bar with its own metrics. Everything else the reference
-        states about this register — the check-double glyph, the bare actions with no underline
-        and no xmark, the trailing pair — is already a parameter of the shared primitive.
+        `rowClass` is a `display: contents` shim, so the primitive's own children become items of
+        THIS row rather than a nested bar with its own metrics. Everything else this register
+        states is already a parameter of the shared primitive.
       -->
       <BulkSelectionToolbar
         rowClass="manager-component-selection-inline"
@@ -837,9 +766,9 @@
         <span class="manager-component-filter-label" id="manager-component-group-label"
           >{text('FABRICATE.Admin.Manager.Component.GroupByCategory', 'Group by category')}</span
         >
-        <!-- `data-component-group-by-category=""` rather than the bare attribute: on a
-             COMPONENT a bare attribute is the boolean `true`, which the rest spread would
-             stamp as `="true"` and change the byte the sheet's own rule is written beside. -->
+        <!-- `data-component-group-by-category=""` rather than the bare attribute: on a COMPONENT
+             a bare attribute is the boolean `true`, which the rest spread would stamp as `="true"`
+             and change the byte the sheet's own rule is written beside. -->
         <StatusToggle
           on={ui.groupByCategory}
           data-component-group-by-category=""
@@ -871,8 +800,8 @@
           )}
           onclick={toggleSortDirection}
         >
-          <!-- The alphabetical pair the reference draws (`proto:5538`) and the sibling lists
-               already draw; this bar drew the AMOUNT pair (issue 1371 r12-list). -->
+          <!-- The alphabetical pair the reference draws and the sibling lists already draw; this
+               bar drew the AMOUNT pair. -->
           <i
             class={ui.sortDirection === 'asc' ? 'fas fa-arrow-down-a-z' : 'fas fa-arrow-up-a-z'}
             aria-hidden="true"
@@ -885,10 +814,9 @@
         </ManagerButton>
       </div>
       <!--
-        THE COUNT AND THE BODY AGREE, IN BOTH COHORTS. It reads `{shown} of {total} catalogue
-        entries` over this system's own library and `{shown} shown · {mine} of {all} in this
-        system` once the cohort is widened — the sentence the reference writes for each — and
-        both are computed over the rows the body is actually drawing.
+        THE COUNT AND THE BODY AGREE, IN BOTH COHORTS: `{shown} of {total} catalogue entries` over
+        this system's own library and `{shown} shown · {mine} of {all} in this system` once the
+        cohort is widened, both computed over the rows the body is actually drawing.
       -->
       <span class="manager-component-count" data-component-count>{countText}</span>
     </div>
@@ -899,9 +827,9 @@
     aria-label={text('FABRICATE.Admin.Manager.Component.Table', 'Components')}
   >
     <!--
-      THE ZERO STATE IS GATED ON THE COHORT, NEVER ON THE RAW PROP: an empty system under
-      `All world components` drew the zero state over a toolbar counting three rows, and the
-      only route in the product to adopt a component into an empty system became unreachable.
+      THE ZERO STATE IS GATED ON THE COHORT, never on the raw prop: an empty system under `All
+      world components` drew the zero state over a toolbar counting three rows, and the only route
+      in the product to adopt a component into an empty system became unreachable.
     -->
     {#if (itemCards || []).length === 0 && visibleGhostRows.length === 0}
       <EmptyState
@@ -934,11 +862,10 @@
           {#each groups as group (group.category)}
             <section class="manager-component-group" data-component-group={group.category}>
               <!--
-                NO DISCLOSURE CHEVRON, AND NOT A BUTTON (gap-list rows 107 and 108). The
-                reference draws a folder glyph, the category name and a bare mono count on a
-                `surface-soft` band, and nothing on it expands. `collapsible={false}` is the
-                primitive's own answer; collapsing this list is not shipped rather than shipped
-                differently, which is what gap-list row 107 asks for.
+                NO DISCLOSURE CHEVRON, AND NOT A BUTTON: the reference draws a folder glyph, the
+                category name and a bare mono count on a `surface-soft` band, and nothing on it
+                expands. `collapsible={false}` is the primitive's own answer, so collapsing this
+                list is not shipped rather than shipped differently.
               -->
               <CollapsibleGroupHeader
                 collapsible={false}
@@ -968,30 +895,21 @@
         {/if}
 
         <!--
-          THE GHOST COHORT: world components this system has NO rules record for.
+          THE GHOST COHORT: world components this system has no rules record for. They are THE
+          SAME ROW, dimmed and stated — the medallion, the copy column and the `Recipes` column all
+          stay, the pill reads `Not in this system`, the second line is the WORLD description and
+          the trailing control is a dashed `+ Add to system`.
 
-          They are THE SAME ROW, dimmed and stated (`rebuild-spec.md` C6, gap-list row 146) —
-          the medallion, the copy column and the `Recipes` column all stay, the pill reads
-          `Not in this system`, the second line is the WORLD description and the trailing
-          control is a dashed `+ Add to system`.
+          THEY CARRY NO SELECTION BOX, and that is mechanical: the prune effect above drops every
+          selected id the system has no component for, so a box rendered here would be untickable
+          in practice, with nothing on screen explaining why. The one knowing divergence from C6's
+          row table.
 
-          THEY CARRY NO SELECTION BOX, and that is mechanical rather than a preference: the
-          prune effect above drops every selected id the system has no component for, so a box
-          rendered here would be untickable in practice — the id would be removed on the next
-          render, with nothing on screen explaining why. Reported to the driver as the one
-          knowing divergence from C6's row table.
-
-          They are rendered as their own list AFTER the member one — a different verb with a
-          different membership answer — rather than folded into the model, which would put
-          unadoptable rows through a category grouping and a difficulty sort that mean nothing
-          for them.
-
-          THEY ARE STILL PAGED, THROUGH THE SAME WINDOW (revision 8). A separate list is not an
-          unpaginated one: `ghostWindow` is the tail of the ONE window taken across
-          `members ++ ghosts`, so this list holds the part of the current page that falls past the
-          member half, and the pager above counts both. Round 5 shipped this `{#each}` over the
-          WHOLE ghost cohort while `Pagination` was fed the member count — every remaining world
-          component in one column, under a count describing a different list.
+          They are rendered as their own list AFTER the member one rather than folded into the
+          model, which would put unadoptable rows through a category grouping and a difficulty sort
+          that mean nothing for them — but they are STILL PAGED through the same window:
+          `ghostWindow` is the tail of the ONE window taken across `members ++ ghosts`, and the
+          pager above counts both.
         -->
         {#if ghostWindow.length > 0}
           <ul
@@ -1029,8 +947,8 @@
      stays at zero. Everything this view drew before issue 1371 keeps its rules in
      `styles/fabricate.css`; only the surfaces this change ADDS are declared here. */
 
-  /* THE HEAD WRAPPER. It exists to hold `.manager-main`'s child count at four; the column and
-     the gap are what its child had as a sibling of the grid. */
+  /* The head wrapper exists to hold `.manager-main`'s child count at four; the column and the gap
+     are what its child had as a sibling of the grid. */
   .manager-component-head {
     display: flex;
     flex-direction: column;
@@ -1038,38 +956,29 @@
     min-width: 0;
   }
 
-  /* THE SELECTION REGISTER'S SHIM. `BulkSelectionToolbar` renders one element carrying the
-     class this prop names; `display: contents` removes that box from the layout so its
-     children — the select-all label, the divider, the count, the standing sentence and the two
-     text actions — become flex items of the toolbar row that hosts it, which is where the
-     reference draws them. It declares nothing else: every metric is the row's.
+  /* THE SELECTION REGISTER'S SHIM. `display: contents` removes `BulkSelectionToolbar`'s own box
+     from the layout so its children become flex items of the toolbar row that hosts it, which is
+     where the reference draws them. It declares nothing else: every metric is the row's.
 
-     `:global()` is REQUIRED and is not laziness. The element is rendered by that component,
-     not by this template, so Svelte's scoping hash is never applied to it and a plain selector
-     here would compile to a rule that matches nothing. */
+     `:global()` is REQUIRED: the element is rendered by that component and not by this template,
+     so Svelte's scoping hash is never applied to it and a plain selector would compile to a rule
+     that matches nothing. */
   :global(.manager-component-selection-inline) {
     display: contents;
   }
 
-  /* `proto:1060` inks `Select all` `var(--text2)` — the solid secondary — where the shared
-     register draws it at `--fab-text-muted`, which is that same colour at 74% alpha. One token
-     (UX F-K).
+  /* The register's `Select all` takes the solid secondary ink rather than the shared register's
+     muted alpha of it (UX F-K).
 
-     IT CANNOT BE WRITTEN IN `styles/fabricate.css`, and that is a cascade fact rather than a
-     preference: `BulkSelectionToolbar` states this ink in its own scoped block, which Svelte
-     injects UNLAYERED, while the sheet is imported at `layer(modules)` — so an unlayered rule
-     beats every layered one whatever its specificity, and a sheet-authored override would be
-     emitted, match, and silently lose. Written here it is unlayered too, so specificity decides,
-     and the leading `.fabricate-manager` puts this at (0,3,0) against the primitive's (0,2,0).
+     IT CANNOT BE WRITTEN IN `styles/fabricate.css`, and that is a cascade fact:
+     `BulkSelectionToolbar` states this ink in its own scoped block, which Svelte injects
+     UNLAYERED, while the sheet is imported at `layer(modules)` — so a sheet-authored override
+     would be emitted, match, and silently lose. Written here it is unlayered too, and the leading
+     `.fabricate-manager` puts it at (0,3,0) against the primitive's (0,2,0).
 
-     AND IT IS SCOPED TO THIS REGISTER, not to the class. `.fab-bulk-selection-all` is drawn by
-     the Recipe Studio and the Essence library as well, and this reference draws neither of them.
-     `.manager-component-selection-inline` is the `rowClass` THIS screen passes, so the selector
-     cannot reach a register the finding was not measured on.
-
-     `:global()` for the reason the shim above gives: every element in the selector is rendered by
-     that component and never by this template, so a scoped selector would compile to a rule that
-     matches nothing. */
+     AND IT IS SCOPED TO THIS REGISTER, not to the class: `.fab-bulk-selection-all` is drawn by
+     the Recipe Studio and the Essence library too, and `.manager-component-selection-inline` is
+     the `rowClass` THIS screen passes. `:global()` for the reason the shim above gives. */
   :global(.fabricate-manager .manager-component-selection-inline .fab-bulk-selection-all) {
     color: var(--fab-text-secondary);
   }

@@ -14,16 +14,12 @@
 
   let {
     tool = null,
-    // THE WORLD TOOL CORPUS, read for ONE question: does a world record exist for this Tool?
-    // `toolScopeProps` was already being spread in by the call site and silently dropped, so
-    // declaring it costs no new wiring. The button below must not offer a route to an entry
-    // editor that would open on nothing, which is the state a pre-migration in-system Tool with
-    // no world half is in.
+    // THE WORLD TOOL CORPUS, read for ONE question: does a world record exist for this Tool? The
+    // button below must not offer a route to an entry editor that would open on nothing, which is
+    // the state a pre-migration in-system Tool with no world half is in.
     scope = null,
-    // WHICH SYSTEM THIS EDITOR IS SCOPED TO. It arrives in the `toolScopeProps` bundle the call
-    // site already spreads, so declaring it costs no new wiring — and `scope` was already
-    // declared and already read in a reactive scope here, so the bundle-subscription hazard
-    // that declaration note warns about was taken long ago and is not deepened by this one.
+    // Which system this editor is scoped to; it arrives in the `toolScopeProps` bundle the call
+    // site already spreads.
     //
     // `actions` is deliberately NOT declared. The two membership writes this screen performs go
     // out as `onToggleInherited` and `onRemoveFromSystem` callbacks, because both have to be
@@ -44,20 +40,19 @@
     currencyUnits = [],
     currencyEnabled = false,
     prerequisiteOptions = [],
-    // THE WORLD MODIFIER LIBRARY, for the Requirements tab's bonus section (issue 1373,
-    // maintainer round 3). Same shape and same scope as `prerequisiteOptions`: the bonus is a
-    // PICK from `characterLibraries.modifiers[]` rather than a typed expression, at both the
-    // world Tool entry and here, so both callers thread the same roster.
+    // THE WORLD MODIFIER LIBRARY, for the Requirements tab's bonus section (issue 1373). Same
+    // shape and scope as `prerequisiteOptions`: the bonus is a PICK from
+    // `characterLibraries.modifiers[]` rather than a typed expression, at both scopes.
     modifierOptions = [],
-    // The rail's `PREVIEW AS` roster and its roll-data resolver, and its `REQUIRED FOR` list.
-    // All three are projections the store owns: this view counts nothing and reads no document.
+    // The rail's `PREVIEW AS` roster, its roll-data resolver and its `REQUIRED FOR` list. All
+    // three are projections the store owns: this view counts nothing and reads no document.
     actorOptions = [],
     getActorRollData = async () => null,
     requiredFor = [],
     authority = 'toolSpecific',
     // WHERE THAT AUTHORITY CAME FROM, for the Breakage tab's mode card. `authority` is the
-    // RESOLVED token and cannot tell "this system chose it" from "this system follows the
-    // world"; the card states which, exactly as the rules list's own pill does (issue 1373).
+    // RESOLVED token and cannot tell "this system chose it" from "this system follows the world";
+    // the card states which, exactly as the rules list's own pill does (issue 1373).
     breakageSource = 'default',
     onOpenSystems = () => {},
     onOpenSystem = () => {},
@@ -67,28 +62,23 @@
     onTabChange = () => {},
     onPatch = () => {},
     onToggleEnabled = () => {},
-    // ── THE ROUTE OUT TO THE WORLD TOOL (issue 1373) ────────────────────────────────────────
-    // The rules LIST already claims this Tool inherits world defaults, offers `What it would
-    // inherit here`, and pins an `Edit the world Tool` button to its inspector. The editor
-    // behind `Edit rules` offered no route to that record at all, so the list advertised a
-    // destination the next screen could not reach. This is the same navigation the inspector's
-    // button takes, wired to the same shell handler; the design puts it in the header band, as
-    // `World Tool`, beside `Back to Tool Rules`.
+    // THE ROUTE OUT TO THE WORLD TOOL (issue 1373). The rules list already claims this Tool
+    // inherits world defaults and pins an `Edit the world Tool` button to its inspector, while the
+    // editor behind `Edit rules` offered no route to that record at all. This is the same
+    // navigation, wired to the same shell handler.
     //
-    // The LINK ITSELF is not authored here any more, and the three wires that used to do it —
-    // `onSourceDrop`, `onCopySourceUuid`, `onUnlinkSource` — are gone with the card that used
-    // them. See `tools/ToolOverviewTab` for why.
+    // The LINK ITSELF is not authored here any more, and the three wires that used to do it are
+    // gone with the card that used them. See `tools/ToolOverviewTab` for why.
     onEditWorldTool = () => {},
-    // ── THE TWO WORLD-MEMBERSHIP WRITES THIS SCREEN OWNS (issue 1373) ───────────────────────
-    // `onToggleInherited(section, nextInherit)` moves ONE section between following the world
-    // Tool and setting this system's own, and `onRemoveFromSystem()` takes the whole rules
-    // record away. Both are membership writes rather than draft patches, so both are the
-    // shell's to perform: they persist immediately, exactly as the enable switch already does.
+    // THE TWO WORLD-MEMBERSHIP WRITES THIS SCREEN OWNS (issue 1373).
+    // `onToggleInherited(section, nextInherit)` moves ONE section between following the world Tool
+    // and setting this system's own, and `onRemoveFromSystem()` takes the whole rules record away.
+    // Both are membership writes rather than draft patches, so both are the shell's to perform and
+    // both persist immediately.
     //
-    // `onDelete` is GONE with the header button that called it. The design puts `Delete` on the
-    // world entry, which is the record it destroys; system scope gets the explained
-    // `Stop using this Tool here` callout on `Breakage` instead, because a bare `Delete` on a
-    // screen whose subject is one world Tool adopted by many systems names no scope at all.
+    // `onDelete` is GONE with the header button that called it: the design puts `Delete` on the
+    // world entry, which is the record it destroys, and system scope gets the explained `Stop
+    // using this Tool here` callout on `Breakage` instead.
     onToggleInherited = () => {},
     onRemoveFromSystem = () => {},
   } = $props();
@@ -114,12 +104,10 @@
   );
   const displayImage = $derived(toolDisplayImage(tool, managedItems));
   /**
-   * THE HEADER'S SUBTITLE, AND IT IS A STATEMENT OF SCOPE (issue 1373).
-   *
-   * It read `Linked game-world Item` — the WORLD editor's subtitle, describing the one thing
-   * this screen cannot change. What a GM needs to know on arriving here is which half of a Tool
-   * this screen owns, and the design says it in one sentence: the rules are this system's, the
-   * identity is the world Tool's.
+   * THE HEADER'S SUBTITLE, AND IT IS A STATEMENT OF SCOPE (issue 1373). It read `Linked game-world
+   * Item` — the WORLD editor's subtitle, describing the one thing this screen cannot change. What
+   * a GM needs on arriving here is which half of a Tool this screen owns: the rules are this
+   * system's, the identity is the world Tool's.
    */
   const sourceContext = $derived(
     systemName
@@ -134,17 +122,14 @@
         )
   );
   /**
-   * THE REQUIREMENTS CARD'S OPENING STRIP (issue 1373).
-   *
-   * `proto:2855` opens the system editor's Requirements card with an info strip, and it is the
-   * one element that distinguishes that card from the world entry's otherwise identical one.
-   * `ToolRequirementsTab` serves both scopes, so the SENTENCE is resolved here: what it states
-   * is a fact about which crafting system these rules belong to, and only this screen has one.
+   * THE REQUIREMENTS CARD'S OPENING STRIP (issue 1373). `ToolRequirementsTab` serves both scopes,
+   * so the SENTENCE is resolved here: what it states is a fact about which crafting system these
+   * rules belong to, and only this screen has one.
    *
    * The design's own wording — "the world Tool only seeds them when you add it" — is not
-   * reproduced. It describes a model in which a system's copy is taken once and then stands
-   * alone; ours inherits for real, and each section follows the world default until this screen
-   * overrides it. Saying the design's sentence here would be saying something untrue.
+   * reproduced. It describes a model in which a system's copy is taken once and then stands alone;
+   * ours inherits for real, and each section follows the world default until this screen overrides
+   * it.
    */
   const requirementsIntro = $derived(
     formattedText(
@@ -163,11 +148,10 @@
   );
 
   /**
-   * Whether the world catalogue actually holds a record for this Tool.
-   *
-   * `false` is a real answer rather than a fallback: a pre-migration in-system Tool that no
-   * `1.30.0` pass has lifted has no world half, and routing to its entry editor would land the
-   * GM on the `no longer in the corpus` state. The button is simply absent there.
+   * Whether the world catalogue actually holds a record for this Tool. `false` is a real answer
+   * rather than a fallback: a pre-migration in-system Tool that no `1.30.0` pass has lifted has no
+   * world half, and routing to its entry editor would land the GM on the `no longer in the corpus`
+   * state. The button is simply absent there.
    */
   const worldEntry = $derived(
     (Array.isArray(scope?.entries) ? scope.entries : []).find(
@@ -177,13 +161,10 @@
   const worldRecordExists = $derived(worldEntry !== null);
 
   /**
-   * THIS `(tool, system)` PAIR'S ROW IN THE WORLD PROJECTION — the only thing that can say
-   * whether a section is inherited or overridden.
-   *
-   * The system's own Tool record carries the RESOLVED values and cannot tell the two apart,
-   * which is exactly why this editor had no inheritance model: it was reading the only source
-   * that does not hold the answer. `ToolsBrowserView` already reads the same join for its
-   * per-row `Inherits world defaults` pill.
+   * This `(tool, system)` pair's row in the world projection — the only thing that can say whether
+   * a section is inherited or overridden. The system's own Tool record carries the RESOLVED values
+   * and cannot tell the two apart, which is exactly why this editor had no inheritance model.
+   * `ToolsBrowserView` already reads the same join for its per-row pill.
    */
   const systemRow = $derived(
     (Array.isArray(worldEntry?.systems) ? worldEntry.systems : []).find(
@@ -191,28 +172,22 @@
     ) ?? null
   );
   /**
-   * Whether this crafting system holds a MEMBERSHIP record for the Tool, and therefore whether
-   * the editor can offer an inherit affordance at all.
-   *
-   * `false` is a real answer: a pre-migration in-system Tool that no `1.30.0` pass lifted has no
-   * world half, so there is nothing to inherit FROM and nothing to be removed from. Every card
-   * then renders its controls with no switch and no pill — which is exactly what this screen did
-   * before, so nothing about that state changed.
+   * Whether this crafting system holds a MEMBERSHIP record for the Tool, and therefore whether the
+   * editor can offer an inherit affordance at all. `false` is a real answer: a pre-migration
+   * in-system Tool has no world half, so there is nothing to inherit FROM and nothing to be
+   * removed from, and every card then renders its controls with no switch and no pill.
    */
   // THE WORLD'S OWN BREAKAGE AUTHORITY, read off the world-scope projection this view already
-  // takes, exactly as `ToolsBrowserView` reads it for the same sentence. It is read HERE rather
-  // than threaded from the shell on purpose: `world-scope-tool-breakage-authority.test.js` pins
-  // every `toolBreakage` access in `CraftingSystemManagerRoot` to a closed set, and a fifth
-  // rooted read there would be a fifth screen re-deriving a fact the projection already
-  // publishes. `''` means the world corpus authored nothing, which is a different answer from
-  // an authored `toolSpecific` and is why it is read rather than inferred.
+  // takes, exactly as `ToolsBrowserView` reads it. It is read HERE rather than threaded from the
+  // shell on purpose: `world-scope-tool-breakage-authority.test.js` pins every `toolBreakage`
+  // access in `CraftingSystemManagerRoot` to a closed set. `''` means the world corpus authored
+  // nothing, which is a different answer from an authored `toolSpecific`.
   const worldAuthority = $derived(scope?.toolBreakage?.authority ?? '');
 
   const member = $derived(systemRow?.member === true);
   const inherited = $derived(systemRow?.inherited ?? {});
   const worldDefaults = $derived(worldEntry?.defaults ?? null);
 
-  // ── THE VALIDATION ROW ACTION (issue 1517) ──────────────────────────────────────────────
   // The two tabs a validation row may address, written once so the route guard below and the
   // announcement's own label lookup cannot disagree about which tabs are reachable.
   const ISSUE_TABS = {
@@ -223,29 +198,27 @@
     },
   };
 
-  // This editor's own root, so `focusValidationTarget` resolves a `data-validation-target`
-  // inside THIS editor rather than anywhere in the manager window.
+  // This editor's own root, so `focusValidationTarget` resolves a `data-validation-target` inside
+  // THIS editor rather than anywhere in the manager window.
   let editorRoot = $state(null);
 
-  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME, not a count. Activating a row action
-  // changes no tally, so a count-subjected region would recite an unchanged number at the
-  // moment a GM most needs to know where they landed.
+  // WHAT THE LIVE REGION SAYS: the ACTION'S OUTCOME, not a count. Activating a row action changes
+  // no tally, so a count-subjected region would recite an unchanged number at the moment a GM most
+  // needs to know where they landed.
   let issueAnnouncement = $state('');
 
-  // The destination TAB PANEL, and it is the focus fallback for a route-only row (issue 1517).
-  // Every `general` row this editor draws is route-only, so this is the majority path here.
+  // The destination TAB PANEL, and the focus fallback for a route-only row (issue 1517). Every
+  // `general` row this editor draws is route-only, so this is the majority path here.
   let tabPanel = $state(null);
 
   /**
    * Deep-link from a validation issue: switch to the tab that hosts the gap, THEN move focus to
    * the offending control.
    *
-   * THE ORDER IS THE MECHANISM, not a preference. The route is requested synchronously and
-   * FIRST — `onTabChange` is the shell's own `$state` write, exactly as the tab strip's own
-   * click is — so Svelte has flushed it and the destination panel exists by the time the focus
-   * helper's `queueMicrotask` runs its query. Everything after that — the panel fallback for a
-   * route-only row, the sentence, and the delay that queues it behind the focus utterance —
-   * belongs to `validationAnnouncement.js`, which owns it for all five hosts.
+   * THE ORDER IS THE MECHANISM. The route is requested synchronously and FIRST — `onTabChange` is
+   * the shell's own `$state` write, exactly as the tab strip's own click is — so Svelte has
+   * flushed it and the destination panel exists by the time the focus helper's `queueMicrotask`
+   * runs its query. Everything after that belongs to `validationAnnouncement.js`.
    *
    * @param {string} targetTab the ROUTE the row carries.
    * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.
@@ -267,18 +240,15 @@
 
 <main class="manager-main manager-tool-edit-main" data-tool-edit-view bind:this={editorRoot}>
   <!--
-    THE ROW ACTION'S LIVE REGION, and it is HOSTED HERE rather than in the validation surface
-    for a reason that is not stylistic (issue 1517). Activating a row action changes `activeTab`
-    to another value, which unmounts the whole validation panel — live region included — in the
-    same update that was supposed to announce. So the element carrying `aria-live` is ALWAYS in
-    the DOM, outside the `{#if activeTab}` chain below, with its own `{#if}` INSIDE it.
+    THE ROW ACTION'S LIVE REGION, hosted here rather than in the validation surface (issue 1517):
+    activating a row action changes `activeTab`, which unmounts the whole validation panel — live
+    region included — in the same update that was supposed to announce. So the element carrying
+    `aria-live` is ALWAYS in the DOM, outside the `{#if activeTab}` chain, with its own `{#if}`
+    inside it.
 
-    A THIRD CHILD OF THIS `<main>` IS SAFE HERE, which is worth saying because it is not safe
-    everywhere: `.visually-hidden` is `position: absolute`, so the element is out of flow and
-    takes no track in any grid or `display: contents` chain this route is laid out by.
-
-    It wears the shipped `.visually-hidden` utility, rooted at the MODULE, and is addressed by a
-    `data-` hook rather than a class, so it joins no pinned class family.
+    A third child of this `<main>` is safe here, which is worth saying because it is not safe
+    everywhere: `.visually-hidden` is `position: absolute`, so the element is out of flow and takes
+    no track in any grid or `display: contents` chain this route is laid out by.
   -->
   <div class="visually-hidden" role="status" aria-live="polite" data-tool-issue-announcement>
     {#if issueAnnouncement}{issueAnnouncement}{/if}
@@ -315,21 +285,15 @@
           >{/if}
         {#if dirty}<span data-tool-editor-dirty hidden>dirty</span>{/if}
         <!-- These three are the AUTHORITY for `ManagerButton` (issue 1096): the maintainer's
-             reference for what a manager button should look like. They go through the
-             primitive so the two screens cannot drift apart again — a role or a treatment
-             that lands here now lands everywhere the primitive is used. THAT CONVERSION changed
-             no rendering: `fab-manager-button` re-declares the same `.manager-header-actions`
-             values these already inherit from their ancestor. A later round did move one of the
-             three onto a different ROLE, which is a different kind of change; see below. -->
-        <!-- BOTH NAVIGATIONS TAKE ONE TREATMENT, because the design gives them one (issue
-             1373). `proto:2601` and `proto:2602` are the same style string twice over -
-             `height: 36px; padding: 0 14px; border: 1px solid var(--border); border-radius: 9px;
-             background: transparent; color: var(--text2); font: 600 11.5px var(--sans)` - and
+             reference for what a manager button should look like. They go through the primitive so
+             the two screens cannot drift apart again. THAT CONVERSION changed no rendering:
+             `fab-manager-button` re-declares the same `.manager-header-actions` values these
+             already inherit. -->
+        <!-- BOTH NAVIGATIONS TAKE ONE TREATMENT, because the design gives them one (issue 1373):
              transparent-over-a-border is the GHOST role here, which `Back to Tool Rules` already
-             took. `World Tool` took the neutral role's `--fab-overlay-light-06` fill, so two
-             adjacent buttons that both leave this screen read as two different weights of verb.
-             `Save rules` stays `primary` and stays green: that is a standing ruling, and it is
-             the emphasis split this repair preserves rather than the one it touches. -->
+             took, while `World Tool` took the neutral role's fill — so two adjacent buttons that
+             both leave this screen read as two different weights of verb. `Save rules` stays
+             `primary` and stays green: that is a standing ruling. -->
         {#if worldRecordExists}
           <ManagerButton
             role="ghost"
@@ -342,12 +306,10 @@
             ></ManagerButton
           >
         {/if}
-        <!-- `Back to Tool Rules` and `Save rules`, not `Back to tools` and `Save tool`. Both
-             old labels named the WORLD editor's job: they came from a time when this was the
-             only Tool editor there was. What this screen saves is one crafting system's RULES
-             for a Tool, and where it goes back to is the Tool Rules list its breadcrumb already
-             names — a `Save tool` on a screen that cannot change the Tool is the same category
-             error as the `Delete` that used to sit between them. -->
+        <!-- `Back to Tool Rules` and `Save rules`, not `Back to tools` and `Save tool`. Both old
+             labels named the WORLD editor's job. What this screen saves is one crafting system's
+             RULES for a Tool, and a `Save tool` on a screen that cannot change the Tool is the same
+             category error as the `Delete` that used to sit between them. -->
         <ManagerButton
           role="ghost"
           data-tool-editor-back
@@ -393,13 +355,12 @@
   />
 
   <div class="manager-tool-edit-composition">
-    <!-- `tabindex="-1"`, WAS `0` (issue 1517). The panel is the ROUTE-ONLY row's focus
-         destination — a row that names a tab and no control leaves focus on a button this
-         update unmounts, and `<body>` is where every Foundry keybinding is live — so it must be
-         focusable programmatically. It is not a tab STOP: `0` put an empty scroll container in
-         the Tab order between the strip and the first field, which no other editor panel in the
-         manager does, and nothing reads it. `data-keyboard-focus="true"` is what tells Foundry
-         the window is focused once it lands. -->
+    <!-- `tabindex="-1"`, WAS `0` (issue 1517). The panel is the ROUTE-ONLY row's focus destination
+         — a row that names a tab and no control leaves focus on a button this update unmounts —
+         so it must be focusable programmatically. It is not a tab STOP: `0` put an empty scroll
+         container in the Tab order between the strip and the first field, which no other editor
+         panel does. `data-keyboard-focus="true"` tells Foundry the window is focused once it
+         lands. -->
     <div
       class="manager-tool-editor-panel"
       role="tabpanel"

@@ -1,95 +1,36 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The manager's ONE bulk edit panel CHROME: the header eyebrow + Clear, the accent count
-  hero, the staged sections a caller supplies, and the Apply button (issue 772, extracted
-  for issue 1010).
-
-  It lives under `apps/manager/` rather than `apps/manager/components/` for the reason
-  `BulkSelectionToolbar` records: `components/` holds area-agnostic leaves and this chrome
-  is manager-scoped. The token half of that reason — that the placement keeps an
-  area-scoped `--fab-manager-*` property in scope — has LAPSED, since a scoped `<style>`
-  may not reach one from any directory. The extraction was a pure move regardless: the
-  block below reads theme-root tokens only.
-
-  It renders in a browser's existing `.manager-inspector` column and REPLACES that
-  browser's single-row inspector for as long as the selection is non-empty. The chrome is
-  shared; what a studio STAGES is not, so the axes arrive as `children`.
-
-  THE NOUN STAYS WITH THE STUDIO. `heading` ("3 components selected") and `applyLabel`
-  ("Apply to 3 components") name what is being edited and are therefore the caller's
-  strings; the panel title, the Clear action and the standing hint are noun-free and live
-  in the neutral `Admin.Manager.BulkEdit.*` namespace here. (Written without its `FABRICATE`
-  root on purpose: `tests/ui-lang-keys-resolve.test.js` scans every dotted literal in `src/`
-  and pins how many of them resolve to an OBJECT, so a prose mention of a namespace base
-  spelled in full counts as one and moves a number no behaviour changed.)
+  The manager's one bulk-edit panel chrome: the eyebrow and Clear, the accent count hero, the
+  caller's staged axes, and the docked Apply (issue 772, extracted for issue 1010). It replaces
+  a browser's single-row inspector for as long as the selection is non-empty.
 
   Props:
-   - heading: the hero's count sentence, already localized and already pluralized.
-   - applyLabel: the Apply button's label, already localized and already pluralized. It
-     names the exact blast radius.
-   - canApply: Apply is GENUINELY inert until an axis is staged, so the GM cannot fire a
-     no-op write and read success from it.
-   - onClearSelection() / onApply().
-   - panelAttr / clearAttr / countAttr / applyAttr: the four test and screenshot hook
-     names, defaulted to the Component Studio's strings so its shipped call site, the smoke
-     selectors and the view-lab cases keep working untouched.
-   - children: the staged axes, rendered between the hero and Apply. They are FLEX ITEMS of
-     this panel, so a caller emits its labels, controls and hints as siblings rather than
-     wrapping them — the panel's uniform `gap` is the section rhythm.
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `heading` | string | `''` | the hero's count sentence, already localized and pluralized |
+  | `applyLabel` | string | `''` | Apply's label, already localized and pluralized; it names the blast radius |
+  | `canApply` | boolean | `false` | Apply is genuinely inert until an axis is staged, so a no-op write cannot read as success |
+  | `clearLabel` | string | `''` | already-localized override for Clear; `''` keeps `BulkEdit.ClearSelection` |
+  | `hint` | string | `''` | already-localized override for the hero sentence; `''` keeps `BulkEdit.SelectedHint` |
+  | `dockBleed` | `''` \| `'space-4'` | `''` | the spacing token the dock bleeds by; it must equal the containing rail's padding |
+  | `panelAttr` / `clearAttr` / `countAttr` / `applyAttr` | string | the Component Studio's | test, smoke and view-lab hook names |
 
-  ── FOUR PER-SITE PARAMETERS, ALL OFF BY DEFAULT (issue 1371, gap-list rows 38, 39, 47; r16-cat
-  ruling M24) ───
+  Snippets:
+  - `children` — the staged axes, rendered between hero and dock. They are flex items of this
+    panel, so a caller emits siblings rather than wrapping them; the panel's `gap` is the rhythm.
+  - `dockFoot` — a caller's control inside the dock, under Apply (`proto:791-796`).
 
-  The world Component catalogue's bulk panel (`proto:622-696`) is this chrome with four
-  differences, and each is a PARAMETER here rather than a fork or an in-place restyle — the
-  standing rule for a shared primitive that must behave differently at a second site. All
-  four default to exactly what ships, so the Component, Recipe and Essence Studios render
-  byte-identically across this change.
+  Callbacks:
+  - `onClearSelection()` / `onApply()`.
 
-   - clearLabel: the header action's label, ALREADY LOCALIZED. `proto:626` reads `Clear`
-     where this panel reads `Clear selection`, and the shorter word is right there: the
-     action sits under a `BULK EDIT` eyebrow in a rail that is showing nothing but the
-     selection, so "selection" is the only thing it could be clearing. `''` — the default —
-     keeps the shipped phrase and its `BulkEdit.ClearSelection` key.
-
-     A CALLER'S STRING rather than a second key chosen here, following the `heading` and
-     `applyLabel` idiom directly above: a panel that wants the shorter word is a panel that
-     has decided its own rail says enough, which is a fact about that screen.
-   - hint: the hero's standing sentence, ALREADY LOCALIZED. `proto:628` writes a sentence
-     naming the staging that panel actually offers — `Pick the systems to add them to, stage
-     a category or tags, then commit below.` — where this shell's noun-free default says
-     `Stage changes below, then apply to all at once.` `''` keeps the default and its
-     `BulkEdit.SelectedHint` key.
-
-     Named `hint` because that is what this component already calls the element
-     (`.fab-bulk-edit-hero-hint`) and the key (`SelectedHint`), and what
-     `BulkSelectionToolbar` calls its own muted standing sentence. One meaning, one name.
-   - dockFoot: a snippet rendered INSIDE the dock, under Apply. `proto:791-796` puts the
-     destructive `🗑 Delete N components` and its consequence note in the same bordered,
-     pinned foot as the primary action, on the dock's own 8px column rhythm — not above it
-     and not in the scrolling body.
-
-     A SNIPPET AND NOT A PROP PAIR, because what goes there is a caller's CONTROL: the
-     catalogue stages an `ArmedDangerButton` with a note under it, and a label-plus-callback
-     prop would force this shell to grow an arm/confirm contract that belongs to that
-     component. `children` already takes the staged axes the same way, for the same reason.
-
-     IT DOES NOT MOVE THE DOCK. The dock's sticky construction and its three negative bleeds
-     are unchanged, and the comment on `.fab-bulk-edit-dock` below is still exact: what the
-     snippet adds is a second flex child inside the same box. A caller placing a TALL control
-     there makes the dock taller, which eats into the scrollport the panel above it scrolls
-     in — that is the same trade `bulk-edit-dock-pinning.test.js` already bounds for a
-     sibling delete card, and the two are alternatives rather than a stack.
-   - dockBleed: WHICH SPACING TOKEN THE DOCK BLEEDS BY (issue 1371 r16-cat, maintainer ruling
-     M24). The dock's three negative bleeds and its two compensating insets are written as the
-     SAME token as its container's padding so the two cannot drift — and that token is
-     `--fab-space-3`, the shared `.manager-inspector` rail's. `EntityListInspectorFrame`'s
-     inspector column pads `--fab-space-4`, so inside it the shipped dock stopped 4px short of
-     each edge and of the bottom, and the panel's scroller clipped it there: "a padding/
-     whitespace around the bulk edit panel that prevents the button panel from being
-     full-width". `'space-4'` restates all five declarations at that token; `''` — the
-     default — is the shipped rail's. Named for the token rather than for a consumer, because
-     what it states is a fact about the box the dock sits in, not about who put it there.
+  Invariants:
+  - The noun stays with the studio: `heading` and `applyLabel` are the caller's strings, and
+    this panel's own copy is noun-free under `Admin.Manager.BulkEdit.*`. That namespace is
+    written without its `FABRICATE` root on purpose — `tests/ui-lang-keys-resolve.test.js`
+    scans every dotted literal in `src/`, so a prose mention spelled in full counts as one.
+  - Apply's border box stays wholly inside the scrollport at every scroll offset, and that
+    holds only while a sibling delete card is shorter than the scrollport — pinned by
+    `tests/components/bulk-edit-dock-pinning.test.js`.
 -->
 <script>
   import ManagerButton from '../../components/ManagerButton.svelte';
@@ -101,18 +42,12 @@
     canApply = false,
     onClearSelection = () => {},
     onApply = () => {},
-    // An ALREADY-LOCALIZED override for the header action's label. `''` keeps the shipped
-    // `Clear selection`; see the props block above for why this is the caller's string.
+    // Already localized; `''` keeps the shipped `Clear selection`.
     clearLabel = '',
-    // An ALREADY-LOCALIZED override for the hero's standing sentence. `''` keeps the shipped
-    // noun-free copy.
+    // Already localized; `''` keeps the shipped noun-free copy.
     hint = '',
-    // A snippet rendered inside the dock, UNDER Apply — the reference's destructive action and
-    // its consequence note (`proto:791-796`). Absent by default.
     dockFoot = undefined,
-    // The spacing token the dock bleeds by: `''` (the shipped `--fab-space-3`, the shared
-    // rail's inset) or `'space-4'` (the scoped list frame's inspector column). See the props
-    // block above.
+    // `''` (the shared rail's `--fab-space-3`) or `'space-4'` (the scoped list frame's column).
     dockBleed = '',
     panelAttr = 'data-component-bulk-panel',
     clearAttr = 'data-component-bulk-clear',
@@ -126,10 +61,8 @@
     return translated && translated !== key ? translated : fallback;
   }
 
-  // Spread, following `Callout`'s hook idiom: the attribute NAME is a parameter, so it
-  // cannot be written literally in the markup. The value is `''`, not `true` — Svelte
-  // serializes `true` as `="true"` and these four hooks shipped as BARE attributes; see the
-  // fuller note in `BulkSelectionToolbar.svelte`.
+  // Spread because the attribute NAME is a parameter. The value is `''`, not `true`: Svelte
+  // serializes `true` as `="true"` and these four hooks shipped as bare attributes.
   const panelHook = $derived({ [panelAttr]: '' });
   const clearHook = $derived({ [clearAttr]: '' });
   const countHook = $derived({ [countAttr]: '' });
@@ -192,18 +125,12 @@
 </section>
 
 <style>
-  /* THEME-ROOT tokens only. The reason once recorded here — that living under
-     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
-     a scoped `<style>` may not reach one from ANY directory, because a component is placed
-     in a directory and not in a DOM subtree (design-system spec, *The token namespace is
-     one generation and names its purpose*), and `tests/token-generation-gate.test.js` fails
-     any scoped block that tries. The placement's surviving consequence is the screenshot
-     map: this appearance lives HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
-     `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the views that actually
-     render it instead of matching the broad `theme-or-global-ui` recipe. Because it sits
-     OUTSIDE both `apps/manager/components/` and `apps/manager/recipes/`, it is enumerated
-     BY NAME in that map's browser match lists; a new sibling here that is not enumerated
-     falls through every glob and maps to no view at all. */
+  /* Theme-root tokens only — design-system spec, *The token namespace is one generation and
+     names its purpose*, gated by `tests/token-generation-gate.test.js`. This appearance lives
+     here rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
+     `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the views that render it; sitting
+     outside `apps/manager/components/` and `apps/manager/recipes/`, it is enumerated BY NAME in
+     that map, and an unenumerated sibling here maps to no view at all. */
 
   .fab-bulk-edit-panel {
     display: flex;
@@ -220,8 +147,8 @@
     min-width: 0;
   }
 
-  /* ACCENT, where the single-row inspector's eyebrow is subtle: the rail has changed what
-     it is for, and that is the first thing the GM must read. */
+  /* Accent where the single-row inspector's eyebrow is subtle: the rail has changed what it is
+     for, and that is the first thing the GM must read. */
   .fab-bulk-edit-eyebrow {
     margin: 0;
     color: var(--fab-accent);
@@ -232,8 +159,8 @@
   }
 
   /* The documented escape from a mode that hides the single-row actions, so it is a real
-     focusable button and the FIRST control in the panel — Foundry's host button geometry
-     (fixed height, its own font) reset explicitly, as `Chip` does. */
+     focusable button and the first control in the panel; Foundry's host button geometry is reset
+     explicitly, as `Chip` does. */
   .fab-bulk-edit-clear {
     appearance: none;
     display: inline-flex;
@@ -268,8 +195,6 @@
     font-size: 0.58rem;
   }
 
-  /* The hero restates the blast radius in the rail, so the number the Apply button names
-     is never the only place it appears. */
   .fab-bulk-edit-hero {
     display: flex;
     gap: var(--fab-space-2);
@@ -315,111 +240,40 @@
     line-height: 1.35;
   }
 
-  /* THE DOCK PINS APPLY TO THE RAIL'S BOTTOM EDGE. The panel is taller than the
-     inspector's scrollport in the Recipe and Component studios, so the panel's primary
-     action scrolled out of view exactly when the GM had staged enough to want it.
+  /* The dock pins Apply to the rail's bottom edge; the panel is taller than the inspector's
+     scrollport in the Recipe and Component studios (issue 1015).
 
-     TWO SUPPORTED CONFIGURATIONS DO NOT PIN. Both are accepted, and neither is a
-     regression — `origin/main` behaves identically in each:
-      - A STUDIO THAT RENDERS A SIBLING DELETE CARD. `EssenceBulkEditPanel` closes this shell
-        and renders its delete card AFTER it, so the shell does not span that rail's
-        scrollable height and Apply un-pins there. `ComponentBulkEditPanel` is the second
-        such studio (issue 1129) and un-pins for the identical reason; this is a shape, not
-        an Essence Studio quirk, so a third sibling-delete panel needs no new entry here.
+     All three negative bleeds are load-bearing, and the two vertical ones answer different
+     clamps: `bottom` answers the scrollport clamp, because Chromium measures a sticky inset
+     from the scroll container's CONTENT box while the rail runs on to its padding box, one
+     `--fab-space-3` lower; `margin-bottom` answers the containing-block clamp, which applies to
+     the sticky box's MARGIN box and starts to bind at maximum scroll. Both are written as the
+     same token as `.manager-inspector`'s padding so the two cannot drift.
+     `tests/components/bulk-edit-dock-pinning.test.js` samples the top of the scroll range as
+     well as the bottom, because a dock that never sticks is indistinguishable from a pinned one
+     at maximum scroll.
 
-        WHAT IS STILL GUARANTEED, AND WHERE THE BOUND IS (issue 1132). "Un-pinned" is not
-        "unbounded". A sibling shortens `.fab-bulk-edit-panel`, which is this dock's
-        CONTAINING BLOCK, so at maximum scroll the dock clamps to the PANEL's padding-box
-        bottom instead of the rail's — measured at −142px on a staged recipe panel and −154px
-        on a component panel. That is a rhythm regression, not a reachability one: Apply never
-        leaves the scrollport, it merely stops being glued to the bottom edge. The requirement
-        that survives is therefore the reachability one — APPLY'S BORDER BOX STAYS WHOLLY
-        INSIDE THE SCROLLPORT AT EVERY SCROLL OFFSET — and it holds only WHILE THE SIBLING IS
-        SHORTER THAN THE SCROLLPORT. A taller sibling scrolls Apply off the TOP, which is
-        issue 1015's original symptom and is NOT accepted.
+     Two configurations do not pin, and neither is a regression. A studio that renders a SIBLING
+     delete card after this shell un-pins because the shell no longer spans the rail's scrollable
+     height; what survives is reachability, and only while that sibling is shorter than the
+     scrollport. Below the manager's 1024px supported minimum,
+     `@container fabricate-manager (max-width: 1120px)` in `styles/fabricate.css` makes
+     `.manager-body` the scrollport, and a rail with no scroll range has nothing to stick within
+     — do not reach into that block from here.
 
-        That is a gate, not prose: `tests/components/bulk-edit-dock-pinning.test.js` mounts a
-        real `BulkDeleteCard` after this shell and asserts exactly those two things, with the
-        shorter-than-scrollport bound asserted first so the case cannot go vacuous. Do not
-        move a delete card INSIDE this shell to "fix" the un-pin — placed after the dock it
-        would leave the dock stuck out of flow OVER the card at maximum scroll, and it would
-        contradict both studios' shipped layout.
-      - A `fabricate-manager` CONTAINER AT 1120px OR NARROWER. There,
-        `@container fabricate-manager (max-width: 1120px)` in `styles/fabricate.css` gives
-        `.manager-body` `grid-auto-rows: max-content` + `overflow-y: auto`, so the BODY
-        becomes the scrollport and `.manager-inspector` is sized to its content. A rail that
-        never overflows has no scroll range, and a sticky box with no scroll range has
-        nothing to stick within. Measured at a 1000px container: the rail does not scroll,
-        the body does, and Apply's overhang runs 1350px to 0 across the range — against a
-        perfect pin at 1400px. The manager's supported minimum is 1024px, so issue 1015's
-        symptom does persist below that breakpoint. Closing it means re-deciding which box
-        scrolls once the three regions stack, which is that block's decision and not this
-        rule's; do NOT reach into the `@container` block from here.
+     No `z-index`, deliberately: nothing this dock can overlap establishes a competing stacking
+     context, and `SearchablePopover` portals out to the `.fabricate-manager` host.
 
-     A SECOND sticky rule rather than reuse of the inspector card's own sticky rule: that
-     one was a bordered, rounded, TOP-anchored card SHELL, and Apply is not a card. (It had
-     no call site under `src/` and was deleted from styles/fabricate.css in issue 1498.) This mirrors its idiom at the opposite edge — surface fill, a
-     hairline against the content it covers, and a shadow thrown away from the edge it is
-     pinned to — without inheriting a card's border box.
-
-     NO `z-index`, deliberately. Nothing this dock can overlap establishes a competing
-     stacking context: `Chip`, `BulkEditSelect` and all three bulk panels declare neither
-     `position` nor `z-index`, and `SearchablePopover` portals out to the
-     `.fabricate-manager` host rather than stacking inside the rail. A `z-index` here would
-     be an unfalsifiable guess at a conflict that does not exist.
-
-     ALL THREE BLEEDS ARE LOAD-BEARING, and the two vertical ones for DIFFERENT reasons.
-     TWO clamps act on a sticky box at once, and each negative value answers one of them:
-
-      - `bottom` answers the SCROLLPORT clamp. Chromium measures a sticky inset from the
-        scroll container's CONTENT box, while the rail the GM sees runs on to its PADDING
-        box — `--fab-space-3` lower, because `.manager-inspector` carries
-        `padding: var(--fab-space-3)` (styles/fabricate.css). Measured by construction:
-        with the rail's `padding-bottom` forced to 40px, `bottom: 0` still rests the dock on
-        the content-box edge and the shipped inset still rests it exactly `--fab-space-3`
-        below that edge. So the inset is what carries the fill out to the line the eye reads
-        as the bottom of the rail, and it is written as the SAME token as the rail's padding
-        so the two cannot drift apart.
-      - `margin-bottom` answers the CONTAINING-BLOCK clamp. A sticky box may not escape its
-        containing block — here `.fab-bulk-edit-panel` — and that clamp applies to its
-        MARGIN box. At maximum scroll the panel's bottom edge has arrived at the rail's
-        content-box bottom, so the clamp starts to bind at exactly the point the inset above
-        needs the dock a `--fab-space-3` lower. The matching negative bottom margin lifts
-        the margin box that far above the border box, which is what lets the border box keep
-        the position the inset asked for.
-
-     Measured on this shell in a real rail — `tests/components/bulk-edit-dock-pinning.test.js`
-     renders precisely this stack — with the rail's padding-box bottom at 520 and its
-     content-box bottom at 508, reading the dock's bottom at scroll top / mid / max:
-
-       bottom -space-3 + margin-bottom -space-3   520 / 520 / 519.91   <- shipped
-       bottom -space-3, no margin-bottom          520 / 520 / 507.91   <- drops at the end
-       bottom 0, with or without the margin       508 / 508 / 508      <- a strip uncovered
-       no `position: sticky` at all               643 / 582 / 520      <- meets only at max
-
-     All three declarations are therefore load-bearing, and the last row is why that gate
-     samples the TOP of the scroll range as well as the bottom: a dock that never sticks at
-     all is indistinguishable from a pinned one at maximum scroll.
-
-     The inline pair is the same trade sideways: the negative margin takes the fill out to
-     the rail's edges so the dock reads as an edge rather than a floating slab, and the
-     matching padding puts the button back exactly where it was.
-
-     THE BUTTON'S OWN BOX IS UNTOUCHED. `.fab-bulk-edit-apply` swaps places with
-     `.manager-component-browser-inspector-edit` in the rail's bottom slot, so a changed
-     min-height or font-size would desynchronise the swap. The dock therefore adds no
-     padding, border or min-height that resizes or re-types the button. */
+     The button's own box is untouched. `.fab-bulk-edit-apply` swaps places with
+     `.manager-component-browser-inspector-edit` in the rail's bottom slot, so the dock adds no
+     padding, border or min-height that would resize or re-type it. */
   .fab-bulk-edit-dock {
     position: sticky;
     bottom: calc(-1 * var(--fab-space-3));
     margin-inline: calc(-1 * var(--fab-space-3));
     margin-bottom: calc(-1 * var(--fab-space-3));
-    /* THE DOCK'S OWN TOP INSET (issue 1371 r16-cat, maintainer ruling M24): `proto:791` and
-       `proto:1270` pad the foot `13px 17px`, and the primary action sat 4px under the hairline
-       here — Apply's own `margin-top`, which the dock inherited from the rail's bottom slot. The
-       reference's 13 is `--fab-space-3` on the scale, stated on the dock so every consumer's foot
-       breathes the same, and Apply's margin goes with it. Whole-manager: the three studios' docks
-       gain the same 8px above Apply. */
+    /* The foot's own inset, so every consumer's foot breathes the same; Apply's `margin-top`
+       moved here with it. */
     padding-top: var(--fab-space-3);
     padding-inline: var(--fab-space-3);
     padding-bottom: var(--fab-space-3);
@@ -428,39 +282,27 @@
     box-shadow: 0 -2px 6px var(--fab-overlay-dark-25);
   }
 
-  /* THE DOCK'S COLUMN RHYTHM, STATED ONLY WHEN IT HAS A SECOND CHILD (issue 1371, gap-list
-     row 47). `proto:791` draws the foot as a `flex-direction:column` with `gap:8px` between the
-     primary action and the destructive one below it.
-
-     GATED ON THE SNIPPET rather than declared unconditionally, because with one child the two
-     display modes are not obviously identical and this rule may not repaint the three studios
-     that ship today: `.fab-bulk-edit-apply` carries `margin-top: var(--fab-space-1)`, whose
-     behaviour is a block-flow question in one mode and not a question at all in the other. With
-     no `dockFoot` the class is not emitted and the dock is byte-identical to what ships.
-
-     `--fab-space-2` IS the reference's 8px, so the rhythm is a token statement rather than an
-     approximation, and the dock's own three negative bleeds above are untouched. */
+  /* Gated on the snippet rather than declared unconditionally: with one child the two display
+     modes are not obviously identical, and `.fab-bulk-edit-apply`'s `margin-top` is a block-flow
+     question in one mode and not a question at all in the other. With no `dockFoot` the class is
+     not emitted and the dock is byte-identical to what ships. */
   .fab-bulk-edit-dock.has-foot {
     display: flex;
     flex-direction: column;
     gap: var(--fab-space-2);
   }
 
-  /* THE FOOT'S CHILDREN MAY SHRINK TO THE RAIL (issue 1371 r16-cat, M24). A flex item's automatic
-     minimum is its min-content width, and a foot whose delete label is one `nowrap` line has a
-     min-content width of that whole line — so without this the column WIDENED past the rail to fit
-     it instead of letting the label ellipsise (measured: a 299px dock holding a 492px button). The
-     rule is on the dock's contract rather than on a consumer's wrapper because the snippet's root is
-     the consumer's markup, and every consumer needs the same answer. `:global`, since that root
-     carries the consumer's scope hash and never this one's. */
+  /* A flex item's automatic minimum is its min-content width, so a `nowrap` delete label would
+     widen the column past the rail instead of ellipsising. Stated on the dock because every
+     consumer needs the same answer, and `:global` because the snippet's root carries the
+     consumer's scope hash and never this one's. */
   .fab-bulk-edit-dock.has-foot > :global(*) {
     min-width: 0;
   }
 
-  /* THE WIDER BLEED, FOR A CONTAINER THAT PADS `--fab-space-4` (issue 1371 r16-cat, M24). All
-     five container-bound declarations of the base rule, restated at the wider token and nothing
-     else: the sticky construction, the hairline, the fill and the shadow are the base rule's.
-     Gated on `dockBleed` so the three studios in the shared rail are byte-identical. */
+  /* The base rule's five container-bound declarations restated at the wider token, for a
+     container that pads `--fab-space-4`. Gated on `dockBleed`, so the three studios in the
+     shared rail are byte-identical. */
   .fab-bulk-edit-dock.is-bleed-space-4 {
     bottom: calc(-1 * var(--fab-space-4));
     margin-inline: calc(-1 * var(--fab-space-4));
@@ -469,40 +311,20 @@
     padding-bottom: var(--fab-space-4);
   }
 
-  /* Full-width and accent, the loudest thing on the panel — and genuinely inert until an
-     axis is staged, so the GM cannot fire a no-op write and read success from it.
-     Geometry, weight and foreground are the browser inspector's primary button verbatim
-     (`.manager-button.manager-component-browser-inspector-edit`, styles/fabricate.css),
-     because this button LITERALLY SWAPS PLACES with it in the rail's bottom slot the
-     moment a box is ticked: 38px and 0.78rem, so the swap does not resize or re-type the
-     slot, and `--fab-on-accent` — the token that means "foreground ON an accent fill" —
-     rather than `--fab-bg-1`, which is a surface colour and differs from it in all seven
-     themes.
+  /* Full-width and accent, and genuinely inert until an axis is staged. Geometry, weight and
+     foreground are the browser inspector's primary button verbatim
+     (`.manager-button.manager-component-browser-inspector-edit`, styles/fabricate.css), because
+     this button literally swaps places with it in the rail's bottom slot: 38px and 0.78rem, and
+     `--fab-on-accent` rather than the surface colour `--fab-bg-1`.
 
-     `:global()` AND CHAINED (issue 1118), and both halves are load-bearing.
-
-     `:global()` first, because Apply is a `<ManagerButton>` now and a scoped selector could
-     not reach it at all. Svelte scopes a rule by appending its `svelte-<hash>` class to the
-     selector and stamping that class onto the elements THIS component writes — it does not
-     stamp a child component's internals, and a `class` prop passed to a child is forwarded
-     verbatim. So `.fab-bulk-edit-apply.svelte-<hash>` matched nothing the moment this button
-     became a component, and Svelte reported NO unused-selector warning for it, because the
-     class literal is right there in the markup. The failure is silent in the compiler, in
-     `lint:svelte:warnings` and in any fixture that stamps the hash by hand
-     (`tests/helpers/scoped-component-css.js` does exactly that) — only
-     `bulk-edit-dock-pinning.test.js`, which mounts the real component, could see it, and it
-     did: Apply lost `width: 100%` and stopped filling the rail.
-
-     Then chained, because `:global()` alone would be (0,2,0) and lose outright to
-     `.fabricate-button.manager-button.fab-manager-button` (0,3,0): this button would have
-     given up `min-height` 38px for 34px and `font-size` 0.78rem for 0.72rem — the two values
-     the dock comment above says must not change, because Apply swaps places with
-     `.manager-component-browser-inspector-edit` in the rail's bottom slot and a resized or
-     re-typed box desynchronises the swap. Naming the ancestor and both primitive classes
-     takes it to (0,4,0), which wins on specificity rather than on where the sheet happens to
-     be injected — see the header of `tests/helpers/scoped-component-css.js` for why
-     injection order is not a thing a rule may depend on. The `:hover`, `:disabled` and
-     `:focus-visible` companions below are written the same way for the same two reasons. */
+     `:global()` AND chained, both load-bearing (issue 1118). `:global()` because Apply is a
+     `<ManagerButton>` and Svelte does not stamp a child component's internals, so a scoped
+     selector matches nothing while the compiler reports no unused-selector warning. Chained
+     because `:global()` alone is (0,2,0) and loses to
+     `.fabricate-button.manager-button.fab-manager-button` (0,3,0), which would give up the two
+     values the dock comment above says must not change; naming the ancestor and both primitive
+     classes takes it to (0,4,0), winning on specificity rather than on injection order. The
+     `:hover`, `:disabled` and `:focus-visible` companions below are written the same way. */
   :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply) {
     display: flex;
     gap: var(--fab-space-chip);
@@ -511,7 +333,6 @@
     width: 100%;
     height: auto;
     min-height: 38px;
-    /* The 4px it carried moved onto the dock as its `padding-top` (M24). */
     margin-top: 0;
     padding: 0 var(--fab-space-3);
     border: 1px solid var(--fab-accent-border);
@@ -524,8 +345,6 @@
     cursor: pointer;
   }
 
-  /* The same accent-strong hover its twin carries. Without it the rail's primary action
-     is the only button on the panel with no pointer feedback. */
   :global(
     .fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply:not(:disabled):hover
   ) {
@@ -540,23 +359,11 @@
     cursor: default;
   }
 
-  /* Apply's half of what used to be one focus group with `.fab-bulk-edit-clear` above. It is
-     split out because the two controls are no longer the same KIND of element: Clear is
+  /* Apply's half of what used to be one focus group with `.fab-bulk-edit-clear`: Clear is
      written here and carries this component's scoping class, Apply is a `<ManagerButton>` and
-     never will, so one selector cannot reach both.
-
-     ANCHORED AND CHAINED like the three companions above it, and MOVED down here beside them,
-     which is what the paragraph on the base rule already promised (issue 1118). It used to be
-     written as a bare `:global(.fab-bulk-edit-apply:focus-visible)` under a comment claiming
-     nothing else in the sheet states an `outline` for a manager button, so it needed no
-     chain. Both halves of that were wrong. `styles/fabricate.css` states
-     `.fabricate button:focus-visible` — (0,2,1), against this selector's (0,2,0) — with
-     byte-identical declarations, so the ring this rule claimed to be the only source of is
-     the module's own standing contract, and this rule was carrying no weight. (It was rooted
-     at `.fabricate-manager` until issue 1501 collapsed it onto the module root; the rank is
-     unchanged, so the argument is.) Chained, it
-     wins on specificity rather than on which sheet was injected last, and it is the only one
-     of Apply's four rules that does not restate the ancestor its siblings all name. */
+     never will, so one selector cannot reach both. Anchored and chained like its three
+     companions, because `styles/fabricate.css` states `.fabricate button:focus-visible` at
+     (0,2,1) with byte-identical declarations — an unchained rule here carries no weight. */
   :global(.fabricate-manager .manager-button.fab-manager-button.fab-bulk-edit-apply:focus-visible) {
     outline: 2px solid var(--fab-accent);
     outline-offset: 2px;

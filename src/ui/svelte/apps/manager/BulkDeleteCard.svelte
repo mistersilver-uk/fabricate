@@ -1,103 +1,47 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The manager's ONE bulk-delete card (issue 1132): the heading, the impact statement, the
-  standing hint and the armed control that every studio's set delete renders.
-
-  It is the extraction `ComponentBulkEditPanel`'s own `<style>` block names as "the honest
-  extraction" and defers. Two copies had already diverged — the Essence Studio renders its
-  three impact rows unconditionally while the Component Studio gates the zero ones, and only
-  one of the two associates the list with the control or announces the arm — so a hand-built
-  third copy would have been three independent implementations of zero-row gating, the
-  description association, the live region, the label-in-name rule and the busy state.
-
-  It lives under `apps/manager/` rather than in either studio's folder, beside
-  `BulkEditPanelShell`, for that file's reason: `components/` holds the area-agnostic leaves
-  and this card is manager-scoped. The token half of that reason — that the placement keeps
-  an area-scoped `--fab-manager-*` property in scope — has LAPSED, since a scoped `<style>`
-  may not reach one from any directory. Two consequences of that placement are load-bearing
-  and both are hand-maintained mirrors:
-
-   - `scripts/lib/viewLabCases.js` must CLAIM this file, or `view-lab-source-coverage.test.js`
-     fails: a component a mounted window renders that no case claims does not produce no
-     evidence, it produces someone else's frame presented as evidence of this change;
-   - `scripts/ui-pr-screenshot-evidence.mjs` enumerates the shell's siblings BY NAME, since a
-     file directly under `apps/manager/` falls through both studios' directory globs.
-
-  ── THE SCOPED CSS BELOW IS THE POINT OF THE MOVE, NOT A DETAIL ───────────────────
-  Svelte scoping is PER COMPONENT. The moment this `<section>` renders from here, the callers'
-  `.manager-essence-bulk-delete :global(.manager-button)` and `.manager-*-bulk-impact` rules
-  stop matching — they are compiled against a scope hash this markup does not carry. Dropping
-  them rather than moving them re-ships the issue 1036 defect in every studio at once: the
-  danger button reverts from 34px/0.72rem/700 to the app's body size, and the impact list
-  loses its indent, its colour and its weight. Nothing in a source review sees that.
-
-  So both rules moved HERE, under one shared `.fab-bulk-delete-card` root, and the per-studio
-  `manager-essence-bulk-delete` / `manager-component-bulk-delete` classes are retired rather
-  than kept as dead selectors. They are NOT in `styles/fabricate.css`: a global rule re-routes
-  every future edit to the broad `theme-or-global-ui` recipe in
-  `scripts/ui-pr-screenshot-evidence.mjs`, which is the exact outcome the block comment at the
-  top of every scoped `<style>` in this directory exists to prevent.
-
-  ── THE CARVE-OUT IS THE PAIR, NOT THE BUTTON ─────────────────────────────────────
-  `AGENTS.md` reserves `services.confirmDialog` for bulk actions EXCEPT where the panel states
-  the impact of the pending action in view before the control is armed. This card is what makes
-  that true, so it arms. Do not substitute a `confirmDialog`, and do not render this card with
-  an empty `rows` — an arm with no statement is outside the carve-out entirely.
+  The manager's one bulk-delete card (issue 1132): the heading, the impact statement, the standing
+  hint and the armed control that every studio's set delete renders.
 
   Props:
-   - heading: the card title, already localized.
-   - rows: `Array<{ key, text, count? }>` — the impact statement, in order. `key` is the row's
-     machine-readable identity and becomes the VALUE of the per-row hook (see `rowAttr`);
-     `text` is already localized and already pluralized by the caller.
-     ZERO ROWS DO NOT RENDER, EXCEPT THE SUBJECT ROW. Row 1 is the count of things being
-     deleted and always renders: it is the statement of what the button does, and a card that
-     states nothing has lost the pairing the arm depends on. Rows 2..n are consequence rows and
-     are omitted when their `count` is 0, because "0 recipes will be rewritten." is noise on
-     the commonest selection there is and it buries the one number that always matters. A row
-     with no `count` at all always renders, so a caller that has already filtered its own zeros
-     needs no change. The gate is HERE and not in the callers precisely so the three studios
-     cannot disagree about it.
-   - standingHint: an OPTIONAL always-rendered sentence for a consequence that is a PROPERTY
-     rather than a count — irreversibility, say — which no row can carry because it has no
-     number. It is also what stops the card degrading to a bare heading and an arm when every
-     consequence row is gated away. It is NOT added to `aria-describedby`: that points at the
-     impact list alone, and the hint's content belongs in the control's own accessible name,
-     where the caller puts it.
-   - idleLabel / armedLabel / busyLabel: the control's three visible faces.
-   - idleAriaLabel / armedAriaLabel: consequence sentences. Each MUST CONTAIN its face's
-     visible label (WCAG 2.5.3 Label in Name) — a speech-input user says what they can read, so
-     "Confirm deleting 3 …" is unactivatable beside a button reading "Confirm delete". The busy
-     face needs no third string: its accessible name IS its visible label.
-   - armedAnnouncement: what the live region says once armed.
-   - disarmedAnnouncement: OPTIONAL, what it says when an ARMED control is disarmed without
-     confirming. Escape and click-away both change the control's accessible name while it
-     still holds focus, which is exactly what this region exists for, and emptying a region
-     announces nothing — so without this the one keyboard gesture that CANCELS a destructive
-     action is the only one that is silent. Omitted by a caller that wants the old silence.
-   - outcomeAnnouncement: OPTIONAL, what it says once a write the caller awaited has come
-     back and left the control live — a REFUSED or no-op delete, in practice. Confirming
-     disables the control, which moves focus to `document.body` and empties this region, so
-     on the failure path nothing distinguishes "deleted" from "refused" except a Foundry
-     toast, which is not a live region this module controls. Setting it also returns focus
-     to the re-enabled control WHEN FOCUS IS STILL ON `<body>`, where the confirm's own
-     `disabled` left it — a GM who tabbed into the browser's search field while the write was
-     running keeps their place (issue 1157) — and it does so BEFORE the sentence is written
-     into the region, not after, because a focus change cancels pending polite speech. That
-     order is the shared rule in `util/announceAfterFocus.js`. A SUCCESSFUL delete unmounts
-     this card, so its outcome cannot be announced from here: the caller's toast and the
-     manager-level live region `CraftingSystemManagerRoot` renders are the surviving feedback
-     for it.
-   - token: the arm token, and the STEM OF BOTH GENERATED IDS. One component now renders in
-     three panels and a manager view can hold more than one at a time, so hardcoding
-     `id="bulk-delete-impact"` would collide the moment it does.
-   - armed / busy / disabled: `busy` is the caller's OWN in-flight flag and must never be
-     derived from `armed`; see the note in `ArmedDangerButton.svelte` for the blur race that
-     makes an `armed`-derived busy face silently wrong in a browser and silently right in
-     happy-dom.
-   - cardAttr / impactAttr / rowAttr / announceAttr: the four test and screenshot hook names,
-     defaulted to nothing so a caller that omits one emits no attribute rather than a wrong
-     one. Same override idiom `BulkEditPanelShell` uses for `panelAttr` / `clearAttr`.
-   - onArm(token) / onDisarm(token) / onConfirm(token).
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `heading` | string | `''` | the card title, already localized |
+  | `rows` | `Array<{ key, text, count? }>` | `[]` | the impact statement, in order; `text` is already localized and pluralized, and `key` becomes the VALUE of the per-row hook |
+  | `standingHint` | string | `''` | an always-rendered sentence for a consequence that is a PROPERTY rather than a count |
+  | `idleLabel` / `armedLabel` / `busyLabel` | string | | the control's three visible faces |
+  | `idleAriaLabel` / `armedAriaLabel` | string | | consequence sentences; each MUST CONTAIN its face's visible label (WCAG 2.5.3 Label in Name) |
+  | `armedAnnouncement` | string | | what the live region says once armed |
+  | `disarmedAnnouncement` | string | `''` | what it says when an ARMED control is disarmed without confirming; omitted keeps the old silence |
+  | `outcomeAnnouncement` | string | `''` | what it says when an awaited write came back and left the control live — a refused or no-op delete |
+  | `token` | string | | the arm token, and the STEM OF BOTH GENERATED IDS |
+  | `armed` / `busy` / `disabled` | boolean | `false` | `busy` is the caller's OWN in-flight flag and must never be derived from `armed` — see `ArmedDangerButton.svelte` for the blur race |
+  | `cardAttr` / `impactAttr` / `rowAttr` / `announceAttr` | string | `''` | the four test and screenshot hook names |
+
+  Callbacks:
+  - `onArm(token)` / `onDisarm(token)` / `onConfirm(token)`.
+
+  Invariants:
+  - THE CARVE-OUT IS THE PAIR, NOT THE BUTTON. `AGENTS.md` reserves `services.confirmDialog` for
+    bulk actions EXCEPT where the panel states the impact in view before the control is armed, so
+    do not substitute a `confirmDialog` and do not render this card with an empty `rows`.
+  - ZERO ROWS DO NOT RENDER, EXCEPT THE SUBJECT ROW. Row 1 is the count of things being deleted
+    and always renders; rows 2..n are omitted when their `count` is 0, and a row with no `count`
+    always renders. The gate is HERE so the three studios cannot disagree about it.
+  - `standingHint` is NOT added to `aria-describedby`: that points at the impact list alone, and
+    the hint's content belongs in the control's own accessible name.
+  - `outcomeAnnouncement` also returns focus to the re-enabled control when focus is still on
+    `<body>`, BEFORE the sentence is written, because a focus change cancels pending polite
+    speech — the shared rule in `util/announceAfterFocus.js`. A SUCCESSFUL delete unmounts this
+    card, so its outcome is the caller's toast and the manager-level live region instead.
+  - `token` stems both generated ids, because a manager view can hold more than one card at once.
+  - Two hand-maintained mirrors follow from this file sitting directly under `apps/manager/`:
+    `scripts/lib/viewLabCases.js` must CLAIM it, or `view-lab-source-coverage.test.js` fails; and
+    `scripts/ui-pr-screenshot-evidence.mjs` enumerates the shell's siblings BY NAME, since a file
+    here falls through both studios' directory globs.
+  - The appearance lives in the scoped `<style>` below and not in either caller: Svelte scoping is
+    PER COMPONENT, so a caller's `.manager-*-bulk-delete` rule stops matching the moment this
+    `<section>` renders from here.
 -->
 <script>
   import ArmedDangerButton from '../../components/ArmedDangerButton.svelte';
@@ -130,9 +74,9 @@
   } = $props();
 
   // The two ids are DERIVED, not literals: `aria-describedby` and a live region are both
-  // document-global references, so two cards mounted at once with fixed ids would have the
-  // second card's button describing the first card's list. Non-id characters are folded to
-  // `-` so a token can never produce a selector that fails to parse.
+  // document-global references, so two cards mounted at once with fixed ids would have the second
+  // card's button describing the first card's list. Non-id characters fold to `-` so a token can
+  // never produce a selector that fails to parse.
   const idStem = $derived(String(token || 'bulk-delete').replace(/[^a-zA-Z0-9_-]/g, '-'));
   const impactId = $derived(`${idStem}-impact`);
   const announceId = $derived(`${idStem}-announce`);
@@ -140,43 +84,37 @@
   const declaredRows = $derived(
     (Array.isArray(rows) ? rows : []).filter((row) => row && typeof row.key === 'string' && row.key)
   );
-  // Index 0 is the SUBJECT row and is exempt. Without the exemption a fully stale selection —
-  // every consequence zero — renders a heading, no rows, and a disabled button with nothing
-  // on screen explaining why, on any studio that carries no `standingHint`.
+  // Index 0 is the SUBJECT row and is exempt: without the exemption a fully stale selection
+  // renders a heading, no rows, and a disabled button with nothing explaining why.
   const visibleRows = $derived(
     declaredRows.filter(
       (row, index) => index === 0 || row.count === undefined || Number(row.count) > 0
     )
   );
 
-  // ── WHAT THE LIVE REGION SAYS, AND WHEN ──────────────────────────────────────────
-  // Three transitions, not one, and the last two cannot be derived from the props alone
-  // because both are states in which the control is simply IDLE — "never armed" and
-  // "armed and then cancelled" are the same `armed: false, busy: false` pair. So this is
-  // `$state` driven by an effect that watches the transition rather than a `$derived`.
+  // WHAT THE LIVE REGION SAYS, AND WHEN. Three transitions, and the last two cannot be derived
+  // from the props alone because "never armed" and "armed and then cancelled" are the same
+  // `armed: false, busy: false` pair — so this is `$state` driven by an effect that watches the
+  // transition rather than a `$derived`.
   //
-  //  - ARMED: the consequence sentence. Cleared while BUSY as well, because "activate again
-  //    to delete" stops being true the moment the write starts.
+  //  - ARMED: the consequence sentence, cleared while BUSY as well.
   //  - DISARMED WITHOUT CONFIRMING: `disarmedAnnouncement`, if the caller supplies one.
-  //  - AN AWAITED WRITE CAME BACK AND LEFT THE CARD MOUNTED: `outcomeAnnouncement`.
+  //  - AN AWAITED WRITE LEFT THE CARD MOUNTED: `outcomeAnnouncement`.
   //
-  // `wasArmed` is cleared on the BUSY edge, and that is what stops a successful confirm
-  // reading as a cancellation: confirm takes the control armed → busy → idle, and without
-  // the clear the trailing idle edge would announce "Delete cancelled." over a delete that
-  // actually happened.
+  // `wasArmed` is cleared on the BUSY edge, which is what stops a successful confirm reading as a
+  // cancellation: confirm takes the control armed → busy → idle, and the trailing idle edge would
+  // otherwise announce a cancellation over a delete that happened.
   //
-  // Every path assigns, including the empty string. A region whose text does not change
-  // says nothing, so re-arming after a cancellation, or cancelling twice, still speaks.
+  // Every path assigns, including the empty string: a region whose text does not change says
+  // nothing, so re-arming after a cancellation still speaks.
   let announcement = $state('');
   let wasArmed = false;
   let announcedOutcome = '';
   let control = $state(null);
 
-  // Only the OUTCOME sentence is spoken late (see `speakOutcome`), and a sentence still
-  // waiting on its timer must never land on top of a transition that has since happened —
-  // a GM who re-arms inside that window would hear the refusal over the arm. Every
-  // assignment therefore goes through here, and the deferred one only speaks while it is
-  // still the most recent thing this card was asked to say.
+  // Only the OUTCOME sentence is spoken late, and a sentence still waiting on its timer must
+  // never land on top of a transition that has since happened. Every assignment goes through
+  // here, and the deferred one only speaks while it is still the most recent thing to say.
   let announcementTicket = 0;
 
   function say(next) {
@@ -185,19 +123,14 @@
   }
 
   /**
-   * Restore focus to the control after an awaited write left the card mounted.
+   * Restore focus to the control after an awaited write left the card mounted — ONLY when focus
+   * is actually nowhere (issue 1157). `<body>` is where the confirm's own `disabled` left it, and
+   * it is the only state worth rescuing; anything else is a place the GM chose.
    *
-   * ONLY WHEN FOCUS IS ACTUALLY NOWHERE (issue 1157). The restore was unconditional, so a GM
-   * who tabbed into the browser's search field while the write was in flight was yanked back
-   * out of it by its result. `<body>` is where the confirm's own `disabled` left them —
-   * measured in Chromium by `bulk-delete-busy-focus.test.js` — and it is the only state
-   * worth rescuing; anything else is a place they chose.
-   *
-   * @returns {boolean} true only when focus actually moved, which is what decides whether the
-   *   announcement has a focus utterance to queue behind. `ArmedDangerButton` exports
-   *   `focus()` and not its element, so the move is observed as a CHANGE OF `activeElement`
-   *   rather than by identity — a control still disabled for any reason takes no focus, and
-   *   an outcome nobody was moved for is spoken immediately.
+   * @returns {boolean} true only when focus actually moved, which decides whether the
+   *   announcement has a focus utterance to queue behind. `ArmedDangerButton` exports `focus()`
+   *   and not its element, so the move is observed as a CHANGE OF `activeElement` rather than by
+   *   identity.
    */
   function restoreFocusToControl() {
     if (typeof document === 'undefined') return false;
@@ -208,17 +141,10 @@
   }
 
   /**
-   * Announce an outcome, AFTER the focus restore rather than before it.
-   *
-   * The confirm disabled the control, which moved focus to `document.body`; re-enabling it
-   * does not bring focus back, so the GM who is being told the delete was refused is told it
-   * from nowhere in particular. Both halves are deferred past this flush because the control
-   * is re-enabled in the same one and `focus()` on a still-disabled button does nothing.
-   *
-   * The ORDER between them is the shared rule in `util/announceAfterFocus.js`: a focus change
-   * cancels pending `polite` speech, so a sentence written before the hop is a sentence the
-   * GM may never hear. `CraftingSystemManagerRoot` obeys the same rule for the actions that
-   * unmount this card entirely.
+   * Announce an outcome, AFTER the focus restore rather than before it. Both halves are deferred
+   * past this flush because the control is re-enabled in the same one and `focus()` on a
+   * still-disabled button does nothing; the ORDER between them is the shared rule in
+   * `util/announceAfterFocus.js`, since a focus change cancels pending `polite` speech.
    */
   function speakOutcome(outcome) {
     announcementTicket += 1;
@@ -255,15 +181,14 @@
     say(cancelled ? disarmedAnnouncement : '');
   });
 
-  // Spread, following `BulkEditPanelShell`'s hook idiom: the attribute NAME is a parameter, so
-  // it cannot be written literally in the markup. The value is `''`, not `true` — Svelte
-  // serializes `true` as `="true"` and these hooks shipped as BARE attributes.
+  // Spread because the attribute NAME is a parameter. The value is `''`, not `true` — Svelte
+  // serializes `true` as `="true"` and these hooks shipped as bare attributes.
   const hook = (name, value = '') => (name ? { [name]: value } : {});
   const cardHook = $derived(hook(cardAttr));
   const impactHook = $derived(hook(impactAttr));
   const announceHook = $derived(hook(announceAttr));
-  // The per-row hook is VALUED, not bare: `data-essence-bulk-impact-row="components"` is
-  // queried BY KEY in four suites, so a `rows: string[]` prop could not have emitted it.
+  // The per-row hook is VALUED, not bare: it is queried BY KEY in four suites, so a
+  // `rows: string[]` prop could not have emitted it.
   const rowHook = (key) => hook(rowAttr, key);
 </script>
 
@@ -285,15 +210,12 @@
   {/if}
 
   <!-- The impact list is the button's DESCRIPTION, not merely adjacent to it: `aria-describedby`
-       is what makes a screen-reader user hear the consequence when they arrive at the control,
-       rather than only if they happened to read the list on the way past. -->
-  <!-- `showTitle={false}`: the accessible name is NOT also a hover tooltip here. The armed
-       names the three studios pass carry the count-agreement-neutral "(s)" idiom, which is
-       defensible for an AT-only string and reads as an un-interpolated template — "1 recipe(s)"
-       — the moment it becomes visible text. Nothing is lost: every count in those names is in
-       the impact list two lines above, which this control is `aria-describedby`-associated
-       with. The ROW call sites keep the tooltip, where the accessible name is the only place
-       a sighted user reads which document a two-word "Delete" reaches. -->
+       is what makes a screen-reader user hear the consequence when they arrive at the control. -->
+  <!-- `showTitle={false}`: the accessible name is not also a hover tooltip here. The armed names
+       the three studios pass carry the count-neutral "(s)" idiom, which is defensible for an
+       AT-only string and reads as an un-interpolated template the moment it becomes visible text.
+       Every count in those names is in the impact list this control is associated with. The ROW
+       call sites keep the tooltip. -->
   <ArmedDangerButton
     bind:this={control}
     {token}
@@ -312,72 +234,49 @@
     {onConfirm}
   />
 
-  <!-- Arming changes the button's label and its accessible name WHILE IT HOLDS FOCUS, and a
-       name change under focus is not reliably announced. So the state change is announced in
-       its own polite region instead — rendered empty on mount and OUTSIDE the control, because
-       a region inserted into the DOM together with its text is not announced by most screen
-       readers, and a region inside a control whose own name is changing is unreliable. -->
+  <!-- Arming changes the button's label and its accessible name WHILE IT HOLDS FOCUS, and a name
+       change under focus is not reliably announced. The state change is announced in its own
+       polite region instead — rendered empty on mount and OUTSIDE the control, because a region
+       inserted together with its text is not announced by most screen readers. -->
   <p id={announceId} class="visually-hidden" aria-live="polite" {...announceHook}>
     {announcement}
   </p>
 </InspectorCard>
 
 <style>
-  /* THEME-ROOT tokens only. The reason once recorded here — that living under
-     `apps/manager/` puts an area-scoped `--fab-manager-*` property in scope — has LAPSED:
-     a scoped `<style>` may not reach one from ANY directory, because a component is placed
-     in a directory and not in a DOM subtree (design-system spec, *The token namespace is
-     one generation and names its purpose*), and `tests/token-generation-gate.test.js` fails
-     any scoped block that tries. The placement's surviving consequence is the screenshot
-     map: this appearance lives HERE rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
-     `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the studios that actually
-     render it instead of matching the broad `theme-or-global-ui` recipe.
+  /* Theme-root tokens only — design-system spec, *The token namespace is one generation and names
+     its purpose*, gated by `tests/token-generation-gate.test.js`. This appearance lives here
+     rather than in `styles/fabricate.css` so `VIEW_RECIPES` in
+     `scripts/ui-pr-screenshot-evidence.mjs` routes a change to the studios that render it.
 
-     `display: flex; flex-direction: column; gap: var(--fab-space-2)` is deliberately NOT
-     restated. Both retired per-studio blocks declared it, and it is a verbatim duplicate of
-     `.fabricate-card.manager-inspector-card` in `styles/fabricate.css`, which this card
-     still carries. */
+     The card's own flex column is deliberately NOT restated: it is a verbatim duplicate of
+     `.fabricate-card.manager-inspector-card` in `styles/fabricate.css`, which this card carries. */
 
-  /* The card is the first thing under `BulkEditPanelShell`'s sticky Apply dock, and the dock's
-     `margin-bottom: calc(-1 * var(--fab-space-3))` consumes the inspector's own
-     `gap: var(--fab-space-3)` exactly — measured, the dock's border-box bottom and this card's
-     top land on the same y coordinate, so the card's border meets the dock's `border-top`
-     hairline across an opaque strip. Margins do not collapse in that flex column, so the gap is
-     restored here as the same token the rail's gap uses, and the two cannot drift apart.
+  /* The card is the first thing under `BulkEditPanelShell`'s sticky Apply dock, whose negative
+     bottom margin consumes the inspector's own gap exactly, so the card's border would meet the
+     dock's hairline across an opaque strip. Margins do not collapse in that flex column, so the
+     gap is restored here as the same token the rail's gap uses.
 
-     `:global()` AND CHAINED (issue 1427), for the reason `ItemPageInspector` states at length.
-     The card shell is an `<InspectorCard>` now, so `fab-bulk-delete-card` rides the `class`
-     prop onto an element THIS component does not write, and Svelte stamps its `svelte-<hash>`
-     only onto the ones it does. This rule was one of the two in the sweep that went dead
-     SILENTLY rather than being pruned. Measured against Svelte 5.56.3, a class that lives only
-     on a component tag is normally pruned to `/* (unused) … *\/` behind a `css_unused_selector`
-     warning — but this component spreads attributes onto three REGULAR elements (`<ul>`,
-     `<li>`, `<p>`), and one such spread makes every class selector in the block
-     possibly-matching, so the compiler emitted this with the hash attached and
-     `lint:svelte:warnings` reported nothing. A spread is not the only trigger: a `class` whose
-     value is any expression, on a regular element, does the same, and the same attribute on a
-     COMPONENT tag does neither — `ui-integration/spec.md` records the measured matrix. Chained onto `.manager-inspector-card` rather
-     than left bare so the selector stays at (0,2,0), exactly where the scoped form put it. */
+     `:global()` AND CHAINED (issue 1427). The card shell is an `<InspectorCard>`, so
+     `fab-bulk-delete-card` rides the `class` prop onto an element this component does not write.
+     This rule went dead SILENTLY rather than being pruned: a class living only on a component tag
+     is normally pruned behind a `css_unused_selector` warning, but this component spreads
+     attributes onto three regular elements, and one such spread makes every class selector in the
+     block possibly-matching. `ui-integration/spec.md` records the measured matrix. Chained onto
+     `.manager-inspector-card` so the selector stays at (0,2,0), where the scoped form put it. */
   :global(.manager-inspector-card.fab-bulk-delete-card) {
     margin-top: var(--fab-space-3);
   }
 
-  /* The armed danger button reads at the shared inspector-action label size (issue 1036,
-     maintainer round). `ArmedDangerButton` renders a bare `.manager-button`, which carries no
-     font-size of its own and so inherited the app's body size — visibly chunkier than every
-     other right-rail control, `InspectorActionButton`'s `.fab-inspector-action` (0.72rem)
-     included. Scoped to this card, so the row-level `ArmedDangerButton` uses elsewhere in the
-     manager are untouched, and the danger/armed colour treatment from `styles/fabricate.css` is
-     untouched too — only the type scale changes.
+  /* The armed danger button reads at the shared inspector-action label size (issue 1036).
+     `ArmedDangerButton` renders a bare `.manager-button`, which carries no font-size and so
+     inherited the app's body size. Scoped to this card, so row-level `ArmedDangerButton` uses
+     elsewhere are untouched, and only the type scale changes. It must also hold for the BUSY
+     face, which would otherwise re-type the button mid-write.
 
-     It must also hold for the BUSY face, which no frame had ever shown before this card
-     existed: a face that missed this rule would re-type the button mid-write.
-
-     WHOLLY `:global()` (issue 1427). It was `.fab-bulk-delete-card :global(.manager-button)`,
-     which compiled to `.fab-bulk-delete-card.svelte-<hash> .manager-button`; the ancestor half
-     stopped matching for the reason stated above, so the whole rule had to move inside the
-     `:global()`. `.manager-inspector-card` is chained for the specificity, leaving this at
-     (0,3,0) exactly as before. */
+     WHOLLY `:global()` (issue 1427): the ancestor half stopped matching for the reason above, so
+     the whole rule had to move inside it. `.manager-inspector-card` is chained for the
+     specificity, leaving this at (0,3,0) exactly as before. */
   :global(.manager-inspector-card.fab-bulk-delete-card .manager-button) {
     min-height: 34px;
     padding: 0 var(--fab-space-3);
@@ -385,10 +284,9 @@
     font-weight: 700;
   }
 
-  /* WEIGHT, not size. This is the sentence the GM is asked to act on and it sits under a
-     louder warning `Callout`; at the muted tone it was the quietest thing on a destructive
-     card. It keeps the small type — the card is a rail, not a dialog — and gains the secondary
-     text colour and a heavier face so it reads as a statement rather than a footnote. */
+  /* WEIGHT, not size. This is the sentence the GM is asked to act on and it sits under a louder
+     warning `Callout`; it keeps the small type — the card is a rail, not a dialog — and gains the
+     secondary ink and a heavier face so it reads as a statement rather than a footnote. */
   .fab-bulk-delete-impact {
     display: flex;
     flex-direction: column;
@@ -400,9 +298,8 @@
     font-weight: 600;
   }
 
-  /* The standing hint is a PROPERTY of the action rather than one of its counts, so it is
-     deliberately quieter than the numbered rows and carries no list marker or indent: it must
-     not read as a fourth thing being counted. */
+  /* The standing hint is a PROPERTY of the action rather than one of its counts, so it carries no
+     list marker or indent: it must not read as a fourth thing being counted. */
   .fab-bulk-delete-hint {
     margin: 0;
     color: var(--fab-text-muted);

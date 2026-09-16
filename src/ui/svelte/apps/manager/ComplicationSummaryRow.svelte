@@ -1,97 +1,42 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  ONE summary row for a complication (issue 1286): severity tile · name · one body line ·
-  optional Player pill · severity pill · the activity glyph run, plus — in the authoring
-  variant only — a disclosure and a delete control.
-
-  ## ONE SCAFFOLD, not a copy per variant
-
-  There are SIX call sites for this shape across the two PRs: the Component Studio's
-  authoring row, the Component Studio's read-only salvage strip, the Recipe Studio's stage
-  strip, the player's per-stage strip, the player's bulk row and the player's crafting
-  strip. Three `{#if}` branches each restating the shell is intra-file duplication and
-  SonarCloud's copy-paste detector reads `.svelte` — issue 1050 failed that gate at 5.3%
-  with 93 of 98 duplicated lines inside ONE component — so `variant` selects slot content
-  and pill treatment ONLY. The Recipe Studio strip's `From {source}` line is an `eyebrow`
-  PROP for the same reason; it is not a fourth variant, because the two GM strips are
-  otherwise structurally identical.
-
-  ## THE BODY SLOT IS TYPED, and that is a disclosure control
-
-  GM variants render the generated TRIGGER SENTENCE ("When the award is missed or 1d20 = 1
-  · rolls 2d6"). The player variant renders the authored DESCRIPTION. The two are never
-  interchangeable and a player must never be shown the trigger, so this component takes
-  them as two separate props and picks by variant, rather than accepting one `body` string
-  a call site could pass the wrong thing to. Typing the slot is what makes the wrong call
-  unspellable at the call site instead of merely discouraged in a comment.
-
-  ## THE ROW IS A `<div>` AND THE DISCLOSURE IS THE ONLY TRIGGER
-
-  The prototype makes its summary row whole-row clickable AND puts a Remove control inside
-  it. A whole-row `<button>` would therefore nest buttons — invalid DOM that
-  `createElement` accepts and no mounted test notices. So the row stays a `<div>`,
-  `RowDisclosure` (which renders a real `<button>` and documents that it must not nest) is
-  the sole disclosure trigger, and the delete control is its SIBLING. `RowDisclosure`'s own
-  docblock named this row as the site that would adopt it.
-
-  String props are PRE-LOCALIZED by the caller, on the `ToggleCard` precedent, so this
-  stays a presentational leaf with no `localize` import.
+  One summary row for a complication (issue 1286): severity tile, name, one body line, an optional
+  Player pill, the severity pill and the activity glyph run, plus — in the authoring variant only —
+  a disclosure and a delete control. String props are PRE-LOCALIZED by the caller, on the
+  `ToggleCard` precedent, so this stays a presentational leaf with no `localize` import.
 
   Props:
-   - variant: `authoring` (Component Studio), `readonly-gm` (both GM read-only strips) or
-     `player`.
-   - nameEmphasis: `display` (default) or `inline`, the NAME's type treatment.
-     The prototypes draw the same row's name two ways and the difference is not derivable
-     from `variant`: an ACCORDION row's name is the heading of a thing you are about to
-     open, drawn in the serif display face at 12.5px, while a STRIP's name is one run of
-     metadata on a row about something else, drawn in the host sans at 11.5px. A shared
-     primitive that picked from `variant` would be hard-coding a treatment behind a
-     semantic flag — the next consumer wanting a strip-shaped row with a display name, or
-     an accordion with an inline one, would have no way to say so and would reach for a
-     call-site override, which is the drift this prop exists to prevent. `display` is the
-     default because it is what the one call site that existed first passes.
-     (The two GM strips' prototypes disagree by half a pixel — the Component Studio's
-     salvage strip draws 11px and the Recipe Studio's stage strip 11.5px. `inline` is one
-     treatment at 11.5px rather than two: a second emphasis for half a pixel between two
-     separately-drawn prototype documents would make this prop unusable for the reason it
-     was added.)
-   - severity / severityLabel: the `minor | major | severe` token and its localized word.
-   - visibility: `gmOnly | visible`. The Player pill renders on the GM variants only — a
-     player being told "you can see this" is noise, and on a GM screen it is the fact that
-     matters most about the row.
-   - triggerSentence / description: the typed body, above.
-   - activities: `[{ icon, title, dim }]` — which activities the complication is enabled
-     for, with `dim` for one the system does not resolve progressively.
-   - statusLabel / statusTone: the TENSE chip and its `Chip` tone (issue 1286, PR 2).
-     The player band says WHEN as well as WHAT — "This can go wrong" before a roll,
-     "This happened" / "This didn't happen" after one — and the tense is deliberately
-     NOT derivable from `variant`: a player row renders all three, and the GM variants
-     render none. It is also deliberately not folded into the severity tile, which is
-     one vocabulary across all six call sites: a tile recoloured by tense would make one
-     control say two things, and a `severe` complication that has not fired would be
-     indistinguishable from a `minor` one that has. The chip renders FIRST, before the
-     severity chip, so a positional selector can address either without encoding tone.
-   - bodyClamp: 0 (default) clips the body to ONE line with an ellipsis; N > 0 WRAPS it
-     and clamps it to N lines. The default is the GM treatment and is right for it — a
-     GM scanning trigger sentences they wrote needs the row height not to move — and it
-     is wrong for the player, where the description IS the disclosure and an ellipsis at
-     roughly sixty characters in a 300px column removes it. Like `nameEmphasis`, this is
-     not derivable from `variant`: it is a width decision belonging to the column the row
-     is placed in, and a call site that could not say so would reach for an override.
-   - expanded / controls / disclosureLabel / onToggle: the authoring disclosure.
-   - onDelete / deleteLabel: the authoring delete control. Absent renders no button.
-   - children: the expanded editor body, rendered inside the row's card when open.
+  | prop | values | default | contract |
+  | --- | --- | --- | --- |
+  | `variant` | `'authoring' \| 'readonly-gm' \| 'player'` | `'authoring'` | selects slot content and pill treatment ONLY |
+  | `nameEmphasis` | `'display' \| 'inline'` | `'display'` | the NAME's type treatment, which is a placement fact and not derivable from `variant` |
+  | `severity` / `severityLabel` | `'minor' \| 'major' \| 'severe'` and its localized word | | |
+  | `visibility` | `'gmOnly' \| 'visible'` | `'gmOnly'` | the Player pill renders on the GM variants only |
+  | `triggerSentence` / `description` | string | `''` | the TYPED body — see the invariant |
+  | `activities` | `[{ icon, title, dim }]` | `[]` | `dim` marks one the system does not resolve progressively |
+  | `statusLabel` / `statusTone` | string and a `Chip` tone | `''` | the TENSE chip; a player row renders all three states and the GM variants none |
+  | `bodyClamp` | number | `0` | 0 clips the body to ONE line; N > 0 wraps and clamps to N lines |
+  | `eyebrow` | string | `''` | the Recipe Studio strip's `From {source}` line |
+  | `expanded` / `controls` / `disclosureLabel` / `onToggle` | | | the authoring disclosure |
+  | `onDelete` / `deleteLabel` | | | the authoring delete control; absent renders no button |
 
-  ## WHERE THE CHIPS SIT IS A WIDTH DECISION, and the player's differs
+  Snippets:
+  - `children` — the expanded editor body, rendered inside the row's card when open.
 
-  On a GM strip the chips are the LINE's trailing items, beside the copy column. In the
-  player inspector — a 300px column — that leaves the copy roughly 120px of 298 once the
-  border, the padding, the 30px severity tile and the gap are paid, against the 259 the
-  prototype gives it. That is the same failure that made `stacked` necessary on the stage
-  row itself. So in the `player` variant the chips move INSIDE the copy column, onto the
-  name's line, where they share the column's full width and wrap under the name rather
-  than competing with it. The chip markup is a snippet rendered in one of two places, not
-  two copies: SonarCloud's copy-paste detector reads `.svelte`.
+  Invariants:
+  - ONE SCAFFOLD, not a copy per variant. There are six call sites for this shape, and three
+    `{#if}` branches each restating the shell is intra-file duplication that SonarCloud's
+    copy-paste detector reads in `.svelte`.
+  - THE BODY SLOT IS TYPED: GM variants render the generated TRIGGER SENTENCE and the player
+    variant the authored DESCRIPTION. They are never interchangeable and a player must never be
+    shown the trigger, so they are two props picked by variant rather than one `body` string a
+    call site could pass the wrong thing to.
+  - THE ROW IS A `<div>` and `RowDisclosure` is the sole trigger, with the delete control as its
+    SIBLING: a whole-row `<button>` would nest buttons, which `createElement` accepts and no
+    mounted test notices.
+  - In the `player` variant the chips move INSIDE the copy column, onto the name's line, because a
+    300px column cannot pay for the tile, the gap and a trailing chip run beside the prose. The
+    chip markup is a snippet rendered in one of two places, not two copies.
 -->
 <script>
   import Chip from '../../components/Chip.svelte';
@@ -126,9 +71,9 @@
     children = undefined,
   } = $props();
 
-  // Severity is a NARRATIVE gravity axis and is deliberately never routed through a helper
-  // shared with `systemValidation.js`'s `critical|warning|info` or `main.js`'s `warn|info`
-  // notice channel. The mapping is stated here, once, for the whole feature.
+  // Severity is a NARRATIVE gravity axis and is deliberately never routed through a helper shared
+  // with `systemValidation.js`'s `critical|warning|info` or `main.js`'s notice channel. The
+  // mapping is stated here, once, for the whole feature.
   const SEVERITIES = Object.freeze({
     minor: { tone: 'info', icon: 'fas fa-circle-exclamation' },
     major: { tone: 'warning', icon: 'fas fa-triangle-exclamation' },
@@ -141,18 +86,17 @@
   // The typed body. `isPlayer` decides, so no call site can hand the player the trigger.
   const body = $derived(isPlayer ? description : triggerSentence);
   const showPlayerPill = $derived(!isPlayer && visibility === 'visible' && Boolean(playerLabel));
-  // Normalized here rather than trusted: the value reaches CSS through a custom property,
-  // so a non-numeric one would emit an invalid declaration instead of falling back.
+  // Normalized here rather than trusted: the value reaches CSS through a custom property, so a
+  // non-numeric one would emit an invalid declaration instead of falling back.
   const clampLines = $derived(
     Number.isFinite(Number(bodyClamp)) && Number(bodyClamp) > 0 ? Math.floor(Number(bodyClamp)) : 0
   );
   const hookAttributes = $derived(dataAttr ? { [dataAttr]: dataValue || true } : {});
 </script>
 
-<!-- ONE chip run, rendered in one of two places. The TENSE chip leads the severity chip so
-     that a positional selector — the parity spec's `pi-strip-badge` (first) and
-     `pi-bulk-row-severity` (last) — can address either without naming a tone, which would
-     encode the very fact being measured. -->
+<!-- ONE chip run, rendered in one of two places. The TENSE chip leads the severity chip so that a
+     positional selector can address either without naming a tone, which would encode the very fact
+     being measured. -->
 {#snippet chips()}
   {#if showPlayerPill}
     <Chip tone="neutral" icon="fas fa-eye" title={playerTitle || undefined} truncate
@@ -185,8 +129,8 @@
         <span class="fab-complication-row-name is-{nameEmphasis}">{name}</span>
         {#if isPlayer}{@render chips()}{/if}
       </span>
-      <!-- `title` carries the FULL string in BOTH treatments: unclamped the line ellipsises
-           at roughly sixty characters, and clamped it ellipsises at `bodyClamp` lines. -->
+      <!-- `title` carries the FULL string in BOTH treatments: unclamped the line ellipsises at
+           roughly sixty characters, and clamped it ellipsises at `bodyClamp` lines. -->
       <span
         class="fab-complication-row-body"
         class:is-clamped={clampLines > 0}
@@ -236,14 +180,13 @@
 </div>
 
 <style>
-  /* Theme-ROOT tokens only — no `--fab-manager-*` property — because the player variant of
-     this row renders under `.fabricate-app`, where an area-scoped property is not in
-     scope and a declaration referencing one silently falls back to inheritance. `Chip.svelte` records
-     the rule and the failure mode in full. */
+  /* Theme-ROOT tokens only, because the player variant renders under `.fabricate-app` where an
+     area-scoped property is not in scope and a declaration referencing one silently falls back to
+     inheritance. `Chip.svelte` records the rule in full. */
   /* The fill is the ramp step at the row's INDEX in the prototype, not the token whose value
-     matches the prototype's row. The two ramps are offset by a step in the middle, and
-     `ComponentComplicationsSection`'s `.fab-complication-card` note records why re-mapping by
-     value collapses this row and the When/Then cards inside it onto one flat fill. */
+     matches the prototype's row: the two ramps are offset by a step in the middle, and
+     `ComponentComplicationsSection`'s `.fab-complication-card` note records why re-mapping by value
+     collapses this row and the cards inside it onto one flat fill. */
   .fab-complication-row {
     box-sizing: border-box;
     border: 1px solid var(--fab-border);
@@ -252,19 +195,13 @@
     overflow: hidden;
   }
 
-  /* The OPEN border is the row's own SEVERITY border, which is the prototype's rule:
-     `border: open ? sev.border : var(--border)`, with the three `sev.border` tokens the
-     severity tile below already carries. It is stated as three rules rather than one
-     `currentColor` trick because the tile's colour is the severity INK (`--fab-*`) and the
-     row's edge is the severity BORDER (`--fab-*-border`) — two different tokens per family.
+  /* The OPEN border is the row's own SEVERITY border, stated as three rules rather than one
+     `currentColor` trick because the tile's colour is the severity INK and the row's edge is the
+     severity BORDER — two different tokens per family.
 
-     It must not be `--fab-border-strong`: that is exactly what the hover below paints, so
-     an open row and a merely-hovered collapsed row would draw the identical edge and the
-     open one would be indistinguishable at rest.
-
-     Hover is the shipped manager's, not the prototype's — the prototype declares no hover
-     delta anywhere — and it is scoped to a COLLAPSED row for the same reason: an expanded
-     row keeps its gravity edge under the pointer instead of losing it. */
+     It must not be `--fab-border-strong`: that is what the hover below paints, so an open row and
+     a merely-hovered collapsed row would draw the identical edge. Hover is scoped to a COLLAPSED
+     row for the same reason. */
   .fab-complication-row.is-authoring:not(.is-expanded):hover {
     border-color: var(--fab-border-strong);
   }
@@ -289,11 +226,10 @@
     background: none;
   }
 
-  /* The PLAYER row draws no shell at all. It is the only variant whose container is itself
-     a bordered, filled band (the stage row's full-bleed complication band, and the bulk
-     block's group card), so the inherited 1px edge would draw a second box inside a box in
-     a 300px column. `transparent` rather than `none` keeps the box metrics identical to
-     the GM strips', so the two treatments differ in ink and in nothing else. */
+  /* The PLAYER row draws no shell at all: it is the only variant whose container is itself a
+     bordered, filled band, so the inherited 1px edge would draw a second box inside a box in a
+     300px column. `transparent` rather than `none` keeps the box metrics identical to the GM
+     strips', so the two treatments differ in ink and in nothing else. */
   .fab-complication-row.is-player {
     border-color: transparent;
   }
@@ -310,8 +246,8 @@
     padding: 7px 10px;
   }
 
-  /* No padding of its own: the band or group card the player row sits in already carries
-     the inset, and paying it twice costs a 300px column ~20px of prose width. */
+  /* No padding of its own: the band or group card the player row sits in already carries the
+     inset, and paying it twice costs a 300px column ~20px of prose width. */
   .fab-complication-row.is-player .fab-complication-row-line {
     gap: 9px;
     padding: 0;
@@ -379,8 +315,8 @@
     text-transform: uppercase;
   }
 
-  /* Everything the two emphases SHARE. The axis they differ on is face and size; the ink,
-     the weight and the leading are the name's, not the treatment's. */
+  /* Everything the two emphases SHARE. The axis they differ on is face and size; the ink, the
+     weight and the leading are the name's, not the treatment's. */
   .fab-complication-row-name {
     color: var(--fab-text);
     font-weight: 600;
@@ -393,28 +329,25 @@
     font-size: 12.5px;
   }
 
-  /* A strip's name: one run of metadata on a row about something else, so it takes the
-     host sans — inherited rather than named, since this repository ships serif and mono
-     tokens and no sans token, and Foundry's own `--font-primary` is the face every other
-     unstyled run here already renders in. */
+  /* A strip's name: one run of metadata on a row about something else, so it takes the host sans —
+     inherited rather than named, since this repository ships serif and mono tokens and no sans
+     token. */
   .fab-complication-row-name.is-inline {
     font-size: 11.5px;
   }
 
-  /* Stated AFTER the two emphases on purpose. `component-complications-section-mounted`
-     reads this file's rules by `indexOf('<selector> {')`, so a selector ENDING in
-     `.fab-complication-row-name {` placed above the base rule would be the block that
-     test measured — and its "the base rule names no face and no size" assertion would
-     pass against the wrong rule. It carries no face and no size itself: it is the
-     player headline's flex behaviour and nothing else. */
+  /* Stated AFTER the two emphases on purpose: `component-complications-section-mounted` reads this
+     file's rules by `indexOf('<selector> {')`, so a selector ENDING in
+     `.fab-complication-row-name {` placed above the base rule would be the block that test
+     measured. It carries no face and no size itself. */
   .fab-complication-row.is-player .fab-complication-row-name {
     flex: 0 1 auto;
     min-width: 0;
     overflow-wrap: anywhere;
   }
 
-  /* Clipped to one line so the row height cannot move under a long authored sentence. The
-     `title` above is what keeps the full string reachable. */
+  /* Clipped to one line so the row height cannot move under a long authored sentence. The `title`
+     above keeps the full string reachable. */
   .fab-complication-row-body {
     overflow: hidden;
     color: var(--fab-text-muted);
@@ -424,10 +357,9 @@
     text-overflow: ellipsis;
   }
 
-  /* `bodyClamp`: WRAP, bounded. The row height still cannot run away — it is clamped to a
-     stated number of lines and ellipsised there — but the disclosure survives past sixty
-     characters, which one-line clipping does not. `overflow-wrap: anywhere` so a single
-     unbroken token cannot push the column wide, matching the stage row's own name rule. */
+  /* `bodyClamp`: WRAP, bounded. The row height still cannot run away, but the disclosure survives
+     past sixty characters, which one-line clipping does not. `overflow-wrap: anywhere` so a single
+     unbroken token cannot push the column wide. */
   .fab-complication-row-body.is-clamped {
     display: -webkit-box;
     -webkit-box-orient: vertical;
@@ -446,8 +378,8 @@
     font-size: 10px;
   }
 
-  /* An activity the SYSTEM does not resolve progressively: the complication is stored and
-     will not fire, so the glyph recedes to the disabled ink rather than disappearing. */
+  /* An activity the SYSTEM does not resolve progressively: the complication is stored and will not
+     fire, so the glyph recedes to the disabled ink rather than disappearing. */
   .fab-complication-row-activities > i.is-dim {
     color: var(--fab-text-disabled);
   }
