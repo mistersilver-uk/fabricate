@@ -256,6 +256,9 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // file threshold and its constructor under the 100-line function threshold. Regenerated from
   // the merged tree rather than reconciled by hand: these counts are derived, so picking a side
   // of the conflict would have pinned a figure no tree actually has.
-  assert.equal(files, 123, 'oversized files');
+  //
+  // 121/123 on this branch: the manager edit, browser and bulk view sweep takes two more files
+  // under the threshold on comment lines alone, on top of the figure main carries.
+  assert.equal(files, 121, 'oversized files');
   assert.equal(keys.length - files, 123, 'oversized functions');
 });
