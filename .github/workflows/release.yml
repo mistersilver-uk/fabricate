@@ -194,10 +194,10 @@ jobs:
       overwrite: false
     secrets:
       # Reusable workflows do not inherit repo secrets. early-access derives its tester feed from
-      # S3_EARLY_ACCESS_PATH_SECRET; S3_TESTER_PATH_SECRET is forwarded because release-s3.yml
+      # S3_GUILD_ARTISAN_PATH_SECRET; S3_TESTER_PATH_SECRET is forwarded because release-s3.yml
       # declares it. A hotfix channel is undeclared and has no tester group, so it needs neither.
       S3_TESTER_PATH_SECRET: ${{ secrets.S3_TESTER_PATH_SECRET }}
-      S3_EARLY_ACCESS_PATH_SECRET: ${{ secrets.S3_EARLY_ACCESS_PATH_SECRET }}
+      S3_GUILD_ARTISAN_PATH_SECRET: ${{ secrets.S3_GUILD_ARTISAN_PATH_SECRET }}
 
   verify-publish:
     needs: [semantic-release, publish-s3]
