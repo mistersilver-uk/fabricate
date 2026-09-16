@@ -1,30 +1,17 @@
-<!-- Svelte 5 runes mode -->
 <!--
-  The recipe LIBRARY's inspector (issue 643), extracted verbatim-in-behaviour out of
-  the ~7,100-line CraftingSystemManagerRoot's inlined `{:else if currentView ===
-  'recipes'}` aside. It renders into the shell's existing `.manager-inspector`
-  column — this component does NOT own a grid, so it cannot introduce the nested
-  second inspector that overflows the row at 1280px.
+  The recipe LIBRARY's inspector. It renders into the shell's existing `.manager-inspector` column
+  and owns NO grid of its own, so it cannot introduce the nested second inspector that overflows the
+  row at 1280px. Two placement rules are load-bearing: it lives under the BROWSER's directory, not
+  `recipe/`, whose glob would republish the five recipe-EDITOR frames instead of the browser frame,
+  and it is named `RecipeBrowserInspector` so its own frames cannot collide with the editor's.
 
-  Two placement rules, both load-bearing:
-   - it lives under `apps/manager/recipes/`, NOT `apps/manager/recipe/`, because the
-     screenshot map's RECIPE_EDIT_MATCHES globs the latter and would republish the
-     five recipe-EDITOR frames instead of the browser frame;
-   - it is named RecipeBrowserInspector, not RecipeInspector, to avoid colliding with
-     the recipe EDITOR's own frames.
+  Contents: hero (image, name, category/status chips, flavour), a 2x2 STAT grid, then a REQUIRES and
+  a PRODUCES list of icon-chip + name + mono quantity rows, then the recipe actions. Produces is not
+  garnish — an inspector that cannot say what a recipe makes is unfinished — so an empty list is a
+  DANGER row reading "a successful craft makes nothing" rather than a blank.
 
-  Contents (brief §3.3): hero (image + name + category/status chips + flavour), a 2x2
-  STAT grid (Ingredients / Results / Steps / Crafting check), a REQUIRES list and a
-  PRODUCES list — both icon-chip + name + mono quantity rows built from the recipe's
-  real ingredient options and result items — then the recipe actions.
-
-  Produces is not optional garnish: a recipe library inspector that cannot tell the GM
-  what the recipe makes is not finished, and an empty list is a DANGER row ("a
-  successful craft makes nothing"), not a blank.
-
-  The walk over execution scopes -> sets -> groups -> options lives in the pure
-  `recipeBrowserModel.js` (`buildRecipeRequirementRows` / `buildRecipeProduceRows`), so
-  it is unit tested without a DOM and is written once for both lists.
+  The walk over execution scopes → sets → groups → options lives in the pure `recipeBrowserModel.js`,
+  so it is unit tested without a DOM and written once for both lists.
 -->
 <script>
   import Chip from '../../../components/Chip.svelte';
@@ -80,13 +67,9 @@
     return result;
   }
 
-  // The 2x2 stat grid asks the four questions a GM actually has about a recipe they
-  // are looking at: what does it take, what does it make, how many steps, and what do
-  // I have to roll. (The old grid answered Category / Structure / Steps / Result-groups
-  // — two of which are restatements of the row the GM just clicked.)
-  //
-  // `results` is the one stat with a DANGER state: a recipe that produces nothing is
-  // not merely unfinished, it is a successful craft that makes nothing.
+  // The four questions a GM has about the recipe they just clicked: what it takes, what it makes,
+  // how many steps, what they roll. `results` is the one stat with a DANGER state, because a recipe
+  // producing nothing is a successful craft that makes nothing.
   const CHECK_LABELS = {
     dc: ['FABRICATE.Admin.Manager.Recipe.CheckDcValue', 'DC {dc}'],
     dynamic: ['FABRICATE.Admin.Manager.Recipe.CheckDynamicShort', 'Dynamic'],
@@ -148,41 +131,30 @@
     selectedRecipe ? buildRecipeProduceRows(selectedRecipe, { componentOptions }) : []
   );
   // Every produced row is listed, TONED BY ROLE. A `role: 'failure'` group is the reserved
-  // alchemy-Simple group — what a FAILED craft makes — and it exists ONLY there; the routed
-  // modes produce nothing at all on a failure, so no failure row is ever invented for them.
+  // alchemy-Simple group and exists ONLY there, so no failure row is invented for a routed mode.
+  // Filtering it out made an alchemy recipe's failure output invisible in the one surface whose job
+  // is to say what a recipe makes, so it renders danger-bordered instead. The empty-Produces
+  // warning still keys on the SUCCESS rows.
   //
-  // Filtering the failure group out (as this did) made an alchemy recipe's failure output
-  // invisible in the one surface whose job is to say what a recipe makes. It is rendered as
-  // a danger-bordered row instead, so it can never be mistaken for a success output.
-  //
-  // The empty-Produces warning still keys on the SUCCESS rows: a recipe whose only group is
-  // the failure group still makes nothing when the craft succeeds, and the GM is told so.
-  // Routed-by-ingredients pairing (issue 643): the ingredient sets, the result groups,
-  // and the set→group routing each set carries. The set and result-set dropdowns are
-  // driven by ONE selection (the ingredient set), so choosing either keeps both in sync.
+  // Routed-by-ingredients pairing: the ingredient sets, the result groups and the set→group routing
+  // each set carries, driven by ONE selection so both dropdowns stay in sync.
   const routingModel = $derived(
     selectedRecipe ? buildRecipeRoutingModel(selectedRecipe) : { sets: [], groups: [] }
   );
   const isRoutedByIngredients = $derived(resolutionMode === 'routedByIngredients');
-  // Progressive awards its ONE result group's items in authoring ORDER, spending the
-  // check budget by each component's difficulty and awarding each entry once — so the
-  // list is an ordered priority queue, not a bulk output. The inspector reflects that:
-  // no "Result Group 1" pill (there is exactly one group), no quantity (each is awarded
-  // once), the component's DC instead, and repeats kept in place because order matters.
+  // Progressive awards ONE group's items in authoring ORDER, each once, so the list is a priority
+  // queue rather than a bulk output: no group pill, no quantity, the component's DC instead, and
+  // repeats kept in place because order matters.
   const isProgressive = $derived(resolutionMode === 'progressive');
   // Routed by check: each result group is routed to a check-outcome tier, so Produces is
   // grouped UNDER each tier's group rather than dumped into one flat list with a pill per
   // row. The group heading names the tier; its rows drop the redundant per-row pill.
   const isRoutedByCheck = $derived(resolutionMode === 'routedByCheck');
-  // Alchemy is a two-outcome model: exactly one Success group and one Failure group. The
-  // success group is the FIRST result group not flagged `role: 'failure'`; every other
-  // group is the failure output. So the inspector labels the produces "Success" /
-  // "Failure" rather than an anonymous "Result Group N" (issue 643).
+  // Alchemy is two-outcome: the success group is the FIRST not flagged `role: 'failure'`, so the
+  // produces read "Success" / "Failure" rather than an anonymous "Result Group N".
   const isAlchemy = $derived(resolutionMode === 'alchemy');
-  // A simple-resolution recipe with the crafting check enabled (a usable DC, so
-  // checkSummary is not 'none') is also a two-outcome recipe: Success + a reserved
-  // Failure. Both render as Success / Failure sections, Failure reading "No results" when
-  // the reserved group is empty (issue 643).
+  // A simple recipe with a usable check is two-outcome too, so both render as Success / Failure
+  // sections, Failure reading "No results" when the reserved group is empty.
   const isSimpleWithCheck = $derived(
     resolutionMode === 'simple' && (selectedRecipe?.checkSummary?.kind ?? 'none') !== 'none'
   );
@@ -302,10 +274,8 @@
     if (next >= 0 && next < stepModel.length) currentStepIndex = next;
   }
 
-  // The Requires / Produces lists render the CURRENT step's rows in multi-step mode, and
-  // the recipe-level rows otherwise. The single-step refinements (routed-by-ingredients
-  // dropdown, routed-by-check tier accordion) key off recipe-level state that is empty
-  // for a multi-step recipe, so they fall through to the flat per-step list.
+  // The CURRENT step's rows in multi-step mode, the recipe-level rows otherwise. The single-step
+  // refinements key off recipe-level state that is empty for a multi-step recipe.
   const activeRequirementRows = $derived(
     isMultiStep ? currentStep?.requirementRows || [] : visibleRequirementRows
   );
@@ -388,13 +358,8 @@
 </script>
 
 {#if selectedRecipe}
-  <!--
-    The inspector is ONE column on the panel background, not a stack of boxes. It used to
-    wrap every section in a bordered panel card under its own heading — five cards, inside a
-    panel, inside a window — and invented a details heading for a stat grid that needs no
-    title. Sections are now uppercase micro-labels sitting directly on the background; only
-    the things that ARE objects (stat tiles, flow rows) keep a box.
-  -->
+  <!-- ONE column on the panel background, not a stack of boxes: sections are uppercase
+       micro-labels sitting directly on it, and only the things that ARE objects keep a box. -->
   <section class="manager-recipe-browser-inspector" data-recipe-inspector>
     <p class="manager-recipe-browser-inspector-label">
       {text('FABRICATE.Admin.Manager.Recipe.Selected', 'Selected recipe')}
@@ -404,13 +369,9 @@
       <Medallion art={resolveRecipeImage(selectedRecipe)} alt="" icon="fas fa-scroll" size={52} />
       <div class="fab-stack" data-gap="1">
         <h2 class="manager-inspector-name" title={selectedRecipe.name}>{selectedRecipe.name}</h2>
-        <!--
-          TWO chips on one line: what it is, and whether it is on. The third chip used to be
-          "Unlocked" — a pill for a NON-state, which forced the row to wrap — and the status
-          chip said "Active" while the row's switch inches away said "On", giving the same
-          state two names on one screen. Locked keeps its pill (a real state); Incomplete /
-          Can't enable appear only when true.
-        -->
+        <!-- TWO chips on one line: what it is, and whether it is on. No "Unlocked" pill for a
+             NON-state, and the status chip uses the same word as the row's own switch. Locked
+             keeps its pill; Incomplete and Can't enable appear only when true. -->
         <div class="manager-chip-row">
           {#if showRecipeCategories}
             <!-- Through the SAME label helper the rows use: a recipe with no category
@@ -431,16 +392,11 @@
               >{text('FABRICATE.Admin.Manager.Recipe.LockedLabel', 'Locked')}</Chip
             >
           {/if}
-          <!--
-            ONE predicate, three surfaces (issue 1010). This pill reads `enableBlocked` —
-            the projection of the SAME activation check the row pills and the bulk panel's
-            pre-flight count read — and not `incomplete`, which is narrower: `incomplete` is
-            "fails validation but is structurally sound", so a STRUCTURALLY BROKEN recipe
-            reads `incomplete: false` and wore no pill here while still being un-enableable.
-            The strict `enabled === false` split survives and is meaningful: a broken recipe
-            that is already ON is unfinished, but nothing is being refused, because the
-            activation gate fires only on a transition into the enabled state.
-          -->
+          <!-- ONE predicate, three surfaces: this reads `enableBlocked`, the SAME activation check
+               the row pills and the bulk panel's pre-flight count read, and not the narrower
+               `incomplete` — a STRUCTURALLY BROKEN recipe reads `incomplete: false` and wore no
+               pill while still being un-enableable. The strict `enabled === false` split is
+               meaningful, because the activation gate fires only on a transition into enabled. -->
           {#if selectedRecipe.enableBlocked}
             {@const blockedLabel =
               selectedRecipe.enabled === false
@@ -585,11 +541,8 @@
     <p class="manager-recipe-browser-inspector-label">
       {text('FABRICATE.Admin.Manager.Recipe.Produces', 'Produces')}
     </p>
-    <!--
-      One produced row, TONED BY ROLE. `showGroupPill` is false when the row already sits
-      under a result-group heading (routed-by-check) or the group is otherwise identified
-      (progressive DC, routed-by-ingredients dropdown), so the pill is not doubled up.
-    -->
+    <!-- One produced row, TONED BY ROLE. `showGroupPill` is false wherever the group is already
+         identified, so the pill is never doubled up. -->
     {#snippet produceRow(row, showGroupPill)}
       <div
         class={`manager-recipe-flow-row ${row.failure ? 'is-failure' : 'is-produced'}`}
@@ -649,10 +602,8 @@
           </div>
         {/each}
       {:else if isRoutedByCheck && !isMultiStep}
-        <!-- Routed by check: group the produced items UNDER each result group as a
-             FULL-WIDTH, COLLAPSIBLE outcome-tier section headed by the tier NAME (from the
-             group's checkOutcomeIds), not an anonymous "Result Group N" pill. Sections
-             start collapsed so the panel opens compact. -->
+        <!-- Routed by check: a FULL-WIDTH collapsible section per result group, headed by the tier
+             NAME rather than an anonymous "Result Group N". They start collapsed. -->
         {#each producedGroups as group, index (group.groupId)}
           {@const expanded = expandedTiers.has(group.groupId)}
           <div
@@ -705,13 +656,9 @@
       {/if}
     </div>
 
-    <!--
-      The point of the inspector: three full-width buttons (issue 643). `Edit recipe` is
-      the accent/peach primary and the loudest thing on the panel; Duplicate is a dark
-      secondary above it; Delete is a dark button below with danger-red text and a subtly
-      danger-tinted border — NOT a plain text link, so a GM never fires it by reflex, but
-      still clearly a real, full-width action rather than a demoted afterthought.
-    -->
+    <!-- Three full-width buttons: `Edit recipe` as the loudest thing on the panel, Duplicate as a
+         dark secondary above it, and Delete below in danger ink — NOT a text link, so a GM never
+         fires it by reflex, but still a real action rather than a demoted afterthought. -->
     <div class="manager-recipe-browser-inspector-actions">
       <ManagerButton
         class="manager-recipe-browser-inspector-duplicate"

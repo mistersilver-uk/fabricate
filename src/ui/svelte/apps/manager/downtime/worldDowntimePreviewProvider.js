@@ -1,16 +1,10 @@
 import { WORLD_DOWNTIME_SURFACE_ID } from '../../../../managerExtensions.js';
 
 /**
- * The tab ids of CORE'S OWN Downtime preview content — four marketing screens Fabricate
- * ships, and nothing more.
- *
- * This is NOT the provider contract, and no part of the seam reads it. A registered
- * companion declares its own tabs (any ids, any count, its own order) and the registry
- * validates their SHAPE only; see `validateProvider` in `src/ui/managerExtensions.js`.
- * The list lives here, beside the copy and the icon table it indexes, precisely so it
- * cannot be mistaken for a requirement the seam imposes.
- *
- * @type {readonly string[]}
+ * The tab ids of CORE'S OWN preview content and nothing more. NOT the provider contract, which no
+ * part of the seam reads: a companion declares any ids, any count, any order, and `validateProvider`
+ * checks their SHAPE alone. The list lives beside the copy it indexes so it cannot be mistaken for
+ * a requirement the seam imposes.
  */
 export const CORE_DOWNTIME_PREVIEW_TAB_IDS = Object.freeze([
   'tracking',
@@ -20,18 +14,10 @@ export const CORE_DOWNTIME_PREVIEW_TAB_IDS = Object.freeze([
 ]);
 
 /**
- * One illustrated slot in the Core preview — a board row or a benefit card.
- *
- * The tint travels with the SLOT, not with the glyph and not with a CSS selector, because
- * that is how the design assigns it: `fa-house-chimney` is ember on Tracking and vitality
- * on Activities, and the four benefit cards rotate their tints between tabs (positions 3
- * and 4 swap). It is also why the tint lands on the tile WRAPPER rather than on the `<i>`:
- * the design colours 43 of its 55 icons through their wrapper so each glyph keeps following
- * its row, and self-colouring an inherited icon would freeze it.
- *
- * @param {string} icon Font Awesome Free class list for the glyph.
- * @param {string} tint Tint name resolved by the `.is-tint-*` classes in `WorldDowntimePreview`.
- * @returns {Readonly<{icon: string, tint: string}>} the frozen slot.
+ * One illustrated slot in the Core preview — a board row or a benefit card. The tint travels with
+ * the SLOT, not the glyph and not a selector, because that is how the design assigns it: the same
+ * glyph takes different tints per tab. It lands on the tile WRAPPER rather than the `<i>`, so each
+ * glyph keeps following its row instead of being frozen by a self-colouring rule.
  */
 function slot(icon, tint) {
   return Object.freeze({ icon, tint });
@@ -101,16 +87,12 @@ const TAB_DEFINITIONS = Object.freeze({
 });
 
 /**
- * Core's fallback preview, expressed as ONE IMPLEMENTATION of the provider interface
- * rather than as a special case the shell branches on. It carries no `mount`: Core renders
- * `WorldDowntimePreview` for its own tabs, and it is never handed to the registry.
+ * Core's fallback preview as ONE IMPLEMENTATION of the provider interface rather than a special case
+ * the shell branches on. It carries no `mount` and is never handed to the registry.
  *
- * Its string fields are lang KEYS, not sentences, because Core owns its copy and localizes
- * at render time. A companion's identical fields are already-localized text. Which mode holds
- * the surface is the single discriminator between the two readings, and every consumer applies
- * it: the rail's Downtime sub-items for `label`, `accessibleName` and `tooltip`, the route
- * chrome for `title`, `subtitle` and `breadcrumb`, and Core's own preview strip — which renders
- * in core-fallback alone and therefore localizes unconditionally.
+ * Its string fields are lang KEYS, not sentences, because Core localizes at render time while a
+ * companion's identical fields are already-localized text. Which mode holds the surface is the
+ * single discriminator, and the rail, the route chrome and Core's own strip all apply it.
  */
 export const WORLD_DOWNTIME_PREVIEW_PROVIDER = Object.freeze({
   apiVersion: 1,
@@ -123,8 +105,7 @@ export const WORLD_DOWNTIME_PREVIEW_PROVIDER = Object.freeze({
         accessibleName: `FABRICATE.Admin.Manager.World.Downtime.Tabs.${TAB_DEFINITIONS[id].key}.AccessibleName`,
         tooltip: `FABRICATE.Admin.Manager.World.Downtime.Tabs.${TAB_DEFINITIONS[id].key}.Tooltip`,
         icon: TAB_DEFINITIONS[id].icon,
-        // The Downtime route titles itself after the preview on screen, not after the
-        // route: a GM switching sub-tabs must see the page name change with them.
+        // The route titles itself after the preview on screen, so the name changes with the sub-tab.
         title: `FABRICATE.Admin.Manager.World.Downtime.Preview.${TAB_DEFINITIONS[id].key}.Title`,
         subtitle: `FABRICATE.Admin.Manager.World.Downtime.Preview.${TAB_DEFINITIONS[id].key}.Subtitle`,
         breadcrumb: `FABRICATE.Admin.Manager.World.Downtime.Tabs.${TAB_DEFINITIONS[id].key}.Label`,
