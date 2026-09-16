@@ -3,7 +3,7 @@ scripts/foundry	26
 scripts/lib	14882
 scripts/visual-parity	163
 scripts/visual-parity/lib	651
-src	3694
+src	3703
 src/canvas	1283
 src/canvas/linkedVisuals	224
 src/canvas/regions	1375
@@ -49,7 +49,7 @@ src/ui/svelte/stores	6973
 src/ui/svelte/util	3463
 src/utils	7546
 styles	7499
-tests	40736
+tests	40777
 tests/actions	155
 tests/canvas	622
 tests/canvas/regions	292

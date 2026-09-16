@@ -2,7 +2,7 @@ src/canvas/InteractableManager.js	1151
 src/canvas/InteractableManager.js::_spawnInteractableRegion	120
 src/canvas/interactableResolution.js::buildRegionSpawnRequest	116
 src/canvas/regions/interactableRegionFlags.js::buildInteractableBehaviorSchema	104
-src/main.js	6796
+src/main.js	6805
 src/main.js::Hooks.once#2	291
 src/main.js::Hooks.once>on	111
 src/main.js::_runMigrations	206
