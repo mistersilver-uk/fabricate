@@ -1290,6 +1290,7 @@
           "OperationFailed": "The run change could not be completed. Refresh the Journal for this run's current state.",
           "OperationUnavailable": "The run change produced no result. Refresh the Journal for this run's current state.",
           "PrepareTokenInvalid": "This roll's authorisation has expired. Start the run change again.",
+          "QueueTimeout": "Another Journal operation has not finished, so this one was not started and nothing was changed. Try again in a moment, and tell your GM if it keeps happening.",
           "RecoveryPending": "The GM's Journal recovery check is still running. Try again in a moment.",
           "RequestIdCollision": "A duplicate run request was detected and ignored. Refresh the Journal for this run's current state.",
           "RequestNotReplayable": "This run request cannot be retried. Refresh the Journal for this run's current state.",
