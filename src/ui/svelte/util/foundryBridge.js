@@ -4,10 +4,8 @@
  * both the Foundry runtime and Node test environments.
  */
 
-// A Fabricate-namespaced class so `styles/fabricate.css` can style the dialog
-// (button layout/padding) without bleeding into other modules' DialogV2s, and a
-// default width so multi-button confirm rows (e.g. "Unlink + delete marker") fit
-// cleanly instead of being crushed by DialogV2's narrow default.
+// Namespaced so `styles/fabricate.css` can style the dialog without bleeding into another module's
+// DialogV2, and wide enough that a multi-button confirm row is not crushed by DialogV2's default.
 const FABRICATE_DIALOG_CLASSES = Object.freeze(['fabricate', 'fabricate-dialog']);
 const FABRICATE_DIALOG_DEFAULT_WIDTH = 420;
 
@@ -15,13 +13,11 @@ function normalizeDialogOptions(options = {}) {
   const deepClone = globalThis.foundry?.utils?.deepClone ?? ((o) => JSON.parse(JSON.stringify(o)));
   const normalized = deepClone(options);
 
-  // Ensure the Fabricate dialog classes are present (idempotent) so the namespaced
-  // CSS applies and the buttons size to their content + wrap cleanly.
+  // Idempotent, so the namespaced CSS applies however often this runs.
   const existingClasses = Array.isArray(normalized.classes) ? normalized.classes : [];
   normalized.classes = [...new Set([...existingClasses, ...FABRICATE_DIALOG_CLASSES])];
 
-  // Give the dialog a sensible minimum width so the button row isn't cramped.
-  // Respect an explicit caller width.
+  // An explicit caller width always wins.
   normalized.position = {
     ...(normalized.position || {}),
     width: normalized.position?.width ?? FABRICATE_DIALOG_DEFAULT_WIDTH,
@@ -64,36 +60,16 @@ function normalizeDialogOptions(options = {}) {
   return normalized;
 }
 
-/**
- * Whether the current Foundry user is a Game Master.
- *
- * This is `isGM`, not `activeGM`: it answers "may this client see and drive a GM surface",
- * a single-client question with no duplicate-execution risk, so an assistant GM must
- * answer true. It is NOT authorization — every write still passes its own gate.
- *
- * @returns {boolean} True when the current user holds the GM role.
- */
+// `isGM`, not `activeGM`: it answers "may this client see and drive a GM surface", a single-client
+// question with no duplicate-execution risk, so an assistant GM answers true. NOT authorization.
 export function isGameMaster() {
   return globalThis.game?.user?.isGM === true;
 }
 
-/**
- * Localize `key`, substituting `data` when supplied.
- *
- * DELIBERATELY calls `i18n.format(key, data)` rather than `i18n.localize(key, data)` for the
- * `data` branch. On Foundry V13.351 `format(stringId, data={})` and `localize(stringId)` are
- * two separately declared methods and `localize` takes no `data` argument at all, so this
- * split is required there. On V14.365 `format` is no longer declared as its own method — the
- * class declares only `localize(stringId, data)`, which now accepts `data` itself — and
- * `format` survives solely as a non-enumerable prototype alias of `localize`, installed with
- * no deprecation warning. `i18n.format(key, data)` is therefore correct on BOTH supported
- * builds today; "modernising" this call to `i18n.localize(key, data)` would silently break on
- * V13.351, where `localize` ignores a second argument.
- *
- * @param {string} key
- * @param {object} [data]
- * @returns {string} the key itself when no `game.i18n` is reachable (outside a running world).
- */
+// DELIBERATELY `i18n.format(key, data)` for the `data` branch: on V13.351 `localize` takes no
+// `data` argument at all, and on V14.365 `format` survives as a prototype alias of `localize`. So
+// this is correct on both supported builds, and "modernising" it silently breaks V13.351.
+// Returns the key itself when no `game.i18n` is reachable, i.e. outside a running world.
 export function localize(key, data) {
   const i18n = globalThis.game?.i18n;
   if (!i18n) return key;
@@ -101,26 +77,13 @@ export function localize(key, data) {
   return i18n.localize(key);
 }
 
-// A comma-and-"and" join is a LANGUAGE rule, not an authored string: the separator,
-// the conjunction and whether an Oxford comma appears all vary by locale. These are
-// the options for the ordinary "x, y and z" reading of a list of things that are all
-// true at once.
+// A comma-and-"and" join is a LANGUAGE rule, not an authored string: separator, conjunction and
+// Oxford comma all vary by locale. These options are the "x, y and z" reading of a conjunction.
 const LIST_FORMAT_OPTIONS = Object.freeze({ style: 'long', type: 'conjunction' });
 
-/**
- * Join already-localized fragments using the ACTIVE language's list conventions.
- *
- * `Localization#getListFormatter` hands back an `Intl.ListFormat` bound to the
- * language the world is actually running in, which is what makes this correct for a
- * sentence assembled at render time — `items.join(', ')` and an authored separator
- * key are both wrong outside English.
- *
- * Degrades to the platform default locale when Foundry's i18n is absent (Node tests)
- * or does not expose the helper, so callers never branch on the runtime.
- *
- * @param {string[]} items
- * @returns {string}
- */
+// `getListFormatter` is bound to the language the world is actually running in, which is what makes
+// this correct for a sentence assembled at render time — `items.join(', ')` and an authored
+// separator key are both wrong outside English. Degrades to the platform locale with no i18n.
 export function formatList(items) {
   const values = Array.isArray(items) ? items.map((item) => String(item ?? '')) : [];
   const i18n = globalThis.game?.i18n;
@@ -130,36 +93,16 @@ export function formatList(items) {
   return i18n.getListFormatter(LIST_FORMAT_OPTIONS).format(values);
 }
 
-/**
- * Put a confirm's option bag into the shape `DialogV2.confirm` and `ApplicationV2`
- * actually READ. Shared with `src/ui/foundryCompat.js`, which imports it, so the manager
- * app's confirm seam and the player app's cannot drift apart (issue 1154).
- *
- * Two mappings, both narrow, both load-bearing:
- *
- *  - `title` → `window.title`, because `ApplicationV2#title` is
- *    `_loc(this.options.window.title)` and `DEFAULT_OPTIONS.window.title` is `""`. A
- *    top-level `title` is read by nothing, so before this every manager confirm — the
- *    crafting-system delete included — rendered with an EMPTY title bar. An explicit
- *    `window.title` always wins; the top-level form is accepted sugar, not a second
- *    contract.
- *  - a function `yes`/`no` → `{ callback }`, because `DialogV2.confirm` merges each over
- *    a default button with `mergeObject`, which iterates `Object.keys(other)` — `[]` for
- *    a function. A bare `yes: () => 'x'` therefore configures NOTHING, silently keeping
- *    the default label AND the default `() => true` callback. Wrapping it makes the
- *    callback real; the LABEL is still the caller's job, and on a destructive confirm it
- *    is not optional.
- *
- * It deliberately does NOT go through `normalizeDialogOptions`. That one injects
- * `buttons: [{ action: 'close', … }]` when `buttons` is absent, and `DialogV2.confirm`
- * then does `config.buttons ??= []; config.buttons.unshift(yes, no)` — i.e. reusing it
- * here would render a THREE-button confirm on every site.
- *
- * Returns a fresh bag; the caller's object is never mutated.
- *
- * @param {object} [options]
- * @returns {object}
- */
+// The shape `DialogV2.confirm` and `ApplicationV2` actually READ, shared with
+// `src/ui/foundryCompat.js` so the manager's confirm seam and the player's cannot drift (issue
+// 1154). Two mappings, both load-bearing: `title` becomes `window.title`, because a top-level
+// `title` is read by NOTHING and every manager confirm used to render an empty title bar; and a
+// FUNCTION `yes`/`no` becomes `{ callback }`, because `DialogV2.confirm` merges each over a default
+// button with `mergeObject`, which iterates `Object.keys` — `[]` for a function — so a bare
+// `yes: () => 'x'` silently keeps the default label AND the default `() => true` callback.
+// Deliberately NOT routed through `normalizeDialogOptions`: that injects a `close` button when
+// `buttons` is absent, and `DialogV2.confirm` unshifts its own pair, giving a THREE-button confirm.
+// Returns a fresh bag; the caller's object is never mutated.
 export function normalizeConfirmOptions(options) {
   const normalized = { ...(options || {}) };
   if (normalized.title && !normalized.window?.title) {
@@ -188,13 +131,6 @@ export function renderDialog(options) {
  * Render a multi-choice dialog and resolve to the chosen action string.
  * Each choice is `{ action, label, icon, default }`; the dialog closing
  * (or DialogV2 being unavailable) resolves to `'cancel'`.
- *
- * @param {object} options
- * @param {string} options.title
- * @param {string} options.content - HTML content
- * @param {Array<{action: string, label?: string, icon?: string, default?: boolean}>} options.choices
- * @param {string} [options.defaultAction] - action whose button is the default
- * @returns {Promise<string>} the chosen action, or 'cancel'
  */
 export function choiceDialog({ title, content, choices = [], defaultAction } = {}) {
   return new Promise((resolve) => {
@@ -232,16 +168,8 @@ export async function viewScene(uuid) {
   return false;
 }
 
-/**
- * Subscribe to scene navigation/activation so callers can refresh when the
- * player's viewed scene changes. Foundry fires `canvasReady` after it draws a
- * scene on the canvas, which is the signal that `game.scenes.current` now points
- * at a different scene. Returns an unsubscribe function; no-ops gracefully when
- * the Foundry `Hooks` global is absent (e.g. unit tests).
- *
- * @param {Function} handler Invoked (no args) on each scene change.
- * @returns {Function} Unsubscribe callback.
- */
+// `canvasReady` fires after Foundry draws a scene, which is the signal that `game.scenes.current`
+// now points somewhere else. Returns an unsubscribe; no-ops with no `Hooks` global.
 export function subscribeSceneChange(handler) {
   const hooks = globalThis.Hooks;
   if (!hooks?.on || typeof handler !== 'function') return () => {};
@@ -251,18 +179,8 @@ export function subscribeSceneChange(handler) {
   };
 }
 
-/**
- * Subscribe to world-time changes so callers can refresh time-gated views
- * (Journal countdowns and run readiness, the player Crafting list's calendar-aware
- * durations) when `game.time.worldTime` advances. Foundry's `updateWorldTime` is a
- * synced hook firing on every connected client. This is a READ-only refresh
- * subscription — the handler must not publish side effects (no GM-gating is applied
- * here). Returns an unsubscribe function; no-ops gracefully when the Foundry `Hooks`
- * global is absent (e.g. unit tests).
- *
- * @param {Function} handler Invoked (no args) on each world-time change.
- * @returns {Function} Unsubscribe callback.
- */
+// `updateWorldTime` is a SYNCED hook firing on every connected client, so this is a READ-only
+// refresh subscription and the handler must not publish side effects — no GM gate is applied here.
 export function subscribeWorldTime(handler) {
   const hooks = globalThis.Hooks;
   if (!hooks?.on || typeof handler !== 'function') return () => {};
@@ -272,36 +190,17 @@ export function subscribeWorldTime(handler) {
   };
 }
 
-/**
- * Subscribe to owned-item changes on the relevant actors so callers can refresh
- * inventory-derived views (owned counts, recipe craftability, the Inventory tab)
- * when a component is added, removed, or its quantity is edited. Registers Foundry's
- * `createItem` / `updateItem` / `deleteItem` hooks — which fire on every connected
- * client — and only invokes `handler` when the changed item is an EMBEDDED item on an
- * actor the caller cares about (`isRelevantActor(actorId)`), skipping world/sidebar
- * items (no actor parent) and unrelated actors.
- *
- * Item mutations arrive in BURSTS — crafting a recipe deletes N ingredients and
- * creates the product (N+1 hook fires) — so the handler is debounced: every fire
- * within `debounceMs` collapses into a single trailing `handler()` call. Returns an
- * unsubscribe function that also cancels any pending debounced call; no-ops
- * gracefully when the Foundry `Hooks` global is absent (e.g. unit tests).
- *
- * @param {Function} handler Invoked (no args) once a burst of relevant item changes settles.
- * @param {object} [options]
- * @param {(actorId: string|null) => boolean} [options.isRelevantActor] Predicate,
- *   read at FIRE time so it tracks the current selection. Defaults to always-true.
- * @param {number} [options.debounceMs=50] Burst-coalescing window in milliseconds.
- * @returns {Function} Unsubscribe callback.
- */
+// Owned-item changes, for inventory-derived views. `isRelevantActor` is load-bearing: the item
+// hooks fire on every connected client, and world/sidebar items have no actor parent at all.
+// Item mutations arrive in BURSTS — crafting deletes N ingredients and creates the product — so the
+// handler is trailing-debounced into one call, and the unsubscribe cancels a pending one.
 export function subscribeInventoryChange(handler, { isRelevantActor, debounceMs = 50 } = {}) {
   const hooks = globalThis.Hooks;
   if (!hooks?.on || typeof handler !== 'function') return () => {};
   const relevant = typeof isRelevantActor === 'function' ? isRelevantActor : () => true;
   let timer = null;
   const schedule = () => {
-    // Trailing debounce: the first fire arms the timer; subsequent fires within the
-    // window are absorbed, so a burst yields exactly one handler() call.
+    // The first fire arms the timer; subsequent fires inside the window are absorbed.
     if (timer !== null) return;
     timer = setTimeout(
       () => {
@@ -312,8 +211,7 @@ export function subscribeInventoryChange(handler, { isRelevantActor, debounceMs 
     );
   };
   const onItemChange = (item) => {
-    // Embedded/owned items only: an owned item's `actor` (or `parent`) is the owning
-    // Actor. World items in the sidebar resolve to null here and are ignored.
+    // Embedded items only: a world item in the sidebar resolves to null here and is ignored.
     const actorId = item?.actor?.id ?? item?.parent?.id ?? null;
     if (actorId && relevant(actorId)) schedule();
   };
@@ -331,62 +229,28 @@ export function subscribeInventoryChange(handler, { isRelevantActor, debounceMs 
   };
 }
 
-/**
- * The unpublished scoped crafting-data signal.
- *
- * A LITERAL, mirroring `CRAFTING_DATA_CHANGED_HOOK` in `src/systems/craftingDataChange.js`
- * rather than importing it, and the reason is mechanical rather than stylistic: roughly 75
- * mounted-component harnesses declare THIS module in their dependency allowlist, and the
- * harness pre-validator walks the whole static import closure — so one new import here would
- * make every one of those suites fail until each declared the new transitive module.
- * `tests/util/foundry-bridge-subscriptions.test.js` asserts the two are equal, so they cannot
- * drift.
- *
- * @type {string}
- */
+// A LITERAL mirroring `CRAFTING_DATA_CHANGED_HOOK` rather than an import, and the reason is
+// mechanical: ~75 mounted harnesses declare THIS module and the pre-validator walks its whole static
+// import closure, so one new import here breaks every one of them until each declares the transitive
+// module. `tests/util/foundry-bridge-subscriptions.test.js` pins the two equal.
 export const CRAFTING_DATA_CHANGED_HOOK = 'fabricate.craftingDataChanged';
 
-/**
- * How many times a change payload has been routed BROADLY because it named no domains.
- *
- * Exposed so a per-domain test can assert "the narrowing came from domain routing" rather than
- * inferring it: a fixture in which the counter moved narrowed by accident, because a payload
- * that reaches the fallback is delivered to EVERY subscriber whatever its domain set. Counted
- * per SUBSCRIBER delivery, not per payload — each subscription classifies independently — so a
- * fail-safe case asserts a rise of exactly the subscriber count.
- *
- * @type {number}
- */
+// Exposed so a test can assert the narrowing CAME FROM domain routing rather than inferring it: a
+// payload reaching the fallback is delivered to every subscriber whatever its domain set. Counted
+// per SUBSCRIBER delivery, not per payload, so a fail-safe case expects a rise of the subscriber
+// count.
 let broadFallbackCount = 0;
 
-/**
- * Read the broad-fallback counter.
- *
- * @returns {number}
- */
 export function readCraftingDataFallbackCount() {
   return broadFallbackCount;
 }
 
-/**
- * Reset the broad-fallback counter, so a case can assert against a known baseline.
- *
- * @returns {void}
- */
 export function resetCraftingDataFallbackCount() {
   broadFallbackCount = 0;
 }
 
-/**
- * Every invalidation domain this build knows, mirroring `INVALIDATION_DOMAIN_NAMES` in
- * `src/systems/invalidationDomains.js`.
- *
- * A LITERAL for the same mechanical reason `CRAFTING_DATA_CHANGED_HOOK` above is one, and pinned
- * against the real constant by `tests/util/foundry-bridge-subscriptions.test.js` so it cannot
- * drift.
- *
- * @type {ReadonlySet<string>}
- */
+// A LITERAL mirroring `INVALIDATION_DOMAIN_NAMES`, for the reason the hook name above is one, and
+// pinned against the real constant by the same guard.
 const KNOWN_INVALIDATION_DOMAINS = new Set([
   'labelling',
   'narrative',
@@ -397,28 +261,13 @@ const KNOWN_INVALIDATION_DOMAINS = new Set([
   'held-inventory',
 ]);
 
-/**
- * The domains a change payload names, or `null` when it names none this build understands and
- * must therefore route broadly.
- *
- * Four shapes route broadly, and they are ONE rule rather than four special cases — "I cannot
- * attribute this": a payload that is not a recognised change, a change whose `scopes` are
- * malformed, a change whose scopes union to nothing (a corpus reordering, which is the
- * production-reachable producer), and a change every one of whose domains is a name this build
- * does not know.
- *
- * That last clause is the one that is easy to leave out and is the only input class that would
- * otherwise route NARROW when it must route broad: an unknown name yields a non-empty set that
- * intersects no subscriber's wanted set, so nothing refreshes and the fallback counter does not
- * move — a stale read model wearing the appearance of correct narrowing. Unreachable from
- * today's producers, and reachable the moment issue 1092 replicates a payload between clients
- * running different module versions.
- *
- * Over-broad invalidation is a performance bug; a stale read model is a correctness one.
- *
- * @param {*} payload
- * @returns {Set<string>|null}
- */
+// The domains a payload names, or `null` to route BROADLY. Four shapes route broadly under ONE rule
+// — "I cannot attribute this": an unrecognised change, malformed `scopes`, scopes unioning to
+// nothing, and a change every one of whose domains is a name this build does not know. That last is
+// the easy one to omit and the only class that would otherwise route NARROW: an unknown name yields
+// a non-empty set intersecting no subscriber, so nothing refreshes and the counter does not move —
+// a stale read model wearing the appearance of correct narrowing. Over-broad invalidation is a
+// performance bug; a stale read model is a correctness one.
 function payloadDomains(payload) {
   const scopes = payload?.scopes;
   if (!Array.isArray(scopes)) return null;
@@ -432,33 +281,14 @@ function payloadDomains(payload) {
   return domains.size > 0 ? domains : null;
 }
 
-/**
- * Subscribe to Fabricate crafting-data changes (a GM editing/saving a crafting system
- * or recipe) so callers can reload definition-derived views.
- *
- * Registers the UNPUBLISHED `fabricate.craftingDataChanged` hook, which both managers emit
- * beside their published change hooks and which `main.js`'s `updateSetting` bridge re-emits on
- * every other client once the replicated setting has reloaded the in-memory managers — so this
- * single subscription still covers both same-client and cross-client edits.
- *
- * It deliberately no longer binds `fabricate.craftingSystemsChanged` /
- * `fabricate.recipesChanged` (issue 1078 part B1). Those bindings were ZERO-ARGUMENT, so the
- * payload was discarded and no narrowing was possible however good a delta was emitted. The two
- * hooks keep firing with their existing payloads for third-party subscribers; every publisher
- * of one also publishes the scoped signal, so nothing this drops is a signal the shell used to
- * receive.
- *
- * Returns an unsubscribe function; no-ops gracefully when the Foundry `Hooks` global is absent
- * (e.g. unit tests).
- *
- * @param {Function} handler Invoked with the change payload when it names a domain this
- *   subscriber consumes, and unconditionally when the change names none.
- * @param {object} [options]
- * @param {readonly string[]|null} [options.domains] The invalidation domains this subscriber
- *   depends on — normally `STORE_DOMAINS[store]` from `src/systems/invalidationDomains.js`.
- *   Omitted means every domain, the behaviour before issue 1078, and stays the safe default.
- * @returns {Function} Unsubscribe callback.
- */
+// The UNPUBLISHED `fabricate.craftingDataChanged` hook, which both managers emit beside their
+// published change hooks and `main.js`'s `updateSetting` bridge re-emits on every other client, so
+// one subscription covers same-client and cross-client edits alike. It deliberately no longer binds
+// `craftingSystemsChanged`/`recipesChanged` (issue 1078): those bindings were ZERO-ARGUMENT, so the
+// payload was discarded and no narrowing was possible. Both still fire for third-party subscribers,
+// and every publisher of one also publishes the scoped signal.
+// `wantedDomains` is normally `STORE_DOMAINS[store]` from `src/systems/invalidationDomains.js`;
+// omitting it means every domain, the behaviour before issue 1078, and stays the safe default.
 export function subscribeCraftingDataChange(handler, { domains = null } = {}) {
   const hooks = globalThis.Hooks;
   if (!hooks?.on || typeof handler !== 'function') return () => {};
@@ -475,22 +305,10 @@ export function subscribeCraftingDataChange(handler, { domains = null } = {}) {
   return () => hooks.off?.(CRAFTING_DATA_CHANGED_HOOK, id);
 }
 
-/**
- * Subscribe to Fabricate gathering-environment changes so callers can reload
- * environment-derived views — notably resource-node counts.
- *
- * Node depletion is applied by the active GM (a player may not write the world
- * setting the pools live in), so the acting player's own post-attempt reload races
- * ahead of the GM's write and nothing else re-runs it. `fabricate.gatheringEnvironmentsChanged`
- * is re-emitted by main.js's `updateSetting` bridge once the replicated setting has
- * reloaded the in-memory environment store, on EVERY client including the one whose
- * attempt caused it. Without this subscription a player's node counts stay stale until
- * they reopen the app, and the local `NODE_DEPLETED` gate keeps offering a pool the GM
- * has already zeroed.
- *
- * @param {Function} handler Invoked (no args) on an environment change.
- * @returns {Function} Unsubscribe callback.
- */
+// Node depletion is applied by the ACTIVE GM, because a player may not write the world setting the
+// pools live in, so the acting player's own post-attempt reload races ahead of the GM's write and
+// nothing else re-runs it. Without this subscription a player's node counts stay stale until they
+// reopen the app, and the local `NODE_DEPLETED` gate keeps offering a pool the GM already zeroed.
 export function subscribeGatheringDataChange(handler) {
   const hooks = globalThis.Hooks;
   if (!hooks?.on || typeof handler !== 'function') return () => {};
@@ -498,26 +316,11 @@ export function subscribeGatheringDataChange(handler) {
   return () => hooks.off?.('fabricate.gatheringEnvironmentsChanged', id);
 }
 
-/**
- * Subscribe to token movement (and token creation/removal) so callers can refresh
- * the live travel current-region view when a party's travel-marker token moves.
- * Fires `handler(actorUuid)` — the base Actor uuid of the moved token. `updateToken`
- * only commits once per move (not the continuous `refreshToken`), so no debounce is
- * needed. No-ops gracefully when the Foundry `Hooks` global is absent (unit tests).
- *
- * @param {(actorUuid: string|null) => void} handler
- * @returns {Function} Unsubscribe callback.
- */
-/**
- * Resolve once a token's MOVE has fully settled. V13 animates token movement, and
- * the document position / region membership only reach their destination once the
- * animation completes — reading earlier reports the region the token just left.
- * Waits one frame for the animation to register, then awaits it (bounded by a
- * timeout). Resolves immediately when there is no canvas/animation (tests/headless).
- *
- * @param {object} tokenDoc
- * @returns {Promise<void>}
- */
+// `handler(actorUuid)` on token movement. `updateToken` commits once per move, unlike the
+// continuous `refreshToken`, so no debounce is needed.
+// V13 ANIMATES token movement, and the document position and region membership only reach their
+// destination once that completes — reading earlier reports the region the token just LEFT. Waits a
+// frame for the animation to register, then awaits it under a timeout.
 function awaitTokenMovementSettled(tokenDoc) {
   const obj = tokenDoc?.object;
   const CanvasAnimation = globalThis.CanvasAnimation;
@@ -546,16 +349,13 @@ function awaitTokenMovementSettled(tokenDoc) {
 export function subscribeTravelMarkerMove(handler) {
   const hooks = globalThis.Hooks;
   if (!hooks?.on || typeof handler !== 'function') return () => {};
-  // Prefer the BASE world-actor uuid (`Actor.<id>`) so it matches a party's
-  // `travelActorUuid` for both linked and unlinked marker tokens; fall back to the
-  // token's bound actor uuid only when the token references no world actor.
+  // The BASE world-actor uuid matches a party's `travelActorUuid` for linked and unlinked marker
+  // tokens alike; the token's bound actor uuid is the fallback for a token referencing no world one.
   const actorUuidOf = (tokenDoc) =>
     (tokenDoc?.actorId ? `Actor.${tokenDoc.actorId}` : null) ?? tokenDoc?.actor?.uuid ?? null;
-  // Fire on ANY token update — the consumer filters to actual travel markers, so a
-  // marker's occasional non-positional update merely triggers a cheap quiet refetch.
-  // (V13 may not always deliver movement as top-level x/y, so we do not pre-filter.)
-  // Defer the notification until the move animation settles so the resolved current
-  // region reflects the DESTINATION, not the region the marker just departed.
+  // ANY token update, because V13 may not deliver movement as top-level x/y; the consumer filters
+  // to real travel markers, so a non-positional update costs one quiet refetch. The notification is
+  // deferred until the move settles, so the resolved region is the DESTINATION.
   const notify = (tokenDoc) => {
     const actorUuid = actorUuidOf(tokenDoc);
     awaitTokenMovementSettled(tokenDoc).then(() => handler(actorUuid));
@@ -570,29 +370,20 @@ export function subscribeTravelMarkerMove(handler) {
   };
 }
 
-/**
- * The run-container flag base paths, a derived local mirror of `runFlagInvalidation.js`'s
- * `RUN_CONTAINER_FLAG_PATHS` and deliberately not an import: this module is enumerated by hand
- * in over a hundred mounted-test manifests, and one that misses a transitive import does not
- * fail — the suite hangs and reports `# cancelled`, never `# fail`.
- * `src/systems/worldScopeRekeyPending.js` makes the same trade for the same reason.
- * `tests/util/foundry-bridge-subscriptions.test.js` asserts {@link RUN_FLAG_DIFF_PATHS} equals
- * the shared module's own derivation, so the mirror cannot drift silently (issue 1654).
- */
+// A local mirror of `runFlagInvalidation.js`'s `RUN_CONTAINER_FLAG_PATHS`, deliberately not an
+// import: a mounted manifest missing a transitive import does not fail, it HANGS and reports
+// `# cancelled`. `tests/util/foundry-bridge-subscriptions.test.js` pins the mirror (issue 1654).
 const RUN_FLAG_BASE_PATHS = Object.freeze([
   'flags.fabricate.fabricate.craftingRuns',
   'flags.fabricate.fabricate.salvageRuns',
   'flags.fabricate.gatheringRuns',
 ]);
 
-/** Mirrored from `FLAG_UPDATE_OPERATOR_PREFIXES`; see {@link RUN_FLAG_BASE_PATHS}. */
+// Mirrored from `FLAG_UPDATE_OPERATOR_PREFIXES`; see the note above.
 const RUN_FLAG_OPERATOR_PREFIXES = Object.freeze(['-=', '==']);
 
-/**
- * Every change-diff path that means a run container was touched: each base path, plus one per
- * update-operator prefix on its last segment, the only segment an operator may sit on. Exported
- * for the drift guard named on {@link RUN_FLAG_BASE_PATHS}, not as a runtime surface.
- */
+// Each base path plus one per update-operator prefix on its LAST segment, the only segment an
+// operator may sit on. Exported for the drift guard, not as a runtime surface.
 export const RUN_FLAG_DIFF_PATHS = Object.freeze(
   RUN_FLAG_BASE_PATHS.flatMap((path) => {
     const lastDot = path.lastIndexOf('.');
@@ -602,31 +393,16 @@ export const RUN_FLAG_DIFF_PATHS = Object.freeze(
   })
 );
 
-/**
- * Subscribe to run-flag writes on the relevant actor so callers can quietly re-fetch
- * run-derived views (the Journal listing, the nav active-run count badge) when a run
- * is created, advanced, or archived by ANY client — including the primary-GM
- * world-time resume (issues 733 + 739). Registers Foundry's `updateActor` hook (which
- * fires on every connected client) and only invokes `handler` when the changed actor
- * is one the caller cares about (`isRelevantActor(actorId)`) AND the diff touches a
- * Fabricate run-container flag path. `updateActor` fires on every HP tick, so both
- * filters are load-bearing. Returns an unsubscribe function; no-ops gracefully when
- * the Foundry `Hooks` global is absent (e.g. unit tests).
- *
- * @param {Function} handler Invoked (no args) on a relevant run-flag change.
- * @param {object} [options]
- * @param {(actorId: string|null) => boolean} [options.isRelevantActor] Predicate,
- *   read at FIRE time so it tracks the current selection. Defaults to always-true.
- * @returns {Function} Unsubscribe callback.
- */
+// Run-flag writes by ANY client, including the primary-GM world-time resume (issues 733, 739).
+// `updateActor` fires on every HP tick, so BOTH filters — the relevant actor and the run-container
+// flag path — are load-bearing.
 export function subscribeActorRunFlagChange(handler, { isRelevantActor } = {}) {
   const hooks = globalThis.Hooks;
   if (!hooks?.on || typeof handler !== 'function') return () => {};
   const relevant = typeof isRelevantActor === 'function' ? isRelevantActor : () => true;
   const hasProperty = globalThis.foundry?.utils?.hasProperty;
-  // With no `foundry.utils.hasProperty` this refreshes nothing rather than probing the diff
-  // itself, which is what the shared matcher's own fallback would do.
-  // `tests/util/foundry-bridge-subscriptions.test.js` pins that choice.
+  // With no `foundry.utils.hasProperty` this refreshes NOTHING rather than probing the diff itself,
+  // which is what the shared matcher's fallback would do; the subscriptions test pins that choice.
   const touchesRunFlag = (changes) =>
     typeof hasProperty === 'function' &&
     RUN_FLAG_DIFF_PATHS.some((path) => hasProperty(changes, path));
@@ -693,23 +469,12 @@ export function notifyError(msg) {
   globalThis.ui?.notifications?.error(msg);
 }
 
-/**
- * The V13 `TextEditor` implementation. `foundry.applications.ux.TextEditor` is the
- * base class and `.implementation` is the system-registered subclass (dnd5e/PF2e
- * install their own). From 13.340 core's base `enrichHTML` self-dispatches to
- * `TextEditor.implementation`, so on such a client the `?? base` fallback is equivalent
- * rather than degraded, and no `compatibility.minimum` raise is needed for it. Below
- * 13.340 it would call the base directly and skip the system subclass — harmless here,
- * because that subclass carries only secrets/visibility behaviour while system and
- * module enrichers live on `CONFIG.TextEditor.enrichers`, which the base runs too.
- * Stated conditionally on purpose: do not read "equivalent" as unconditional.
- *
- * Always reached through `globalThis.foundry?.…` — a bare `foundry.` throws a
- * ReferenceError in Node instead of yielding `undefined`, which would defeat this
- * module's stated "works in both Foundry and Node" contract.
- *
- * @returns {object|null}
- */
+// `.implementation` is the system-registered subclass. From 13.340 core's base `enrichHTML`
+// self-dispatches to it, so the `?? base` fallback is equivalent THERE and degraded below it —
+// harmlessly, because that subclass carries only secrets and visibility behaviour while system and
+// module enrichers live on `CONFIG.TextEditor.enrichers`, which the base runs too. Read that
+// conditionally, not as unconditional equivalence.
+// Always through `globalThis.foundry?.…`: a bare `foundry.` throws a ReferenceError in Node.
 function textEditorImplementation() {
   return (
     globalThis.foundry?.applications?.ux?.TextEditor?.implementation ??
@@ -718,53 +483,23 @@ function textEditorImplementation() {
   );
 }
 
-/**
- * RESOLVE a raw description through Foundry's own enricher and return the enriched
- * HTML. A label-less `@UUID[…]` comes back as an anchor whose text is the
- * referenced document's real NAME — which is the whole point of resolving at write
- * time instead of flattening directives to whatever label the author happened to
- * type.
- *
- * The caller is expected to normalize the returned HTML to plain text with
- * `plainTextDescription` (`src/utils/plainTextDescription.js`), whose broken-anchor
- * and privacy passes need the MARKUP, not `textContent`. That is why this is named
- * `enrichToHtml` rather than `enrichText`.
- *
- * Option bag — every value here is load-bearing:
- * - `documents: true` — the point; turns a reference into a named anchor.
- * - `custom: true` — runs `CONFIG.TextEditor.enrichers`, i.e. the system's and
- *   modules' own enrichers (`@Check`, `@Damage`, `&Reference`, …).
- * - `secrets: false`, EXPLICITLY — PF2e's `TextEditorPF2e.enrichHTML` does
- *   `options.secrets ??= game.user.isGM`, and we enrich AS GM but store the result
- *   for PLAYERS, so an omitted key would bake a GM-only secret block into
- *   player-visible text. The explicit `false` defeats the `??=`.
- * - `rolls: false` — a command-LESS `[[1d6]]` is EAGERLY evaluated by the enricher
- *   and would freeze as a literal `"4"` in the stored description forever. The
- *   deferred `[[/roll 1d6]]` form cannot be had without the eager one, so rolls are
- *   flattened deterministically downstream instead.
- * - `embeds: false` — `@Embed[uuid]` inlines an entire journal page into what is
- *   meant to be a one-line description; its authored label is recovered by the
- *   label mop-up in `plainTextDescription`.
- * - `links: false` — raw hyperlink auto-linking adds nothing to plain text.
- * - `relativeTo` — resolves relative UUIDs against the source document.
- *
- * `processVisibility` is **deliberately ABSENT**, and re-adding it is pinned as a
- * failing test. Passing `false` is wrong in DIRECTION: PF2e's `UserVisibilityPF2e`
- * removes `[data-visibility="gm"]` content only when the current user is NOT a GM,
- * and we enrich as a GM — so `false` never closes the GM leak it looks like it
- * closes, while additionally re-opening the unconditional `[data-visibility="none"]`
- * removal the default performs for free. The frame of reference is the mismatch: the
- * flag filters for the user DOING the enriching, whereas the result is stored for a
- * different, broader audience. The leak is closed by an audience-independent
- * attribute scrub in `plainTextDescription` instead.
- *
- * Falls back to the raw text (never throws) when no enricher is reachable, so the
- * headless/test path degrades to today's behaviour rather than losing the text.
- *
- * @param {string} raw - the source description text
- * @param {{ relativeTo?: object|null }} [options]
- * @returns {Promise<string>} enriched HTML
- */
+// Resolve a raw description through Foundry's own enricher and return the enriched HTML: a
+// label-less `@UUID[…]` comes back as an anchor carrying the referenced document's real NAME, which
+// is the whole point of resolving at write time. Named `enrichToHtml` rather than `enrichText`
+// because the caller normalizes with `plainTextDescription`, whose broken-anchor and privacy passes
+// need the MARKUP rather than `textContent`.
+// Every option below is load-bearing. `secrets: false` is EXPLICIT because PF2e does
+// `options.secrets ??= game.user.isGM` and we enrich AS GM but store the result for PLAYERS.
+// `rolls: false` because a command-less `[[1d6]]` is evaluated EAGERLY and would freeze as a
+// literal in the stored description forever. `embeds: false` because `@Embed[uuid]` inlines a whole
+// journal page into a one-line description.
+// `processVisibility` is DELIBERATELY ABSENT and re-adding it is pinned as a failing test: `false`
+// is wrong in DIRECTION, because PF2e strips `[data-visibility="gm"]` only when the user is NOT a
+// GM — so it never closes the leak it appears to, and it re-opens the unconditional
+// `[data-visibility="none"]` removal the default performs for free. The flag filters for the user
+// DOING the enriching while the result is stored for a broader audience; the leak is closed by an
+// audience-independent attribute scrub in `plainTextDescription` instead.
+// Falls back to the raw text and never throws, so a headless path loses no text.
 export async function enrichToHtml(raw, { relativeTo = null } = {}) {
   const text = typeof raw === 'string' ? raw : '';
   if (!text) return '';
@@ -786,27 +521,17 @@ export async function enrichToHtml(raw, { relativeTo = null } = {}) {
   }
 }
 
-// Compendium-shaped UUID candidates inside directive text. Deliberately GENEROUS —
-// every candidate is handed to `foundry.utils.parseUuid`, which is the authoritative
-// parser, so over-matching costs one cheap parse while under-matching would silently
-// revert priming to one round-trip per description while every call-count test still
-// passed. Bounded quantifiers only (Sonar S5852): an unterminated run of `@Word[`
-// must stay linear, which the adversarial-length test pins.
+// Deliberately GENEROUS: every candidate goes to the authoritative `foundry.utils.parseUuid`, so
+// over-matching costs one cheap parse while under-matching would silently revert priming to one
+// round-trip per description with every call-count test still passing. Bounded quantifiers only
+// (Sonar S5852), so an unterminated run of `@Word[` stays linear.
 const COMPENDIUM_UUID_CANDIDATE =
   /@[A-Za-z]{1,32}\[([^\]]{0,2048})\]|(?<![\w.])(Compendium\.[\w.-]{1,512})/g;
 
-// Foundry documents no cap on `_id__in`; chunked defensively so a world with
-// hundreds of references from one pack cannot build a pathological query.
+// Foundry documents no cap on `_id__in`, so this is chunked defensively.
 const PRIME_CHUNK_SIZE = 250;
 
-/**
- * Group the compendium documents referenced by `rawTexts` by pack.
- * Ids already resident in a pack's document cache are skipped — priming them
- * again would be a wasted round-trip.
- *
- * @param {Iterable<string>} rawTexts
- * @returns {Map<object, string[]>} pack → ids to fetch
- */
+// Ids already resident in a pack's document cache are skipped: priming them again is a wasted trip.
 function groupUncachedCompendiumIds(rawTexts) {
   const parseUuid = globalThis.foundry?.utils?.parseUuid;
   const byPack = new Map();
@@ -841,21 +566,9 @@ function groupUncachedCompendiumIds(rawTexts) {
   return byPack;
 }
 
-/**
- * Warm the compendium document cache for every reference in `rawTexts`, ONCE, up
- * front.
- *
- * Core's enricher primes compendiums per `enrichHTML` call, so resolving 400
- * descriptions one at a time costs up to 400 round-trips. Priming from a single
- * sweep collapses that to one query per PACK. The fetched documents are retained
- * for the session (Foundry evicts nothing here), which is what makes the
- * subsequent per-description `enrichHTML` calls cache hits.
- *
- * No-ops safely when Foundry's UUID parser is absent (headless tests).
- *
- * @param {Iterable<string>} rawTexts
- * @returns {Promise<void>}
- */
+// Core's enricher primes compendiums per `enrichHTML` call, so 400 descriptions cost up to 400
+// round-trips. One sweep collapses that to one query per PACK, and the fetched documents are
+// retained for the session, which is what makes the later per-description calls cache hits.
 export async function primeEnricherCache(rawTexts) {
   const byPack = groupUncachedCompendiumIds(rawTexts);
   const fetches = [];
@@ -869,26 +582,24 @@ export async function primeEnricherCache(rawTexts) {
 }
 
 export function getDragEventData(event) {
-  // Strategy 1: Foundry v13+ API
   const impl = globalThis.foundry?.applications?.ux?.TextEditor?.implementation;
   if (impl?.getDragEventData) {
     return impl.getDragEventData(event);
   }
 
-  // Strategy 2: Parse text/plain from dataTransfer (universal Foundry format)
+  // `text/plain` on the dataTransfer is the universal Foundry format.
   try {
     const raw = event?.dataTransfer?.getData?.('text/plain');
     if (raw) return JSON.parse(raw);
   } catch (_) {
-    // Not valid JSON -- fall through
+    // Not valid JSON: fall through to the null answer below.
   }
 
   return null;
 }
 
 async function itemSourceDescription(item) {
-  // Most UI consumers need only the lightweight Foundry wrappers; load the
-  // description pipeline only when an Item snapshot actually requests it.
+  // Most consumers need only the lightweight wrappers, so the description pipeline loads lazily.
   const { descriptionTextCandidate, plainTextDescription } =
     await import('../../../utils/plainTextDescription.js');
   const candidates = [
@@ -907,14 +618,8 @@ async function itemSourceDescription(item) {
   return '';
 }
 
-/**
- * Resolve a Foundry UUID to the small, system-agnostic Item snapshot used by
- * manager drop zones. Non-Item documents, missing documents, and resolver
- * failures are rejected before a caller mutates draft state.
- *
- * @param {string} uuid
- * @returns {Promise<{uuid:string,name:string,img:string,type:string,description:string}|null>}
- */
+// Non-Item documents, missing documents and resolver failures are all rejected BEFORE a caller
+// mutates draft state.
 export async function resolveItemSourceSnapshot(uuid) {
   if (!uuid || typeof globalThis.fromUuid !== 'function') return null;
   try {
