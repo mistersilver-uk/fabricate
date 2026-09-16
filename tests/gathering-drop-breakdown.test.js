@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 
 import { GatheringRichStateService } from '../src/systems/GatheringRichStateService.js';
 import { SETTING_KEYS } from '../src/config/settings.js';
+import {
+  GatheringDocumentActor,
+  compendiumSourceItem,
+  gatheringFixture,
+  runRealGatheringAttempt,
+} from './helpers/real-gathering-attempt.js';
 
 function makeService({ evaluateExpression } = {}) {
   const settings = new Map([[SETTING_KEYS.GATHERING_CONFIG, {}]]);
@@ -166,4 +172,114 @@ test('issue 299: previewDropBreakdown final chance matches resolveD100Attempt fo
     resolved.items[0].finalDropRate,
     'preview and resolution agree on the multiplicative final rate'
   );
+});
+
+/**
+ * ## The RECORDED breakdown (issue 1648, TP14-B)
+ *
+ * Everything above is the live preview — odds computed from current configuration. This is
+ * the other half: what a real d100 gather leaves behind, read back through a fresh run
+ * manager and the journal builder after the actor flags were serialized. Evaluated rows,
+ * the selected subset and their row/source links must survive that trip, and a recorded
+ * quantity must come from an ACKNOWLEDGED receipt rather than the authored row — which is
+ * only observable once the two disagree, so one test makes them disagree.
+ */
+
+const ORE_SOURCE_UUID = 'Compendium.fixture.materials.Item.iron-ore';
+const ORE_SOURCE = compendiumSourceItem({
+  uuid: ORE_SOURCE_UUID,
+  name: 'Iron Ore',
+  img: 'icons/commodities/ore/ore-iron-grey.webp',
+});
+const RECORDED_SOURCES = { [ORE_SOURCE_UUID]: ORE_SOURCE };
+const RECORDED_COMPONENTS = [
+  { id: 'ore', name: 'Iron Ore', img: ORE_SOURCE.img, registeredItemUuid: ORE_SOURCE_UUID, difficulty: 1 },
+  { id: 'gem', name: 'Gem', img: 'icons/commodities/gems/gem-rough-navette-blue.webp', difficulty: 1 },
+];
+
+const recordedFixture = (dropRows) => gatheringFixture({ components: RECORDED_COMPONENTS, dropRows });
+const historyEntries = (attempt) => attempt.project({ projectionViewer: { isGM: true } }).gatheringYield.entries;
+
+test('the evaluated rows, the selected subset and their row/source linkage survive into the record', async () => {
+  const attempt = await runRealGatheringAttempt({
+    ...recordedFixture([
+      { id: 'row-ore', componentId: 'ore', quantity: 2, dropRate: 90, enabled: true },
+      { id: 'row-gem', componentId: 'gem', quantity: 1, dropRate: 10, enabled: true },
+    ]),
+    sources: RECORDED_SOURCES,
+    rolls: [50],
+  });
+
+  assert.equal(attempt.error, null);
+  const recorded = attempt.record.checkResult;
+  // EVERY evaluated row is recorded and linked, including the one that missed — a row
+  // that only appears when it drops cannot show a player what they did not find.
+  assert.deepEqual(
+    recorded.itemRows.map((row) => [row.resultRowId, row.dropped]),
+    [['row-ore:0', true], ['row-gem:1', false]]
+  );
+  assert.deepEqual(recorded.items.map((row) => row.resultRowId), ['row-ore:0']);
+
+  // The actual ref names the SOURCE it was created from, distinct from the owned
+  // destination document, and carries the link back to the row that selected it.
+  assert.deepEqual(attempt.record.createdResults, [
+    {
+      actorUuid: attempt.actor.uuid,
+      itemUuid: `${attempt.actor.uuid}.Item.item-0`,
+      name: 'Iron Ore',
+      img: ORE_SOURCE.img,
+      quantity: 2,
+      componentId: 'ore',
+      resultRowId: 'row-ore:0',
+      sourceItemUuid: ORE_SOURCE_UUID,
+    },
+  ]);
+
+  assert.deepEqual(
+    historyEntries(attempt).map((entry) => [entry.id, entry.cleared, entry.rawRoll, entry.threshold, entry.qty]),
+    [
+      ['row-ore:0', true, 50, 11, 2],
+      ['row-gem:1', false, 50, 91, 0],
+    ]
+  );
+});
+
+test('a row that was never evaluated carries NO outcome rather than a defaulted one', async () => {
+  const attempt = await runRealGatheringAttempt({
+    ...recordedFixture([
+      { id: 'row-ore', componentId: 'ore', quantity: 2, dropRate: 90, enabled: true },
+      { id: 'row-off', componentId: 'gem', quantity: 9, dropRate: 100, enabled: false },
+    ]),
+    sources: RECORDED_SOURCES,
+    rolls: [50],
+  });
+
+  // A disabled row is never rolled, so it must be absent — not present with a
+  // manufactured `cleared: false` / `qty: 0`, which would read as a recorded miss.
+  assert.deepEqual(attempt.record.checkResult.itemRows.map((row) => row.resultRowId), ['row-ore:0']);
+  assert.deepEqual(historyEntries(attempt).map((entry) => entry.id), ['row-ore:0']);
+  assert.equal(JSON.stringify(attempt.record).includes('row-off'), false);
+});
+
+test('a recorded quantity is the ACKNOWLEDGED delta, never the authored row quantity', async () => {
+  const actor = new GatheringDocumentActor();
+  const create = actor.createEmbeddedDocuments.bind(actor);
+  // A document layer that accepts the create but stores less than was asked for. Until
+  // the two disagree, "the receipt" and "the authored default" produce the same number.
+  actor.createEmbeddedDocuments = async (type, data) =>
+    create(type, data.map((entry) => ({ ...entry, system: { ...entry.system, quantity: 1 } })));
+
+  const attempt = await runRealGatheringAttempt({
+    ...recordedFixture([{ id: 'row-ore', componentId: 'ore', quantity: 3, dropRate: 90, enabled: true }]),
+    actor,
+    sources: RECORDED_SOURCES,
+    rolls: [50],
+  });
+
+  assert.equal(attempt.error.code, 'HISTORY_EFFECT_UNCERTAIN');
+  assert.equal(attempt.record.historySettlement.awards, 'uncertain');
+  assert.deepEqual(attempt.record.createdResults.map((entry) => entry.quantity), [1]);
+  assert.deepEqual(historyEntries(attempt).map((entry) => entry.qty), [1]);
+  // The authored 3 is still on the evaluated row, and is still not an award.
+  assert.equal(attempt.record.checkResult.itemRows[0].quantity, 3);
 });

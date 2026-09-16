@@ -516,7 +516,7 @@ export const KNOWN_OFF_LADDER_RADII = knownDebt('offLadderRadii');
  *
  * @see KNOWN_OFF_LADDER_RADII
  */
-export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 281;
+export const KNOWN_OFF_LADDER_RADIUS_TOTAL = 277;
 
 /**
  * A Svelte SCOPED STYLE reading an area-scoped `--fab-*` property, keyed `file | property`.
@@ -806,7 +806,8 @@ export const KNOWN_FORMLESS_BUTTONS = knownDebt('formlessButtons');
  *
  * @see KNOWN_FORMLESS_BUTTONS
  */
-export const KNOWN_FORMLESS_BUTTON_TOTAL = 230;
+// #1648: ActionsPanel delegates its four former raw controls to RunActionBar (230 - 4).
+export const KNOWN_FORMLESS_BUTTON_TOTAL = 226;
 
 /**
  * A shared component outside `components/` with no manifest row, keyed `path`.
@@ -976,7 +977,11 @@ export const KNOWN_OFF_LADDER_ART_SIZES = knownDebt('offLadderArtSizes');
  *
  * Both are pre-existing geometry becoming visible, on the same reading as the thirteen above.
  */
-export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 74;
+// Issue 1648 removes six former Journal render sites and adds SlotTile's single 56px site.
+// The generic 38px maximum is rejected for that site because the published SlotTile specimen
+// specifies a 56px material-choice tile with an overlaid quantity pip. Its dedicated geometry
+// takes precedence over the generic Medallion ladder; ordinary Journal art now uses 30px/38px.
+export const KNOWN_OFF_LADDER_ART_SIZE_TOTAL = 69;
 
 export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredSharedComponents');
 
@@ -1036,4 +1041,6 @@ export const KNOWN_UNREGISTERED_SHARED_COMPONENTS = knownDebt('unregisteredShare
 // file sits outside `src/ui/svelte/components/` and inside `src/ui/svelte/`, which is what
 // `unregisteredSharedComponents()` filters on. The same file under `components/` would be inside
 // the primitive directory and would demand a manifest row instead.
-export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 46;
+// Issue 1648: ThisRun is an app-specific composition of InspectorCard, Kicker and
+// JournalFactRow, shared by the active and historical detail compositions.
+export const KNOWN_UNREGISTERED_SHARED_COMPONENT_TOTAL = 47;

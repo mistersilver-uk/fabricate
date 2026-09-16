@@ -349,7 +349,7 @@ class FakeActor {
   async setFlag(namespace, key, value) {
     this.flags[namespace] = this.flags[namespace] || {};
     this.flags[namespace][key] = structuredClone(value);
-    return value;
+    return this;
   }
 }
 

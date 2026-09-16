@@ -15,6 +15,18 @@ import assert from 'node:assert/strict';
 
 import { CraftingEngine } from '../src/systems/CraftingEngine.js';
 import { SalvageRunManager } from '../src/systems/SalvageRunManager.js';
+import { createPersistedSalvageHistory, mergeHistoryFlag } from './helpers/journal-fixtures.js';
+
+for (const timed of [false, true]) {
+  test(`real salvage writer keeps duplicate-source row linkage through reload and projection (timed=${timed})`, async () => {
+    const { record, model } = await createPersistedSalvageHistory({ timed });
+    assert.deepEqual(record.createdResults.map((row) => row.resultRowId), ['output:result-0:0', 'output:result-1:1']);
+    for (const rows of [record.createdResults, model.createdResults]) {
+      assert.deepEqual(rows.map((row) => row.quantity), [2, 1]);
+      assert.equal(rows[0].itemUuid, rows[1].itemUuid, 'one physical stack, two independent awards');
+    }
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Globals
@@ -77,12 +89,15 @@ function makeItem(id, name, quantity = 1) {
     },
     async delete() {
       this.deleteCalled = true;
+      return this;
     },
     async update(payload) {
       this.updateCalled = true;
       this.updatePayloads.push({ ...payload });
       if (payload['system.quantity'] !== undefined)
         this.system.quantity = payload['system.quantity'];
+      if (this._source && payload['system.quantity'] !== undefined) this._source.system.quantity = payload['system.quantity'];
+      return this;
     },
   };
   return item;
@@ -108,7 +123,8 @@ function makeActor(id, items = []) {
     },
     async setFlag(ns, key, value) {
       if (!flags[ns]) flags[ns] = {};
-      flags[ns][key] = value;
+      flags[ns][key] = mergeHistoryFlag(flags[ns][key], value);
+      return this;
     },
     flags: {},
     _flagStore: flags,
@@ -117,6 +133,8 @@ function makeActor(id, items = []) {
       return dataArr.map((d, i) => {
         const it = makeItem(`created-${id}-${i}`, d.name || 'Created', d.system?.quantity || 1);
         it.uuid = `Actor.${id}.Item.created-${i}`;
+        it.parent = this;
+        it._source = structuredClone(it.toObject());
         created.push(it);
         return it;
       });

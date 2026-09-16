@@ -41,6 +41,11 @@ import {
   stackQuantityUpdate,
   updateStackQuantity,
 } from '../src/systems/itemStackQuantity.js';
+import { CraftingEngine } from '../src/systems/CraftingEngine.js';
+import {
+  createItemReceiptCollector,
+  writeItemAward,
+} from '../src/systems/runHistoryEvidence.js';
 
 /** Capture `console.warn` for the duration of one test. */
 function captureWarnings(t) {
@@ -238,21 +243,28 @@ const SITE_MAPPING = [
     anchors: [/return readStackQuantity\(item\);/],
   },
   {
-    site: 'componentStacking.createOrStackComponentItem (existing stack)',
-    file: 'src/systems/componentStacking.js',
+    site: 'runHistoryEvidence.sourceItemQuantity stored source read',
+    file: 'src/systems/runHistoryEvidence.js',
     accessor: 'readStoredStackQuantity',
     sites: 1,
-    absentDefault: 1,
+    absentDefault: null,
     anchors: [
-      /const base = readStoredStackQuantity\(existing, \{ absentDefault: 1, path: quantityPath \}\)/,
+      /readStoredStackQuantity\(source, \{ path, absentDefault: null \}\)/,
     ],
   },
   {
-    site: 'componentStacking.createOrStackComponentItem (increment write)',
-    file: 'src/systems/componentStacking.js',
+    site: 'runHistoryEvidence.writeItemAward increment write',
+    file: 'src/systems/runHistoryEvidence.js',
     accessor: 'updateStackQuantity',
     sites: 1,
-    anchors: [/updateStackQuantity\(existing, base \+ delta, quantityPath\)/],
+    anchors: [/updateStackQuantity\(existing, before \+ quantity, path, {/],
+  },
+  {
+    site: 'runHistoryEvidence.sourceItemQuantity presence before caller default',
+    file: 'src/systems/runHistoryEvidence.js',
+    accessor: 'hasStackQuantity',
+    sites: 1,
+    anchors: [/hasStackQuantity\(source, path\)/],
   },
   {
     site: 'CraftingEngine.selectedQuantityItems + salvage totalAvailable',
@@ -274,24 +286,6 @@ const SITE_MAPPING = [
     file: 'src/systems/pooledAllocation.js',
     accessor: 'readStackQuantity',
     sites: 1,
-    // The read that decides delete-versus-decrement for the salvage consume. It is the
-    // coercing reader on purpose: a stored 0 read as 0 would make every take exhaust its
-    // item, so the consume would DELETE where it should decrement.
-    deleteSites: 1,
-  },
-  {
-    site: 'CraftingEngine._consumeAlchemyExtraItems + _consumeSubmittedAlchemyItems + _consumeIngredients',
-    file: 'src/systems/CraftingEngine.js',
-    accessor: 'readStoredStackQuantity',
-    sites: 3,
-    absentDefault: 1,
-    deleteSites: 3,
-    // The two alchemy consume sites are spelled identically, so the first anchor accounts
-    // for two of the three occurrences and the totals assertion covers the rest.
-    anchors: [
-      /const qty = readStoredStackQuantity\(item, \{ absentDefault: 1 \}\);/,
-      /const itemQuantity = readStoredStackQuantity\(item, \{ absentDefault: 1 \}\);/,
-    ],
   },
   {
     site: 'CraftingEngine award creation stackability probe',
@@ -301,29 +295,48 @@ const SITE_MAPPING = [
     anchors: [/if \(hasStackQuantity\(itemData\) \|\| !sourceItem\)/],
   },
   {
+    site: 'CraftingEngine versioned alchemy validation (#1648)',
+    file: 'src/systems/CraftingEngine.js',
+    accessor: 'readStoredStackQuantity',
+    sites: 1,
+    absentDefault: 1,
+    anchors: [
+      /if \(readStoredStackQuantity\(item, \{ absentDefault: 1 \}\) < count\)/,
+    ],
+  },
+  {
+    // The DELETE half of the boundary below, and the reason it reads the present-item
+    // accessor rather than the stored one: the consumption plan counted this document
+    // with `readStackQuantity`, so a stack stored at `0` was planned as one unit and
+    // must settle as one unit. Reading it as stored answers zero and refuses the whole
+    // consumption as uncertain (#1648).
+    site: 'CraftingEngine._consumeItemQuantity whole-document delete delta (#1648)',
+    file: 'src/systems/CraftingEngine.js',
+    accessor: 'readStackQuantity',
+    sites: 1,
+    anchors: [/const whole = readStackQuantity\(item\?\._source \?\? item, path\);/],
+  },
+  {
+    site: 'CraftingEngine._consumeItemQuantity shared decrement write (#1648)',
+    file: 'src/systems/CraftingEngine.js',
+    accessor: 'updateStackQuantity',
+    sites: 1,
+    deleteSites: 1,
+    anchors: [/updateStackQuantity\(item, before - quantity, path, {/],
+  },
+  {
+    site: 'RunJournalBuilder candidate held quantity (#1648)',
+    file: 'src/systems/RunJournalBuilder.js',
+    accessor: 'readStackQuantity',
+    sites: 1,
+    anchors: [/const held = readStackQuantity\(item\);/],
+  },
+  {
     site: 'CraftingEngine._restoreComponentItem + award creation (payload writes)',
     file: 'src/systems/CraftingEngine.js',
     accessor: 'setStackQuantity',
     sites: 2,
     anchors: [/setStackQuantity\(itemData, qty\);/, /setStackQuantity\(itemData, result\.quantity\);/],
-  },
-  {
-    site: 'CraftingEngine decrement writes on the four delete sites',
-    file: 'src/systems/CraftingEngine.js',
-    accessor: 'updateStackQuantity',
-    sites: 4,
-    anchors: [
-      /updateStackQuantity\(item, qty - count\)/,
-      /updateStackQuantity\(item, itemQuantity - quantity\)/,
-      /updateStackQuantity\(take\.item, take\.remainingQuantity\)/,
-    ],
-  },
-  {
-    site: 'GatheringEngine.normalizeRunItems (source term only)',
-    file: 'src/systems/GatheringEngine.js',
-    accessor: 'readStoredStackQuantity',
-    sites: 1,
-    absentDefault: 1,
   },
   {
     site: 'RecipeManager have counts',
@@ -406,22 +419,7 @@ const SITE_MAPPING = [
     file: 'src/gatheringResultCreation.js',
     accessor: 'setStackQuantity',
     sites: 1,
-    anchors: [/setStackQuantity\(itemData, Number\(result\.quantity \|\| 1\)\)/],
-  },
-  {
-    site: 'gatheringResultCreation stack-onto-existing',
-    file: 'src/gatheringResultCreation.js',
-    accessor: 'readStoredStackQuantity',
-    sites: 1,
-    absentDefault: 0,
-    anchors: [/readStoredStackQuantity\(existing, \{ absentDefault: 0 \}\)/],
-  },
-  {
-    site: 'gatheringResultCreation stack-onto-existing write',
-    file: 'src/gatheringResultCreation.js',
-    accessor: 'updateStackQuantity',
-    sites: 1,
-    anchors: [/updateStackQuantity\(existing, next\)/],
+    anchors: [/setStackQuantity\(itemData, quantity\)/],
   },
   {
     site: 'toolBreakageRuntime replacement payload write',
@@ -461,10 +459,7 @@ const SITE_MAPPING = [
     file: 'src/systems/companionComponentAward.js',
     accessor: 'readStoredStackQuantity',
     sites: 1,
-    // The ONLY `absentDefault: null` site in `src/**`, and it is the whole of the award's
-    // "nothing is invented" rule: a target carrying no readable count is not stacked onto at
-    // all, so the award creates a second document instead of authoring a count field on an
-    // item type that has none.
+    // A missing stack base creates a separate document rather than inventing a count.
     absentDefault: null,
     anchors: [
       /readStoredStackQuantity\(target, \{ absentDefault: null, path: quantityPath \}\)/,
@@ -641,7 +636,7 @@ describe('the per-site accessor mapping', () => {
   it('uses only 1, 0 and null as absent defaults, and only on the stored reader', () => {
     // `null` is the third value, and it is a DIFFERENT KIND of answer from the other two:
     // 1 and 0 supply a base, while `null` says the item carries no readable count at all and
-    // hands the decision back to the caller. Exactly one site uses it (issue 1301).
+    // hands the decision back to the caller.
     const ABSENT_DEFAULTS = [0, 1, null];
     for (const entry of SITE_MAPPING) {
       if (entry.accessor === 'readStoredStackQuantity') {
@@ -661,11 +656,6 @@ describe('the per-site accessor mapping', () => {
     // that 0 to a 1 inflates every gathered stack by one on the very first award onto an
     // existing item, and it is the drift a reviewer used to prove the earlier table
     // discovered nothing — so it is asserted against SOURCE, not against the table.
-    const zeroDefault = SITE_MAPPING.filter((entry) => entry.absentDefault === 0);
-    assert.deepEqual(
-      zeroDefault.map((entry) => entry.site),
-      ['gatheringResultCreation stack-onto-existing']
-    );
     assert.deepEqual(
       [...countAbsentDefaults(0).entries()],
       [['src/gatheringResultCreation.js', 1]],
@@ -673,19 +663,25 @@ describe('the per-site accessor mapping', () => {
     );
   });
 
-  it('records exactly one absent-default-null site, and live source agrees', () => {
-    // Pinned in both directions for the same reason the `0` site is: `null` is the value that
-    // makes the component award REFUSE to stack rather than inventing a base, so a second site
-    // adopting it — or this one losing it — is a behavioural change that must be deliberate.
+  it('records the stored-reader and measured-delta unknown defaults exactly', () => {
     const nullDefault = SITE_MAPPING.filter((entry) => entry.absentDefault === null);
     assert.deepEqual(
       nullDefault.map((entry) => entry.site),
-      ['companionComponentAward stack-target base read']
+      ['runHistoryEvidence.sourceItemQuantity stored source read', 'companionComponentAward stack-target base read']
     );
+    // Sorted, like its sibling below. A Map's entries follow the order `collectSources` walked
+    // the tree, so a raw comparison pins the FILESYSTEM's enumeration: this passed on Windows
+    // and failed on Linux CI the moment a third file joined the list (issue 1648).
     assert.deepEqual(
-      [...countAbsentDefaults('null').entries()],
-      [['src/systems/companionComponentAward.js', 1]],
-      'exactly one `absentDefault: null` in src/**, and only in the component award'
+      asSortedPairs(countAbsentDefaults('null')),
+      asSortedPairs(
+        new Map([
+          ['src/systems/companionComponentAward.js', 1],
+          ['src/systems/CraftingEngine.js', 1],
+          ['src/systems/runHistoryEvidence.js', 2],
+        ])
+      ),
+      'post-write measurements remain unknown when the quantity field is absent'
     );
   });
 
@@ -698,7 +694,7 @@ describe('the per-site accessor mapping', () => {
     assert.deepEqual(asSortedPairs(countAbsentDefaults(1)), asSortedPairs(declared));
   });
 
-  it('records exactly four delete-on-underrun sites, and four decrement writes beside them', () => {
+  it('records one shared consumption delete/decrement boundary', () => {
     // Counted from an explicit field rather than parsed out of the label: a label-substring
     // filter reads as a check while actually depending on prose nobody validates.
     const total = SITE_MAPPING.reduce((sum, entry) => sum + (entry.deleteSites ?? 0), 0);
@@ -708,7 +704,7 @@ describe('the per-site accessor mapping', () => {
     const contributors = SITE_MAPPING.filter((entry) => (entry.deleteSites ?? 0) > 0).map(
       (entry) => `${entry.site} (${entry.deleteSites})`
     );
-    assert.equal(total, 4, `expected four delete-on-underrun sites: ${contributors.join('; ')}`);
+    assert.equal(total, 1, `expected one shared delete-on-underrun site: ${contributors.join('; ')}`);
     for (const entry of SITE_MAPPING) {
       assert.ok(
         (entry.deleteSites ?? 0) <= entry.sites,
@@ -722,7 +718,7 @@ describe('the per-site accessor mapping', () => {
       (entry) =>
         entry.file === 'src/systems/CraftingEngine.js' && entry.accessor === 'updateStackQuantity'
     ).reduce((sum, entry) => sum + entry.sites, 0);
-    assert.equal(engineWrites, 4);
+    assert.equal(engineWrites, 1);
   });
 });
 
@@ -1442,5 +1438,186 @@ describe('the pooled reduction and its inverse, pinned FUNCTION BY FUNCTION', ()
         `${name} writes ${other}, which is the OTHER half of the pair`
       );
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A GUARD REFUSAL IS NOT A LOST ACKNOWLEDGEMENT (#1648 A4).
+//
+// The object-valued-path guard answers `null` WITHOUT calling `update`, and the two
+// acknowledgement sites read that exactly as they read a document that did not acknowledge —
+// so a write that never reached the database demanded GM reconciliation. `throwOnRefusal`
+// separates them; the two directions are asserted together so neither can drift into the other.
+// ---------------------------------------------------------------------------
+
+describe('a refused write is distinguishable from an unacknowledged one', () => {
+  // The divergence is modelled EXPLICITLY, and it is what makes the guard reachable from an
+  // acknowledgement site at all: the quantity is read from `_source` (a number, so the site
+  // proceeds) while the guard reads the PREPARED document, where derived data or an Active
+  // Effect has put an object. A fixture aliasing the two could never reach the refusal, and the
+  // test would pass while asserting nothing.
+  function divergentItem() {
+    return {
+      name: 'Iron Ingot',
+      system: { quantity: { value: 20 } },
+      _source: { system: { quantity: 20 } },
+      update: async () => {
+        throw new Error('update must never be reached on a refusal');
+      },
+    };
+  }
+
+  it('throws its own definite error rather than answering the acknowledgement null', async (t) => {
+    captureWarnings(t);
+    t.after(resetItemStackQuantityPath);
+    configureItemStackQuantityPath('system.quantity');
+    await assert.rejects(
+      () => updateStackQuantity(divergentItem(), 19, undefined, { throwOnRefusal: true }),
+      (error) => error.code === 'STACK_QUANTITY_PATH_REFUSED' && error.path === 'system.quantity'
+    );
+  });
+
+  it('keeps answering null for a caller whose null does not mean uncertainty', async (t) => {
+    captureWarnings(t);
+    t.after(resetItemStackQuantityPath);
+    configureItemStackQuantityPath('system.quantity');
+    // The companion-award stack branch publishes `awardFailed` as RETRY-SAFE from this `null`,
+    // which is already the right reading of a write that never happened.
+    assert.equal(await updateStackQuantity(divergentItem(), 19), null);
+  });
+
+  it('reports a refused consumption as definite rather than as needing reconciliation', async (t) => {
+    captureWarnings(t);
+    t.after(resetItemStackQuantityPath);
+    configureItemStackQuantityPath('system.quantity');
+    const engine = new CraftingEngine({ getRecipe: () => null }, null);
+    await assert.rejects(
+      () => engine._consumeIngredients([{ item: divergentItem(), quantity: 1, ingredient: null }]),
+      (error) => {
+        assert.equal(error.code, 'STACK_QUANTITY_PATH_REFUSED', 'a definite failure');
+        return true;
+      }
+    );
+  });
+
+  it('reports a refused award as definite rather than as needing reconciliation', async (t) => {
+    captureWarnings(t);
+    t.after(resetItemStackQuantityPath);
+    configureItemStackQuantityPath('system.quantity');
+    await assert.rejects(
+      () => writeItemAward({ existing: divergentItem(), quantity: 1 }),
+      (error) => {
+        assert.equal(error.code, 'STACK_QUANTITY_PATH_REFUSED', 'a definite failure');
+        return true;
+      }
+    );
+  });
+
+  it('still reports an unacknowledged decrement as uncertain', async (t) => {
+    // THE OTHER DIRECTION, on the same code path: a healthy path whose `update` resolves
+    // nothing is a real lost acknowledgement and must keep demanding reconciliation.
+    t.after(resetItemStackQuantityPath);
+    configureItemStackQuantityPath('system.qtd');
+    const engine = new CraftingEngine({ getRecipe: () => null }, null);
+    const item = {
+      name: 'Iron Ingot',
+      system: { qtd: 20 },
+      _source: { system: { qtd: 20 } },
+      update: async () => undefined,
+    };
+    await assert.rejects(
+      () => engine._consumeIngredients([{ item, quantity: 1, ingredient: null }]),
+      (error) => error.code === 'HISTORY_EFFECT_UNCERTAIN'
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AN ACKNOWLEDGED SHORT WRITE IS NOT A COMPLETE ONE (#1648 Q-M1).
+//
+// Both short-write guards in `writeItemAward` were deletable with the whole corpus green: the
+// corpus covers UNACKNOWLEDGED writes well and never an acknowledged one that moved the stack
+// by less than it was asked to. That is the case whose receipt is real but partial, so the run
+// owes `historySettlement: uncertain` and would otherwise record `complete` — a persisted shape.
+// ---------------------------------------------------------------------------
+
+describe('an acknowledged write that landed short still demands reconciliation', () => {
+  /** A document that acknowledges its own update but only moves the stack by `moved`. */
+  function shortItem(before, moved) {
+    return {
+      name: 'Iron Ingot',
+      uuid: 'Actor.a.Item.ingot',
+      system: { quantity: before },
+      _source: { system: { quantity: before } },
+      async update() {
+        this._source.system.quantity = before + moved;
+        this.system.quantity = before + moved;
+        return this;
+      },
+    };
+  }
+
+  /** An actor that acknowledges the creation but with `created` in the stack, not what was asked. */
+  function shortActor(created) {
+    const actor = { uuid: 'Actor.a' };
+    actor.createEmbeddedDocuments = async (_type, [data]) => [
+      {
+        ...data,
+        uuid: `${actor.uuid}.Item.ingot`,
+        parent: actor,
+        system: { quantity: created },
+        _source: { system: { quantity: created } },
+      },
+    ];
+    return actor;
+  }
+
+  const uncertain = (error) => {
+    assert.equal(error.code, 'HISTORY_EFFECT_UNCERTAIN');
+    return true;
+  };
+
+  it('refuses an increment the document acknowledged but applied short', async (t) => {
+    t.after(resetItemStackQuantityPath);
+    configureItemStackQuantityPath('system.quantity');
+    const receiptCollector = createItemReceiptCollector();
+
+    // The control: the full delta lands, so the award settles and its receipt is the whole of it.
+    const exact = shortItem(2, 5);
+    assert.equal(await writeItemAward({ existing: exact, quantity: 5, receiptCollector }), exact);
+    assert.deepEqual(
+      receiptCollector.snapshot().map((receipt) => receipt.quantity),
+      [5]
+    );
+
+    await assert.rejects(
+      () => writeItemAward({ existing: shortItem(2, 1), quantity: 5, receiptCollector }),
+      uncertain
+    );
+    // The partial delta is RETAINED, because reconciliation needs to know what really landed.
+    assert.deepEqual(
+      receiptCollector.snapshot().map((receipt) => receipt.quantity),
+      [5, 1]
+    );
+  });
+
+  it('refuses a creation the actor acknowledged with a smaller stack than requested', async (t) => {
+    t.after(resetItemStackQuantityPath);
+    configureItemStackQuantityPath('system.quantity');
+    const receiptCollector = createItemReceiptCollector();
+    const award = (actor, quantity) =>
+      writeItemAward({
+        actor,
+        itemData: { name: 'Iron Ingot', system: { quantity } },
+        quantity,
+        receiptCollector,
+      });
+
+    assert.equal((await award(shortActor(4), 4)).uuid, 'Actor.a.Item.ingot');
+    await assert.rejects(() => award(shortActor(1), 4), uncertain);
+    assert.deepEqual(
+      receiptCollector.snapshot().map((receipt) => receipt.quantity),
+      [4, 1]
+    );
   });
 });

@@ -81,6 +81,23 @@ export function withoutLinkTargets(sentence) {
 }
 
 /**
+ * A sentence with every digit run replaced by a placeholder.
+ *
+ * A case-count number embedded in prose (the View Lab registry size) changes for reasons unrelated
+ * to a document split, and pinning the literal replacement text the way `withoutLinkTargets` does
+ * would need re-editing every time the registry grows. This lets such a change be allowed NARROWLY
+ * instead: an allowlist entry must reduce to the same string as its replacement once digits are
+ * ignored, so the allowance covers the count and nothing else. A reworded rule cannot pass this
+ * because only digit runs are dropped — every other character must still match exactly.
+ *
+ * @param {string} sentence
+ * @returns {string}
+ */
+export function withoutCounts(sentence) {
+  return String(sentence).replaceAll(/\d+/gu, '#');
+}
+
+/**
  * A multiset of sentences: sentence -> how many times it appears.
  *
  * A MULTISET AND NOT A SET, because a set hides the failure this exists to catch. If a rule

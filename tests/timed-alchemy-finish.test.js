@@ -72,9 +72,11 @@ class FakeItem {
   }
   async delete() {
     this._deleted = true;
+    return this;
   }
   async update(payload) {
     if (payload['system.quantity'] !== undefined) this.system.quantity = payload['system.quantity'];
+    return this;
   }
   toObject() {
     return { name: this.name, img: this.img, type: 'loot', system: { ...this.system } };
@@ -97,7 +99,7 @@ class FakeActor {
   async setFlag(ns, key, value) {
     this._flags[ns] = this._flags[ns] || {};
     this._flags[ns][key] = value;
-    return value;
+    return this;
   }
   async createEmbeddedDocuments(type, data) {
     if (type === 'ActiveEffect') return data;
@@ -108,6 +110,8 @@ class FakeActor {
         entry.system?.quantity || 1
       );
       item.parent = this;
+      item.uuid = `${this.uuid}.Item.${item.id}`;
+      item._source = structuredClone(entry);
       item.createEmbeddedDocuments = async (_t, effectData) => effectData;
       return item;
     });
@@ -338,7 +342,7 @@ test('a matured NON-alchemy timed craft never calls learnRecipeOnCraft', async (
     resolutionMode: 'simple',
     features: { craftingChecks: false, essences: false },
     craftingCheck: { enabled: false, consumption: {} },
-    components: [{ id: 'herb', name: 'Herb' }],
+    components: [{ id: 'herb', name: 'Herb' }, { id: 'elixir', name: 'Elixir' }],
   };
   const spy = buildVisibilitySpy();
   const resolutionService = setupGame(system, spy.service, 1000);
