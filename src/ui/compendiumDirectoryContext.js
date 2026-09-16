@@ -1,21 +1,9 @@
-/**
- * Compendium Directory bulk-import context-menu integration.
- *
- * This module mirrors the pure-helper style of `itemsDirectoryButtons.js`: the
- * option builder imports no Foundry runtime globals (`game`, `ui`, `Hooks`,
- * `CONFIG`) and takes every Foundry-touching collaborator by injection, so it is
- * unit-testable under happy-dom. The one Foundry-touching function in this module
- * (`promptSelectCraftingSystem`) is the injected picker collaborator and is not
- * unit-tested.
- */
+// Compendium Directory bulk-import context menu. The option builder imports no Foundry runtime
+// global and takes every Foundry-touching collaborator by injection, so it is unit-testable;
+// `promptSelectCraftingSystem` below is that injected picker, and is the one Foundry-touching
+// function here.
 
-/**
- * Dataset key that carries the right-clicked compendium's collection id on the
- * Compendium Directory entry element (`data-pack`). Named here so the live
- * runtime key is a single, visibly-diffed source of truth.
- *
- * @type {string}
- */
+// The right-clicked entry's `data-pack`, named so the live runtime key is one visibly-diffed source.
 export const PACK_DATASET_KEY = 'pack';
 
 function escapeHtml(value) {
@@ -28,30 +16,10 @@ function escapeHtml(value) {
   })[ch]);
 }
 
-/**
- * Build the GM-only Compendium Directory context-menu entry that imports every
- * eligible Item from the right-clicked compendium into a chosen crafting system.
- *
- * Returns the MODERN Foundry `ContextMenuEntry` shape `{ label, icon, visible,
- * onClick }` (NOT the deprecated `{ name, condition, callback }`). `visible`
- * returns a boolean; `onClick` receives `(event, target)` with the target
- * SECOND. The handler delegates entirely to `importPack` and renders its
- * returned summary, so de-duplication and update/skip reporting are preserved by
- * construction — no counting logic lives here.
- *
- * @param {object} deps Injected collaborators.
- * @param {(key: string, data?: object) => string} deps.localize Localizer.
- * @param {() => boolean} deps.isGM True when the current user is a GM.
- * @param {(packId: string) => boolean} deps.isItemPack True when the pack holds Items.
- * @param {(packId: string) => string} deps.getPackName Human-readable pack name.
- * @param {() => Array<{id: string, name?: string}>} deps.getSystems Crafting systems.
- * @param {(systems: Array, options: object) => Promise<string|null>} deps.promptSelectSystem
- *   Opens the target-system picker; resolves the chosen system id or null on cancel.
- * @param {(systemId: string, packId: string) => Promise<object>} deps.importPack
- *   Bulk-import primitive (`CraftingSystemManager.addItemsFromPack`).
- * @param {{info: Function, warn: Function}} deps.notify Notification sink.
- * @returns {{label: string, icon: string, visible: Function, onClick: Function}}
- */
+// The MODERN `ContextMenuEntry` shape `{ label, icon, visible, onClick }`, not the deprecated
+// `{ name, condition, callback }`; `onClick` receives `(event, target)` with the target SECOND.
+// The handler delegates entirely to `importPack` and renders its summary, so de-duplication and
+// update/skip reporting are preserved by construction — no counting logic lives here.
 export function buildCompendiumImportContextOption({
   localize,
   isGM,
@@ -77,9 +45,8 @@ export function buildCompendiumImportContextOption({
         return;
       }
 
-      // Always open the picker so the Import button is the deliberate commit —
-      // even for a single system it is preselected, never auto-imported. A null
-      // (cancel) return aborts without touching importPack.
+      // The picker always opens, so the Import button is the deliberate commit: a lone system is
+      // preselected, never auto-imported, and a null return aborts without touching `importPack`.
       const systemId = await promptSelectSystem(systems, { localize, packName });
       if (!systemId) return;
 
@@ -106,23 +73,8 @@ export function buildCompendiumImportContextOption({
   };
 }
 
-/**
- * Foundry picker collaborator: prompt the GM to choose a target crafting system
- * for a compendium import via a `DialogV2` select. Mirrors the DialogV2 usage in
- * `renderSystemImportDialog` (`SvelteCraftingSystemManagerApp.svelte.js`). The
- * sole system is preselected when exactly one exists so the Import button is
- * still the deliberate commit. Resolves to the chosen system id, or null on
- * cancel/close.
- *
- * This is the single Foundry-touching function in this module; it is injected
- * into the option builder (as `promptSelectSystem`) and is not unit-tested.
- *
- * @param {Array<{id: string, name?: string}>} systems Available crafting systems.
- * @param {object} options
- * @param {(key: string, data?: object) => string} options.localize Localizer.
- * @param {string} [options.packName] Human-readable compendium name for the prompt.
- * @returns {Promise<string|null>} Chosen system id, or null.
- */
+// The `DialogV2` picker, mirroring `renderSystemImportDialog`'s usage. Resolves the chosen system
+// id, or null on cancel or close.
 export async function promptSelectCraftingSystem(systems, { localize, packName = '' } = {}) {
   const DialogV2 = globalThis.foundry?.applications?.api?.DialogV2;
   if (!DialogV2?.wait) return null;

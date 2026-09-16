@@ -252,12 +252,15 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // IconButton back under the .svelte threshold -- two of this branch's entries removed by
   // someone else's work rather than by ours.
   //
-  // 124/120 after merging #1682's sweep. Four rows left the ledger with this branch's comment
-  // mass -- `interactableRegionFlags.js::buildInteractableBehaviorSchema`, `main.js::Hooks.once>on`,
-  // `migrateRecipeForModeChange` and `remapWorldScopeIdentityFlags.js` -- and #1682 took
-  // `src/models/Recipe.js` under the file threshold with its constructor under the function one.
-  // Regenerated from the merged tree rather than reconciled by hand: these counts are derived, so
-  // picking a side of the conflict would have pinned a figure no tree actually has.
-  assert.equal(files, 124, 'oversized files');
+  // 123/123 after merging #1682's sweep, which took `src/models/Recipe.js` under the 800-line
+  // file threshold and its constructor under the 100-line function threshold. Regenerated from
+  // the merged tree rather than reconciled by hand: these counts are derived, so picking a side
+  // of the conflict would have pinned a figure no tree actually has.
+  //
+  // 122/120 on this branch. Four rows leave the ledger with its comment mass --
+  // `interactableRegionFlags.js::buildInteractableBehaviorSchema`, `main.js::Hooks.once>on`,
+  // `migrateRecipeForModeChange` and `remapWorldScopeIdentityFlags.js` -- on top of the figure
+  // main carries.
+  assert.equal(files, 122, 'oversized files');
   assert.equal(keys.length - files, 120, 'oversized functions');
 });

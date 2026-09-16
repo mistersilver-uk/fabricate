@@ -10,25 +10,10 @@ import {
   getSystemComponent,
 } from './interactableSourceLibrary.js';
 
-/**
- * The GM "component browser" (Phase 7): a lightweight ApplicationV2 listing the
- * draggable Tools and Gathering Tasks of the active/selected crafting system so
- * a GM can place them on the canvas. Each browser row is a placement source —
- * drag it onto the canvas, or use the keyboard-accessible "Place on current
- * scene" button (the a11y fallback). Both route through the SAME spawn pipeline
- * as a real drop (`InteractableManager`): tools spawn directly; gathering tasks
- * run the env-resolution precedence.
- *
- * SINGLETON, mirroring {@link SvelteFabricateApp}: `static _instance`,
- * `static async show()` (re-focus or create+render), `close()` clears the
- * singleton. GM-only — launched from the Foundry V13 scene-control button.
- *
- * Library reads are delegated to the live Fabricate API
- * (`game.fabricate.getCraftingSystemManager()` for systems + per-system Tools)
- * and the persisted gathering config (per-system tasks) — the SAME sources the
- * Manager tool/task library and `InteractableManager` already read — rather than
- * duplicating data access.
- */
+// The GM interactable browser: a GM-only singleton listing the draggable Tools and Gathering Tasks
+// of the selected crafting system. A drag and the keyboard "Place on current scene" fallback both
+// route through the SAME `InteractableManager` spawn pipeline as a real drop, and every library
+// read is delegated to the sources the Manager library and `InteractableManager` already use.
 export class InteractableBrowserApp extends SvelteApplicationMixin(
   foundry.applications.api.ApplicationV2
 ) {
@@ -37,20 +22,16 @@ export class InteractableBrowserApp extends SvelteApplicationMixin(
   // Single shared instance so the scene-control button re-focuses one window.
   static _instance = null;
 
-  // In-flight render promise for the live instance; lets concurrent show() calls
-  // coalesce onto the SAME window rather than constructing a competing instance.
+  // The in-flight render, so concurrent `show()` calls coalesce onto ONE window.
   static _renderPromise = null;
 
   _services = null;
 
   static DEFAULT_OPTIONS = {
     id: 'fabricate-interactable-browser',
-    // `fabricate-app` is the shared PLAY-surface area class (issue 1520), adopted at the frame so
-    // this 420px-wide window takes the module's typography, colour and dark `color-scheme`.
-    // NOT on the Svelte root: `resolveOverlayHost` needs a POSITIONED ancestor, and the frame is
-    // the only one outside `.window-content`, which `.fabricate.fabricate-app .window-content`
-    // clips. The size floor is NOT part of this class — it lives on `fabricate-app-window`, which
-    // only the player window emits.
+    // `fabricate-app` is the shared area class, adopted at the FRAME (issue 1520): `resolveOverlayHost`
+    // needs a positioned ancestor, and the frame is the only one outside the clipped
+    // `.window-content`. The size floor is not this class — it is on `fabricate-app-window`.
     classes: ['fabricate', 'fabricate-interactable-browser-app', 'fabricate-app'],
     tag: 'div',
     window: {
@@ -64,19 +45,8 @@ export class InteractableBrowserApp extends SvelteApplicationMixin(
     }
   };
 
-  /**
-   * Build the services bag passed to the Svelte root. Reuses the existing
-   * per-system Tool/Task library reads; the placement seam delegates to the
-   * shared {@link InteractableManager} singleton (the same spawn pipeline a real
-   * canvas drop uses).
-   *
-   * @returns {object}
-   */
-  /**
-   * The dependency bag the shared {@link interactableSourceLibrary} reads through —
-   * the SAME bag the Manage-Interactables promote picker uses, so both surfaces
-   * enumerate Tools + Gathering Tasks from one source of truth.
-   */
+  // The SAME bag the Manage-Interactables promote picker uses, so both surfaces enumerate from one
+  // source of truth.
   _sourceDeps() {
     return {
       getCraftingSystemManager: () => game?.fabricate?.getCraftingSystemManager?.() ?? null,
@@ -86,22 +56,14 @@ export class InteractableBrowserApp extends SvelteApplicationMixin(
 
   _buildServices() {
     return {
-      // Crafting systems (id + name), via the shared source enumeration.
       listSystems: () => listSystemOptions(this._sourceDeps()),
-      // Per-system Tool library (the shared system-owned `getSystem(id).tools`).
       listToolsForSystem: (systemId) => listSystemTools(this._sourceDeps(), systemId),
-      // Per-system managed component lookup ({ id, name, img }), the SAME
-      // `system.components` source ToolsBrowserView resolves a tool's display
-      // name/image from when the tool's own `label` is empty.
+      // The SAME `system.components` source `ToolsBrowserView` resolves a tool's display name from.
       getComponentForSystem: (systemId, componentId) =>
         getSystemComponent(this._sourceDeps(), systemId, componentId),
-      // Per-system gathering library tasks, from the persisted gathering config
-      // (the same source InteractableManager._readLibraryTasks reads).
       listTasksForSystem: (systemId) => listSystemTasks(this._sourceDeps(), systemId),
-      // Click-to-place a11y fallback: route through the shared spawn pipeline at
-      // the current scene's view center. NOT a divergent placement path. A
-      // `visualMode:'none'` routes the SAME spawn as a region-only interactable
-      // (hidden, no marker); the default 'marker' creates the linked Tile.
+      // The a11y fallback routes the SHARED spawn pipeline at the view centre, never a divergent
+      // placement path: `visualMode: 'none'` is the region-only spawn, `'marker'` the linked Tile.
       placeOnScene: ({ interactableType, systemId, referenceId, visualMode = 'marker' } = {}) =>
         InteractableManager.instance?.placeInteractableAtViewCenter?.({
           interactableType,
@@ -135,46 +97,28 @@ export class InteractableBrowserApp extends SvelteApplicationMixin(
     super._onClose(options);
   }
 
-  /**
-   * Open (or re-focus) the shared Interactable browser window.
-   *
-   * RE-ENTRANCY: the V13 scene-control button fires the launch handler 2–3× per
-   * activation (and a fast re-click is also possible), so concurrent `show()`
-   * calls can arrive while the first render is still in flight. Guarding only on
-   * `rendered` was insufficient: a second call mid-render constructed a SECOND
-   * instance and the two ApplicationV2 renders collided in `_updatePosition`
-   * ("el.parentElement is null"). We coalesce to a single window — if ANY
-   * instance already exists (rendering OR rendered), we await/return it and never
-   * construct a second. Only construct when `_instance` is null. `close()` /
-   * `_onClose()` clear `_instance`, so a closed window allows a fresh open.
-   *
-   * @returns {Promise<InteractableBrowserApp>}
-   */
+  // RE-ENTRANCY: the V13 scene-control button fires its launch handler 2-3 times per activation, so
+  // concurrent calls arrive mid-render. Guarding on `rendered` alone was not enough — a second call
+  // constructed a SECOND instance and the two renders collided in `_updatePosition`. Any existing
+  // instance, rendering OR rendered, is awaited and returned; only a null `_instance` constructs.
   static async show() {
     const existing = InteractableBrowserApp._instance;
     if (existing) {
-      // An instance is already live (in-flight render or finished). Re-focus a
-      // finished window; for an in-flight one, await the tracked render promise
-      // so a concurrent caller resolves to the SAME window once it completes.
+      // Re-focus a finished window; await the tracked promise for an in-flight one.
       if (existing.rendered) existing.bringToFront();
       else if (InteractableBrowserApp._renderPromise) await InteractableBrowserApp._renderPromise;
       return existing;
     }
     const app = new InteractableBrowserApp();
     InteractableBrowserApp._instance = app;
-    // Track the in-flight render so concurrent show() calls coalesce onto it
-    // instead of constructing a competing instance.
     const renderPromise = Promise.resolve(app.render(true));
     InteractableBrowserApp._renderPromise = renderPromise;
     try {
       await renderPromise;
     } catch (err) {
-      // The render REJECTED: leaving `_instance` pointing at the dead app would
-      // make a later show() return it and never re-render (browser stuck-closed
-      // until reload). Clear the failed instance + its tracked promise so the
-      // NEXT show() constructs and renders a fresh window. Only clear when they
-      // still point at THIS attempt (a concurrent close()/show() may have moved
-      // on). Rethrow to preserve the existing reject contract.
+      // A REJECTED render must not leave `_instance` pointing at the dead app, or a later `show()`
+      // returns it and never re-renders. Cleared only when both still point at THIS attempt, since
+      // a concurrent close or show may have moved on; the rejection is rethrown.
       if (InteractableBrowserApp._instance === app) {
         InteractableBrowserApp._instance = null;
       }
@@ -191,7 +135,6 @@ export class InteractableBrowserApp extends SvelteApplicationMixin(
   }
 }
 
-// Register with the factory so the scene-control hook can launch this class
-// without a static import chain that requires the Svelte compiler in Node.
-// This file is imported as a side-effect by main.js, triggering registration.
+// Registered through the factory so the scene-control hook launches this class without a static
+// import chain that would need the Svelte compiler in Node; `main.js` imports this for the effect.
 registerInteractableBrowserApp(InteractableBrowserApp);
