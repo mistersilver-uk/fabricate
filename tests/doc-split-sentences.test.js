@@ -136,6 +136,38 @@ const RENUMBERED = [
 /** Pinned for the same reason as DEDUPLICATED_COUNT and RETARGETED_COUNT. */
 const RENUMBERED_COUNT = 3;
 
+/**
+ * Sentences a deliberate RENAME forced to change, where the only edit is an identifier.
+ *
+ * Issue #1761 renamed the early-access tester group's path secret so one Patreon tier resolves to
+ * one URL prefix across both publishing repositories. A frozen sentence naming the old secret has
+ * to change, and it is not a retarget, a renumbering or a duplicate.
+ *
+ * The proof is RETARGETED's shape made narrower: each entry pins the replacement AND the exact
+ * identifier pair, and substituting the old identifier back into the surviving sentence must
+ * reproduce the frozen one CHARACTER FOR CHARACTER. Every other word is therefore still compared,
+ * so a reworded rule wearing a rename's clothes fails here. The substitution is asserted to have
+ * applied, because a pair that matched nothing would make the equality a tautology.
+ */
+const RENAMED = [
+  {
+    before:
+      'The tester feed lives at an unguessable path: `testers/<group>/<segment>/<moduleId>/…`, ' +
+      'where `<segment>` comes from a per-channel repository **secret** (`S3_TESTER_PATH_SECRET` ' +
+      'for beta, a separate `S3_EARLY_ACCESS_PATH_SECRET` for early access, referred to abstractly ' +
+      'here — never paste the value) — never the committed config.',
+    after:
+      'The tester feed lives at an unguessable path: `testers/<group>/<segment>/<moduleId>/…`, ' +
+      'where `<segment>` comes from a per-channel repository **secret** (`S3_TESTER_PATH_SECRET` ' +
+      'for beta, a separate `S3_GUILD_ARTISAN_PATH_SECRET` for early access, referred to abstractly ' +
+      'here — never paste the value) — never the committed config.',
+    identifiers: [['S3_GUILD_ARTISAN_PATH_SECRET', 'S3_EARLY_ACCESS_PATH_SECRET']],
+  },
+];
+
+/** Pinned for the same reason as DEDUPLICATED_COUNT. */
+const RENAMED_COUNT = 1;
+
 /** Every sentence of the post-split set, as one multiset. */
 function survivingSentences() {
   const all = [];
@@ -170,6 +202,7 @@ test('every sentence of the pre-split documents still exists somewhere', () => {
   const allowed = new Set([
     ...DEDUPLICATED.map(({ sentence }) => sentence),
     ...RETARGETED.map(({ before }) => before),
+    ...RENAMED.map(({ before }) => before),
     ...RENUMBERED,
   ]);
   const lost = missingSentences(before, after).filter(({ sentence }) => !allowed.has(sentence));
@@ -181,7 +214,8 @@ test('every sentence of the pre-split documents still exists somewhere', () => {
       'DESTINATIONS names. Move them, or — if one is a genuine duplicate that now lives in one ' +
       'place — add it to DEDUPLICATED with the file that still carries it, and raise ' +
       'DEDUPLICATED_COUNT in the same commit. If only a registry case count changed, add it to ' +
-      'RENUMBERED and raise RENUMBERED_COUNT instead.'
+      'RENUMBERED and raise RENUMBERED_COUNT instead; if only a renamed identifier changed, ' +
+      'RENAMED and RENAMED_COUNT.'
   );
 });
 
@@ -265,6 +299,44 @@ test('every renumbering claim really is a renumbering and nothing more', () => {
       1,
       `RENUMBERED entry does not match exactly one surviving sentence once digits are ignored ` +
         `(found ${matches.length}):\n  ${sentence}`
+    );
+  }
+});
+
+test('every rename claim really is a rename and nothing more', () => {
+  assert.equal(
+    RENAMED.length,
+    RENAMED_COUNT,
+    'the rename allowlist changed size. Each entry excuses one sentence from the subset ' +
+      'assertion, so growing it needs its own justification in review.'
+  );
+
+  const surviving = survivingSentences();
+  for (const { before, after, identifiers } of RENAMED) {
+    // 1. The replacement must actually be somewhere, or the sentence is simply gone.
+    assert.ok(
+      (surviving.get(after) ?? 0) > 0,
+      `RENAMED claims this replaced a sentence and it is in no destination:
+  ${after}`
+    );
+    // 2. It must not be stale: an entry whose `before` still exists excuses nothing.
+    assert.equal(
+      surviving.get(before) ?? 0,
+      0,
+      `RENAMED still lists this sentence, which is present after all — remove the entry:
+  ${before}`
+    );
+    // 3. THE ONLY DIFFERENCE MAY BE THE NAMED IDENTIFIERS, and each substitution must really fire:
+    //    a pair matching nothing would leave the equality below comparing the sentence to itself.
+    let restored = after;
+    for (const [renamed, original] of identifiers) {
+      assert.ok(restored.includes(renamed), `RENAMED entry does not contain ${renamed}`);
+      restored = restored.replaceAll(renamed, original);
+    }
+    assert.equal(
+      restored,
+      before,
+      'a RENAMED entry changed more than the identifiers it names, so it is a rewrite'
     );
   }
 });
