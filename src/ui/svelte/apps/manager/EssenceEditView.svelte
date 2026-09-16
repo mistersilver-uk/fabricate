@@ -603,7 +603,7 @@
   <!--
     ONE HEAD ELEMENT, AND IT IS LOAD-BEARING RATHER THAN TIDINESS.
 
-    `styles/fabricate.css:2448` gives this route's `<main>` `grid-template-rows: auto minmax(0,
+    `styles/fabricate.css:1655` gives this route's `<main>` `grid-template-rows: auto minmax(0,
     1fr)` — EXACTLY TWO rows, the tab strip and the form. A third child of `<main>` lands in an
     implicit third row and the form then overlaps the tab strip: measured in the View Lab, the tab
     button was visible, enabled and stable and every click on it was intercepted by

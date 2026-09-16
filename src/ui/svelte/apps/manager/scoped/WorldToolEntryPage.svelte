@@ -1960,7 +1960,7 @@
      template is `auto auto 1fr` and that a scoped redeclaration is a specificity tie resolved
      on injection order. Both halves were wrong here.
 
-     `styles/fabricate.css:9589-9601` names `world-tool-entry` among the world-scope views and
+     `styles/fabricate.css:7255-7267` names `world-tool-entry` among the world-scope views and
      overrides every one of them to `grid-template-rows: minmax(0, 1fr)` — ONE track. Against
      one track the head took the whole `1fr`, the mode card and the body opened implicit rows
      below it, and the screen rendered as a 700px void with the tab panel pushed under it.

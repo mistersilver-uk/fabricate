@@ -48,7 +48,7 @@ src/ui/svelte/components	1245
 src/ui/svelte/stores	6973
 src/ui/svelte/util	3463
 src/utils	1367
-styles	7499
+styles	1044
 tests	40807
 tests/actions	155
 tests/canvas	622

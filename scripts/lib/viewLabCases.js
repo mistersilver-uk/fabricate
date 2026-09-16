@@ -549,15 +549,15 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // row list, which is a whole-frame collapse and is visible in exactly this frame.
   //
   // `manager-environments-browse-normal` is the SCROLLING cap. `.manager-environments-toolbar`
-  // is `max-height: 100px; overflow-y: auto` (`fabricate.css:5684`) and
+  // is `max-height: 100px; overflow-y: auto` (`fabricate.css:4182`) and
   // `.manager-task-toolbar` is the same shape at 112px; the component browser's bar has no cap
   // at all, so the representative frame cannot show either. This is the frame the environments
   // bar is drawn in.
   //
   // The sheet's remaining branch, `.manager-toolbar:not(:has(.manager-toolbar-primary))`
-  // (`:5679`), is NOT listed and is not a gap: measured across `src/`, no component writes
+  // (`:4176`), is NOT listed and is not a gap: measured across `src/`, no component writes
   // `.manager-toolbar-primary`, so every shipped bar takes that branch and the grid form at
-  // `:5671` is declared and never rendered. Naming a frame for it would be an override for a
+  // `:4165` is declared and never rendered. Naming a frame for it would be an override for a
   // state the product cannot reach.
   'src/ui/svelte/components/ManagerToolbar.svelte': Object.freeze([
     'world-component-catalogue',
@@ -569,14 +569,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // the player window holds none. The two entries are the treatments that frame cannot hold.
   //
   // `manager-gathering-task-editor-normal` is the COMPACT density — `is-compact`, the
-  // `min(220px, 30%)` 32px form at `fabricate.css:14791`, which three of the twenty converted
+  // `min(220px, 30%)` 32px form at `fabricate.css:11638`, which three of the twenty converted
   // sites take and all three live in that editor. Its drop-rules card renders one
   // unconditionally, and the sheet gives that card's controls a second override on top
-  // (`:14804`), so the frame draws the density and its per-card refinement together.
+  // (`:11651`), so the frame draws the density and its per-card refinement together.
   //
   // `manager-knowledge-owned-copies` is the one place the field is NOT the flexible member of
   // a row: `.manager-knowledge-roster .manager-search` overrides the shared `flex: 1 1 260px`
-  // to `flex: 0 0 auto` (`fabricate.css:13840`), authored alongside the Access roster's
+  // to `flex: 0 0 auto` (`fabricate.css:10718`), authored alongside the Access roster's
   // identical rule. `KnowledgeView.svelte:159` renders the roster unconditionally, so this
   // frame always contains it.
   //
@@ -598,14 +598,14 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   // restyle of the shell published two frames that could not contain it.
   //
   // Two, because the shell has two painted treatments and one frame cannot hold both.
-  // `manager-essences-disabled-in-use` is the BASE box — `fabricate.css:12685` and `:13429`, the
+  // `manager-essences-disabled-in-use` is the BASE box — `fabricate.css:9948` and `:10449`, the
   // 8px radius on `--fab-overlay-light-04`: it is the one essence frame whose steps select a row,
   // and the inspector it opens is six of these stacked, which is the densest run of the base
   // treatment in the registry.
   //
-  // `coverage-mode-routed-check-checks` is the CHECKS box — `fabricate.css:2500`, which overrides
+  // `coverage-mode-routed-check-checks` is the CHECKS box — `fabricate.css:1724`, which overrides
   // the base at (0,3,0) to radius 11, zero padding and `--fab-bg-2` — and it reaches the Checks
-  // rail's own third treatment (`:3308`) in the same frame. Twenty-five of the sweep's 48
+  // rail's own third treatment (`:2334`) in the same frame. Twenty-five of the sweep's 48
   // converted sites are in that studio.
   //
   // The sheet's fourth treatment, `.is-sticky` (`:5404`), is NOT listed here and is not a gap:
@@ -706,7 +706,7 @@ export const BROAD_SIGNAL_CASE_OVERRIDES = Object.freeze({
   //
   // `manager-checks-validation` is the only published frame that draws it inside
   // `.manager-checks-validation-route`, and that route is the one place its metrics are
-  // re-stated: `styles/fabricate.css:3897-3929` overrides the summary card's gap, padding,
+  // re-stated: `styles/fabricate.css:2814-2841` overrides the summary card's gap, padding,
   // radius and fill, the count tile's height and radius, the group label's size and tracking,
   // and the row stack's radius and fill. Every geometry decision in the surface is therefore
   // arbitrated twice, and this is the frame that shows the second arbitration.
