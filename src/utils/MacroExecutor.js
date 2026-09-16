@@ -1,29 +1,13 @@
 /**
- * Executes Foundry script macros as return-value functions.
- *
- * ## Callers, and the disclosure contract this module deliberately does NOT own
- *
- * {@link MacroExecutor.run} THROWS on a miss (`Macro not found or invalid: <uuid>`);
- * there is no `{ok: false}` to read. Its callers do not agree on what that should look
- * like — an essence property macro whose link is broken must stay a silent
- * `console.warn`, while a complication's broken link is a real GM-facing report — so the
- * decision belongs to each of them and never to this module.
- *
- * For the same reason the `type === 'script'` check is a CALL-SITE check and is not, and
- * must not be, centralised here. Centralising it would turn a `chat`-type essence
- * property macro from that silent warn into a per-essence-per-result error notification,
- * which is the regression the essence-property-macro requirement exists to prevent. The
- * resolve-then-gate idiom at those call sites also resolves the uuid a second time on
- * purpose: settling "is the GM's link broken" BEFORE entering the try is the only way to
- * tell that (silent) apart from "the macro itself blew up" (reported).
+ * Executes Foundry script macros as return-value functions. {@link MacroExecutor.run} THROWS on a
+ * miss and offers no `{ok: false}`, because its callers disagree about what a broken link means — a
+ * silent `console.warn` for an essence property macro, a GM-facing report for a complication. For
+ * the same reason the `type === 'script'` check is a CALL-SITE check and is not, and must not be,
+ * centralised here: centralising it would turn a `chat`-type essence property macro into a
+ * per-essence-per-result error notification.
  */
 export const MacroExecutor = {
-  /**
-   * Run a script macro by UUID and return its result.
-   * @param {string|null} macroUuid
-   * @param {Object} payload
-   * @returns {Promise<any>}
-   */
+  /** Run a script macro by UUID and return its result. */
   async run(macroUuid, payload = {}) {
     if (!macroUuid) return null;
 

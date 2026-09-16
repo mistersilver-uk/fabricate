@@ -1,50 +1,22 @@
-/**
- * Registry of ingredient-`match` type handlers.
- *
- * Each `match` is a PLAIN object of the shape `{ type, ... }` persisted in the
- * recipe wire format. Rather than scatter `match.type` branching across the
- * model, systems, and UI-readiness layers, every type owns its logic here in one
- * place and call sites dispatch through {@link getMatchHandler}.
- *
- * This is a pure leaf module: it imports ONLY `../../config/flags.js` (the tags
- * handler's `matchesItem` reads item flags) and constructs no class instances —
- * a `match` stays a plain object everywhere. It must NOT import Ingredient,
- * Recipe, or RecipeManager (those import the registry, so importing them back
- * would form a cycle).
- *
- * @typedef {object} MatchHandler
- * @property {string} type
- * @property {boolean} isTerminalInventoryMatch
- * @property {(data: object) => object|null} normalize
- * @property {(match: object) => boolean} isComplete
- * @property {(match: object, options: {requireComplete?: boolean}) => string[]} validate
- * @property {(match: object) => (string|null)} signature
- * @property {(match: object, systemComponents: object[]) => Set<string>} expandToComponentIds
- * @property {(match: object, item: object, options: {features?: object, itemTags?: string[]}) => boolean} matchesItem
- * @property {(match: object) => (string|null)} getComponentId
- * @property {(match: object, options: {quantity?: number}) => string} describe
- * @property {(match: object, options: {affordCurrency?: (match: object) => boolean}) => boolean} affords
- * @property {(match: object) => ({unit: string, amount: number}|null)} getCurrencySpend
- */
+/** Registry of ingredient-`match` type handlers. */
 import { getFabricateFlag } from '../../config/flags.js';
 
 function trimmed(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-/** @type {MatchHandler} */
 const componentHandler = {
   type: 'component',
 
-  // A component (or legacy systemItem) match is NOT terminal for inventory
-  // matching: its id is resolved upstream against managed components, so
-  // `_matchesIngredient` falls through to the bare-field / alternatives paths.
+  // A component (or legacy systemItem) match is NOT terminal for inventory matching: its id is
+  // resolved upstream against managed components, so `_matchesIngredient` falls through to the
+  // bare-field / alternatives paths.
   isTerminalInventoryMatch: false,
 
   normalize(data = {}) {
     const raw = data.match && typeof data.match === 'object' ? data.match : null;
-    // Accept both 'component' (primary) and 'systemItem' (legacy fallback),
-    // folding bare top-level fields into the canonical component shape.
+    // Accept both 'component' (primary) and 'systemItem' (legacy fallback), folding bare top-level
+    // fields into the canonical component shape.
     const componentId =
       (raw && (raw.componentId || raw.systemItemId)) ||
       data.componentId ||
@@ -56,16 +28,15 @@ const componentHandler = {
     };
   },
 
-  // Use the shared ID extraction so the legacy `systemItem`/`systemItemId`
-  // alias is treated as complete even before normalisation folds it to
-  // `componentId`.
+  // Use the shared ID extraction so the legacy `systemItem`/`systemItemId` alias is treated as
+  // complete even before normalisation folds it to `componentId`.
   isComplete: (match) => !!componentHandler.getComponentId(match),
 
   validate: () => [],
 
   signature(match) {
-    // Read through getComponentId so a raw `{ type: 'systemItem', systemItemId }`
-    // signs identically to its normalised `{ type: 'component', componentId }`.
+    // Read through getComponentId so a raw `{ type: 'systemItem', systemItemId }` signs identically
+    // to its normalised `{ type: 'component', componentId }`.
     const componentId = trimmed(componentHandler.getComponentId(match));
     return componentId ? `component:${componentId}` : null;
   },
@@ -75,8 +46,8 @@ const componentHandler = {
     return id ? new Set([id]) : new Set();
   },
 
-  // Component matching stays in `ingredientMatchesItem` upstream (managed
-  // component source/name resolution), so the handler never matches here.
+  // Component matching stays in `ingredientMatchesItem` upstream (managed component source/name
+  // resolution), so the handler never matches here.
   matchesItem: () => false,
 
   getComponentId: (match) => match?.componentId || match?.systemItemId || null,
@@ -89,12 +60,11 @@ const componentHandler = {
   getCurrencySpend: () => null,
 };
 
-/** @type {MatchHandler} */
 const tagsHandler = {
   type: 'tags',
 
-  // A tags match is terminal for inventory matching: `matchesItem` fully decides
-  // the result off the match object, so `_matchesIngredient` dispatches to it.
+  // A tags match is terminal for inventory matching: `matchesItem` fully decides the result off the
+  // match object, so `_matchesIngredient` dispatches to it.
   isTerminalInventoryMatch: true,
 
   normalize(data = {}) {
@@ -145,11 +115,8 @@ const tagsHandler = {
   matchesItem(match, item, { features, itemTags } = {}) {
     if (!features?.enableTags) return false;
     const requiredTags = Array.isArray(match?.tags) ? match.tags : [];
-    // Authored tags live on the managed COMPONENT definition, not on the owned
-    // item's own flags — Fabricate never stamps `flags.fabricate.tags` onto
-    // inventory items (issue 857). A caller with component context (the craft-time
-    // matcher) resolves the item's component tags and passes them as `itemTags`;
-    // absent that (the model-only path) fall back to the item's own tag flag.
+    // Authored tags live on the managed COMPONENT definition, not on the owned item's own flags —
+    // Fabricate never stamps `flags.fabricate.tags` onto inventory items (issue 857).
     const resolvedTags = Array.isArray(itemTags) ? itemTags : getFabricateFlag(item, 'tags', []);
     const matched =
       match?.tagMatch === 'all'
@@ -172,20 +139,18 @@ const tagsHandler = {
   getCurrencySpend: () => null,
 };
 
-/** @type {MatchHandler} */
 const currencyHandler = {
   type: 'currency',
 
-  // A currency match is terminal for inventory matching: it matches no inventory
-  // item (satisfied by affordance, not item matching), so `matchesItem` returns
-  // false and `_matchesIngredient` dispatches to it rather than falling through.
+  // A currency match is terminal for inventory matching: it matches no inventory item (satisfied by
+  // affordance, not item matching), so `matchesItem` returns false and `_matchesIngredient`
+  // dispatches to it rather than falling through.
   isTerminalInventoryMatch: true,
 
   normalize(data = {}) {
     const raw = data.match && typeof data.match === 'object' ? data.match : null;
-    // A currency alternative ("100 gp") mirrors the legacy step-currency shape:
-    // a unit id string plus a non-negative amount. It is spent at craft time via
-    // the currency-affordance layer (see src/systems/currencyAffordance.js).
+    // A currency alternative ("100 gp") mirrors the legacy step-currency shape: a unit id string
+    // plus a non-negative amount.
     return {
       type: 'currency',
       unit: String(raw?.unit || '').trim(),
@@ -209,38 +174,32 @@ const currencyHandler = {
     return `currency:${unit}:${amount}`;
   },
 
-  // A currency alternative is not a managed component, so it contributes no
-  // component ids and is ignored by alchemy signature overlap detection.
+  // A currency alternative is not a managed component, so it contributes no component ids and is
+  // ignored by alchemy signature overlap detection.
   expandToComponentIds: () => new Set(),
 
-  // A currency alternative matches no inventory item — it is satisfied by
-  // affording its cost, handled out-of-band during ingredient selection and
-  // spent by the currency-affordance layer, not by item matching here.
+  // A currency alternative matches no inventory item — it is satisfied by affording its cost,
+  // handled out-of-band during ingredient selection and spent by the currency-affordance layer, not
+  // by item matching here.
   matchesItem: () => false,
 
   getComponentId: () => null,
 
   describe(match) {
-    // A currency alternative carries its cost on the match (`amount`/`unit`), not
-    // the option quantity, so the description reads as a flat currency cost rather
-    // than an "Nx" item count.
+    // A currency alternative carries its cost on the match (`amount`/`unit`), not the option
+    // quantity, so the description reads as a flat currency cost rather than an "Nx" item count.
     const unit = trimmed(match?.unit);
     const amount = Number(match?.amount) || 0;
     return `${amount} ${unit}`.trim();
   },
 
-  /**
-   * Whether the actor can afford this currency option. The `affordCurrency` probe
-   * (bound to the crafting actor + system currency profile in the engine) reports
-   * affordability; with no probe (the default, back-compat for `canBeCraftedWith`)
-   * currency is NEVER affordable, so an item plan is byte-for-byte unchanged.
-   */
+  /** Whether the actor can afford this currency option. */
   affords: (match, { affordCurrency } = {}) =>
     typeof affordCurrency === 'function' ? !!affordCurrency(match) : false,
 
   /**
-   * The `{ unit, amount }` spend this currency option requires, or null when the
-   * option is incomplete (no unit / non-positive amount).
+   * The `{ unit, amount }` spend this currency option requires, or null when the option is
+   * incomplete (no unit / non-positive amount).
    */
   getCurrencySpend(match) {
     if (!currencyHandler.isComplete(match)) return null;
@@ -248,23 +207,18 @@ const currencyHandler = {
   },
 };
 
-/** @type {MatchHandler} */
 const essenceHandler = {
   type: 'essence',
 
-  // An essence match is terminal for inventory matching: it matches no single
-  // inventory item (satisfaction is amount-accumulative across items carrying the
-  // essence, resolved by the consumption planner, not per-item), so `matchesItem`
-  // returns false and `_matchesIngredient` dispatches to it rather than falling
-  // through.
+  // An essence match is terminal for inventory matching: it matches no single inventory item
+  // (satisfaction is amount-accumulative across items carrying the essence, resolved by the
+  // consumption planner, not per-item), so `matchesItem` returns false and `_matchesIngredient`
   isTerminalInventoryMatch: true,
 
   normalize(data = {}) {
     const raw = data.match && typeof data.match === 'object' ? data.match : null;
-    // An essence alternative ("3 fire essence") mirrors the legacy per-set essence
-    // requirement: an essence id string plus a non-negative amount. It is met at
-    // craft time by consuming items whose accumulated essence reaches `amount`
-    // (see IngredientSet._buildPlanForEssenceOption).
+    // An essence alternative ("3 fire essence") mirrors the legacy per-set essence requirement: an
+    // essence id string plus a non-negative amount.
     return {
       type: 'essence',
       essenceId: String(raw?.essenceId || '').trim(),
@@ -289,9 +243,9 @@ const essenceHandler = {
     return `essence:${essenceId}:${amount}`;
   },
 
-  // An essence alternative is satisfied by EVERY managed component carrying the
-  // essence, so it expands to all such components' ids — load-bearing for readiness
-  // overlap detection and the alchemy SignatureValidator.
+  // An essence alternative is satisfied by EVERY managed component carrying the essence, so it
+  // expands to all such components' ids — load-bearing for readiness overlap detection and the
+  // alchemy SignatureValidator.
   expandToComponentIds(match, systemComponents) {
     const essenceId = trimmed(match?.essenceId);
     if (!essenceId) return new Set();
@@ -300,17 +254,17 @@ const essenceHandler = {
     );
   },
 
-  // An essence alternative matches no single inventory item — satisfaction is
-  // amount-accumulative across items carrying the essence and routes through the
-  // consumption planner, not per-item matching here.
+  // An essence alternative matches no single inventory item — satisfaction is amount-accumulative
+  // across items carrying the essence and routes through the consumption planner, not per-item
+  // matching here.
   matchesItem: () => false,
 
   getComponentId: () => null,
 
   describe(match) {
-    // An essence alternative carries its amount on the match (`amount`/`essenceId`),
-    // not the option quantity, so the description reads as an essence amount phrase
-    // rather than an "Nx" item count.
+    // An essence alternative carries its amount on the match (`amount`/`essenceId`), not the option
+    // quantity, so the description reads as an essence amount phrase rather than an "Nx" item
+    // count.
     const essenceId = trimmed(match?.essenceId);
     const amount = Number(match?.amount) || 0;
     return `${amount}x ${essenceId} essence`.trim();
@@ -322,16 +276,11 @@ const essenceHandler = {
   getCurrencySpend: () => null,
 };
 
-/**
- * Fallback handler for a null match or an unrecognized `match.type`. Every method
- * is a safe no-op so call sites can dispatch without guarding the type.
- *
- * @type {MatchHandler}
- */
+/** Fallback handler for a null match or an unrecognized `match.type`. */
 const unknownHandler = {
   type: 'unknown',
-  // A null/unrecognized match is NOT terminal: `_matchesIngredient` falls through
-  // to the bare-field `ingredient.tag` block and the `alternatives` recursion.
+  // A null/unrecognized match is NOT terminal: `_matchesIngredient` falls through to the bare-field
+  // `ingredient.tag` block and the `alternatives` recursion.
   isTerminalInventoryMatch: false,
   normalize: () => null,
   isComplete: () => false,
@@ -345,12 +294,7 @@ const unknownHandler = {
   getCurrencySpend: () => null,
 };
 
-/**
- * Type → handler registry. `systemItem` is a legacy alias for `component`
- * resolved by {@link getMatchHandler}, not a distinct entry.
- *
- * @type {{ component: MatchHandler, tags: MatchHandler, currency: MatchHandler, essence: MatchHandler }}
- */
+/** Type → handler registry. */
 export const HANDLERS = {
   component: componentHandler,
   tags: tagsHandler,
@@ -358,31 +302,13 @@ export const HANDLERS = {
   essence: essenceHandler,
 };
 
-/**
- * Resolve the handler for a match by its `type`, aliasing `systemItem` to
- * `component`. Returns the safe fallback handler for null/undefined matches and
- * unrecognized types.
- *
- * @param {object|null|undefined} match
- * @returns {MatchHandler}
- */
+/** Resolve the handler for a match by its `type`, aliasing `systemItem` to `component`. */
 export function getMatchHandler(match) {
   const type = match?.type === 'systemItem' ? 'component' : match?.type;
   return HANDLERS[type] || unknownHandler;
 }
 
-/**
- * Resolve the managed-component id an ingredient/result reference points at, or
- * `null`. Takes the REF (ingredient or result), not a bare match, because the
- * non-component branch reads the legacy bare top-level `ref.componentId` /
- * `ref.systemItemId`. A `component` (or aliased `systemItem`) match resolves its
- * id through the handler; every other type (tags/currency/null/unknown) resolves
- * `null` from the handler and falls back to the bare fields. The trailing
- * `|| null` normalises `undefined`/`''` to `null` uniformly.
- *
- * @param {object|null|undefined} ref
- * @returns {string|null}
- */
+/** Resolve the managed-component id an ingredient/result reference points at, or `null`. */
 export function getIngredientComponentId(ref) {
   const handler = getMatchHandler(ref?.match);
   const id =
@@ -393,12 +319,8 @@ export function getIngredientComponentId(ref) {
 }
 
 /**
- * Normalize raw ingredient data into a canonical `match` object (or null when no
- * match can be derived). Dispatches per declared `match.type`, then falls back to
- * legacy bare top-level fields (`componentId`/`systemItemId`, then `tags`/`tag`).
- *
- * @param {object} [data]
- * @returns {object|null}
+ * Normalize raw ingredient data into a canonical `match` object (or null when no match can be
+ * derived).
  */
 export function normalizeMatch(data = {}) {
   const raw = data.match && typeof data.match === 'object' ? data.match : null;
@@ -409,10 +331,10 @@ export function normalizeMatch(data = {}) {
     if (raw.type === 'currency') {
       return currencyHandler.normalize(data);
     }
-    // The essence branch MUST precede the component fallback below: `normalizeMatch`
-    // falls through everything that is not tags/currency/essence to the component
-    // normalizer, so a misplaced essence branch would normalize to
-    // `{ type: 'component', componentId: null }` and silently drop essenceId/amount.
+    // The essence branch MUST precede the component fallback below: `normalizeMatch` falls through
+    // everything that is not tags/currency/essence to the component normalizer, so a misplaced
+    // essence branch would normalize to `{ type: 'component', componentId: null }` and silently
+    // drop essenceId/amount.
     if (raw.type === 'essence') {
       return essenceHandler.normalize(data);
     }

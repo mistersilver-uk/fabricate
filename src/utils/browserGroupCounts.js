@@ -1,39 +1,6 @@
-/**
- * The shared category-total model behind the GM library group headers (issue 676).
- *
- * Both libraries group the PAGE, not the filtered list (see `recipeBrowserModel.js` and
- * `componentBrowserModel.js`): the pager stays the unit of truth for how many rows are
- * on screen, so a header counting the filtered list would put "12 recipes" above the
- * three rows page 2 renders. The reverse reading is just as wrong the other way —
- * "General · 25 components" above page 1 of a 282-strong General bucket says the bucket
- * holds 25. So the header carries BOTH numbers ("25 of 282"), and this module supplies
- * the second one.
- *
- * The total is computed over the FILTERED rows, never the raw roster: a category total
- * that ignored the active search / category / essence filters would be a third wrong
- * number.
- *
- * It lives under `src/utils/` and is shared by both browser models rather than copied
- * into each: the two studios must read as one product, and a hand-copied count loop is
- * how they stop.
- */
+/** The shared category-total model behind the GM library group headers (issue 676). */
 
-/**
- * Count rows per category.
- *
- * PASS THE COHORT, NEVER THE PAGE (issue 1081). Once the row projection is page-scoped —
- * only the current page's definitions are richly projected — the temptation is to count
- * whatever array is already to hand, and the array to hand is the page. That produces a
- * header which says a 282-strong bucket holds 25, and {@link categoryTotalOf} CANNOT catch
- * it: it guards one direction only. `buildRecipeBrowserModel` and
- * `buildComponentBrowserModel` are therefore the intended callers, because each computes
- * this from its own `filtered` array before paginating and hands the page and the totals to
- * the grouper together, so the two scopes cannot be mixed up at a call site.
- *
- * @param {object[]} rows the FILTERED COHORT (pre-pagination), in any order.
- * @param {(row: object) => string} categoryOf reads a row's normalized category key.
- * @returns {Map<string, number>} category key → how many filtered rows it holds.
- */
+/** Count rows per category. */
 export function countByCategory(rows, categoryOf) {
   const counts = new Map();
   for (const row of Array.isArray(rows) ? rows : []) {
@@ -43,18 +10,7 @@ export function countByCategory(rows, categoryOf) {
   return counts;
 }
 
-/**
- * The total to show beside a group's rendered count.
- *
- * Falls back to the rendered count when the category is absent from the map (an
- * un-supplied totals map, or a caller that grouped rows the totals were not computed
- * from) — so a header can never claim a category holds FEWER rows than it is rendering.
- *
- * @param {Map<string, number>|null|undefined} totals from {@link countByCategory}.
- * @param {string} category
- * @param {number} renderedCount how many rows this group renders on the current page.
- * @returns {number}
- */
+/** The total to show beside a group's rendered count. */
 export function categoryTotalOf(totals, category, renderedCount) {
   const total = totals instanceof Map ? totals.get(category) : undefined;
   return Number.isInteger(total) && total > renderedCount ? total : renderedCount;
