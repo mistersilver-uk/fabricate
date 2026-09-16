@@ -1,25 +1,16 @@
 /**
- * @module gatheringResultCreation
- *
- * The gathering award/result-creation seam, split out of `main.js` so it is
- * runtime-importable in tests (`main.js` statically imports CSS and cannot load
- * under `node --test`). It owns how a gathering task's authored result rows become
- * owned Items on an actor: resolving each result to its award source, and either
- * stacking it onto an existing owned quantity item or creating a new document.
- *
- * The durable-identity stack guard is the load-bearing behaviour here (issue 556):
- * a fresh award is handed the awarding system's resolved component set + system id
- * so it is never folded into an owned item that resolves to a DIFFERENT component
- * via a transitive `_stats.duplicateSource`. Foundry globals (`fromUuidSync`,
- * `foundry.utils`) stay localized inside these helpers; the crafting-system manager
- * is injected.
+ * The gathering award seam, split out of `main.js` so it is runtime-importable under `node --test`.
+ * It turns a task's authored result rows into owned Items: resolve each to its award source, then
+ * stack onto an owned quantity item or create a new document.
+ * THE DURABLE-IDENTITY STACK GUARD IS THE LOAD-BEARING PART (issue 556) — a fresh award is handed
+ * the awarding system's resolved component set and id, so it is never folded into an owned item
+ * that resolves to a DIFFERENT component through a transitive `_stats.duplicateSource`.
  */
 
 import { stampItemDataRoleIdentity } from './config/flags.js';
-// Routed onto the configured stack-quantity path (issue 1024) but deliberately NOT
-// consolidated onto `createOrStackComponentItem`: two behaviour deltas separate them
-// (the absent-field default above, and this path's own stack-match resolution), so
-// merging them is its own change.
+// Routed onto the configured stack-quantity path (issue 1024) but deliberately NOT consolidated
+// onto `createOrStackComponentItem`: the absent-field default and this path's own stack-match
+// resolution both differ, so merging them is its own change.
 import {
   hasStackQuantity,
   readStoredStackQuantity,
@@ -33,11 +24,9 @@ export function flattenGatheringResults(resultGroups = []) {
   return resultGroups.flatMap((group) => (Array.isArray(group?.results) ? group.results : []));
 }
 
-// Resolve the awarding system's component set the SAME way `resolveGatheringResultSource`
-// does — the in-memory `system.components`, falling back to the manager-loaded system's
-// components when the passed system carries none. The gathering stack guard
-// (`findStackableMatch`) must be handed this exact set + `system.id` so a fresh award is
-// never folded into an owned item that resolves to a different component (issue 556).
+// Resolve the awarding system's component set exactly as `resolveGatheringResultSource` does. The
+// stack guard must be handed this set and `system.id`, or a fresh award can be folded into an owned
+// item resolving to a different component (issue 556).
 export function resolveGatheringSystemComponents(system, craftingSystemManager) {
   const own = resolvedComponentsFor(system);
   if (own.length > 0) return own;
@@ -45,19 +34,11 @@ export function resolveGatheringSystemComponents(system, craftingSystemManager) 
 }
 
 /**
- * Resolve a result row to the thing that will be awarded.
- *
- * Returns `{ source, componentId }`. `componentId` is non-null ONLY when the award
- * resolved through a MANAGED COMPONENT — the identity stamp (issue 780) keys off
- * that fact, not off what the row happened to author. A row can carry an `itemUuid`
- * AND a `componentId` (every d100 drop row does), so "the row named a component" and
- * "the award resolved as that component" are different questions and only the second
- * one may stamp.
- *
- * An `itemUuid` that fails to resolve now FALLS BACK to the component lookup instead
- * of giving up. That asymmetry was a real defect: the `registeredItemUuid` branch
- * below has always fallen back to the bare component, while the `itemUuid` branch
- * returned null and the caller silently dropped the award.
+ * Resolve a result row to the thing that will be awarded, as `{ source, componentId }`.
+ * `componentId` is non-null ONLY when the award resolved through a MANAGED COMPONENT, because the
+ * identity stamp (issue 780) keys off that fact and not off what the row authored — a row may carry
+ * an `itemUuid` AND a `componentId`. An `itemUuid` that fails to resolve falls back to the component
+ * lookup, matching the `registeredItemUuid` branch, which otherwise silently dropped the award.
  */
 export function resolveGatheringResultAward(result, system, craftingSystemManager) {
   if (result?.itemUuid) {
@@ -102,9 +83,8 @@ function stringOrNull(value) {
 }
 
 /**
- * Resolve every row up front so an unresolvable one is caught BEFORE anything is
- * created. Returns `{ awards, unresolved }`; `unresolved` holds the descriptions of
- * rows with no award source.
+ * Resolve every row up front so an unresolvable one is caught BEFORE anything is created.
+ * Answers `{ awards, unresolved }`, the latter describing rows with no award source.
  */
 function resolveAllResults(resultGroups, system, craftingSystemManager) {
   const awards = [];
@@ -139,11 +119,9 @@ export function normalizeFoundryCollection(collection) {
 }
 
 /**
- * `componentId` is carried so a ref built BEFORE creation still has an identity. A
- * planned award that resolves to a bare component has no `uuid` yet — the document
- * does not exist until `create` runs — and a uuid-only identity meant every such
- * planned award was discarded downstream, emptying the chat card and run journal for
- * a gather that really did award items.
+ * `componentId` is carried so a ref built BEFORE creation still has an identity: a planned award
+ * resolving to a bare component has no `uuid` yet, and a uuid-only identity made downstream discard
+ * every such award, emptying the chat card and run journal for a gather that did award items.
  */
 export function gatheringRunItemRef(actor, item, quantity = 1, componentId = null) {
   const ref = {
@@ -164,11 +142,9 @@ export function gatheringRunItemRef(actor, item, quantity = 1, componentId = nul
 
 export function createGatheringResultCreator(craftingSystemManager) {
   return {
-    // Reports UNRESOLVED rows as diagnostics rather than quietly returning a short
-    // list. The engine turns diagnostics into a blocked, misconfigured start, which
-    // happens BEFORE the node and stamina are committed — so a broken drop reference
-    // costs the player nothing and can be retried once the GM fixes it. Dropping the
-    // row instead (the old behaviour) spent the node and told nobody.
+    // Unresolved rows are DIAGNOSTICS, not a quietly shortened list. The engine turns them into a
+    // blocked, misconfigured start BEFORE the node and stamina are committed, so a broken drop
+    // reference costs the player nothing and can be retried once the GM fixes it.
     async plan({ actor, system, resultGroups = [] } = {}) {
       const { awards, unresolved } = resolveAllResults(resultGroups, system, craftingSystemManager);
       if (unresolved.length > 0) {
@@ -187,9 +163,8 @@ export function createGatheringResultCreator(craftingSystemManager) {
 
     async create({ actor, system, resultGroups = [] } = {}) {
       const { awards, unresolved } = resolveAllResults(resultGroups, system, craftingSystemManager);
-      // `plan` already blocked this attempt, so reaching here means the two disagreed.
-      // Throw rather than create a partial award: a half-granted gather is worse than a
-      // loud one, and silence here is exactly what hid this class of bug.
+      // `plan` already blocked this attempt, so reaching here means the two disagreed. Throw
+      // rather than create a partial award: a half-granted gather is worse than a loud failure.
       if (unresolved.length > 0) {
         const error = new Error(
           `Fabricate | Refusing to award a gathering result with unresolved sources: ${unresolved.join(', ')}`
@@ -218,27 +193,17 @@ export function createGatheringResultCreator(craftingSystemManager) {
           globalThis.foundry?.utils?.setProperty?.(itemData, 'flags.core.sourceId', source.uuid);
         }
 
-        // Stamp the awarded component's durable per-system identity (issue 780) on the
-        // CREATED award item so a gathered part resolves to its OWN component through the
-        // identity tier once #601 removes the name fallback. NEVER `source.id`: in the
-        // `registeredItemUuid` case `source` is the registered source Item, whose id is a
-        // Foundry Item id, not the component id.
-        //
-        // The gate is `componentId` from the RESOLVER — i.e. "this award really is that
-        // managed component" — not a raw `result.componentId` read. A row can carry both an
-        // `itemUuid` and a `componentId` (every d100 drop row does), so a uuid-resolved award
-        // with a stray componentId still stamps nothing, while a row whose uuid failed and
-        // fell back to its component now correctly DOES stamp. Reading the row directly would
-        // get both cases wrong. The stack branch below never touches `itemData`, so this
-        // stays create-only.
+        // Stamp the awarded component's durable per-system identity (issue 780) on the CREATED
+        // item. NEVER `source.id` — in the `registeredItemUuid` case that is a Foundry Item id.
+        // The gate is the RESOLVER's `componentId`, never a raw `result.componentId`: a row may
+        // carry both an `itemUuid` and a `componentId`, so only "the award resolved AS that
+        // component" may stamp. The stack branch never touches `itemData`, so this is create-only.
         if (componentId) {
           stampItemDataRoleIdentity(itemData, system?.id, 'componentId', componentId);
         }
 
-        // Stack onto an existing matching item (same source UUID chain) that uses
-        // a quantity field, rather than creating a duplicate document — but never fold
-        // an award into an owned item that resolves to a DIFFERENT component (issue 556),
-        // so hand the guard the resolved component set + system id.
+        // Never fold an award into an owned item that resolves to a DIFFERENT component (issue
+        // 556), so hand the stack guard the resolved component set and the system id.
         const stackComponents = resolveGatheringSystemComponents(system, craftingSystemManager);
         const existing = findStackableMatch(
           normalizeFoundryCollection(actor.items),
@@ -247,9 +212,8 @@ export function createGatheringResultCreator(craftingSystemManager) {
           system?.id
         );
         if (existing) {
-          // absentDefault 0, not 1: this site treated a missing stack quantity as zero
-          // before the routing change (an award onto a field-less item authors exactly
-          // the awarded amount), unlike every other stacking site.
+          // `absentDefault` 0, not 1: this site has always read a missing stack quantity as zero,
+          // unlike every other stacking site, so an award onto a field-less item authors exactly it.
           const next =
             readStoredStackQuantity(existing, { absentDefault: 0 }) +
             Number(result.quantity || 1);

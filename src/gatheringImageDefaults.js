@@ -1,11 +1,6 @@
 /**
- * Shared, layering-safe default images for gathering entities.
- *
- * This module has NO imports so it can be consumed from both `src/systems/`
- * and `src/ui/` without a layering violation. It is the single source of truth
- * for the environment, task, and event placeholder images — GM editor, GM
- * browser, player rows/detail, and runtime/chat fallbacks all resolve to the
- * same constants so GM and player surfaces never diverge.
+ * The one source of truth for gathering placeholder images, so GM and player surfaces cannot
+ * diverge. Deliberately import-free, so `src/systems/` and `src/ui/` can both consume it.
  */
 
 /** Default image for a gathering environment with no custom image. */
