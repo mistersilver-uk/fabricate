@@ -54,10 +54,18 @@ test('Fabricate exposes gathering runtime getters and API methods', () => {
   // through the routing wrapper, which hands a blind timed start to the active GM
   // BEFORE any task is drawn. Delegating straight to `startAttempt` again would
   // put the draw back on the player's own client, where it can be rigged.
+  // Since issue 1759 the delegation is the `requestStart` callback handed to
+  // `executePublicGather`, which completes a READY attempt in one call rather than leaving it
+  // started and unawarded. What this pin guards is unchanged and asserted together, so the
+  // wrapper cannot be kept while the routing quietly reverts: the boundary is still entered,
+  // and the start inside it is still `requestStart` under current-user viewer enforcement with
+  // the remembered-actor default.
   assert.match(
     mainSource,
-    /return callGatheringRuntimeWithCurrentViewer\(gatheringEngine, 'requestStart', withRememberedActor, \(\) => game\.user\);/,
-    'startGatheringAttempt should delegate through current-user viewer enforcement (with the remembered-actor default)'
+    /return executePublicGather\(\{[\s\S]*?requestStart: \(\) =>[\s\S]*?callGatheringRuntimeWithCurrentViewer\([\s\S]*?gatheringEngine,[\s\S]*?'requestStart',[\s\S]*?withRememberedActor,[\s\S]*?\(\) => game\.user/,
+    'startGatheringAttempt should complete a ready attempt through executePublicGather, still '
+      + 'delegating to requestStart under current-user viewer enforcement (with the '
+      + 'remembered-actor default)'
   );
   // The three wrappers (list, attempt, drop breakdown) MUST resolve the SAME actor
   // the UI displays. They default `rememberedActorId` through

@@ -5419,6 +5419,10 @@ export class GatheringEngine {
       timeGate: plainObjectOrNull(run?.timeGate),
       run: publicRun,
       blockedReasons: [],
+      // Execution is still required, but not yet: this one matures at GM-gated world time, and
+      // completing it early would spend the wait the task declares.
+      requiresExecution: true,
+      canExecuteImmediately: false,
     };
   }
 
@@ -5437,6 +5441,13 @@ export class GatheringEngine {
       runStatus: stringOrNull(run?.status) || 'inProgress',
       run: opaqueBlind ? redactBlindRun(run) : stripRuntimeSnapshotFromRun(run),
       blockedReasons: [],
+      // Said in the crafting engine's vocabulary on purpose. `state` is the gathering-native
+      // word and the journal command layer's result normaliser drops it, so a caller reading a
+      // normalised start -- which is every public caller -- could not tell a run that can
+      // execute now from one waiting on the clock. These two fields it does forward, and
+      // `executePublicGather` keys the one-call completion on them (issue 1759).
+      requiresExecution: true,
+      canExecuteImmediately: true,
     };
   }
 
