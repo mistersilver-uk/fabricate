@@ -1,32 +1,9 @@
 /**
- * 0.7.0 — Reconcile UI-authored library Tools onto the crafting system (pure,
- * idempotent, version-gated).
- *
- * Tools are system-owned: every consumer reads
- * `craftingSystemManager.getSystem(id).tools`. The 0.6.0 catalyst migration
- * already writes migrated catalysts onto `system.tools`, but tools authored in
- * the Manager before this change were persisted under
- * `gatheringConfig.systems[id].tools`. This migration MOVES any such
- * gathering-config tools onto the matching crafting system's `tools` (the single
- * canonical source) and clears the gathering-config copy.
- *
- * Mutated setting keys: `craftingSystems` (systems[].tools) and `gatheringConfig`
- * (systems[id].tools cleared).
- *
- * Dedupe rule: by tool `id`. When the same id exists on both the system and the
- * gathering config, the EXISTING system tool wins (the gathering copy is dropped,
- * not merged) so a re-author on the system is never clobbered by a stale config
- * copy. Tools without an id are skipped.
- *
- * Idempotent: once the gathering-config `tools` arrays are emptied/removed, a
- * re-run finds nothing to move and is a no-op.
- *
- * Pure: returns `{ systems, gatheringConfig }` and performs no I/O. The runner
- * detects the change and persists.
- *
- * @param {Array<object>} systems - raw craftingSystems setting
- * @param {object} gatheringConfig - raw gatheringConfig setting
- * @returns {{ systems: Array<object>, gatheringConfig: object, movedCount: number }}
+ * `0.7.0` — move any Manager-authored library Tool off `gatheringConfig.systems[id].tools` onto the
+ * matching crafting system's `tools`, the single canonical source, and clear the gathering copy.
+ * Pure, idempotent, version-gated. Dedupe is by tool `id`, and on a clash the EXISTING system tool
+ * wins — the gathering copy is dropped, not merged, so a re-author is never clobbered by a stale
+ * config copy. A tool without an id is skipped.
  */
 export function migrateToolsToSystem(systems, gatheringConfig) {
   const safeSystems = Array.isArray(systems) ? systems : [];

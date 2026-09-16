@@ -1,27 +1,7 @@
 /**
- * Pure action/decision helpers for the rich GM Interactable config panel
- * (`InteractableConfigApp`) and the manager seams it drives.
- *
- * The config panel is a THIN view: every decision it needs — what a Restock
- * write looks like, the behaviour `state` patch for an enable/lock/consume
- * toggle, the patch to clear a visual link, the display view models for the node
- * + the whole interactable, and the GM Test-as-Player activation context — is
- * computed here as a PURE function returning plain data. The Foundry write (the
- * active-GM-routed `behavior.update`, the activation pipeline, the tile create /
- * delete, the camera pan) is a SEPARATE injected edge owned by the manager /
- * the app shell.
- *
- * Everything in this module is PURE: it takes plain data (a behaviour system or
- * a normalized view) and returns the intended mutation/decision. No `globalThis`
- * access.
- *
- * A gathering-task interactable is either LINKED to the gathering task or
- * UNLINKED (independent), selected by `taskNodeLink`. When
- * `taskNodeLink === 'unlinked'` the behaviour carries its own `node` object
- * (independent capacity / depletion / respawn); when 'linked' (the default)
- * depletion/respawn follow the task (owned by the environment's
- * `nodeRuntime[taskId]`) and the behaviour carries no node state. The link toggle
- * + independent-pool restock planners live here.
+ * PURE decisions behind the GM Interactable config panel, a thin view: every patch, view model
+ * and activation context it needs is plain data here, written by an injected active-GM edge.
+ * Task-node link semantics: `data-models/spec.md` § Gathering-Task Node State (issue 302).
  */
 
 import { normalizeNodeConfig } from '../../systems/gatheringNodeConfig.js';
@@ -35,61 +15,27 @@ import {
   INTERACTABLE_TYPES,
 } from './interactableRegionFlags.js';
 
-/**
- * Read a behaviour system as a normalized view, tolerating BOTH a raw behaviour
- * `system` object and a live RegionBehavior document. Returns null when it is not
- * a `fabricate.interactable`.
- *
- * @param {object} systemOrBehavior
- * @returns {object|null}
- */
+/** A normalized view of a raw `system`, a `{ type, system }` or a live RegionBehavior; else null. */
 function asSystemView(systemOrBehavior) {
   if (!systemOrBehavior || typeof systemOrBehavior !== 'object') return null;
-  // A live behaviour document / a `{ type, system }` shape → read through the
-  // canonical reader. A raw system object (carrying `interactableType`) is used
-  // as-is (it is already the normalized-ish shape).
   if (systemOrBehavior.interactableType && systemOrBehavior.state) return systemOrBehavior;
   const view = readInteractableBehaviorSystem(systemOrBehavior);
   if (view) return view;
-  // A raw system passed without a `type` wrapper — accept it as-is when it looks
-  // like an interactable system.
+  // A raw system passed without a `type` wrapper is already the normalized-ish shape.
   return systemOrBehavior.interactableType ? systemOrBehavior : null;
 }
 
-/**
- * Plan a behaviour `state.enabled` patch. PURE: returns the minimal patch, or
- * null when the value already matches (no-op).
- *
- * @param {object} system
- * @param {boolean} enabled
- * @returns {{ system: { state: { enabled: boolean } } } | null}
- */
+/** The minimal `state.enabled` patch, or null when the value already matches. */
 export function planSetEnabled(system, enabled) {
   return planStateFlag(system, 'enabled', enabled, true);
 }
 
-/**
- * Plan a behaviour `state.locked` patch. PURE: returns the minimal patch, or null
- * when the value already matches (no-op).
- *
- * @param {object} system
- * @param {boolean} locked
- * @returns {{ system: { state: { locked: boolean } } } | null}
- */
+/** The minimal `state.locked` patch, or null when the value already matches. */
 export function planSetLocked(system, locked) {
   return planStateFlag(system, 'locked', locked, false);
 }
 
-/**
- * Shared body for the boolean `state.*` planners. `defaultValue` is the schema
- * default used to read the current value so a same-value toggle is a clean no-op.
- *
- * @param {object} system
- * @param {'enabled'|'locked'} key
- * @param {boolean} next
- * @param {boolean} defaultValue
- * @returns {object|null}
- */
+/** Shared body for the boolean `state.*` planners; `defaultValue` makes a same-value toggle a no-op. */
 function planStateFlag(system, key, next, defaultValue) {
   const view = asSystemView(system);
   if (!view) return null;
@@ -100,31 +46,14 @@ function planStateFlag(system, key, next, defaultValue) {
   return { system: { state: { [key]: target } } };
 }
 
-/**
- * Plan CLEARING the linked-visual link. PURE: returns the behaviour patch that
- * detaches the marker (uuid/documentName null, mode 'none'). Idempotent intent —
- * always returns the patch so the panel can re-clear after a manual fix.
- *
- * @param {object} _system  Accepted for symmetry; the clear patch is constant.
- * @returns {{ system: { linkedVisual: { uuid: null, documentName: null, mode: 'none' } } }}
- */
+/** The detach patch (uuid and documentName null, mode 'none'), always returned so re-clear works. */
 export function planClearVisualLink(_system) {
   return { system: { linkedVisual: { uuid: null, documentName: null, mode: 'none' } } };
 }
 
 /**
- * Build the panel's display view model for one interactable. PURE: reads the
- * behaviour system through the canonical reader and resolves a live linked-visual
- * status via the injected `resolveVisual` seam (defaults to the real
- * {@link resolveLinkedVisual}, which itself is a no-throw edge — pass a fake in
- * tests). Returns null when the behaviour is not a `fabricate.interactable`.
- *
- * @param {object} system  A behaviour system (raw or normalized view) or a behaviour doc.
- * @param {object} [opts]
- * @param {(system: object) => ({ doc: object, documentName: string }|null)} [opts.resolveVisual]
- *   Live linked-visual resolver. Injected so the view model's missing/ok status
- *   is unit-testable without Foundry.
- * @returns {object|null}
+ * The panel's view model for one interactable, or null when it is not a `fabricate.interactable`.
+ * `resolveVisual` is injected so the missing/ok status is testable without Foundry.
  */
 export function summarizeInteractable(system, { resolveVisual = resolveLinkedVisual } = {}) {
   const view = asSystemView(system);
@@ -142,9 +71,7 @@ export function summarizeInteractable(system, { resolveVisual = resolveLinkedVis
 
   const state = view.state && typeof view.state === 'object' ? view.state : {};
 
-  // Task-node link + independent-pool summary (issue 302). Only an unlinked node
-  // (`taskNodeLink === 'unlinked'` with a real `node`) surfaces a node summary;
-  // the linked default reports `taskNodeLink: 'linked'` and a null node.
+  // Only an unlinked node surfaces a summary; the linked default reports a null node (issue 302).
   const scopedNode =
     view.interactableType === 'gatheringTask' && view.taskNodeLink === 'unlinked' && view.node
       ? normalizeNodeConfig(view.node)
@@ -166,15 +93,12 @@ export function summarizeInteractable(system, { resolveVisual = resolveLinkedVis
 
   return {
     interactableType: view.interactableType,
-    // Whether the interactable still needs its identity/source configured (issue
-    // 342). The single authority; the panel renders a "Needs configuration" state
-    // and conceals/inerts the interactable while true.
+    // The single authority for "needs configuration"; the panel conceals and inerts while true.
     unconfigured: isUnconfiguredInteractable(view),
     name: view.name || '',
     taskNodeLink,
     node: nodeSummary,
     systemId: view.systemId || '',
-    // The id of the linked Tool (tool station) or Gathering Task, whichever applies.
     referenceId: view.interactableType === 'tool' ? (view.toolId ?? null) : (view.taskId ?? null),
     toolId: view.toolId ?? null,
     taskId: view.taskId ?? null,
@@ -212,17 +136,8 @@ export function summarizeInteractable(system, { resolveVisual = resolveLinkedVis
 }
 
 /**
- * Plan a task-node link toggle for a gatheringTask interactable (issue 302). PURE.
- *
- * Switching to `'unlinked'` seeds a fresh independent node (preserving any existing
- * independent node) so the behaviour owns its own pool; switching to `'linked'`
- * clears the independent node (depletion/respawn returns to following the task's
- * environment runtime). Returns null for a non-gatheringTask, an unknown link
- * value, or a no-op toggle.
- *
- * @param {object} system  A behaviour system (raw or normalized view) or a behaviour doc.
- * @param {'linked'|'unlinked'} link
- * @returns {{ system: { taskNodeLink: string, node: object|null } } | null}
+ * PURE. The link toggle: 'unlinked' seeds a fresh independent node (preserving an existing one),
+ * 'linked' clears it. Null for a non-gatheringTask, an unknown value, or a no-op (issue 302).
  */
 export function planSetTaskNodeLink(system, link) {
   const view = asSystemView(system);
@@ -236,8 +151,7 @@ export function planSetTaskNodeLink(system, link) {
     return { system: { taskNodeLink: 'linked', node: null } };
   }
 
-  // Seed an independent node: keep the existing one if present, else a sensible
-  // default single-use pool the GM can then edit through the shared node controls.
+  // Keep the existing independent node if present, else a default single-use pool the GM edits.
   const existing = normalizeNodeConfig(view.node);
   const node =
     existing ??
@@ -246,15 +160,8 @@ export function planSetTaskNodeLink(system, link) {
 }
 
 /**
- * Plan a GM restock of a scoped node pool (issue 302). PURE. Mirrors the
- * environment restock contract: a `nonRegenerating` pool is permanently
- * depletable and cannot be restocked (no-op → null). Otherwise sets the pool's
- * `max` (when provided) and clamps `current` into `[0, max]`. Returns null when
- * there is no scoped node to restock or the values do not change it.
- *
- * @param {object} system  A behaviour system (raw or normalized view) or a behaviour doc.
- * @param {{ current?: number, max?: number }} [values]
- * @returns {{ system: { node: object } } | null}
+ * PURE. A GM restock, mirroring the environment contract: a `nonRegenerating` pool cannot be
+ * restocked, otherwise set `max` and clamp `current` into `[0, max]`; else null.
  */
 export function planRestockScopedNode(system, { current, max } = {}) {
   const view = asSystemView(system);
@@ -279,35 +186,14 @@ export function planRestockScopedNode(system, { current, max } = {}) {
   return { system: { node: { ...node, max: nextMax, current: nextCurrent } } };
 }
 
-/** Local string-coercion mirror (avoids re-exporting from the flags module here). */
+/** Local string coercion, so this module need not re-export from the flags module. */
 function trimmedString(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
 /**
- * Plan the IDENTITY / SOURCE patch that configures a (typically unconfigured)
- * interactable from a GM selection in the config panel (issue 342). PURE: builds
- * the canonical `sourceUuid` via {@link buildInteractableSourceUuid} and the
- * type-scoped ids, and returns the minimal behaviour patch. The actual write is the
- * panel's existing GM-routed `updateBehavior` seam.
- *
- * SAFETY: this NEVER writes a PARTIAL identity. It returns null (a no-op) unless the
- * selection is complete for its type:
- *   - tool          → `{ interactableType, systemId, toolId }`;
- *   - gatheringTask → `{ interactableType, systemId, taskId }` (+ optional
- *                      `environmentId`).
- * The off-type id is cleared to null so a re-target never leaves a stale id behind.
- *
- * @param {object} _system  The current behaviour system (accepted for symmetry; the
- *   patch is derived entirely from the selection, so a re-target is deterministic).
- * @param {object} selection
- * @param {'tool'|'gatheringTask'} selection.interactableType
- * @param {string} selection.systemId
- * @param {string} [selection.toolId]         Required for a tool.
- * @param {string} [selection.taskId]         Required for a gatheringTask.
- * @param {string} [selection.environmentId]  Optional (gatheringTask only).
- * @returns {{ system: object } | null}  The behaviour patch, or null for an
- *   incomplete/invalid selection (no-op).
+ * PURE. The identity patch from a GM selection (issue 342). NEVER writes a PARTIAL identity —
+ * null unless complete for its type — and clears the off-type id so a re-target leaves nothing stale.
  */
 export function planConfigureSource(_system, selection = {}) {
   const interactableType = selection?.interactableType;
@@ -329,14 +215,13 @@ export function planConfigureSource(_system, selection = {}) {
           referenceId: toolId,
         }),
         toolId,
-        // Clear the off-type id so a re-target from a gatheringTask leaves nothing stale.
+        // Clear the off-type id so a re-target leaves nothing stale.
         taskId: null,
         environmentId: null,
       },
     };
   }
 
-  // gatheringTask
   const taskId = trimmedString(selection.taskId);
   if (!taskId) return null; // never write a partial identity.
   const environmentId = trimmedString(selection.environmentId) || null;
@@ -351,7 +236,7 @@ export function planConfigureSource(_system, selection = {}) {
       }),
       taskId,
       environmentId,
-      // Clear the off-type id so a re-target from a tool leaves nothing stale.
+      // Clear the off-type id so a re-target leaves nothing stale.
       toolId: null,
     },
   };

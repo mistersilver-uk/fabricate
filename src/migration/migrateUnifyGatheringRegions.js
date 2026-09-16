@@ -1,48 +1,16 @@
 /**
- * Migration 0.9.0: unify gathering regions.
- *
- * Collapses the two historical "region" notions into the single first-class
- * `GatheringRegion` concept:
- *
- * 1. Each legacy per-system region vocabulary entry
- *    (`gatheringConfig.systems[sysId].vocabularies.regions.values`) becomes a
- *    `GatheringRegion` record on the matching crafting system
- *    (`system.gatheringRegions[]`), keyed by the crafting-system id. Dedupe is by
- *    region id (the vocabulary's own identity model), so distinct ids with
- *    duplicate labels produce distinct regions, and a config system id with no
- *    matching crafting system is skipped (no target to write to).
- * 2. Each environment with a non-empty legacy `region` and empty
- *    `includedRegionIds` is mapped to `includedRegionIds = [thatId]` ONLY when a
- *    derived region with that id exists. Orphan fallback: a free-text
- *    `environment.region` with no matching derived region leaves
- *    `includedRegionIds` empty and the inert `region` string in place (no data
- *    loss, no stale reference).
- * 3. `region` / `regions` tags are stripped from gathering-config tasks and
- *    events (region is no longer a composition axis — composition is biome +
- *    danger only).
- * 4. Each migrated system's `vocabularies.regions` is cleared to `{ values: [] }`.
- * 5. `gatheringRegionSettings.enabled` is left unset (normalizes to `false`), so
- *    migrated systems keep the region/travel subsystem opt-in. The runner fires a
- *    one-time GM notice naming the systems that had regions, warning that
- *    region-scoped tasks/events may now appear in MORE environments.
- *
- * Pure function: no I/O, no Foundry calls, deep-clones its inputs. Idempotent —
- * the id-dedupe on regions, the empty-`includedRegionIds` guard, the
- * orphan-leave-inert rule, and the cleared vocabulary all mean a second run is a
- * no-op. Runs at a version higher than the 0.2.0 `migrateGatheringConfig` so it
- * sees the per-system vocabulary that migration intentionally preserves.
+ * `0.9.0` — collapse the two historical "region" notions into the first-class `GatheringRegion`,
+ * mapping each environment's legacy `region` onto `includedRegionIds` and clearing the per-system
+ * vocabulary. `gatheringRegionSettings.enabled` is LEFT UNSET, so a migrated system keeps the
+ * subsystem opt-in and the runner's notice warns that region-scoped records may now appear in MORE
+ * environments. Pure, deep-cloning and idempotent; it runs above `0.2.0`, whose vocabulary it reads.
  */
 
 import { isPlainObject, clone } from './migrationHelpers.js';
 
 /**
- * Normalize a vocabulary id (or a region/environment id) to its canonical form.
- * Matches the gathering vocabulary's own id model (`trim().toLowerCase()`), so a
- * derived region id, an `environment.region` string, and a stripped task tag all
- * collapse to the same key.
- *
- * @param {*} value
- * @returns {string}
+ * Normalize an id to the gathering vocabulary's own model, so a derived region id, an
+ * `environment.region` string and a stripped task tag all collapse to the same key.
  */
 function vocabId(value) {
   if (value && typeof value === 'object') {
@@ -53,13 +21,7 @@ function vocabId(value) {
     .toLowerCase();
 }
 
-/**
- * Extract `{ id, label }` from one vocabulary `values` entry (a bare string or a
- * `{ id|value, label }` record). Returns `null` for entries with no usable id.
- *
- * @param {*} entry
- * @returns {{ id: string, label: string }|null}
- */
+/** `{ id, label }` from one vocabulary entry — a bare string or a record; null with no usable id. */
 function vocabularyEntry(entry) {
   const isRecord = entry && typeof entry === 'object';
   const id = vocabId(isRecord ? (entry.id ?? entry.value ?? entry.label) : entry);
@@ -76,13 +38,8 @@ function regionValuesFor(systemConfig) {
 }
 
 /**
- * Run the unification transform over the runner's one-pass data bundle.
- *
- * @param {{ systems?: object[], gatheringConfig?: object, environments?: object[] }} data
- * @returns {{ systems: object[], gatheringConfig: object, environments: object[], _unifiedRegionSystems?: string[] }}
- *   The transformed payloads plus a transient `_unifiedRegionSystems` field (the
- *   names of systems that had legacy regions) for the runner's GM notice. The
- *   field is stripped before persist by the runner.
+ * Run the unification over the runner's bundle, plus a transient `_unifiedRegionSystems` field
+ * naming the systems that had legacy regions, which the runner strips before persisting.
  */
 export function migrateUnifyGatheringRegions(data = {}) {
   const systems = Array.isArray(data?.systems) ? clone(data.systems) : [];
@@ -96,11 +53,9 @@ export function migrateUnifyGatheringRegions(data = {}) {
     systems.filter(isPlainObject).map((system) => [String(system?.id ?? ''), system])
   );
 
-  // Per crafting-system: the set of region ids known after derivation (existing +
-  // newly derived), so environment mapping can tell a real region from an orphan.
-  // Pre-seed from each system's existing `gatheringRegions` so an environment that
-  // already cites a first-class region (a partially-migrated or re-imported
-  // system whose vocab is gone) still maps instead of being treated as an orphan.
+  // The region ids known after derivation, per system, so environment mapping tells a real region
+  // from an orphan. Pre-seeded from existing `gatheringRegions` so an environment citing a
+  // first-class region on a partially-migrated system still maps.
   const derivedRegionIdsBySystem = new Map();
   for (const [sysId, system] of systemsById) {
     const ids = new Set(
@@ -117,19 +72,15 @@ export function migrateUnifyGatheringRegions(data = {}) {
     if (!isPlainObject(systemConfig)) continue;
     const values = regionValuesFor(systemConfig);
 
-    // Only touch the per-system vocabulary when it actually carried region
-    // values. Clearing it to `{ values: [] }` then makes a re-run a no-op (an
-    // already-empty/absent regions vocab is left untouched). Systems with no
-    // region vocab keep their config byte-for-byte so idempotency holds and
-    // unrelated configs are never rewritten.
+    // Only touch a vocabulary that actually carried region values, so a system with none keeps its
+    // config byte-for-byte and idempotence holds.
     const hadRegionVocab = values.length > 0;
     if (hadRegionVocab) {
       systemConfig.vocabularies = isPlainObject(systemConfig.vocabularies)
         ? systemConfig.vocabularies
         : {};
       systemConfig.vocabularies.regions = { values: [] };
-      // Track the systems that actually carried region data for the GM notice
-      // (only when a crafting system exists to receive the derived regions).
+      // Only when a crafting system exists to receive the derived regions.
       if (systemsById.has(sysId)) unifiedSystemNames.push(sysId);
     }
 
@@ -150,9 +101,7 @@ export function migrateUnifyGatheringRegions(data = {}) {
       if (!entry) continue;
       if (existingIds.has(entry.id)) continue; // id-dedupe → idempotent.
       existingIds.add(entry.id);
-      // Lazily materialize the array only when there is a region to add, so a
-      // system with no derivable regions is never mutated (idempotent + no
-      // spurious persist of an empty `gatheringRegions: []`).
+      // Lazily materialized, so a system with no derivable regions is never mutated.
       if (!Array.isArray(system.gatheringRegions)) system.gatheringRegions = [];
       system.gatheringRegions.push({
         id: entry.id,
@@ -170,8 +119,7 @@ export function migrateUnifyGatheringRegions(data = {}) {
     return name || sysId;
   });
 
-  // Strip region/regions tags from gathering-config tasks and events (region is
-  // no longer a composition axis).
+  // Region is no longer a composition axis, so its tags go.
   for (const systemConfig of Object.values(configSystems)) {
     if (!isPlainObject(systemConfig)) continue;
     for (const collectionKey of ['tasks', 'events']) {
@@ -200,8 +148,8 @@ export function migrateUnifyGatheringRegions(data = {}) {
     if (known && known.has(regionId)) {
       environment.includedRegionIds = [regionId];
     }
-    // Orphan: no derived region with this id → leave includedRegionIds empty and
-    // the inert `region` string in place (no stale reference, no data loss).
+    // Orphan: leave `includedRegionIds` empty and the inert `region` string in place — no stale
+    // reference, no data loss.
   }
 
   const result = { systems, gatheringConfig, environments };

@@ -257,10 +257,16 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // the merged tree rather than reconciled by hand: these counts are derived, so picking a side
   // of the conflict would have pinned a figure no tree actually has.
   //
-  // 123/119 on this branch: the issue-1683 sweep of the crafting and gathering engines and the
-  // two managers takes `_validateTools`, `_normalizeSalvage`, `_terminalStart` and
-  // `evaluateShoppingRequirement` back under the function threshold on comment lines alone. The
-  // file count is main's -- none of the four swept files left the list, all still oversized.
-  assert.equal(files, 123, 'oversized files');
-  assert.equal(keys.length - files, 119, 'oversized functions');
+  // 122/120 on this branch. Four rows leave the ledger with its comment mass --
+  // `interactableRegionFlags.js::buildInteractableBehaviorSchema`, `main.js::Hooks.once>on`,
+  // `migrateRecipeForModeChange` and `remapWorldScopeIdentityFlags.js` -- on top of the figure
+  // main carries.
+  //
+  // 122/116 here: on top of everything main now carries, the issue-1683 sweep of the crafting and
+  // gathering engines and the two managers takes `_validateTools`, `_normalizeSalvage`,
+  // `_terminalStart` and `evaluateShoppingRequirement` back under the function threshold on
+  // comment lines alone. The file count is main's -- none of the four swept files left the list,
+  // all four are still oversized. Regenerated from the merged tree rather than reconciled by hand.
+  assert.equal(files, 122, 'oversized files');
+  assert.equal(keys.length - files, 116, 'oversized functions');
 });
