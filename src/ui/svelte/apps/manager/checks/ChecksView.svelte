@@ -1,21 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The Checks Studio's per-ACTIVITY route: `checks-crafting`, `checks-salvage`, `checks-gathering`
-  and `checks-validation` are rail ROUTES and this component renders whichever one is open.
-  `activity` is therefore a prop rather than internal state — the rail owns the highlight, the
-  breadcrumb and the deep link, and a second copy here would be a second source of truth for
-  which screen the GM is on.
+  and `checks-validation` are rail ROUTES and this renders whichever is open. `activity` is a
+  PROP, not internal state — the rail owns the highlight, the breadcrumb and the deep link.
 
-  A system has exactly one crafting, one salvage and one gathering check, each a singleton whose
-  shape follows its resolution mode, so an activity route is a single editor page rather than a
-  list: no create action, no "no checks yet" empty state.
-
-  The five sections (The roll / Outcomes / Triggers / Modifiers / On failure), which of them
-  render in which mode, the dot-and-count contract, the "switched off" predicate and the right
-  rail's contents are all stated in `openspec/specs/ui-integration/spec.md` → "GM Checks Studio".
-  The section dots and the rail badges the parent derives from the same pass are computed on the
-  LIVE DRAFT, so a GM sees the consequence of an edit before saving; the enable gate is not, and
-  the Validation route says so.
+  Each activity's check is a singleton whose shape follows its resolution mode, so a route is a
+  single editor page rather than a list. The five sections, which render in which mode, the
+  dot-and-count contract, the "switched off" predicate and the right rail's contents are stated
+  in `openspec/specs/ui-integration/spec.md` → "GM Checks Studio". Dots and rail badges are
+  computed on the LIVE DRAFT; the enable gate is not, and the Validation route says so.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -644,12 +637,10 @@
    * and the SECTION owning the gap, THEN move focus to the offending control.
    *
    * THE ORDER IS THE MECHANISM. `onOpenActivity` is the router's own synchronous state write, so
-   * the destination panel exists by the time the focus helper's `queueMicrotask` runs its query.
-   * Everything after that belongs to `validationAnnouncement.js`, for all five hosts.
-   *
-   * A ROUTE-ONLY ROW IS NORMAL HERE, so the helper resolves `null` and the SECTION PANEL takes
-   * the keyboard. Leaving focus where it was is not the alternative: the row's button is
-   * unmounted by the route change, so focus would fall to `<body>`.
+   * the destination panel exists by the time the focus helper's `queueMicrotask` runs its query;
+   * everything after that belongs to `validationAnnouncement.js`. A ROUTE-ONLY ROW IS NORMAL
+   * HERE, so the helper resolves `null` and the SECTION PANEL takes the keyboard — leaving focus
+   * where it was is not the alternative, the row's button being unmounted by the route change.
    *
    * @param {{activity?: string, section?: string}} target the ROUTE the row carries.
    * @param {string} [focusTarget] the CONTROL's `data-validation-target` value, if it named one.

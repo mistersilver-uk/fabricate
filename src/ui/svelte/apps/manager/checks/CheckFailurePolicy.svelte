@@ -1,19 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The FAILURE-RESULT POLICY card — the On-failure section's first control on all three activity
-  routes. It answers exactly ONE question, and the copy is written to keep it there: may a
-  FAILED check produce a result at all. What a failed attempt COSTS is the consumption axis, and
-  those toggles sit beside this card rather than inside it.
+  routes. It answers exactly ONE question and the copy keeps it there: may a FAILED check produce
+  a result at all. What a failed attempt COSTS is the consumption axis, beside this card.
 
-  The `perRecord` label is PER-ACTIVITY, because the persisted token is activity-independent
-  where the word "record" is not; the nouns come in as props, a noun being copy.
-
-  THE INERT NOTE. The policy has no reach in `routedByIngredients` or `progressive` — neither has
-  a failure tier or a reserved failure group to mark — nor in gathering's dormant routed path, so
-  rather than render a control that quietly does nothing, this states WHY. The control stays
-  ENABLED under an inert mode on purpose: disabling it would destroy the distinction between
-  "this system forbids failure results" and "this mode cannot express them", and the policy is
-  persisted per ACTIVITY rather than per mode.
+  The `perRecord` label is PER-ACTIVITY, the nouns arriving as props. THE INERT NOTE states WHY
+  the policy has no reach in `routedByIngredients`, `progressive` or gathering's dormant routed
+  path, rather than rendering a control that quietly does nothing — and the control stays ENABLED
+  there, disabling it destroying the distinction between "this system forbids failure results"
+  and "this mode cannot express them" for a value persisted per ACTIVITY.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';

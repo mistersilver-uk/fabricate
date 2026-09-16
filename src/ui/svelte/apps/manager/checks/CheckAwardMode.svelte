@@ -1,12 +1,10 @@
 <!-- Svelte 5 runes mode -->
 <!--
   Shared progressive award-mode selector. Progressive resolution spends the check value against
-  each result's difficulty in order, and the award mode decides how the spend stops: `equal`
-  awards each result the value covers in full, `partial` also awards the first it cannot, and
-  `exceed` requires the value to strictly clear each difficulty. Used by all three progressive
-  check editors, so the vocabulary stays one.
-
-  Controlled, through the shared `RadioCardGroup` primitive: renders `value` and emits the next.
+  each result's difficulty in order: `equal` awards each result the value covers in full,
+  `partial` also awards the first it cannot, and `exceed` requires the value to clear each
+  difficulty. Used by all three progressive check editors, so the vocabulary stays one, and
+  controlled through the shared `RadioCardGroup` primitive.
 -->
 <script>
   import RadioCardGroup from '../../../components/RadioCardGroup.svelte';

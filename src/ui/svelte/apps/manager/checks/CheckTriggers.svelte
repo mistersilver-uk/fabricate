@@ -1,25 +1,18 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Unified per-check trigger editor. One trigger list per check, ALWAYS rendered, each trigger
-  pairing an expressive dice-matching CONDITION with three effects:
+  Unified per-check trigger editor. One trigger list per check, ALWAYS rendered, each pairing an
+  expressive dice-matching CONDITION with three effects: `outcome` forces an automatic success or
+  failure under BOTH breakage authorities; `breakTools` breaks every required tool and is
+  authored and applied ONLY under `checkDriven`; and `tierStep` moves the rolled outcome tier,
+  routed only and deliberately NOT gated on `showBreakTools`, stepping not being a breakage
+  concept.
 
-    - `outcome` — force the check to an automatic success or failure, or leave it. A progressive
-      check reads those as Award all / Award none. Forcing applies under BOTH breakage
-      authorities.
-    - `breakTools` — break every required tool for the attempt. Authored and applied ONLY under
-      `checkDriven` authority; under `toolSpecific` a check never breaks tools.
-    - `tierStep` — move the rolled outcome tier, by target or by N steps. Routed only, there
-      being no tiers to step otherwise, and deliberately NOT gated on `showBreakTools`: stepping
-      is not a breakage concept.
+  An `outcomeTier` condition cannot force an outcome — the routed tier resolves AFTER the forced
+  outcome would run — so its outcome segments are pinned to No effect and disabled. It CAN step.
 
-  An `outcomeTier` condition cannot force an outcome — the routed tier is resolved AFTER the
-  forced outcome would run — so the outcome segments are pinned to No effect and disabled for
-  it. It CAN step, a step reading the rolled tier and producing the final one.
-
-  Controlled: reads the `{ triggers[] }` block plus the roll formula and emits the next block
-  via `onChange`. Dice groups are enumerated from the formula by `parseDiceGroups`, so a
-  `diceGroup` trigger targets a group by its evaluated-term index. `kind` selects which
-  condition types are offered.
+  Controlled: reads the `{ triggers[] }` block plus the roll formula and emits the next block.
+  Dice groups come from `parseDiceGroups`, so a `diceGroup` trigger targets a group by its
+  evaluated-term index, and `kind` selects which condition types are offered.
 -->
 <script>
   import Field from '../../../components/Field.svelte';

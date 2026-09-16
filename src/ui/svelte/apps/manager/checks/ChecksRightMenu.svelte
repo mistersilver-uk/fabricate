@@ -1,32 +1,22 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The Checks Studio's right rail. What it carries on an activity route, and the fact that the
-  Validation route's rail is a different, shorter stack, are stated in
-  `openspec/specs/ui-integration/spec.md` → "GM Checks Studio"; this file implements that.
+  The Checks Studio's right rail. What it carries on an activity route, and that the Validation
+  route's rail is a shorter stack, are stated in `openspec/specs/ui-integration/spec.md` → "GM
+  Checks Studio".
 
-  THE ACTIVATION CARD HAS NO HEADING, where every other section here is named by a flat kicker:
-  the CARD is the statement — a switch, the words `Check is on`, and, when the mode locks it, a
-  padlock and the sentence saying which mode requires it. An `ACTIVE` kicker above a card
-  reading `On` said the same thing twice and read as a third section.
+  THE ACTIVATION CARD HAS NO HEADING, where every other section is named by a flat kicker: the
+  CARD is the statement, and an `ACTIVE` kicker above a card reading `On` says it twice.
+  STRUCTURE IS FLAT HEADINGS WITH CARDS BENEATH, each an optional right-aligned adjunct after
+  the kicker; no card wraps a section and no panel is a disclosure. THE DIGEST AND THE
+  ALL-CHECKS LIST ARE ONE CARD OF COMPACT ROWS whose chevron OPENS the section it describes,
+  through the same `onOpen` deep link the Validation issues use — so a row stating an ABSENCE
+  carries neither chevron nor target.
 
-  STRUCTURE: FLAT HEADINGS, CARDS BENEATH. Every section is a `.manager-kicker` naming it,
-  followed by the card it labels — the Tool Studio's inspector convention. No card wraps a
-  section and no panel is a disclosure. The heading ROW is the prototype's inside that
-  structure: a leading glyph, the kicker, and an optional right-aligned adjunct.
-
-  THE DIGEST AND THE ALL-CHECKS LIST ARE ONE CARD OF COMPACT ROWS, not a stack of bordered
-  cards. Each row is glyph, one line of text and a trailing chevron, and the chevron is an
-  affordance: the row opens the section it describes through the same `onOpen` deep link the
-  Validation issues use. A row stating an ABSENCE has nowhere to go, so it carries neither a
-  chevron nor a target.
-
-  RESPONSIVE BEHAVIOUR REUSES THE SHIPPED CONTAINER LADDER in `styles/fabricate.css` and
-  introduces no new breakpoint. At ≤1120 the shipped rule already restacks `.manager-body` to
-  one column with `grid-auto-rows: max-content` and hands scrolling to the body; the rail's own
-  `overflow-y` / `max-height` are LEFT ALONE, because against a `max-content` track the bound
-  resolves to the region's own content height and cannot clip. The real constraint is narrower
-  than "do not self-scroll": do not defeat `grid-auto-rows: max-content`, and give no
-  `.manager-body` child a DEFINITE height.
+  RESPONSIVE BEHAVIOUR REUSES THE SHIPPED CONTAINER LADDER in `styles/fabricate.css` and adds no
+  breakpoint. At ≤1120 the shipped rule restacks `.manager-body` to one column with
+  `grid-auto-rows: max-content`; the rail's own `overflow-y`/`max-height` are LEFT ALONE, the
+  bound resolving to the region's own content height there. The real constraint is narrower than
+  "do not self-scroll": give no `.manager-body` child a DEFINITE height.
 -->
 <script>
   import Field from '../../../components/Field.svelte';

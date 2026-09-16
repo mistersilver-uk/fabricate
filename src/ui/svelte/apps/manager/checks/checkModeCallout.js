@@ -1,38 +1,25 @@
 /**
- * WHAT THIS MODE DOES: the Checks Studio's per-mode explanation, as data.
+ * WHAT THIS MODE DOES: the Checks Studio's per-mode explanation, as data — a callout naming the
+ * resolution mode, one paragraph on what it does with a roll, and three facts under it.
  *
- * The roll section opens with a callout naming the resolution mode, explaining in one paragraph
- * what that mode does with a roll, and stating three facts under it — whether the check is
- * rolled at all, what shape its outcomes take, and how results are reached.
+ * IT IS PURE, AND IT COVERS EVERY MODE, so `tests/check-mode-callout.test.js` proves
+ * exhaustiveness in BOTH directions. ALCHEMY HAS TWO ENTRIES, NOT THREE: there is no
+ * `crafting:none`, alchemy at `checkMode: 'none'` being the OFF state of an optional check, so
+ * `checkModeKey` returns `''` and the switched-off panel renders instead. Its SIMPLE check
+ * states `check:optional` unlike its tiered sibling, a system wanting the reserved failure
+ * result set having to roll one and a system that does not being served by switching it off.
  *
- * IT IS PURE, AND IT COVERS EVERY MODE. No Svelte and no Foundry, so
- * `tests/check-mode-callout.test.js` proves exhaustiveness in BOTH directions: a mode with no
- * entry would render its raw token to a GM, and an entry for a mode nothing can select is copy
- * nobody will ever see.
+ * THE `MODES` TABLE IS ONE COPY-PASTE BLOCK, so keep edits inside it SMALL: thirteen entries of
+ * one shape read as duplication to SonarCloud's CPD, new-code density is measured over the lines
+ * a PR touches, and ANY edit there lands at 100% duplicated. That is why this rationale is in
+ * the header, outside the block.
  *
- * ALCHEMY HAS TWO ENTRIES, NOT THREE, AND ITS SIMPLE CHECK IS OPTIONAL. There is no
- * `crafting:none`, because alchemy at `checkMode: 'none'` is the OFF state of an optional check
- * rather than a mode of its own, so its route renders the shared switched-off panel and this
- * callout never renders; `checkModeKey` returns `''` and the caller renders nothing.
- * `crafting:alchemySimple` states `check:optional` unlike its tiered sibling: a system wanting
- * the reserved failure result set has to roll the check, and one that does not is served by
- * switching it off. Tiered stays required, routing result groups by outcome tier.
- *
- * THE `MODES` TABLE IS ONE COPY-PASTE BLOCK, so keep edits inside it SMALL. Thirteen entries of
- * one `{ icon, title, body, facts }` shape read as duplication to SonarCloud's CPD and the
- * whole table sits inside the flagged region, where new-code density is measured over the lines
- * a PR touches — so ANY edit there lands at 100% duplicated and can fail the gate on its own.
- * That is why this rationale lives in the header, which is outside the block; restructuring the
- * table to satisfy CPD would cost the declarative shape that makes it checkable.
- *
- * GATHERING'S ROUTED AND PROGRESSIVE MODES ARE DORMANT, not configurable: they are rendered
- * disabled in the GM UI, so no gathering configuration a GM can choose today rolls a formula.
- * They are still REACHABLE by a world already carrying one, so the answer is dormancy framing
- * rather than absence — and the framing is the Modifiers section's own, reused VERBATIM, two
- * sentences for one fact being exactly the drift `checksCopy.js` exists to prevent.
+ * GATHERING'S ROUTED AND PROGRESSIVE MODES ARE DORMANT, rendered disabled in the GM UI but still
+ * REACHABLE, so the answer is dormancy framing in the Modifiers section's own words reused
+ * VERBATIM — two sentences for one fact being the drift `checksCopy.js` prevents.
  *
  * Each entry is `{ icon, title, body, facts }` with `[key, fallback]` pairs, resolved by the
- * component's own `text()` bridge, so the localization seam stays in the Svelte layer.
+ * component's `text()` bridge.
  */
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Mode.';

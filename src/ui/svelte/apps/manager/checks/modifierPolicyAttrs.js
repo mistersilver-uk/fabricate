@@ -2,19 +2,14 @@
  * The DOM hook names the check-modifier combination-rule group renders, hoisted out of Svelte
  * markup so a test can import them.
  *
- * WHY THIS MODULE EXISTS. `scripts/lib/viewLabCases.js` targets individual rule options by that
- * attribute, and `tests/view-lab-cases.test.js` asserts every value in the registry is a real
- * `MODIFIER_POLICIES` member — a guard that is worthless if it RESTATES the attribute name: on
- * a rename it extracts an EMPTY set, the subset assertion holds, the test passes, and the
- * registry's selectors point at a dead hook, failing the capture job whole while
- * `check-screenshots` stays green on stale frames.
- *
- * Importing the name from the component is not implementable: the card passes the literal as a
- * PROP VALUE in markup, has no `<script module>` and exports nothing, and the consuming test
- * compiles no Svelte. So the literal is hoisted HERE and imported by both sides, the same shape
- * the `MODIFIER_POLICIES` import already uses.
- *
- * Deliberately import-free and Foundry-free.
+ * WHY THIS MODULE EXISTS. `scripts/lib/viewLabCases.js` targets rule options by that attribute
+ * and `tests/view-lab-cases.test.js` asserts every value in the registry is a real
+ * `MODIFIER_POLICIES` member — a guard worthless if it RESTATES the name: on a rename it
+ * extracts an EMPTY set, the subset assertion holds, the test passes, and the registry's
+ * selectors point at a dead hook, failing the capture job whole while `check-screenshots` stays
+ * green on stale frames. Importing the name from the component is not implementable: the card
+ * passes the literal as a PROP VALUE in markup and exports nothing, and the consuming test
+ * compiles no Svelte. Deliberately import-free and Foundry-free.
  */
 
 /**

@@ -1,8 +1,5 @@
 /**
- * Checks sub-navigation model: the expandable rail GROUP. The router imports
- * `buildChecksNavItems` to render the visible children, `activeChecksTab` to highlight the
- * child owning the active view, and `isChecksRoute` to decide whether the active view belongs
- * to the group at all. It mirrors `crafting/craftingNav.js`, the shipped precedent.
+ * Checks sub-navigation model: the expandable rail GROUP, mirroring `crafting/craftingNav.js`.
  *
  * `CHECKS_VIEWS` VALUES ARE `data-manager-view` STRINGS, not nav-item ids, and the distinction
  * is load-bearing: `craftingNav.js` declares a nav item `settings` whose view is
@@ -10,25 +7,16 @@
  * `tests/view-lab-cases.test.js` pins every View Lab `expectView` value beginning `checks`
  * against this array, and `expectView` is matched against `data-manager-view`.
  *
- * The bare `checks` id is deliberately NOT a member — the root never renders it, route
- * normalization redirecting it to the first available child — and is exported separately as
- * {@link CHECKS_REDIRECT_VIEW}, so a deep link still has a defined answer without widening the
- * pinned set to a string no screen shows.
- *
- * Pure and dependency-free: no Svelte, no Foundry.
+ * The bare `checks` id is deliberately NOT a member — the root never renders it — and is
+ * exported separately as {@link CHECKS_REDIRECT_VIEW}, so a deep link still has a defined answer
+ * without widening the pinned set to a string no screen shows. Pure and dependency-free.
  */
 
-/**
- * The retained entry point. Anything routing to it lands on the first AVAILABLE child,
- * which depends on the feature flags, so it is resolved rather than aliased to a constant.
- * @type {string}
- */
+/** The retained entry point, landing on the first AVAILABLE child, which depends on the feature
+ *  flags — so it is resolved rather than aliased. @type {string} */
 export const CHECKS_REDIRECT_VIEW = 'checks';
 
-/**
- * Every view id the Checks group owns, in reading order.
- * @type {readonly string[]}
- */
+/** Every view id the Checks group owns, in reading order. @type {readonly string[]} */
 export const CHECKS_VIEWS = Object.freeze([
   'checks-crafting',
   'checks-salvage',
@@ -37,9 +25,8 @@ export const CHECKS_VIEWS = Object.freeze([
 ]);
 
 /**
- * The three ACTIVITY children, in reading order. Validation is not one, which is the whole
- * reason this constant exists: the parent badge sums these three and Validation restates the
- * same total, so a sum over "every child" would double it.
+ * The three ACTIVITY children, in reading order. Validation is not one, which is why this exists:
+ * the parent badge sums these three and Validation RESTATES that total.
  * @type {readonly string[]}
  */
 export const CHECKS_ACTIVITIES = Object.freeze(['crafting', 'salvage', 'gathering']);
@@ -95,23 +82,19 @@ function countFor(issueCounts, id) {
 }
 
 /**
- * Build the ordered list of visible Checks children. Salvage and gathering are optional
- * FEATURES and their children are dropped when the feature is off; crafting and Validation are
- * always present, so the list is never empty and the `checks` redirect always has a target.
+ * Build the ordered list of visible Checks children. Salvage and gathering are optional FEATURES
+ * whose children are dropped when the feature is off; crafting and Validation are always
+ * present, so the list is never empty and the `checks` redirect always has a target.
  *
  * @param {object} args
- * @param {object} [args.features] The selected system's feature flags. `salvage` defaults
- *   ON (absent means on); `gathering` is opt-in and must be exactly `true`.
+ * @param {object} [args.features] Feature flags. `salvage` defaults ON; `gathering` is opt-in.
  * @param {string} [args.resolutionMode] The system's recipe resolution mode.
  * @param {string} [args.salvageResolutionMode] The salvage resolution mode.
- * @param {string} [args.gatheringResolutionMode] The gathering economy's resolution mode.
- *   All three are carried onto their child as `mode` so a caller reads one shape rather
- *   than re-deriving which mode belongs to which activity.
- * @param {Record<string, number>} [args.issueCounts] Per-activity readiness issue counts,
- *   keyed by activity id. Validation's own count is IGNORED if supplied: it is defined as
- *   the total of the three activities and is computed here so the two cannot disagree.
+ * @param {string} [args.gatheringResolutionMode] The gathering economy's resolution mode. All
+ *   three are carried onto their child as `mode`, so a caller reads one shape.
+ * @param {Record<string, number>} [args.issueCounts] Per-activity issue counts. Validation's own
+ *   is IGNORED if supplied and computed here, being the total of the three.
  * @param {Record<string, boolean>} [args.dirtyActivities] Per-activity unsaved-edit flags.
- *   Validation authors nothing, so it never carries one.
  * @returns {Array<{ id: string, view: string, icon: string, labelKey: string,
  *   labelFallback: string, activity: boolean, mode: string, issueCount: number,
  *   dirty: boolean }>}
@@ -155,9 +138,8 @@ export function buildChecksNavItems({
 }
 
 /**
- * The PARENT badge: the sum of the three activity children and nothing else. Validation's badge
- * is that same total RESTATED, so adding it would report every issue twice.
- *
+ * The PARENT badge: the sum of the three activity children and nothing else, Validation's badge
+ * being that same total RESTATED.
  * @param {Array<{ activity?: boolean, issueCount?: number }>} items
  * @returns {number}
  */
@@ -167,20 +149,15 @@ export function checksNavIssueTotal(items = []) {
     .reduce((total, item) => total + (Number(item?.issueCount) || 0), 0);
 }
 
-/**
- * Whether any visible Checks child carries an unsaved edit.
- * @param {Array<{ dirty?: boolean }>} items
- * @returns {boolean}
- */
+/** Whether any visible Checks child carries an unsaved edit.
+ *  @param {Array<{ dirty?: boolean }>} items @returns {boolean} */
 export function checksNavHasDirty(items = []) {
   return items.some((item) => item?.dirty === true);
 }
 
 /**
- * The child id that owns a given active view, or `null` for a view outside the group. The bare
- * `checks` redirect resolves to no child: it is not a destination, and highlighting one before
- * normalization has run would flash the wrong entry.
- *
+ * The child id that owns a given active view, or `null` outside the group. The bare `checks`
+ * redirect resolves to no child: highlighting one before normalization flashes the wrong entry.
  * @param {string} view The active view id.
  * @returns {string|null}
  */
@@ -189,9 +166,8 @@ export function activeChecksTab(view) {
 }
 
 /**
- * Whether a view belongs to the Checks group. The `checks` redirect counts: route guards
- * ask this before normalization has had a chance to rewrite it.
- *
+ * Whether a view belongs to the Checks group. The `checks` redirect counts, route guards asking
+ * this before normalization has rewritten it.
  * @param {string} view The view id to test.
  * @returns {boolean}
  */
@@ -200,9 +176,8 @@ export function isChecksRoute(view) {
 }
 
 /**
- * The view the bare `checks` id redirects to: the FIRST AVAILABLE child, resolved from the same
- * builder the rail renders, so the two can never disagree about what "first available" means.
- *
+ * The view the bare `checks` id redirects to: the FIRST AVAILABLE child, from the same builder
+ * the rail renders, so the two cannot disagree about what "first available" means.
  * @param {object} [args] The same argument bag {@link buildChecksNavItems} takes.
  * @returns {string}
  */

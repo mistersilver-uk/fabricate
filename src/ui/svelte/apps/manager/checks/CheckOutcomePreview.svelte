@@ -1,18 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The Checks Studio's OUTCOME PREVIEW readout. It renders values already on the runner's own
-  result object and nothing else: the simulator drove the engine's runners and this panel reads
-  what came back, so a readout that disagreed with a real craft would need the engine to
-  disagree with itself. It shows a `Medallion` die face, the TERSE breakdown line, the total
+  result object and nothing else, so a readout that disagreed with a real craft would need the
+  engine to disagree with itself: a `Medallion` die face, the TERSE breakdown line, the total
   against the DC with its margin, the matched band card and a "What happens" list.
 
-  FOUR STATES THAT ARE NOT THE READOUT, each saying why: NO FORMULA (nothing to roll); DYNAMIC
-  DC (the engine resolves that DC by RUNNING the linked macro and a preview must not, so it
-  previews against the static fallback and states so — see `checkPreview.js` for why that is a
-  safety property); UNRESOLVED ROLL DATA (`Roll.parse`'s own `missing: "0"` turns an `@` key the
-  actor lacks into a plausible WRONG total, which "renders only values present on the result"
-  cannot catch because the wrong number IS on the result, so the signal is
-  `resolveCheckFormulaDisplay`'s `resolved === false`); and NO CHECK.
+  FOUR STATES THAT ARE NOT THE READOUT, each saying why: NO FORMULA; DYNAMIC DC, which the engine
+  resolves by RUNNING the linked macro and a preview must not, so it previews the static fallback
+  and states so; UNRESOLVED ROLL DATA, where `Roll.parse`'s `missing: "0"` turns an `@` key the
+  actor lacks into a plausible WRONG total that "renders only values present on the result"
+  cannot catch, the signal being `resolved === false`; and NO CHECK.
 -->
 <script>
   import IconFactRow from '../IconFactRow.svelte';

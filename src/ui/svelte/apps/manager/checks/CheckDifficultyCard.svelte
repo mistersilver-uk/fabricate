@@ -1,26 +1,17 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  DIFFICULTY — the number the roll is measured against, and where it comes from.
+  DIFFICULTY — the number the roll is measured against, and where it comes from. ITS OWN CARD
+  because the formula card answers "what is rolled" and this answers "what is it measured
+  against"; the second question inside the first card reads as part of the formula.
 
-  IT IS ITS OWN CARD because the formula card answers "what is rolled" and this one answers
-  "what is it measured against"; a control answering the second inside the card that answers the
-  first reads as part of the formula, which is how a GM comes to think the DC is a term in it.
+  `showDcSource` IS A MODEL FACT, NOT A PREFERENCE: the static/dynamic chooser writes `dcMode`
+  and `macroUuid`, and only the SIMPLE check slot carries those fields, so a routed check gets
+  the same card with `BASE DC` and `COMPARISON` alone rather than a chooser that cannot choose.
+  The record noun is a PROP, hard-coding one activity's word being how a gathering screen comes
+  to talk about recipes.
 
-  `showDcSource` IS A MODEL FACT, NOT A PREFERENCE. The static/dynamic chooser writes `dcMode`
-  and `macroUuid`, and only the SIMPLE check slot carries those fields — `CraftingSystemManager`
-  normalizes them on `simple` and `CraftingEngine` runs the macro for `simple.dcMode ===
-  'dynamic'`, where the routed slot has neither. So the chooser renders where the model can
-  honour it, and a routed check gets the same card with `BASE DC` and `COMPARISON` alone; the
-  pair on a routed check would be a chooser that does not choose.
-
-  The record noun is a PROP, because hard-coding one activity's word is how a gathering screen
-  comes to talk about recipes.
-
-  Props:
-   - dc / thresholdMode: the authored values.
-   - dcMode / showDcSource: the DC-source chooser, when the slot carries one.
-   - recordNoun: the activity's word for the thing a check is rolled for.
-   - onChange(patch): partial patch, merged by the parent into the whole check.
+  Props: dc / thresholdMode, the authored values; dcMode / showDcSource, the chooser;
+  recordNoun; onChange(patch), merged by the parent into the whole check.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';

@@ -1,25 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  FORMULA — what is rolled, and what a roll actually resolves to. Three parts, in order: the
-  INPUT with its leading dice glyph and right-aligned `avg N` reading; `WHAT ACTUALLY GETS
-  ROLLED`, an inset restating the formula with each applied check modifier as a chip plus one
-  sentence naming the rule that combines them; and the suggestion chips derived from the active
-  world. The DC and comparison are the `Difficulty` card's: this answers "what is rolled" and it
-  answers "what is it measured against".
+  FORMULA — what is rolled, and what a roll actually resolves to: the INPUT with its `avg N`
+  reading, the `WHAT ACTUALLY GETS ROLLED` inset, and the suggestion chips. The DC and comparison
+  are the `Difficulty` card's.
 
-  Part 2 is why a bare input was not enough. Check modifiers are added to the roll AUTOMATICALLY
-  and deliberately never appear in the formula text, so the field a GM types into is not the
-  expression the engine rolls; this says so IN the expression, the only place a GM can check it
-  against what they meant.
-
-  `avg` TAKES ROLL-DATA TERMS AS ZERO, AND SAYS SO. A roll-data path has no value on this
-  screen, so the average is of the DICE with every `@` term taken as zero and the reading carries
-  a title stating exactly that. Showing nothing was the alternative and is worse, almost every
-  real formula carrying an `@` term; an expression that cannot be reduced withholds the reading
-  rather than guessing. For the same reason THE RULE SENTENCE STOPS AT THE RULE: naming it is
-  the part that is true with no previewed actor.
-
-  Controlled: reads the formula and emits a partial patch through `onChange`.
+  The inset is why a bare input was not enough: check modifiers are added to the roll
+  AUTOMATICALLY and never appear in the formula text, so the field a GM types into is not the
+  expression the engine rolls. `avg` TAKES ROLL-DATA TERMS AS ZERO AND SAYS SO, a roll-data path
+  having no value on this screen; showing nothing is worse, almost every real formula carrying an
+  `@` term, and an expression that cannot be reduced withholds the reading rather than guessing.
+  For the same reason THE RULE SENTENCE STOPS AT THE RULE. Controlled through `onChange`.
 -->
 <script>
   import { getModifierExpressionSuggestions } from '../../../../../config/modifierExpressionSuggestions.js';

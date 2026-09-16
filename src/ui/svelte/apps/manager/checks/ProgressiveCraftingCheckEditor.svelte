@@ -1,11 +1,9 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Progressive crafting check editor. A progressive check rolls a FORMULA for a numeric value,
-  and progressive awarding spends that value against each result's difficulty in order until it
-  can no longer cover the next; the award mode decides exactly how the spend stops. There is no
-  DC, comparison or recipe tier — just the formula, the award mode and the unified
-  `CheckTriggers` editor, whose outcome select is relabelled for this numeric context.
-
+  Progressive crafting check editor. A progressive check rolls a FORMULA for a numeric value and
+  spends it against each result's difficulty in order, the award mode deciding how the spend
+  stops. There is no DC, comparison or recipe tier — just the formula, the award mode and the
+  unified `CheckTriggers` editor, whose outcome select is relabelled for this numeric context.
   Controlled: renders `value` (`{ awardMode, rollFormula, checkBreakage }`) and emits the next.
 -->
 <script>

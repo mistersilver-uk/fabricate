@@ -1,19 +1,14 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  Simple pass/fail crafting check editor (simple and alchemy resolution modes).
+  Simple pass/fail crafting check editor (simple and alchemy resolution modes). It rolls a
+  FORMULA and succeeds when the total reaches the DC, whose value is polymorphic: `static` takes
+  the default DC with optional named recipe TIERS, `dynamic` takes what a dropped macro returns,
+  and both sides persist so switching mode is non-destructive. The unified `CheckTriggers` editor
+  forces success or failure and, under `checkDriven`, breaks tools.
 
-  A simple check rolls a FORMULA and succeeds when the total reaches the DC. The DC value is
-  polymorphic — `static` takes the default DC with optional named recipe TIERS, `dynamic` hands
-  a dropped macro the ingredient set, recipe and actor and takes the DC it returns — and both
-  sides persist, so switching the DC mode is non-destructive. The unified `CheckTriggers` editor
-  lets each trigger force success or failure and, under `checkDriven` authority, break tools.
-
-  `showDcSource` (default true) renders the DC-SOURCE half: the static/dynamic chooser inside
-  the Difficulty card plus the recipe-tier table or the dynamic-DC macro card. Salvage and
-  gathering reuse this editor with `showDcSource={false}`, having no records to pick a tier from
-  and no dynamic-DC macro, and take a per-entity DC override elsewhere.
-
-  Controlled: renders `value` and emits the next value via `onChange`.
+  `showDcSource` (default true) renders the DC-SOURCE half. Salvage and gathering reuse this
+  editor with it off, having no records to pick a tier from and no dynamic-DC macro, and take a
+  per-entity DC override elsewhere. Controlled through `onChange`.
 -->
 <script>
   import Field from '../../../components/Field.svelte';

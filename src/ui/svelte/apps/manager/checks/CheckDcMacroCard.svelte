@@ -1,23 +1,17 @@
 <!-- Svelte 5 runes mode -->
 <!--
   THE DC MACRO — the card a check shows when its difficulty is computed rather than authored,
-  shared because the ROUTED check carries `dcMode`/`macroUuid` too: a routed relative check is
-  defined as bands offset from a DC, so it has one by construction. Two copies of a drop-zone
-  card would be two chances to drift on the one sentence telling a GM what their macro receives.
+  shared because the ROUTED check carries `dcMode`/`macroUuid` too: two copies would be two
+  chances to drift on the one sentence telling a GM what their macro receives.
 
-  The macro receives the ANCHOR DC — the record's selected difficulty tier, or the static default
-  — alongside the ingredients, the record, the system and the actor, and returns the final
-  number. Tiers and the macro therefore COMPOSE, which is why the difficulty tier list is NOT
-  hidden under dynamic.
+  The macro receives the ANCHOR DC — the record's selected tier, or the static default —
+  alongside the ingredients, the record, the system and the actor, and returns the final number,
+  so tiers and the macro COMPOSE and the tier list is NOT hidden under dynamic. A macro that
+  throws, returns a non-number or is missing falls back to the anchor and never throws mid-craft:
+  a throw inside the engine is a CONSUMING failure, so this card's copy promises what
+  `CraftingEngine._resolveSimpleCheckDc` guarantees.
 
-  A macro that throws, returns a non-number or is missing falls back to the anchor and never
-  throws mid-craft. That posture is not a nicety: a throw inside the engine is a CONSUMING
-  failure, ingredients already spent and tools already broken, so this card's copy promises what
-  `CraftingEngine._resolveSimpleCheckDc` actually guarantees.
-
-  Props:
-   - macroUuid: the linked macro, or null.
-   - onChange(patch): partial patch, merged by the parent into the whole check.
+  Props: macroUuid, the linked macro or null; onChange(patch), merged by the parent.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';

@@ -1,23 +1,15 @@
 /**
- * The Checks Studio's outcome-preview simulator.
+ * The Checks Studio's outcome-preview simulator. IT DRIVES THE ENGINE'S OWN RUNNERS AND
+ * REIMPLEMENTS NO RESOLUTION: a preview that disagreed with the engine about which tier a roll
+ * lands on would be worse than no preview, so tier matching, forced outcomes and tier stepping
+ * have one implementation, in `src/systems/checkRoll.js`.
  *
- * IT DRIVES THE ENGINE'S OWN RUNNERS AND REIMPLEMENTS NO RESOLUTION: everything here builds the
- * SAME argument bag the three engines build and hands it to `runFormulaPassFail` /
- * `runFormulaProgressive` / `runFormulaRouted`. A preview that disagreed with the engine about
- * which tier a roll lands on would be worse than no preview at all, so tier matching, forced
- * outcomes and tier stepping have exactly one implementation, in `src/systems/checkRoll.js`.
- *
- * What it must NOT do — mutate, post, prompt, or execute a DC macro — and why a dynamic DC
- * previews against the STATIC fallback are stated in `openspec/specs/ui-integration/spec.md` →
- * "Outcome-preview simulator". Two mechanisms carry those guarantees here:
- *
- * - `rollOptions: null` is load-bearing rather than decorative. All three runners SPREAD it into
- *   the `evaluateCheckRoll` options bag and `{...null}` is `{}`, the chat post is gated on
- *   `options?.interactive`, and the evaluation passes `allowInteractive: false`, which bypasses
- *   Foundry's manual-fulfilment resolver even on a client configured for it.
- * - `Actor#getRollData()` returns the LIVE `system` object, which Foundry's own docs warn must
- *   not be mutated. Nothing here writes to it, and {@link cloneRollData} exists for any caller
- *   that needs to augment it.
+ * What it must NOT do — mutate, post, prompt or execute a DC macro — is stated in
+ * `openspec/specs/ui-integration/spec.md` → "Outcome-preview simulator". Two mechanisms carry it:
+ * `rollOptions: null`, which the runners SPREAD into the options bag so the chat post's
+ * `options?.interactive` gate and `allowInteractive: false` both hold; and never writing to
+ * `Actor#getRollData()`'s LIVE `system` object, {@link cloneRollData} existing for a caller that
+ * needs to augment it.
  */
 
 import { isPlayerCharacterActor } from '../../../../../config/playerCharacterTypes.js';
@@ -43,15 +35,11 @@ const RUNNER_KINDS = new Map([
 ]);
 
 /**
- * The world's PLAYER-CHARACTER actors.
- *
- * THIS LIST IS FILTERED. Authority is not the question a preview picker answers — the question
- * is WHO A CHECK IS PREVIEWED AGAINST, and a crafting check is rolled by a character, where a
- * real world's actor directory is mostly bestiary. Membership is the shared, GM-CONFIGURABLE
- * player-character predicate that already serves the actor-selection bar, the stamina roster and
- * the Access and Knowledge rosters, so this screen gets no second, narrower answer.
- *
- * Both seams are injected so the list is testable without a `game`.
+ * The world's PLAYER-CHARACTER actors. THIS LIST IS FILTERED: authority is not the question a
+ * preview picker answers — the question is WHO A CHECK IS PREVIEWED AGAINST, and a real world's
+ * actor directory is mostly bestiary. Membership is the shared, GM-CONFIGURABLE predicate that
+ * already serves the actor-selection bar and the stamina, Access and Knowledge rosters. Both
+ * seams are injected so the list is testable without a `game`.
  *
  * @param {object} [options] Options.
  * @param {() => Iterable<object>} [options.getActors] The actor source.
@@ -76,9 +64,9 @@ export function listPreviewActors({
 }
 
 /**
- * The previewed actor document, or null for the "No actor" selection. Under null every `@` key
- * resolves to `0`, which is precisely why the readout renders its unresolved warning there
- * rather than a total: a plausible wrong number is the failure that warning exists for.
+ * The previewed actor document, or null for "No actor". Under null every `@` key resolves to
+ * `0`, which is why the readout renders its unresolved warning rather than a plausible wrong
+ * total.
  *
  * @param {string} id The selected actor id, or {@link NO_ACTOR_ID}.
  * @param {object} [options] Options.
@@ -106,15 +94,11 @@ export function cloneRollData(actor) {
 }
 
 /**
- * The records a check can be previewed AGAINST: whatever supplies the DC this check is measured
- * against for one subject, which for a simple or relative-routed check is its OWN authored
- * recipe tiers. The check's default DC is always offered first, so a system that has authored no
- * tiers still has something to preview against. A FIXED routed check's bands are the same for
- * every record, and the selector still lists them, because the readout and the "What happens"
- * rows are per-record even where the bands are not.
- *
- * A RECORD SUPPLIES A DC AND NOTHING ELSE. A progressive check has no DC, and its award count
- * comes from the check's own preview sandbox — see `src/systems/progressiveCheckSandbox.js`.
+ * The records a check can be previewed AGAINST: whatever supplies the DC, which for a simple or
+ * relative-routed check is its OWN authored recipe tiers, the default DC always offered first. A
+ * FIXED routed check's bands are the same for every record and the selector still lists them,
+ * the readout and the "What happens" rows being per-record. A RECORD SUPPLIES A DC AND NOTHING
+ * ELSE: a progressive check has none, its award count coming from the check's preview sandbox.
  *
  * @param {object} params Params.
  * @param {object|null} params.check The active check draft.
@@ -143,29 +127,21 @@ export function buildPreviewRecords({ check, defaultLabel = 'Default' }) {
 }
 
 /**
- * Build the argument bag the engines build, for one previewed (activity, mode, record,
- * actor) tuple.
+ * Build the argument bag the engines build, for one previewed (activity, mode, record, actor).
  *
  * @param {object} params Params.
  * @param {'crafting'|'salvage'|'gathering'} params.activity Which activity's check.
  * @param {'simple'|'routed'|'progressive'} params.mode The readiness mode.
  * @param {object|null} params.draft The active check draft.
  * @param {object|null} params.system The draft system, for the modifier context.
- * @param {object|null} [params.subject] The subject the modifier context resolves
- *   against. Always null on this route: the Studio validates the SYSTEM's selection.
+ * @param {object|null} [params.subject] The modifier context's subject; always null here, the
+ *   Studio validating the SYSTEM's selection.
  * @param {object|null} [params.actor] The previewed actor, or null for "No actor".
  * @param {object|null} [params.record] The previewed record.
- * @param {Array<{value: number, label: string}>} [params.toolTerms] Tool contributions.
- *   Crafting and salvage have that seam and gathering does not; a preview selects no ingredient
- *   set, so this is empty in the product and exists so the seam is real rather than assumed.
- * @returns {{
- *   kind: 'passFail'|'routed'|'progressive'|null,
- *   formula: string,
- *   dc: number,
- *   dynamicDc: boolean,
- *   actor: object|null,
- *   args: object,
- * }} `kind: null` means this mode rolls nothing.
+ * @param {Array<{value: number, label: string}>} [params.toolTerms] Tool contributions, which
+ *   gathering has no seam for and which a preview never populates.
+ * @returns {{kind: 'passFail'|'routed'|'progressive'|null, formula: string, dc: number,
+ *   dynamicDc: boolean, actor: object|null, args: object}} `kind: null` means nothing rolls.
  */
 export function buildPreviewCheckArgs({
   activity,
@@ -179,13 +155,12 @@ export function buildPreviewCheckArgs({
 }) {
   const kind = RUNNER_KINDS.get(mode) ?? null;
   const authored = String(draft?.rollFormula ?? '').trim();
-  // Crafting and salvage append tool bonus terms before the roll and gathering has no such
-  // seam, so this branch is about which activities HAVE it rather than about the data.
+  // This branch is about which activities HAVE the tool-bonus seam, not about the data.
   const formula =
     activity === 'gathering' ? authored : appendToolBonusTerms(authored, toolTerms ?? []);
 
-  // A dynamic DC is resolved by RUNNING a macro. The preview refuses to, and falls back to the
-  // authored static DC — the same value the engine's own try/catch falls back to.
+  // A dynamic DC is resolved by RUNNING a macro; the preview refuses to and falls back to the
+  // static DC, the same value the engine's own try/catch falls back to.
   const dynamicDc = draft?.dcMode === 'dynamic';
   const recordDc = Number(record?.dc);
   const authoredDc = Number(draft?.dc ?? 0);
@@ -200,8 +175,8 @@ export function buildPreviewCheckArgs({
     formula,
     triggers,
     actor,
-    // `rollOptions: null` — see the module header. Stated rather than omitted, because an
-    // explicit null is what a reader can check the "posts nothing, prompts nothing" claim against.
+    // `rollOptions: null` — see the module header. Stated rather than omitted, so a reader can
+    // check the "posts nothing, prompts nothing" claim against it.
     rollOptions: null,
     craftingModifier,
   };
@@ -224,11 +199,10 @@ export function buildPreviewCheckArgs({
         type: draft?.type === 'fixed' ? 'fixed' : 'relative',
         relativeOutcomes: Array.isArray(draft?.relativeOutcomes) ? draft.relativeOutcomes : [],
         fixedOutcomes: Array.isArray(draft?.fixedOutcomes) ? draft.fixedOutcomes : [],
-        // Every routed caller in the product opts in, so a preview that did not would report
-        // a rolled-but-unrouted total no craft can produce.
+        // Every routed caller opts in, so a preview that did not would report a
+        // rolled-but-unrouted total no craft can produce.
         clampToNearest: true,
-        // A recipe's minimum success tier, which no record here carries; stated rather than
-        // omitted so the arg bag is the engine's whole shape.
+        // A recipe's minimum success tier, stated so the arg bag is the engine's whole shape.
         minOutcomeId: null,
       },
     };
@@ -251,10 +225,8 @@ export function buildPreviewCheckArgs({
 /**
  * Roll the preview through the engine's own runner.
  *
- * @param {{kind: string|null, args: object}} plan The output of
- *   {@link buildPreviewCheckArgs}.
- * @returns {Promise<object|null>} The runner's own result object, verbatim. Null when
- *   the mode rolls nothing or no formula is authored.
+ * @param {{kind: string|null, args: object}} plan {@link buildPreviewCheckArgs}'s output.
+ * @returns {Promise<object|null>} The runner's own result verbatim, or null when nothing rolls.
  */
 export async function runCheckPreview(plan) {
   if (!plan?.kind || String(plan.formula ?? '').trim() === '') return null;
@@ -264,9 +236,9 @@ export async function runCheckPreview(plan) {
 }
 
 /**
- * The TERSE breakdown line the readout shows. It is NOT the full resolved formula, which is the
- * `THIS CHECK` digest's job, so it reduces the result to the die faces actually rolled, the
- * signed remainder they were added to, and who rolled them.
+ * The TERSE breakdown line the readout shows — NOT the full resolved formula, which is the
+ * `THIS CHECK` digest's job — so it reduces the result to the faces rolled, the signed remainder
+ * they were added to, and who rolled them.
  *
  * @param {object|null} result A runner result.
  * @param {string} [actorName] The previewed actor's name.

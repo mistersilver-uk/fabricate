@@ -1,23 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <!--
   The Checks Studio's CHANCE PER OUTCOME histogram. It renders the enumeration `checkOdds.js`
-  computed, computes nothing itself and rolls nothing, so every bar is a real share of a fully
-  enumerated outcome space.
+  computed and rolls nothing, so every bar is a real share of a fully enumerated space.
 
-  THE `all N faces` CAPTION IS NOT DRAWN HERE: the rail section's heading row carries a
-  right-aligned adjunct and that is where the domain reads. A second copy inside the card would
-  put one sentence on screen twice and — the head's own fallback being a regex over the AUTHORED
-  formula — the two could disagree.
-
-  IT ABSTAINS LOUDLY. A formula outside the enumerable shape renders a STATED note naming the
-  reason and never an approximation: a histogram that lies is worse than one that abstains, and
-  each reason has its own sentence so "why is there no chart" is answerable from the panel.
-
-  BARS ARE `FillBar`, FLAT. `openspec/specs/ui-integration/spec.md` → "Shared product UI
-  primitives" records the hand-rolled fill bars as a live non-conformance and names `FillBar` as
-  the fix. It is a LEAF with no `role` and no `aria-*`, so the row is announced as an ordinary
-  label/value pair with the bar decorative. No gradient: the band strip's full-track semantic
-  scale is the only exemption that requirement grants.
+  THE `all N faces` CAPTION IS NOT DRAWN HERE: the rail section's heading row carries it, and a
+  second copy could disagree, the head's own fallback being a regex over the AUTHORED formula. IT
+  ABSTAINS LOUDLY, a formula outside the enumerable shape rendering a STATED note naming the
+  reason rather than an approximation. BARS ARE `FillBar`, FLAT, per
+  `openspec/specs/ui-integration/spec.md` → "Shared product UI primitives"; it is a LEAF with no
+  `role` and no `aria-*`, so a row announces as a label/value pair with the bar decorative. No
+  gradient: the band strip's full-track semantic scale is that requirement's only exemption.
 -->
 <script>
   import FillBar from '../../../components/FillBar.svelte';

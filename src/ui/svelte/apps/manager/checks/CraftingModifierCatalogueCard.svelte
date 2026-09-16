@@ -4,19 +4,16 @@
 
   A crafting system defines ONE named modifier library, authored in ONE place, which this card
   deep-links to. THIS CARD AUTHORS NO ENTRY, ON ANY ACTIVITY: two editors for one array is how
-  two screens come to disagree about which wrote last. What stays here is the SELECTION, which is
-  genuinely per-activity — the COMBINATION RULE (`defaultModifierPolicy`), the PICK CAP
-  (`maxModifierPicks`, where ABSENT is a real value meaning unlimited) and the DEFAULT ELIGIBLE
-  SET (`defaultModifierIds`). `MODIFIER_POLICIES` and `policyDefersSelection` in the resolver are
+  two screens come to disagree about which wrote last. What stays is the SELECTION — the
+  COMBINATION RULE, the PICK CAP (where ABSENT is a real value meaning unlimited) and the
+  DEFAULT ELIGIBLE SET — with `MODIFIER_POLICIES` and `policyDefersSelection` in the resolver as
   the sources for the rule list, its order and which two rules defer.
 
   The two cards, the six-label eligibility vocabulary, where the rule-keyed description sits, the
-  2x2-to-1x4 reflow and the single empty-library sentence are all required by
+  reflow and the single empty-library sentence are required by
   `openspec/specs/ui-integration/spec.md` → "Checks studio — combination rule and pick cap".
-
-  Rendered for every sub-tab, INCLUDING the ones where the library cannot reach a roll, because a
-  library that silently does nothing is the defect this card must report rather than hide.
-  Controlled: it emits a partial SELECTION patch and cannot emit a library patch at all.
+  Rendered for every sub-tab, INCLUDING those where the library reaches no roll, which is the
+  defect this card must report rather than hide. Controlled, and it emits no library patch.
 -->
 <script>
   import Field from '../../../components/Field.svelte';
@@ -587,46 +584,37 @@
 </InspectorCard>
 
 <style>
-  /* The card is its OWN container-query context. The shipped `@container (max-width: 620px)`
-     rule that reflows a `.is-config-cards` radio grid is UNNAMED, so it resolves against the
-     NEAREST container — the whole `fabricate-manager` shell — and fired only when the entire
-     manager was narrow. Declaring the container here makes it measure this card.
+  /* The card is its OWN container-query context. The shipped `@container (max-width: 620px)` rule
+       that reflows a `.is-config-cards` radio grid is UNNAMED, so it resolves against the NEAREST
+       container — the whole `fabricate-manager` shell — and fired only when the entire manager was
+       narrow. Declaring the container here makes it measure this card.
 
-     `:global()` AND ANCHORED ON THE TWO CARDS' OWN HOOKS: both cards are `<InspectorCard>`s, so
-     `manager-inspector-card` is written by that primitive and a scoped rule stopped matching —
-     SILENTLY, because an `<i class={…}>` in this component makes every class selector in the
-     block possibly-matching, so it was emitted with the hash attached and
-     `lint:svelte:warnings` reported nothing. Measured against Svelte 5.56.3: a REGULAR element
-     carrying a spread or an expression `class` does that, and the same attribute on a COMPONENT
-     tag does not.
+       `:global()` AND ANCHORED ON THE TWO CARDS' OWN HOOKS: both cards are `<InspectorCard>`s, so
+       `manager-inspector-card` is written by that primitive and a scoped rule stopped matching —
+       SILENTLY, because an `<i class={…}>` in this component makes every class selector in the
+       block possibly-matching, so it was emitted with the hash attached and `lint:svelte:warnings`
+       reported nothing. Measured against Svelte 5.56.3: a REGULAR element carrying a spread or an
+       expression `class` does that, and the same attribute on a COMPONENT tag does not.
 
-     Anchored on the two `data-` hooks rather than on the `.manager-checks-card` modifier the
-     cards share, because that modifier has eleven other sites across seven components and
-     `container-type` creates a containment context rather than painting — widening it would
-     silently re-point every unnamed `@container` query inside all of them, which is this
-     block's own defect inverted. An attribute weighs the same as a class, so each half stays
-     at (0,2,0) and the two match exactly the elements the scoped form matched. */
+       Anchored on the two `data-` hooks rather than the `.manager-checks-card` modifier the cards
+       share, because that modifier has eleven other sites and `container-type` creates a
+       containment context rather than painting — widening it would re-point every unnamed
+       `@container` query inside all of them. Each half stays at (0,2,0). */
   :global(.manager-inspector-card[data-crafting-modifier-catalogue]),
   :global(.manager-inspector-card[data-crafting-modifier-policy-card]) {
     container-type: inline-size;
   }
 
   /* THE ROW'S CHIPS ARE `Chip` AT `density="row"`, NOT STYLED HERE. Restating the row scale's
-     GEOMETRY here RENDERS correctly — this block and `Chip.svelte`'s own scoped block are both
-     unlayered, where `styles/fabricate.css` imports at `layer(modules)` and could never win, so
-     ordinary specificity decides it and a local four-class rule beats the primitive's own. That
-     is exactly the problem: a second, correctly-rendering implementation of one chip's geometry
-     is what `manager-layout.test.js`'s hand-rolled-chip ratchet greps every non-primitive file
-     for. Rendering right was never the bar; one owner is.
+       GEOMETRY here RENDERS correctly — this block and `Chip.svelte`'s own scoped block are both
+       unlayered, where `styles/fabricate.css` imports at `layer(modules)` and could never win, so
+       ordinary specificity decides it and a local four-class rule beats the primitive's own. That
+       is exactly the problem, and it is what `manager-layout.test.js`'s hand-rolled-chip ratchet
+       greps every non-primitive file for: rendering right was never the bar, one owner is.
 
-     What stays here is layout CONTEXT rather than the chip's geometry: `flex: 0 0 auto` keeps
-     both chips from shrinking below their content, which is a property of this row's flex
-     layout.
-
-     RE-ANCHORED ON THE CARD, for the reason the rule above records: the row moved into
-     `ModifierLibraryRow`, so `.manager-modifier-readonly-row` carries THAT component's hash and
-     the scoped ancestor half stopped matching. Anchored on this card's own hook, each half
-     stays at the (0,3,0) the scoped form had. */
+       What stays here is layout CONTEXT rather than the chip's geometry. RE-ANCHORED ON THE CARD
+       for the reason the rule above records: the row moved into `ModifierLibraryRow`, so its class
+       carries THAT component's hash. Each half stays at the (0,3,0) the scoped form had. */
   :global(.manager-inspector-card[data-crafting-modifier-catalogue] .manager-modifier-bounds-chip),
   :global(.manager-inspector-card[data-crafting-modifier-catalogue] .manager-modifier-roll-chip) {
     flex: 0 0 auto;

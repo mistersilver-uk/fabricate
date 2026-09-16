@@ -1,22 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  The Checks Studio's five-SECTION strip for whichever activity route is open, and a THIN CALLER
-  of the promoted `EditorTabs` primitive: this file owns the section-to-tab mapping, the
+  The Checks Studio's five-SECTION strip for whichever activity route is open, a THIN CALLER of
+  the promoted `EditorTabs` primitive: this file owns the section-to-tab mapping, the
   `checks-section-*` / `checks-panel-*` id stems, the `data-checks-*` hooks and the issue count's
-  localized unit, while the primitive owns the strip, the keyboard contract and every mark.
+  localized unit, and the primitive owns the strip, the keyboard contract and every mark.
 
-  Each section carries two INDEPENDENT markers, per `openspec/specs/ui-integration/spec.md` →
-  "GM Checks Studio": a COUNT mark for how many things are authored here, which a section with
-  nothing to count renders NOT AT ALL rather than as a zero — so `null` and `0` read the same,
-  unmarked, while the number stays this component's own derivation — and a WARNING dot carrying
-  a TEXT accessible name naming the unit. A section may carry both at once, and both are fed
-  from the SAME readiness pass the rail badge and the Validation route read.
-
-  Only the SELECTED tab carries `aria-controls`, which is `EditorTabs`'s `activePanelOnly` mode:
-  this strip renders one panel at a time, so the other four would be IDREFs to nowhere.
-
-  The parent decides membership — an inapplicable section is simply absent from `sections`, and
-  an OFF check collapses the strip to one entry — so this component does not know the modes.
+  Each section carries two INDEPENDENT markers per `openspec/specs/ui-integration/spec.md` → "GM
+  Checks Studio": a COUNT mark, which a section with nothing to count renders NOT AT ALL rather
+  than as a zero, so `null` and `0` read the same; and a WARNING dot carrying a TEXT accessible
+  name. Only the SELECTED tab carries `aria-controls` — `activePanelOnly` — this strip rendering
+  one panel at a time. The parent decides membership, so this does not know the modes.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';

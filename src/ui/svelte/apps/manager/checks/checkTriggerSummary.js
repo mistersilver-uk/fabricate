@@ -3,14 +3,13 @@
  * one sentence under it stating its effect. A card headed by the label of its first `<select>`
  * made a list of three triggers read `When`, `When`, `When`.
  *
- * COMPOSED FROM FRAGMENTS, NOT WRITTEN PER SHAPE. Five condition types, five aggregates, five
- * operators and three independent effects is hundreds of strings as a sentence per combination,
- * so both readings are composed from a small fragment set — and the composition is PURE, so
+ * COMPOSED FROM FRAGMENTS, NOT WRITTEN PER SHAPE — a sentence per combination of five condition
+ * types, five aggregates, five operators and three effects is hundreds of strings — and PURE, so
  * `tests/check-trigger-summary.test.js` pins every shape without mounting anything. Each
- * function returns `{ key, fallback, data }` for the caller's own `text()` bridge to resolve.
+ * function returns `{ key, fallback, data }` for the caller's `text()` bridge.
  *
- * IT DESCRIBES; IT NEVER DECIDES. Nothing here reads or writes a trigger, and every value it
- * states is read straight off the same `condition` object the controls under it bind to.
+ * IT DESCRIBES; IT NEVER DECIDES: every value it states is read straight off the same
+ * `condition` object the controls under it bind to.
  */
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Breakage.';
@@ -179,22 +178,20 @@ export function summariseEffect(trigger = {}, context = {}) {
 
 /**
  * WHAT THE COLLAPSED HEAD SHOWS. A trigger list collapses, so the head carries the effect at a
- * glance: a glyph tile and a short result chip beside the condition sentence. Every effect shape
- * gets that treatment, each taking the glyph and semantic family its own vocabulary already uses
- * elsewhere in this manager.
+ * glance — a glyph tile and a short result chip beside the condition sentence — and every effect
+ * shape gets that treatment in the glyph and family its own vocabulary already uses.
  *
  * ONE effect wins the head even when a trigger carries several, in this order: a tier step is
- * the most specific statement about the result, a forced outcome the next, a bare tool break the
- * last. The full combination is still stated in prose by `summariseEffect` under the title.
+ * the most specific statement about the result, a forced outcome next, a bare tool break last.
+ * The full combination is still stated in prose by `summariseEffect` under the title.
  *
  * @param {object} trigger The whole trigger.
  * @param {object} [context]
  * @param {Record<string, string>} [context.tierNames] Outcome tier names by id.
  * @param {boolean} [context.progressive] Whether this check awards rather than passes.
  * @param {boolean} [context.showBreakTools] Whether tool breakage is authored on this check.
- * @returns {{glyph: string, tone: string, chip: ({key: string, fallback: string, data: object}|null)}}
- *   `chip` is null when nothing is in force — a trigger that changes nothing states that in its
- *   own prose line and does not need a chip repeating it.
+ * @returns {{glyph: string, tone: string, chip: (object|null)}} `chip` is null when nothing is
+ *   in force, a trigger that changes nothing stating that in its own prose line.
  */
 export function summariseHeadline(trigger = {}, context = {}) {
   const { tierNames = {}, progressive = false, showBreakTools = false } = context;

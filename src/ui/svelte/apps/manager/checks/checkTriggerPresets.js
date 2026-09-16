@@ -1,24 +1,17 @@
 /**
- * ADD A COMMON TRIGGER — the conditions almost every system writes.
+ * ADD A COMMON TRIGGER — the conditions almost every system writes. Authoring one by hand needs
+ * the dice-group and condition vocabulary first, and a row of one-click presets teaches it by
+ * example: the trigger appears fully authored and every control on it is then legible.
  *
- * Authoring a trigger by hand requires knowing the dice-group and condition vocabulary first:
- * which group, which aggregate, which operator, and then which of three independent effects. A
- * row of one-click presets above the list teaches that vocabulary by example — the trigger
- * appears fully authored, and every control on it is then legible.
- *
- * A PRESET PRODUCES AN ORDINARY TRIGGER. No marker field, no preset id, nothing downstream
- * treating it differently, and that is a hard rule: the moment a preset produced something
+ * A PRESET PRODUCES AN ORDINARY TRIGGER — no marker field, no preset id, nothing downstream
+ * treating it differently — and that is a hard rule: the moment a preset produced something
  * special, the engine, the readiness pass and the summariser would each need to know about it.
- * `buildPresetTrigger` therefore returns exactly the shape `CheckTriggers.addTrigger` returns.
  *
- * THEY ADAPT TO WHAT THE CHECK CAN DO. A tier step is meaningless with no tiers and an
- * automatic success is meaningless on a check that awards rather than passes, so the effect is
- * chosen from the check's own `kind` — and the presets are withheld entirely when the formula
- * rolls no dice, a preset offered against a formula with no die authoring a condition pointing
- * at a group that does not exist.
+ * THEY ADAPT TO WHAT THE CHECK CAN DO, the effect being chosen from the check's own `kind`, and
+ * are withheld entirely when the formula rolls no dice, a preset offered against a formula with
+ * no die authoring a condition pointing at a group that does not exist.
  *
- * Pure: no Svelte, no Foundry. `tests/check-trigger-presets.test.js` pins the exact trigger each
- * preset authors.
+ * Pure. `tests/check-trigger-presets.test.js` pins the exact trigger each preset authors.
  */
 
 const NAMESPACE = 'FABRICATE.Admin.Manager.Checks.Breakage.';

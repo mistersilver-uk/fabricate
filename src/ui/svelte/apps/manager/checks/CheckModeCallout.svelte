@@ -1,22 +1,15 @@
 <!-- Svelte 5 runes mode -->
 <!--
-  WHAT THIS MODE DOES — the roll section's opening callout: a dice glyph in a rounded tile, the
-  mode's name, one paragraph explaining what that mode does with a roll, and a facts row under
-  it. MODE-AWARE for every mode the product renders, the copy and the three facts coming from
-  the pure `checkModeCallout.js`, which is proven exhaustive against the reachable pairs.
+  WHAT THIS MODE DOES — the roll section's opening callout: a dice glyph, the mode's name, one
+  paragraph on what it does with a roll, and a facts row. MODE-AWARE for every mode the product
+  renders, from the pure `checkModeCallout.js`, which is proven exhaustive.
 
   Not the shared `Callout`, and what still separates the two is the FACT ROW: a run of
-  label/value facts is an `InfoStrip`, deferred while it has one qualifying caller in the tree,
-  and a paragraph plus a fact list under one title is two shapes wearing one name. When the
-  strip ships, this block is a `Callout` composing one.
+  label/value facts is an `InfoStrip`, deferred while it has one qualifying caller, and a
+  paragraph plus a fact list under one title is two shapes wearing one name.
 
-  DORMANT modes render the same shape with the shipped dormancy sentence and a clock glyph, so a
-  GM whose world already carries one is told it is not in use rather than shown a live
-  configuration.
-
-  Props:
-   - activity / mode / alchemyCheckMode: what to describe.
-   - outcomeCount: authored outcome tiers, for the `{count} tiers` fact.
+  DORMANT modes render the same shape with the shipped dormancy sentence and a clock glyph.
+  Props: activity / mode / alchemyCheckMode; outcomeCount, for the `{count} tiers` fact.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';

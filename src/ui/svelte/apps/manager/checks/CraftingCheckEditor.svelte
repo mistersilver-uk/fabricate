@@ -4,15 +4,13 @@
 
   A routed crafting check has a TYPE (relative or fixed), a roll FORMULA with a default DC and
   comparison shared with the simple check, the unified `CheckTriggers` editor, and a table of
-  OUTCOME TIERS — relative tiers expressed as offsets from the record's DC, fixed tiers owning a
-  non-overlapping start/end segment of the formula's value range. Every outcome has a name, a
-  generated secret id, a success toggle and, under `checkDriven` authority, a break-tools toggle.
-  BOTH the relative DC and the fixed start/end are kept on each outcome, so switching type never
-  destroys the other mode's values.
+  OUTCOME TIERS — relative tiers as offsets from the record's DC, fixed tiers owning a
+  non-overlapping segment of the value range. Every outcome has a name, a generated secret id, a
+  success toggle and, under `checkDriven`, a break-tools toggle, and BOTH the relative DC and the
+  fixed start/end are kept on each, so switching type destroys neither.
 
   It reuses the shared check sub-components so routed and simple stay structurally identical.
-  Controlled: renders `value`, emits the next value through `onChange`; range parsing lives in
-  `utils/craftingCheckExpression.js`.
+  Controlled; range parsing lives in `utils/craftingCheckExpression.js`.
 -->
 <script>
   import { localize } from '../../../util/foundryBridge.js';
@@ -188,30 +186,25 @@
 
   // THE BAND STRIP is a VISUALISATION of the tier list; the steppers in the rows stay the
   // control of record. Bands are handed over in ABSOLUTE track values whatever the type
-  // underneath, relative offsets being resolved against the previewed DC here, because a strip
-  // reading two authored shapes would be two components wearing one name. Band identity is a
-  // THEME TOKEN rather than a persisted colour, and the strip's `color` prop takes the value
-  // verbatim, so an authored swatch can replace this later with no strip change.
+  // underneath, relative offsets resolved against the previewed DC here, a strip reading two
+  // authored shapes being two components wearing one name. Band identity is a THEME TOKEN
+  // rather than a persisted colour, and the `color` prop takes the value verbatim.
   //
   // FIVE HUES, WALKED BY POSITION IN VALUE ORDER, and NOT by the `success` flag: a flag has two
   // values, so a flag-derived colour paints two of a five-tier check's bands identically, and
   // ranking WITHIN each family reads worse still — a lone failure tier takes its family's
   // strongest tone, putting the darkest band in the MIDDLE. One ramp across the whole list is
-  // what makes the strip read left-to-right as escalating, and it need not restate the
-  // success/failure split, which every tier row's own pill already carries.
+  // what makes the strip read as escalating, and it need not restate the success/failure split
+  // that every tier row's own pill already carries.
   //
-  // PREVIEW AGAINST is the record the bands are DRAWN against, the bands' own control in their
-  // own card; the rail's separate "Preview as" chooses an ACTOR, and conflating the two
-  // subjects is what left this one missing. NEVER PERSISTED — choosing a record to look at is
-  // not an edit to the system — but not LOCAL either where a route owns it: the rail's
-  // simulator and histogram read the SAME record, so a second copy here would let the strip and
-  // the readout beside it describe different records on one screen. A route supplying
-  // `previewRecords` is the authority and this control reports upward; otherwise the local
-  // fallback below keeps it live. Exactly one of the two is ever read.
+  // PREVIEW AGAINST is the record the bands are DRAWN against, in their own card; the rail's
+  // separate "Preview as" chooses an ACTOR. NEVER PERSISTED — choosing a record to look at is not
+  // an edit — but not LOCAL either where a route owns it, the rail's simulator and histogram
+  // reading the SAME record. A route supplying `previewRecords` is the authority and this control
+  // reports upward; otherwise the local fallback below keeps it live, and exactly one is read.
   //
-  // WITHHELD ONLY WHERE THE BANDS HAVE NO ANCHOR — `bandsAreAbsolute`, the one named gate all
-  // three anchored surfaces read — because a control offering to re-anchor absolute roll values
-  // would be a promise the model cannot keep.
+  // WITHHELD ONLY WHERE THE BANDS HAVE NO ANCHOR — `bandsAreAbsolute` — a control offering to
+  // re-anchor absolute roll values being a promise the model cannot keep.
   let localPreviewRecordId = $state('');
   const recipeTiers = $derived(Array.isArray(value?.tiers) ? value.tiers : []);
   const routeOwnsPreview = $derived(previewRecords.length > 0);
