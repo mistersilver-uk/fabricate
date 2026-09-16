@@ -251,6 +251,6 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // 126 after merging origin/main, which condensed 38 component headers and took Chip and
   // IconButton back under the .svelte threshold -- two of this branch's entries removed by
   // someone else's work rather than by ours.
-  assert.equal(files, 126, 'oversized files');
-  assert.equal(keys.length - files, 124, 'oversized functions');
+  assert.equal(files, 125, 'oversized files');
+  assert.equal(keys.length - files, 123, 'oversized functions');
 });
