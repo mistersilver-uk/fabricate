@@ -251,6 +251,10 @@ test('the ledger reports the two figures epic 1656 tracks', (t) => {
   // 126 after merging origin/main, which condensed 38 component headers and took Chip and
   // IconButton back under the .svelte threshold -- two of this branch's entries removed by
   // someone else's work rather than by ours.
+  // 120 after the issue-1683 comment sweep of the crafting and gathering engines and the two
+  // managers: `_validateTools`, `_normalizeSalvage`, `_terminalStart` and
+  // `evaluateShoppingRequirement` fell back under the function threshold on comment lines alone.
+  // The file count is unchanged, because all four swept files are still oversized.
   assert.equal(files, 126, 'oversized files');
-  assert.equal(keys.length - files, 124, 'oversized functions');
+  assert.equal(keys.length - files, 120, 'oversized functions');
 });
